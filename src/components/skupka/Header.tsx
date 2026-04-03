@@ -30,7 +30,10 @@ const Header = ({ scrollTo }: HeaderProps) => {
           <div className="w-10 h-10 bg-[#FFD700] flex items-center justify-center">
             <span className="font-oswald font-bold text-black text-sm leading-none">С24</span>
           </div>
-          <span className="font-oswald font-bold text-xl tracking-wider text-[#FFD700]">СКУПКА24</span>
+          <div>
+            <span className="font-oswald font-bold text-xl tracking-wider text-[#FFD700]">СКУПКА24</span>
+            <div className="font-roboto text-white/40 text-[10px] leading-tight">Кирова 7/47 · Кирова 11</div>
+          </div>
         </div>
 
         <nav className="hidden lg:flex items-center gap-6">

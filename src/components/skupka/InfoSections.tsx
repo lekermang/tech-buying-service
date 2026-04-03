@@ -28,8 +28,8 @@ const GUARANTEES = [
 ];
 
 const BRANCHES = [
-  { city: "Филиал 1", addr: "ул. Кирова, 11", metro: "", time: "10:00 — 21:00", phone: "+7 (992) 999-03-33" },
-  { city: "Филиал 2", addr: "ул. Кирова, 7/47", metro: "", time: "10:00 — 21:00", phone: "8 (800) 600-68-33" },
+  { city: "Филиал 1", addr: "ул. Кирова, 11", metro: "", time: "24/7", phones: ["+7 (992) 999-03-33", "8 (800) 600-68-33"] },
+  { city: "Филиал 2", addr: "ул. Кирова, 7/47", metro: "", time: "24/7", phones: ["+7 (992) 999-03-33", "8 (800) 600-68-33"] },
 ];
 
 const InfoSections = () => {
@@ -142,10 +142,12 @@ const InfoSections = () => {
                     <Icon name="Clock" size={14} className="text-[#FFD700] shrink-0" />
                     <span className="font-roboto text-white/70 text-sm">{b.time}</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Icon name="Phone" size={14} className="text-[#FFD700] shrink-0" />
-                    <a href={`tel:${b.phone.replace(/\D/g, '')}`} className="font-roboto text-white/70 text-sm hover:text-[#FFD700] transition-colors">{b.phone}</a>
-                  </div>
+                  {b.phones.map(phone => (
+                    <div key={phone} className="flex items-center gap-2">
+                      <Icon name="Phone" size={14} className="text-[#FFD700] shrink-0" />
+                      <a href={`tel:${phone.replace(/\D/g, '')}`} className="font-roboto text-white/70 text-sm hover:text-[#FFD700] transition-colors">{phone}</a>
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}
