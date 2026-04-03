@@ -199,7 +199,7 @@ const InfoSections = () => {
               <p className="font-roboto text-white/50 text-sm">Смотрите наши объявления и отзывы покупателей</p>
             </div>
           </div>
-          <a href="https://avito.ru" target="_blank" rel="noopener noreferrer"
+          <a href="https://www.avito.ru/brands/skupka24kirova7" target="_blank" rel="noopener noreferrer"
             className="border-2 border-[#00AAFF] text-[#00AAFF] font-oswald font-bold px-6 py-3 uppercase tracking-wide hover:bg-[#00AAFF] hover:text-white transition-colors">
             Открыть на Авито
           </a>
