@@ -49,6 +49,7 @@ const Index = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [formData, setFormData] = useState({ name: "", phone: "", category: "", desc: "" });
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoBase64, setPhotoBase64] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +59,11 @@ const Index = () => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = ev => setPhotoPreview(ev.target?.result as string);
+      reader.onload = ev => {
+        const result = ev.target?.result as string;
+        setPhotoPreview(result);
+        setPhotoBase64(result.split(',')[1]);
+      };
       reader.readAsDataURL(file);
     }
   };
@@ -71,7 +76,7 @@ const Index = () => {
       const res = await fetch(SEND_LEAD_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ ...formData, photo: photoBase64 }),
       });
       if (!res.ok) throw new Error("Ошибка отправки");
       setSubmitted(true);
