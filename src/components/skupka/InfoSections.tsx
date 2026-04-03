@@ -180,9 +180,9 @@ const InfoSections = () => {
               <div className="absolute top-0 right-0 w-1/2 h-1 bg-[#FFD700]" />
               <div className="absolute bottom-0 left-0 w-1/2 h-1 bg-[#FFD700]" />
               <img
-                src="https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/47a9e726-1666-459a-824f-d2c990b98092.jpg"
+                src="https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/a1949b69-d0e9-4258-a070-4865807b102b.jpg"
                 alt="О компании"
-                className="w-full h-80 object-cover relative grayscale"
+                className="w-full h-80 object-cover relative"
               />
             </div>
           </div>
