@@ -162,12 +162,12 @@ const Index = () => {
           <div>
             <div className="inline-flex items-center gap-2 bg-[#FFD700]/10 border border-[#FFD700]/30 px-3 py-1 mb-6">
               <div className="w-2 h-2 bg-[#FFD700] rounded-full animate-pulse" />
-              <span className="font-roboto text-xs text-[#FFD700] uppercase tracking-widest">Работаем сегодня 10:00 — 21:00</span>
+              <span className="font-roboto text-xs text-[#FFD700] uppercase tracking-widest">Работаем 24/7 без выходных</span>
             </div>
 
             <h1 className="font-oswald text-5xl md:text-7xl font-bold leading-none mb-6">
               ПРОДАЙ<br />
-              <span className="text-[#FFD700]">ТЕХНИКУ</span><br />
+              <span className="animate-shimmer">ТЕХНИКУ</span><br />
               ВЫГОДНО
             </h1>
 
@@ -481,9 +481,10 @@ const Index = () => {
             <h2 className="font-oswald text-4xl md:text-5xl font-bold">КОНТАКТЫ</h2>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-4 gap-8">
             {[
-              { icon: "Phone", title: "Телефон", lines: ["+7 (992) 999-03-33", "8 (800) 600-68-33 (бесплатно)"], href: "tel:+79929990333" },
+              { icon: "MapPin", title: "Филиал — Кирова 11", lines: ["+7 (992) 999-03-33", "24/7 без выходных"], href: "tel:+79929990333" },
+              { icon: "MapPin", title: "Филиал — Кирова 7/47", lines: ["8 (800) 600-68-33", "Бесплатно по России"], href: "tel:88006006833" },
               { icon: "MessageCircle", title: "WhatsApp / Telegram", lines: ["@skupka24", "Ответим за 5 минут"], href: "https://t.me/skupka24" },
               { icon: "Mail", title: "Email", lines: ["info@skupka24.ru", "Для деловых запросов"], href: "mailto:info@skupka24.ru" },
             ].map((c) => (

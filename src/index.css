@@ -142,4 +142,29 @@
       transform: translateY(0);
     }
   }
+
+  @keyframes shimmer {
+    0% {
+      background-position: -200% center;
+    }
+    100% {
+      background-position: 200% center;
+    }
+  }
+
+  .animate-shimmer {
+    background: linear-gradient(
+      90deg,
+      #ffd700 0%,
+      #fffacd 25%,
+      #ffd700 50%,
+      #ffa500 75%,
+      #ffd700 100%
+    );
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: shimmer 2.5s linear infinite;
+  }
 }
