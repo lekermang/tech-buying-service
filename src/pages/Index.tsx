@@ -43,11 +43,15 @@ const BRANCHES = [
   { city: "Филиал 2", addr: "ул. Кирова, 7/47", metro: "", time: "10:00 — 21:00", phone: "8 (800) 600-68-33" },
 ];
 
+const SEND_LEAD_URL = "https://functions.poehali.dev/52666ff7-db52-4b6a-a90e-d60aeed699de";
+
 const Index = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [formData, setFormData] = useState({ name: "", phone: "", category: "", desc: "" });
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -59,9 +63,23 @@ const Index = () => {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(SEND_LEAD_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+      if (!res.ok) throw new Error("Ошибка отправки");
+      setSubmitted(true);
+    } catch {
+      setError("Не удалось отправить заявку. Позвоните нам по телефону.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const scrollTo = (href: string) => {
@@ -243,9 +261,13 @@ const Index = () => {
                     </div>
                   </div>
 
-                  <button type="submit"
-                    className="w-full bg-[#FFD700] text-black font-oswald font-bold text-lg py-4 uppercase tracking-wide hover:bg-yellow-400 transition-colors">
-                    Получить оценку бесплатно
+                  {error && (
+                    <p className="font-roboto text-red-400 text-sm text-center">{error}</p>
+                  )}
+
+                  <button type="submit" disabled={loading}
+                    className="w-full bg-[#FFD700] text-black font-oswald font-bold text-lg py-4 uppercase tracking-wide hover:bg-yellow-400 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
+                    {loading ? "Отправляем..." : "Получить оценку бесплатно"}
                   </button>
 
                   <p className="font-roboto text-white/30 text-xs text-center">

@@ -1,0 +1,24 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Пустое тело — ошибка",
+      "method": "POST",
+      "path": "/",
+      "body": {"name": "", "phone": ""},
+      "expectedStatus": 400
+    },
+    {
+      "name": "Заявка с именем и телефоном",
+      "method": "POST",
+      "path": "/",
+      "body": {"name": "Тест", "phone": "+79999999999", "category": "Смартфоны", "desc": "iPhone 13"},
+      "expectedStatus": 200
+    }
+  ]
+}
