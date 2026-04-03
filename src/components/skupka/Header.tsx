@@ -27,11 +27,13 @@ const Header = ({ scrollTo }: HeaderProps) => {
     <header className="fixed top-0 left-0 right-0 z-50 bg-[#0D0D0D]/95 backdrop-blur-sm border-b border-[#FFD700]/20">
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-[#FFD700] flex items-center justify-center">
-            <span className="font-oswald font-bold text-black text-sm leading-none">С24</span>
-          </div>
+          <img
+            src="https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/9c9b4fca-bfd7-4841-a827-eb0354dad8da.JPG"
+            alt="Скупка24"
+            className="w-10 h-10 rounded-full object-cover"
+          />
           <div>
-            <span className="font-oswald font-bold text-xl tracking-wider text-[#FFD700]">СКУПКА24</span>
+            <span className="font-oswald font-bold text-xl tracking-wider animate-shimmer">СКУПКА24</span>
             <div className="font-roboto text-white/40 text-[10px] leading-tight">Кирова 7/47 · Кирова 11</div>
           </div>
         </div>
