@@ -3,8 +3,9 @@ import Icon from "@/components/ui/icon";
 import { EMPLOYEE_AUTH_URL } from "./staff.types";
 import GoodsTab from "./StaffGoodsTab";
 import { SalesTab, ClientsTab, AnalyticsTab, EmployeesTab } from "./StaffOtherTabs";
+import StaffRepairTab from "./StaffRepairTab";
 
-type Tab = "goods" | "sales" | "clients" | "analytics" | "employees";
+type Tab = "goods" | "sales" | "clients" | "analytics" | "employees" | "repair";
 
 export default function Staff() {
   const [token, setToken] = useState(() => localStorage.getItem("employee_token") || "");
@@ -96,6 +97,7 @@ export default function Staff() {
   const TABS = [
     { k: "goods", l: "Товары", icon: "Package" },
     { k: "sales", l: "Продажи", icon: "ShoppingCart" },
+    { k: "repair", l: "Ремонт", icon: "Wrench" },
     { k: "clients", l: "Клиенты", icon: "Users" },
     { k: "analytics", l: "Аналитика", icon: "BarChart2" },
     ...(isOwnerOrAdmin ? [{ k: "employees", l: "Сотрудники", icon: "UserCog" }] : []),
@@ -136,6 +138,7 @@ export default function Staff() {
 
       {tab === "goods" && <GoodsTab token={token} />}
       {tab === "sales" && <SalesTab token={token} />}
+      {tab === "repair" && <StaffRepairTab token={token} />}
       {tab === "clients" && <ClientsTab token={token} />}
       {tab === "analytics" && <AnalyticsTab token={token} />}
       {tab === "employees" && isOwnerOrAdmin && <EmployeesTab token={token} myRole={empRole} />}

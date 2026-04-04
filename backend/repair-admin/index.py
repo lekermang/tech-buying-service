@@ -8,20 +8,35 @@ ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN', '')
 
 VALID_STATUSES = ['new', 'in_progress', 'waiting_parts', 'ready', 'done', 'cancelled']
 
+ALLOW_HEADERS = 'Content-Type, X-Admin-Token, X-Employee-Token'
+
 
 def auth(event: dict) -> bool:
     headers = {k.lower(): v for k, v in (event.get('headers') or {}).items()}
-    token = headers.get('x-admin-token', '')
-    return token == ADMIN_TOKEN and bool(ADMIN_TOKEN)
+    admin_token = headers.get('x-admin-token', '')
+    if admin_token and admin_token == ADMIN_TOKEN and ADMIN_TOKEN:
+        return True
+    emp_token = headers.get('x-employee-token', '')
+    if emp_token:
+        conn = psycopg2.connect(os.environ['DATABASE_URL'])
+        cur = conn.cursor()
+        cur.execute(
+            f"SELECT id FROM {SCHEMA}.employees WHERE auth_token=%s AND token_expires_at>NOW() AND is_active=true",
+            (emp_token,)
+        )
+        row = cur.fetchone()
+        cur.close(); conn.close()
+        return row is not None
+    return False
 
 
 def handler(event: dict, context) -> dict:
-    """Управление заявками на ремонт: список, создание, смена статуса (только для администратора)"""
+    """Управление заявками на ремонт: список, создание, смена статуса, дневная статистика"""
 
     if event.get('httpMethod') == 'OPTIONS':
         return {
             'statusCode': 200,
-            'headers': {**HEADERS, 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Token'},
+            'headers': {**HEADERS, 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': ALLOW_HEADERS},
             'body': '',
         }
 
@@ -29,32 +44,62 @@ def handler(event: dict, context) -> dict:
         return {'statusCode': 401, 'headers': HEADERS, 'body': json.dumps({'error': 'Unauthorized'}, ensure_ascii=False)}
 
     method = event.get('httpMethod', 'GET')
+    params = event.get('queryStringParameters') or {}
 
     conn = psycopg2.connect(os.environ['DATABASE_URL'])
     cur = conn.cursor()
 
     if method == 'GET':
-        params = event.get('queryStringParameters') or {}
+        action = params.get('action', '')
+
+        # Дневная статистика
+        if action == 'daily_stats':
+            cur.execute(f"""
+                SELECT
+                    DATE(created_at AT TIME ZONE 'Europe/Moscow') as day,
+                    COUNT(*) as total,
+                    COUNT(*) FILTER (WHERE status = 'done') as done,
+                    COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled,
+                    COALESCE(SUM(repair_amount) FILTER (WHERE status = 'done'), 0) as revenue,
+                    COALESCE(SUM(purchase_amount) FILTER (WHERE status = 'done'), 0) as costs
+                FROM {SCHEMA}.repair_orders
+                WHERE created_at >= NOW() - INTERVAL '30 days'
+                GROUP BY day
+                ORDER BY day DESC
+            """)
+            rows = cur.fetchall()
+            cur.close(); conn.close()
+            stats = [
+                {
+                    'day': str(r[0]), 'total': r[1], 'done': r[2],
+                    'cancelled': r[3], 'revenue': int(r[4]), 'costs': int(r[5]),
+                    'profit': int(r[4]) - int(r[5]),
+                }
+                for r in rows
+            ]
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'stats': stats}, ensure_ascii=False)}
+
+        # Список заявок
         status_filter = params.get('status', '')
         if status_filter:
             cur.execute(
-                f"SELECT id, name, phone, model, repair_type, price, status, admin_note, created_at, comment FROM {SCHEMA}.repair_orders WHERE status = %s ORDER BY created_at DESC",
+                f"SELECT id, name, phone, model, repair_type, price, status, admin_note, created_at, comment, purchase_amount, repair_amount, completed_at FROM {SCHEMA}.repair_orders WHERE status = %s ORDER BY created_at DESC",
                 (status_filter,)
             )
         else:
             cur.execute(
-                f"SELECT id, name, phone, model, repair_type, price, status, admin_note, created_at, comment FROM {SCHEMA}.repair_orders ORDER BY created_at DESC LIMIT 200"
+                f"SELECT id, name, phone, model, repair_type, price, status, admin_note, created_at, comment, purchase_amount, repair_amount, completed_at FROM {SCHEMA}.repair_orders ORDER BY created_at DESC LIMIT 200"
             )
         rows = cur.fetchall()
-        cur.close()
-        conn.close()
+        cur.close(); conn.close()
 
         orders = [
             {
                 'id': r[0], 'name': r[1], 'phone': r[2], 'model': r[3],
                 'repair_type': r[4], 'price': r[5], 'status': r[6],
                 'admin_note': r[7], 'created_at': r[8].isoformat() if r[8] else None,
-                'comment': r[9],
+                'comment': r[9], 'purchase_amount': r[10], 'repair_amount': r[11],
+                'completed_at': r[12].isoformat() if r[12] else None,
             }
             for r in rows
         ]
@@ -65,6 +110,7 @@ def handler(event: dict, context) -> dict:
         body = json.loads(raw_body) if isinstance(raw_body, str) else (raw_body or {})
         action = body.get('action', 'update_status')
 
+        # Создание заявки
         if action == 'create':
             name = (body.get('name') or '').strip()
             phone = (body.get('phone') or '').strip()
@@ -88,6 +134,36 @@ def handler(event: dict, context) -> dict:
             notify_telegram(new_id, name, phone, model, repair_type, price, comment)
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'id': new_id}, ensure_ascii=False)}
 
+        # Завершение ремонта с суммами
+        if action == 'complete':
+            order_id = body.get('id')
+            purchase_amount = body.get('purchase_amount')
+            repair_amount = body.get('repair_amount')
+
+            if not order_id:
+                cur.close(); conn.close()
+                return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'Укажите id заявки'}, ensure_ascii=False)}
+
+            cur.execute(
+                f"""UPDATE {SCHEMA}.repair_orders
+                    SET status = 'done', purchase_amount = %s, repair_amount = %s,
+                        completed_at = NOW(), status_updated_at = NOW()
+                    WHERE id = %s RETURNING id""",
+                (int(purchase_amount) if purchase_amount else None,
+                 int(repair_amount) if repair_amount else None,
+                 int(order_id))
+            )
+            updated = cur.fetchone()
+            conn.commit()
+            cur.close(); conn.close()
+
+            if not updated:
+                return {'statusCode': 404, 'headers': HEADERS, 'body': json.dumps({'error': 'Заявка не найдена'}, ensure_ascii=False)}
+
+            notify_client(int(order_id), 'done', '')
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True}, ensure_ascii=False)}
+
+        # Смена статуса
         order_id = body.get('id')
         new_status = body.get('status', '').strip()
         admin_note = body.get('admin_note', '').strip()
@@ -142,7 +218,7 @@ def notify_telegram(order_id: int, name: str, phone: str, model, repair_type, pr
     chat_id = os.environ.get('TELEGRAM_CHAT_ID', '')
     if not token or not chat_id:
         return
-    lines = [f"📋 *Новая заявка #{order_id}* (из админки)"]
+    lines = [f"📋 *Новая заявка #{order_id}*"]
     lines.append(f"👤 {name} | 📞 {phone}")
     if model:
         lines.append(f"📱 {model}")
