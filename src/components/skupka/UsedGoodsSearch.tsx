@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 
 const GOODS_URL = "https://functions.poehali.dev/de4c1e8e-0c7b-4f25-a3fd-155c46fa3399";
@@ -17,26 +17,38 @@ export default function UsedGoodsSearch() {
   const [items, setItems] = useState<Good[]>([]);
   const [loading, setLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const abortRef = useRef<AbortController | null>(null);
 
-  const fetchGoods = (q: string) => {
+  const fetchGoods = useCallback((q: string) => {
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
     setLoading(true);
-    const url = q ? `${GOODS_URL}?q=${encodeURIComponent(q)}&status=available` : `${GOODS_URL}?status=available&limit=6`;
-    fetch(url).then(r => r.json()).then(d => { setItems(d.items || []); setLoading(false); }).catch(() => setLoading(false));
-  };
+    const url = q
+      ? `${GOODS_URL}?q=${encodeURIComponent(q)}&status=available`
+      : `${GOODS_URL}?status=available&limit=6`;
+    fetch(url, { signal: abortRef.current.signal })
+      .then(r => r.json())
+      .then(d => { setItems(d.items || []); setLoading(false); })
+      .catch(e => { if (e.name !== "AbortError") setLoading(false); });
+  }, []);
 
   useEffect(() => {
     if (!open) return;
     fetchGoods("");
-  }, [open]);
+    return () => {
+      abortRef.current?.abort();
+      clearTimeout(debounceRef.current);
+    };
+  }, [open, fetchGoods]);
 
-  const handleSearch = (val: string) => {
+  const handleSearch = useCallback((val: string) => {
     setQuery(val);
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => fetchGoods(val), 400);
-  };
+  }, [fetchGoods]);
 
   return (
-    <div className="border border-white/10 bg-black/30 p-3 mb-3 w-full max-w-sm">
+    <div className="border border-white/10 bg-black/30 p-3 mb-3 w-full">
       <button className="flex items-center justify-between w-full" onClick={() => setOpen(v => !v)}>
         <div className="flex items-center gap-2">
           <div className="w-5 h-5 bg-[#FFD700] flex items-center justify-center shrink-0">

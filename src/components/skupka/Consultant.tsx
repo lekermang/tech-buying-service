@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 import { useChatGPT } from "@/components/extensions/chatgpt-polza/useChatGPT";
 
@@ -37,11 +37,17 @@ const Consultant = () => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const { generate, isLoading } = useChatGPT({ apiUrl: API_URL });
 
+  // Скролл только при новых сообщениях (не при открытии)
   useEffect(() => {
-    if (open) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [msgs, open]);
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [msgs]);
 
-  const send = async (text?: string) => {
+  // Скролл при открытии чата
+  useEffect(() => {
+    if (open) setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "instant" }), 50);
+  }, [open]);
+
+  const send = useCallback(async (text?: string) => {
     const message = text || input.trim();
     if (!message || isLoading) return;
     setInput("");
@@ -65,7 +71,7 @@ const Consultant = () => {
       role: "assistant",
       text: result.success && result.content ? result.content : "Извините, не удалось ответить. Позвоните нам: +7 (992) 999-03-33"
     }]);
-  };
+  }, [input, isLoading, msgs, generate]);
 
   return (
     <>
