@@ -18,11 +18,21 @@ interface HeaderProps {
   scrollTo: (href: string) => void;
 }
 
+const PROBES = [
+  { label: "375", value: 375, coeff: 0.375 },
+  { label: "500", value: 500, coeff: 0.500 },
+  { label: "585", value: 585, coeff: 0.585 },
+  { label: "750", value: 750, coeff: 0.750 },
+  { label: "916", value: 916, coeff: 0.916 },
+  { label: "999", value: 999, coeff: 0.999 },
+];
+
 const Header = ({ scrollTo }: HeaderProps) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [goldPrice, setGoldPrice] = useState<{ buy: number; date: string } | null>(null);
   const [sellOpen, setSellOpen] = useState(false);
   const [clientType, setClientType] = useState<'retail' | 'wholesale'>('retail');
+  const [probe, setProbe] = useState(585);
   const [form, setForm] = useState({ name: "", phone: "" });
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
@@ -39,9 +49,17 @@ const Header = ({ scrollTo }: HeaderProps) => {
     setMenuOpen(false);
   };
 
-  const priceRetail = goldPrice ? Math.round(goldPrice.buy * 0.90) : null;
-  const priceWholesale = goldPrice ? Math.round(goldPrice.buy * 0.93) : null;
-  const activePrice = clientType === 'retail' ? priceRetail : priceWholesale;
+  const selectedProbe = PROBES.find(p => p.value === probe) || PROBES[2];
+  const discount = clientType === 'retail' ? 0.90 : 0.93;
+  const discountLabel = clientType === 'retail' ? '−10%' : '−7%';
+
+  const calcPrice = (coeff: number) =>
+    goldPrice ? Math.round(goldPrice.buy * coeff * discount) : null;
+
+  const activePrice = calcPrice(selectedProbe.coeff);
+
+  const priceRetail999 = goldPrice ? Math.round(goldPrice.buy * 0.999 * 0.90) : null;
+  const priceWholesale999 = goldPrice ? Math.round(goldPrice.buy * 0.999 * 0.93) : null;
 
   const handleSell = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,9 +73,9 @@ const Header = ({ scrollTo }: HeaderProps) => {
           name: form.name,
           phone: form.phone,
           category: "Золото",
-          desc: `Быстрая заявка из тикера. Клиент: ${clientType === 'retail' ? 'Физлицо' : 'Оптовый'}`,
-          client_type: clientType === 'retail' ? 'Физлицо (-10%)' : 'Оптовый (-7%)',
-          gold_price: activePrice,
+          desc: `Проба: ${probe}, цена: ${activePrice} ₽/г. Тип: ${clientType === 'retail' ? 'Физлицо' : 'Оптовый'}`,
+          client_type: clientType === 'retail' ? `Физлицо (${discountLabel})` : `Оптовый (${discountLabel})`,
+          gold_price: `${activePrice} ₽/г (проба ${probe})`,
         }),
       });
       setSent(true);
@@ -69,9 +87,9 @@ const Header = ({ scrollTo }: HeaderProps) => {
   return (
     <header className="fixed top-0 left-0 right-0 z-50">
       {/* Gold ticker */}
-      <div className="bg-[#FFD700] px-4 py-1.5 flex items-center justify-center gap-4 flex-wrap">
+      <div className="bg-[#FFD700] px-4 py-1.5 flex items-center justify-center gap-3 flex-wrap">
         <div className="flex items-center gap-2">
-          <span className="text-black text-xs font-oswald font-bold uppercase tracking-wider">🥇 Золото (Au)</span>
+          <span className="text-black text-xs font-oswald font-bold uppercase tracking-wider">🥇 Биржа 999:</span>
           {goldPrice ? (
             <span className="text-black font-roboto font-bold text-sm">
               {goldPrice.buy.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽/г
@@ -83,17 +101,19 @@ const Header = ({ scrollTo }: HeaderProps) => {
 
         {goldPrice && (
           <>
-            <div className="w-px h-4 bg-black/20 hidden sm:block" />
-            <div className="flex items-center gap-3 text-xs font-roboto">
-              <span className="bg-black/10 px-2 py-0.5 rounded text-black font-semibold">
-                Физлица: {priceRetail?.toLocaleString('ru-RU')} ₽/г
+            <div className="w-px h-4 bg-black/20 hidden md:block" />
+            <div className="hidden md:flex items-center gap-2 text-xs font-roboto">
+              <span className="bg-black/10 px-2 py-0.5 text-black font-semibold">
+                Физлица 999: {priceRetail999?.toLocaleString('ru-RU')} ₽/г
                 <span className="text-black/50 ml-1">−10%</span>
               </span>
-              <span className="bg-black/10 px-2 py-0.5 rounded text-black font-semibold">
-                Опт: {priceWholesale?.toLocaleString('ru-RU')} ₽/г
+              <span className="bg-black/10 px-2 py-0.5 text-black font-semibold">
+                Опт 999: {priceWholesale999?.toLocaleString('ru-RU')} ₽/г
                 <span className="text-black/50 ml-1">−7%</span>
               </span>
             </div>
+            <div className="w-px h-4 bg-black/20 hidden md:block" />
+            <span className="hidden md:block text-black/50 font-roboto text-[10px]">Калькулятор по пробам →</span>
           </>
         )}
 
@@ -172,25 +192,41 @@ const Header = ({ scrollTo }: HeaderProps) => {
 
             <div className="p-5">
               {/* Client type selector */}
-              <div className="grid grid-cols-2 gap-2 mb-5">
-                <button
-                  onClick={() => setClientType('retail')}
+              <div className="grid grid-cols-2 gap-2 mb-4">
+                <button onClick={() => setClientType('retail')}
                   className={`p-3 border-2 text-left transition-colors ${clientType === 'retail' ? 'border-[#FFD700] bg-[#FFD700]/10' : 'border-[#333] hover:border-[#FFD700]/40'}`}>
                   <div className="font-oswald font-bold text-sm uppercase mb-0.5">Физлицо</div>
-                  <div className="font-roboto text-[#FFD700] font-bold text-lg leading-none">
-                    {priceRetail ? `${priceRetail.toLocaleString('ru-RU')} ₽/г` : '—'}
-                  </div>
-                  <div className="font-roboto text-white/40 text-xs mt-0.5">−10% от биржи</div>
+                  <div className="font-roboto text-white/40 text-xs">−10% от биржи</div>
                 </button>
-                <button
-                  onClick={() => setClientType('wholesale')}
+                <button onClick={() => setClientType('wholesale')}
                   className={`p-3 border-2 text-left transition-colors ${clientType === 'wholesale' ? 'border-[#FFD700] bg-[#FFD700]/10' : 'border-[#333] hover:border-[#FFD700]/40'}`}>
                   <div className="font-oswald font-bold text-sm uppercase mb-0.5">Оптовый</div>
-                  <div className="font-roboto text-[#FFD700] font-bold text-lg leading-none">
-                    {priceWholesale ? `${priceWholesale.toLocaleString('ru-RU')} ₽/г` : '—'}
-                  </div>
-                  <div className="font-roboto text-white/40 text-xs mt-0.5">−7% от биржи</div>
+                  <div className="font-roboto text-white/40 text-xs">−7% от биржи</div>
                 </button>
+              </div>
+
+              {/* Probe selector */}
+              <div className="mb-5">
+                <label className="font-roboto text-white/50 text-xs uppercase tracking-wider block mb-2">Проба изделия</label>
+                <div className="grid grid-cols-6 gap-1.5">
+                  {PROBES.map(p => (
+                    <button key={p.value} onClick={() => setProbe(p.value)}
+                      className={`py-2 border-2 font-oswald font-bold text-sm transition-colors ${probe === p.value ? 'border-[#FFD700] bg-[#FFD700]/10 text-[#FFD700]' : 'border-[#333] text-white/60 hover:border-[#FFD700]/40'}`}>
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+                {goldPrice && (
+                  <div className="mt-3 bg-[#0D0D0D] border border-[#FFD700]/30 p-3 text-center">
+                    <div className="font-roboto text-white/50 text-xs mb-1">Ваша цена ({probe} проба, {discountLabel})</div>
+                    <div className="font-oswald text-3xl font-bold text-[#FFD700]">
+                      {activePrice?.toLocaleString('ru-RU')} <span className="text-lg">₽/г</span>
+                    </div>
+                    <div className="font-roboto text-white/30 text-[10px] mt-1">
+                      Биржа 999: {goldPrice.buy.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽/г · на {goldPrice.date}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {sent ? (
