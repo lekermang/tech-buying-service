@@ -57,9 +57,9 @@ const Catalog = () => {
       }, {});
 
   return (
-    <div className="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
+    <div className="min-h-screen bg-[#FFCC00] text-[#1d1d1f]">
       {/* Apple-style nav */}
-      <nav className="bg-[rgba(245,245,247,0.85)] backdrop-blur-xl border-b border-black/5 sticky top-0 z-40">
+      <nav className="bg-[rgba(255,204,0,0.90)] backdrop-blur-xl border-b border-black/5 sticky top-0 z-40">
         <div className="max-w-[1200px] mx-auto px-6 h-14 flex items-center gap-6">
           <a href="/" className="flex items-center gap-2 shrink-0 text-[#1d1d1f] hover:text-black transition-colors">
             <Icon name="ArrowLeft" size={16} className="text-[#1d1d1f]/50" />
@@ -73,7 +73,7 @@ const Catalog = () => {
               value={search}
               onChange={e => handleSearch(e.target.value)}
               placeholder="Поиск в каталоге"
-              className="w-full bg-[#e8e8ed] text-[#1d1d1f] pl-9 pr-4 py-1.5 rounded-lg text-sm focus:outline-none focus:bg-white focus:ring-2 focus:ring-black/10 transition-all placeholder:text-[#1d1d1f]/30"
+              className="w-full bg-black/10 text-[#1d1d1f] pl-9 pr-4 py-1.5 rounded-lg text-sm focus:outline-none focus:bg-white/80 focus:ring-2 focus:ring-black/10 transition-all placeholder:text-[#1d1d1f]/40"
             />
           </div>
 
@@ -93,7 +93,7 @@ const Catalog = () => {
       </nav>
 
       {/* Categories pill bar */}
-      <div className="bg-[rgba(245,245,247,0.85)] backdrop-blur-xl border-b border-black/5 sticky top-14 z-30">
+      <div className="bg-[rgba(255,204,0,0.90)] backdrop-blur-xl border-b border-black/5 sticky top-14 z-30">
         <div className="max-w-[1200px] mx-auto px-6">
           <div className="flex gap-0 overflow-x-auto scrollbar-hide">
             <button
