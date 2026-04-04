@@ -140,39 +140,127 @@ export default function StaffRepairTab({ token }: { token: string }) {
   };
 
   const printReceipt = (o: Order) => {
-    const profit = (o.repair_amount || 0) - (o.purchase_amount || 0);
-    const win = window.open("", "_blank", "width=400,height=600");
+    const now = new Date();
+    const dateStr = now.toLocaleDateString("ru-RU");
+    const timeStr = now.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+    const isWater = /вода|влага|залит|liquid|water/i.test((o.repair_type || "") + " " + (o.comment || ""));
+    const win = window.open("", "_blank", "width=800,height=900");
     if (!win) return;
     win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Чек #${o.id}</title><style>
-      body{font-family:monospace;font-size:13px;padding:20px;max-width:300px;margin:0 auto}
-      h2{text-align:center;font-size:15px;margin-bottom:4px}
-      .center{text-align:center}
-      .line{border-top:1px dashed #000;margin:10px 0}
-      .row{display:flex;justify-content:space-between;margin:3px 0}
-      .bold{font-weight:bold}
-      .big{font-size:16px;font-weight:bold}
-      @media print{body{padding:0}}
+      *{box-sizing:border-box;margin:0;padding:0}
+      body{font-family:Arial,sans-serif;font-size:12px;color:#000;background:#fff}
+      .page{width:100%;display:flex;gap:0}
+      .half{width:50%;padding:18px 16px;border-right:2px dashed #aaa}
+      .half:last-child{border-right:none}
+      h1{font-size:15px;font-weight:bold;text-align:center;margin-bottom:2px}
+      .subtitle{font-size:10px;text-align:center;color:#444;margin-bottom:10px}
+      .section-title{font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #000;padding-bottom:3px;margin:10px 0 6px}
+      .row{display:flex;justify-content:space-between;margin-bottom:3px;font-size:11px}
+      .row .label{color:#555;flex-shrink:0;margin-right:6px}
+      .row .val{font-weight:600;text-align:right}
+      .total-row{display:flex;justify-content:space-between;font-size:14px;font-weight:bold;border-top:2px solid #000;padding-top:6px;margin-top:6px}
+      .dashed{border-top:1px dashed #999;margin:8px 0}
+      .requisites{font-size:9px;color:#555;margin-top:8px;line-height:1.5}
+      .warranty-box{border:2px solid #000;padding:8px;margin-top:10px}
+      .warranty-title{font-size:12px;font-weight:bold;text-align:center;margin-bottom:6px}
+      .warranty-item{font-size:10px;margin-bottom:3px;padding-left:10px;position:relative}
+      .warranty-item:before{content:"•";position:absolute;left:0}
+      .no-warranty{font-size:11px;font-weight:bold;color:#000;border:2px solid #000;padding:6px;text-align:center;margin-top:8px}
+      .sign-line{display:flex;justify-content:space-between;margin-top:14px;font-size:10px}
+      .sign-line span{border-top:1px solid #000;padding-top:3px;min-width:100px;text-align:center}
+      @media print{body{margin:0}button{display:none!important}.page{width:210mm}}
     </style></head><body>
-      <h2>Скупка24</h2>
-      <div class="center" style="font-size:11px">Ремонт телефонов</div>
-      <div class="line"></div>
-      <div class="row"><span>Заявка:</span><span class="bold">#${o.id}</span></div>
-      <div class="row"><span>Дата:</span><span>${new Date().toLocaleDateString("ru-RU")} ${new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}</span></div>
-      <div class="line"></div>
-      <div class="row"><span>Клиент:</span><span class="bold">${o.name}</span></div>
-      <div class="row"><span>Телефон:</span><span>${o.phone}</span></div>
-      ${o.model ? `<div class="row"><span>Устройство:</span><span>${o.model}</span></div>` : ""}
-      ${o.repair_type ? `<div class="row"><span>Работа:</span><span>${o.repair_type}</span></div>` : ""}
-      ${o.comment ? `<div class="row"><span>Описание:</span><span style="max-width:160px;text-align:right">${o.comment}</span></div>` : ""}
-      <div class="line"></div>
-      ${o.purchase_amount ? `<div class="row"><span>Закупка (себестоимость):</span><span>${o.purchase_amount.toLocaleString("ru-RU")} ₽</span></div>` : ""}
-      <div class="row big"><span>К оплате:</span><span>${(o.repair_amount || 0).toLocaleString("ru-RU")} ₽</span></div>
-      <div class="line"></div>
-      <div class="center" style="font-size:11px;color:#555">Спасибо за обращение!</div>
+    <div style="text-align:center;padding:10px"><button onclick="window.print()" style="padding:8px 20px;font-size:13px;cursor:pointer;background:#FFD700;border:none;font-weight:bold">🖨 Печатать</button></div>
+    <div class="page">
+
+      <!-- ЛЕВАЯ ПОЛОВИНА: ЧЕК -->
+      <div class="half">
+        <h1>Скупка24</h1>
+        <div class="subtitle">ИП Мамедов Адиль Мирза Оглы · г.Калуга, ул.Кирова, 21а</div>
+
+        <div class="section-title">Квитанция об оплате</div>
+
+        <div class="row"><span class="label">№ заявки:</span><span class="val">#${o.id}</span></div>
+        <div class="row"><span class="label">Дата:</span><span class="val">${dateStr} ${timeStr}</span></div>
+
+        <div class="dashed"></div>
+
+        <div class="row"><span class="label">Клиент:</span><span class="val">${o.name}</span></div>
+        <div class="row"><span class="label">Телефон:</span><span class="val">${o.phone}</span></div>
+        ${o.model ? `<div class="row"><span class="label">Устройство:</span><span class="val">${o.model}</span></div>` : ""}
+
+        <div class="dashed"></div>
+
+        ${o.repair_type ? `<div class="row"><span class="label">Вид работы:</span><span class="val">${o.repair_type}</span></div>` : ""}
+        ${o.comment ? `<div class="row"><span class="label">Описание:</span><span class="val" style="max-width:130px">${o.comment}</span></div>` : ""}
+
+        <div class="total-row">
+          <span>К оплате:</span>
+          <span>${(o.repair_amount || 0).toLocaleString("ru-RU")} ₽</span>
+        </div>
+
+        <div class="dashed"></div>
+        <div style="font-size:10px;color:#555;margin-top:4px">Оплата принята. Спасибо за обращение!</div>
+
+        <div class="requisites">
+          ИНН: 402810962699 · ОГРНИП: 307402814200032<br>
+          Р/с: 40802810422270001866<br>
+          КАЛУЖСКОЕ ОТДЕЛЕНИЕ N8608 ПАО СБЕРБАНК<br>
+          БИК: 042908612 · К/с: 30101810100000000612
+        </div>
+
+        <div class="sign-line">
+          <span>Выдал</span>
+          <span>Получил</span>
+        </div>
+      </div>
+
+      <!-- ПРАВАЯ ПОЛОВИНА: ГАРАНТИЙНЫЙ ТАЛОН -->
+      <div class="half">
+        <h1>Гарантийный талон</h1>
+        <div class="subtitle">Скупка24 · г.Калуга, ул.Кирова, 21а</div>
+
+        <div class="section-title">Данные ремонта</div>
+
+        <div class="row"><span class="label">№ заявки:</span><span class="val">#${o.id}</span></div>
+        <div class="row"><span class="label">Дата:</span><span class="val">${dateStr}</span></div>
+        <div class="row"><span class="label">Клиент:</span><span class="val">${o.name}</span></div>
+        ${o.model ? `<div class="row"><span class="label">Устройство:</span><span class="val">${o.model}</span></div>` : ""}
+        ${o.repair_type ? `<div class="row"><span class="label">Работа:</span><span class="val">${o.repair_type}</span></div>` : ""}
+
+        <div class="dashed"></div>
+
+        ${isWater ? `
+        <div class="no-warranty">
+          ⚠ ГАРАНТИЯ НЕ ПРЕДОСТАВЛЯЕТСЯ<br>
+          <span style="font-size:10px;font-weight:normal">Ремонт после воздействия влаги/воды</span>
+        </div>
+        ` : `
+        <div class="warranty-box">
+          <div class="warranty-title">Гарантия: 30 дней</div>
+          <div class="warranty-item">Гарантия распространяется только на выполненную работу и установленные запчасти</div>
+          <div class="warranty-item">Гарантия не распространяется на механические повреждения, попадание влаги и воды</div>
+          <div class="warranty-item">Гарантия не распространяется на программное обеспечение</div>
+          <div class="warranty-item">При нарушении пломб гарантия аннулируется</div>
+        </div>
+        `}
+
+        <div style="font-size:10px;color:#555;margin-top:10px">
+          Сохраняйте талон до окончания гарантийного срока.<br>
+          По вопросам: ул.Кирова, 21а, г.Калуга
+        </div>
+
+        <div class="sign-line">
+          <span>Мастер</span>
+          <span>Клиент</span>
+        </div>
+      </div>
+
+    </div>
     </body></html>`);
     win.document.close();
     win.focus();
-    setTimeout(() => win.print(), 300);
+    setTimeout(() => win.print(), 400);
   };
 
   const inp = "w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-2 font-roboto text-xs focus:outline-none focus:border-[#FFD700] transition-colors placeholder:text-white/20";
