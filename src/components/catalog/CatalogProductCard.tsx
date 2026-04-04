@@ -17,7 +17,7 @@ const CatalogProductCard = ({ item, onBuy }: Props) => {
 
   return (
     <div className="bg-[#111] border border-[#222] hover:border-[#FFD700]/30 transition-colors group relative flex flex-col">
-      <div className="h-44 bg-[#151515] relative overflow-hidden flex items-center justify-center">
+      <div className="h-32 sm:h-44 bg-[#151515] relative overflow-hidden flex items-center justify-center">
         {photo ? (
           <img src={photo} alt={title}
             className="w-full h-full object-cover opacity-70 group-hover:opacity-90 group-hover:scale-105 transition-all duration-500" />
@@ -40,26 +40,27 @@ const CatalogProductCard = ({ item, onBuy }: Props) => {
         )}
       </div>
 
-      <div className="p-4 flex flex-col flex-1">
-        <div className="font-oswald font-bold text-base uppercase leading-tight mb-0.5">{title}</div>
-        {sub && <div className="font-roboto text-white/40 text-xs mb-1">{sub}</div>}
+      <div className="p-2.5 sm:p-4 flex flex-col flex-1">
+        <div className="font-oswald font-bold text-sm sm:text-base uppercase leading-tight mb-0.5">{title}</div>
+        {sub && <div className="font-roboto text-white/40 text-[10px] sm:text-xs mb-1">{sub}</div>}
         {!inStock && (
-          <div className="font-roboto text-white/25 text-[10px] mb-2">Доставка на следующий день (заказ до 17:00)</div>
+          <div className="font-roboto text-white/25 text-[9px] sm:text-[10px] mb-1 hidden sm:block">Доставка на следующий день (заказ до 17:00)</div>
         )}
 
         <div className="mt-auto">
-          <div className="mb-3">
+          <div className="mb-2">
             {item.price ? (
-              <span className="font-oswald font-bold text-xl text-[#FFD700]">
+              <span className="font-oswald font-bold text-base sm:text-xl text-[#FFD700]">
                 {(item.price + PRICE_MARKUP).toLocaleString("ru-RU")} ₽
               </span>
             ) : (
-              <span className="font-roboto text-white/30 text-sm italic">Цену уточняйте</span>
+              <span className="font-roboto text-white/30 text-xs sm:text-sm italic">Цену уточняйте</span>
             )}
           </div>
           <button onClick={() => onBuy(item)}
-            className="w-full bg-[#FFD700] text-black font-oswald font-bold text-sm py-2.5 uppercase tracking-wide hover:bg-yellow-400 transition-colors flex items-center justify-center gap-2">
-            <Icon name="ShoppingCart" size={14} />
+            className="w-full bg-[#FFD700] text-black font-oswald font-bold text-xs sm:text-sm py-2 sm:py-2.5 uppercase tracking-wide hover:bg-yellow-400 transition-colors flex items-center justify-center gap-1 sm:gap-2">
+            <Icon name="ShoppingCart" size={12} className="sm:hidden" />
+            <Icon name="ShoppingCart" size={14} className="hidden sm:block" />
             Купить
           </button>
         </div>

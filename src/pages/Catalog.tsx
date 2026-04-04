@@ -102,8 +102,24 @@ const Catalog = () => {
         </div>
       </div>
 
+      {/* Mobile categories scroll — вне flex контейнера */}
+      <div className="lg:hidden overflow-x-auto border-b border-[#111]">
+        <div className="flex gap-2 px-4 py-3 min-w-max">
+          <button onClick={() => handleCategory("")}
+            className={`font-roboto text-xs px-3 py-2 border whitespace-nowrap transition-colors ${activeCategory === "" ? "bg-[#FFD700] text-black border-[#FFD700]" : "border-[#333] text-white/50"}`}>
+            Все
+          </button>
+          {categories.map(cat => (
+            <button key={cat} onClick={() => handleCategory(cat)}
+              className={`font-roboto text-xs px-3 py-2 border whitespace-nowrap transition-colors ${activeCategory === cat ? "bg-[#FFD700] text-black border-[#FFD700]" : "border-[#333] text-white/50"}`}>
+              {cat}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="max-w-7xl mx-auto px-4 py-6 flex gap-6">
-        {/* Sidebar categories */}
+        {/* Sidebar categories — только десктоп */}
         <aside className="hidden lg:block w-52 shrink-0">
           <div className="sticky top-36 space-y-1">
             <button onClick={() => handleCategory("")}
@@ -119,24 +135,8 @@ const Catalog = () => {
           </div>
         </aside>
 
-        {/* Mobile categories scroll */}
-        <div className="lg:hidden w-full -mx-4 px-4 mb-4 overflow-x-auto">
-          <div className="flex gap-2 pb-2 min-w-max">
-            <button onClick={() => handleCategory("")}
-              className={`font-roboto text-xs px-3 py-1.5 border whitespace-nowrap transition-colors ${activeCategory === "" ? "bg-[#FFD700] text-black border-[#FFD700]" : "border-[#333] text-white/50"}`}>
-              Все
-            </button>
-            {categories.map(cat => (
-              <button key={cat} onClick={() => handleCategory(cat)}
-                className={`font-roboto text-xs px-3 py-1.5 border whitespace-nowrap transition-colors ${activeCategory === cat ? "bg-[#FFD700] text-black border-[#FFD700]" : "border-[#333] text-white/50"}`}>
-                {cat}
-              </button>
-            ))}
-          </div>
-        </div>
-
         {/* Main content */}
-        <main className="flex-1 min-w-0">
+        <main className="flex-1 min-w-0 w-full">
           {loading ? (
             <div className="flex items-center justify-center py-20">
               <div className="w-8 h-8 border-2 border-[#FFD700] border-t-transparent rounded-full animate-spin" />
@@ -146,11 +146,11 @@ const Catalog = () => {
               <div key={cat} className="mb-10">
                 {!activeCategory && (
                   <div className="flex items-center gap-3 mb-4 pb-3 border-b border-[#FFD700]/10">
-                    <h2 className="font-oswald font-bold text-xl text-white uppercase">{cat}</h2>
+                    <h2 className="font-oswald font-bold text-lg md:text-xl text-white uppercase">{cat}</h2>
                     <span className="font-roboto text-white/30 text-xs">{catItems.length} позиций</span>
                   </div>
                 )}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-2 md:gap-3">
                   {catItems.map(item => (
                     <CatalogProductCard key={item.id} item={item} onBuy={setOrderItem} />
                   ))}
