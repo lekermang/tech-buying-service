@@ -1,4 +1,5 @@
 import Icon from "@/components/ui/icon";
+import Reveal from "@/components/skupka/Reveal";
 
 const CATEGORIES = [
   { icon: "Smartphone", title: "Смартфоны", desc: "iPhone, Samsung, Xiaomi и другие", price: "до 95 000 ₽" },
@@ -38,24 +39,25 @@ const InfoSections = () => {
       {/* CATEGORIES */}
       <section id="catalog" className="py-20 border-t border-[#FFD700]/10">
         <div className="max-w-7xl mx-auto px-4">
-          <div className="flex items-end justify-between mb-12">
+          <Reveal className="flex items-end justify-between mb-12">
             <div>
               <p className="font-roboto text-[#FFD700] text-sm uppercase tracking-widest mb-2">Что принимаем</p>
               <h2 className="font-oswald text-4xl md:text-5xl font-bold">ВСЁ ЧТО ИМЕЕТ<br />ЦЕННОСТЬ</h2>
             </div>
             <div className="hidden md:block w-24 h-1 bg-[#FFD700] mb-4" />
-          </div>
+          </Reveal>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-[#FFD700]/10">
-            {CATEGORIES.map((cat) => (
-              <div key={cat.title}
-                className="bg-[#0D0D0D] p-6 hover:bg-[#1A1A1A] transition-colors group cursor-pointer relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-0 group-hover:w-full h-0.5 bg-[#FFD700] transition-all duration-300" />
-                <Icon name={cat.icon} size={28} className="text-[#FFD700] mb-4" />
-                <h3 className="font-oswald text-xl font-bold mb-1 uppercase">{cat.title}</h3>
-                <p className="font-roboto text-white/50 text-sm mb-3">{cat.desc}</p>
-                <span className="font-oswald text-[#FFD700] font-bold text-sm">{cat.price}</span>
-              </div>
+            {CATEGORIES.map((cat, i) => (
+              <Reveal key={cat.title} delay={(i % 4) as 0|1|2|3|4|5}>
+                <div className="bg-[#0D0D0D] p-6 hover:bg-[#1A1A1A] transition-colors group cursor-pointer relative overflow-hidden h-full">
+                  <div className="absolute top-0 left-0 w-0 group-hover:w-full h-0.5 bg-[#FFD700] transition-all duration-300" />
+                  <Icon name={cat.icon} size={28} className="text-[#FFD700] mb-4" />
+                  <h3 className="font-oswald text-xl font-bold mb-1 uppercase">{cat.title}</h3>
+                  <p className="font-roboto text-white/50 text-sm mb-3">{cat.desc}</p>
+                  <span className="font-oswald text-[#FFD700] font-bold text-sm">{cat.price}</span>
+                </div>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -64,28 +66,30 @@ const InfoSections = () => {
       {/* HOW IT WORKS */}
       <section id="how" className="py-20 bg-[#111] border-t border-[#FFD700]/10">
         <div className="max-w-7xl mx-auto px-4">
-          <div className="mb-12">
+          <Reveal className="mb-12">
             <p className="font-roboto text-[#FFD700] text-sm uppercase tracking-widest mb-2">Процесс</p>
             <h2 className="font-oswald text-4xl md:text-5xl font-bold">КАК ЭТО<br />РАБОТАЕТ</h2>
-          </div>
+          </Reveal>
 
           <div className="grid md:grid-cols-4 gap-8">
             {HOW_STEPS.map((step, i) => (
-              <div key={step.num} className="relative">
-                <div className="text-[6rem] font-oswald font-bold text-[#FFD700]/5 leading-none absolute -top-4 -left-2 select-none pointer-events-none">
-                  {step.num}
-                </div>
+              <Reveal key={step.num} delay={(i) as 0|1|2|3|4|5}>
                 <div className="relative">
-                  <div className="w-14 h-14 border-2 border-[#FFD700] flex items-center justify-center mb-4">
-                    <Icon name={step.icon} size={24} className="text-[#FFD700]" />
+                  <div className="text-[6rem] font-oswald font-bold text-[#FFD700]/5 leading-none absolute -top-4 -left-2 select-none pointer-events-none">
+                    {step.num}
                   </div>
-                  {i < HOW_STEPS.length - 1 && (
-                    <div className="hidden md:block absolute top-7 left-14 right-0 h-px bg-[#FFD700]/20" />
-                  )}
-                  <h3 className="font-oswald text-xl font-bold uppercase mb-2">{step.title}</h3>
-                  <p className="font-roboto text-white/50 text-sm leading-relaxed">{step.desc}</p>
+                  <div className="relative">
+                    <div className="w-14 h-14 border-2 border-[#FFD700] flex items-center justify-center mb-4">
+                      <Icon name={step.icon} size={24} className="text-[#FFD700]" />
+                    </div>
+                    {i < HOW_STEPS.length - 1 && (
+                      <div className="hidden md:block absolute top-7 left-14 right-0 h-px bg-[#FFD700]/20" />
+                    )}
+                    <h3 className="font-oswald text-xl font-bold uppercase mb-2">{step.title}</h3>
+                    <p className="font-roboto text-white/50 text-sm leading-relaxed">{step.desc}</p>
+                  </div>
                 </div>
-              </div>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -94,20 +98,22 @@ const InfoSections = () => {
       {/* GUARANTEES */}
       <section id="guarantees" className="py-20 border-t border-[#FFD700]/10">
         <div className="max-w-7xl mx-auto px-4">
-          <div className="mb-12">
+          <Reveal className="mb-12">
             <p className="font-roboto text-[#FFD700] text-sm uppercase tracking-widest mb-2">Надёжность</p>
             <h2 className="font-oswald text-4xl md:text-5xl font-bold">НАШИ<br />ГАРАНТИИ</h2>
-          </div>
+          </Reveal>
 
           <div className="grid md:grid-cols-3 gap-px bg-[#FFD700]/10">
-            {GUARANTEES.map((g) => (
-              <div key={g.title} className="bg-[#0D0D0D] p-8 hover:bg-[#1A1A1A] transition-colors group">
-                <div className="w-12 h-12 bg-[#FFD700]/10 border border-[#FFD700]/20 flex items-center justify-center mb-4 group-hover:bg-[#FFD700]/20 transition-colors">
-                  <Icon name={g.icon} size={24} className="text-[#FFD700]" />
+            {GUARANTEES.map((g, i) => (
+              <Reveal key={g.title} delay={(i) as 0|1|2|3|4|5}>
+                <div className="bg-[#0D0D0D] p-8 hover:bg-[#1A1A1A] transition-colors group h-full">
+                  <div className="w-12 h-12 bg-[#FFD700]/10 border border-[#FFD700]/20 flex items-center justify-center mb-4 group-hover:bg-[#FFD700]/20 transition-colors">
+                    <Icon name={g.icon} size={24} className="text-[#FFD700]" />
+                  </div>
+                  <h3 className="font-oswald text-xl font-bold uppercase mb-2">{g.title}</h3>
+                  <p className="font-roboto text-white/50 text-sm leading-relaxed">{g.desc}</p>
                 </div>
-                <h3 className="font-oswald text-xl font-bold uppercase mb-2">{g.title}</h3>
-                <p className="font-roboto text-white/50 text-sm leading-relaxed">{g.desc}</p>
-              </div>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -116,14 +122,15 @@ const InfoSections = () => {
       {/* BRANCHES */}
       <section id="branches" className="py-20 bg-[#111] border-t border-[#FFD700]/10">
         <div className="max-w-7xl mx-auto px-4">
-          <div className="mb-12">
+          <Reveal className="mb-12">
             <p className="font-roboto text-[#FFD700] text-sm uppercase tracking-widest mb-2">Адреса</p>
             <h2 className="font-oswald text-4xl md:text-5xl font-bold">НАШИ<br />ФИЛИАЛЫ</h2>
-          </div>
+          </Reveal>
 
           <div className="grid md:grid-cols-2 gap-6">
             {BRANCHES.map((b, i) => (
-              <div key={b.city} className="border border-[#FFD700]/20 p-6 hover:border-[#FFD700]/60 transition-colors group relative overflow-hidden">
+              <Reveal key={b.city} delay={(i) as 0|1|2|3|4|5}>
+              <div className="border border-[#FFD700]/20 p-6 hover:border-[#FFD700]/60 transition-colors group relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-1 h-0 group-hover:h-full bg-[#FFD700] transition-all duration-300" />
                 <div className="flex items-start justify-between mb-4">
                   <h3 className="font-oswald text-xl font-bold uppercase text-[#FFD700]">{b.city}</h3>
@@ -150,6 +157,7 @@ const InfoSections = () => {
                   ))}
                 </div>
               </div>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -159,7 +167,7 @@ const InfoSections = () => {
       <section id="about" className="py-20 border-t border-[#FFD700]/10">
         <div className="max-w-7xl mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
-            <div>
+            <Reveal>
               <p className="font-roboto text-[#FFD700] text-sm uppercase tracking-widest mb-2">О компании</p>
               <h2 className="font-oswald text-4xl md:text-5xl font-bold mb-6">МЫ ЦЕНИМ<br />ЧЕСТНОСТЬ</h2>
               <p className="font-roboto text-white/60 leading-relaxed mb-4">
@@ -180,17 +188,19 @@ const InfoSections = () => {
                   <div className="font-roboto text-white/40 text-xs uppercase tracking-wide">рейтинг</div>
                 </div>
               </div>
-            </div>
-            <div className="relative">
-              <div className="absolute -inset-4 bg-[#FFD700]/5" />
-              <div className="absolute top-0 right-0 w-1/2 h-1 bg-[#FFD700]" />
-              <div className="absolute bottom-0 left-0 w-1/2 h-1 bg-[#FFD700]" />
-              <img
-                src="https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/a1949b69-d0e9-4258-a070-4865807b102b.jpg"
-                alt="О компании"
-                className="w-full h-80 object-cover relative"
-              />
-            </div>
+            </Reveal>
+            <Reveal delay={2}>
+              <div className="relative">
+                <div className="absolute -inset-4 bg-[#FFD700]/5" />
+                <div className="absolute top-0 right-0 w-1/2 h-1 bg-[#FFD700]" />
+                <div className="absolute bottom-0 left-0 w-1/2 h-1 bg-[#FFD700]" />
+                <img
+                  src="https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/a1949b69-d0e9-4258-a070-4865807b102b.jpg"
+                  alt="О компании"
+                  className="w-full h-80 object-cover relative"
+                />
+              </div>
+            </Reveal>
           </div>
         </div>
       </section>
