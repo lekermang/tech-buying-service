@@ -79,59 +79,65 @@ const HeroSection = ({ scrollTo }: HeroSectionProps) => {
       </div>
       <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#FFD700]" />
 
-      <div className="relative max-w-7xl mx-auto px-4 py-20 grid lg:grid-cols-2 gap-12 items-center w-full">
-        <div>
-          <UsedGoodsSearch />
-          {/* Каталог новых товаров */}
-          <a href="/catalog"
-            className="flex items-center justify-between bg-[#111] border border-[#FFD700]/20 hover:border-[#FFD700]/60 px-4 py-3 mb-2 transition-colors group">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-[#FFD700]/10 flex items-center justify-center shrink-0">
-                <Icon name="ShoppingBag" size={16} className="text-[#FFD700]" />
-              </div>
-              <div>
-                <div className="font-oswald font-bold text-sm uppercase text-white">Каталог новой техники</div>
-                <div className="font-roboto text-white/35 text-xs">iPhone, Samsung, MacBook, Dyson — от поставщика</div>
-              </div>
-            </div>
-            <Icon name="ArrowRight" size={16} className="text-[#FFD700]/40 group-hover:text-[#FFD700] transition-colors" />
-          </a>
-          <RepairWidget />
-          <AppleWidget compact />
-
-          <div className="inline-flex items-center gap-2 bg-[#FFD700]/10 border border-[#FFD700]/30 px-3 py-1 mb-6">
+      <div className="relative max-w-7xl mx-auto px-4 py-16 grid lg:grid-cols-2 gap-12 items-start w-full">
+        <div className="flex flex-col">
+          {/* Бейдж */}
+          <div className="inline-flex items-center gap-2 bg-[#FFD700]/10 border border-[#FFD700]/30 px-3 py-1 mb-5 self-start">
             <div className="w-2 h-2 bg-[#FFD700] rounded-full animate-pulse" />
             <span className="font-roboto text-xs text-[#FFD700] uppercase tracking-widest">Работаем 24/7 без выходных</span>
           </div>
 
-          <h1 className="font-oswald text-5xl md:text-7xl font-bold leading-none mb-6">
+          {/* Заголовок */}
+          <h1 className="font-oswald text-5xl md:text-6xl lg:text-7xl font-bold leading-none mb-5">
             ПРОДАЙ<br />
             <span className="animate-shimmer">ТЕХНИКУ</span><br />
             ВЫГОДНО
           </h1>
 
-          <p className="font-roboto text-white/65 text-lg mb-8 max-w-md leading-relaxed">
+          <p className="font-roboto text-white/65 text-base md:text-lg mb-7 max-w-md leading-relaxed">
             Честная оценка за 15 минут. Смартфоны, ноутбуки, ювелирные украшения — принимаем всё. Выплата в день обращения.
           </p>
 
-          <div className="flex flex-wrap gap-4">
+          {/* CTA кнопки */}
+          <div className="flex flex-wrap gap-3 mb-8">
             <button onClick={() => scrollTo("#evaluate")}
-              className="bg-[#FFD700] text-black font-oswald font-bold text-lg px-8 py-4 uppercase tracking-wide hover:bg-yellow-400 transition-colors">
+              className="bg-[#FFD700] text-black font-oswald font-bold text-base px-7 py-3.5 uppercase tracking-wide hover:bg-yellow-400 transition-colors">
               Оценить онлайн
             </button>
-            <a href="tel:+74951234567"
-              className="border-2 border-[#FFD700] text-[#FFD700] font-oswald font-bold text-lg px-8 py-4 uppercase tracking-wide hover:bg-[#FFD700] hover:text-black transition-colors">
+            <a href="tel:+79929990333"
+              className="border-2 border-[#FFD700] text-[#FFD700] font-oswald font-bold text-base px-7 py-3.5 uppercase tracking-wide hover:bg-[#FFD700] hover:text-black transition-colors">
               Позвонить
             </a>
           </div>
 
-          <div className="flex gap-8 mt-10">
-            {[["50 000+", "клиентов"], ["9 лет", "на рынке"], ["4", "филиала"]].map(([num, label]) => (
+          {/* Статистика */}
+          <div className="flex gap-8 mb-8 pb-8 border-b border-white/5">
+            {[["50 000+", "клиентов"], ["9 лет", "на рынке"], ["2", "филиала"]].map(([num, label]) => (
               <div key={label}>
-                <div className="font-oswald text-3xl font-bold text-[#FFD700]">{num}</div>
-                <div className="font-roboto text-white/45 text-sm uppercase tracking-wide">{label}</div>
+                <div className="font-oswald text-2xl font-bold text-[#FFD700]">{num}</div>
+                <div className="font-roboto text-white/40 text-xs uppercase tracking-wide">{label}</div>
               </div>
             ))}
+          </div>
+
+          {/* Виджеты — компактный блок */}
+          <div className="space-y-1.5">
+            <UsedGoodsSearch />
+            <a href="/catalog"
+              className="flex items-center justify-between bg-[#111] border border-[#FFD700]/20 hover:border-[#FFD700]/50 px-4 py-2.5 transition-colors group">
+              <div className="flex items-center gap-3">
+                <div className="w-7 h-7 bg-[#FFD700]/10 flex items-center justify-center shrink-0">
+                  <Icon name="ShoppingBag" size={14} className="text-[#FFD700]" />
+                </div>
+                <div>
+                  <div className="font-oswald font-bold text-sm uppercase text-white leading-tight">Каталог новой техники</div>
+                  <div className="font-roboto text-white/30 text-[11px]">iPhone, Samsung, MacBook, Dyson</div>
+                </div>
+              </div>
+              <Icon name="ArrowRight" size={14} className="text-[#FFD700]/40 group-hover:text-[#FFD700] transition-colors shrink-0" />
+            </a>
+            <RepairWidget />
+            <AppleWidget compact />
           </div>
         </div>
 

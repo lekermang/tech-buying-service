@@ -10,7 +10,6 @@ const NAV_LINKS = [
   { label: "Как работает", href: "#how" },
   { label: "Гарантии", href: "#guarantees" },
   { label: "Филиалы", href: "#branches" },
-  { label: "О нас", href: "#about" },
   { label: "Контакты", href: "#contacts" },
 ];
 
@@ -146,7 +145,7 @@ const Header = ({ scrollTo }: HeaderProps) => {
             </div>
           </div>
 
-          <nav className="hidden lg:flex items-center gap-6">
+          <nav className="hidden lg:flex items-center gap-5">
             {NAV_LINKS.map(l => (
               <button key={l.href} onClick={() => handleNav(l.href)}
                 className="font-roboto text-sm text-white/70 hover:text-[#FFD700] transition-colors uppercase tracking-wide">
@@ -154,7 +153,7 @@ const Header = ({ scrollTo }: HeaderProps) => {
               </button>
             ))}
             <a href="/catalog"
-              className="font-roboto text-sm text-[#FFD700] hover:opacity-80 transition-opacity uppercase tracking-wide flex items-center gap-1.5 border border-[#FFD700]/30 px-3 py-1 hover:border-[#FFD700]">
+              className="font-roboto text-sm text-white/70 hover:text-[#FFD700] transition-colors uppercase tracking-wide flex items-center gap-1">
               <Icon name="ShoppingBag" size={13} />
               Каталог
             </a>
