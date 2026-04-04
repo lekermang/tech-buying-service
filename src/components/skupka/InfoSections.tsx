@@ -176,7 +176,7 @@ const InfoSections = () => {
                   </div>
                 ))}
                 <div className="border-l-2 border-[#FFD700] pl-4">
-                  <div className="flex text-[#FFD700] text-xl leading-none mb-0.5">★★★★★</div>
+                  <div className="font-oswald text-2xl font-bold text-[#FFD700]">5.0 ★★★★★</div>
                   <div className="font-roboto text-white/40 text-xs uppercase tracking-wide">рейтинг</div>
                 </div>
               </div>
