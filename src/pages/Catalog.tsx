@@ -20,6 +20,12 @@ const CATEGORY_ICONS: Record<string, string> = {
 const BRAND_PRIORITY = ["Apple", "Samsung", "Xiaomi", "POCO", "Realme", "OnePlus", "Honor", "Google", "Dyson", "Sony"];
 const CAT_PRIORITY = ["Смартфоны", "Планшеты", "Ноутбуки", "Наушники", "Умные часы", "Компьютеры"];
 
+function modelSortKey(model: string): number {
+  // Извлекаем число из названия модели для сортировки по убыванию (17 > 16 > 15...)
+  const m = model.match(/\b(\d{1,2})\b/);
+  return m ? parseInt(m[1]) : 0;
+}
+
 function sortItems(raw: CatalogItem[]) {
   return [...raw].sort((a, b) => {
     const ai = BRAND_PRIORITY.indexOf(a.brand);
@@ -27,6 +33,9 @@ function sortItems(raw: CatalogItem[]) {
     const av = ai === -1 ? 999 : ai;
     const bv = bi === -1 ? 999 : bi;
     if (av !== bv) return av - bv;
+    // Внутри бренда: свежие модели первыми (17 > 16 > 15)
+    const numDiff = modelSortKey(b.model) - modelSortKey(a.model);
+    if (numDiff !== 0) return numDiff;
     return a.model.localeCompare(b.model);
   });
 }
@@ -42,7 +51,7 @@ const Catalog = () => {
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [activeCategory, setActiveCategory] = useState("Смартфоны");
-  const [activeBrand, setActiveBrand] = useState("");
+  const [activeBrand, setActiveBrand] = useState("Apple");
   const [search, setSearch] = useState("");
   const [filterAvail, setFilterAvail] = useState("");
   const [loading, setLoading] = useState(true);

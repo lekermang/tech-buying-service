@@ -4,6 +4,7 @@ import SkyTab from "@/components/admin/SkyTab";
 import RepairTab from "@/components/admin/RepairTab";
 import PricesTab from "@/components/admin/PricesTab";
 import CatalogTab from "@/components/admin/CatalogTab";
+import CatalogEditTab from "@/components/admin/CatalogEditTab";
 
 const ADMIN_URL = "https://functions.poehali.dev/a105aede-d55d-4b99-9d3e-5e977887aa04";
 
@@ -11,7 +12,7 @@ export default function Admin() {
   const [token, setToken] = useState(() => localStorage.getItem("admin_token") || "");
   const [tokenInput, setTokenInput] = useState("");
   const [authed, setAuthed] = useState(false);
-  const [tab, setTab] = useState<"repair" | "prices" | "sky" | "catalog">("repair");
+  const [tab, setTab] = useState<"repair" | "prices" | "sky" | "catalog" | "items">("repair");
   const [error, setError] = useState("");
   const [checking, setChecking] = useState(false);
 
@@ -78,7 +79,8 @@ export default function Admin() {
               { key: "repair", label: "Ремонт", icon: "Wrench" },
               { key: "prices", label: "Цены", icon: "Tag" },
               { key: "sky", label: "SKY", icon: "Package" },
-              { key: "catalog", label: "Каталог", icon: "Bot" },
+              { key: "items", label: "Товары", icon: "ShoppingBag" },
+              { key: "catalog", label: "Синхронизация", icon: "Bot" },
             ].map((t) => (
               <button key={t.key} onClick={() => setTab(t.key as typeof tab)}
                 className={`flex items-center gap-1.5 font-oswald font-bold uppercase text-xs px-3 py-1.5 transition-colors ${tab === t.key ? "bg-[#FFD700] text-black" : "text-white/40 hover:text-white"}`}>
@@ -97,6 +99,7 @@ export default function Admin() {
       {tab === "repair" && <RepairTab token={token} />}
       {tab === "prices" && <PricesTab token={token} />}
       {tab === "sky" && <SkyTab token={token} />}
+      {tab === "items" && <CatalogEditTab token={token} />}
       {tab === "catalog" && <CatalogTab token={token} />}
     </div>
   );
