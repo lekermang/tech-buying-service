@@ -68,7 +68,7 @@ const HeroSection = ({ scrollTo }: HeroSectionProps) => {
   };
 
   return (
-    <section id="hero" className="relative min-h-screen flex items-center pt-24" style={{ backgroundImage: "linear-gradient(rgba(255,215,0,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,215,0,0.04) 1px, transparent 1px)", backgroundSize: "60px 60px" }}>
+    <section id="hero" className="relative min-h-screen flex items-center pt-[88px] md:pt-[104px]" style={{ backgroundImage: "linear-gradient(rgba(255,215,0,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,215,0,0.04) 1px, transparent 1px)", backgroundSize: "60px 60px" }}>
       <div className="absolute inset-0 overflow-hidden">
         <img
           src="https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/47a9e726-1666-459a-824f-d2c990b98092.jpg"
@@ -79,43 +79,45 @@ const HeroSection = ({ scrollTo }: HeroSectionProps) => {
       </div>
       <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#FFD700]" />
 
-      <div className="relative max-w-7xl mx-auto px-4 py-16 grid lg:grid-cols-2 gap-12 items-start w-full">
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-8 md:py-14 lg:py-16 grid lg:grid-cols-2 gap-8 lg:gap-12 items-start w-full">
         <div className="flex flex-col">
           {/* Бейдж */}
-          <div className="inline-flex items-center gap-2 bg-[#FFD700]/10 border border-[#FFD700]/30 px-3 py-1 mb-5 self-start">
+          <div className="inline-flex items-center gap-2 bg-[#FFD700]/10 border border-[#FFD700]/30 px-3 py-1.5 mb-4 md:mb-5 self-start">
             <div className="w-2 h-2 bg-[#FFD700] rounded-full animate-pulse" />
-            <span className="font-roboto text-xs text-[#FFD700] uppercase tracking-widest">Работаем 24/7 без выходных</span>
+            <span className="font-roboto text-[11px] md:text-xs text-[#FFD700] uppercase tracking-widest">Работаем 24/7 без выходных</span>
           </div>
 
           {/* Заголовок */}
-          <h1 className="font-oswald text-5xl md:text-6xl lg:text-7xl font-bold leading-none mb-5">
+          <h1 className="font-oswald text-[2.8rem] sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-none mb-4 md:mb-5">
             ПРОДАЙ<br />
             <span className="animate-shimmer">ТЕХНИКУ</span><br />
             ВЫГОДНО
           </h1>
 
-          <p className="font-roboto text-white/65 text-base md:text-lg mb-7 max-w-md leading-relaxed">
+          <p className="font-roboto text-white/65 text-sm sm:text-base md:text-lg mb-5 md:mb-7 max-w-md leading-relaxed">
             Честная оценка за 15 минут. Смартфоны, ноутбуки, ювелирные украшения — принимаем всё. Выплата в день обращения.
           </p>
 
-          {/* CTA кнопки */}
-          <div className="flex flex-wrap gap-3 mb-8">
+          {/* CTA кнопки — большие, удобные для пальцев */}
+          <div className="flex gap-3 mb-6 md:mb-8">
             <button onClick={() => scrollTo("#evaluate")}
-              className="bg-[#FFD700] text-black font-oswald font-bold text-base px-7 py-3.5 uppercase tracking-wide hover:bg-yellow-400 transition-colors">
+              className="flex-1 sm:flex-none bg-[#FFD700] text-black font-oswald font-bold text-base sm:text-lg px-6 sm:px-8 py-4 uppercase tracking-wide hover:bg-yellow-400 active:scale-95 transition-all flex items-center justify-center gap-2">
+              <Icon name="Zap" size={18} />
               Оценить онлайн
             </button>
             <a href="tel:+79929990333"
-              className="border-2 border-[#FFD700] text-[#FFD700] font-oswald font-bold text-base px-7 py-3.5 uppercase tracking-wide hover:bg-[#FFD700] hover:text-black transition-colors">
+              className="flex-1 sm:flex-none border-2 border-[#FFD700] text-[#FFD700] font-oswald font-bold text-base sm:text-lg px-6 sm:px-8 py-4 uppercase tracking-wide hover:bg-[#FFD700] hover:text-black active:scale-95 transition-all flex items-center justify-center gap-2">
+              <Icon name="Phone" size={18} />
               Позвонить
             </a>
           </div>
 
           {/* Статистика */}
-          <div className="flex gap-8 mb-8 pb-8 border-b border-white/5">
+          <div className="flex gap-6 md:gap-8 mb-6 md:mb-8 pb-6 md:pb-8 border-b border-white/5">
             {[["50 000+", "клиентов"], ["9 лет", "на рынке"], ["2", "филиала"]].map(([num, label]) => (
               <div key={label}>
-                <div className="font-oswald text-2xl font-bold text-[#FFD700]">{num}</div>
-                <div className="font-roboto text-white/40 text-xs uppercase tracking-wide">{label}</div>
+                <div className="font-oswald text-xl md:text-2xl font-bold text-[#FFD700]">{num}</div>
+                <div className="font-roboto text-white/40 text-[10px] md:text-xs uppercase tracking-wide">{label}</div>
               </div>
             ))}
           </div>
@@ -124,10 +126,10 @@ const HeroSection = ({ scrollTo }: HeroSectionProps) => {
           <div className="space-y-1.5">
             <UsedGoodsSearch />
             <a href="/catalog"
-              className="flex items-center justify-between bg-[#111] border border-[#FFD700]/20 hover:border-[#FFD700]/50 px-4 py-2.5 transition-colors group">
+              className="flex items-center justify-between bg-[#111] border border-[#FFD700]/20 hover:border-[#FFD700]/50 px-4 py-3 transition-colors group">
               <div className="flex items-center gap-3">
-                <div className="w-7 h-7 bg-[#FFD700]/10 flex items-center justify-center shrink-0">
-                  <Icon name="ShoppingBag" size={14} className="text-[#FFD700]" />
+                <div className="w-8 h-8 bg-[#FFD700]/10 flex items-center justify-center shrink-0">
+                  <Icon name="ShoppingBag" size={15} className="text-[#FFD700]" />
                 </div>
                 <div>
                   <div className="font-oswald font-bold text-sm uppercase text-white leading-tight">Каталог новой техники</div>
@@ -143,7 +145,7 @@ const HeroSection = ({ scrollTo }: HeroSectionProps) => {
 
         {/* Quick evaluate form */}
         <div id="evaluate">
-          <div className="bg-[#1A1A1A] border border-[#FFD700]/30 p-6">
+          <div className="bg-[#1A1A1A] border border-[#FFD700]/30 p-4 sm:p-6">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-1 h-8 bg-[#FFD700]" />
               <h2 className="font-oswald text-2xl font-bold uppercase">Быстрая оценка</h2>
@@ -233,8 +235,12 @@ const HeroSection = ({ scrollTo }: HeroSectionProps) => {
                 )}
 
                 <button type="submit" disabled={loading}
-                  className="w-full bg-[#FFD700] text-black font-oswald font-bold text-lg py-4 uppercase tracking-wide hover:bg-yellow-400 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
-                  {loading ? "Отправляем..." : "Получить оценку бесплатно"}
+                  className="w-full bg-[#FFD700] text-black font-oswald font-bold text-lg sm:text-xl py-4 sm:py-5 uppercase tracking-wide hover:bg-yellow-400 active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                  {loading ? (
+                    <><Icon name="Loader" size={20} className="animate-spin" /> Отправляем...</>
+                  ) : (
+                    <><Icon name="Check" size={20} /> Получить оценку бесплатно</>
+                  )}
                 </button>
 
                 <p className="font-roboto text-white/30 text-xs text-center">

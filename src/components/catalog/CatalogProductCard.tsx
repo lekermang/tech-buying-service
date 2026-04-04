@@ -17,7 +17,7 @@ const CatalogProductCard = ({ item, onBuy }: Props) => {
 
   return (
     <div className="bg-[#111] border border-[#222] hover:border-[#FFD700]/30 transition-colors group relative flex flex-col">
-      <div className="h-32 sm:h-44 bg-[#151515] relative overflow-hidden flex items-center justify-center">
+      <div className="h-36 sm:h-44 md:h-48 bg-[#151515] relative overflow-hidden flex items-center justify-center">
         {photo ? (
           <img src={photo} alt={title}
             className="w-full h-full object-cover opacity-70 group-hover:opacity-90 group-hover:scale-105 transition-all duration-500" />
@@ -58,9 +58,8 @@ const CatalogProductCard = ({ item, onBuy }: Props) => {
             )}
           </div>
           <button onClick={() => onBuy(item)}
-            className="w-full bg-[#FFD700] text-black font-oswald font-bold text-xs sm:text-sm py-2 sm:py-2.5 uppercase tracking-wide hover:bg-yellow-400 transition-colors flex items-center justify-center gap-1 sm:gap-2">
-            <Icon name="ShoppingCart" size={12} className="sm:hidden" />
-            <Icon name="ShoppingCart" size={14} className="hidden sm:block" />
+            className="w-full bg-[#FFD700] text-black font-oswald font-bold text-sm sm:text-base py-2.5 sm:py-3 uppercase tracking-wide hover:bg-yellow-400 active:scale-95 transition-all flex items-center justify-center gap-1.5">
+            <Icon name="ShoppingCart" size={15} />
             Купить
           </button>
         </div>

@@ -47,13 +47,13 @@ const InfoSections = () => {
             <div className="hidden md:block w-24 h-1 bg-[#FFD700] mb-4" />
           </Reveal>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-[#FFD700]/10">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-px bg-[#FFD700]/10">
             {CATEGORIES.map((cat, i) => (
               <Reveal key={cat.title} delay={(i % 4) as 0|1|2|3|4|5}>
-                <div className="bg-[#0D0D0D] p-4 md:p-6 hover:bg-[#1A1A1A] transition-colors group cursor-pointer relative overflow-hidden h-full">
+                <div className="bg-[#0D0D0D] p-4 sm:p-5 md:p-6 hover:bg-[#1A1A1A] transition-colors group cursor-pointer relative overflow-hidden h-full">
                   <div className="absolute top-0 left-0 w-0 group-hover:w-full h-0.5 bg-[#FFD700] transition-all duration-300" />
-                  <Icon name={cat.icon} size={24} className="text-[#FFD700] mb-3" />
-                  <h3 className="font-oswald text-lg md:text-xl font-bold mb-1 uppercase">{cat.title}</h3>
+                  <Icon name={cat.icon} size={28} className="text-[#FFD700] mb-3" />
+                  <h3 className="font-oswald text-base sm:text-lg md:text-xl font-bold mb-1 uppercase">{cat.title}</h3>
                   <p className="font-roboto text-white/50 text-xs md:text-sm mb-2 md:mb-3 hidden sm:block">{cat.desc}</p>
                   <span className="font-oswald text-[#FFD700] font-bold text-sm">{cat.price}</span>
                 </div>
@@ -71,7 +71,7 @@ const InfoSections = () => {
             <h2 className="font-oswald text-3xl md:text-5xl font-bold">КАК ЭТО<br />РАБОТАЕТ</h2>
           </Reveal>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-5 md:gap-8">
             {HOW_STEPS.map((step, i) => (
               <Reveal key={step.num} delay={(i) as 0|1|2|3|4|5}>
                 <div className="relative">
@@ -85,8 +85,8 @@ const InfoSections = () => {
                     {i < HOW_STEPS.length - 1 && (
                       <div className="hidden md:block absolute top-7 left-14 right-0 h-px bg-[#FFD700]/20" />
                     )}
-                    <h3 className="font-oswald text-lg md:text-xl font-bold uppercase mb-2">{step.title}</h3>
-                    <p className="font-roboto text-white/50 text-sm leading-relaxed">{step.desc}</p>
+                    <h3 className="font-oswald text-base md:text-xl font-bold uppercase mb-2">{step.title}</h3>
+                    <p className="font-roboto text-white/50 text-xs md:text-sm leading-relaxed">{step.desc}</p>
                   </div>
                 </div>
               </Reveal>
@@ -103,15 +103,17 @@ const InfoSections = () => {
             <h2 className="font-oswald text-3xl md:text-5xl font-bold">НАШИ<br />ГАРАНТИИ</h2>
           </Reveal>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-px bg-[#FFD700]/10">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-px bg-[#FFD700]/10">
             {GUARANTEES.map((g, i) => (
               <Reveal key={g.title} delay={(i) as 0|1|2|3|4|5}>
-                <div className="bg-[#0D0D0D] p-6 md:p-8 hover:bg-[#1A1A1A] transition-colors group h-full">
-                  <div className="w-12 h-12 bg-[#FFD700]/10 border border-[#FFD700]/20 flex items-center justify-center mb-4 group-hover:bg-[#FFD700]/20 transition-colors">
+                <div className="bg-[#0D0D0D] p-5 md:p-8 hover:bg-[#1A1A1A] transition-colors group h-full flex gap-4 sm:block">
+                  <div className="w-12 h-12 shrink-0 bg-[#FFD700]/10 border border-[#FFD700]/20 flex items-center justify-center sm:mb-4 group-hover:bg-[#FFD700]/20 transition-colors">
                     <Icon name={g.icon} size={24} className="text-[#FFD700]" />
                   </div>
-                  <h3 className="font-oswald text-xl font-bold uppercase mb-2">{g.title}</h3>
-                  <p className="font-roboto text-white/50 text-sm leading-relaxed">{g.desc}</p>
+                  <div>
+                    <h3 className="font-oswald text-lg md:text-xl font-bold uppercase mb-1 md:mb-2">{g.title}</h3>
+                    <p className="font-roboto text-white/50 text-xs md:text-sm leading-relaxed">{g.desc}</p>
+                  </div>
                 </div>
               </Reveal>
             ))}

@@ -61,7 +61,7 @@ const Catalog = () => {
     <div className="min-h-screen bg-[#0D0D0D] text-white">
       {/* Header */}
       <div className="bg-[#0D0D0D] border-b border-[#FFD700]/20 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-3">
           <a href="/" className="flex items-center gap-2 shrink-0">
             <div className="w-8 h-8 bg-[#FFD700] flex items-center justify-center">
               <Icon name="ShoppingBag" size={16} className="text-black" />
@@ -75,60 +75,59 @@ const Catalog = () => {
               type="text"
               value={search}
               onChange={e => handleSearch(e.target.value)}
-              placeholder="iPhone 17, Samsung S25, MacBook..."
-              className="w-full bg-[#1A1A1A] border border-[#333] text-white pl-9 pr-4 py-2.5 font-roboto text-sm focus:outline-none focus:border-[#FFD700] transition-colors"
+              placeholder="iPhone, Samsung, MacBook..."
+              className="w-full bg-[#1A1A1A] border border-[#333] text-white pl-9 pr-4 py-2.5 sm:py-3 font-roboto text-sm focus:outline-none focus:border-[#FFD700] transition-colors"
             />
           </div>
-          <a href="/" className="text-white/40 hover:text-white font-roboto text-xs transition-colors flex items-center gap-1">
-            <Icon name="ArrowLeft" size={14} />На сайт
+          <a href="/" className="text-white/40 hover:text-white font-roboto text-xs transition-colors flex items-center gap-1 shrink-0">
+            <Icon name="ArrowLeft" size={14} />
+            <span className="hidden sm:inline">На сайт</span>
           </a>
         </div>
 
         {/* Filters row */}
-        <div className="max-w-7xl mx-auto px-4 pb-3 flex items-center gap-2 flex-wrap">
-          <button onClick={() => handleAvail("")}
-            className={`font-roboto text-xs px-3 py-1.5 border transition-colors ${filterAvail === "" ? "bg-[#FFD700] text-black border-[#FFD700]" : "border-[#333] text-white/50 hover:border-white/30"}`}>
-            Все
-          </button>
-          <button onClick={() => handleAvail("in_stock")}
-            className={`font-roboto text-xs px-3 py-1.5 border transition-colors flex items-center gap-1 ${filterAvail === "in_stock" ? "bg-[#FFD700] text-black border-[#FFD700]" : "border-[#333] text-white/50 hover:border-white/30"}`}>
-            ✅ В наличии
-          </button>
-          <button onClick={() => handleAvail("on_order")}
-            className={`font-roboto text-xs px-3 py-1.5 border transition-colors flex items-center gap-1 ${filterAvail === "on_order" ? "bg-[#FFD700] text-black border-[#FFD700]" : "border-[#333] text-white/50 hover:border-white/30"}`}>
-            🚗 Под заказ
-          </button>
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 pb-2.5 flex items-center gap-2">
+          {[
+            { val: "", label: "Все" },
+            { val: "in_stock", label: "✅ В наличии" },
+            { val: "on_order", label: "🚗 Под заказ" },
+          ].map(f => (
+            <button key={f.val} onClick={() => handleAvail(f.val)}
+              className={`font-roboto text-xs px-3 py-2 border transition-colors active:scale-95 ${filterAvail === f.val ? "bg-[#FFD700] text-black border-[#FFD700]" : "border-[#333] text-white/50 hover:border-white/30"}`}>
+              {f.label}
+            </button>
+          ))}
           <div className="hidden sm:block text-white/20 text-xs font-roboto ml-1">Заказ до 17:00 — доставка завтра</div>
         </div>
       </div>
 
-      {/* Mobile categories scroll — вне flex контейнера */}
-      <div className="lg:hidden overflow-x-auto border-b border-[#111]">
-        <div className="flex gap-2 px-4 py-3 min-w-max">
+      {/* Категории — горизонтальный скролл на мобильном и планшете */}
+      <div className="lg:hidden overflow-x-auto border-b border-[#111] scrollbar-hide">
+        <div className="flex gap-2 px-3 sm:px-4 py-2.5 min-w-max">
           <button onClick={() => handleCategory("")}
-            className={`font-roboto text-xs px-3 py-2 border whitespace-nowrap transition-colors ${activeCategory === "" ? "bg-[#FFD700] text-black border-[#FFD700]" : "border-[#333] text-white/50"}`}>
+            className={`font-roboto text-xs px-3 py-2 border whitespace-nowrap transition-colors active:scale-95 ${activeCategory === "" ? "bg-[#FFD700] text-black border-[#FFD700]" : "border-[#333] text-white/50"}`}>
             Все
           </button>
           {categories.map(cat => (
             <button key={cat} onClick={() => handleCategory(cat)}
-              className={`font-roboto text-xs px-3 py-2 border whitespace-nowrap transition-colors ${activeCategory === cat ? "bg-[#FFD700] text-black border-[#FFD700]" : "border-[#333] text-white/50"}`}>
+              className={`font-roboto text-xs px-3 py-2 border whitespace-nowrap transition-colors active:scale-95 ${activeCategory === cat ? "bg-[#FFD700] text-black border-[#FFD700]" : "border-[#333] text-white/50"}`}>
               {cat}
             </button>
           ))}
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-6 flex gap-6">
-        {/* Sidebar categories — только десктоп */}
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 flex gap-6">
+        {/* Sidebar — только десктоп */}
         <aside className="hidden lg:block w-52 shrink-0">
-          <div className="sticky top-36 space-y-1">
+          <div className="sticky top-36 space-y-0.5">
             <button onClick={() => handleCategory("")}
-              className={`w-full text-left font-roboto text-sm px-3 py-2 transition-colors ${activeCategory === "" ? "text-[#FFD700] border-l-2 border-[#FFD700] bg-[#1A1A1A]" : "text-white/50 hover:text-white border-l-2 border-transparent"}`}>
+              className={`w-full text-left font-roboto text-sm px-3 py-2.5 transition-colors ${activeCategory === "" ? "text-[#FFD700] border-l-2 border-[#FFD700] bg-[#1A1A1A]" : "text-white/50 hover:text-white border-l-2 border-transparent"}`}>
               Все категории
             </button>
             {categories.map(cat => (
               <button key={cat} onClick={() => handleCategory(cat)}
-                className={`w-full text-left font-roboto text-xs px-3 py-2 transition-colors ${activeCategory === cat ? "text-[#FFD700] border-l-2 border-[#FFD700] bg-[#1A1A1A]" : "text-white/40 hover:text-white border-l-2 border-transparent"}`}>
+                className={`w-full text-left font-roboto text-xs px-3 py-2.5 transition-colors ${activeCategory === cat ? "text-[#FFD700] border-l-2 border-[#FFD700] bg-[#1A1A1A]" : "text-white/40 hover:text-white border-l-2 border-transparent"}`}>
                 {cat}
               </button>
             ))}
@@ -143,14 +142,14 @@ const Catalog = () => {
             </div>
           ) : (
             Object.entries(grouped).map(([cat, catItems]) => catItems.length > 0 && (
-              <div key={cat} className="mb-10">
+              <div key={cat} className="mb-8 md:mb-10">
                 {!activeCategory && (
-                  <div className="flex items-center gap-3 mb-4 pb-3 border-b border-[#FFD700]/10">
-                    <h2 className="font-oswald font-bold text-lg md:text-xl text-white uppercase">{cat}</h2>
+                  <div className="flex items-center gap-3 mb-3 pb-3 border-b border-[#FFD700]/10">
+                    <h2 className="font-oswald font-bold text-base md:text-xl text-white uppercase">{cat}</h2>
                     <span className="font-roboto text-white/30 text-xs">{catItems.length} позиций</span>
                   </div>
                 )}
-                <div className="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-2 md:gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-3">
                   {catItems.map(item => (
                     <CatalogProductCard key={item.id} item={item} onBuy={setOrderItem} />
                   ))}

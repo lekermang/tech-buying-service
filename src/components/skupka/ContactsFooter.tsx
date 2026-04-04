@@ -40,15 +40,15 @@ const ContactsFooter = ({ scrollTo }: ContactsFooterProps) => {
             <h2 className="font-oswald text-3xl md:text-5xl font-bold">КОНТАКТЫ</h2>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
             {[
               { icon: "MapPin", title: "Кирова, 11", lines: ["+7 (992) 999-03-33", "24/7 без выходных"], href: "tel:+79929990333" },
               { icon: "MapPin", title: "Кирова, 7/47", lines: ["8 (800) 600-68-33", "Бесплатно по России"], href: "tel:88006006833" },
-              { icon: "MessageCircle", title: "WhatsApp / Telegram", lines: ["@skupka24", "Ответим за 5 минут"], href: "https://t.me/skupka24" },
+              { icon: "MessageCircle", title: "Telegram", lines: ["@skupka24", "Ответим за 5 минут"], href: "https://t.me/skupka24" },
               { icon: "Mail", title: "Email", lines: ["lekermany@yandex.ru", "Деловые запросы"], href: "mailto:lekermany@yandex.ru" },
             ].map((c) => (
               <a key={c.title} href={c.href}
-                className="border border-[#FFD700]/20 p-4 md:p-6 hover:border-[#FFD700] transition-colors group block">
+                className="border border-[#FFD700]/20 p-4 md:p-6 hover:border-[#FFD700] active:bg-[#FFD700]/5 transition-colors group block">
                 <div className="w-10 h-10 md:w-12 md:h-12 border border-[#FFD700]/20 flex items-center justify-center mb-3 group-hover:bg-[#FFD700]/10 transition-colors">
                   <Icon name={c.icon} size={20} className="text-[#FFD700]" />
                 </div>
@@ -64,7 +64,8 @@ const ContactsFooter = ({ scrollTo }: ContactsFooterProps) => {
               <p className="font-roboto text-black/60 text-sm mt-1">Оценим бесплатно. Деньги в день обращения.</p>
             </div>
             <button onClick={() => scrollTo("#evaluate")}
-              className="w-full sm:w-auto bg-black text-[#FFD700] font-oswald font-bold text-base px-6 py-3.5 uppercase tracking-wide hover:bg-[#1A1A1A] transition-colors shrink-0">
+              className="w-full sm:w-auto bg-black text-[#FFD700] font-oswald font-bold text-lg px-8 py-4 uppercase tracking-wide hover:bg-[#1A1A1A] active:scale-95 transition-all shrink-0 flex items-center justify-center gap-2">
+              <Icon name="Zap" size={18} />
               Оценить сейчас
             </button>
           </div>
