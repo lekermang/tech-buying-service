@@ -134,6 +134,34 @@ def handler(event: dict, context) -> dict:
             notify_telegram(new_id, name, phone, model, repair_type, price, comment)
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'id': new_id}, ensure_ascii=False)}
 
+        # Полное редактирование полей заявки
+        if action == 'update_fields':
+            order_id = body.get('id')
+            if not order_id:
+                cur.close(); conn.close()
+                return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'Укажите id'}, ensure_ascii=False)}
+            name = (body.get('name') or '').strip()
+            phone = (body.get('phone') or '').strip()
+            model = (body.get('model') or '').strip() or None
+            repair_type = (body.get('repair_type') or '').strip() or None
+            price = body.get('price')
+            comment = (body.get('comment') or '').strip() or None
+            admin_note = (body.get('admin_note') or '').strip() or None
+            cur.execute(
+                f"""UPDATE {SCHEMA}.repair_orders
+                    SET name=%s, phone=%s, model=%s, repair_type=%s,
+                        price=%s, comment=%s, admin_note=%s
+                    WHERE id=%s RETURNING id""",
+                (name, phone, model, repair_type,
+                 int(price) if price else None, comment, admin_note, int(order_id))
+            )
+            updated = cur.fetchone()
+            conn.commit()
+            cur.close(); conn.close()
+            if not updated:
+                return {'statusCode': 404, 'headers': HEADERS, 'body': json.dumps({'error': 'Заявка не найдена'}, ensure_ascii=False)}
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True}, ensure_ascii=False)}
+
         # Перевод в «Готово» с записью сумм (статус ready)
         if action == 'complete':
             order_id = body.get('id')

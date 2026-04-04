@@ -104,6 +104,23 @@ export default function StaffRepairTab({ token }: { token: string }) {
     loadOrders();
   };
 
+  const saveEdit = async (id: number, fields: { name: string; phone: string; model: string; repair_type: string; price: string; comment: string; admin_note: string }) => {
+    setSaving(true);
+    await fetch(REPAIR_URL, {
+      method: "POST", headers,
+      body: JSON.stringify({
+        action: "update_fields", id,
+        name: fields.name, phone: fields.phone,
+        model: fields.model || null, repair_type: fields.repair_type || null,
+        price: fields.price ? parseInt(fields.price) : null,
+        comment: fields.comment || null, admin_note: fields.admin_note || null,
+      }),
+    });
+    setSaving(false);
+    setEditing(null);
+    loadOrders();
+  };
+
   return (
     <div>
       {/* Шапка с переключателем вид + кнопки */}
@@ -188,6 +205,7 @@ export default function StaffRepairTab({ token }: { token: string }) {
               onCompleteFormChange={setCompleteForm}
               onCompleteRepair={completeRepair}
               onIssueRepair={issueRepair}
+              onSaveEdit={saveEdit}
             />
           ))}
         </div>
