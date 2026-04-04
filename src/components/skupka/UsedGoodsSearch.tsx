@@ -55,7 +55,7 @@ export default function UsedGoodsSearch() {
             <Icon name="ShoppingBag" size={11} className="text-black" />
           </div>
           <span className="font-oswald font-bold text-xs uppercase text-white tracking-wide">Б/У техника</span>
-          <span className="bg-[#FFD700]/20 text-[#FFD700] font-roboto text-[10px] px-1.5 py-0.5 border border-[#FFD700]/30">Гарантия 14 дней</span>
+          <span className="bg-[#FFD700]/20 text-[#FFD700] font-roboto text-[10px] px-1.5 py-0.5 border border-[#FFD700]/30">Гарантия 1 год</span>
         </div>
         <Icon name={open ? "ChevronUp" : "ChevronDown"} size={14} className="text-white/40" />
       </button>

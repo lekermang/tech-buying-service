@@ -124,7 +124,6 @@ const HeroSection = ({ scrollTo }: HeroSectionProps) => {
 
           {/* Виджеты — компактный блок */}
           <div className="space-y-1.5">
-            <UsedGoodsSearch />
             <a href="/catalog"
               className="flex items-center justify-between bg-[#111] border border-[#FFD700]/20 hover:border-[#FFD700]/50 px-4 py-3 transition-colors group">
               <div className="flex items-center gap-3">
@@ -133,11 +132,12 @@ const HeroSection = ({ scrollTo }: HeroSectionProps) => {
                 </div>
                 <div>
                   <div className="font-oswald font-bold text-sm uppercase text-white leading-tight">Каталог новой техники</div>
-                  <div className="font-roboto text-white/30 text-[11px]">iPhone, Samsung, MacBook, Dyson</div>
+                  <div className="font-roboto text-white/30 text-[11px]">iPhone, Samsung, MacBook, Dyson · <span className="text-[#FFD700]/60">Гарантия 2 года</span></div>
                 </div>
               </div>
               <Icon name="ArrowRight" size={14} className="text-[#FFD700]/40 group-hover:text-[#FFD700] transition-colors shrink-0" />
             </a>
+            <UsedGoodsSearch />
             <RepairWidget />
             <AppleWidget compact />
           </div>
