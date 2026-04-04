@@ -35,40 +35,67 @@ function printPriceTag(item: Good) {
   </div><script>window.onload=()=>window.print()</` + `script></body></html>`);
 }
 
-function printContract(contractNumber: string, good: Good, clientName: string, clientPhone: string, amount: number) {
+type Passport = { series: string; number: string; issued_by: string; issued_date: string; address: string };
+
+function printContract(contractNumber: string, good: Good, clientName: string, clientPhone: string, amount: number, passport?: Passport) {
   const w = window.open("", "_blank", "width=700,height=900");
   if (!w) return;
   const date = new Date().toLocaleDateString("ru-RU");
+  const passportLine = passport?.series
+    ? `паспорт ${passport.series} ${passport.number}, выдан ${passport.issued_by} ${passport.issued_date}, зарег.: ${passport.address}`
+    : "";
   w.document.write(`<!DOCTYPE html><html><head><title>Договор ${contractNumber}</title><style>
     body{font-family:Arial,sans-serif;margin:40px;font-size:14px;line-height:1.6}
-    h2{text-align:center;font-size:18px}
-    .section{margin:20px 0}
+    h2{text-align:center;font-size:18px;margin-bottom:4px}
+    .sub{text-align:center;color:#555;font-size:13px;margin-bottom:20px}
+    .section{margin:16px 0}
+    p{margin:6px 0}
+    table{width:100%;border-collapse:collapse;margin:10px 0}
+    td{padding:6px 8px;border:1px solid #ccc;font-size:13px}
+    td:first-child{font-weight:bold;width:40%;background:#f9f9f9}
     .sign{display:flex;justify-content:space-between;margin-top:60px}
     .sign div{width:45%}
     .line{border-bottom:1px solid #000;margin-top:40px;margin-bottom:5px}
+    .small{font-size:11px;color:#888}
     @media print{body{margin:20px}}
   </style></head><body>
   <h2>ДОГОВОР КУПЛИ-ПРОДАЖИ № ${contractNumber}</h2>
-  <p style="text-align:center">г. Калуга, ${date}</p>
+  <div class="sub">г. Калуга, ${date}</div>
   <div class="section">
-    <p><b>Продавец:</b> ИП Скупка24, г. Калуга, ул. Кирова 11</p>
-    <p><b>Покупатель:</b> ${clientName}, тел.: ${clientPhone}</p>
+    <p><b>Продавец:</b> ИП Скупка24, г. Калуга, ул. Кирова 11, тел. +7 (4842) 27-77-04</p>
+    <p><b>Покупатель:</b> ${clientName}</p>
+    <p>Телефон: ${clientPhone}</p>
+    ${passportLine ? `<p>Паспорт: ${passportLine}</p>` : ""}
   </div>
   <div class="section">
-    <p>Продавец продаёт, а Покупатель приобретает следующий товар:</p>
-    <p><b>Наименование:</b> ${good.title}</p>
-    <p><b>Состояние:</b> ${good.condition}</p>
-    ${good.imei ? `<p><b>IMEI:</b> ${good.imei}</p>` : ""}
-    ${good.storage ? `<p><b>Память:</b> ${good.storage}</p>` : ""}
-    <p><b>Стоимость:</b> <b>${amount.toLocaleString("ru-RU")} рублей</b></p>
+    <p>Продавец продал, а Покупатель купил следующий товар:</p>
+    <table>
+      <tr><td>Наименование</td><td>${good.title}</td></tr>
+      <tr><td>Состояние</td><td>${good.condition}</td></tr>
+      ${good.storage ? `<tr><td>Память</td><td>${good.storage}</td></tr>` : ""}
+      ${good.color ? `<tr><td>Цвет</td><td>${good.color}</td></tr>` : ""}
+      ${good.imei ? `<tr><td>IMEI</td><td>${good.imei}</td></tr>` : ""}
+      <tr><td>Стоимость</td><td><b>${amount.toLocaleString("ru-RU")} рублей</b></td></tr>
+    </table>
   </div>
   <div class="section">
-    <p>Покупатель ознакомлен с техническим состоянием товара и претензий не имеет.</p>
-    <p>Гарантийный срок: 14 дней с момента покупки.</p>
+    <p>Покупатель осмотрел товар, ознакомлен с его техническим состоянием, претензий не имеет.</p>
+    <p>Гарантийный срок: <b>14 (четырнадцать) дней</b> с момента передачи товара.</p>
+    <p>Товар передан в момент подписания настоящего договора.</p>
   </div>
   <div class="sign">
-    <div><p><b>Продавец:</b></p><div class="line"></div><p>подпись / печать</p></div>
-    <div><p><b>Покупатель:</b></p><div class="line"></div><p>подпись</p></div>
+    <div>
+      <p><b>Продавец:</b></p>
+      <p class="small">ИП Скупка24</p>
+      <div class="line"></div>
+      <p class="small">подпись / М.П.</p>
+    </div>
+    <div>
+      <p><b>Покупатель:</b></p>
+      <p class="small">${clientName}</p>
+      <div class="line"></div>
+      <p class="small">подпись</p>
+    </div>
   </div>
   <script>window.onload=()=>window.print()</` + `script></body></html>`);
 }
@@ -85,6 +112,8 @@ function GoodsTab({ token }: { token: string }) {
   const [sellForm, setSellForm] = useState({ client_phone: "", discount_pct: "0", payment_method: "cash" });
   const [sellResult, setSellResult] = useState<{ contract_number: string; amount_final: number } | null>(null);
   const [clientFound, setClientFound] = useState<{ id: number; full_name: string; discount_pct: number } | null>(null);
+  const [passport, setPassport] = useState<Passport>({ series: "", number: "", issued_by: "", issued_date: "", address: "" });
+  const [showPassport, setShowPassport] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -115,8 +144,20 @@ function GoodsTab({ token }: { token: string }) {
     if (phone.length < 6) { setClientFound(null); return; }
     const res = await fetch(`${AUTH_CLIENT_URL}?action=profile&phone=${encodeURIComponent(phone)}`);
     const data = await res.json();
-    if (data.id) setClientFound(data);
-    else setClientFound(null);
+    if (data.id) {
+      setClientFound(data);
+      // Подставляем паспортные данные из базы если есть
+      if (data.passport_series) {
+        setShowPassport(true);
+        setPassport({
+          series: data.passport_series || "",
+          number: data.passport_number || "",
+          issued_by: data.passport_issued_by || "",
+          issued_date: data.passport_issued_date || "",
+          address: data.address || "",
+        });
+      }
+    } else setClientFound(null);
   };
 
   const doSell = async () => {
@@ -128,6 +169,11 @@ function GoodsTab({ token }: { token: string }) {
     if (data.contract_number) {
       setSellResult(data);
       load();
+      // Сохраняем паспортные данные клиента если введены
+      if (clientFound?.id && passport.series) {
+        fetch(AUTH_CLIENT_URL, { method: "PUT", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ client_id: clientFound.id, passport_series: passport.series, passport_number: passport.number, passport_issued_by: passport.issued_by, passport_issued_date: passport.issued_date || null, address: passport.address }) });
+      }
     }
   };
 
@@ -219,7 +265,7 @@ function GoodsTab({ token }: { token: string }) {
               <div className="font-oswald font-bold text-[#FFD700] text-sm shrink-0">{g.sell_price.toLocaleString("ru-RU")} ₽</div>
               <div className="flex gap-1 shrink-0">
                 <button onClick={() => printPriceTag(g)} className="text-white/30 hover:text-[#FFD700] p-1 transition-colors"><Icon name="Printer" size={13} /></button>
-                <button onClick={() => { setSellModal(g); setSellResult(null); setSellForm({ client_phone: "", discount_pct: "0", payment_method: "cash" }); setClientFound(null); }}
+                <button onClick={() => { setSellModal(g); setSellResult(null); setSellForm({ client_phone: "", discount_pct: "0", payment_method: "cash" }); setClientFound(null); setPassport({ series: "", number: "", issued_by: "", issued_date: "", address: "" }); setShowPassport(false); }}
                   className="text-white/30 hover:text-green-400 p-1 transition-colors"><Icon name="ShoppingCart" size={13} /></button>
               </div>
             </div>
@@ -235,7 +281,7 @@ function GoodsTab({ token }: { token: string }) {
                 <div className="font-roboto text-white/60 text-sm mb-1">Договор: <b className="text-white">{sellResult.contract_number}</b></div>
                 <div className="font-roboto text-white/60 text-sm mb-4">Сумма: <b className="text-[#FFD700]">{sellResult.amount_final.toLocaleString("ru-RU")} ₽</b></div>
                 <div className="flex gap-2">
-                  <button onClick={() => printContract(sellResult.contract_number, sellModal, clientFound?.full_name || "Покупатель", sellForm.client_phone, sellResult.amount_final)}
+                  <button onClick={() => printContract(sellResult.contract_number, sellModal, clientFound?.full_name || "Покупатель", sellForm.client_phone, sellResult.amount_final, passport.series ? passport : undefined)}
                     className="flex items-center gap-1 bg-[#FFD700] text-black font-oswald font-bold px-3 py-1.5 text-xs uppercase">
                     <Icon name="FileText" size={12} /> Договор
                   </button>
@@ -268,6 +314,49 @@ function GoodsTab({ token }: { token: string }) {
                     </select>
                   </div>
                 </div>
+
+                {/* Паспортные данные */}
+                <button onClick={() => setShowPassport(v => !v)}
+                  className="flex items-center gap-1 text-white/40 hover:text-[#FFD700] font-roboto text-[10px] transition-colors mb-2">
+                  <Icon name={showPassport ? "ChevronUp" : "ChevronDown"} size={11} />
+                  {showPassport ? "Скрыть паспортные данные" : "Добавить паспортные данные"}
+                </button>
+
+                {showPassport && (
+                  <div className="bg-black/20 border border-white/10 p-3 space-y-2 mb-3">
+                    <div className="font-roboto text-white/30 text-[10px] uppercase tracking-wide mb-1">Паспортные данные покупателя</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="font-roboto text-white/30 text-[10px] block mb-1">Серия</label>
+                        <input value={passport.series} onChange={e => setPassport(p => ({ ...p, series: e.target.value }))} placeholder="4520"
+                          className="w-full bg-[#0D0D0D] border border-[#333] text-white px-2 py-1.5 font-roboto text-xs focus:outline-none focus:border-[#FFD700]" />
+                      </div>
+                      <div>
+                        <label className="font-roboto text-white/30 text-[10px] block mb-1">Номер</label>
+                        <input value={passport.number} onChange={e => setPassport(p => ({ ...p, number: e.target.value }))} placeholder="123456"
+                          className="w-full bg-[#0D0D0D] border border-[#333] text-white px-2 py-1.5 font-roboto text-xs focus:outline-none focus:border-[#FFD700]" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="font-roboto text-white/30 text-[10px] block mb-1">Кем выдан</label>
+                      <input value={passport.issued_by} onChange={e => setPassport(p => ({ ...p, issued_by: e.target.value }))} placeholder="ОУФМС России..."
+                        className="w-full bg-[#0D0D0D] border border-[#333] text-white px-2 py-1.5 font-roboto text-xs focus:outline-none focus:border-[#FFD700]" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="font-roboto text-white/30 text-[10px] block mb-1">Дата выдачи</label>
+                        <input type="date" value={passport.issued_date} onChange={e => setPassport(p => ({ ...p, issued_date: e.target.value }))}
+                          className="w-full bg-[#0D0D0D] border border-[#333] text-white px-2 py-1.5 font-roboto text-xs focus:outline-none focus:border-[#FFD700]" />
+                      </div>
+                      <div>
+                        <label className="font-roboto text-white/30 text-[10px] block mb-1">Адрес регистрации</label>
+                        <input value={passport.address} onChange={e => setPassport(p => ({ ...p, address: e.target.value }))} placeholder="г. Калуга..."
+                          className="w-full bg-[#0D0D0D] border border-[#333] text-white px-2 py-1.5 font-roboto text-xs focus:outline-none focus:border-[#FFD700]" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex gap-2">
                   <button onClick={doSell} className="bg-[#FFD700] text-black font-oswald font-bold px-4 py-1.5 uppercase text-xs hover:bg-yellow-400 transition-colors">
                     Оформить

@@ -35,18 +35,31 @@ def handler(event: dict, context) -> dict:
     headers_in = {k.lower(): v for k, v in (event.get('headers') or {}).items()}
     client_token = headers_in.get('x-client-token', '').strip()
 
-    # GET /profile — получить профиль по токену
+    # GET /profile — получить профиль по токену или по номеру телефона (для сотрудников)
     if method == 'GET' and params.get('action') == 'profile':
-        if not client_token:
-            return _err(401, 'Требуется токен')
+        phone_param = params.get('phone', '').strip()
         conn = get_conn(); cur = conn.cursor()
-        cur.execute(f"SELECT id, full_name, phone, email, discount_pct, loyalty_points, registered_at FROM {SCHEMA}.clients WHERE auth_token=%s AND token_expires_at > NOW()", (client_token,))
+        if phone_param:
+            # поиск по телефону (публичный, для сотрудников)
+            cur.execute(f"""SELECT id, full_name, phone, email, discount_pct, loyalty_points,
+                            passport_series, passport_number, passport_issued_by, passport_issued_date, address, registered_at
+                            FROM {SCHEMA}.clients WHERE phone=%s""", (phone_param,))
+        else:
+            if not client_token:
+                return _err(401, 'Требуется токен')
+            cur.execute(f"""SELECT id, full_name, phone, email, discount_pct, loyalty_points,
+                            passport_series, passport_number, passport_issued_by, passport_issued_date, address, registered_at
+                            FROM {SCHEMA}.clients WHERE auth_token=%s AND token_expires_at > NOW()""", (client_token,))
         row = cur.fetchone(); cur.close(); conn.close()
         if not row:
-            return _err(401, 'Токен недействителен')
+            return _err(404, 'Клиент не найден')
         return _ok({'id': row[0], 'full_name': row[1], 'phone': row[2], 'email': row[3],
                     'discount_pct': row[4], 'loyalty_points': row[5],
-                    'registered_at': row[6].isoformat() if row[6] else None})
+                    'passport_series': row[6], 'passport_number': row[7],
+                    'passport_issued_by': row[8],
+                    'passport_issued_date': str(row[9]) if row[9] else None,
+                    'address': row[10],
+                    'registered_at': row[11].isoformat() if row[11] else None})
 
     # POST /register — регистрация по телефону
     if method == 'POST' and body.get('action') == 'register':
@@ -114,8 +127,24 @@ def handler(event: dict, context) -> dict:
         return _ok({'token': token, 'is_new': True, 'client_id': row[0], 'discount_pct': row[1],
                     'needs_phone': not bool(phone), 'full_name': full_name, 'email': email})
 
-    # PUT /update — обновление профиля
+    # PUT /update — обновление профиля (клиент по токену или сотрудник по client_id в body)
     if method == 'PUT':
+        # Сотрудник может обновить паспорт клиента по client_id
+        if body.get('client_id') and not client_token:
+            conn = get_conn(); cur = conn.cursor()
+            client_id = int(body['client_id'])
+            fields, values = [], []
+            for f in ('full_name', 'phone', 'email', 'address',
+                      'passport_series', 'passport_number', 'passport_issued_by',
+                      'passport_issued_date'):
+                if f in body and body[f] is not None:
+                    fields.append(f"{f}=%s"); values.append(body[f])
+            if fields:
+                values.append(client_id)
+                cur.execute(f"UPDATE {SCHEMA}.clients SET {', '.join(fields)}, updated_at=NOW() WHERE id=%s", values)
+                conn.commit()
+            cur.close(); conn.close()
+            return _ok({'ok': True})
         if not client_token:
             return _err(401, 'Требуется токен')
         conn = get_conn(); cur = conn.cursor()
@@ -125,8 +154,10 @@ def handler(event: dict, context) -> dict:
             return _err(401, 'Токен недействителен')
         client_id = row[0]
         fields, values = [], []
-        for f in ('full_name', 'phone', 'email', 'address'):
-            if f in body:
+        for f in ('full_name', 'phone', 'email', 'address',
+                  'passport_series', 'passport_number', 'passport_issued_by',
+                  'passport_issued_date', 'discount_pct'):
+            if f in body and body[f] is not None:
                 fields.append(f"{f}=%s"); values.append(body[f])
         if fields:
             values.append(client_id)
