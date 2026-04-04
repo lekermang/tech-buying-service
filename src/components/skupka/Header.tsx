@@ -39,10 +39,15 @@ const Header = ({ scrollTo }: HeaderProps) => {
   const [sent, setSent] = useState(false);
 
   useEffect(() => {
-    fetch(GOLD_PRICE_URL)
-      .then(r => r.json())
-      .then(d => setGoldPrice({ buy: d.buy, date: d.date }))
-      .catch(() => {});
+    const load = () => {
+      fetch(GOLD_PRICE_URL)
+        .then(r => r.json())
+        .then(d => setGoldPrice({ buy: d.buy, date: d.date }))
+        .catch(() => {});
+    };
+    load();
+    const interval = setInterval(load, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleNav = (href: string) => {
