@@ -32,7 +32,7 @@ const Index = () => {
             <Icon name="Zap" size={22} />
             <span className="font-oswald font-bold text-sm uppercase tracking-wide">Оценить онлайн</span>
           </button>
-          <a href="https://t.me/skupka24" target="_blank" rel="noopener noreferrer"
+          <a href="https://t.me/skypka24" target="_blank" rel="noopener noreferrer"
             className="flex-1 flex flex-col items-center justify-center gap-1 text-[#FFD700] hover:bg-[#FFD700]/5 active:bg-[#FFD700]/10 transition-colors">
             <Icon name="MessageCircle" size={22} />
             <span className="font-roboto text-[10px] uppercase tracking-wide">Telegram</span>
