@@ -7,7 +7,7 @@ import { CatalogItem, CATALOG_URL } from "@/pages/catalog.types";
 const Catalog = () => {
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
-  const [activeCategory, setActiveCategory] = useState("");
+  const [activeCategory, setActiveCategory] = useState("Смартфоны");
   const [search, setSearch] = useState("");
   const [filterAvail, setFilterAvail] = useState("");
   const [loading, setLoading] = useState(true);
@@ -25,13 +25,35 @@ const Catalog = () => {
       .then(r => r.json())
       .then(d => {
         setItems(d.items || []);
-        if (d.categories?.length) setCategories(d.categories);
+        if (d.categories?.length) {
+          const priority = ["Смартфоны", "Планшеты", "Ноутбуки", "Наушники", "Умные часы", "Компьютеры"];
+          const sorted = [
+            ...priority.filter(p => d.categories.includes(p)),
+            ...d.categories.filter((c: string) => !priority.includes(c)),
+          ];
+          setCategories(sorted);
+        }
         setLoading(false);
       })
       .catch(() => setLoading(false));
   };
 
-  useEffect(() => { load("", "", ""); }, []);
+  useEffect(() => {
+    load("Смартфоны", "", "");
+    // Загружаем список категорий отдельно
+    fetch(`${CATALOG_URL}?limit=1`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.categories?.length) {
+          const priority = ["Смартфоны", "Планшеты", "Ноутбуки", "Наушники", "Умные часы", "Компьютеры"];
+          const sorted = [
+            ...priority.filter(p => d.categories.includes(p)),
+            ...d.categories.filter((c: string) => !priority.includes(c)),
+          ];
+          setCategories(sorted);
+        }
+      });
+  }, []);
 
   const handleSearch = (val: string) => {
     setSearch(val);
