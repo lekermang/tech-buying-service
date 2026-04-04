@@ -1,4 +1,6 @@
 {
+  "repair-order": "https://functions.poehali.dev/8d0ee3bd-41eb-44fe-9d30-aab6ddc2042d",
+  "repair-parts": "https://functions.poehali.dev/68da5b17-ae5f-4568-8e27-0d945b995d82",
   "chatgpt-polza-chatgpt": "https://functions.poehali.dev/720613b1-3503-4345-a6eb-3d97329267ce",
   "avito-price": "https://functions.poehali.dev/5c99f770-dbe8-42ad-b8df-adea87477627",
   "vk-auth-vk-auth": "https://functions.poehali.dev/540ea9ff-6ef6-482b-b525-cce4503d9eca",

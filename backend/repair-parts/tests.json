@@ -1,0 +1,11 @@
+{
+  "tests": [
+    {
+      "name": "Get parts catalog returns 200 with repair_cost",
+      "method": "GET",
+      "path": "/?type=battery",
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    }
+  ]
+}
