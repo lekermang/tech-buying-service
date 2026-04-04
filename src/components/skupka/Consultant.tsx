@@ -72,7 +72,7 @@ const Consultant = () => {
       {/* Toggle button */}
       <button
         onClick={() => setOpen(o => !o)}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-[#FFD700] text-black flex items-center justify-center shadow-2xl hover:bg-yellow-400 transition-all hover:scale-110"
+        className="fixed bottom-5 right-4 z-50 w-14 h-14 bg-[#FFD700] text-black flex items-center justify-center shadow-2xl hover:bg-yellow-400 transition-all hover:scale-110"
         aria-label="Онлайн-консультант"
       >
         {open
@@ -86,8 +86,8 @@ const Consultant = () => {
 
       {/* Chat window */}
       {open && (
-        <div className="fixed bottom-24 right-6 z-50 w-80 md:w-96 flex flex-col bg-[#1A1A1A] border border-[#FFD700]/30 shadow-2xl"
-          style={{ maxHeight: "70vh" }}>
+        <div className="fixed bottom-20 right-3 left-3 sm:left-auto sm:right-6 sm:w-80 md:w-96 z-50 flex flex-col bg-[#1A1A1A] border border-[#FFD700]/30 shadow-2xl"
+          style={{ maxHeight: "75vh" }}>
 
           {/* Header */}
           <div className="flex items-center gap-3 px-4 py-3 bg-[#FFD700] shrink-0">
