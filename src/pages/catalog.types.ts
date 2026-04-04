@@ -102,6 +102,7 @@ export const CATEGORY_PHOTOS: Record<string, string> = {
   "Sony / XBOX / GoPro":        "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/b8718f70-347b-41e3-83b4-593eda29ef37.jpg",
   "Яндекс / JBL / Marshall":    "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/f9a6510e-48b4-40bf-b204-e19d2e6667ea.jpg",
   "Dyson / Garmin":             "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/99f293d0-2e03-4172-8673-6925ca157715.jpg",
+  "SKY":                        "",
 };
 
 const COLOR_MAP: Record<string, string> = {
