@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import Icon from "@/components/ui/icon";
 import AppleWidget from "@/components/skupka/AppleWidget";
 import RepairWidget from "@/components/skupka/RepairWidget";
+import UsedGoodsSearch from "@/components/skupka/UsedGoodsSearch";
 
 const CATEGORIES = [
   { icon: "Smartphone", title: "Смартфоны", desc: "iPhone, Samsung, Xiaomi и другие", price: "до 95 000 ₽" },
@@ -80,6 +81,7 @@ const HeroSection = ({ scrollTo }: HeroSectionProps) => {
 
       <div className="relative max-w-7xl mx-auto px-4 py-20 grid lg:grid-cols-2 gap-12 items-center w-full">
         <div>
+          <UsedGoodsSearch />
           <RepairWidget />
           <AppleWidget compact />
 

@@ -1,0 +1,12 @@
+{
+  "tests": [
+    {
+      "name": "Login without credentials returns 400",
+      "method": "POST",
+      "path": "/",
+      "body": {"action": "login"},
+      "expectedStatus": 400,
+      "bodyMatcher": "partial"
+    }
+  ]
+}

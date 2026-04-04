@@ -1,0 +1,19 @@
+{
+  "tests": [
+    {
+      "name": "Public search returns list",
+      "method": "GET",
+      "path": "/?status=available",
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Add without token returns 401",
+      "method": "POST",
+      "path": "/",
+      "body": {"action": "add", "title": "Test"},
+      "expectedStatus": 401,
+      "bodyMatcher": "partial"
+    }
+  ]
+}

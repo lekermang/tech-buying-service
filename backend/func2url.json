@@ -1,4 +1,8 @@
 {
+  "auth-client": "https://functions.poehali.dev/58edd0bc-cce3-4ece-acca-a003e2260758",
+  "sales-api": "https://functions.poehali.dev/1610b50a-9d00-450f-a2ca-6311f04eafe7",
+  "goods-api": "https://functions.poehali.dev/de4c1e8e-0c7b-4f25-a3fd-155c46fa3399",
+  "employee-auth": "https://functions.poehali.dev/29210248-0b73-4c54-9b9f-acd13668dfea",
   "repair-prices": "https://functions.poehali.dev/cf08a66e-0b80-4105-826b-361e9be7f0f3",
   "repair-status": "https://functions.poehali.dev/1fb5db63-4cb6-41be-af0f-80d6f9ce8fdf",
   "repair-admin": "https://functions.poehali.dev/a105aede-d55d-4b99-9d3e-5e977887aa04",

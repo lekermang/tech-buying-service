@@ -1,0 +1,11 @@
+{
+  "tests": [
+    {
+      "name": "No token returns 401",
+      "method": "GET",
+      "path": "/?action=analytics",
+      "expectedStatus": 401,
+      "bodyMatcher": "partial"
+    }
+  ]
+}
