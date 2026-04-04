@@ -82,6 +82,20 @@ const HeroSection = ({ scrollTo }: HeroSectionProps) => {
       <div className="relative max-w-7xl mx-auto px-4 py-20 grid lg:grid-cols-2 gap-12 items-center w-full">
         <div>
           <UsedGoodsSearch />
+          {/* Каталог новых товаров */}
+          <a href="/catalog"
+            className="flex items-center justify-between bg-[#111] border border-[#FFD700]/20 hover:border-[#FFD700]/60 px-4 py-3 mb-2 transition-colors group">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-[#FFD700]/10 flex items-center justify-center shrink-0">
+                <Icon name="ShoppingBag" size={16} className="text-[#FFD700]" />
+              </div>
+              <div>
+                <div className="font-oswald font-bold text-sm uppercase text-white">Каталог новой техники</div>
+                <div className="font-roboto text-white/35 text-xs">iPhone, Samsung, MacBook, Dyson — от поставщика</div>
+              </div>
+            </div>
+            <Icon name="ArrowRight" size={16} className="text-[#FFD700]/40 group-hover:text-[#FFD700] transition-colors" />
+          </a>
           <RepairWidget />
           <AppleWidget compact />
 

@@ -1,0 +1,61 @@
+INSERT INTO t_p31606708_tech_buying_service.catalog (category, brand, model, color, storage, ram, region, availability, price, has_photo) VALUES
+-- Samsung A
+('Samsung A-M','Samsung','Galaxy A56','Graphite','128GB','8GB','EU','in_stock',23900,true),
+('Samsung A-M','Samsung','Galaxy A56','Pink','128GB','8GB','EU','in_stock',24600,true),
+('Samsung A-M','Samsung','Galaxy A56','Graphite','256GB','12GB','EU','in_stock',31000,true),
+('Samsung A-M','Samsung','Galaxy A56','Lightgray','256GB','12GB','EU','in_stock',31000,true),
+('Samsung A-M','Samsung','Galaxy A56','Olive','256GB','12GB','EU','in_stock',31000,true),
+('Samsung A-M','Samsung','Galaxy A56','Pink','256GB','12GB','EU','in_stock',31000,true),
+('Samsung A-M','Samsung','Galaxy A17','Gray','128GB','4GB','EU','in_stock',11300,true),
+('Samsung A-M','Samsung','Galaxy A17','Black','128GB','4GB','EU','on_order',11300,true),
+('Samsung A-M','Samsung','Galaxy A17','Blue','128GB','4GB','EU','in_stock',11200,true),
+-- Galaxy Buds
+('Samsung A-M','Samsung','Galaxy Buds 4 Pro','Black',NULL,NULL,'EU','in_stock',15400,false),
+('Samsung A-M','Samsung','Galaxy Buds 4 Pro','White',NULL,NULL,'EU','in_stock',15400,false),
+('Samsung A-M','Samsung','Galaxy Buds 3 Pro','Silver',NULL,NULL,'EU','in_stock',11200,true),
+-- POCO
+('POCO M-X-F','Xiaomi','Poco C85','Black','256GB','8GB','EU','in_stock',9500,true),
+('POCO M-X-F','Xiaomi','Poco C85','Green','256GB','8GB','EU','in_stock',9500,true),
+('POCO M-X-F','Xiaomi','Poco M8 Pro','Black','512GB','12GB','EU','in_stock',25900,false),
+('POCO M-X-F','Xiaomi','Poco X7 Pro','Black','512GB','12GB','EU','in_stock',29800,true),
+('POCO M-X-F','Xiaomi','Poco X7 Pro','Green','512GB','12GB','EU','on_order',29800,true),
+('POCO M-X-F','Xiaomi','Poco F8 Ultra','Black','256GB','12GB','EU','in_stock',57100,false),
+('POCO M-X-F','Xiaomi','Poco F8 Ultra','Blue','256GB','12GB','EU','on_order',57100,false),
+-- Xiaomi
+('Xiaomi/Redmi/Pad','Xiaomi','Xiaomi 15','Black','256GB','12GB','EU','on_order',51600,true),
+('Xiaomi/Redmi/Pad','Xiaomi','Xiaomi 15','White','256GB','12GB','EU','on_order',51600,true),
+('Xiaomi/Redmi/Pad','Xiaomi','Xiaomi 15T Pro','Black','512GB','12GB','EU','on_order',54400,true),
+('Xiaomi/Redmi/Pad','Xiaomi','Xiaomi 17 Ultra','Black','512GB','16GB','EU','on_order',106700,false),
+('Xiaomi/Redmi/Pad','Xiaomi','Redmi 15','Black','128GB','6GB','RU','in_stock',11200,true),
+-- Honor/Pixel
+('Honor / PIXEL','Honor','Honor 400 Pro','Black','512GB','12GB','EU','on_order',49000,true),
+('Honor / PIXEL','Honor','Honor 200','Black','256GB','12GB','EU','on_order',21000,false),
+('Honor / PIXEL','Google','Pixel 10','Obsidian','256GB',NULL,'EU','on_order',54300,false),
+('Honor / PIXEL','Google','Pixel 10 Pro XL','Obsidian','256GB',NULL,'EU','on_order',75100,false),
+('Honor / PIXEL','Google','Pixel 10A','Obsidian','256GB',NULL,'EU','on_order',37700,false),
+-- Sony XBOX GoPro
+('Sony / XBOX / GoPro','Sony','PS5 Slim 1TB Disc Edition',NULL,NULL,NULL,'US','in_stock',49500,false),
+('Sony / XBOX / GoPro','Sony','PS5 Slim 1TB Digital Edition',NULL,NULL,NULL,'US','in_stock',44400,true),
+('Sony / XBOX / GoPro','Sony','PS5 DualSense Midnight Black',NULL,NULL,NULL,'US','in_stock',5500,false),
+('Sony / XBOX / GoPro','Sony','PS5 DualSense Cosmic Red',NULL,NULL,NULL,'US','in_stock',5600,false),
+('Sony / XBOX / GoPro','Sony','PS5 DualSense Sterling Silver',NULL,NULL,NULL,'US','in_stock',6000,false),
+-- Яндекс JBL Marshall
+('Яндекс / JBL / Marshall','Яндекс','Станция Лайт 2','Синий',NULL,NULL,NULL,'in_stock',4500,true),
+('Яндекс / JBL / Marshall','Яндекс','Станция Лайт 2','Зелёный',NULL,NULL,NULL,'in_stock',4500,true),
+('Яндекс / JBL / Marshall','Яндекс','Станция 3','Фиолетовый',NULL,NULL,NULL,'in_stock',20100,false),
+('Яндекс / JBL / Marshall','JBL','Charge 6','Black',NULL,NULL,'US','on_order',10000,false),
+('Яндекс / JBL / Marshall','JBL','Charge 6','Blue',NULL,NULL,'US','on_order',10000,false),
+('Яндекс / JBL / Marshall','JBL','Flip 7','Black',NULL,NULL,'US','on_order',7800,false),
+('Яндекс / JBL / Marshall','Marshall','Major 5','Black',NULL,NULL,'US','on_order',5900,false),
+('Яндекс / JBL / Marshall','Marshall','Major 5','Brown',NULL,NULL,'US','on_order',5900,false),
+-- Dyson
+('Dyson / Garmin','Dyson','HD16 Vinca Blue (с кейсом)',NULL,NULL,NULL,'EU','in_stock',30400,true),
+('Dyson / Garmin','Dyson','HS08 Long Vinca Blue',NULL,NULL,NULL,'CN','in_stock',31500,false),
+('Dyson / Garmin','Dyson','HS08 Long Ceramic Pink',NULL,NULL,NULL,'CN','in_stock',33200,false),
+('Dyson / Garmin','Dyson','HT01 Blue/Copper (без кейса)',NULL,NULL,NULL,'CN','in_stock',28400,true),
+('Dyson / Garmin','Dyson','V15 SV47 Detect Absolute',NULL,NULL,NULL,'CN','on_order',43800,false),
+-- Realme OnePlus Nothing
+('Realme / OnePlus / Nothing','OnePlus','OnePlus 15','Violet','256GB','12GB','EU','on_order',60800,false),
+('Realme / OnePlus / Nothing','OnePlus','OnePlus 13S','Black','256GB','12GB','EU','on_order',42200,false),
+('Realme / OnePlus / Nothing','Nothing','Nothing Phone (3)','Black','256GB','12GB','EU','on_order',40500,false),
+('Realme / OnePlus / Nothing','Nothing','Nothing Phone (3)','White','256GB','12GB','EU','on_order',40500,false);

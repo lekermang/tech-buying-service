@@ -153,6 +153,11 @@ const Header = ({ scrollTo }: HeaderProps) => {
                 {l.label}
               </button>
             ))}
+            <a href="/catalog"
+              className="font-roboto text-sm text-[#FFD700] hover:opacity-80 transition-opacity uppercase tracking-wide flex items-center gap-1.5 border border-[#FFD700]/30 px-3 py-1 hover:border-[#FFD700]">
+              <Icon name="ShoppingBag" size={13} />
+              Каталог
+            </a>
           </nav>
 
           <div className="flex items-center gap-3">
@@ -181,6 +186,10 @@ const Header = ({ scrollTo }: HeaderProps) => {
             <a href="tel:+79929990333" className="flex items-center gap-2 mt-4 text-[#FFD700] font-oswald font-semibold text-lg">
               <Icon name="Phone" size={16} />
               +7 (992) 999-03-33
+            </a>
+            <a href="/catalog" className="flex items-center gap-2 mt-3 text-[#FFD700] hover:opacity-80 font-roboto text-sm transition-colors font-bold">
+              <Icon name="ShoppingBag" size={15} />
+              Каталог техники
             </a>
             <a href="/staff" className="flex items-center gap-2 mt-3 text-[#FFD700]/60 hover:text-[#FFD700] font-roboto text-sm transition-colors">
               <Icon name="LogIn" size={15} />
