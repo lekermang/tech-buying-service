@@ -30,12 +30,17 @@ def handler(event: dict, context) -> dict:
     chat_id = os.environ['TELEGRAM_CHAT_ID']
     tg_url = f'https://api.telegram.org/bot{token}'
 
+    client_type = body.get('client_type', '').strip()
+    gold_price = body.get('gold_price', '')
+
     caption = (
         f"📦 *Новая заявка — Скупка24*\n\n"
         f"👤 *Имя:* {name}\n"
         f"📞 *Телефон:* {phone}\n"
         f"🏷 *Категория:* {category or '—'}\n"
         f"📝 *Описание:* {desc or '—'}"
+        + (f"\n👥 *Тип клиента:* {client_type}" if client_type else "")
+        + (f"\n🥇 *Курс золота:* {gold_price} ₽/г" if gold_price else "")
     )
 
     photos_b64 = body.get('photos') or ([photo_b64] if photo_b64 else [])
