@@ -68,7 +68,7 @@ const Catalog = () => {
             </div>
             <span className="font-oswald font-bold text-white uppercase tracking-wide hidden sm:block">КАТАЛОГ</span>
           </a>
-          <div className="flex-1 max-w-md relative">
+          <div className="flex-1 relative">
             <Icon name="Search" size={16} className="text-white/30 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               ref={searchRef}
@@ -98,7 +98,7 @@ const Catalog = () => {
             className={`font-roboto text-xs px-3 py-1.5 border transition-colors flex items-center gap-1 ${filterAvail === "on_order" ? "bg-[#FFD700] text-black border-[#FFD700]" : "border-[#333] text-white/50 hover:border-white/30"}`}>
             🚗 Под заказ
           </button>
-          <div className="text-white/20 text-xs font-roboto ml-2">Заказ до 17:00 — доставка завтра</div>
+          <div className="hidden sm:block text-white/20 text-xs font-roboto ml-1">Заказ до 17:00 — доставка завтра</div>
         </div>
       </div>
 
@@ -150,7 +150,7 @@ const Catalog = () => {
                     <span className="font-roboto text-white/30 text-xs">{catItems.length} позиций</span>
                   </div>
                 )}
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3">
                   {catItems.map(item => (
                     <CatalogProductCard key={item.id} item={item} onBuy={setOrderItem} />
                   ))}

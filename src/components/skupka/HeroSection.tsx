@@ -162,14 +162,14 @@ const HeroSection = ({ scrollTo }: HeroSectionProps) => {
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="font-roboto text-white/50 text-xs uppercase tracking-wider block mb-1">Ваше имя</label>
                     <input type="text" required
                       value={formData.name}
                       onChange={e => setFormData(p => ({ ...p, name: e.target.value }))}
                       placeholder="Иван"
-                      className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-2.5 font-roboto text-sm focus:outline-none focus:border-[#FFD700] transition-colors" />
+                      className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-3 font-roboto text-sm focus:outline-none focus:border-[#FFD700] transition-colors" />
                   </div>
                   <div>
                     <label className="font-roboto text-white/50 text-xs uppercase tracking-wider block mb-1">Телефон</label>
@@ -177,7 +177,7 @@ const HeroSection = ({ scrollTo }: HeroSectionProps) => {
                       value={formData.phone}
                       onChange={e => setFormData(p => ({ ...p, phone: e.target.value }))}
                       placeholder="+7 (___) ___-__-__"
-                      className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-2.5 font-roboto text-sm focus:outline-none focus:border-[#FFD700] transition-colors" />
+                      className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-3 font-roboto text-sm focus:outline-none focus:border-[#FFD700] transition-colors" />
                   </div>
                 </div>
 
@@ -204,7 +204,7 @@ const HeroSection = ({ scrollTo }: HeroSectionProps) => {
                   <label className="font-roboto text-white/50 text-xs uppercase tracking-wider block mb-1">
                     Фото товара <span className="text-[#FFD700]">{photos.length}/5</span>
                   </label>
-                  <div className="grid grid-cols-5 gap-2 mb-2">
+                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mb-2">
                     {photos.map((p, idx) => (
                       <div key={idx} className="relative group aspect-square">
                         <img src={p.preview} alt={`фото ${idx + 1}`} className="w-full h-full object-cover border border-[#333]" />

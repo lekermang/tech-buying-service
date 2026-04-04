@@ -93,9 +93,9 @@ const Header = ({ scrollTo }: HeaderProps) => {
   return (
     <header className="fixed top-0 left-0 right-0 z-50">
       {/* Gold ticker */}
-      <div className="bg-[#FFD700] px-4 py-1.5 flex items-center justify-center gap-3 flex-wrap">
+      <div className="bg-[#FFD700] px-4 py-2 flex items-center justify-between gap-2 md:justify-center md:gap-3">
         <div className="flex items-center gap-2">
-          <span className="text-black text-xs font-oswald font-bold uppercase tracking-wider">🥇 Биржа 999:</span>
+          <span className="text-black text-xs font-oswald font-bold uppercase tracking-wider">🥇 Золото 999:</span>
           {goldPrice ? (
             <span className="text-black font-roboto font-bold text-sm">
               {goldPrice.buy.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽/г
@@ -110,23 +110,22 @@ const Header = ({ scrollTo }: HeaderProps) => {
             <div className="w-px h-4 bg-black/20 hidden md:block" />
             <div className="hidden md:flex items-center gap-2 text-xs font-roboto">
               <span className="bg-black/10 px-2 py-0.5 text-black font-semibold">
-                Физлица 999: {priceRetail999?.toLocaleString('ru-RU')} ₽/г
+                Физлица: {priceRetail999?.toLocaleString('ru-RU')} ₽/г
               </span>
               <span className="bg-black/10 px-2 py-0.5 text-black font-semibold">
-                Опт 999: {priceWholesale999?.toLocaleString('ru-RU')} ₽/г
+                Опт: {priceWholesale999?.toLocaleString('ru-RU')} ₽/г
                 <span className="text-black/60 ml-1 font-normal">от 30 г</span>
               </span>
             </div>
-            <div className="w-px h-4 bg-black/20 hidden md:block" />
-            <span className="hidden md:block text-black/50 font-roboto text-[10px]">Калькулятор по пробам →</span>
           </>
         )}
 
         <button
           onClick={() => { setSellOpen(true); setSent(false); setForm({ name: "", phone: "" }); }}
-          className="bg-black text-[#FFD700] font-oswald font-bold text-xs px-4 py-1.5 uppercase tracking-wide hover:bg-[#1A1A1A] transition-colors flex items-center gap-1.5">
+          className="bg-black text-[#FFD700] font-oswald font-bold text-xs px-3 py-2 uppercase tracking-wide hover:bg-[#1A1A1A] transition-colors flex items-center gap-1.5 shrink-0">
           <Icon name="Zap" size={12} />
-          Продать золото
+          <span className="hidden sm:inline">Продать</span>
+          <span className="sm:hidden">Продать</span>
         </button>
       </div>
 
@@ -230,7 +229,7 @@ const Header = ({ scrollTo }: HeaderProps) => {
               {/* Probe selector */}
               <div className="mb-5">
                 <label className="font-roboto text-white/50 text-xs uppercase tracking-wider block mb-2">Проба изделия</label>
-                <div className="grid grid-cols-6 gap-1.5">
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
                   {PROBES.map(p => (
                     <button key={p.value} onClick={() => setProbe(p.value)}
                       className={`py-2 border-2 font-oswald font-bold text-sm transition-colors ${probe === p.value ? 'border-[#FFD700] bg-[#FFD700]/10 text-[#FFD700]' : 'border-[#333] text-white/60 hover:border-[#FFD700]/40'}`}>
