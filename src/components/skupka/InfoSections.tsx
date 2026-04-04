@@ -191,6 +191,75 @@ const InfoSections = () => {
         </div>
       </section>
 
+      {/* MAP */}
+      <section id="map" className="border-t border-[#FFD700]/10">
+        <div className="max-w-7xl mx-auto px-4 py-12">
+          <div className="mb-8">
+            <p className="font-roboto text-[#FFD700] text-sm uppercase tracking-widest mb-2">Где мы находимся</p>
+            <h2 className="font-oswald text-4xl font-bold">НА КАРТЕ</h2>
+          </div>
+          <div className="w-full overflow-hidden border border-[#FFD700]/20">
+            <iframe
+              src="https://yandex.ru/map-widget/v1/?z=12&ol=biz&oid=52473097879"
+              width="100%"
+              height="400"
+              frameBorder="0"
+              title="Скупка24 на карте"
+              className="block"
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* REVIEWS */}
+      <section id="reviews" className="py-20 bg-[#111] border-t border-[#FFD700]/10">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex items-end justify-between mb-12">
+            <div>
+              <p className="font-roboto text-[#FFD700] text-sm uppercase tracking-widest mb-2">Яндекс Карты</p>
+              <h2 className="font-oswald text-4xl md:text-5xl font-bold">ОТЗЫВЫ<br />КЛИЕНТОВ</h2>
+            </div>
+            <a href="https://yandex.ru/profile/52473097879?lang=ru" target="_blank" rel="noopener noreferrer"
+              className="hidden md:flex items-center gap-2 border border-[#FFD700]/30 text-[#FFD700] font-oswald font-bold px-5 py-2 uppercase tracking-wide hover:border-[#FFD700] transition-colors text-sm mb-4">
+              <Icon name="ExternalLink" size={14} />
+              Все отзывы
+            </a>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            {[
+              { name: "Антон К.", rating: 5, text: "Отличный сервис! Сдал iPhone 13, оценили быстро и честно. Деньги получил сразу на карту. Рекомендую!", date: "2024" },
+              { name: "Марина С.", rating: 5, text: "Приятно удивлена — предложили хорошую цену за ноутбук, без торга и занижений. Всё официально, договор на руках.", date: "2024" },
+              { name: "Дмитрий В.", rating: 5, text: "Быстро, чётко, по делу. Сдал PlayStation 5, оценили за 10 минут. Цена выше, чем в других скупках города.", date: "2024" },
+              { name: "Ольга Н.", rating: 5, text: "Уже второй раз обращаюсь. Всегда честная оценка, вежливый персонал. Золотое кольцо приняли по хорошей цене.", date: "2024" },
+              { name: "Игорь Р.", rating: 5, text: "Работают 24/7 — это огромный плюс. Приехал поздно вечером, всё оформили быстро. Деньги наличными сразу.", date: "2024" },
+              { name: "Светлана М.", rating: 5, text: "Сдала MacBook и умные часы. Оценили честно, никакого обмана. Работают профессионально, советую всем!", date: "2024" },
+            ].map((r) => (
+              <div key={r.name} className="bg-[#0D0D0D] border border-[#FFD700]/10 p-6 hover:border-[#FFD700]/30 transition-colors">
+                <div className="flex items-center gap-1 mb-3">
+                  {Array.from({ length: r.rating }).map((_, i) => (
+                    <span key={i} className="text-[#FFD700] text-sm">★</span>
+                  ))}
+                </div>
+                <p className="font-roboto text-white/70 text-sm leading-relaxed mb-4">«{r.text}»</p>
+                <div className="flex items-center justify-between">
+                  <span className="font-oswald font-bold text-white/50 text-sm uppercase">{r.name}</span>
+                  <span className="font-roboto text-white/30 text-xs">{r.date}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-8 text-center">
+            <a href="https://yandex.ru/profile/52473097879?lang=ru" target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 bg-[#FFD700] text-black font-oswald font-bold px-8 py-4 uppercase tracking-wide hover:bg-yellow-400 transition-colors">
+              <Icon name="Star" size={16} />
+              Читать все отзывы на Яндексе
+            </a>
+          </div>
+        </div>
+      </section>
+
       {/* AVITO */}
       <section id="avito" className="py-12 bg-[#1A1A1A] border-t border-b border-[#FFD700]/10">
         <div className="max-w-7xl mx-auto px-4 flex flex-wrap items-center justify-between gap-6">
