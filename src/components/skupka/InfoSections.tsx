@@ -169,12 +169,16 @@ const InfoSections = () => {
                 Все наши оценщики — сертифицированные специалисты. Мы не занижаем цены и не используем серые схемы. Только прозрачные сделки, официальный договор и выплата день в день.
               </p>
               <div className="grid grid-cols-3 gap-6">
-                {[["50 000+", "сделок"], ["₽ 500 млн", "выплачено"], ["4.9 ★", "рейтинг"]].map(([num, label]) => (
+                {[["50 000+", "сделок"], ["₽ 500 млн", "выплачено"]].map(([num, label]) => (
                   <div key={label} className="border-l-2 border-[#FFD700] pl-4">
                     <div className="font-oswald text-2xl font-bold text-[#FFD700]">{num}</div>
                     <div className="font-roboto text-white/40 text-xs uppercase tracking-wide">{label}</div>
                   </div>
                 ))}
+                <div className="border-l-2 border-[#FFD700] pl-4">
+                  <div className="flex text-[#FFD700] text-xl leading-none mb-0.5">★★★★★</div>
+                  <div className="font-roboto text-white/40 text-xs uppercase tracking-wide">рейтинг</div>
+                </div>
               </div>
             </div>
             <div className="relative">
