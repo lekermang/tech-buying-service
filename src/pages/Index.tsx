@@ -13,8 +13,8 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-white">
       <Header scrollTo={scrollTo} />
-      <AppleWidget />
       <HeroSection scrollTo={scrollTo} />
+      <AppleWidget />
       <InfoSections />
       <ContactsFooter scrollTo={scrollTo} />
     </div>
