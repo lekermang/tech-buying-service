@@ -7,15 +7,16 @@
       "expectedStatus": 200
     },
     {
-      "name": "GET all catalog items with photos",
-      "method": "GET",
+      "name": "POST empty webhook update",
+      "method": "POST",
       "path": "/",
+      "body": "{}",
       "expectedStatus": 200
     },
     {
-      "name": "POST without token returns 403",
-      "method": "POST",
-      "path": "/",
+      "name": "GET setup without token returns 403",
+      "method": "GET",
+      "path": "/?action=setup",
       "expectedStatus": 403
     }
   ]
