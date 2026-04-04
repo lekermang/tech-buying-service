@@ -33,6 +33,7 @@ const Header = ({ scrollTo }: HeaderProps) => {
   const [sellOpen, setSellOpen] = useState(false);
   const [clientType, setClientType] = useState<'retail' | 'wholesale'>('retail');
   const [probe, setProbe] = useState(585);
+  const [weight, setWeight] = useState("");
   const [form, setForm] = useState({ name: "", phone: "" });
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
@@ -57,6 +58,8 @@ const Header = ({ scrollTo }: HeaderProps) => {
     goldPrice ? Math.round(goldPrice.buy * coeff * discount) : null;
 
   const activePrice = calcPrice(selectedProbe.coeff);
+  const weightNum = parseFloat(weight.replace(',', '.')) || 0;
+  const totalPrice = activePrice && weightNum > 0 ? Math.round(activePrice * weightNum) : null;
 
   const priceRetail999 = goldPrice ? Math.round(goldPrice.buy * 0.999 * 0.90) : null;
   const priceWholesale999 = goldPrice ? Math.round(goldPrice.buy * 0.999 * 0.93) : null;
@@ -73,9 +76,9 @@ const Header = ({ scrollTo }: HeaderProps) => {
           name: form.name,
           phone: form.phone,
           category: "Золото",
-          desc: `Проба: ${probe}, цена: ${activePrice} ₽/г. Тип: ${clientType === 'retail' ? 'Физлицо' : 'Оптовый'}`,
+          desc: `Проба: ${probe}, вес: ${weight || '?'} г, цена: ${activePrice} ₽/г, итого: ${totalPrice ? totalPrice.toLocaleString('ru-RU') : '?'} ₽. Тип: ${clientType === 'retail' ? 'Физлицо' : 'Оптовый'}`,
           client_type: clientType === 'retail' ? `Физлицо (${discountLabel})` : `Оптовый (${discountLabel})`,
-          gold_price: `${activePrice} ₽/г (проба ${probe})`,
+          gold_price: `${activePrice} ₽/г (проба ${probe}, вес ${weight || '?'} г = ${totalPrice ? totalPrice.toLocaleString('ru-RU') : '?'} ₽)`,
         }),
       });
       setSent(true);
@@ -216,14 +219,39 @@ const Header = ({ scrollTo }: HeaderProps) => {
                     </button>
                   ))}
                 </div>
+                {/* Weight input */}
+                <div className="mt-3">
+                  <label className="font-roboto text-white/50 text-xs uppercase tracking-wider block mb-1">Вес изделия (граммы)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    value={weight}
+                    onChange={e => setWeight(e.target.value)}
+                    placeholder="Например: 15.5"
+                    className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-2.5 font-roboto text-sm focus:outline-none focus:border-[#FFD700] transition-colors"
+                  />
+                </div>
+
                 {goldPrice && (
-                  <div className="mt-3 bg-[#0D0D0D] border border-[#FFD700]/30 p-3 text-center">
-                    <div className="font-roboto text-white/50 text-xs mb-1">Ваша цена ({probe} проба, {discountLabel})</div>
-                    <div className="font-oswald text-3xl font-bold text-[#FFD700]">
-                      {activePrice?.toLocaleString('ru-RU')} <span className="text-lg">₽/г</span>
+                  <div className="mt-3 bg-[#0D0D0D] border border-[#FFD700]/30 p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-roboto text-white/50 text-xs">Цена за грамм ({probe} проба, {discountLabel})</span>
+                      <span className="font-oswald font-bold text-[#FFD700]">{activePrice?.toLocaleString('ru-RU')} ₽/г</span>
                     </div>
-                    <div className="font-roboto text-white/30 text-[10px] mt-1">
-                      Биржа 999: {goldPrice.buy.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽/г · на {goldPrice.date}
+                    {totalPrice ? (
+                      <>
+                        <div className="w-full h-px bg-[#FFD700]/20 mb-2" />
+                        <div className="flex items-center justify-between">
+                          <span className="font-roboto text-white/50 text-xs">Итого за {weightNum} г</span>
+                          <span className="font-oswald font-bold text-2xl text-[#FFD700]">{totalPrice.toLocaleString('ru-RU')} ₽</span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="font-roboto text-white/30 text-[10px]">Введите вес для расчёта итоговой суммы</div>
+                    )}
+                    <div className="font-roboto text-white/20 text-[10px] mt-2">
+                      Биржа 999: {goldPrice.buy.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽/г · {goldPrice.date}
                     </div>
                   </div>
                 )}
@@ -259,7 +287,7 @@ const Header = ({ scrollTo }: HeaderProps) => {
                   <button type="submit" disabled={sending}
                     className="w-full bg-[#FFD700] text-black font-oswald font-bold text-base py-3 uppercase tracking-wide hover:bg-yellow-400 transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
                     <Icon name="Send" size={16} />
-                    {sending ? "Отправляем..." : `Продать за ${activePrice?.toLocaleString('ru-RU')} ₽/г`}
+                    {sending ? "Отправляем..." : totalPrice ? `Продать за ${totalPrice.toLocaleString('ru-RU')} ₽` : `Продать за ${activePrice?.toLocaleString('ru-RU')} ₽/г`}
                   </button>
                   <p className="font-roboto text-white/25 text-[10px] text-center">
                     Нажимая кнопку, вы соглашаетесь с обработкой персональных данных
