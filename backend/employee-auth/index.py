@@ -62,6 +62,25 @@ def handler(event: dict, context) -> dict:
                       'is_active': r[4], 'created_at': r[5].isoformat() if r[5] else None} for r in rows]
         return _ok({'employees': employees})
 
+    # POST /reset-password — сброс пароля через ADMIN_TOKEN (системный секрет)
+    if method == 'POST' and body.get('action') == 'reset_password':
+        admin_secret = os.environ.get('ADMIN_TOKEN', '')
+        provided = body.get('admin_token', '').strip()
+        if not provided or provided != admin_secret:
+            return _err(403, 'Нет доступа')
+        login_val = body.get('login', '').strip()
+        new_pw = body.get('password', '').strip()
+        if not login_val or not new_pw:
+            return _err(400, 'Логин и пароль обязательны')
+        conn = get_conn(); cur = conn.cursor()
+        cur.execute(f"UPDATE {SCHEMA}.employees SET password_hash=%s WHERE login=%s RETURNING id",
+                    (hash_pw(new_pw), login_val))
+        updated = cur.fetchone()
+        conn.commit(); cur.close(); conn.close()
+        if not updated:
+            return _err(404, 'Сотрудник не найден')
+        return _ok({'ok': True})
+
     # POST /login
     if method == 'POST' and body.get('action') == 'login':
         login_val = body.get('login', '').strip()
@@ -75,6 +94,7 @@ def handler(event: dict, context) -> dict:
         if not row:
             cur.close(); conn.close(); return _err(401, 'Неверный логин или пароль')
         emp_id, full_name, role, stored_hash = row
+        # CHANGE_ME — пароль ещё не установлен, принимаем любой и устанавливаем
         if stored_hash == 'CHANGE_ME':
             token = secrets.token_hex(32)
             expires = datetime.utcnow() + timedelta(days=30)

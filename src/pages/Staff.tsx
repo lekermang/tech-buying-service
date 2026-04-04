@@ -46,13 +46,22 @@ export default function Staff() {
   if (!authed) return (
     <div className="min-h-screen bg-[#0D0D0D] flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        <div className="flex items-center gap-2 mb-6">
-          <div className="w-8 h-8 bg-[#FFD700] flex items-center justify-center">
-            <Icon name="Users" size={16} className="text-black" />
+        {/* Шапка */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-[#FFD700] flex items-center justify-center">
+              <Icon name="Users" size={16} className="text-black" />
+            </div>
+            <span className="font-oswald font-bold text-white uppercase tracking-wide">Панель сотрудника</span>
           </div>
-          <span className="font-oswald font-bold text-white uppercase tracking-wide">Панель сотрудника</span>
+          <a href="/" className="text-white/30 hover:text-white font-roboto text-xs transition-colors flex items-center gap-1">
+            <Icon name="ArrowLeft" size={13} /> На сайт
+          </a>
         </div>
-        <div className="bg-[#1A1A1A] border border-[#333] p-5 space-y-3">
+
+        {/* Форма входа */}
+        <div className="bg-[#1A1A1A] border border-[#333] p-5 space-y-3 mb-3">
+          <div className="font-roboto text-white/40 text-[10px] uppercase tracking-wider mb-2">Вход для сотрудников</div>
           {[{ key: "login", label: "Логин", placeholder: "admin", type: "text" }, { key: "password", label: "Пароль", placeholder: "••••••••", type: "password" }].map(f => (
             <div key={f.key}>
               <label className="font-roboto text-white/40 text-xs uppercase tracking-wider block mb-1">{f.label}</label>
@@ -67,7 +76,16 @@ export default function Staff() {
           <button onClick={login} className="w-full bg-[#FFD700] text-black font-oswald font-bold py-2.5 uppercase tracking-wide hover:bg-yellow-400 transition-colors">
             Войти
           </button>
-          <div className="font-roboto text-white/30 text-[10px] text-center">Первый вход: введите логин и придумайте пароль</div>
+        </div>
+
+        {/* Кнопка регистрации клиента */}
+        <a href="/cabinet"
+          className="flex items-center justify-center gap-2 w-full border border-white/10 text-white/50 hover:text-white hover:border-white/30 font-roboto text-sm py-3 transition-colors">
+          <Icon name="UserPlus" size={15} />
+          Зарегистрироваться как клиент
+        </a>
+        <div className="font-roboto text-white/20 text-[10px] text-center mt-2">
+          Клиентская регистрация даёт скидку до 10% на все услуги
         </div>
       </div>
     </div>
