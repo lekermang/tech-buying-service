@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import Icon from "@/components/ui/icon";
+import AppleWidget from "@/components/skupka/AppleWidget";
 
 const CATEGORIES = [
   { icon: "Smartphone", title: "Смартфоны", desc: "iPhone, Samsung, Xiaomi и другие", price: "до 95 000 ₽" },
@@ -78,6 +79,8 @@ const HeroSection = ({ scrollTo }: HeroSectionProps) => {
 
       <div className="relative max-w-7xl mx-auto px-4 py-20 grid lg:grid-cols-2 gap-12 items-center w-full">
         <div>
+          <AppleWidget compact />
+
           <div className="inline-flex items-center gap-2 bg-[#FFD700]/10 border border-[#FFD700]/30 px-3 py-1 mb-6">
             <div className="w-2 h-2 bg-[#FFD700] rounded-full animate-pulse" />
             <span className="font-roboto text-xs text-[#FFD700] uppercase tracking-widest">Работаем 24/7 без выходных</span>

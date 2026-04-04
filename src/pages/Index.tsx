@@ -1,5 +1,4 @@
 import Header from "@/components/skupka/Header";
-import AppleWidget from "@/components/skupka/AppleWidget";
 import HeroSection from "@/components/skupka/HeroSection";
 import InfoSections from "@/components/skupka/InfoSections";
 import ContactsFooter from "@/components/skupka/ContactsFooter";
@@ -14,7 +13,6 @@ const Index = () => {
     <div className="min-h-screen bg-[#0D0D0D] text-white">
       <Header scrollTo={scrollTo} />
       <HeroSection scrollTo={scrollTo} />
-      <AppleWidget />
       <InfoSections />
       <ContactsFooter scrollTo={scrollTo} />
     </div>
