@@ -1,0 +1,26 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Поиск iPhone 14",
+      "method": "POST",
+      "path": "/",
+      "body": {"query": "iPhone 14 Pro"},
+      "expectedStatus": 200,
+      "expectedBody": {"avito_avg": 58000, "skupka_price": 53000},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Неизвестная модель",
+      "method": "POST",
+      "path": "/",
+      "body": {"query": "Samsung Galaxy"},
+      "expectedStatus": 404
+    }
+  ]
+}
