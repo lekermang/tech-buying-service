@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import Icon from "@/components/ui/icon";
 
+const SEND_LEAD_URL = "https://functions.poehali.dev/52666ff7-db52-4b6a-a90e-d60aeed699de";
+const PRICE_MARKUP = 3500;
+
 const CATALOG_URL = "https://functions.poehali.dev/e0e6576c-f000-4288-86ef-1de08ad7bcc4";
 
 const CATEGORY_PHOTOS: Record<string, string> = {
@@ -49,6 +52,7 @@ const Catalog = () => {
   const [search, setSearch] = useState("");
   const [filterAvail, setFilterAvail] = useState("");
   const [loading, setLoading] = useState(true);
+  const [orderItem, setOrderItem] = useState<CatalogItem | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -207,7 +211,7 @@ const Catalog = () => {
                 )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                   {catItems.map(item => (
-                    <ProductCard key={item.id} item={item} />
+                    <ProductCard key={item.id} item={item} onBuy={setOrderItem} />
                   ))}
                 </div>
               </div>
@@ -227,18 +231,21 @@ const Catalog = () => {
       <div className="border-t border-[#1A1A1A] py-6">
         <div className="max-w-7xl mx-auto px-4 text-center">
           <p className="font-roboto text-white/20 text-xs">
-            Цены актуальны на сегодня · Гарантия 14 дней · +3 500 ₽ к ценам поставщика уже включены
+            Цены актуальны на сегодня · Гарантия 14 дней · Включает наценку за сервис
           </p>
           <p className="font-roboto text-white/20 text-xs mt-1">
             +7 (992) 999-03-33 · ул. Кирова, 11 и ул. Кирова, 7/47
           </p>
         </div>
       </div>
+
+      {/* Order modal */}
+      {orderItem && <OrderModal item={orderItem} onClose={() => setOrderItem(null)} />}
     </div>
   );
 };
 
-const ProductCard = ({ item }: { item: CatalogItem }) => {
+const ProductCard = ({ item, onBuy }: { item: CatalogItem; onBuy: (item: CatalogItem) => void }) => {
   const flag = item.region ? (REGION_FLAG[item.region] || "") : "";
   const inStock = item.availability === "in_stock";
 
@@ -275,23 +282,119 @@ const ProductCard = ({ item }: { item: CatalogItem }) => {
         <div className="font-oswald font-bold text-base uppercase leading-tight mb-1">{title}</div>
         {sub && <div className="font-roboto text-white/40 text-xs mb-3">{sub}</div>}
 
-        <div className="mt-auto flex items-end justify-between">
-          <div>
+        <div className="mt-auto">
+          <div className="mb-3">
             {item.price ? (
               <span className="font-oswald font-bold text-xl text-[#FFD700]">
-                {item.price.toLocaleString("ru-RU")} ₽
+                {(item.price + PRICE_MARKUP).toLocaleString("ru-RU")} ₽
               </span>
             ) : (
               <span className="font-roboto text-white/30 text-sm italic">Цену уточняйте</span>
             )}
           </div>
-          <a
-            href="tel:+79929990333"
-            className="font-roboto text-xs text-white/40 hover:text-[#FFD700] transition-colors flex items-center gap-1"
+          <button
+            onClick={() => onBuy(item)}
+            className="w-full bg-[#FFD700] text-black font-oswald font-bold text-sm py-2.5 uppercase tracking-wide hover:bg-yellow-400 transition-colors flex items-center justify-center gap-2"
           >
-            <Icon name="Phone" size={12} />
+            <Icon name="ShoppingCart" size={14} />
             Купить
-          </a>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const OrderModal = ({ item, onClose }: { item: CatalogItem; onClose: () => void }) => {
+  const [form, setForm] = useState({ name: "", phone: "" });
+  const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  const title = [item.brand, item.model, item.storage, item.color].filter(Boolean).join(" ");
+  const displayPrice = item.price ? (item.price + PRICE_MARKUP).toLocaleString("ru-RU") + " ₽" : "Цену уточняйте";
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name || !form.phone) return;
+    setLoading(true);
+    try {
+      await fetch(SEND_LEAD_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name,
+          phone: form.phone,
+          category: item.category,
+          desc: `Заявка на покупку: ${title}, цена: ${displayPrice}`,
+        }),
+      });
+      setSent(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-[#1A1A1A] border border-[#FFD700]/30 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-5 border-b border-[#FFD700]/20">
+          <div className="flex items-center gap-2">
+            <div className="w-1 h-6 bg-[#FFD700]" />
+            <h3 className="font-oswald font-bold text-lg uppercase">Оформить заявку</h3>
+          </div>
+          <button onClick={onClose} className="text-white/30 hover:text-white transition-colors">
+            <Icon name="X" size={20} />
+          </button>
+        </div>
+
+        <div className="p-5">
+          {/* Товар */}
+          <div className="bg-[#111] border border-[#333] p-3 mb-5">
+            <div className="font-oswald font-bold text-sm uppercase">{title}</div>
+            <div className="font-oswald text-[#FFD700] font-bold text-lg mt-1">{displayPrice}</div>
+            {item.availability === "on_order" && (
+              <div className="font-roboto text-white/30 text-xs mt-1">🚗 Под заказ — доставка на следующий день (заказ до 17:00)</div>
+            )}
+          </div>
+
+          {sent ? (
+            <div className="text-center py-6">
+              <div className="w-14 h-14 bg-[#FFD700] flex items-center justify-center mx-auto mb-3">
+                <Icon name="Check" size={28} className="text-black" />
+              </div>
+              <h4 className="font-oswald font-bold text-xl text-[#FFD700] mb-1">ЗАЯВКА ОТПРАВЛЕНА</h4>
+              <p className="font-roboto text-white/50 text-sm">Перезвоним в течение 15 минут</p>
+              <a href="tel:+79929990333" className="flex items-center justify-center gap-2 mt-4 text-[#FFD700] font-oswald font-bold">
+                <Icon name="Phone" size={16} />
+                +7 (992) 999-03-33
+              </a>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <div>
+                <label className="font-roboto text-white/40 text-xs uppercase tracking-wider block mb-1">Ваше имя</label>
+                <input type="text" required value={form.name}
+                  onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
+                  placeholder="Иван"
+                  className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-2.5 font-roboto text-sm focus:outline-none focus:border-[#FFD700] transition-colors" />
+              </div>
+              <div>
+                <label className="font-roboto text-white/40 text-xs uppercase tracking-wider block mb-1">Телефон</label>
+                <input type="tel" required value={form.phone}
+                  onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
+                  placeholder="+7 (___) ___-__-__"
+                  className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-2.5 font-roboto text-sm focus:outline-none focus:border-[#FFD700] transition-colors" />
+              </div>
+              <button type="submit" disabled={loading}
+                className="w-full bg-[#FFD700] text-black font-oswald font-bold py-3 uppercase tracking-wide hover:bg-yellow-400 transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
+                <Icon name="Phone" size={16} />
+                {loading ? "Отправляем..." : "Отправить заявку"}
+              </button>
+              <p className="font-roboto text-white/20 text-[10px] text-center">
+                Перезвоним в течение 15 минут
+              </p>
+            </form>
+          )}
         </div>
       </div>
     </div>
