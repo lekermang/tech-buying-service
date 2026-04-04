@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Icon from "@/components/ui/icon";
+
+const GOLD_PRICE_URL = "https://functions.poehali.dev/0e3260ee-7b92-4be2-833b-d3fcc9d2472d";
 
 const NAV_LINKS = [
   { label: "Главная", href: "#hero" },
@@ -17,6 +19,14 @@ interface HeaderProps {
 
 const Header = ({ scrollTo }: HeaderProps) => {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [goldPrice, setGoldPrice] = useState<{ buy: number; date: string } | null>(null);
+
+  useEffect(() => {
+    fetch(GOLD_PRICE_URL)
+      .then(r => r.json())
+      .then(d => setGoldPrice({ buy: d.buy, date: d.date }))
+      .catch(() => {});
+  }, []);
 
   const handleNav = (href: string) => {
     scrollTo(href);
@@ -24,7 +34,28 @@ const Header = ({ scrollTo }: HeaderProps) => {
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-[#0D0D0D]/95 backdrop-blur-sm border-b border-[#FFD700]/20">
+    <header className="fixed top-0 left-0 right-0 z-50">
+      {/* Gold ticker */}
+      <div className="bg-[#FFD700] px-4 py-1 flex items-center justify-center gap-6 flex-wrap">
+        <div className="flex items-center gap-2">
+          <span className="text-black text-xs font-oswald font-bold uppercase tracking-wider">🥇 Золото (Au)</span>
+          {goldPrice ? (
+            <span className="text-black font-roboto font-bold text-sm">
+              {goldPrice.buy.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽/г
+            </span>
+          ) : (
+            <span className="text-black/50 font-roboto text-xs">загрузка...</span>
+          )}
+          {goldPrice && (
+            <span className="text-black/50 font-roboto text-[10px]">на {goldPrice.date}</span>
+          )}
+        </div>
+        <div className="hidden md:flex items-center gap-1 text-black/60 text-[10px] font-roboto">
+          <Icon name="TrendingUp" size={11} />
+          <span>Курс биржи · обновляется ежедневно</span>
+        </div>
+      </div>
+      <div className="bg-[#0D0D0D]/95 backdrop-blur-sm border-b border-[#FFD700]/20">
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <img
@@ -72,6 +103,7 @@ const Header = ({ scrollTo }: HeaderProps) => {
           </a>
         </div>
       )}
+      </div>
     </header>
   );
 };
