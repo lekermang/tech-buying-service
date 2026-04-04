@@ -1,4 +1,6 @@
 {
+  "repair-status": "https://functions.poehali.dev/1fb5db63-4cb6-41be-af0f-80d6f9ce8fdf",
+  "repair-admin": "https://functions.poehali.dev/a105aede-d55d-4b99-9d3e-5e977887aa04",
   "repair-order": "https://functions.poehali.dev/8d0ee3bd-41eb-44fe-9d30-aab6ddc2042d",
   "repair-parts": "https://functions.poehali.dev/68da5b17-ae5f-4568-8e27-0d945b995d82",
   "chatgpt-polza-chatgpt": "https://functions.poehali.dev/720613b1-3503-4345-a6eb-3d97329267ce",
