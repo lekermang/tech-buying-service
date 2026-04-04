@@ -2,6 +2,7 @@ import Header from "@/components/skupka/Header";
 import HeroSection from "@/components/skupka/HeroSection";
 import InfoSections from "@/components/skupka/InfoSections";
 import ContactsFooter from "@/components/skupka/ContactsFooter";
+import Consultant from "@/components/skupka/Consultant";
 
 const scrollTo = (href: string) => {
   const el = document.querySelector(href);
@@ -15,6 +16,7 @@ const Index = () => {
       <HeroSection scrollTo={scrollTo} />
       <InfoSections />
       <ContactsFooter scrollTo={scrollTo} />
+      <Consultant />
     </div>
   );
 };
