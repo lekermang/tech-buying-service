@@ -1,4 +1,5 @@
 {
+  "repair-prices": "https://functions.poehali.dev/cf08a66e-0b80-4105-826b-361e9be7f0f3",
   "repair-status": "https://functions.poehali.dev/1fb5db63-4cb6-41be-af0f-80d6f9ce8fdf",
   "repair-admin": "https://functions.poehali.dev/a105aede-d55d-4b99-9d3e-5e977887aa04",
   "repair-order": "https://functions.poehali.dev/8d0ee3bd-41eb-44fe-9d30-aab6ddc2042d",
