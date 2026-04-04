@@ -1,4 +1,29 @@
+import { useState } from "react";
 import Icon from "@/components/ui/icon";
+
+const ShareButton = () => {
+  const [copied, setCopied] = useState(false);
+
+  const share = async () => {
+    const url = window.location.origin;
+    const text = "Скупка24 — выкуп техники и золота за 15 минут. Честная оценка, деньги сразу.";
+    if (navigator.share) {
+      navigator.share({ title: "Скупка24", text, url }).catch(() => {});
+    } else {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <button onClick={share}
+      className="flex items-center gap-1.5 font-roboto text-xs text-white/30 hover:text-[#FFD700] transition-colors">
+      <Icon name={copied ? "Check" : "Share2"} size={13} />
+      {copied ? "Скопировано!" : "Поделиться"}
+    </button>
+  );
+};
 
 interface ContactsFooterProps {
   scrollTo: (href: string) => void;
@@ -58,9 +83,10 @@ const ContactsFooter = ({ scrollTo }: ContactsFooterProps) => {
             <span className="font-oswald font-bold text-[#FFD700]">СКУПКА24</span>
           </div>
           <p className="font-roboto text-white/30 text-sm">© 2015–2026 Скупка24. Все права защищены.</p>
-          <div className="flex gap-6">
+          <div className="flex items-center gap-4">
+            <ShareButton />
             {["Политика конфиденциальности", "Договор оферты"].map(l => (
-              <a key={l} href="#" className="font-roboto text-white/30 text-xs hover:text-white/60 transition-colors">{l}</a>
+              <a key={l} href="#" className="font-roboto text-white/30 text-xs hover:text-white/60 transition-colors hidden sm:block">{l}</a>
             ))}
           </div>
         </div>
