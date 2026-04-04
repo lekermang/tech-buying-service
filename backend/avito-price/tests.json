@@ -16,11 +16,13 @@
       "bodyMatcher": "partial"
     },
     {
-      "name": "Неизвестная модель",
+      "name": "Неизвестная модель — возвращает unknown",
       "method": "POST",
       "path": "/",
       "body": {"query": "Samsung Galaxy"},
-      "expectedStatus": 404
+      "expectedStatus": 200,
+      "expectedBody": {"unknown": true},
+      "bodyMatcher": "partial"
     }
   ]
 }

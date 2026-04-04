@@ -11,8 +11,9 @@ const POPULAR = [
 
 type PriceResult = {
   model: string;
-  avito_avg: number;
-  skupka_price: number;
+  avito_avg: number | null;
+  skupka_price: number | null;
+  unknown?: boolean;
 };
 
 interface AppleWidgetProps {
@@ -48,7 +49,7 @@ const useAppleWidget = () => {
         body: JSON.stringify({ query: searchQuery }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Модель не найдена");
+      if (!res.ok) throw new Error(data.error || "Ошибка");
       setResult(data);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Ошибка");
@@ -122,11 +123,15 @@ const AppleWidget = ({ compact }: AppleWidgetProps) => {
         {w.result && !w.sent && (
           <div className="border-t border-[#FFD700]/20 pt-2 mt-2">
             <div className="font-roboto text-white/40 text-[10px] mb-1">{w.result.model}</div>
-            <div className="flex items-baseline gap-2 mb-2">
-              <span className="font-oswald text-white/30 text-sm line-through">{w.result.avito_avg.toLocaleString("ru-RU")} ₽</span>
-              <Icon name="ArrowRight" size={11} className="text-[#FFD700]" />
-              <span className="font-oswald font-bold text-[#FFD700] text-xl">{w.result.skupka_price.toLocaleString("ru-RU")} ₽</span>
-            </div>
+            {w.result.unknown ? (
+              <div className="font-roboto text-white/50 text-[10px] mb-2">Оставьте заявку — оценим и перезвоним</div>
+            ) : (
+              <div className="flex items-baseline gap-2 mb-2">
+                <span className="font-oswald text-white/30 text-sm line-through">{w.result.avito_avg?.toLocaleString("ru-RU")} ₽</span>
+                <Icon name="ArrowRight" size={11} className="text-[#FFD700]" />
+                <span className="font-oswald font-bold text-[#FFD700] text-xl">{w.result.skupka_price?.toLocaleString("ru-RU")} ₽</span>
+              </div>
+            )}
             <div className="flex gap-1.5">
               <input type="tel" value={w.phone} onChange={e => w.setPhone(e.target.value)}
                 placeholder="+7 (___) ___-__-__"
@@ -183,15 +188,19 @@ const AppleWidget = ({ compact }: AppleWidgetProps) => {
         {w.result && !w.sent && (
           <div className="bg-[#0D0D0D] border border-[#FFD700]/30 p-4">
             <div className="font-roboto text-white/50 text-xs uppercase tracking-wider mb-3">{w.result.model}</div>
-            <div className="flex items-center gap-4 mb-4 flex-wrap">
-              <div><div className="font-roboto text-white/40 text-xs mb-1">Авито (средняя)</div>
-                <div className="font-oswald font-bold text-white/40 text-xl line-through">{w.result.avito_avg.toLocaleString("ru-RU")} ₽</div>
+            {w.result.unknown ? (
+              <div className="font-roboto text-white/50 text-sm mb-4">Оставьте номер — оценим и перезвоним в течение 15 минут</div>
+            ) : (
+              <div className="flex items-center gap-4 mb-4 flex-wrap">
+                <div><div className="font-roboto text-white/40 text-xs mb-1">Авито (средняя)</div>
+                  <div className="font-oswald font-bold text-white/40 text-xl line-through">{w.result.avito_avg?.toLocaleString("ru-RU")} ₽</div>
+                </div>
+                <Icon name="ArrowRight" size={20} className="text-[#FFD700]" />
+                <div><div className="font-roboto text-[#FFD700] text-xs mb-1">Мы платим</div>
+                  <div className="font-oswald font-bold text-[#FFD700] text-3xl">{w.result.skupka_price?.toLocaleString("ru-RU")} ₽</div>
+                </div>
               </div>
-              <Icon name="ArrowRight" size={20} className="text-[#FFD700]" />
-              <div><div className="font-roboto text-[#FFD700] text-xs mb-1">Мы платим</div>
-                <div className="font-oswald font-bold text-[#FFD700] text-3xl">{w.result.skupka_price.toLocaleString("ru-RU")} ₽</div>
-              </div>
-            </div>
+            )}
             <div className="flex gap-2 flex-wrap">
               <input type="tel" value={w.phone} onChange={e => w.setPhone(e.target.value)} placeholder="+7 (___) ___-__-__"
                 className="flex-1 min-w-[160px] bg-[#1A1A1A] border border-[#444] text-white px-4 py-3 font-roboto text-sm focus:outline-none focus:border-[#FFD700] transition-colors" />
