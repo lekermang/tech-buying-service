@@ -20,7 +20,7 @@ const ContactsFooter = ({ scrollTo }: ContactsFooterProps) => {
               { icon: "MapPin", title: "Филиал — Кирова 11", lines: ["+7 (992) 999-03-33", "24/7 без выходных"], href: "tel:+79929990333" },
               { icon: "MapPin", title: "Филиал — Кирова 7/47", lines: ["8 (800) 600-68-33", "Бесплатно по России"], href: "tel:88006006833" },
               { icon: "MessageCircle", title: "WhatsApp / Telegram", lines: ["@skupka24", "Ответим за 5 минут"], href: "https://t.me/skupka24" },
-              { icon: "Mail", title: "Email", lines: ["info@skupka24.ru", "Для деловых запросов"], href: "mailto:info@skupka24.ru" },
+              { icon: "Mail", title: "Email", lines: ["lekermany@yandex.ru", "Для деловых запросов"], href: "mailto:lekermany@yandex.ru" },
             ].map((c) => (
               <a key={c.title} href={c.href}
                 className="border border-[#FFD700]/20 p-6 hover:border-[#FFD700] transition-colors group block">
@@ -50,9 +50,11 @@ const ContactsFooter = ({ scrollTo }: ContactsFooterProps) => {
       <footer className="bg-[#0A0A0A] border-t border-[#FFD700]/10 py-8">
         <div className="max-w-7xl mx-auto px-4 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-[#FFD700] flex items-center justify-center">
-              <span className="font-oswald font-bold text-black text-xs">С24</span>
-            </div>
+            <img
+              src="https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/9c9b4fca-bfd7-4841-a827-eb0354dad8da.JPG"
+              alt="Скупка24"
+              className="w-8 h-8 rounded-full object-cover"
+            />
             <span className="font-oswald font-bold text-[#FFD700]">СКУПКА24</span>
           </div>
           <p className="font-roboto text-white/30 text-sm">© 2015–2026 Скупка24. Все права защищены.</p>
