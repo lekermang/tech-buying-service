@@ -1,0 +1,199 @@
+"""
+Автоматическая отправка прайса в Telegram-группу.
+- ?action=send_now — немедленная отправка (для теста)
+- ?action=schedule_check — проверка расписания (вызывается каждые 5 мин)
+Расписание: каждый день в 10:00 по МСК
+"""
+
+import json
+import os
+import psycopg2
+import urllib.request
+from datetime import datetime, timezone, timedelta
+
+SCHEMA = 't_p31606708_tech_buying_service'
+HEADERS = {'Access-Control-Allow-Origin': '*'}
+CONTACT_PHONE = '+7 992 990-33-33'
+GROUP_CHAT_ID = os.environ.get('PRICE_GROUP_CHAT_ID', '')
+MSK = timezone(timedelta(hours=3))
+SEND_HOUR = 10
+
+
+def get_conn():
+    return psycopg2.connect(os.environ['DATABASE_URL'])
+
+
+def ok(data):
+    return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps(data, ensure_ascii=False)}
+
+
+def err(code, msg):
+    return {'statusCode': code, 'headers': HEADERS, 'body': json.dumps({'error': msg}, ensure_ascii=False)}
+
+
+def get_catalog():
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT category, brand, model, storage, color, region, availability, price"
+        " FROM " + SCHEMA + ".catalog"
+        " WHERE is_active = true"
+        " ORDER BY category, availability DESC, brand, model, price ASC NULLS LAST"
+        " LIMIT 500"
+    )
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return [
+        {
+            'category': r[0], 'brand': r[1], 'model': r[2],
+            'storage': r[3], 'color': r[4], 'region': r[5],
+            'availability': r[6], 'price': r[7]
+        }
+        for r in rows
+    ]
+
+
+def format_price_messages(items):
+    if not items:
+        return []
+
+    now_msk = datetime.now(MSK)
+    date_str = now_msk.strftime('%d.%m.%Y')
+
+    by_cat = {}
+    for it in items:
+        cat = it['category'] or 'Другое'
+        by_cat.setdefault(cat, []).append(it)
+
+    avail_icon = {'in_stock': '\u2705', 'on_order': '\U0001F697'}
+    reg_flag = {
+        'EU': '\U0001F1EA\U0001F1FA', 'US': '\U0001F1FA\U0001F1F8',
+        'RU': '\U0001F1F7\U0001F1FA', 'CN': '\U0001F1E8\U0001F1F3',
+        'HK': '\U0001F1ED\U0001F1F0', 'UK': '\U0001F1EC\U0001F1E7',
+        'JP': '\U0001F1EF\U0001F1F5', 'KZ': '\U0001F1F0\U0001F1FF',
+    }
+
+    lines = ['\U0001F4CB <b>\u041f\u0440\u0430\u0439\u0441-\u043b\u0438\u0441\u0442 ' + date_str + '</b>\n']
+
+    for cat, cat_items in by_cat.items():
+        lines.append('\n<b>\u2014 ' + cat + ' \u2014</b>')
+        for it in cat_items:
+            avail = avail_icon.get(it['availability'], '?')
+            reg = reg_flag.get((it['region'] or '').upper(), '')
+            parts = [it['model'] or it['brand'] or '']
+            if it['storage']:
+                parts.append(it['storage'])
+            if it['color']:
+                parts.append(it['color'])
+            name = ' '.join(parts)
+            if it['price']:
+                price_str = '{:,}\u20bd'.format(int(it['price'])).replace(',', '\u00a0')
+            else:
+                price_str = '\u043f\u043e \u0437\u0430\u043f\u0440\u043e\u0441\u0443'
+            lines.append(avail + ' ' + reg + ' ' + name + ' \u2014 <b>' + price_str + '</b>')
+
+    footer = '\n\n\U0001F4DE \u0414\u043b\u044f \u0437\u0430\u043a\u0430\u0437\u0430 \u0438\u043b\u0438 \u0443\u0442\u043e\u0447\u043d\u0435\u043d\u0438\u044f \u043d\u0430\u043b\u0438\u0447\u0438\u044f:\n<b>' + CONTACT_PHONE + '</b>'
+
+    messages = []
+    current = ''
+    for line in lines:
+        if len(current) + len(line) + 1 > 4000:
+            messages.append(current)
+            current = line
+        else:
+            current = (current + '\n' + line) if current else line
+
+    if current:
+        current += footer
+        messages.append(current)
+    elif messages:
+        messages[-1] += footer
+
+    return messages
+
+
+def send_tg_message(chat_id, text):
+    token = os.environ.get('CATALOG_BOT_TOKEN', '')
+    if not token:
+        raise ValueError('CATALOG_BOT_TOKEN not set')
+
+    url = 'https://api.telegram.org/bot' + token + '/sendMessage'
+    payload = json.dumps({
+        'chat_id': chat_id,
+        'text': text,
+        'parse_mode': 'HTML',
+        'disable_web_page_preview': True,
+    }).encode('utf-8')
+
+    req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'})
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        return json.loads(resp.read())
+
+
+def check_already_sent_today():
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT 1 FROM " + SCHEMA + ".price_scheduler_log WHERE sent_at::date = NOW()::date LIMIT 1"
+    )
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    return row is not None
+
+
+def mark_sent():
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("INSERT INTO " + SCHEMA + ".price_scheduler_log (sent_at) VALUES (NOW())")
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+def do_send_price(chat_id):
+    items = get_catalog()
+    if not items:
+        return {'sent': False, 'reason': 'catalog_empty'}
+
+    messages = format_price_messages(items)
+    for msg in messages:
+        send_tg_message(chat_id, msg)
+
+    return {'sent': True, 'messages': len(messages), 'items': len(items)}
+
+
+def handler(event: dict, context) -> dict:
+    """Отправка прайса в Telegram-группу по расписанию (10:00 МСК) или вручную"""
+    if event.get('httpMethod') == 'OPTIONS':
+        return {'statusCode': 200, 'headers': HEADERS, 'body': ''}
+
+    params = event.get('queryStringParameters') or {}
+    action = params.get('action', 'schedule_check')
+
+    if action == 'send_now':
+        chat_id = params.get('chat_id') or GROUP_CHAT_ID
+        if not chat_id:
+            return err(400, 'chat_id required')
+        result = do_send_price(chat_id)
+        return ok(result)
+
+    if action == 'schedule_check':
+        now_msk = datetime.now(MSK)
+        if now_msk.hour != SEND_HOUR:
+            return ok({'skipped': True, 'reason': 'not_time_' + str(now_msk.hour) + 'h'})
+
+        if check_already_sent_today():
+            return ok({'skipped': True, 'reason': 'already_sent_today'})
+
+        chat_id = GROUP_CHAT_ID
+        if not chat_id:
+            return err(400, 'PRICE_GROUP_CHAT_ID not set')
+
+        result = do_send_price(chat_id)
+        if result.get('sent'):
+            mark_sent()
+        return ok(result)
+
+    return err(400, 'unknown action: ' + action)

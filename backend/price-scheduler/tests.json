@@ -1,0 +1,11 @@
+{
+  "tests": [
+    {
+      "name": "schedule_check — проверка расписания",
+      "method": "GET",
+      "path": "/?action=schedule_check",
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
+    }
+  ]
+}
