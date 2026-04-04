@@ -4,7 +4,7 @@ import psycopg2
 
 HEADERS = {'Access-Control-Allow-Origin': '*'}
 SCHEMA = 't_p31606708_tech_buying_service'
-ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN', '')
+ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN', 'Mark2015N')
 
 VALID_STATUSES = ['new', 'in_progress', 'waiting_parts', 'ready', 'done', 'cancelled']
 
