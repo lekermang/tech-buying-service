@@ -1,0 +1,52 @@
+{
+  "name": "Skypka24 — Скупка техники и золота",
+  "short_name": "Skypka24",
+  "description": "Честная скупка iPhone, ноутбуков, MacBook, золота. Оценка 15 минут, деньги сразу. 24/7.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0D0D0D",
+  "theme_color": "#FFD700",
+  "orientation": "portrait-primary",
+  "lang": "ru",
+  "scope": "/",
+  "categories": ["shopping", "finance"],
+  "icons": [
+    {
+      "src": "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/9c9b4fca-bfd7-4841-a827-eb0354dad8da.JPG",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/9c9b4fca-bfd7-4841-a827-eb0354dad8da.JPG",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Оценить онлайн",
+      "short_name": "Оценить",
+      "description": "Быстрая оценка вашей техники",
+      "url": "/#evaluate",
+      "icons": [{ "src": "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/9c9b4fca-bfd7-4841-a827-eb0354dad8da.JPG", "sizes": "96x96" }]
+    },
+    {
+      "name": "Каталог техники",
+      "short_name": "Каталог",
+      "description": "Купить технику в рассрочку",
+      "url": "/catalog",
+      "icons": [{ "src": "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/9c9b4fca-bfd7-4841-a827-eb0354dad8da.JPG", "sizes": "96x96" }]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/47a9e726-1666-459a-824f-d2c990b98092.jpg",
+      "sizes": "1280x720",
+      "type": "image/jpeg",
+      "form_factor": "wide",
+      "label": "Главная страница Skypka24"
+    }
+  ]
+}
