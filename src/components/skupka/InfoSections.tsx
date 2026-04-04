@@ -265,18 +265,40 @@ const InfoSections = () => {
       </section>
 
       {/* AVITO */}
-      <section id="avito" className="py-12 bg-[#1A1A1A] border-t border-b border-[#FFD700]/10">
-        <div className="max-w-7xl mx-auto px-4 flex flex-wrap items-center justify-between gap-6">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-[#00AAFF] flex items-center justify-center font-bold text-white text-lg font-oswald">AV</div>
-            <div>
-              <h3 className="font-oswald text-xl font-bold uppercase">Мы на Авито</h3>
-              <p className="font-roboto text-white/50 text-sm">Смотрите наши объявления и отзывы покупателей</p>
-            </div>
+      <section id="avito" className="border-t border-[#FFD700]/10">
+        <div className="max-w-7xl mx-auto px-4 py-12">
+          <div className="mb-8">
+            <p className="font-roboto text-[#FFD700] text-sm uppercase tracking-widest mb-2">Маркетплейс</p>
+            <h2 className="font-oswald text-4xl md:text-5xl font-bold">МЫ НА АВИТО</h2>
           </div>
+
           <a href="https://www.avito.ru/brands/skupka24kirova7" target="_blank" rel="noopener noreferrer"
-            className="border-2 border-[#00AAFF] text-[#00AAFF] font-oswald font-bold px-6 py-3 uppercase tracking-wide hover:bg-[#00AAFF] hover:text-white transition-colors">
-            Открыть на Авито
+            className="block group relative overflow-hidden border border-[#00AAFF]/30 hover:border-[#00AAFF] transition-colors">
+            <div className="bg-gradient-to-r from-[#003D5C] to-[#001F2E] p-8 md:p-12 flex flex-wrap items-center justify-between gap-8">
+              {/* Left */}
+              <div className="flex items-center gap-6">
+                <div className="w-16 h-16 bg-[#00AAFF] flex items-center justify-center font-oswald font-bold text-white text-2xl shrink-0">AV</div>
+                <div>
+                  <div className="font-oswald text-2xl md:text-3xl font-bold text-white uppercase mb-1">Скупка24 на Авито</div>
+                  <div className="font-roboto text-white/50 text-sm">Актуальные объявления · Отзывы покупателей · Безопасные сделки</div>
+                  <div className="flex items-center gap-4 mt-3 flex-wrap">
+                    {[["✓ Быстрый ответ", ""], ["✓ Проверенный продавец", ""], ["✓ Безопасная сделка", ""]].map(([label]) => (
+                      <span key={label} className="font-roboto text-[#00AAFF] text-xs">{label}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              {/* Right CTA */}
+              <div className="flex flex-col items-center gap-3 shrink-0">
+                <div className="bg-[#00AAFF] text-white font-oswald font-bold text-lg px-8 py-4 uppercase tracking-wide group-hover:bg-[#0099EE] transition-colors flex items-center gap-3">
+                  <Icon name="ExternalLink" size={18} />
+                  Смотреть объявления
+                </div>
+                <span className="font-roboto text-white/30 text-xs">avito.ru/brands/skupka24kirova7</span>
+              </div>
+            </div>
+            {/* Animated border */}
+            <div className="absolute bottom-0 left-0 w-0 group-hover:w-full h-0.5 bg-[#00AAFF] transition-all duration-500" />
           </a>
         </div>
       </section>
