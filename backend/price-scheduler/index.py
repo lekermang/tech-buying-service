@@ -88,7 +88,7 @@ def format_price_messages(items):
                 parts.append(it['color'])
             name = ' '.join(parts)
             if it['price']:
-                price_str = '{:,}\u20bd'.format(int(it['price'])).replace(',', '\u00a0')
+                price_str = '{:,}\u20bd'.format(int(it['price']) + 3500).replace(',', '\u00a0')
             else:
                 price_str = '\u043f\u043e \u0437\u0430\u043f\u0440\u043e\u0441\u0443'
             lines.append(avail + ' ' + reg + ' ' + name + ' \u2014 <b>' + price_str + '</b>')
