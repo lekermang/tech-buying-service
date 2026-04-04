@@ -40,7 +40,7 @@ export default function RepairWidget() {
   const [selectedPart, setSelectedPart] = useState<PartItem | null>(null);
   const [partsData, setPartsData] = useState<PartsData>(null);
   const [partsLoading, setPartsLoading] = useState(false);
-  const [form, setForm] = useState({ name: "", phone: "" });
+  const [form, setForm] = useState({ name: "", phone: "", model: "", comment: "" });
   const [sending, setSending] = useState(false);
   const [orderId, setOrderId] = useState<number | null>(null);
   const [open, setOpen] = useState(false);
@@ -88,9 +88,10 @@ export default function RepairWidget() {
         body: JSON.stringify({
           name: form.name,
           phone: form.phone,
-          model: selectedPart ? normalizeModel(selectedPart.model) : modelQuery,
+          model: form.model || (selectedPart ? normalizeModel(selectedPart.model) : modelQuery) || null,
           repair_type: repairLabel,
           price: priceVal,
+          comment: form.comment || null,
         }),
       });
       const data = await res.json();
@@ -123,7 +124,7 @@ export default function RepairWidget() {
     setSimpleRepair(null);
     setModelQuery("");
     setSelectedPart(null);
-    setForm({ name: "", phone: "" });
+    setForm({ name: "", phone: "", model: "", comment: "" });
     setOrderId(null);
   };
 
@@ -304,7 +305,7 @@ export default function RepairWidget() {
                     </div>
                   )}
                   <button
-                    onClick={() => setStep("form")}
+                    onClick={() => { setForm(p => ({ ...p, model: selectedPart ? normalizeModel(selectedPart.model) : modelQuery })); setStep("form"); }}
                     disabled={!modelQuery}
                     className="w-full bg-[#FFD700] text-black font-oswald font-bold py-2 uppercase text-xs hover:bg-yellow-400 transition-colors disabled:opacity-40"
                   >
@@ -346,25 +347,37 @@ export default function RepairWidget() {
                       type="text"
                       value={form.name}
                       onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-                      placeholder="Ваше имя"
+                      placeholder="Ваше имя *"
                       className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-2 font-roboto text-xs focus:outline-none focus:border-[#FFD700] transition-colors"
                     />
-                    <div className="flex gap-1.5">
-                      <input
-                        type="tel"
-                        value={form.phone}
-                        onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
-                        placeholder="+7 (___) ___-__-__"
-                        className="flex-1 bg-[#0D0D0D] border border-[#333] text-white px-3 py-2 font-roboto text-xs focus:outline-none focus:border-[#FFD700] transition-colors"
-                      />
-                      <button
-                        onClick={handleSubmit}
-                        disabled={sending || !form.name || !form.phone}
-                        className="bg-[#FFD700] text-black font-oswald font-bold px-3 py-2 uppercase text-xs hover:bg-yellow-400 transition-colors disabled:opacity-50 shrink-0"
-                      >
-                        {sending ? "..." : "Записаться"}
-                      </button>
-                    </div>
+                    <input
+                      type="tel"
+                      value={form.phone}
+                      onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
+                      placeholder="Телефон *"
+                      className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-2 font-roboto text-xs focus:outline-none focus:border-[#FFD700] transition-colors"
+                    />
+                    <input
+                      type="text"
+                      value={form.model}
+                      onChange={(e) => setForm((p) => ({ ...p, model: e.target.value }))}
+                      placeholder="Модель телефона (iPhone 14, Samsung A54...)"
+                      className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-2 font-roboto text-xs focus:outline-none focus:border-[#FFD700] transition-colors"
+                    />
+                    <textarea
+                      value={form.comment}
+                      onChange={(e) => setForm((p) => ({ ...p, comment: e.target.value }))}
+                      placeholder="Опишите поломку (не включается, разбит экран, не заряжается...)"
+                      rows={2}
+                      className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-2 font-roboto text-xs focus:outline-none focus:border-[#FFD700] transition-colors resize-none"
+                    />
+                    <button
+                      onClick={handleSubmit}
+                      disabled={sending || !form.name || !form.phone}
+                      className="w-full bg-[#FFD700] text-black font-oswald font-bold px-3 py-2.5 uppercase text-xs hover:bg-yellow-400 transition-colors disabled:opacity-50"
+                    >
+                      {sending ? "Отправляю..." : "Записаться на ремонт"}
+                    </button>
                   </div>
                 </div>
               ) : null}
