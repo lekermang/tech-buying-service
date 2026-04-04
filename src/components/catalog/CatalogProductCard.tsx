@@ -9,60 +9,68 @@ interface Props {
 const CatalogProductCard = ({ item, onBuy }: Props) => {
   const flag = item.region ? (REGION_FLAG[item.region] || "") : "";
   const inStock = item.availability === "in_stock";
-
   const title = [item.brand, item.model].filter(Boolean).join(" ");
-  const sub = [item.ram, item.storage].filter(Boolean).join(" · ");
+  const sub = [item.storage, item.ram].filter(Boolean).join(" · ");
   const photo = item.photo_url || MODEL_PHOTOS[item.model] || CATEGORY_PHOTOS[item.category] || null;
   const colorHex = getColorHex(item.color);
 
   return (
-    <div className="bg-[#111] border border-[#222] hover:border-[#FFD700]/30 transition-colors group relative flex flex-col">
-      <div className="h-36 sm:h-44 md:h-48 bg-[#151515] relative overflow-hidden flex items-center justify-center">
+    <div
+      className="bg-white rounded-2xl overflow-hidden group cursor-pointer flex flex-col hover:shadow-xl transition-all duration-300"
+      onClick={() => onBuy(item)}
+    >
+      {/* Image area */}
+      <div className="relative bg-[#f5f5f7] aspect-square flex items-center justify-center overflow-hidden">
         {photo ? (
-          <img src={photo} alt={title}
-            className="w-full h-full object-cover opacity-70 group-hover:opacity-90 group-hover:scale-105 transition-all duration-500" />
+          <img
+            src={photo}
+            alt={title}
+            className="w-4/5 h-4/5 object-contain group-hover:scale-105 transition-transform duration-500"
+          />
         ) : (
-          <Icon name="Package" size={40} className="text-white/10" />
+          <Icon name="Package" size={48} className="text-[#1d1d1f]/10" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#111] via-transparent to-transparent" />
 
-        <div className={`absolute top-2 left-2 font-roboto text-[10px] px-2 py-1 backdrop-blur-sm ${inStock ? "bg-green-900/70 text-green-400" : "bg-black/70 text-white/60"}`}>
-          {inStock ? "✅ В наличии" : "🚗 Завтра"}
+        {/* Stock badge */}
+        <div className={`absolute top-3 left-3 text-[10px] font-medium px-2 py-0.5 rounded-full ${inStock ? "bg-green-100 text-green-700" : "bg-[#1d1d1f]/8 text-[#1d1d1f]/50"}`}>
+          {inStock ? "В наличии" : "Под заказ"}
         </div>
 
-        {flag && <div className="absolute top-2 right-2 text-base drop-shadow">{flag}</div>}
-
-        {colorHex && (
-          <div className="absolute bottom-2 right-2 flex items-center gap-1.5 bg-black/60 backdrop-blur-sm px-2 py-1 rounded-sm">
-            <div className="w-3 h-3 rounded-full border border-white/20 shrink-0" style={{ backgroundColor: colorHex }} />
-            <span className="font-roboto text-white/70 text-[10px] capitalize">{item.color}</span>
-          </div>
+        {flag && (
+          <div className="absolute top-3 right-3 text-sm">{flag}</div>
         )}
       </div>
 
-      <div className="p-2.5 sm:p-4 flex flex-col flex-1">
-        <div className="font-oswald font-bold text-sm sm:text-base uppercase leading-tight mb-0.5">{title}</div>
-        {sub && <div className="font-roboto text-white/40 text-[10px] sm:text-xs mb-1">{sub}</div>}
-        {!inStock && (
-          <div className="font-roboto text-white/25 text-[9px] sm:text-[10px] mb-1 hidden sm:block">Доставка на следующий день (заказ до 17:00)</div>
+      {/* Info */}
+      <div className="p-4 flex flex-col flex-1">
+        <div className="font-semibold text-[#1d1d1f] text-sm leading-snug mb-0.5 line-clamp-2">{title}</div>
+
+        {sub && (
+          <div className="text-[#1d1d1f]/40 text-xs mb-1">{sub}</div>
         )}
 
-        <div className="mt-auto">
-          <div className="mb-2">
-            {item.price ? (
-              <span className="font-oswald font-bold text-base sm:text-xl text-[#FFD700]">
-                {(item.price + PRICE_MARKUP).toLocaleString("ru-RU")} ₽
-              </span>
-            ) : (
-              <span className="font-roboto text-white/30 text-xs sm:text-sm italic">Цену уточняйте</span>
-            )}
+        {colorHex && (
+          <div className="flex items-center gap-1.5 mt-1 mb-2">
+            <div className="w-3 h-3 rounded-full border border-black/10" style={{ backgroundColor: colorHex }} />
+            <span className="text-[#1d1d1f]/40 text-[11px] capitalize">{item.color}</span>
           </div>
-          <button onClick={() => onBuy(item)}
-            className="w-full bg-[#FFD700] text-black font-oswald font-bold text-sm sm:text-base py-2.5 sm:py-3 uppercase tracking-wide hover:bg-yellow-400 active:scale-95 transition-all flex items-center justify-center gap-1.5">
-            <Icon name="ShoppingCart" size={15} />
-            Купить
-          </button>
+        )}
+
+        <div className="mt-auto pt-3 flex items-center justify-between">
+          <div className="font-semibold text-[#1d1d1f] text-base">
+            {item.price
+              ? `${(item.price + PRICE_MARKUP).toLocaleString("ru-RU")} ₽`
+              : <span className="text-[#1d1d1f]/30 text-sm font-normal">По запросу</span>
+            }
+          </div>
+          {flag && <span className="text-[10px] text-[#1d1d1f]/25">{item.region}</span>}
         </div>
+
+        <button
+          onClick={e => { e.stopPropagation(); onBuy(item); }}
+          className="mt-3 w-full bg-[#0071e3] hover:bg-[#0077ed] text-white text-sm font-medium py-2 rounded-xl transition-colors">
+          Купить
+        </button>
       </div>
     </div>
   );
