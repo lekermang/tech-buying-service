@@ -2,7 +2,26 @@ import { useState, useEffect, useRef } from "react";
 import Icon from "@/components/ui/icon";
 
 const CATALOG_URL = "https://functions.poehali.dev/e0e6576c-f000-4288-86ef-1de08ad7bcc4";
-const LABEL_IMG = "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/3067a572-e39d-4cc5-b8c8-0330ae2d1a5b.jpg";
+
+const CATEGORY_PHOTOS: Record<string, string> = {
+  "iPhone 17/AIR/PRO/MAX": "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/1f1769fc-9b20-48ed-8861-8c1b04d23927.jpg",
+  "iPhone 16/e/+/PRO/MAX": "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/1f1769fc-9b20-48ed-8861-8c1b04d23927.jpg",
+  "iPhone 15/+/PRO/MAX":   "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/1f1769fc-9b20-48ed-8861-8c1b04d23927.jpg",
+  "iPhone 11/12/13/14":    "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/1f1769fc-9b20-48ed-8861-8c1b04d23927.jpg",
+  "MacBook":               "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/2770bb8e-b288-4a74-90dd-c34273d319b2.jpg",
+  "AirPods":               "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/3f012a5d-ae26-4bd6-8a5b-5c5d3a1e7a18.jpg",
+  "Apple Watch":           "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/d2560222-885a-4515-8776-83021252cc4b.jpg",
+  "Apple iPad":            "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/266e961c-0843-4fe9-a40c-57b985d8871c.jpg",
+  "Samsung S-Z":           "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/01aba5f4-13b9-45b2-9d70-19ae983f4b83.jpg",
+  "Samsung A-M":           "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/01aba5f4-13b9-45b2-9d70-19ae983f4b83.jpg",
+  "POCO M-X-F":            "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/0cf59ebb-65d4-49c5-a497-9981a237895a.jpg",
+  "Xiaomi/Redmi/Pad":      "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/0cf59ebb-65d4-49c5-a497-9981a237895a.jpg",
+  "Honor / PIXEL":         "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/0cf59ebb-65d4-49c5-a497-9981a237895a.jpg",
+  "Realme / OnePlus / Nothing": "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/0cf59ebb-65d4-49c5-a497-9981a237895a.jpg",
+  "Sony / XBOX / GoPro":   "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/e81be9d8-bf0f-4c6f-ad01-3d8479375a9d.jpg",
+  "Яндекс / JBL / Marshall": "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/cf6f931d-3e9c-418b-a329-1bb362ec1c07.jpg",
+  "Dyson / Garmin":        "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/b0d97190-0c73-4187-abec-eb1c45311653.jpg",
+};
 
 interface CatalogItem {
   id: number;
@@ -225,23 +244,29 @@ const ProductCard = ({ item }: { item: CatalogItem }) => {
 
   const title = [item.brand, item.model].filter(Boolean).join(" ");
   const sub = [item.ram, item.storage, item.color].filter(Boolean).join(" · ");
+  const photo = item.photo_url || CATEGORY_PHOTOS[item.category] || null;
 
   return (
     <div className="bg-[#111] border border-[#222] hover:border-[#FFD700]/30 transition-colors group relative flex flex-col">
       {/* Image area */}
-      <div className="h-40 bg-[#1A1A1A] relative overflow-hidden flex items-center justify-center">
-        <img
-          src={LABEL_IMG}
-          alt={title}
-          className="w-24 h-24 object-cover opacity-30 group-hover:opacity-50 transition-opacity"
-        />
+      <div className="h-44 bg-[#151515] relative overflow-hidden flex items-center justify-center">
+        {photo ? (
+          <img
+            src={photo}
+            alt={title}
+            className="w-full h-full object-cover opacity-70 group-hover:opacity-90 group-hover:scale-105 transition-all duration-500"
+          />
+        ) : (
+          <Icon name="Package" size={40} className="text-white/10" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#111] via-transparent to-transparent" />
         {/* Availability badge */}
-        <div className={`absolute top-2 left-2 font-roboto text-[10px] px-2 py-1 ${inStock ? "bg-green-900/60 text-green-400" : "bg-[#1A1A1A] text-white/40"}`}>
+        <div className={`absolute top-2 left-2 font-roboto text-[10px] px-2 py-1 backdrop-blur-sm ${inStock ? "bg-green-900/70 text-green-400" : "bg-black/60 text-white/50"}`}>
           {inStock ? "✅ В наличии" : "🚗 Под заказ"}
         </div>
         {/* Region flag */}
         {flag && (
-          <div className="absolute top-2 right-2 text-base">{flag}</div>
+          <div className="absolute top-2 right-2 text-base drop-shadow">{flag}</div>
         )}
       </div>
 
