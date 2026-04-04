@@ -134,7 +134,7 @@ def handler(event: dict, context) -> dict:
             notify_telegram(new_id, name, phone, model, repair_type, price, comment)
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'id': new_id}, ensure_ascii=False)}
 
-        # Завершение ремонта с суммами
+        # Перевод в «Готово» с записью сумм (статус ready)
         if action == 'complete':
             order_id = body.get('id')
             purchase_amount = body.get('purchase_amount')
@@ -144,14 +144,16 @@ def handler(event: dict, context) -> dict:
                 cur.close(); conn.close()
                 return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'Укажите id заявки'}, ensure_ascii=False)}
 
+            if not purchase_amount or not repair_amount:
+                cur.close(); conn.close()
+                return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'Укажите закупочную и итоговую цену'}, ensure_ascii=False)}
+
             cur.execute(
                 f"""UPDATE {SCHEMA}.repair_orders
-                    SET status = 'done', purchase_amount = %s, repair_amount = %s,
-                        completed_at = NOW(), status_updated_at = NOW()
+                    SET status = 'ready', purchase_amount = %s, repair_amount = %s,
+                        status_updated_at = NOW()
                     WHERE id = %s RETURNING id""",
-                (int(purchase_amount) if purchase_amount else None,
-                 int(repair_amount) if repair_amount else None,
-                 int(order_id))
+                (int(purchase_amount), int(repair_amount), int(order_id))
             )
             updated = cur.fetchone()
             conn.commit()
@@ -160,7 +162,7 @@ def handler(event: dict, context) -> dict:
             if not updated:
                 return {'statusCode': 404, 'headers': HEADERS, 'body': json.dumps({'error': 'Заявка не найдена'}, ensure_ascii=False)}
 
-            notify_client(int(order_id), 'done', '')
+            notify_client(int(order_id), 'ready', '')
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True}, ensure_ascii=False)}
 
         # Смена статуса

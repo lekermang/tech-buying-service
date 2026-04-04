@@ -113,19 +113,66 @@ export default function StaffRepairTab({ token }: { token: string }) {
   };
 
   const completeRepair = async (id: number) => {
+    if (!completeForm.purchase_amount || !completeForm.repair_amount) return;
     setCompleteSaving(true);
     await fetch(REPAIR_URL, {
       method: "POST", headers,
       body: JSON.stringify({
         action: "complete", id,
-        purchase_amount: completeForm.purchase_amount ? parseInt(completeForm.purchase_amount) : null,
-        repair_amount: completeForm.repair_amount ? parseInt(completeForm.repair_amount) : null,
+        purchase_amount: parseInt(completeForm.purchase_amount),
+        repair_amount: parseInt(completeForm.repair_amount),
       }),
     });
     setCompleteSaving(false);
     setCompleting(null);
     setCompleteForm(EMPTY_COMPLETE);
     loadOrders();
+  };
+
+  const issueRepair = async (id: number) => {
+    setSaving(true);
+    await fetch(REPAIR_URL, {
+      method: "POST", headers,
+      body: JSON.stringify({ id, status: "done", admin_note: "" }),
+    });
+    setSaving(false);
+    loadOrders();
+  };
+
+  const printReceipt = (o: Order) => {
+    const profit = (o.repair_amount || 0) - (o.purchase_amount || 0);
+    const win = window.open("", "_blank", "width=400,height=600");
+    if (!win) return;
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Чек #${o.id}</title><style>
+      body{font-family:monospace;font-size:13px;padding:20px;max-width:300px;margin:0 auto}
+      h2{text-align:center;font-size:15px;margin-bottom:4px}
+      .center{text-align:center}
+      .line{border-top:1px dashed #000;margin:10px 0}
+      .row{display:flex;justify-content:space-between;margin:3px 0}
+      .bold{font-weight:bold}
+      .big{font-size:16px;font-weight:bold}
+      @media print{body{padding:0}}
+    </style></head><body>
+      <h2>Скупка24</h2>
+      <div class="center" style="font-size:11px">Ремонт телефонов</div>
+      <div class="line"></div>
+      <div class="row"><span>Заявка:</span><span class="bold">#${o.id}</span></div>
+      <div class="row"><span>Дата:</span><span>${new Date().toLocaleDateString("ru-RU")} ${new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}</span></div>
+      <div class="line"></div>
+      <div class="row"><span>Клиент:</span><span class="bold">${o.name}</span></div>
+      <div class="row"><span>Телефон:</span><span>${o.phone}</span></div>
+      ${o.model ? `<div class="row"><span>Устройство:</span><span>${o.model}</span></div>` : ""}
+      ${o.repair_type ? `<div class="row"><span>Работа:</span><span>${o.repair_type}</span></div>` : ""}
+      ${o.comment ? `<div class="row"><span>Описание:</span><span style="max-width:160px;text-align:right">${o.comment}</span></div>` : ""}
+      <div class="line"></div>
+      ${o.purchase_amount ? `<div class="row"><span>Закупка (себестоимость):</span><span>${o.purchase_amount.toLocaleString("ru-RU")} ₽</span></div>` : ""}
+      <div class="row big"><span>К оплате:</span><span>${(o.repair_amount || 0).toLocaleString("ru-RU")} ₽</span></div>
+      <div class="line"></div>
+      <div class="center" style="font-size:11px;color:#555">Спасибо за обращение!</div>
+    </body></html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 300);
   };
 
   const inp = "w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-2 font-roboto text-xs focus:outline-none focus:border-[#FFD700] transition-colors placeholder:text-white/20";
@@ -311,26 +358,39 @@ export default function StaffRepairTab({ token }: { token: string }) {
                 {/* Форма завершения ремонта */}
                 {isCompleting && (
                   <div className="border-t border-[#FFD700]/20 pt-3 mt-2">
-                    <div className="font-roboto text-[10px] text-[#FFD700]/70 mb-2 uppercase tracking-wide">Завершить ремонт — укажите суммы</div>
-                    <div className="grid grid-cols-2 gap-2 mb-3">
+                    <div className="font-roboto text-[10px] text-[#FFD700]/70 mb-2 uppercase tracking-wide">Перевести в «Готово» — укажите суммы</div>
+                    <div className="grid grid-cols-2 gap-2 mb-1">
                       <div>
-                        <label className={lbl}>Сумма закупки (₽)</label>
+                        <label className={lbl}>Закупочная цена (₽) *</label>
                         <input type="number" value={completeForm.purchase_amount}
                           onChange={e => setCompleteForm(p => ({ ...p, purchase_amount: e.target.value }))}
                           placeholder="500" className={inp} />
                       </div>
                       <div>
-                        <label className={lbl}>Взято за ремонт (₽)</label>
+                        <label className={lbl}>Итоговая цена (₽) *</label>
                         <input type="number" value={completeForm.repair_amount}
                           onChange={e => setCompleteForm(p => ({ ...p, repair_amount: e.target.value }))}
                           placeholder="1500" className={inp} />
                       </div>
                     </div>
+                    {completeForm.purchase_amount && completeForm.repair_amount && (
+                      <div className="text-[10px] font-roboto text-white/40 mb-2 px-1">
+                        Прибыль: <span className={`font-bold ${parseInt(completeForm.repair_amount) - parseInt(completeForm.purchase_amount) >= 0 ? "text-[#FFD700]" : "text-red-400"}`}>
+                          {(parseInt(completeForm.repair_amount) - parseInt(completeForm.purchase_amount)).toLocaleString("ru-RU")} ₽
+                        </span>
+                      </div>
+                    )}
+                    {(!completeForm.purchase_amount || !completeForm.repair_amount) && (
+                      <div className="text-[10px] font-roboto text-red-400/70 mb-2 px-1 flex items-center gap-1">
+                        <Icon name="AlertCircle" size={11} /> Заполните обе суммы чтобы сохранить
+                      </div>
+                    )}
                     <div className="flex gap-2">
-                      <button onClick={() => completeRepair(o.id)} disabled={completeSaving}
-                        className="bg-green-600 hover:bg-green-500 text-white font-oswald font-bold px-4 py-2 uppercase text-xs transition-colors disabled:opacity-50 flex items-center gap-1.5">
+                      <button onClick={() => completeRepair(o.id)}
+                        disabled={completeSaving || !completeForm.purchase_amount || !completeForm.repair_amount}
+                        className="bg-[#FFD700] text-black font-oswald font-bold px-4 py-2 uppercase text-xs hover:bg-yellow-400 transition-colors disabled:opacity-40 flex items-center gap-1.5">
                         <Icon name="CheckCircle" size={13} />
-                        {completeSaving ? "Сохраняю..." : "Завершить ремонт"}
+                        {completeSaving ? "Сохраняю..." : "Готово — сохранить"}
                       </button>
                       <button onClick={() => { setCompleting(null); setCompleteForm(EMPTY_COMPLETE); }}
                         className="text-white/30 font-roboto text-xs hover:text-white transition-colors px-2">
@@ -367,23 +427,37 @@ export default function StaffRepairTab({ token }: { token: string }) {
 
                 {/* Кнопки действий */}
                 {!isEditing && !isCompleting && (
-                  <div className="flex gap-2 mt-2 pt-2 border-t border-white/5">
+                  <div className="flex gap-2 mt-2 pt-2 border-t border-white/5 flex-wrap">
                     {!isDone && (
                       <>
                         <button onClick={() => { setEditing(o.id); setNoteInput(o.admin_note || ""); setCompleting(null); }}
                           className="flex items-center gap-1 text-white/30 hover:text-[#FFD700] font-roboto text-[10px] transition-colors">
                           <Icon name="Pencil" size={11} /> Сменить статус
                         </button>
-                        <button onClick={() => { setCompleting(o.id); setCompleteForm(EMPTY_COMPLETE); setEditing(null); }}
-                          className="flex items-center gap-1 text-white/30 hover:text-green-400 font-roboto text-[10px] transition-colors ml-auto">
-                          <Icon name="CheckCircle" size={11} /> Завершить ремонт
-                        </button>
+                        {o.status !== "ready" && (
+                          <button onClick={() => { setCompleting(o.id); setCompleteForm(EMPTY_COMPLETE); setEditing(null); }}
+                            className="flex items-center gap-1 text-white/30 hover:text-[#FFD700] font-roboto text-[10px] transition-colors ml-auto">
+                            <Icon name="CheckCircle" size={11} /> Готово
+                          </button>
+                        )}
+                        {o.status === "ready" && (
+                          <button onClick={() => issueRepair(o.id)} disabled={saving}
+                            className="flex items-center gap-1 bg-green-600 hover:bg-green-500 text-white font-oswald font-bold px-3 py-1 text-xs uppercase transition-colors ml-auto disabled:opacity-50">
+                            <Icon name="PackageCheck" size={12} /> Выдать клиенту
+                          </button>
+                        )}
                       </>
                     )}
                     {isDone && (
                       <span className="font-roboto text-[10px] text-green-400/50 flex items-center gap-1">
                         <Icon name="CheckCircle" size={11} /> Ремонт завершён
                       </span>
+                    )}
+                    {(isDone || o.status === "ready") && (
+                      <button onClick={() => printReceipt(o)}
+                        className="flex items-center gap-1 text-white/30 hover:text-white font-roboto text-[10px] transition-colors ml-auto">
+                        <Icon name="Printer" size={11} /> Печать чека
+                      </button>
                     )}
                   </div>
                 )}
