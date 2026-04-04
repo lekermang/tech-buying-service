@@ -91,7 +91,7 @@ const AppleWidget = ({ compact }: AppleWidgetProps) => {
           <div className="w-5 h-5 bg-white rounded flex items-center justify-center shrink-0 text-black">
             <AppleLogo size={12} />
           </div>
-          <span className="font-oswald font-bold text-xs uppercase text-white tracking-wide">Apple — на 5 000 ₽ ниже Авито</span>
+          <span className="font-oswald font-bold text-xs uppercase text-white tracking-wide">Купим дороже всех Apple технику!</span>
         </div>
 
         <div className="flex gap-1.5 mb-2">
@@ -163,7 +163,7 @@ const AppleWidget = ({ compact }: AppleWidgetProps) => {
           </div>
           <div>
             <span className="font-oswald font-bold text-white text-base uppercase tracking-wide">Скупка Apple техники</span>
-            <span className="ml-2 bg-[#FFD700] text-black font-oswald font-bold text-xs px-2 py-0.5">−5 000 ₽ от Авито</span>
+            <span className="ml-2 bg-[#FFD700] text-black font-oswald font-bold text-xs px-2 py-0.5">Дороже всех!</span>
           </div>
         </div>
         <div className="flex gap-2 mb-3">
