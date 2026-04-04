@@ -125,17 +125,15 @@ const HeroSection = ({ scrollTo }: HeroSectionProps) => {
           {/* Виджеты — компактный блок */}
           <div className="space-y-1.5">
             <a href="/catalog"
-              className="flex items-center justify-between bg-[#111] border border-[#FFD700]/20 hover:border-[#FFD700]/50 px-4 py-3 transition-colors group">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-[#FFD700]/10 flex items-center justify-center shrink-0">
-                  <Icon name="ShoppingBag" size={15} className="text-[#FFD700]" />
+              className="flex items-center justify-between bg-black/30 border border-white/10 hover:border-[#FFD700]/40 px-3 py-3 transition-colors group w-full">
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 bg-[#FFD700] flex items-center justify-center shrink-0">
+                  <Icon name="ShoppingBag" size={11} className="text-black" />
                 </div>
-                <div>
-                  <div className="font-oswald font-bold text-sm uppercase text-white leading-tight">Каталог новой техники</div>
-                  <div className="font-roboto text-white/30 text-[11px]">iPhone, Samsung, MacBook, Dyson · <span className="text-[#FFD700]/60">Гарантия 2 года</span></div>
-                </div>
+                <span className="font-oswald font-bold text-xs uppercase text-white tracking-wide">Каталог новой техники</span>
+                <span className="bg-[#FFD700]/20 text-[#FFD700] font-roboto text-[10px] px-1.5 py-0.5 border border-[#FFD700]/30">Гарантия 2 года</span>
               </div>
-              <Icon name="ArrowRight" size={14} className="text-[#FFD700]/40 group-hover:text-[#FFD700] transition-colors shrink-0" />
+              <Icon name="ChevronRight" size={14} className="text-white/40 group-hover:text-[#FFD700] transition-colors shrink-0" />
             </a>
             <UsedGoodsSearch />
             <RepairWidget />

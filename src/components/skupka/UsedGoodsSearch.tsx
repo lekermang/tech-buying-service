@@ -48,7 +48,7 @@ export default function UsedGoodsSearch() {
   }, [fetchGoods]);
 
   return (
-    <div className="border border-white/10 bg-black/30 p-3 mb-3 w-full">
+    <div className="border border-white/10 bg-black/30 px-3 py-3 w-full">
       <button className="flex items-center justify-between w-full" onClick={() => setOpen(v => !v)}>
         <div className="flex items-center gap-2">
           <div className="w-5 h-5 bg-[#FFD700] flex items-center justify-center shrink-0">
