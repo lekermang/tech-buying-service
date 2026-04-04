@@ -7,7 +7,7 @@ import RepairStats from "./repair/RepairStats";
 
 type View = "list" | "stats";
 
-export default function StaffRepairTab({ token }: { token: string }) {
+export default function StaffRepairTab({ token, isOwner = false }: { token: string; isOwner?: boolean }) {
   const [view, setView] = useState<View>("list");
   const [orders, setOrders] = useState<Order[]>([]);
   const [stats, setStats] = useState<DayStat[]>([]);
@@ -121,6 +121,14 @@ export default function StaffRepairTab({ token }: { token: string }) {
     loadOrders();
   };
 
+  const deleteOrder = async (id: number) => {
+    await fetch(REPAIR_URL, {
+      method: "POST", headers,
+      body: JSON.stringify({ action: "delete", id }),
+    });
+    loadOrders();
+  };
+
   return (
     <div>
       {/* Шапка с переключателем вид + кнопки */}
@@ -196,6 +204,7 @@ export default function StaffRepairTab({ token }: { token: string }) {
               saving={saving}
               completeForm={completeForm}
               completeSaving={completeSaving}
+              isOwner={isOwner}
               onEditStart={(id, note) => { setEditing(id); setNoteInput(note); setCompleting(null); }}
               onEditCancel={() => setEditing(null)}
               onNoteChange={setNoteInput}
@@ -206,6 +215,7 @@ export default function StaffRepairTab({ token }: { token: string }) {
               onCompleteRepair={completeRepair}
               onIssueRepair={issueRepair}
               onSaveEdit={saveEdit}
+              onDelete={isOwner ? deleteOrder : undefined}
             />
           ))}
         </div>

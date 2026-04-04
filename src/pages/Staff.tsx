@@ -138,7 +138,7 @@ export default function Staff() {
 
       {tab === "goods" && <GoodsTab token={token} />}
       {tab === "sales" && <SalesTab token={token} />}
-      {tab === "repair" && <StaffRepairTab token={token} />}
+      {tab === "repair" && <StaffRepairTab token={token} isOwner={empRole === "owner"} />}
       {tab === "clients" && <ClientsTab token={token} />}
       {tab === "analytics" && <AnalyticsTab token={token} />}
       {tab === "employees" && isOwnerOrAdmin && <EmployeesTab token={token} myRole={empRole} />}

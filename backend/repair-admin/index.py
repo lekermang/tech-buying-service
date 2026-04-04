@@ -30,6 +30,25 @@ def auth(event: dict) -> bool:
     return False
 
 
+def is_owner(event: dict) -> bool:
+    headers = {k.lower(): v for k, v in (event.get('headers') or {}).items()}
+    admin_token = headers.get('x-admin-token', '')
+    if admin_token and admin_token == ADMIN_TOKEN and ADMIN_TOKEN:
+        return True
+    emp_token = headers.get('x-employee-token', '')
+    if emp_token:
+        conn = psycopg2.connect(os.environ['DATABASE_URL'])
+        cur = conn.cursor()
+        cur.execute(
+            f"SELECT role FROM {SCHEMA}.employees WHERE auth_token=%s AND token_expires_at>NOW() AND is_active=true",
+            (emp_token,)
+        )
+        row = cur.fetchone()
+        cur.close(); conn.close()
+        return row is not None and row[0] == 'owner'
+    return False
+
+
 def handler(event: dict, context) -> dict:
     """Управление заявками на ремонт: список, создание, смена статуса, дневная статистика"""
 
@@ -214,6 +233,23 @@ def handler(event: dict, context) -> dict:
             return {'statusCode': 404, 'headers': HEADERS, 'body': json.dumps({'error': 'Заявка не найдена'}, ensure_ascii=False)}
 
         notify_client(int(order_id), new_status, admin_note)
+        return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True}, ensure_ascii=False)}
+
+        # Удаление заявки — только для владельца (admin token)
+    if action == 'delete':
+        if not is_owner(event):
+            cur.close(); conn.close()
+            return {'statusCode': 403, 'headers': HEADERS, 'body': json.dumps({'error': 'Только владелец может удалять заявки'}, ensure_ascii=False)}
+        order_id = body.get('id')
+        if not order_id:
+            cur.close(); conn.close()
+            return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'Укажите id'}, ensure_ascii=False)}
+        cur.execute(f"DELETE FROM {SCHEMA}.repair_orders WHERE id = %s RETURNING id", (int(order_id),))
+        deleted = cur.fetchone()
+        conn.commit()
+        cur.close(); conn.close()
+        if not deleted:
+            return {'statusCode': 404, 'headers': HEADERS, 'body': json.dumps({'error': 'Заявка не найдена'}, ensure_ascii=False)}
         return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True}, ensure_ascii=False)}
 
     cur.close(); conn.close()

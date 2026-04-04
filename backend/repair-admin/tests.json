@@ -6,6 +6,14 @@
       "path": "/",
       "expectedStatus": 401,
       "bodyMatcher": "partial"
+    },
+    {
+      "name": "Delete without token returns 401",
+      "method": "POST",
+      "path": "/",
+      "body": {"action": "delete", "id": 999},
+      "expectedStatus": 401,
+      "bodyMatcher": "partial"
     }
   ]
 }

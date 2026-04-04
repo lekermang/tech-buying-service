@@ -17,6 +17,7 @@ type Props = {
   saving: boolean;
   completeForm: CompleteForm;
   completeSaving: boolean;
+  isOwner?: boolean;
   onEditStart: (id: number, note: string) => void;
   onEditCancel: () => void;
   onNoteChange: (val: string) => void;
@@ -27,15 +28,18 @@ type Props = {
   onCompleteRepair: (id: number) => void;
   onIssueRepair: (id: number) => void;
   onSaveEdit: (id: number, fields: EditForm) => void;
+  onDelete?: (id: number) => void;
 };
 
 export default function RepairOrderCard({
   o, editing, completing, noteInput, saving,
   completeForm, completeSaving,
+  isOwner = false,
   onEditStart, onEditCancel, onNoteChange, onUpdateStatus,
   onCompleteStart, onCompleteCancel, onCompleteFormChange,
-  onCompleteRepair, onIssueRepair, onSaveEdit,
+  onCompleteRepair, onIssueRepair, onSaveEdit, onDelete,
 }: Props) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const st = statusInfo(o.status);
   const isEditing = editing === o.id;
   const isCompleting = completing === o.id;
@@ -260,6 +264,28 @@ export default function RepairOrderCard({
             className="flex items-center gap-1 text-white/30 hover:text-[#FFD700] font-roboto text-[10px] transition-colors">
             <Icon name="Pencil" size={11} /> Редактировать
           </button>
+
+          {/* Удалить — только владелец */}
+          {isOwner && onDelete && (
+            confirmDelete ? (
+              <div className="flex items-center gap-1.5">
+                <span className="font-roboto text-[10px] text-red-400">Удалить заявку?</span>
+                <button onClick={() => { onDelete(o.id); setConfirmDelete(false); }}
+                  className="font-roboto text-[10px] text-red-400 hover:text-red-300 border border-red-500/40 px-2 py-0.5 transition-colors">
+                  Да
+                </button>
+                <button onClick={() => setConfirmDelete(false)}
+                  className="font-roboto text-[10px] text-white/30 hover:text-white transition-colors px-1">
+                  Нет
+                </button>
+              </div>
+            ) : (
+              <button onClick={() => setConfirmDelete(true)}
+                className="flex items-center gap-1 text-white/20 hover:text-red-400 font-roboto text-[10px] transition-colors">
+                <Icon name="Trash2" size={11} /> Удалить
+              </button>
+            )
+          )}
 
           {/* Перевести в Готово — если не ready и не done */}
           {o.status !== "ready" && o.status !== "done" && (
