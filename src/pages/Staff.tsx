@@ -2,7 +2,9 @@ import { useState, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import { EMPLOYEE_AUTH_URL } from "./staff.types";
 import GoodsTab from "./StaffGoodsTab";
-import { SalesTab, ClientsTab, AnalyticsTab } from "./StaffOtherTabs";
+import { SalesTab, ClientsTab, AnalyticsTab, EmployeesTab } from "./StaffOtherTabs";
+
+type Tab = "goods" | "sales" | "clients" | "analytics" | "employees";
 
 export default function Staff() {
   const [token, setToken] = useState(() => localStorage.getItem("employee_token") || "");
@@ -11,13 +13,16 @@ export default function Staff() {
   const [authed, setAuthed] = useState(false);
   const [empName, setEmpName] = useState(() => localStorage.getItem("employee_name") || "");
   const [empRole, setEmpRole] = useState(() => localStorage.getItem("employee_role") || "");
-  const [tab, setTab] = useState<"goods" | "sales" | "clients" | "analytics">("goods");
+  const [tab, setTab] = useState<Tab>("goods");
 
   useEffect(() => {
     if (!token) return;
     fetch(EMPLOYEE_AUTH_URL, { headers: { "X-Employee-Token": token } })
       .then(r => r.json())
-      .then(d => { if (d.id) { setAuthed(true); setEmpName(d.full_name); setEmpRole(d.role); } else { localStorage.removeItem("employee_token"); setToken(""); } })
+      .then(d => {
+        if (d.id) { setAuthed(true); setEmpName(d.full_name); setEmpRole(d.role); }
+        else { localStorage.removeItem("employee_token"); setToken(""); }
+      })
       .catch(() => {});
   }, [token]);
 
@@ -62,18 +67,28 @@ export default function Staff() {
           <button onClick={login} className="w-full bg-[#FFD700] text-black font-oswald font-bold py-2.5 uppercase tracking-wide hover:bg-yellow-400 transition-colors">
             Войти
           </button>
-          <div className="font-roboto text-white/30 text-[10px] text-center">Первый вход: введите логин и новый пароль</div>
+          <div className="font-roboto text-white/30 text-[10px] text-center">Первый вход: введите логин и придумайте пароль</div>
         </div>
       </div>
     </div>
   );
+
+  const isOwnerOrAdmin = empRole === "owner" || empRole === "admin";
 
   const TABS = [
     { k: "goods", l: "Товары", icon: "Package" },
     { k: "sales", l: "Продажи", icon: "ShoppingCart" },
     { k: "clients", l: "Клиенты", icon: "Users" },
     { k: "analytics", l: "Аналитика", icon: "BarChart2" },
+    ...(isOwnerOrAdmin ? [{ k: "employees", l: "Сотрудники", icon: "UserCog" }] : []),
   ];
+
+  const ROLE_BADGE: Record<string, string> = {
+    owner: "bg-[#FFD700] text-black",
+    admin: "bg-blue-500/20 text-blue-400",
+    staff: "bg-white/10 text-white/50",
+  };
+  const ROLE_LABEL: Record<string, string> = { owner: "Владелец", admin: "Админ", staff: "Сотрудник" };
 
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-white">
@@ -83,14 +98,18 @@ export default function Staff() {
             <Icon name="Users" size={11} className="text-black" />
           </div>
           <span className="font-oswald font-bold uppercase text-sm">{empName}</span>
-          {empRole === "admin" && <span className="bg-[#FFD700] text-black font-roboto text-[10px] px-1.5 py-0.5">admin</span>}
+          <span className={`font-roboto text-[10px] px-1.5 py-0.5 ${ROLE_BADGE[empRole] || "bg-white/10 text-white/50"}`}>
+            {ROLE_LABEL[empRole] || empRole}
+          </span>
         </div>
-        <button onClick={logout} className="text-white/30 hover:text-red-400 transition-colors"><Icon name="LogOut" size={15} /></button>
+        <button onClick={logout} className="text-white/30 hover:text-red-400 transition-colors">
+          <Icon name="LogOut" size={15} />
+        </button>
       </div>
 
       <div className="flex border-b border-[#222] overflow-x-auto">
         {TABS.map(t => (
-          <button key={t.k} onClick={() => setTab(t.k as typeof tab)}
+          <button key={t.k} onClick={() => setTab(t.k as Tab)}
             className={`flex items-center gap-1.5 font-roboto text-xs px-4 py-3 whitespace-nowrap border-b-2 transition-colors ${tab === t.k ? "border-[#FFD700] text-[#FFD700]" : "border-transparent text-white/40 hover:text-white"}`}>
             <Icon name={t.icon} size={13} /> {t.l}
           </button>
@@ -101,6 +120,7 @@ export default function Staff() {
       {tab === "sales" && <SalesTab token={token} />}
       {tab === "clients" && <ClientsTab token={token} />}
       {tab === "analytics" && <AnalyticsTab token={token} />}
+      {tab === "employees" && isOwnerOrAdmin && <EmployeesTab token={token} myRole={empRole} />}
     </div>
   );
 }

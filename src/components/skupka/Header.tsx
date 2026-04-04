@@ -160,6 +160,10 @@ const Header = ({ scrollTo }: HeaderProps) => {
               <Icon name="Phone" size={16} />
               +7 (992) 999-03-33
             </a>
+            <a href="/staff" className="hidden md:flex items-center gap-1.5 border border-[#FFD700]/30 text-[#FFD700]/70 hover:text-[#FFD700] hover:border-[#FFD700] font-roboto text-xs px-3 py-1.5 transition-colors">
+              <Icon name="LogIn" size={13} />
+              Войти
+            </a>
             <button onClick={() => setMenuOpen(!menuOpen)} className="lg:hidden p-2 text-white hover:text-[#FFD700]">
               <Icon name={menuOpen ? "X" : "Menu"} size={24} />
             </button>
@@ -177,6 +181,10 @@ const Header = ({ scrollTo }: HeaderProps) => {
             <a href="tel:+79929990333" className="flex items-center gap-2 mt-4 text-[#FFD700] font-oswald font-semibold text-lg">
               <Icon name="Phone" size={16} />
               +7 (992) 999-03-33
+            </a>
+            <a href="/staff" className="flex items-center gap-2 mt-3 text-[#FFD700]/60 hover:text-[#FFD700] font-roboto text-sm transition-colors">
+              <Icon name="LogIn" size={15} />
+              Войти в панель
             </a>
           </div>
         )}
