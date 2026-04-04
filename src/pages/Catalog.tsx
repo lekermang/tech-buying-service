@@ -24,7 +24,17 @@ const Catalog = () => {
     fetch(`${CATALOG_URL}?${params}`)
       .then(r => r.json())
       .then(d => {
-        setItems(d.items || []);
+        const raw: CatalogItem[] = d.items || [];
+        const brandPriority = ["Apple", "Samsung", "Xiaomi", "Realme", "OnePlus", "Honor", "Google"];
+        const sorted = [...raw].sort((a, b) => {
+          const ai = brandPriority.indexOf(a.brand);
+          const bi = brandPriority.indexOf(b.brand);
+          const av = ai === -1 ? 999 : ai;
+          const bv = bi === -1 ? 999 : bi;
+          if (av !== bv) return av - bv;
+          return a.model.localeCompare(b.model);
+        });
+        setItems(sorted);
         if (d.categories?.length) {
           const priority = ["Смартфоны", "Планшеты", "Ноутбуки", "Наушники", "Умные часы", "Компьютеры"];
           const sorted = [
