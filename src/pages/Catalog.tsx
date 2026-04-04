@@ -57,23 +57,23 @@ const Catalog = () => {
       }, {});
 
   return (
-    <div className="min-h-screen bg-[#FFCC00] text-[#1d1d1f]">
+    <div className="min-h-screen bg-[#0D0D0D] text-white">
       {/* Apple-style nav */}
-      <nav className="bg-[rgba(255,204,0,0.90)] backdrop-blur-xl border-b border-black/5 sticky top-0 z-40">
+      <nav className="bg-[rgba(13,13,13,0.90)] backdrop-blur-xl border-b border-white/5 sticky top-0 z-40">
         <div className="max-w-[1200px] mx-auto px-6 h-14 flex items-center gap-6">
-          <a href="/" className="flex items-center gap-2 shrink-0 text-[#1d1d1f] hover:text-black transition-colors">
-            <Icon name="ArrowLeft" size={16} className="text-[#1d1d1f]/50" />
+          <a href="/" className="flex items-center gap-2 shrink-0 text-white hover:text-white/70 transition-colors">
+            <Icon name="ArrowLeft" size={16} className="text-white/50" />
             <span className="text-sm font-medium">Скупка24</span>
           </a>
 
           <div className="flex-1 relative max-w-lg mx-auto">
-            <Icon name="Search" size={15} className="text-[#1d1d1f]/30 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Icon name="Search" size={15} className="text-white/30 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={search}
               onChange={e => handleSearch(e.target.value)}
               placeholder="Поиск в каталоге"
-              className="w-full bg-black/10 text-[#1d1d1f] pl-9 pr-4 py-1.5 rounded-lg text-sm focus:outline-none focus:bg-white/80 focus:ring-2 focus:ring-black/10 transition-all placeholder:text-[#1d1d1f]/40"
+              className="w-full bg-white/10 text-white pl-9 pr-4 py-1.5 rounded-lg text-sm focus:outline-none focus:bg-white/15 focus:ring-2 focus:ring-white/10 transition-all placeholder:text-white/30"
             />
           </div>
 
@@ -84,7 +84,7 @@ const Catalog = () => {
               { val: "on_order", label: "Под заказ" },
             ].map(f => (
               <button key={f.val} onClick={() => handleAvail(f.val)}
-                className={`text-xs px-3 py-1.5 rounded-full transition-all font-medium ${filterAvail === f.val ? "bg-[#1d1d1f] text-white" : "text-[#1d1d1f]/60 hover:text-[#1d1d1f]"}`}>
+                className={`text-xs px-3 py-1.5 rounded-full transition-all font-medium ${filterAvail === f.val ? "bg-[#FFD700] text-black" : "text-white/50 hover:text-white"}`}>
                 {f.label}
               </button>
             ))}
@@ -93,18 +93,18 @@ const Catalog = () => {
       </nav>
 
       {/* Categories pill bar */}
-      <div className="bg-[rgba(255,204,0,0.90)] backdrop-blur-xl border-b border-black/5 sticky top-14 z-30">
+      <div className="bg-[rgba(13,13,13,0.90)] backdrop-blur-xl border-b border-white/5 sticky top-14 z-30">
         <div className="max-w-[1200px] mx-auto px-6">
           <div className="flex gap-0 overflow-x-auto scrollbar-hide">
             <button
               onClick={() => handleCategory("")}
-              className={`shrink-0 text-sm px-4 py-3 border-b-2 transition-all font-medium whitespace-nowrap ${activeCategory === "" ? "border-[#1d1d1f] text-[#1d1d1f]" : "border-transparent text-[#1d1d1f]/50 hover:text-[#1d1d1f]"}`}>
+              className={`shrink-0 text-sm px-4 py-3 border-b-2 transition-all font-medium whitespace-nowrap ${activeCategory === "" ? "border-[#FFD700] text-[#FFD700]" : "border-transparent text-white/40 hover:text-white"}`}>
               Все
             </button>
             {categories.map(cat => (
               <button key={cat}
                 onClick={() => handleCategory(cat)}
-                className={`shrink-0 text-sm px-4 py-3 border-b-2 transition-all font-medium whitespace-nowrap ${activeCategory === cat ? "border-[#1d1d1f] text-[#1d1d1f]" : "border-transparent text-[#1d1d1f]/50 hover:text-[#1d1d1f]"}`}>
+                className={`shrink-0 text-sm px-4 py-3 border-b-2 transition-all font-medium whitespace-nowrap ${activeCategory === cat ? "border-[#FFD700] text-[#FFD700]" : "border-transparent text-white/40 hover:text-white"}`}>
                 {cat}
               </button>
             ))}
@@ -116,15 +116,15 @@ const Catalog = () => {
       <main className="max-w-[1200px] mx-auto px-6 py-10">
         {loading ? (
           <div className="flex items-center justify-center py-32">
-            <div className="w-8 h-8 border-2 border-[#1d1d1f]/20 border-t-[#1d1d1f] rounded-full animate-spin" />
+            <div className="w-8 h-8 border-2 border-white/10 border-t-[#FFD700] rounded-full animate-spin" />
           </div>
         ) : (
           Object.entries(grouped).map(([cat, catItems]) => catItems.length > 0 && (
             <section key={cat} className="mb-14">
               {!activeCategory && (
                 <div className="mb-6">
-                  <h2 className="text-2xl font-semibold text-[#1d1d1f] tracking-tight">{cat}</h2>
-                  <p className="text-sm text-[#1d1d1f]/40 mt-0.5">{catItems.length} товаров</p>
+                  <h2 className="text-2xl font-semibold text-white tracking-tight">{cat}</h2>
+                  <p className="text-sm text-white/30 mt-0.5">{catItems.length} товаров</p>
                 </div>
               )}
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-4">
@@ -138,15 +138,15 @@ const Catalog = () => {
 
         {!loading && items.length === 0 && (
           <div className="text-center py-32">
-            <Icon name="Search" size={48} className="text-[#1d1d1f]/10 mx-auto mb-4" />
-            <p className="text-[#1d1d1f]/30 text-lg font-medium">Ничего не найдено</p>
+            <Icon name="Search" size={48} className="text-white/10 mx-auto mb-4" />
+            <p className="text-white/30 text-lg font-medium">Ничего не найдено</p>
           </div>
         )}
       </main>
 
-      <footer className="border-t border-black/8 py-8 mt-6">
+      <footer className="border-t border-white/5 py-8 mt-6">
         <div className="max-w-[1200px] mx-auto px-6">
-          <p className="text-[#1d1d1f]/30 text-xs text-center">
+          <p className="text-white/20 text-xs text-center">
             Цены актуальны на сегодня · Гарантия 2 года на новую технику · +7 (992) 999-03-33
           </p>
         </div>
