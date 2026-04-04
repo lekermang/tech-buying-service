@@ -51,8 +51,7 @@ const Header = ({ scrollTo }: HeaderProps) => {
   };
 
   const selectedProbe = PROBES.find(p => p.value === probe) || PROBES[2];
-  const discount = clientType === 'retail' ? 0.90 : 0.93;
-  const discountLabel = clientType === 'retail' ? '−10%' : '−7%';
+  const discount = clientType === 'retail' ? 0.85 : 0.90;
 
   const calcPrice = (coeff: number) =>
     goldPrice ? Math.round(goldPrice.buy * coeff * discount) : null;
@@ -61,8 +60,8 @@ const Header = ({ scrollTo }: HeaderProps) => {
   const weightNum = parseFloat(weight.replace(',', '.')) || 0;
   const totalPrice = activePrice && weightNum > 0 ? Math.round(activePrice * weightNum) : null;
 
-  const priceRetail999 = goldPrice ? Math.round(goldPrice.buy * 0.999 * 0.90) : null;
-  const priceWholesale999 = goldPrice ? Math.round(goldPrice.buy * 0.999 * 0.93) : null;
+  const priceRetail999 = goldPrice ? Math.round(goldPrice.buy * 0.999 * 0.85) : null;
+  const priceWholesale999 = goldPrice ? Math.round(goldPrice.buy * 0.999 * 0.90) : null;
 
   const handleSell = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,7 +76,7 @@ const Header = ({ scrollTo }: HeaderProps) => {
           phone: form.phone,
           category: "Золото",
           desc: `Проба: ${probe}, вес: ${weight || '?'} г, цена: ${activePrice} ₽/г, итого: ${totalPrice ? totalPrice.toLocaleString('ru-RU') : '?'} ₽. Тип: ${clientType === 'retail' ? 'Физлицо' : 'Оптовый'}`,
-          client_type: clientType === 'retail' ? `Физлицо (${discountLabel})` : `Оптовый (${discountLabel})`,
+          client_type: clientType === 'retail' ? 'Физлицо' : 'Оптовый (от 30 г)',
           gold_price: `${activePrice} ₽/г (проба ${probe}, вес ${weight || '?'} г = ${totalPrice ? totalPrice.toLocaleString('ru-RU') : '?'} ₽)`,
         }),
       });
@@ -108,11 +107,10 @@ const Header = ({ scrollTo }: HeaderProps) => {
             <div className="hidden md:flex items-center gap-2 text-xs font-roboto">
               <span className="bg-black/10 px-2 py-0.5 text-black font-semibold">
                 Физлица 999: {priceRetail999?.toLocaleString('ru-RU')} ₽/г
-                <span className="text-black/50 ml-1">−10%</span>
               </span>
               <span className="bg-black/10 px-2 py-0.5 text-black font-semibold">
                 Опт 999: {priceWholesale999?.toLocaleString('ru-RU')} ₽/г
-                <span className="text-black/50 ml-1">−7%</span>
+                <span className="text-black/60 ml-1 font-normal">от 30 г</span>
               </span>
             </div>
             <div className="w-px h-4 bg-black/20 hidden md:block" />
@@ -199,12 +197,12 @@ const Header = ({ scrollTo }: HeaderProps) => {
                 <button onClick={() => setClientType('retail')}
                   className={`p-3 border-2 text-left transition-colors ${clientType === 'retail' ? 'border-[#FFD700] bg-[#FFD700]/10' : 'border-[#333] hover:border-[#FFD700]/40'}`}>
                   <div className="font-oswald font-bold text-sm uppercase mb-0.5">Физлицо</div>
-                  <div className="font-roboto text-white/40 text-xs">−10% от биржи</div>
+                  <div className="font-roboto text-white/40 text-xs">Стандартная цена</div>
                 </button>
                 <button onClick={() => setClientType('wholesale')}
                   className={`p-3 border-2 text-left transition-colors ${clientType === 'wholesale' ? 'border-[#FFD700] bg-[#FFD700]/10' : 'border-[#333] hover:border-[#FFD700]/40'}`}>
                   <div className="font-oswald font-bold text-sm uppercase mb-0.5">Оптовый</div>
-                  <div className="font-roboto text-white/40 text-xs">−7% от биржи</div>
+                  <div className="font-roboto text-white/40 text-xs">от 30 грамм</div>
                 </button>
               </div>
 
@@ -236,7 +234,7 @@ const Header = ({ scrollTo }: HeaderProps) => {
                 {goldPrice && (
                   <div className="mt-3 bg-[#0D0D0D] border border-[#FFD700]/30 p-3">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="font-roboto text-white/50 text-xs">Цена за грамм ({probe} проба, {discountLabel})</span>
+                      <span className="font-roboto text-white/50 text-xs">Цена за грамм ({probe} проба)</span>
                       <span className="font-oswald font-bold text-[#FFD700]">{activePrice?.toLocaleString('ru-RU')} ₽/г</span>
                     </div>
                     {totalPrice ? (
