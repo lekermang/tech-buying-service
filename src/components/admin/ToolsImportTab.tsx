@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import Icon from "@/components/ui/icon";
 
 const IMPORT_URL = "https://functions.poehali.dev/465711ab-0bef-49fe-b8c4-18c7f3064970";
+const SYNC_URL = "https://functions.poehali.dev/8e9219e9-9dcf-4726-a272-69c6ce976b80";
 
 interface Preview {
   article: string;
@@ -25,7 +26,7 @@ const ToolsImportTab = ({ token }: ToolsImportTabProps) => {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const loadStats = async () => {
-    const res = await fetch(IMPORT_URL, { headers: { "X-Admin-Token": token } });
+    const res = await fetch(`${IMPORT_URL}?token=${token}`);
     const data = await res.json();
     setCount(data.count ?? 0);
     setPreview(data.preview ?? []);
@@ -35,7 +36,7 @@ const ToolsImportTab = ({ token }: ToolsImportTabProps) => {
   useEffect(() => { loadStats(); }, []);
 
   const pollStatus = async () => {
-    const res = await fetch(IMPORT_URL, { headers: { "X-Admin-Token": token } });
+    const res = await fetch(`${IMPORT_URL}?token=${token}`);
     const data = await res.json();
     setCount(data.count ?? 0);
     setPreview(data.preview ?? []);
@@ -53,29 +54,19 @@ const ToolsImportTab = ({ token }: ToolsImportTabProps) => {
     setSyncing(true);
     setResult(null);
     try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 28000);
-      const res = await fetch(IMPORT_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Admin-Token": token },
-        body: JSON.stringify({ action: "sync" }),
-        signal: controller.signal,
-      });
-      clearTimeout(timer);
+      // tools-sync скачивает 200МБ фид потоково — может занять 2-5 минут
+      // Таймаут функции нужно поставить 300 сек в настройках Ядро → Функции → tools-sync
+      const res = await fetch(`${SYNC_URL}?token=${token}`, { method: "POST" });
       const data = await res.json();
-      if (data.running) {
-        // Идёт в фоне — поллим статус
-        setTimeout(pollStatus, 3000);
-      } else if (data.ok) {
+      if (data.ok) {
         setResult({ ok: true, imported: data.imported });
         loadStats();
-        setSyncing(false);
       } else {
         setResult({ ok: false, error: data.error });
-        setSyncing(false);
       }
     } catch (err) {
-      setResult({ ok: false, error: "Превышено время ожидания. Попробуй ещё раз." });
+      setResult({ ok: false, error: "Превышено время ожидания. Фид большой (200МБ) — увеличь таймаут функции tools-sync до 300 сек в разделе Ядро → Функции." });
+    } finally {
       setSyncing(false);
     }
   };
@@ -90,9 +81,9 @@ const ToolsImportTab = ({ token }: ToolsImportTabProps) => {
     reader.onload = async (ev) => {
       const base64 = (ev.target?.result as string).split(",")[1];
       try {
-        const res = await fetch(IMPORT_URL, {
+        const res = await fetch(`${IMPORT_URL}?token=${token}`, {
           method: "POST",
-          headers: { "Content-Type": "application/json", "X-Admin-Token": token },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ file: base64, delimiter }),
         });
         const data = await res.json();

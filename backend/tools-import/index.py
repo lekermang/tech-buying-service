@@ -141,7 +141,13 @@ def handler(event: dict, context) -> dict:
     if event.get("httpMethod") == "OPTIONS":
         return {"statusCode": 200, "headers": CORS_HEADERS, "body": ""}
 
-    admin_token = event.get("headers", {}).get("X-Admin-Token", "")
+    headers = event.get("headers", {})
+    params_auth = event.get("queryStringParameters") or {}
+    admin_token = (
+        headers.get("X-Admin-Token") or
+        headers.get("x-admin-token") or
+        params_auth.get("token") or ""
+    )
     if admin_token != os.environ.get("ADMIN_TOKEN", ""):
         return {"statusCode": 401, "headers": CORS_HEADERS, "body": json.dumps({"error": "Unauthorized"})}
 
