@@ -22,6 +22,9 @@ interface CatalogNavProps {
   onResetFilters: () => void;
   cartCount?: number;
   onCartOpen?: () => void;
+  modelFilters?: string[];
+  modelFilter?: string;
+  onModelFilter?: (f: string) => void;
 }
 
 export default function CatalogNav({
@@ -31,6 +34,7 @@ export default function CatalogNav({
   onSearch, onAvail, onFilterPanelToggle, onSidebarOpen,
   onBrandChange, onStorageChange, onColorChange, onResetFilters,
   cartCount = 0, onCartOpen,
+  modelFilters, modelFilter = "Все", onModelFilter,
 }: CatalogNavProps) {
   return (
     <nav className="bg-[#0D0D0D]/97 backdrop-blur-xl border-b border-white/6 sticky top-0 z-40">
@@ -90,6 +94,24 @@ export default function CatalogNav({
           )}
         </button>
       </div>
+
+      {/* Фильтры модели (Pro / Pro Max / Air / ...) */}
+      {modelFilters && modelFilters.length > 1 && onModelFilter && (
+        <div className="overflow-x-auto scrollbar-hide border-t border-white/5">
+          <div className="flex gap-1.5 px-3 sm:px-4 py-2" style={{ width: "max-content" }}>
+            {modelFilters.map(f => (
+              <button key={f} onClick={() => onModelFilter(f)}
+                className={`shrink-0 px-3 py-1 rounded-full text-xs font-semibold border transition-all ${
+                  modelFilter === f
+                    ? "bg-white text-black border-white"
+                    : "border-white/15 text-white/50 hover:border-white/30 hover:text-white"
+                }`}>
+                {f}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Мобильная панель фильтров */}
       {filterPanelOpen && (

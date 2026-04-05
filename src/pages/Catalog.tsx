@@ -6,6 +6,19 @@ import CatalogGrid from "@/components/catalog/CatalogGrid";
 import CatalogBanners from "@/components/catalog/CatalogBanners";
 import Icon from "@/components/ui/icon";
 import { CatalogItem, CATALOG_URL, PRICE_MARKUP } from "@/pages/catalog.types";
+
+const MODEL_FILTERS: Record<string, string[]> = {
+  "iPhone 17/AIR/PRO/MAX":   ["Все", "Pro Max", "Pro", "Air", "iPhone 17"],
+  "iPhone 16/e/+/PRO/MAX":   ["Все", "Pro Max", "Pro", "Plus", "iPhone 16", "16e"],
+  "iPhone 15/+/PRO/MAX":     ["Все", "Pro Max", "Pro", "Plus", "iPhone 15"],
+  "iPhone 11/12/13/14":      ["Все", "iPhone 14", "iPhone 13", "iPhone 12", "iPhone 11"],
+  "MacBook":                 ["Все", "Air M4", "Pro 14", "Pro 16", "Air M3"],
+  "Apple Watch":             ["Все", "Ultra 3", "Ultra 2", "S11", "SE3"],
+  "AirPods":                 ["Все", "Pro 3", "Pro 2", "Max 2", "4 ANC", "AirPods 4"],
+  "Apple iPad":              ["Все", "Air M4", "Mini 7", "iPad 11"],
+  "Samsung S-Z":             ["Все", "Ultra", "S25+", "S25"],
+  "Samsung A-M":             ["Все", "A55", "A35"],
+};
 import { BRAND_PRIORITY, sortItems, sortCategories } from "@/components/catalog/catalog.utils";
 
 interface CartEntry { item: CatalogItem; qty: number; }
@@ -133,8 +146,25 @@ const Catalog = () => {
     if (activeStorage && i.storage !== activeStorage) return false;
     if (activeColor && i.color !== activeColor) return false;
     if (modelFilter && modelFilter !== "Все") {
-      const name = `${i.brand} ${i.model}`.toLowerCase();
-      if (!name.includes(modelFilter.toLowerCase())) return false;
+      const name = `${i.model}`.toLowerCase();
+      const f = modelFilter.toLowerCase();
+      if (f === "pro" || f === "pro max" || f === "air" || f === "plus" || f === "ultra") {
+        // Точное совпадение слов: "pro" не должен захватывать "pro max"
+        const words = name.split(/[\s/]+/);
+        if (f === "pro max") {
+          if (!name.includes("pro max")) return false;
+        } else if (f === "pro") {
+          if (!words.includes("pro") || name.includes("pro max")) return false;
+        } else if (f === "air") {
+          if (!words.includes("air")) return false;
+        } else if (f === "ultra") {
+          if (!words.includes("ultra")) return false;
+        } else if (f === "plus") {
+          if (!name.includes("plus") && !name.includes("+")) return false;
+        }
+      } else {
+        if (!name.includes(f)) return false;
+      }
     }
     return true;
   });
@@ -148,8 +178,6 @@ const Catalog = () => {
       <CatalogBanners
         onCategory={handleCategory}
         activeCategory={activeCategory}
-        modelFilter={modelFilter}
-        onModelFilter={setModelFilter}
       />
 
       {/* Поиск — липкий */}
@@ -175,6 +203,9 @@ const Catalog = () => {
         onResetFilters={resetFilters}
         cartCount={cartCount}
         onCartOpen={() => setCartOpen(true)}
+        modelFilters={MODEL_FILTERS[activeCategory]}
+        modelFilter={modelFilter}
+        onModelFilter={setModelFilter}
       />
 
       <div className="max-w-[1400px] mx-auto flex">

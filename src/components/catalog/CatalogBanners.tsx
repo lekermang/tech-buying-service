@@ -1,5 +1,6 @@
 import { CATEGORY_PHOTOS } from "@/pages/catalog.types";
 import Icon from "@/components/ui/icon";
+import { SparklesCore } from "@/components/ui/sparkles";
 
 interface Cat {
   title: string;
@@ -28,38 +29,48 @@ const CATS: Cat[] = [
   { title: "JBL · Marshall",    subtitle: "Колонки · Яндекс",      cat: "Яндекс / JBL / Marshall",    accent: "#ca8a04" },
 ];
 
-const MODEL_FILTERS: Record<string, string[]> = {
-  "iPhone 17/AIR/PRO/MAX":   ["Все", "Pro Max", "Pro", "Air", "17"],
-  "iPhone 16/e/+/PRO/MAX":   ["Все", "Pro Max", "Pro", "Plus", "16", "16e"],
-  "iPhone 15/+/PRO/MAX":     ["Все", "Pro Max", "Pro", "Plus", "15"],
-  "iPhone 11/12/13/14":      ["Все", "14", "13", "12", "11"],
-  "MacBook":                 ["Все", "Air M4", "Pro 14", "Pro 16", "Air M3"],
-  "Apple Watch":             ["Все", "Ultra 3", "Ultra 2", "S11", "SE3"],
-  "AirPods":                 ["Все", "Pro 3", "Pro 2", "Max 2", "4 ANC", "4"],
-  "Apple iPad":              ["Все", "Air M4", "Mini 7", "iPad 11"],
-  "Samsung S-Z":             ["Все", "S25 Ultra", "S25+", "S25"],
-  "Samsung A-M":             ["Все", "A55", "A35"],
-};
 
 interface Props {
   onCategory: (cat: string) => void;
   activeCategory: string;
-  modelFilter: string;
-  onModelFilter: (f: string) => void;
 }
 
-export default function CatalogBanners({ onCategory, activeCategory, modelFilter, onModelFilter }: Props) {
+export default function CatalogBanners({ onCategory, activeCategory }: Props) {
   const hero = CATS[0];
   const heroPhoto = CATEGORY_PHOTOS[hero.cat];
-  const filters = MODEL_FILTERS[activeCategory] || null;
 
   return (
     <div className="bg-[#0D0D0D]">
 
-      {/* Заголовок */}
-      <div className="px-3 sm:px-4 pt-4 pb-3">
-        <h1 className="text-white font-bold text-xl sm:text-2xl tracking-tight">Каталог новой техники</h1>
-        <p className="text-white/35 text-xs mt-0.5">Гарантия · Рассрочка · Доставка</p>
+      {/* Hero заголовок со Sparkles */}
+      <div className="relative overflow-hidden" style={{ height: 110 }}>
+        {/* Частицы */}
+        <SparklesCore
+          background="transparent"
+          minSize={0.4}
+          maxSize={1.2}
+          particleDensity={80}
+          className="absolute inset-0 w-full h-full"
+          particleColor="#a5b4fc"
+          speed={1.2}
+        />
+        {/* Градиент снизу */}
+        <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-[#0D0D0D] to-transparent" />
+        {/* Текст */}
+        <div className="relative z-10 px-3 sm:px-5 h-full flex flex-col justify-center">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="inline-flex items-center gap-1 bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-[10px] font-bold px-2 py-0.5 rounded-full">
+              <Icon name="Sparkles" size={9} />
+              Официальная гарантия
+            </span>
+            <span className="text-white/20 text-[10px]">·</span>
+            <span className="text-white/40 text-[10px]">Рассрочка 0%</span>
+          </div>
+          <h1 className="text-white font-extrabold text-2xl sm:text-3xl tracking-tight leading-tight">
+            Каталог новой техники
+          </h1>
+          <p className="text-white/40 text-xs mt-0.5">277 товаров · iPhone · MacBook · Samsung · Dyson</p>
+        </div>
       </div>
 
       {/* Hero баннер iPhone 17 */}
@@ -136,30 +147,6 @@ export default function CatalogBanners({ onCategory, activeCategory, modelFilter
           })}
         </div>
       </div>
-
-      {/* Подфильтры модели (Pro / Max / Air / ...) */}
-      {filters && (
-        <div className="overflow-x-auto scrollbar-hide pt-2 pb-1">
-          <div className="flex gap-1.5 px-3 sm:px-4" style={{ width: "max-content" }}>
-            {filters.map(f => {
-              const isActive = modelFilter === f;
-              return (
-                <button
-                  key={f}
-                  onClick={() => onModelFilter(f)}
-                  className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-                    isActive
-                      ? "bg-white text-black border-white"
-                      : "border-white/15 text-white/50 hover:border-white/30 hover:text-white/80"
-                  }`}
-                >
-                  {f}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
     </div>
   );
