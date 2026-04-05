@@ -21,9 +21,18 @@ const BRAND_PRIORITY = ["Apple", "Samsung", "Xiaomi", "POCO", "Realme", "OnePlus
 const CAT_PRIORITY = ["Смартфоны", "Планшеты", "Ноутбуки", "Наушники", "Умные часы", "Компьютеры"];
 
 function modelSortKey(model: string): number {
-  // Извлекаем число из названия модели для сортировки по убыванию (17 > 16 > 15...)
   const m = model.match(/\b(\d{1,2})\b/);
   return m ? parseInt(m[1]) : 0;
+}
+
+const MODEL_SUFFIX_PRIORITY = ["Pro Max", "Pro", "Air", "Plus", "Ultra"];
+
+function modelSuffixKey(model: string): number {
+  const lower = model.toLowerCase();
+  for (let i = 0; i < MODEL_SUFFIX_PRIORITY.length; i++) {
+    if (lower.includes(MODEL_SUFFIX_PRIORITY[i].toLowerCase())) return i;
+  }
+  return MODEL_SUFFIX_PRIORITY.length;
 }
 
 function sortItems(raw: CatalogItem[]) {
@@ -36,6 +45,9 @@ function sortItems(raw: CatalogItem[]) {
     // Внутри бренда: свежие модели первыми (17 > 16 > 15)
     const numDiff = modelSortKey(b.model) - modelSortKey(a.model);
     if (numDiff !== 0) return numDiff;
+    // Одинаковый номер: Pro Max > Pro > Air > Plus > базовая
+    const suffixDiff = modelSuffixKey(a.model) - modelSuffixKey(b.model);
+    if (suffixDiff !== 0) return suffixDiff;
     return a.model.localeCompare(b.model);
   });
 }
