@@ -28,14 +28,30 @@ const CATS: Cat[] = [
   { title: "JBL · Marshall",    subtitle: "Колонки · Яндекс",      cat: "Яндекс / JBL / Marshall",    accent: "#ca8a04" },
 ];
 
+const MODEL_FILTERS: Record<string, string[]> = {
+  "iPhone 17/AIR/PRO/MAX":   ["Все", "Pro Max", "Pro", "Air", "17"],
+  "iPhone 16/e/+/PRO/MAX":   ["Все", "Pro Max", "Pro", "Plus", "16", "16e"],
+  "iPhone 15/+/PRO/MAX":     ["Все", "Pro Max", "Pro", "Plus", "15"],
+  "iPhone 11/12/13/14":      ["Все", "14", "13", "12", "11"],
+  "MacBook":                 ["Все", "Air M4", "Pro 14", "Pro 16", "Air M3"],
+  "Apple Watch":             ["Все", "Ultra 3", "Ultra 2", "S11", "SE3"],
+  "AirPods":                 ["Все", "Pro 3", "Pro 2", "Max 2", "4 ANC", "4"],
+  "Apple iPad":              ["Все", "Air M4", "Mini 7", "iPad 11"],
+  "Samsung S-Z":             ["Все", "S25 Ultra", "S25+", "S25"],
+  "Samsung A-M":             ["Все", "A55", "A35"],
+};
+
 interface Props {
   onCategory: (cat: string) => void;
   activeCategory: string;
+  modelFilter: string;
+  onModelFilter: (f: string) => void;
 }
 
-export default function CatalogBanners({ onCategory, activeCategory }: Props) {
+export default function CatalogBanners({ onCategory, activeCategory, modelFilter, onModelFilter }: Props) {
   const hero = CATS[0];
   const heroPhoto = CATEGORY_PHOTOS[hero.cat];
+  const filters = MODEL_FILTERS[activeCategory] || null;
 
   return (
     <div className="bg-[#0D0D0D]">
@@ -74,8 +90,8 @@ export default function CatalogBanners({ onCategory, activeCategory }: Props) {
         </button>
       </div>
 
-      {/* Горизонтальный скролл всех категорий */}
-      <div className="overflow-x-auto scrollbar-hide pb-3">
+      {/* Горизонтальный скролл категорий */}
+      <div className="overflow-x-auto scrollbar-hide pb-2">
         <div className="flex gap-2 px-3 sm:px-4" style={{ width: "max-content" }}>
           {CATS.map(c => {
             const photo = CATEGORY_PHOTOS[c.cat];
@@ -83,7 +99,7 @@ export default function CatalogBanners({ onCategory, activeCategory }: Props) {
             return (
               <button
                 key={c.cat}
-                onClick={() => onCategory(c.cat)}
+                onClick={() => { onCategory(c.cat); onModelFilter("Все"); }}
                 className="relative rounded-xl overflow-hidden shrink-0 text-left group transition-all duration-200"
                 style={{
                   width: 110,
@@ -120,6 +136,30 @@ export default function CatalogBanners({ onCategory, activeCategory }: Props) {
           })}
         </div>
       </div>
+
+      {/* Подфильтры модели (Pro / Max / Air / ...) */}
+      {filters && (
+        <div className="overflow-x-auto scrollbar-hide pt-2 pb-1">
+          <div className="flex gap-1.5 px-3 sm:px-4" style={{ width: "max-content" }}>
+            {filters.map(f => {
+              const isActive = modelFilter === f;
+              return (
+                <button
+                  key={f}
+                  onClick={() => onModelFilter(f)}
+                  className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                    isActive
+                      ? "bg-white text-black border-white"
+                      : "border-white/15 text-white/50 hover:border-white/30 hover:text-white/80"
+                  }`}
+                >
+                  {f}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
     </div>
   );

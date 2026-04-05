@@ -4,9 +4,10 @@ import { CatalogItem, REGION_FLAG, MODEL_PHOTOS, CATEGORY_PHOTOS, PRICE_MARKUP, 
 interface Props {
   item: CatalogItem;
   onBuy: (item: CatalogItem) => void;
+  onAddToCart?: (item: CatalogItem) => void;
 }
 
-const CatalogProductCard = ({ item, onBuy }: Props) => {
+const CatalogProductCard = ({ item, onBuy, onAddToCart }: Props) => {
   const flag = item.region ? (REGION_FLAG[item.region] || "") : "";
   const inStock = item.availability === "in_stock";
   const title = [item.brand, item.model].filter(Boolean).join(" ");
@@ -66,11 +67,21 @@ const CatalogProductCard = ({ item, onBuy }: Props) => {
           {flag && <span className="text-[10px] text-white/20">{item.region}</span>}
         </div>
 
-        <button
-          onClick={e => { e.stopPropagation(); onBuy(item); }}
-          className="mt-2.5 w-full bg-[#FFD700] hover:bg-yellow-400 text-black text-sm font-semibold py-2 rounded-xl transition-colors">
-          Купить
-        </button>
+        <div className="mt-2.5 flex gap-2">
+          <button
+            onClick={e => { e.stopPropagation(); onBuy(item); }}
+            className="flex-1 bg-[#FFD700] hover:bg-yellow-400 text-black text-sm font-semibold py-2 rounded-xl transition-colors">
+            Купить
+          </button>
+          {onAddToCart && (
+            <button
+              onClick={e => { e.stopPropagation(); onAddToCart(item); }}
+              className="w-10 h-9 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-xl transition-colors shrink-0"
+              title="В корзину">
+              <Icon name="ShoppingCart" size={15} className="text-white/70" />
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

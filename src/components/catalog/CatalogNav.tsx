@@ -20,6 +20,8 @@ interface CatalogNavProps {
   onStorageChange: (storage: string) => void;
   onColorChange: (color: string) => void;
   onResetFilters: () => void;
+  cartCount?: number;
+  onCartOpen?: () => void;
 }
 
 export default function CatalogNav({
@@ -28,6 +30,7 @@ export default function CatalogNav({
   brandsInCategory, storagesInCategory, colorsInCategory,
   onSearch, onAvail, onFilterPanelToggle, onSidebarOpen,
   onBrandChange, onStorageChange, onColorChange, onResetFilters,
+  cartCount = 0, onCartOpen,
 }: CatalogNavProps) {
   return (
     <nav className="bg-[#0D0D0D]/97 backdrop-blur-xl border-b border-white/6 sticky top-0 z-40">
@@ -64,6 +67,17 @@ export default function CatalogNav({
             </button>
           ))}
         </div>
+
+        {/* Корзина */}
+        {onCartOpen && (
+          <button onClick={onCartOpen}
+            className="relative shrink-0 flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-[#FFD700] hover:bg-yellow-400 transition-colors text-black font-semibold">
+            <Icon name="ShoppingCart" size={15} />
+            {cartCount > 0 && (
+              <span className="text-xs font-bold">{cartCount}</span>
+            )}
+          </button>
+        )}
 
         {/* Фильтры — мобилка */}
         <button

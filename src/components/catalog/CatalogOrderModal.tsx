@@ -86,31 +86,41 @@ const CatalogOrderModal = ({ item, onClose }: Props) => {
           )}
 
           {sent ? (
-            <div className="text-center py-4">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Icon name="Check" size={28} className="text-green-600" />
+            <div className="text-center">
+              <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Icon name="Check" size={26} className="text-green-600" />
               </div>
-              <h4 className="text-lg font-semibold text-[#1d1d1f] mb-1">Заявка принята</h4>
-              <p className="text-sm text-[#1d1d1f]/40 mb-5">Перезвоним в течение 15 минут</p>
+              <h4 className="text-lg font-semibold text-[#1d1d1f] mb-1">Заявка принята!</h4>
+              <p className="text-sm text-[#1d1d1f]/40 mb-4">Перезвоним в течение 15 минут</p>
 
-              <div className="bg-[#f5f5f7] rounded-2xl p-4 text-left mb-4">
-                <div className="text-xs text-[#1d1d1f]/40 uppercase tracking-wide mb-2">Оплата переводом СБП</div>
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <div className="text-lg font-semibold text-[#1d1d1f]">8 992 999-03-33</div>
-                    <div className="text-xs text-[#1d1d1f]/30 mt-0.5">Банк подберётся автоматически</div>
+              {/* QR + реквизиты Сбербанк */}
+              <div className="bg-[#f5f5f7] rounded-2xl p-4 mb-4">
+                <div className="text-xs font-semibold text-[#1d1d1f]/40 uppercase tracking-wide mb-3">Оплата через СБП · Сбербанк</div>
+                <div className="flex items-center gap-4">
+                  {/* QR */}
+                  <div className="shrink-0 w-24 h-24 bg-white rounded-xl overflow-hidden flex items-center justify-center p-1.5 border border-black/8">
+                    <img
+                      src="https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/c4300d94-dd25-455c-82c9-2da4f7f45c86.jpg"
+                      alt="QR Сбербанк"
+                      className="w-full h-full object-contain"
+                    />
                   </div>
-                  <button
-                    onClick={() => navigator.clipboard.writeText("89929990333")}
-                    className="shrink-0 bg-white border border-black/10 text-[#0071e3] text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-[#f5f5f7] transition-colors flex items-center gap-1">
-                    <Icon name="Copy" size={12} />
-                    Скопировать
-                  </button>
+                  <div className="flex-1 text-left">
+                    <div className="text-xs text-[#1d1d1f]/40 mb-1">Номер телефона</div>
+                    <div className="text-lg font-bold text-[#1d1d1f] tracking-tight">8 992 999-03-33</div>
+                    <div className="text-[11px] text-[#1d1d1f]/35 mt-0.5">Сбербанк · Получатель подтвердится</div>
+                    <button
+                      onClick={() => navigator.clipboard.writeText("89929990333")}
+                      className="mt-2 inline-flex items-center gap-1 text-[#21A038] text-xs font-medium">
+                      <Icon name="Copy" size={11} />
+                      Скопировать номер
+                    </button>
+                  </div>
                 </div>
                 {item.price && (
-                  <div className="mt-3 pt-3 border-t border-black/5 flex items-center justify-between">
-                    <span className="text-xs text-[#1d1d1f]/40">К оплате:</span>
-                    <span className="text-sm font-semibold text-[#1d1d1f]">{(item.price + PRICE_MARKUP).toLocaleString("ru-RU")} ₽</span>
+                  <div className="mt-3 pt-3 border-t border-black/6 flex items-center justify-between">
+                    <span className="text-xs text-[#1d1d1f]/40">Сумма к переводу:</span>
+                    <span className="text-base font-bold text-[#1d1d1f]">{(item.price + PRICE_MARKUP).toLocaleString("ru-RU")} ₽</span>
                   </div>
                 )}
               </div>
@@ -148,17 +158,28 @@ const CatalogOrderModal = ({ item, onClose }: Props) => {
                 {loading ? "Отправляем..." : "Отправить заявку"}
               </button>
 
-              <div className="bg-[#f5f5f7] rounded-xl p-3 flex items-center justify-between gap-2">
-                <div>
-                  <div className="text-[10px] text-[#1d1d1f]/30 uppercase tracking-wide">Оплата СБП</div>
-                  <div className="text-sm font-medium text-[#1d1d1f]">8 992 999-03-33</div>
+              {/* QR перед отправкой */}
+              <div className="bg-[#f5f5f7] rounded-2xl p-4">
+                <div className="text-xs font-semibold text-[#1d1d1f]/40 uppercase tracking-wide mb-3">Оплата · Сбербанк СБП</div>
+                <div className="flex items-center gap-3">
+                  <div className="shrink-0 w-20 h-20 bg-white rounded-xl overflow-hidden flex items-center justify-center p-1 border border-black/8">
+                    <img
+                      src="https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/c4300d94-dd25-455c-82c9-2da4f7f45c86.jpg"
+                      alt="QR"
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <div className="text-sm font-bold text-[#1d1d1f]">8 992 999-03-33</div>
+                    <div className="text-[11px] text-[#1d1d1f]/35 mt-0.5">Сбербанк</div>
+                    <button type="button"
+                      onClick={() => navigator.clipboard.writeText("89929990333")}
+                      className="mt-1.5 inline-flex items-center gap-1 text-[#21A038] text-xs font-medium">
+                      <Icon name="Copy" size={11} />
+                      Скопировать
+                    </button>
+                  </div>
                 </div>
-                <button type="button"
-                  onClick={() => navigator.clipboard.writeText("89929990333")}
-                  className="text-[#0071e3] text-xs font-medium px-3 py-1.5 rounded-lg bg-white border border-black/8 hover:bg-[#f5f5f7] transition-colors flex items-center gap-1">
-                  <Icon name="Copy" size={11} />
-                  Скопировать
-                </button>
               </div>
 
               <p className="text-[#1d1d1f]/25 text-[11px] text-center">

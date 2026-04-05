@@ -47,6 +47,7 @@ interface CatalogGridProps {
   activeColor: string;
   activeFiltersCount: number;
   onBuy: (item: CatalogItem) => void;
+  onAddToCart: (item: CatalogItem) => void;
   onBrandChange: (brand: string) => void;
   onStorageReset: () => void;
   onColorReset: () => void;
@@ -57,7 +58,7 @@ interface CatalogGridProps {
 export default function CatalogGrid({
   filteredItems, brandsInCategory, loading, search,
   activeBrand, activeCategory, activeStorage, activeColor,
-  activeFiltersCount, onBuy, onBrandChange, onStorageReset, onColorReset, onResetFilters, onCategory,
+  activeFiltersCount, onBuy, onAddToCart, onBrandChange, onStorageReset, onColorReset, onResetFilters, onCategory,
 }: CatalogGridProps) {
 
   return (
@@ -134,7 +135,7 @@ export default function CatalogGrid({
           </div>
           {/* Планшет и десктоп — сетка */}
           <div className="hidden sm:grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
-            {filteredItems.map(item => <CatalogProductCard key={item.id} item={item} onBuy={onBuy} />)}
+            {filteredItems.map(item => <CatalogProductCard key={item.id} item={item} onBuy={onBuy} onAddToCart={onAddToCart} />)}
           </div>
         </>
       )}
