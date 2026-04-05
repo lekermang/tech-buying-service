@@ -73,10 +73,9 @@ const ToolsImportTab = ({ token }: ToolsImportTabProps) => {
     setSyncing(true);
     setResult(null);
     try {
-      const res = await fetch(`${SYNC_URL}?token=${token}`, { method: "POST" });
+      const res = await fetch(`${SYNC_URL}?token=${token}&action=start`);
       const data = await res.json();
       if (data.ok && data.job_id) {
-        // Сразу получили job_id — поллим статус
         setTimeout(() => pollJob(data.job_id), 5000);
       } else {
         setResult({ ok: false, error: data.error || "Не удалось запустить" });

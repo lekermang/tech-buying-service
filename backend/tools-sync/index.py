@@ -126,6 +126,18 @@ def handler(event: dict, context) -> dict:
 
     method = event.get("httpMethod", "GET")
     params = event.get("queryStringParameters") or {}
+    action = params.get("action", "")
+
+    # GET ?action=start — запуск синхронизации
+    if action == "start":
+        job_id = create_job()
+        t = threading.Thread(target=do_sync, args=(job_id,), daemon=False)
+        t.start()
+        return {
+            "statusCode": 200,
+            "headers": {**CORS_HEADERS, "Content-Type": "application/json"},
+            "body": json.dumps({"ok": True, "job_id": job_id}),
+        }
 
     # GET — статус задачи
     if method == "GET":
@@ -158,10 +170,12 @@ def handler(event: dict, context) -> dict:
             }),
         }
 
-    # POST — запускаем задачу и сразу возвращаем job_id
+    # POST или GET с action=start — запускаем задачу
     job_id = create_job()
-    t = threading.Thread(target=do_sync, args=(job_id,), daemon=True)
+    t = threading.Thread(target=do_sync, args=(job_id,), daemon=False)
     t.start()
+    # Ждём 2 секунды — если уже готово, возвращаем результат сразу
+    t.join(timeout=2)
 
     return {
         "statusCode": 200,
