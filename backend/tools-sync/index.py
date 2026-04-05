@@ -77,7 +77,7 @@ def save_batch(cur, batch: list):
 
 
 def do_sync(job_id: int):
-    """Фоновый поток: скачивает CSV-фид, парсит построчно, обновляет статус в БД."""
+    """Фоновый поток: потоковое скачивание CSV-фида построчно, без загрузки в память."""
     try:
         req = urllib.request.Request(FEED_URL, headers={"User-Agent": "Mozilla/5.0"})
         conn = get_conn()
@@ -86,21 +86,21 @@ def do_sync(job_id: int):
         batch = []
 
         with urllib.request.urlopen(req, timeout=300) as resp:
-            raw = resp.read().decode("utf-8-sig")
-
-        reader = csv.DictReader(io.StringIO(raw), delimiter=";")
-        for row in reader:
-            article = (row.get("Код артикула") or "").strip()
-            name = (row.get("Название") or "").strip()
-            brand = (row.get("Бренд") or "").strip()
-            category = (row.get("Раздел") or "").strip()
-            if article and name:
-                batch.append((article, name, brand, category))
-                if len(batch) >= BATCH_SIZE:
-                    save_batch(cur, batch)
-                    conn.commit()
-                    total += len(batch)
-                    batch = []
+            # Потоковый парсинг — читаем построчно, не грузим весь файл в RAM
+            stream = io.TextIOWrapper(resp, encoding="utf-8-sig", errors="replace")
+            reader = csv.DictReader(stream, delimiter=";")
+            for row in reader:
+                article = (row.get("Код артикула") or "").strip()
+                name = (row.get("Название") or "").strip()
+                brand = (row.get("Бренд") or "").strip()
+                category = (row.get("Раздел") or "").strip()
+                if article and name:
+                    batch.append((article, name, brand, category))
+                    if len(batch) >= BATCH_SIZE:
+                        save_batch(cur, batch)
+                        conn.commit()
+                        total += len(batch)
+                        batch = []
 
         if batch:
             save_batch(cur, batch)
@@ -111,7 +111,7 @@ def do_sync(job_id: int):
         conn.close()
         update_job(job_id, "done", imported=total)
     except Exception as e:
-        update_job(job_id, "error", error=str(e))
+        update_job(job_id, "error", error=str(e) or repr(e))
 
 
 def handler(event: dict, context) -> dict:
