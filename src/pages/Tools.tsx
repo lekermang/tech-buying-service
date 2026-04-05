@@ -4,6 +4,7 @@ import { Product, CartItem, CatMeta } from "@/components/tools/types";
 import ToolsProductCard from "@/components/tools/ToolsProductCard";
 import ToolsCartModal from "@/components/tools/ToolsCartModal";
 import ToolsSidebar from "@/components/tools/ToolsSidebar";
+import GrassBackground from "@/components/tools/GrassBackground";
 
 const TOOLS_API = "https://functions.poehali.dev/434ea4ea-de14-4074-a738-e5db6e4f9697";
 const PAGE_SIZE = 48;
@@ -180,6 +181,26 @@ export default function ToolsPage() {
           </button>
         </div>
       </header>
+
+      {/* ── Баннер с живой травой ── */}
+      <div className="relative overflow-hidden bg-gradient-to-b from-emerald-700 via-emerald-600 to-emerald-500" style={{ height: "140px" }}>
+        {/* Небо */}
+        <div className="absolute inset-0 bg-gradient-to-b from-sky-400/30 to-transparent" />
+        {/* Солнечные блики */}
+        <div className="absolute top-4 right-12 w-20 h-20 bg-yellow-200/10 rounded-full blur-2xl" />
+        <div className="absolute top-2 right-32 w-10 h-10 bg-white/10 rounded-full blur-xl" />
+        {/* Текст */}
+        <div className="relative z-10 max-w-screen-xl mx-auto px-4 h-full flex items-center">
+          <div>
+            <h2 className="text-2xl font-bold text-white drop-shadow">Каталог инструментов</h2>
+            {total > 0 && (
+              <p className="text-emerald-100 text-sm mt-0.5">{total.toLocaleString("ru-RU")} товаров в наличии</p>
+            )}
+          </div>
+        </div>
+        {/* Живая трава */}
+        <GrassBackground />
+      </div>
 
       <div className="max-w-screen-xl mx-auto px-4 py-4">
 
