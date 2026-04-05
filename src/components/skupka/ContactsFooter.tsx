@@ -42,7 +42,7 @@ const ContactsFooter = ({ scrollTo }: ContactsFooterProps) => {
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
             {[
-              { icon: "MapPin", title: "Кирова, 11", lines: ["+7 (992) 999-03-33", "24/7 без выходных"], href: "tel:+79929990333" },
+              { icon: "MapPin", title: "Кирова, 11", lines: ["+7 (992) 999-03-33", "24/7 без выходных"], href: "tel:+79929990333", yandex: true },
               { icon: "MapPin", title: "Кирова, 7/47", lines: ["8 (800) 600-68-33", "Бесплатно по России"], href: "tel:88006006833" },
               { icon: "MessageCircle", title: "Telegram", lines: ["@skupka24", "Ответим за 5 минут"], href: "https://t.me/skupka24" },
               { icon: "Mail", title: "Email", lines: ["lekermany@yandex.ru", "Деловые запросы"], href: "mailto:lekermany@yandex.ru" },
@@ -53,6 +53,17 @@ const ContactsFooter = ({ scrollTo }: ContactsFooterProps) => {
                   <Icon name={c.icon} size={20} className="text-[#FFD700]" />
                 </div>
                 <h3 className="font-oswald text-sm md:text-base font-bold uppercase mb-1.5">{c.title}</h3>
+                {"yandex" in c && c.yandex && (
+                  <div className="mb-2" onClick={e => e.preventDefault()}>
+                    <iframe
+                      src="https://yandex.ru/sprav/widget/rating-badge/52473097879?type=rating&theme=dark"
+                      width="150"
+                      height="50"
+                      frameBorder="0"
+                      title="Рейтинг Яндекс"
+                    />
+                  </div>
+                )}
                 {c.lines.map(l => <p key={l} className="font-roboto text-white/60 text-xs md:text-sm">{l}</p>)}
               </a>
             ))}
