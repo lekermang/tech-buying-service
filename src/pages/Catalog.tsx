@@ -87,7 +87,7 @@ const Catalog = () => {
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [activeCategory, setActiveCategory] = useState("Смартфоны");
-  const [activeBrand, setActiveBrand] = useState("Apple");
+  const [activeBrand, setActiveBrand] = useState("");
   const [activeStorage, setActiveStorage] = useState("");
   const [activeColor, setActiveColor] = useState("");
   const [search, setSearch] = useState("");
