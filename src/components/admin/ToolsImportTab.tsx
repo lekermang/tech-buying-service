@@ -20,6 +20,7 @@ const ToolsImportTab = ({ token }: ToolsImportTabProps) => {
   const [hasCredentials, setHasCredentials] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<{ links: string[]; snippet: string } | null>(null);
   const [result, setResult] = useState<{ ok: boolean; imported?: number; error?: string } | null>(null);
   const [delimiter, setDelimiter] = useState(",");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -33,6 +34,17 @@ const ToolsImportTab = ({ token }: ToolsImportTabProps) => {
   };
 
   useEffect(() => { loadStats(); }, []);
+
+  const handleDebug = async () => {
+    setDebugInfo(null);
+    const res = await fetch(IMPORT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Admin-Token": token },
+      body: JSON.stringify({ action: "debug" }),
+    });
+    const data = await res.json();
+    setDebugInfo(data);
+  };
 
   const pollStatus = async () => {
     const res = await fetch(IMPORT_URL, { headers: { "X-Admin-Token": token } });
@@ -152,6 +164,32 @@ const ToolsImportTab = ({ token }: ToolsImportTabProps) => {
           <div className={`mt-3 flex items-center gap-2 font-roboto text-sm p-2.5 border ${result.ok ? "border-green-500/30 text-green-400" : "border-red-500/30 text-red-400"}`}>
             <Icon name={result.ok ? "CheckCircle" : "AlertCircle"} size={15} />
             {result.ok ? `Загружено ${result.imported?.toLocaleString("ru-RU")} товаров из instrument.ru` : result.error}
+          </div>
+        )}
+      </div>
+
+      {/* Диагностика */}
+      <div className="border border-white/5 p-4 mb-4">
+        <div className="flex items-center justify-between mb-2">
+          <p className="font-roboto text-white/30 text-xs uppercase tracking-wider">Диагностика авторизации</p>
+          <button onClick={handleDebug} className="font-roboto text-xs text-white/30 hover:text-white border border-white/10 px-3 py-1 transition-colors">
+            Проверить ссылки
+          </button>
+        </div>
+        {debugInfo && (
+          <div className="mt-2 space-y-2">
+            <div>
+              <p className="font-roboto text-xs text-white/40 mb-1">Найденные ссылки ({debugInfo.links?.length || 0}):</p>
+              {debugInfo.links?.length > 0 ? (
+                <div className="space-y-1">
+                  {debugInfo.links.map((l, i) => <div key={i} className="font-roboto text-xs text-[#FFD700] bg-[#111] px-2 py-1 break-all">{l}</div>)}
+                </div>
+              ) : <p className="font-roboto text-xs text-red-400">Ссылок не найдено — возможно авторизация не прошла</p>}
+            </div>
+            <details className="cursor-pointer">
+              <summary className="font-roboto text-xs text-white/30">HTML страницы (первые 3000 символов)</summary>
+              <pre className="font-roboto text-[10px] text-white/40 bg-[#111] p-2 mt-1 overflow-x-auto whitespace-pre-wrap">{debugInfo.snippet}</pre>
+            </details>
           </div>
         )}
       </div>

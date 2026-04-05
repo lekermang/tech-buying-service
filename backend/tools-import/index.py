@@ -219,6 +219,40 @@ def handler(event: dict, context) -> dict:
 
     action = data.get("action", "upload")
 
+    # Отладка — найти ссылки на странице выгрузки
+    if action == "debug":
+        login = os.environ.get("INSTRUMENT_LOGIN", "")
+        password = os.environ.get("INSTRUMENT_PASSWORD", "")
+        try:
+            cj = http.cookiejar.CookieJar()
+            opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+            auth_data = urllib.parse.urlencode({"login": login, "password": password}).encode("utf-8")
+            auth_req = urllib.request.Request(
+                f"{INSTRUMENT_BASE}/personal/login/",
+                data=auth_data,
+                headers={"User-Agent": "Mozilla/5.0", "Content-Type": "application/x-www-form-urlencoded", "Referer": f"{INSTRUMENT_BASE}/personal/login/"},
+            )
+            with opener.open(auth_req, timeout=20) as resp:
+                resp.read()
+            page_req = urllib.request.Request(
+                f"{INSTRUMENT_BASE}/personal/unloading/",
+                headers={"User-Agent": "Mozilla/5.0"},
+            )
+            with opener.open(page_req, timeout=20) as resp:
+                html = resp.read().decode("utf-8", errors="ignore")
+            # Ищем все ссылки с href
+            import re
+            links = re.findall(r'href=["\']([^"\']*(?:csv|xls|yml|download|export|unload)[^"\']*)["\']', html, re.I)
+            # Первые 2000 символов HTML для диагностики
+            snippet = html[:3000]
+            return {
+                "statusCode": 200,
+                "headers": {**CORS_HEADERS, "Content-Type": "application/json"},
+                "body": json.dumps({"links": links, "snippet": snippet}, ensure_ascii=False),
+            }
+        except Exception as e:
+            return {"statusCode": 200, "headers": CORS_HEADERS, "body": json.dumps({"error": str(e)})}
+
     # Запуск синхронизации в фоне
     if action == "sync":
         if _sync_status.get("running"):
