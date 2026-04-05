@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Icon from "@/components/ui/icon";
+import { adminHeaders } from "@/lib/adminFetch";
 
 const TG_PARSER_URL = "https://functions.poehali.dev/2e98b33f-0f6a-4bc3-9c93-6bbb80277fac";
 const TG_AUTO_SYNC_URL = "https://functions.poehali.dev/79437e4a-387b-4d66-952b-a6e8e8d627a2";
@@ -39,7 +40,7 @@ function PhotoEditor({ item, token, onClose }: { item: CatalogItem; token: strin
   const loadPhotos = useCallback(async () => {
     setLoading(true);
     const res = await fetch(`${PHOTOS_URL}?item_id=${item.id}`, {
-      headers: { "X-Admin-Token": token },
+      headers: { ...adminHeaders(token) },
     });
     const data = await res.json();
     setPhotos(data.photos || []);
@@ -60,7 +61,7 @@ function PhotoEditor({ item, token, onClose }: { item: CatalogItem; token: strin
       });
       await fetch(PHOTOS_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-Admin-Token": token },
+        headers: { "Content-Type": "application/json", ...adminHeaders(token) },
         body: JSON.stringify({
           item_id: item.id,
           file_name: file.name,
@@ -78,7 +79,7 @@ function PhotoEditor({ item, token, onClose }: { item: CatalogItem; token: strin
     setDeleting(photoId);
     await fetch(`${PHOTOS_URL}?photo_id=${photoId}`, {
       method: "DELETE",
-      headers: { "X-Admin-Token": token },
+      headers: { ...adminHeaders(token) },
     });
     setDeleting(null);
     loadPhotos();
@@ -179,7 +180,7 @@ function PhotosManager({ token }: { token: string }) {
   const load = useCallback(async (q: string, p: number) => {
     setLoading(true);
     const url = `${PHOTOS_URL}?search=${encodeURIComponent(q)}&page=${p}`;
-    const res = await fetch(url, { headers: { "X-Admin-Token": token } });
+    const res = await fetch(url, { headers: { ...adminHeaders(token) } });
     const data = await res.json();
     setItems(data.items || []);
     setTotalPages(data.pages || 1);
@@ -301,7 +302,7 @@ export default function CatalogTab({ token }: { token: string }) {
     try {
       const res = await fetch(TG_PARSER_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-Admin-Token": token },
+        headers: { "Content-Type": "application/json", ...adminHeaders(token) },
         body: JSON.stringify({}),
       });
       const data = await res.json();
@@ -338,7 +339,7 @@ export default function CatalogTab({ token }: { token: string }) {
     try {
       const res = await fetch(
         `${TG_AUTO_SYNC_URL}?action=setup&url=${encodeURIComponent(TG_AUTO_SYNC_URL)}`,
-        { headers: { "X-Admin-Token": token } }
+        { headers: { ...adminHeaders(token) } }
       );
       const data = await res.json();
       setWebhookSetup(data?.webhook?.ok === true || data?.webhook?.result === true);

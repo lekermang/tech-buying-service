@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Icon from "@/components/ui/icon";
+import { adminHeaders } from "@/lib/adminFetch";
 
 const CATALOG_API = "https://functions.poehali.dev/e0e6576c-f000-4288-86ef-1de08ad7bcc4";
 const PHOTOS_API = "https://functions.poehali.dev/76998fa9-f1f9-4986-8449-ecfe56cc3ee8";
@@ -55,7 +56,7 @@ function PhotoUploader({ item, token, onDone }: { item: SkyItem; token: string; 
       const b64 = (reader.result as string).split(",")[1];
       const res = await fetch(PHOTOS_API, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-Admin-Token": token },
+        headers: { "Content-Type": "application/json", ...adminHeaders(token) },
         body: JSON.stringify({
           item_id: item.id,
           sku,
@@ -208,7 +209,7 @@ export default function SkyTab({ token }: { token: string }) {
     };
     await fetch(CATALOG_API, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-Admin-Token": token },
+      headers: { "Content-Type": "application/json", ...adminHeaders(token) },
       body: JSON.stringify(body),
     });
     setSaving(false);

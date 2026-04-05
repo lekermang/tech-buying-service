@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import Icon from "@/components/ui/icon";
+import { adminHeaders } from "@/lib/adminFetch";
 
 const ADMIN_URL = "https://functions.poehali.dev/a105aede-d55d-4b99-9d3e-5e977887aa04";
 
@@ -42,7 +43,7 @@ export default function RepairTab({ token }: { token: string }) {
   const load = useCallback(async () => {
     setLoading(true);
     const url = filterStatus === "all" ? ADMIN_URL : ADMIN_URL + "?status=" + filterStatus;
-    const res = await fetch(url, { headers: { "X-Admin-Token": token } });
+    const res = await fetch(url, { headers: { ...adminHeaders(token) } });
     const data = await res.json();
     setOrders(data.orders || []);
     setLoading(false);
@@ -54,7 +55,7 @@ export default function RepairTab({ token }: { token: string }) {
     setSaving(true);
     await fetch(ADMIN_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-Admin-Token": token },
+      headers: { "Content-Type": "application/json", ...adminHeaders(token) },
       body: JSON.stringify({ id, status, admin_note: note }),
     });
     setSaving(false);
@@ -67,7 +68,7 @@ export default function RepairTab({ token }: { token: string }) {
     setCreating(true);
     await fetch(ADMIN_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-Admin-Token": token },
+      headers: { "Content-Type": "application/json", ...adminHeaders(token) },
       body: JSON.stringify({ action: "create", ...form, price: form.price ? parseInt(form.price) : null }),
     });
     setCreating(false);

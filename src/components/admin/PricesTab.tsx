@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import Icon from "@/components/ui/icon";
+import { adminHeaders } from "@/lib/adminFetch";
 
 const PRICES_URL = "https://functions.poehali.dev/cf08a66e-0b80-4105-826b-361e9be7f0f3";
 
@@ -51,7 +52,7 @@ export default function PricesTab({ token }: { token: string }) {
     if (editingId !== "new") body.id = editingId;
     await fetch(PRICES_URL, {
       method: editingId === "new" ? "POST" : "PUT",
-      headers: { "Content-Type": "application/json", "X-Admin-Token": token },
+      headers: { "Content-Type": "application/json", ...adminHeaders(token) },
       body: JSON.stringify(body),
     });
     setSaving(false);
@@ -63,7 +64,7 @@ export default function PricesTab({ token }: { token: string }) {
     if (!confirm("Удалить позицию?")) return;
     await fetch(PRICES_URL, {
       method: "DELETE",
-      headers: { "Content-Type": "application/json", "X-Admin-Token": token },
+      headers: { "Content-Type": "application/json", ...adminHeaders(token) },
       body: JSON.stringify({ id }),
     });
     load();

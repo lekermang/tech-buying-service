@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Icon from "@/components/ui/icon";
+import { adminHeaders } from "@/lib/adminFetch";
 
 const CATALOG_URL = "https://functions.poehali.dev/e0e6576c-f000-4288-86ef-1de08ad7bcc4";
 const PHOTOS_URL = "https://functions.poehali.dev/76998fa9-f1f9-4986-8449-ecfe56cc3ee8";
@@ -51,7 +52,7 @@ function ItemModal({
 
   const loadPhotos = useCallback(async () => {
     if (!item) return;
-    const res = await fetch(`${PHOTOS_URL}?item_id=${item.id}`, { headers: { "X-Admin-Token": token } });
+    const res = await fetch(`${PHOTOS_URL}?item_id=${item.id}`, { headers: { ...adminHeaders(token) } });
     const d = await res.json();
     setPhotos(d.photos || []);
   }, [item, token]);
@@ -74,13 +75,13 @@ function ItemModal({
     if (isNew) {
       await fetch(CATALOG_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-Admin-Token": token },
+        headers: { "Content-Type": "application/json", ...adminHeaders(token) },
         body: JSON.stringify(body),
       });
     } else {
       await fetch(`${CATALOG_URL}?id=${item!.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json", "X-Admin-Token": token },
+        headers: { "Content-Type": "application/json", ...adminHeaders(token) },
         body: JSON.stringify(body),
       });
     }
@@ -103,7 +104,7 @@ function ItemModal({
       });
       await fetch(PHOTOS_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-Admin-Token": token },
+        headers: { "Content-Type": "application/json", ...adminHeaders(token) },
         body: JSON.stringify({ item_id: item.id, file_name: file.name, file_b64: b64, content_type: file.type || "image/jpeg" }),
       });
     }
@@ -114,7 +115,7 @@ function ItemModal({
 
   const deletePhoto = async (photoId: number) => {
     setDeleting(photoId);
-    await fetch(`${PHOTOS_URL}?photo_id=${photoId}`, { method: "DELETE", headers: { "X-Admin-Token": token } });
+    await fetch(`${PHOTOS_URL}?photo_id=${photoId}`, { method: "DELETE", headers: { ...adminHeaders(token) } });
     setDeleting(null);
     loadPhotos();
   };
@@ -284,7 +285,7 @@ export default function CatalogEditTab({ token }: { token: string }) {
     if (q) params.set("search", q);
     if (cat) params.set("category", cat);
     if (avail) params.set("availability", avail);
-    const res = await fetch(`${CATALOG_URL}?${params}`, { headers: { "X-Admin-Token": token } });
+    const res = await fetch(`${CATALOG_URL}?${params}`, { headers: { ...adminHeaders(token) } });
     const d = await res.json();
     setItems(d.items || []);
     setTotal(d.total || 0);
@@ -307,7 +308,7 @@ export default function CatalogEditTab({ token }: { token: string }) {
   const handleDelete = async (id: number) => {
     if (!confirm("Удалить товар?")) return;
     setDeleting(id);
-    await fetch(`${CATALOG_URL}?id=${id}`, { method: "DELETE", headers: { "X-Admin-Token": token } });
+    await fetch(`${CATALOG_URL}?id=${id}`, { method: "DELETE", headers: { ...adminHeaders(token) } });
     setDeleting(null);
     load(search, filterCat, filterAvail, page);
   };
