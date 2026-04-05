@@ -1,5 +1,7 @@
+import * as React from "react";
 import Icon from "@/components/ui/icon";
 import { WebGLShader } from "@/components/ui/web-gl-shader";
+import { CardStack, CardStackItem } from "@/components/ui/card-stack";
 
 interface Cat {
   title: string;
@@ -53,13 +55,34 @@ interface Props {
 }
 
 export default function ToolsBanners({ activeCategory, activeBrand, onCategory, onBrand, total }: Props) {
-  const heroes = CATS.filter(c => c.hero);
-  const rest = CATS.filter(c => !c.hero);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const [cardW, setCardW] = React.useState(300);
+
+  React.useEffect(() => {
+    const update = () => {
+      if (containerRef.current) {
+        const w = containerRef.current.offsetWidth;
+        setCardW(Math.min(400, Math.max(220, w * 0.55)));
+      }
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    if (containerRef.current) ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, []);
+
+  const brandItems: CardStackItem[] = BRANDS.map(b => ({
+    id: b.name,
+    title: b.name,
+    description: b.subtitle,
+    imageSrc: b.photo,
+    tag: b.accent,
+  }));
 
   return (
-    <div className="bg-gray-950">
+    <div className="bg-gray-950" ref={containerRef}>
 
-      {/* WebGL шейдер-заголовок */}
+      {/* ── Шапка WebGL ── */}
       <div className="relative overflow-hidden" style={{ height: 110 }}>
         <WebGLShader className="opacity-75" xScale={1.2} yScale={0.4} distortion={0.08} />
         <div className="absolute inset-0 bg-gradient-to-r from-gray-950/90 via-gray-950/50 to-transparent" />
@@ -80,49 +103,57 @@ export default function ToolsBanners({ activeCategory, activeBrand, onCategory, 
         </div>
       </div>
 
-      {/* ── Категории: сетка по центру ── */}
-      {/* мобилка: 5 колонок | планшет md: 4 | десктоп lg: 6 (2 ряда из 6) */}
-      <div className="px-3 sm:px-4 lg:px-6 mb-3">
-        <div className="grid grid-cols-5 md:grid-cols-4 lg:grid-cols-6 gap-2 lg:gap-2.5">
-
-          {/* Кнопка «Все» */}
+      {/* ── Категории: плотная сетка без пробелов ── */}
+      {/* мобилка: 5 cols | планшет sm: 5 md: 6 | ПК lg: 11 (все в 1 ряд) */}
+      <div className="mb-0">
+        {/* Кнопка «Все» + все категории в grid без gap */}
+        <div className="grid grid-cols-5 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-11 gap-0">
+          {/* «Все» */}
           <button
             onClick={() => onCategory("")}
-            className="relative rounded-xl flex flex-col items-center justify-center gap-1 transition-all aspect-[4/3]"
+            className="relative flex flex-col items-center justify-center gap-1 transition-all"
             style={{
-              background: !activeCategory && !activeBrand ? "#f97316" : "#1f2937",
-              boxShadow: !activeCategory && !activeBrand ? "0 0 0 2px #f97316" : undefined,
+              aspectRatio: "1 / 1",
+              background: !activeCategory && !activeBrand ? "#f97316" : "#111827",
+              outline: !activeCategory && !activeBrand ? "2px solid #f97316" : "1px solid rgba(255,255,255,0.06)",
+              outlineOffset: "-1px",
             }}
           >
-            <Icon name="LayoutGrid" size={16} className={!activeCategory && !activeBrand ? "text-white" : "text-gray-500"} />
-            <span className={`text-[10px] font-bold leading-none ${!activeCategory && !activeBrand ? "text-white" : "text-gray-500"}`}>Все</span>
+            <Icon name="LayoutGrid" size={18} className={!activeCategory && !activeBrand ? "text-white" : "text-gray-500"} />
+            <span className={`text-[10px] sm:text-[11px] font-bold leading-none mt-0.5 ${!activeCategory && !activeBrand ? "text-white" : "text-gray-500"}`}>Все</span>
           </button>
 
-          {/* Все категории включая героев */}
+          {/* Категории */}
           {CATS.map(c => {
             const isActive = activeCategory === c.cat;
             return (
               <button
                 key={c.cat}
                 onClick={() => onCategory(c.cat)}
-                className="relative rounded-xl overflow-hidden text-left group transition-all aspect-[4/3]"
-                style={{ boxShadow: isActive ? `0 0 0 2px ${c.accent}` : undefined }}
+                className="relative overflow-hidden text-left group transition-all"
+                style={{
+                  aspectRatio: "1 / 1",
+                  outline: isActive ? `2px solid ${c.accent}` : "1px solid rgba(255,255,255,0.06)",
+                  outlineOffset: "-1px",
+                }}
               >
                 <img src={c.photo} alt={c.title} loading="lazy"
                   className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
-                <div className="absolute inset-x-0 bottom-0 p-1.5 sm:p-2">
+                {isActive && (
+                  <div className="absolute inset-0 ring-2 ring-inset pointer-events-none" style={{ borderColor: c.accent }} />
+                )}
+                <div className="absolute inset-x-0 bottom-0 p-1 sm:p-1.5 md:p-2">
                   {c.badge && (
-                    <div className="text-[7px] sm:text-[8px] font-bold px-1 py-0.5 rounded-full w-fit mb-0.5 hidden sm:block"
+                    <div className="text-[6px] sm:text-[7px] font-bold px-1 py-px rounded-full w-fit mb-0.5 hidden md:block"
                       style={{ background: `${c.accent}40`, color: c.accent }}>{c.badge}</div>
                   )}
-                  <div className="text-white font-bold text-[9px] sm:text-[11px] leading-tight line-clamp-1">{c.title}</div>
-                  <div className="text-white/40 text-[8px] leading-tight mt-0.5 line-clamp-1 hidden sm:block">{c.subtitle}</div>
+                  <div className="text-white font-bold text-[8px] sm:text-[9px] md:text-[10px] leading-tight line-clamp-2">{c.title}</div>
                 </div>
                 {isActive && (
-                  <div className="absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center"
+                  <div className="absolute top-1 right-1 w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full flex items-center justify-center"
                     style={{ background: c.accent }}>
-                    <Icon name="Check" size={8} className="text-white" />
+                    <Icon name="Check" size={7} className="text-white" />
                   </div>
                 )}
               </button>
@@ -131,45 +162,67 @@ export default function ToolsBanners({ activeCategory, activeBrand, onCategory, 
         </div>
       </div>
 
-      {/* ── Бренды: сетка по центру ── */}
-      {/* мобилка: 5 колонок | планшет: 4 | десктоп: 6 */}
-      <div className="px-3 sm:px-4 lg:px-6 pb-4">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-gray-600">Бренды</span>
+      {/* ── Бренды: CardStack ── */}
+      <div className="pt-3 pb-5 px-3 sm:px-5">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-[11px] font-bold uppercase tracking-widest text-gray-500">Бренды</span>
           {activeBrand && (
-            <button onClick={() => onBrand("")} className="text-[10px] text-orange-400 hover:text-orange-300 flex items-center gap-1">
-              <Icon name="X" size={9} /> Сбросить
+            <button onClick={() => onBrand("")} className="text-[11px] text-orange-400 hover:text-orange-300 flex items-center gap-1">
+              <Icon name="X" size={10} /> Сбросить
             </button>
           )}
         </div>
-        <div className="grid grid-cols-5 md:grid-cols-4 lg:grid-cols-6 gap-2 lg:gap-2.5">
-          {BRANDS.map(b => {
-            const isActive = activeBrand === b.name;
+
+        <CardStack
+          items={brandItems}
+          cardWidth={cardW}
+          cardHeight={Math.round(cardW * 0.58)}
+          maxVisible={5}
+          overlap={0.5}
+          spreadDeg={32}
+          autoAdvance
+          intervalMs={2600}
+          pauseOnHover
+          showDots
+          loop
+          renderCard={(item, { active }) => {
+            const brand = BRANDS.find(b => b.name === item.id);
+            const accent = brand?.accent ?? "#f97316";
             return (
               <button
-                key={b.name}
-                onClick={() => onBrand(isActive ? "" : b.name)}
-                className="relative rounded-xl overflow-hidden text-left group transition-all aspect-[4/3]"
-                style={{ boxShadow: isActive ? `0 0 0 2.5px ${b.accent}` : undefined }}
+                className="relative h-full w-full text-left focus:outline-none"
+                onClick={() => onBrand(activeBrand === item.id ? "" : String(item.id))}
               >
-                <img src={b.photo} alt={b.name} loading="lazy"
-                  className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/50 to-black/10" />
-                <div className="absolute inset-x-0 bottom-0 h-0.5" style={{ background: b.accent }} />
-                <div className="absolute inset-x-0 bottom-0 p-1.5 sm:p-2">
-                  <div className="text-white font-extrabold text-[9px] sm:text-[11px] leading-none tracking-tight">{b.name}</div>
-                  <div className="text-white/40 text-[7px] sm:text-[9px] mt-0.5 hidden sm:block">{b.subtitle}</div>
+                <img src={item.imageSrc} alt={item.title} className="h-full w-full object-cover" draggable={false} loading="eager" />
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
+                {/* Цветная полоска снизу */}
+                <div className="absolute inset-x-0 bottom-0 h-0.5" style={{ background: accent }} />
+                <div className="relative z-10 flex h-full flex-col justify-end p-4">
+                  <div className="flex items-end gap-2">
+                    <span
+                      className={`font-extrabold tracking-tight leading-none transition-all ${active ? "text-2xl sm:text-3xl" : "text-lg"} text-white`}
+                    >
+                      {item.title}
+                    </span>
+                    {active && activeBrand === item.id && (
+                      <span className="mb-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: `${accent}40`, color: accent }}>
+                        выбран
+                      </span>
+                    )}
+                  </div>
+                  {active && (
+                    <div className="mt-1 text-xs text-white/60">{item.description}</div>
+                  )}
                 </div>
-                {isActive && (
-                  <div className="absolute top-1 right-1 w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center"
-                    style={{ background: b.accent }}>
-                    <Icon name="Check" size={8} className="text-white" />
+                {activeBrand === item.id && (
+                  <div className="absolute top-3 right-3 w-6 h-6 rounded-full flex items-center justify-center shadow-lg" style={{ background: accent }}>
+                    <Icon name="Check" size={12} className="text-white" />
                   </div>
                 )}
               </button>
             );
-          })}
-        </div>
+          }}
+        />
       </div>
 
     </div>
