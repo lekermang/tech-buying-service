@@ -34,21 +34,48 @@ const ToolsImportTab = ({ token }: ToolsImportTabProps) => {
 
   useEffect(() => { loadStats(); }, []);
 
+  const pollStatus = async () => {
+    const res = await fetch(IMPORT_URL, { headers: { "X-Admin-Token": token } });
+    const data = await res.json();
+    setCount(data.count ?? 0);
+    setPreview(data.preview ?? []);
+    const s = data.sync_status || {};
+    if (s.running) {
+      setTimeout(pollStatus, 3000);
+    } else {
+      setSyncing(false);
+      if (s.error) setResult({ ok: false, error: s.error });
+      else if (s.last != null) setResult({ ok: true, imported: s.last });
+    }
+  };
+
   const handleSync = async () => {
     setSyncing(true);
     setResult(null);
     try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 28000);
       const res = await fetch(IMPORT_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Admin-Token": token },
         body: JSON.stringify({ action: "sync" }),
+        signal: controller.signal,
       });
+      clearTimeout(timer);
       const data = await res.json();
-      setResult(data.ok ? { ok: true, imported: data.imported } : { ok: false, error: data.error });
-      if (data.ok) loadStats();
+      if (data.running) {
+        // Идёт в фоне — поллим статус
+        setTimeout(pollStatus, 3000);
+      } else if (data.ok) {
+        setResult({ ok: true, imported: data.imported });
+        loadStats();
+        setSyncing(false);
+      } else {
+        setResult({ ok: false, error: data.error });
+        setSyncing(false);
+      }
     } catch (err) {
-      setResult({ ok: false, error: String(err) });
-    } finally {
+      setResult({ ok: false, error: "Превышено время ожидания. Попробуй ещё раз." });
       setSyncing(false);
     }
   };
@@ -118,7 +145,7 @@ const ToolsImportTab = ({ token }: ToolsImportTabProps) => {
             disabled={syncing || !hasCredentials}
             className="flex items-center gap-2 bg-[#FFD700] text-black font-oswald font-bold uppercase text-sm px-5 py-2.5 hover:bg-yellow-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
             <Icon name={syncing ? "Loader" : "RefreshCw"} size={14} className={syncing ? "animate-spin" : ""} />
-            {syncing ? "Синхронизирую..." : "Синхронизировать"}
+            {syncing ? "Загружаю каталог..." : "Синхронизировать"}
           </button>
         </div>
         {result && (
