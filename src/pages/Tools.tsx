@@ -4,7 +4,7 @@ import { Product, CartItem, CatMeta, PriceRange, Meta } from "@/components/tools
 import ToolsProductCard from "@/components/tools/ToolsProductCard";
 import ToolsCartModal from "@/components/tools/ToolsCartModal";
 import ToolsSidebar from "@/components/tools/ToolsSidebar";
-import GrassBackground from "@/components/tools/GrassBackground";
+import ToolsBanners from "@/components/tools/ToolsBanners";
 
 const TOOLS_API = "https://functions.poehali.dev/434ea4ea-de14-4074-a738-e5db6e4f9697";
 const PAGE_SIZE = 48;
@@ -222,21 +222,18 @@ export default function ToolsPage() {
         </div>
       </header>
 
-      {/* ── Баннер с живой травой ── */}
-      <div className="relative overflow-hidden bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950" style={{ height: "140px" }}>
-        <div className="absolute inset-0 bg-gradient-to-b from-green-900/20 to-transparent" />
-        <div className="absolute top-4 right-12 w-32 h-32 bg-green-500/5 rounded-full blur-3xl" />
-        <div className="absolute top-2 left-1/3 w-20 h-20 bg-orange-500/5 rounded-full blur-2xl" />
-        <div className="relative z-10 max-w-screen-xl mx-auto px-4 h-full flex items-center">
-          <div>
-            <h2 className="text-2xl font-bold text-white">Каталог инструментов</h2>
-            {total > 0 && (
-              <p className="text-gray-400 text-sm mt-0.5">{total.toLocaleString("ru-RU")} товаров</p>
-            )}
-          </div>
-        </div>
-        <GrassBackground />
-      </div>
+      {/* ── Баннеры категорий ── */}
+      <ToolsBanners
+        activeCategory={activeCategory}
+        onCategory={(cat) => {
+          setActiveCategory(cat);
+          setActiveSubcategory("");
+          setExpandedCat(cat);
+          apply(search, cat, "", activeBrand, inStockOnly, sort, activeAmount, priceMin, priceMax, hasImage);
+          setSidebarOpen(false);
+        }}
+        total={total}
+      />
 
       <div className="max-w-screen-xl mx-auto px-4 py-4">
 
