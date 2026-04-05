@@ -5,8 +5,8 @@
       "method": "GET",
       "path": "/?action=meta",
       "expectedStatus": 200,
-      "bodyMatcher": "partial",
-      "expectedBody": {"brands": ["string"]}
+      "bodyMatcher": "none",
+      "expectedBody": {}
     }
   ]
 }

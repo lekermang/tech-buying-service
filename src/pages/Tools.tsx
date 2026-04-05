@@ -1,14 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Icon from "@/components/ui/icon";
 
-const IMPORT_API = "https://functions.poehali.dev/465711ab-0bef-49fe-b8c4-18c7f3064970";
-
 const TOOLS_API = "https://functions.poehali.dev/434ea4ea-de14-4074-a738-e5db6e4f9697";
-const SYNC_API = "https://functions.poehali.dev/8e9219e9-9dcf-4726-a272-69c6ce976b80";
-const PAGE_SIZE = 100;
+const PAGE_SIZE = 50;
 
 interface Product {
-  id: string;
   article: string;
   name: string;
   brand: string;
@@ -18,48 +14,47 @@ interface Product {
   amount: string;
 }
 
+const fmt = (n: number) =>
+  n > 0 ? n.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " ₽" : "—";
+
+const discount = (p: Product) =>
+  p.base_price > 0 && p.discount_price > 0 && p.base_price > p.discount_price
+    ? Math.round((1 - p.discount_price / p.base_price) * 100)
+    : 0;
+
 const ToolsPage = () => {
   const [products, setProducts] = useState<Product[]>([]);
-  const [brands, setBrands] = useState<string[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [activeBrand, setActiveBrand] = useState("");
   const [activeCategory, setActiveCategory] = useState("");
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-  const [syncDone, setSyncDone] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [uploadMsg, setUploadMsg] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const searchRef = useRef<ReturnType<typeof setTimeout>>();
-  const pollRef = useRef<ReturnType<typeof setTimeout>>();
+  const loaderRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch(`${TOOLS_API}?action=meta`)
       .then(r => r.json())
-      .then(d => { setBrands(d.brands || []); setCategories(d.categories || []); });
+      .then(d => setCategories(d.categories || []));
   }, []);
 
-  const load = useCallback(async (q: string, off: number, brand: string, cat: string) => {
+  const load = useCallback(async (q: string, off: number, cat: string, append = false) => {
     setLoading(true);
     setError(null);
     try {
       const params = new URLSearchParams({ action: "products", limit: String(PAGE_SIZE), offset: String(off) });
       if (q) params.set("search", q);
-      if (brand) params.set("brand", brand);
       if (cat) params.set("category", cat);
       const res = await fetch(`${TOOLS_API}?${params}`);
       const data = await res.json();
       if (data.error) { setError(data.error); return; }
-      if (off === 0) {
-        setProducts(data.items || []);
-      } else {
-        setProducts(prev => [...prev, ...(data.items || [])]);
-      }
+      const items = data.items || [];
+      setProducts(prev => append ? [...prev, ...items] : items);
+      setTotal(data.total || items.length);
       setHasMore(data.has_more);
     } catch (e) {
       setError(String(e));
@@ -68,306 +63,290 @@ const ToolsPage = () => {
     }
   }, []);
 
-  useEffect(() => { load("", 0, "", ""); }, []);
+  useEffect(() => { load("", 0, ""); }, []);
 
-  const pollSync = async (jobId: number) => {
-    try {
-      const res = await fetch(`${SYNC_API}?job_id=${jobId}`);
-      const data = await res.json();
-      if (data.status === "running") {
-        pollRef.current = setTimeout(() => pollSync(jobId), 5000);
-      } else {
-        setSyncing(false);
-        if (data.status === "done") {
-          setSyncDone(true);
-          load("", 0, "", "");
-          setTimeout(() => setSyncDone(false), 4000);
-        }
+  // Бесконечный скролл
+  useEffect(() => {
+    const el = loaderRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasMore && !loading) {
+        const next = offset + PAGE_SIZE;
+        setOffset(next);
+        load(search, next, activeCategory, true);
       }
-    } catch {
-      pollRef.current = setTimeout(() => pollSync(jobId), 5000);
-    }
-  };
-
-  const handleCsvUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    setUploadMsg(null);
-    try {
-      const bytes = await file.arrayBuffer();
-      const b64 = btoa(String.fromCharCode(...new Uint8Array(bytes)));
-      const res = await fetch(IMPORT_API, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "upload", file: b64 }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setUploadMsg(`Загружено ${data.imported} товаров`);
-        load("", 0, "", "");
-        setTimeout(() => setUploadMsg(null), 5000);
-      } else {
-        setUploadMsg(data.error || "Ошибка");
-      }
-    } catch {
-      setUploadMsg("Ошибка загрузки");
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  };
-
-  const handleSyncNow = async () => {
-    setSyncing(true);
-    setSyncDone(false);
-    try {
-      const res = await fetch(`${SYNC_API}?action=start`);
-      const data = await res.json();
-      if (data.ok && data.job_id) {
-        pollRef.current = setTimeout(() => pollSync(data.job_id), 5000);
-      } else {
-        setSyncing(false);
-      }
-    } catch {
-      setSyncing(false);
-    }
-  };
+    }, { threshold: 0.1 });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [hasMore, loading, offset, search, activeCategory, load]);
 
   const handleSearch = (val: string) => {
     setSearch(val);
     clearTimeout(searchRef.current);
-    searchRef.current = setTimeout(() => { setOffset(0); load(val, 0, activeBrand, activeCategory); }, 400);
-  };
-
-  const handleBrand = (b: string) => {
-    const next = activeBrand === b ? "" : b;
-    setActiveBrand(next);
-    setOffset(0);
-    load(search, 0, next, activeCategory);
-    setSidebarOpen(false);
+    searchRef.current = setTimeout(() => {
+      setOffset(0);
+      load(val, 0, activeCategory);
+    }, 350);
   };
 
   const handleCategory = (c: string) => {
     const next = activeCategory === c ? "" : c;
     setActiveCategory(next);
     setOffset(0);
-    load(search, 0, activeBrand, next);
+    load(search, 0, next);
     setSidebarOpen(false);
   };
 
-  const loadMore = () => {
-    const next = offset + PAGE_SIZE;
-    setOffset(next);
-    load(search, next, activeBrand, activeCategory);
+  const clearFilters = () => {
+    setActiveCategory("");
+    setSearch("");
+    setOffset(0);
+    load("", 0, "");
   };
 
-  const inStock = products.filter(p => p.amount === "В наличии");
-  const outOfStock = products.filter(p => p.amount !== "В наличии");
-  const sorted = [...inStock, ...outOfStock];
-
-  const discount = (p: Product) => p.base_price > 0
-    ? Math.round((1 - p.discount_price / p.base_price) * 100)
-    : 0;
-
-  const activeFilters = [activeBrand, activeCategory].filter(Boolean).length;
+  const hasFilters = !!(activeCategory || search);
 
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-white">
 
       {/* Шапка */}
       <div className="sticky top-0 z-30 bg-[#0D0D0D]/95 backdrop-blur-sm border-b border-[#FFD700]/20">
-        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-3">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 h-14 flex items-center gap-2 sm:gap-4">
           <a href="/" className="text-white/50 hover:text-[#FFD700] transition-colors shrink-0">
             <Icon name="ArrowLeft" size={20} />
           </a>
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <div className="w-1 h-5 bg-[#FFD700] shrink-0" />
-            <span className="font-oswald font-bold text-sm sm:text-base uppercase tracking-wider truncate">Инструменты и расходники</span>
-          </div>
           <div className="flex items-center gap-2 shrink-0">
-            <div className="relative hidden sm:block">
-              <Icon name="Search" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
-              <input
-                value={search}
-                onChange={e => handleSearch(e.target.value)}
-                placeholder="Поиск..."
-                className="bg-[#111] border border-[#333] text-white pl-8 pr-3 py-1.5 font-roboto text-sm focus:outline-none focus:border-[#FFD700] transition-colors w-44"
-              />
-            </div>
-            {/* Загрузка CSV */}
-            <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleCsvUpload} />
-            <button onClick={() => fileInputRef.current?.click()} disabled={uploading}
-              title="Загрузить CSV каталог"
-              className={`flex items-center gap-1.5 border px-3 py-1.5 font-roboto text-xs transition-colors disabled:opacity-50 ${uploadMsg && !uploadMsg.includes("шибк") ? "border-green-500/50 text-green-400" : uploadMsg ? "border-red-500/50 text-red-400" : "border-white/10 text-white/50 hover:text-white hover:border-[#FFD700]/40"}`}>
-              <Icon name={uploading ? "Loader" : "Upload"} size={13} className={uploading ? "animate-spin" : ""} />
-              <span className="hidden sm:inline">{uploading ? "Загружаю..." : uploadMsg || "CSV"}</span>
-            </button>
-            <button onClick={handleSyncNow} disabled={syncing}
-              title="Обновить каталог с instrument.ru"
-              className={`flex items-center gap-1.5 border px-3 py-1.5 font-roboto text-xs transition-colors disabled:opacity-50 ${syncDone ? "border-green-500/50 text-green-400" : "border-white/10 text-white/50 hover:text-white hover:border-[#FFD700]/40"}`}>
-              <Icon name={syncDone ? "Check" : "RefreshCw"} size={13} className={syncing ? "animate-spin" : ""} />
-              <span className="hidden sm:inline">{syncing ? "Загружаю..." : syncDone ? "Готово" : "Обновить"}</span>
-            </button>
-            <button onClick={() => setSidebarOpen(v => !v)}
-              className="flex items-center gap-1.5 border border-white/10 text-white/50 hover:text-white px-3 py-1.5 font-roboto text-xs transition-colors">
-              <Icon name="SlidersHorizontal" size={13} />
-              Фильтры
-              {activeFilters > 0 && (
-                <span className="w-4 h-4 bg-[#FFD700] text-black text-[10px] font-bold flex items-center justify-center rounded-full">{activeFilters}</span>
-              )}
-            </button>
+            <div className="w-1 h-5 bg-[#FFD700]" />
+            <span className="font-oswald font-bold text-sm sm:text-lg uppercase tracking-wider whitespace-nowrap">
+              Инструменты
+            </span>
+            {total > 0 && (
+              <span className="text-white/30 font-roboto text-xs hidden sm:inline">
+                {total.toLocaleString("ru-RU")} позиций
+              </span>
+            )}
           </div>
-        </div>
-        <div className="sm:hidden px-4 pb-3">
-          <div className="relative">
-            <Icon name="Search" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
-            <input value={search} onChange={e => handleSearch(e.target.value)} placeholder="Поиск по артикулу или названию..."
-              className="w-full bg-[#111] border border-[#333] text-white pl-8 pr-3 py-2 font-roboto text-sm focus:outline-none focus:border-[#FFD700] transition-colors" />
+
+          {/* Поиск */}
+          <div className="relative flex-1 max-w-md">
+            <Icon name="Search" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
+            <input
+              value={search}
+              onChange={e => handleSearch(e.target.value)}
+              placeholder="Поиск по названию или артикулу..."
+              className="w-full bg-[#111] border border-[#333] text-white pl-9 pr-3 py-2 font-roboto text-sm focus:outline-none focus:border-[#FFD700]/60 transition-colors rounded-sm"
+            />
+            {search && (
+              <button onClick={() => handleSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-white/30 hover:text-white">
+                <Icon name="X" size={14} />
+              </button>
+            )}
           </div>
+
+          {/* Кнопка фильтров */}
+          <button
+            onClick={() => setSidebarOpen(v => !v)}
+            className={`flex items-center gap-1.5 border px-3 py-2 font-roboto text-xs transition-colors shrink-0 ${sidebarOpen || activeCategory ? "border-[#FFD700]/60 text-[#FFD700]" : "border-white/10 text-white/50 hover:text-white hover:border-white/30"}`}
+          >
+            <Icon name="SlidersHorizontal" size={13} />
+            <span className="hidden sm:inline">Категории</span>
+            {activeCategory && (
+              <span className="w-1.5 h-1.5 rounded-full bg-[#FFD700]" />
+            )}
+          </button>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto flex">
 
-        {/* Сайдбар */}
-        {sidebarOpen && <div className="fixed inset-0 bg-black/60 z-30 lg:hidden" onClick={() => setSidebarOpen(false)} />}
+        {/* Боковая панель категорий */}
         <aside className={`
-          fixed inset-y-0 left-0 z-40 w-64 bg-[#0D0D0D] border-r border-[#FFD700]/10 overflow-y-auto transition-transform duration-200 pt-16
-          lg:relative lg:translate-x-0 lg:w-52 lg:shrink-0 lg:pt-0 lg:block
-          ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
+          fixed inset-0 z-20 lg:relative lg:inset-auto
+          transition-all duration-200
+          ${sidebarOpen ? "block" : "hidden lg:block"}
+          lg:w-56 xl:w-64 shrink-0
         `}>
-          <div className="p-4 space-y-5">
-            {activeBrand || activeCategory ? (
-              <button onClick={() => { setActiveBrand(""); setActiveCategory(""); setOffset(0); load(search, 0, "", ""); }}
-                className="w-full flex items-center gap-1.5 text-white/40 hover:text-white font-roboto text-xs transition-colors py-1">
-                <Icon name="X" size={12} /> Сбросить фильтры
+          {/* Оверлей на мобилке */}
+          <div
+            className="absolute inset-0 bg-black/60 lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+          <div className="relative lg:sticky lg:top-14 h-screen lg:h-[calc(100vh-56px)] overflow-y-auto bg-[#0D0D0D] lg:bg-transparent border-r border-[#222] w-64 lg:w-full">
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="font-oswald text-xs uppercase tracking-widest text-white/40">Категории</span>
+                <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-white/30 hover:text-white">
+                  <Icon name="X" size={16} />
+                </button>
+              </div>
+
+              {hasFilters && (
+                <button
+                  onClick={clearFilters}
+                  className="w-full text-left text-xs text-[#FFD700]/70 hover:text-[#FFD700] font-roboto mb-3 flex items-center gap-1"
+                >
+                  <Icon name="X" size={11} />
+                  Сбросить фильтры
+                </button>
+              )}
+
+              <button
+                onClick={() => handleCategory("")}
+                className={`w-full text-left px-3 py-2 font-roboto text-sm transition-colors mb-0.5 rounded-sm ${!activeCategory ? "bg-[#FFD700] text-black font-medium" : "text-white/60 hover:text-white hover:bg-white/5"}`}
+              >
+                Все товары
               </button>
-            ) : null}
 
-            <div>
-              <p className="font-oswald font-bold text-xs uppercase tracking-widest text-[#FFD700] mb-2">Бренды</p>
-              <div className="space-y-0.5">
-                {brands.map(b => (
-                  <button key={b} onClick={() => handleBrand(b)}
-                    className={`w-full text-left px-2 py-1.5 font-roboto text-sm transition-colors rounded-sm ${activeBrand === b ? "text-[#FFD700] bg-[#FFD700]/10" : "text-white/60 hover:text-white"}`}>
-                    {b}
-                  </button>
-                ))}
-              </div>
+              {categories.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => handleCategory(cat)}
+                  className={`w-full text-left px-3 py-2 font-roboto text-sm transition-colors mb-0.5 rounded-sm ${activeCategory === cat ? "bg-[#FFD700] text-black font-medium" : "text-white/60 hover:text-white hover:bg-white/5"}`}
+                >
+                  {cat}
+                </button>
+              ))}
             </div>
-
-            {categories.length > 0 && (
-              <div>
-                <p className="font-oswald font-bold text-xs uppercase tracking-widest text-[#FFD700] mb-2">Категории</p>
-                <div className="space-y-0.5">
-                  {categories.map(c => (
-                    <button key={c} onClick={() => handleCategory(c)}
-                      className={`w-full text-left px-2 py-1.5 font-roboto text-xs transition-colors leading-snug rounded-sm ${activeCategory === c ? "text-[#FFD700] bg-[#FFD700]/10" : "text-white/60 hover:text-white"}`}>
-                      {c}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </aside>
 
         {/* Основной контент */}
-        <main className="flex-1 min-w-0 p-4">
+        <main className="flex-1 min-w-0 p-3 sm:p-6">
 
-          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-            <div className="flex items-center gap-3 flex-wrap">
-              <span className="font-roboto text-white/40 text-sm">{sorted.length} товаров{hasMore ? "+" : ""}</span>
-              {inStock.length > 0 && <span className="font-roboto text-green-400 text-xs border border-green-500/30 px-2 py-0.5">{inStock.length} в наличии</span>}
-              {activeBrand && <span className="font-roboto text-[#FFD700] text-xs border border-[#FFD700]/30 px-2 py-0.5 flex items-center gap-1">{activeBrand} <button onClick={() => handleBrand(activeBrand)}><Icon name="X" size={10} /></button></span>}
-              {activeCategory && <span className="font-roboto text-[#FFD700] text-xs border border-[#FFD700]/30 px-2 py-0.5 flex items-center gap-1 max-w-[200px] truncate">{activeCategory} <button onClick={() => handleCategory(activeCategory)}><Icon name="X" size={10} /></button></span>}
-            </div>
-          </div>
-
-          {error && (
-            <div className="flex items-center gap-2 text-red-400 font-roboto text-sm py-6">
-              <Icon name="AlertCircle" size={15} /> {error}
-            </div>
-          )}
-
-          {loading && sorted.length === 0 && (
-            <div className="flex items-center gap-2 text-white/40 font-roboto text-sm py-16 justify-center">
-              <Icon name="Loader" size={18} className="animate-spin" /> Загружаю каталог...
-            </div>
-          )}
-
-          {sorted.length > 0 && (
-            <div className="border border-[#FFD700]/20 overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-[#FFD700]/10 border-b border-[#FFD700]/20">
-                    <th className="text-left py-2.5 px-3 font-oswald font-bold text-xs uppercase tracking-wide text-[#FFD700]">Артикул</th>
-                    <th className="text-left py-2.5 px-3 font-oswald font-bold text-xs uppercase tracking-wide text-[#FFD700]">Наименование</th>
-                    <th className="text-right py-2.5 px-3 font-oswald font-bold text-xs uppercase tracking-wide text-[#FFD700]">Цена</th>
-                    <th className="text-left py-2.5 px-3 font-oswald font-bold text-xs uppercase tracking-wide text-[#FFD700] hidden sm:table-cell">Наличие</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sorted.map(p => {
-                    const disc = discount(p);
-                    const isInStock = p.amount === "В наличии";
-                    return (
-                      <tr key={p.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-                        <td className="py-2.5 px-3 font-roboto text-xs text-white/50 whitespace-nowrap">{p.article}</td>
-                        <td className="py-2.5 px-3">
-                          {p.name ? (
-                            <div>
-                              <span className="font-roboto text-sm text-white/90">{p.name}</span>
-                              {p.brand && <span className="ml-2 font-roboto text-[10px] text-white/30">{p.brand}</span>}
-                            </div>
-                          ) : (
-                            <span className="font-roboto text-xs text-white/20 italic">нет данных</span>
-                          )}
-                          {p.category && <div className="font-roboto text-[10px] text-white/25 mt-0.5">{p.category}</div>}
-                        </td>
-                        <td className="py-2.5 px-3 text-right whitespace-nowrap">
-                          <div className="flex items-center justify-end gap-1.5">
-                            {disc > 0 && <span className="font-roboto text-[10px] bg-[#FFD700] text-black px-1.5 py-0.5 font-bold">-{disc}%</span>}
-                            <div>
-                              <div className="font-roboto font-bold text-sm text-[#FFD700]">{p.discount_price.toLocaleString("ru-RU")} ₽</div>
-                              {disc > 0 && <div className="font-roboto text-[10px] text-white/25 line-through text-right">{p.base_price.toLocaleString("ru-RU")} ₽</div>}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-2.5 px-3 hidden sm:table-cell">
-                          <span className={`font-roboto text-xs px-2 py-0.5 border ${isInStock ? "border-green-500/40 text-green-400" : "border-white/10 text-white/25"}`}>
-                            {p.amount || "—"}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {hasMore && (
-            <div className="mt-6 text-center">
-              <button onClick={loadMore} disabled={loading}
-                className="font-oswald font-bold uppercase tracking-wide text-sm border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700] hover:text-black px-8 py-3 transition-colors disabled:opacity-50 flex items-center gap-2 mx-auto">
-                {loading ? <><Icon name="Loader" size={14} className="animate-spin" /> Загружаю...</> : "Загрузить ещё"}
+          {/* Активный фильтр */}
+          {activeCategory && (
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-white/40 font-roboto text-sm">{activeCategory}</span>
+              <button onClick={() => handleCategory("")} className="text-white/30 hover:text-white">
+                <Icon name="X" size={14} />
               </button>
             </div>
           )}
 
-          {!loading && sorted.length === 0 && !error && (
-            <div className="text-center py-16">
-              <Icon name="PackageSearch" size={40} className="text-white/10 mx-auto mb-3" />
-              <p className="font-roboto text-white/30 text-sm">Ничего не найдено</p>
-              {(activeBrand || activeCategory || search) && (
-                <button onClick={() => { setActiveBrand(""); setActiveCategory(""); setSearch(""); load("", 0, "", ""); }}
-                  className="mt-3 font-roboto text-xs text-[#FFD700] hover:underline">
-                  Сбросить фильтры
-                </button>
-              )}
+          {error && (
+            <div className="bg-red-900/20 border border-red-500/30 text-red-400 px-4 py-3 font-roboto text-sm mb-4 rounded-sm">
+              {error}
             </div>
+          )}
+
+          {/* Таблица */}
+          {!error && (
+            <>
+              {/* Desktop таблица */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="border-b border-[#FFD700]/20">
+                      <th className="text-left py-2.5 px-3 font-oswald text-xs uppercase tracking-wider text-[#FFD700] w-24">Артикул</th>
+                      <th className="text-left py-2.5 px-3 font-oswald text-xs uppercase tracking-wider text-[#FFD700]">Наименование</th>
+                      <th className="text-left py-2.5 px-3 font-oswald text-xs uppercase tracking-wider text-[#FFD700] w-40 hidden lg:table-cell">Категория</th>
+                      <th className="text-right py-2.5 px-3 font-oswald text-xs uppercase tracking-wider text-[#FFD700] w-32">Цена</th>
+                      <th className="text-center py-2.5 px-3 font-oswald text-xs uppercase tracking-wider text-[#FFD700] w-24">Наличие</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {products.map((p, i) => {
+                      const disc = discount(p);
+                      const inStock = p.amount === "В наличии";
+                      return (
+                        <tr
+                          key={`${p.article}-${i}`}
+                          className="border-b border-white/5 hover:bg-white/3 transition-colors group"
+                        >
+                          <td className="py-3 px-3 font-roboto text-xs text-white/40 font-mono">{p.article}</td>
+                          <td className="py-3 px-3">
+                            <span className="font-roboto text-sm text-white/90 group-hover:text-white transition-colors leading-snug">
+                              {p.name || <span className="text-white/20 italic">нет данных</span>}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 hidden lg:table-cell">
+                            <span className="font-roboto text-xs text-white/30">
+                              {p.category ? p.category.split("/").pop() : ""}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-right">
+                            {p.discount_price > 0 ? (
+                              <div>
+                                <div className="font-oswald text-base text-[#FFD700] font-bold leading-tight">
+                                  {fmt(p.discount_price)}
+                                </div>
+                                {disc > 0 && (
+                                  <div className="font-roboto text-xs text-white/30 line-through">
+                                    {fmt(p.base_price)}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-white/20 font-roboto text-sm">—</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <span className={`inline-block w-2 h-2 rounded-full ${inStock ? "bg-green-500" : p.amount ? "bg-yellow-500" : "bg-white/10"}`} title={p.amount || "Нет данных"} />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile карточки */}
+              <div className="md:hidden space-y-2">
+                {products.map((p, i) => {
+                  const disc = discount(p);
+                  const inStock = p.amount === "В наличии";
+                  return (
+                    <div key={`${p.article}-${i}`} className="bg-[#111] border border-white/8 p-3 rounded-sm">
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <span className="font-roboto text-xs text-white/30 font-mono shrink-0">{p.article}</span>
+                        <span className={`w-2 h-2 rounded-full shrink-0 mt-1 ${inStock ? "bg-green-500" : p.amount ? "bg-yellow-500" : "bg-white/10"}`} title={p.amount || ""} />
+                      </div>
+                      <p className="font-roboto text-sm text-white/85 leading-snug mb-2">
+                        {p.name || <span className="text-white/20 italic">нет данных</span>}
+                      </p>
+                      <div className="flex items-center justify-between">
+                        <span className="font-roboto text-xs text-white/25">
+                          {p.category ? p.category.split("/").slice(0, 2).join(" / ") : ""}
+                        </span>
+                        <div className="text-right">
+                          {p.discount_price > 0 ? (
+                            <>
+                              <div className="font-oswald text-base text-[#FFD700] font-bold leading-tight">{fmt(p.discount_price)}</div>
+                              {disc > 0 && <div className="font-roboto text-xs text-white/25 line-through">{fmt(p.base_price)}</div>}
+                            </>
+                          ) : (
+                            <span className="text-white/20 text-sm">—</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Загрузка / пусто */}
+              {loading && (
+                <div className="flex items-center justify-center py-12 gap-3 text-white/30">
+                  <Icon name="Loader" size={18} className="animate-spin" />
+                  <span className="font-roboto text-sm">Загрузка...</span>
+                </div>
+              )}
+
+              {!loading && products.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-20 text-white/20">
+                  <Icon name="PackageSearch" size={40} className="mb-3" />
+                  <span className="font-roboto text-sm">Ничего не найдено</span>
+                  {hasFilters && (
+                    <button onClick={clearFilters} className="mt-3 text-[#FFD700]/60 hover:text-[#FFD700] font-roboto text-xs">
+                      Сбросить фильтры
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Триггер бесконечного скролла */}
+              <div ref={loaderRef} className="h-8" />
+            </>
           )}
         </main>
       </div>

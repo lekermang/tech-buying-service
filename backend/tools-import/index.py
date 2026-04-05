@@ -92,8 +92,10 @@ def parse_csv_bytes(content: bytes) -> list:
 
 
 def save_rows(rows: list) -> int:
+    """Загружает товары из CSV и удаляет те, которых нет в файле."""
     conn = get_conn()
     cur = conn.cursor()
+    articles_in_csv = []
     for article, name, brand, category, image_url in rows:
         cur.execute(
             f"""INSERT INTO {SCHEMA}.tools_products (article, name, brand, category, updated_at)
@@ -104,6 +106,13 @@ def save_rows(rows: list) -> int:
                     category=EXCLUDED.category,
                     updated_at=NOW()""",
             (article, name, brand, category),
+        )
+        articles_in_csv.append(article)
+    if articles_in_csv:
+        placeholders = ",".join(["%s"] * len(articles_in_csv))
+        cur.execute(
+            f"DELETE FROM {SCHEMA}.tools_products WHERE article NOT IN ({placeholders})",
+            articles_in_csv,
         )
     conn.commit()
     cur.close()
