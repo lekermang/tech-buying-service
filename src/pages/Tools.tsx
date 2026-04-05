@@ -3,7 +3,6 @@ import Icon from "@/components/ui/icon";
 
 const TOOLS_API = "https://functions.poehali.dev/434ea4ea-de14-4074-a738-e5db6e4f9697";
 const SYNC_API = "https://functions.poehali.dev/8e9219e9-9dcf-4726-a272-69c6ce976b80";
-const ADMIN_TOKEN = "Mark2015N";
 const PAGE_SIZE = 100;
 
 interface Product {
@@ -68,7 +67,7 @@ const ToolsPage = () => {
 
   const pollSync = async (jobId: number) => {
     try {
-      const res = await fetch(`${SYNC_API}?token=${ADMIN_TOKEN}&job_id=${jobId}`);
+      const res = await fetch(`${SYNC_API}?job_id=${jobId}`);
       const data = await res.json();
       if (data.status === "running") {
         pollRef.current = setTimeout(() => pollSync(jobId), 5000);
@@ -89,7 +88,7 @@ const ToolsPage = () => {
     setSyncing(true);
     setSyncDone(false);
     try {
-      const res = await fetch(`${SYNC_API}?token=${ADMIN_TOKEN}&action=start`);
+      const res = await fetch(`${SYNC_API}?action=start`);
       const data = await res.json();
       if (data.ok && data.job_id) {
         pollRef.current = setTimeout(() => pollSync(data.job_id), 5000);

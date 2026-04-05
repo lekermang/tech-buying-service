@@ -121,9 +121,6 @@ def handler(event: dict, context) -> dict:
     if event.get("httpMethod") == "OPTIONS":
         return {"statusCode": 200, "headers": CORS_HEADERS, "body": ""}
 
-    if not check_token(event):
-        return {"statusCode": 401, "headers": CORS_HEADERS, "body": json.dumps({"error": "Unauthorized"})}
-
     method = event.get("httpMethod", "GET")
     params = event.get("queryStringParameters") or {}
     action = params.get("action", "")
