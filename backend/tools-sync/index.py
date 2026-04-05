@@ -64,20 +64,29 @@ def update_job(job_id: int, status: str, imported: int = None, error: str = None
     conn.close()
 
 
+def parse_price(val: str) -> float:
+    try:
+        return float((val or "").replace(",", ".").replace(" ", "").strip())
+    except Exception:
+        return 0.0
+
+
 def save_batch(cur, batch: list):
-    for article, name, brand, category, image_url in batch:
+    for article, name, brand, category, image_url, base_price, my_price, amount in batch:
         cur.execute(
-            f"""INSERT INTO {SCHEMA}.tools_products (article, name, brand, category, image_url, updated_at)
-                VALUES (%s, %s, %s, %s, %s, NOW())
+            f"""INSERT INTO {SCHEMA}.tools_products
+                (article, name, brand, category, image_url, base_price, my_price, amount, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW())
                 ON CONFLICT (article) DO UPDATE
-                SET name=EXCLUDED.name, brand=EXCLUDED.brand,
-                    category=EXCLUDED.category, image_url=EXCLUDED.image_url, updated_at=NOW()""",
-            (article, name, brand, category, image_url),
+                SET name=EXCLUDED.name, brand=EXCLUDED.brand, category=EXCLUDED.category,
+                    image_url=EXCLUDED.image_url, base_price=EXCLUDED.base_price,
+                    my_price=EXCLUDED.my_price, amount=EXCLUDED.amount, updated_at=NOW()""",
+            (article, name, brand, category, image_url, base_price, my_price, amount),
         )
 
 
 def do_sync(job_id: int):
-    """Фоновый поток: потоковое скачивание CSV-фида построчно, без загрузки в память."""
+    """Фоновый поток: скачивает CSV-фид, парсит цены/картинки/остатки, сохраняет в БД."""
     try:
         req = urllib.request.Request(FEED_URL, headers={"User-Agent": "Mozilla/5.0"})
         conn = get_conn()
@@ -86,7 +95,6 @@ def do_sync(job_id: int):
         batch = []
 
         with urllib.request.urlopen(req, timeout=300) as resp:
-            # Потоковый парсинг — читаем построчно, не грузим весь файл в RAM
             stream = io.TextIOWrapper(resp, encoding="utf-8-sig", errors="replace")
             reader = csv.DictReader(stream, delimiter=";")
             for row in reader:
@@ -94,13 +102,16 @@ def do_sync(job_id: int):
                 name = (row.get("Название") or "").strip()
                 brand = (row.get("Бренд") or "").strip()
                 category = (row.get("Раздел") or "").strip()
+                base_price = parse_price(row.get("Базовая цена") or row.get("Розничная цена") or "")
+                my_price = parse_price(row.get("Ваша цена") or "")
+                amount = (row.get("Статус") or "").strip()
                 image_url = ""
                 for key, val in row.items():
                     if key and "изображени" in key.lower() and val and val.strip().startswith("http"):
                         image_url = val.strip()
                         break
                 if article and name:
-                    batch.append((article, name, brand, category, image_url))
+                    batch.append((article, name, brand, category, image_url, base_price, my_price, amount))
                     if len(batch) >= BATCH_SIZE:
                         save_batch(cur, batch)
                         conn.commit()
