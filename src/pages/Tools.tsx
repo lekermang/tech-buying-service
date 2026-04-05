@@ -138,32 +138,32 @@ export default function ToolsPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-950">
 
       {/* ── Шапка ── */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
+      <header className="bg-gray-900 border-b border-gray-800 sticky top-0 z-30 shadow-lg">
         <div className="max-w-screen-xl mx-auto px-4 h-14 flex items-center gap-4">
           <a href="/" className="flex items-center gap-2 shrink-0 hover:opacity-80 transition-opacity">
             <div className="w-8 h-8 bg-orange-500 rounded flex items-center justify-center">
               <Icon name="Wrench" size={16} className="text-white" />
             </div>
-            <span className="font-bold text-gray-900 text-lg hidden sm:block">Инструменты</span>
+            <span className="font-bold text-white text-lg hidden sm:block">Инструменты</span>
           </a>
 
           <div className="relative flex-1 max-w-2xl">
-            <Icon name="Search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            <Icon name="Search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
             <input value={search} onChange={e => handleSearch(e.target.value)}
               placeholder="Поиск по названию, артикулу, бренду..."
-              className="w-full bg-gray-100 border border-gray-200 text-gray-900 pl-10 pr-8 py-2.5 rounded-lg text-sm focus:outline-none focus:border-orange-400 focus:bg-white transition-all placeholder-gray-400" />
+              className="w-full bg-gray-800 border border-gray-700 text-white pl-10 pr-8 py-2.5 rounded-lg text-sm focus:outline-none focus:border-orange-400 transition-all placeholder-gray-500" />
             {search && (
-              <button onClick={() => handleSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+              <button onClick={() => handleSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300">
                 <Icon name="X" size={14} />
               </button>
             )}
           </div>
 
           <button onClick={() => setSidebarOpen(v => !v)}
-            className={`lg:hidden flex items-center gap-1.5 border rounded-lg px-3 py-2 text-sm transition-colors ${activeFilters ? "border-orange-400 text-orange-500 bg-orange-50" : "border-gray-200 text-gray-500"}`}>
+            className={`lg:hidden flex items-center gap-1.5 border rounded-lg px-3 py-2 text-sm transition-colors ${activeFilters ? "border-orange-400 text-orange-400 bg-orange-500/10" : "border-gray-700 text-gray-400"}`}>
             <Icon name="SlidersHorizontal" size={15} />
             <span className="hidden sm:inline">Фильтры</span>
             {activeFilters > 0 && <span className="w-5 h-5 bg-orange-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold">{activeFilters}</span>}
@@ -183,18 +183,17 @@ export default function ToolsPage() {
       </header>
 
       {/* ── Баннер с живой травой ── */}
-      <div className="relative overflow-hidden bg-gradient-to-b from-emerald-700 via-emerald-600 to-emerald-500" style={{ height: "140px" }}>
-        {/* Небо */}
-        <div className="absolute inset-0 bg-gradient-to-b from-sky-400/30 to-transparent" />
-        {/* Солнечные блики */}
-        <div className="absolute top-4 right-12 w-20 h-20 bg-yellow-200/10 rounded-full blur-2xl" />
-        <div className="absolute top-2 right-32 w-10 h-10 bg-white/10 rounded-full blur-xl" />
+      <div className="relative overflow-hidden bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950" style={{ height: "140px" }}>
+        {/* Мягкое свечение */}
+        <div className="absolute inset-0 bg-gradient-to-b from-green-900/20 to-transparent" />
+        <div className="absolute top-4 right-12 w-32 h-32 bg-green-500/5 rounded-full blur-3xl" />
+        <div className="absolute top-2 left-1/3 w-20 h-20 bg-orange-500/5 rounded-full blur-2xl" />
         {/* Текст */}
         <div className="relative z-10 max-w-screen-xl mx-auto px-4 h-full flex items-center">
           <div>
-            <h2 className="text-2xl font-bold text-white drop-shadow">Каталог инструментов</h2>
+            <h2 className="text-2xl font-bold text-white">Каталог инструментов</h2>
             {total > 0 && (
-              <p className="text-emerald-100 text-sm mt-0.5">{total.toLocaleString("ru-RU")} товаров в наличии</p>
+              <p className="text-gray-400 text-sm mt-0.5">{total.toLocaleString("ru-RU")} товаров</p>
             )}
           </div>
         </div>
@@ -205,13 +204,13 @@ export default function ToolsPage() {
       <div className="max-w-screen-xl mx-auto px-4 py-4">
 
         {/* Хлебные крошки */}
-        <nav className="flex items-center gap-1.5 text-sm text-gray-500 mb-4">
+        <nav className="flex items-center gap-1.5 text-sm text-gray-600 mb-4">
           {breadcrumbs.map((bc, i) => (
             <span key={i} className="flex items-center gap-1.5">
-              {i > 0 && <Icon name="ChevronRight" size={12} className="text-gray-300" />}
+              {i > 0 && <Icon name="ChevronRight" size={12} className="text-gray-700" />}
               {i < breadcrumbs.length - 1
-                ? <a href={bc.href} className="hover:text-orange-500 transition-colors">{bc.label}</a>
-                : <span className="text-gray-900 font-medium">{bc.label}</span>
+                ? <a href={bc.href} className="hover:text-orange-400 transition-colors">{bc.label}</a>
+                : <span className="text-gray-300 font-medium">{bc.label}</span>
               }
             </span>
           ))}
@@ -250,9 +249,9 @@ export default function ToolsPage() {
           <div className="flex-1 min-w-0">
 
             {/* Заголовок раздела + сортировка */}
-            <div className="bg-white rounded-lg border border-gray-200 px-4 py-3 mb-4 flex items-center justify-between gap-4 flex-wrap">
+            <div className="bg-gray-900 rounded-lg border border-gray-800 px-4 py-3 mb-4 flex items-center justify-between gap-4 flex-wrap">
               <div>
-                <h1 className="font-bold text-gray-900 text-lg">
+                <h1 className="font-bold text-white text-lg">
                   {activeSubcategory || activeCategory || "Все инструменты"}
                 </h1>
                 {total > 0 && (
@@ -262,7 +261,7 @@ export default function ToolsPage() {
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-500 hidden sm:inline">Сортировка:</span>
                 <select value={sort} onChange={e => handleSort(e.target.value)}
-                  className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:border-orange-400 bg-white">
+                  className="border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-gray-300 focus:outline-none focus:border-orange-400 bg-gray-800">
                   <option value="popular">По популярности</option>
                   <option value="price_asc">Цена: по возрастанию</option>
                   <option value="price_desc">Цена: по убыванию</option>
@@ -275,20 +274,20 @@ export default function ToolsPage() {
             {(activeCategory || activeBrand || inStockOnly) && (
               <div className="flex flex-wrap gap-2 mb-4">
                 {activeCategory && (
-                  <span className="flex items-center gap-1.5 bg-orange-50 border border-orange-200 text-orange-700 text-sm px-3 py-1 rounded-full">
+                  <span className="flex items-center gap-1.5 bg-orange-500/10 border border-orange-500/30 text-orange-400 text-sm px-3 py-1 rounded-full">
                     {activeSubcategory ? `${activeCategory} / ${activeSubcategory}` : activeCategory}
                     <button onClick={() => { setActiveCategory(""); setActiveSubcategory(""); apply(search, "", "", activeBrand, inStockOnly, sort); }}
-                      className="hover:text-orange-900"><Icon name="X" size={12} /></button>
+                      className="hover:text-orange-200"><Icon name="X" size={12} /></button>
                   </span>
                 )}
                 {activeBrand && (
-                  <span className="flex items-center gap-1.5 bg-orange-50 border border-orange-200 text-orange-700 text-sm px-3 py-1 rounded-full">
+                  <span className="flex items-center gap-1.5 bg-orange-500/10 border border-orange-500/30 text-orange-400 text-sm px-3 py-1 rounded-full">
                     {activeBrand}
                     <button onClick={() => handleBrand(activeBrand)}><Icon name="X" size={12} /></button>
                   </span>
                 )}
                 {inStockOnly && (
-                  <span className="flex items-center gap-1.5 bg-green-50 border border-green-200 text-green-700 text-sm px-3 py-1 rounded-full">
+                  <span className="flex items-center gap-1.5 bg-green-500/10 border border-green-500/30 text-green-400 text-sm px-3 py-1 rounded-full">
                     В наличии
                     <button onClick={() => handleStock(false)}><Icon name="X" size={12} /></button>
                   </span>
@@ -298,11 +297,11 @@ export default function ToolsPage() {
 
             {/* Сетка товаров */}
             {products.length === 0 && !loading ? (
-              <div className="bg-white rounded-lg border border-gray-200 py-20 text-center">
-                <Icon name="Search" size={40} className="text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500 text-lg font-medium">Ничего не найдено</p>
-                <p className="text-gray-400 text-sm mt-1">Попробуйте изменить фильтры или поисковый запрос</p>
-                <button onClick={clearAll} className="mt-4 text-orange-500 hover:text-orange-600 font-medium text-sm">
+              <div className="bg-gray-900 rounded-lg border border-gray-800 py-20 text-center">
+                <Icon name="Search" size={40} className="text-gray-700 mx-auto mb-4" />
+                <p className="text-gray-400 text-lg font-medium">Ничего не найдено</p>
+                <p className="text-gray-600 text-sm mt-1">Попробуйте изменить фильтры или поисковый запрос</p>
+                <button onClick={clearAll} className="mt-4 text-orange-400 hover:text-orange-300 font-medium text-sm">
                   Сбросить все фильтры
                 </button>
               </div>

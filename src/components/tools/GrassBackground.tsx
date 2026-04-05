@@ -29,8 +29,8 @@ export default function GrassBackground() {
     };
 
     const COLORS = [
-      "#4ade80", "#22c55e", "#16a34a", "#15803d",
-      "#86efac", "#6ee7b7", "#34d399", "#10b981",
+      "#4ade80", "#22c55e", "#86efac", "#bbf7d0",
+      "#6ee7b7", "#34d399", "#a7f3d0", "#d1fae5",
     ];
 
     const generateBlades = () => {
