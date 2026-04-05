@@ -138,6 +138,19 @@ const HeroSection = ({ scrollTo }: HeroSectionProps) => {
             <UsedGoodsSearch />
             <RepairWidget />
             <AppleWidget compact />
+            <a href="/api-catalog"
+              className="flex items-center justify-between bg-black/30 border border-white/10 hover:border-[#FFD700]/40 px-3 py-3 transition-colors group w-full">
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 bg-[#FFD700]/20 border border-[#FFD700]/40 flex items-center justify-center shrink-0">
+                  <Icon name="PackageOpen" size={11} className="text-[#FFD700]" />
+                </div>
+                <span className="font-oswald font-bold text-xs uppercase text-white tracking-wide">Каталог: инструменты и расходные материалы</span>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="font-roboto text-[10px] text-white/30 hidden sm:block">YML · CSV · Excel</span>
+                <Icon name="ChevronRight" size={14} className="text-white/40 group-hover:text-[#FFD700] transition-colors" />
+              </div>
+            </a>
           </div>
         </div>
 
