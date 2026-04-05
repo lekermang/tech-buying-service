@@ -204,59 +204,18 @@ def finish_sync_job(job_id, imported=None, error=None):
     conn.close()
 
 
-def sync_tools_feed(job_id):
+def sync_tools_feed(_job_id):
+    """Запускает синхронизацию каталога через tools-sync функцию."""
     try:
-        req = urllib.request.Request(FEED_URL, headers={'User-Agent': 'Mozilla/5.0'})
-        conn = get_conn()
-        cur = conn.cursor()
-        categories = {}
-        total = 0
-        batch = []
-
-        with urllib.request.urlopen(req, timeout=300) as resp:
-            for event, elem in ET.iterparse(resp, events=('end',)):
-                if elem.tag == 'category':
-                    categories[elem.get('id', '')] = elem.text or ''
-                    elem.clear()
-                elif elem.tag == 'offer':
-                    article = (elem.findtext('vendorCode') or elem.get('id', '')).strip()
-                    name = (elem.findtext('name') or elem.findtext('model') or '').strip()
-                    brand = (elem.findtext('vendor') or '').strip()
-                    cat_id = (elem.findtext('categoryId') or '').strip()
-                    category = categories.get(cat_id, '').strip()
-                    if article and name:
-                        batch.append((article, name, brand, category))
-                        if len(batch) >= 500:
-                            for a, n, b, c in batch:
-                                cur.execute(
-                                    f"""INSERT INTO {SCHEMA}.tools_products (article,name,brand,category,updated_at)
-                                        VALUES (%s,%s,%s,%s,NOW())
-                                        ON CONFLICT (article) DO UPDATE SET
-                                        name=EXCLUDED.name, brand=EXCLUDED.brand,
-                                        category=EXCLUDED.category, updated_at=NOW()""",
-                                    (a, n, b, c)
-                                )
-                            conn.commit()
-                            total += len(batch)
-                            batch = []
-                    elem.clear()
-
-        for a, n, b, c in batch:
-            cur.execute(
-                f"""INSERT INTO {SCHEMA}.tools_products (article,name,brand,category,updated_at)
-                    VALUES (%s,%s,%s,%s,NOW())
-                    ON CONFLICT (article) DO UPDATE SET
-                    name=EXCLUDED.name, brand=EXCLUDED.brand,
-                    category=EXCLUDED.category, updated_at=NOW()""",
-                (a, n, b, c)
-            )
-        conn.commit()
-        total += len(batch)
-        cur.close()
-        conn.close()
-        finish_sync_job(job_id, imported=total)
-    except Exception as e:
-        finish_sync_job(job_id, error=str(e))
+        tools_sync_url = 'https://functions.poehali.dev/8e9219e9-9dcf-4726-a272-69c6ce976b80'
+        req = urllib.request.Request(
+            tools_sync_url + '?action=start',
+            headers={'User-Agent': 'price-scheduler/1.0'}
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            pass
+    except Exception:
+        pass
 
 
 def handler(event: dict, context) -> dict:
