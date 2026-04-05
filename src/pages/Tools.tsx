@@ -224,14 +224,24 @@ export default function ToolsPage() {
         </div>
       </header>
 
-      {/* ── Баннеры категорий ── */}
+      {/* ── Баннеры категорий + брендов ── */}
       <ToolsBanners
         activeCategory={activeCategory}
+        activeBrand={activeBrand}
         onCategory={(cat) => {
           setActiveCategory(cat);
           setActiveSubcategory("");
           setExpandedCat(cat);
-          apply(search, cat, "", activeBrand, inStockOnly, sort, activeAmount, priceMin, priceMax, hasImage);
+          setActiveBrand("");
+          apply(search, cat, "", "", inStockOnly, sort, activeAmount, priceMin, priceMax, hasImage);
+          setSidebarOpen(false);
+        }}
+        onBrand={(brand) => {
+          setActiveBrand(brand);
+          setActiveCategory("");
+          setActiveSubcategory("");
+          setExpandedCat("");
+          apply(search, "", "", brand, inStockOnly, sort, activeAmount, priceMin, priceMax, hasImage);
           setSidebarOpen(false);
         }}
         total={total}
