@@ -1,17 +1,15 @@
 """
-Импорт наименований товаров из CSV/YML-фида instrument.ru в БД.
-Фид: https://instrument.ru/api/personalFeed/5492bff915789200fc2d54a3fca417cd/
-Защищён токеном админа.
+Импорт каталога инструментов из CSV-файла в S3 папке tools/.
+GET  — листает файлы в S3 tools/ и показывает статистику БД
+POST ?action=import_s3 — читает CSV из S3 и загружает в tools_products с картинками
+POST ?action=upload — ручная загрузка base64-файла
 """
 import json
 import os
 import base64
 import csv
 import io
-import re
-import threading
-import xml.etree.ElementTree as ET
-import urllib.request
+import boto3
 import psycopg2
 
 CORS_HEADERS = {
@@ -21,57 +19,36 @@ CORS_HEADERS = {
 }
 SCHEMA = os.environ.get("MAIN_DB_SCHEMA", "public")
 
-FEED_URL = "https://instrument.ru/api/personalFeed/5492bff915789200fc2d54a3fca417cd/"
-
-_sync_status = {"running": False, "last": None, "error": None}
-
 
 def get_conn():
     return psycopg2.connect(os.environ["DATABASE_URL"])
 
 
-def save_rows(rows: list) -> int:
-    conn = get_conn()
-    cur = conn.cursor()
-    for article, name, brand, category in rows:
-        cur.execute(
-            f"""INSERT INTO {SCHEMA}.tools_products (article, name, brand, category, updated_at)
-                VALUES (%s, %s, %s, %s, NOW())
-                ON CONFLICT (article) DO UPDATE SET name=EXCLUDED.name, brand=EXCLUDED.brand,
-                category=EXCLUDED.category, updated_at=NOW()""",
-            (article, name, brand, category),
-        )
-    conn.commit()
-    cur.close()
-    conn.close()
-    return len(rows)
+def get_s3():
+    return boto3.client(
+        "s3",
+        endpoint_url="https://bucket.poehali.dev",
+        aws_access_key_id=os.environ["AWS_ACCESS_KEY_ID"],
+        aws_secret_access_key=os.environ["AWS_SECRET_ACCESS_KEY"],
+    )
 
 
-def parse_yml(content: bytes) -> list:
-    """Парсим YML-фид (Яндекс.Маркет формат)."""
-    root = ET.fromstring(content)
-    shop = root.find("shop")
-    if shop is None:
-        raise ValueError("Не найден тег <shop> в YML")
-
-    categories = {}
-    for cat in shop.findall(".//category"):
-        categories[cat.get("id", "")] = cat.text or ""
-
-    rows = []
-    for offer in shop.findall(".//offer"):
-        article = offer.findtext("vendorCode", "") or offer.get("id", "")
-        name = offer.findtext("name", "") or offer.findtext("model", "")
-        brand = offer.findtext("vendor", "")
-        cat_id = offer.findtext("categoryId", "")
-        category = categories.get(cat_id, "")
-        if article and name:
-            rows.append((article.strip(), name.strip(), brand.strip(), category.strip()))
-    return rows
+def list_s3_tools():
+    """Возвращает список файлов в S3 папке tools/"""
+    s3 = get_s3()
+    resp = s3.list_objects_v2(Bucket="files", Prefix="tools/")
+    files = []
+    for obj in resp.get("Contents", []):
+        files.append({
+            "key": obj["Key"],
+            "size": obj["Size"],
+            "modified": str(obj["LastModified"]),
+        })
+    return files
 
 
-def parse_csv(content: bytes) -> list:
-    """Парсим CSV с автоопределением кодировки и разделителя."""
+def parse_csv_bytes(content: bytes) -> list:
+    """Парсит CSV — возвращает список (article, name, brand, category, image_url)"""
     try:
         text = content.decode("utf-8-sig")
     except UnicodeDecodeError:
@@ -81,98 +58,88 @@ def parse_csv(content: bytes) -> list:
     delimiter = ";" if first_line.count(";") > first_line.count(",") else ","
 
     reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
-    fieldnames = [f.strip().lower() for f in (reader.fieldnames or [])]
+    fieldnames = reader.fieldnames or []
 
-    article_col = next((f for f in fieldnames if f in (
-        "article", "vendorcode", "артикул", "код", "artic", "vendor_code", "sku", "id")), None)
-    name_col = next((f for f in fieldnames if f in (
-        "name", "наименование", "название", "товар", "product", "full_name", "title", "fullname")), None)
-    brand_col = next((f for f in fieldnames if f in (
-        "brand", "vendor", "бренд", "производитель", "trademark")), None)
-    category_col = next((f for f in fieldnames if f in (
-        "category", "категория", "раздел", "section", "group", "группа")), None)
+    # Ищем нужные колонки без учёта регистра
+    fn_lower = {f.strip().lower(): f for f in fieldnames}
+
+    def find_col(*variants):
+        for v in variants:
+            if v in fn_lower:
+                return fn_lower[v]
+        return None
+
+    article_col = find_col("код артикула", "артикул", "article", "vendorcode", "sku", "id", "код")
+    name_col = find_col("название", "наименование", "name", "товар", "product", "title")
+    brand_col = find_col("бренд", "brand", "vendor", "производитель")
+    category_col = find_col("раздел", "категория", "category", "группа")
+    image_col = find_col("изображения", "image", "фото", "картинка", "photo", "img", "images")
 
     if not article_col or not name_col:
-        raise ValueError(f"Нет нужных колонок. Найдено: {fieldnames}")
+        raise ValueError(f"Не найдены колонки артикула/названия. Есть: {fieldnames[:10]}")
 
     rows = []
     for row in reader:
-        norm = {k.strip().lower(): v.strip() for k, v in row.items() if k}
-        article = norm.get(article_col, "").strip()
-        name = norm.get(name_col, "").strip()
-        if article and name:
-            rows.append((
-                article, name,
-                norm.get(brand_col, "") if brand_col else "",
-                norm.get(category_col, "") if category_col else "",
-            ))
+        article = (row.get(article_col) or "").strip()
+        name = (row.get(name_col) or "").strip()
+        if not article or not name:
+            continue
+        brand = (row.get(brand_col) or "").strip() if brand_col else ""
+        category = (row.get(category_col) or "").strip() if category_col else ""
+        image_url = (row.get(image_col) or "").strip() if image_col else ""
+        rows.append((article, name, brand, category, image_url))
     return rows
 
 
-def do_sync():
-    """Скачивает фид и сохраняет в БД."""
-    global _sync_status
-    _sync_status = {"running": True, "last": None, "error": None}
-    try:
-        req = urllib.request.Request(
-            FEED_URL,
-            headers={"User-Agent": "Mozilla/5.0"},
+def save_rows(rows: list) -> int:
+    conn = get_conn()
+    cur = conn.cursor()
+    for article, name, brand, category, image_url in rows:
+        cur.execute(
+            f"""INSERT INTO {SCHEMA}.tools_products (article, name, brand, category, updated_at)
+                VALUES (%s, %s, %s, %s, NOW())
+                ON CONFLICT (article) DO UPDATE SET
+                    name=EXCLUDED.name,
+                    brand=EXCLUDED.brand,
+                    category=EXCLUDED.category,
+                    updated_at=NOW()""",
+            (article, name, brand, category),
         )
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            content = resp.read()
-            content_type = resp.headers.get("Content-Type", "")
-
-        # Определяем формат по содержимому
-        if content[:5] in (b"<?xml", b"<yml_") or b"<yml_catalog" in content[:200] or b"<offer" in content[:500]:
-            rows = parse_yml(content)
-        else:
-            rows = parse_csv(content)
-
-        if not rows:
-            raise ValueError("Фид пустой или не удалось распарсить")
-
-        imported = save_rows(rows)
-        _sync_status = {"running": False, "last": imported, "error": None}
-    except Exception as e:
-        _sync_status = {"running": False, "last": None, "error": str(e)}
+    conn.commit()
+    cur.close()
+    conn.close()
+    return len(rows)
 
 
 def handler(event: dict, context) -> dict:
+    """Импорт каталога инструментов из S3 или base64-файла"""
     if event.get("httpMethod") == "OPTIONS":
         return {"statusCode": 200, "headers": CORS_HEADERS, "body": ""}
 
-    headers = event.get("headers", {})
-    params_auth = event.get("queryStringParameters") or {}
-    admin_token = (
-        headers.get("X-Admin-Token") or
-        headers.get("x-admin-token") or
-        params_auth.get("token") or ""
-    )
-    if admin_token != os.environ.get("ADMIN_TOKEN", ""):
-        return {"statusCode": 401, "headers": CORS_HEADERS, "body": json.dumps({"error": "Unauthorized"})}
-
     method = event.get("httpMethod", "GET")
+    params = event.get("queryStringParameters") or {}
+    action = params.get("action", "")
 
-    # GET — статистика
+    # GET — показываем файлы в S3 и статистику БД
     if method == "GET":
         conn = get_conn()
         cur = conn.cursor()
         cur.execute(f"SELECT COUNT(*) FROM {SCHEMA}.tools_products")
         count = cur.fetchone()[0]
-        cur.execute(f"SELECT article, name, brand, category FROM {SCHEMA}.tools_products ORDER BY updated_at DESC LIMIT 20")
-        rows = cur.fetchall()
+        cur.execute(f"SELECT article, name, brand, category FROM {SCHEMA}.tools_products ORDER BY updated_at DESC LIMIT 5")
+        preview = [{"article": r[0], "name": r[1], "brand": r[2], "category": r[3]} for r in cur.fetchall()]
         cur.close()
         conn.close()
+
+        try:
+            s3_files = list_s3_tools()
+        except Exception as e:
+            s3_files = [{"error": str(e)}]
+
         return {
             "statusCode": 200,
             "headers": {**CORS_HEADERS, "Content-Type": "application/json"},
-            "body": json.dumps({
-                "count": count,
-                "preview": [{"article": r[0], "name": r[1], "brand": r[2], "category": r[3]} for r in rows],
-                "has_credentials": True,
-                "sync_status": _sync_status,
-                "feed_url": FEED_URL,
-            }, ensure_ascii=False),
+            "body": json.dumps({"count": count, "preview": preview, "s3_files": s3_files}, ensure_ascii=False),
         }
 
     # POST
@@ -184,58 +151,46 @@ def handler(event: dict, context) -> dict:
     except Exception:
         data = {}
 
-    action = data.get("action", "upload")
+    action = data.get("action", action or "import_s3")
 
-    # Синхронизация с фидом
-    if action == "sync":
-        if _sync_status.get("running"):
-            return {
-                "statusCode": 200,
-                "headers": {**CORS_HEADERS, "Content-Type": "application/json"},
-                "body": json.dumps({"ok": True, "running": True, "message": "Уже запущено"}),
-            }
-        t = threading.Thread(target=do_sync, daemon=True)
-        t.start()
-        t.join(timeout=25)
-        if _sync_status.get("running"):
-            return {
-                "statusCode": 200,
-                "headers": {**CORS_HEADERS, "Content-Type": "application/json"},
-                "body": json.dumps({"ok": True, "running": True, "message": "Загружаю фид, проверь статус через 30 сек"}),
-            }
-        if _sync_status.get("error"):
-            return {
-                "statusCode": 200,
-                "headers": {**CORS_HEADERS, "Content-Type": "application/json"},
-                "body": json.dumps({"ok": False, "error": _sync_status["error"]}),
-            }
+    # Импорт из S3
+    if action == "import_s3":
+        s3 = get_s3()
+        s3_key = data.get("key")  # конкретный файл или берём первый
+        if not s3_key:
+            resp = s3.list_objects_v2(Bucket="files", Prefix="tools/")
+            csv_files = [o["Key"] for o in resp.get("Contents", []) if o["Key"].lower().endswith(".csv")]
+            if not csv_files:
+                return {
+                    "statusCode": 404,
+                    "headers": {**CORS_HEADERS, "Content-Type": "application/json"},
+                    "body": json.dumps({"error": "CSV файлы не найдены в S3 папке tools/"}, ensure_ascii=False),
+                }
+            s3_key = csv_files[0]
+
+        obj = s3.get_object(Bucket="files", Key=s3_key)
+        content = obj["Body"].read()
+        rows = parse_csv_bytes(content)
+        imported = save_rows(rows)
+
         return {
             "statusCode": 200,
             "headers": {**CORS_HEADERS, "Content-Type": "application/json"},
-            "body": json.dumps({"ok": True, "imported": _sync_status.get("last"), "running": False}),
+            "body": json.dumps({"ok": True, "imported": imported, "key": s3_key}, ensure_ascii=False),
         }
 
-    # Ручная загрузка файла (base64)
-    file_b64 = data.get("file", "")
-    delimiter = data.get("delimiter", ",")
-    if not file_b64:
-        return {"statusCode": 400, "headers": CORS_HEADERS, "body": json.dumps({"error": "Нет файла"})}
-    try:
+    # Ручная загрузка base64
+    if action == "upload":
+        file_b64 = data.get("file", "")
+        if not file_b64:
+            return {"statusCode": 400, "headers": CORS_HEADERS, "body": json.dumps({"error": "Нет файла"})}
         file_bytes = base64.b64decode(file_b64)
-        # Определяем формат
-        if b"<yml_catalog" in file_bytes[:500] or b"<?xml" in file_bytes[:10]:
-            rows = parse_yml(file_bytes)
-        else:
-            rows = parse_csv(file_bytes)
+        rows = parse_csv_bytes(file_bytes)
         imported = save_rows(rows)
         return {
             "statusCode": 200,
             "headers": {**CORS_HEADERS, "Content-Type": "application/json"},
             "body": json.dumps({"ok": True, "imported": imported}, ensure_ascii=False),
         }
-    except Exception as e:
-        return {
-            "statusCode": 400,
-            "headers": {**CORS_HEADERS, "Content-Type": "application/json"},
-            "body": json.dumps({"error": str(e)}),
-        }
+
+    return {"statusCode": 400, "headers": CORS_HEADERS, "body": json.dumps({"error": "Неизвестный action"})}

@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Icon from "@/components/ui/icon";
 
+const IMPORT_API = "https://functions.poehali.dev/465711ab-0bef-49fe-b8c4-18c7f3064970";
+
 const TOOLS_API = "https://functions.poehali.dev/434ea4ea-de14-4074-a738-e5db6e4f9697";
 const SYNC_API = "https://functions.poehali.dev/8e9219e9-9dcf-4726-a272-69c6ce976b80";
 const PAGE_SIZE = 100;
@@ -30,6 +32,9 @@ const ToolsPage = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncDone, setSyncDone] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadMsg, setUploadMsg] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const searchRef = useRef<ReturnType<typeof setTimeout>>();
   const pollRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -81,6 +86,35 @@ const ToolsPage = () => {
       }
     } catch {
       pollRef.current = setTimeout(() => pollSync(jobId), 5000);
+    }
+  };
+
+  const handleCsvUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setUploadMsg(null);
+    try {
+      const bytes = await file.arrayBuffer();
+      const b64 = btoa(String.fromCharCode(...new Uint8Array(bytes)));
+      const res = await fetch(IMPORT_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "upload", file: b64 }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setUploadMsg(`Загружено ${data.imported} товаров`);
+        load("", 0, "", "");
+        setTimeout(() => setUploadMsg(null), 5000);
+      } else {
+        setUploadMsg(data.error || "Ошибка");
+      }
+    } catch {
+      setUploadMsg("Ошибка загрузки");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -161,6 +195,14 @@ const ToolsPage = () => {
                 className="bg-[#111] border border-[#333] text-white pl-8 pr-3 py-1.5 font-roboto text-sm focus:outline-none focus:border-[#FFD700] transition-colors w-44"
               />
             </div>
+            {/* Загрузка CSV */}
+            <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleCsvUpload} />
+            <button onClick={() => fileInputRef.current?.click()} disabled={uploading}
+              title="Загрузить CSV каталог"
+              className={`flex items-center gap-1.5 border px-3 py-1.5 font-roboto text-xs transition-colors disabled:opacity-50 ${uploadMsg && !uploadMsg.includes("шибк") ? "border-green-500/50 text-green-400" : uploadMsg ? "border-red-500/50 text-red-400" : "border-white/10 text-white/50 hover:text-white hover:border-[#FFD700]/40"}`}>
+              <Icon name={uploading ? "Loader" : "Upload"} size={13} className={uploading ? "animate-spin" : ""} />
+              <span className="hidden sm:inline">{uploading ? "Загружаю..." : uploadMsg || "CSV"}</span>
+            </button>
             <button onClick={handleSyncNow} disabled={syncing}
               title="Обновить каталог с instrument.ru"
               className={`flex items-center gap-1.5 border px-3 py-1.5 font-roboto text-xs transition-colors disabled:opacity-50 ${syncDone ? "border-green-500/50 text-green-400" : "border-white/10 text-white/50 hover:text-white hover:border-[#FFD700]/40"}`}>
