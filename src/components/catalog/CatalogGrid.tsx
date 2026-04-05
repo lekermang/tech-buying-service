@@ -1,6 +1,7 @@
 import Icon from "@/components/ui/icon";
 import CatalogProductCard from "@/components/catalog/CatalogProductCard";
 import { CatalogItem, REGION_FLAG, MODEL_PHOTOS, CATEGORY_PHOTOS, PRICE_MARKUP } from "@/pages/catalog.types";
+import { BackgroundGradientAnimation } from "@/components/ui/background-gradient-animation";
 
 // Мобильная карточка-строка
 const CatalogRowCard = ({ item, onBuy }: { item: CatalogItem; onBuy: (item: CatalogItem) => void }) => {
@@ -62,7 +63,21 @@ export default function CatalogGrid({
 }: CatalogGridProps) {
 
   return (
-    <main className="flex-1 min-w-0 px-3 sm:px-4 lg:px-6 py-4 sm:py-5">
+    <BackgroundGradientAnimation
+      containerClassName="flex-1 min-w-0"
+      gradientBackgroundStart="rgb(10, 10, 20)"
+      gradientBackgroundEnd="rgb(5, 5, 13)"
+      firstColor="99, 102, 241"
+      secondColor="139, 92, 246"
+      thirdColor="6, 182, 212"
+      fourthColor="255, 215, 0"
+      fifthColor="16, 185, 129"
+      pointerColor="255, 215, 0"
+      size="50%"
+      blendingValue="soft-light"
+      interactive
+    >
+    <main className="relative z-10 px-3 sm:px-4 lg:px-6 py-4 sm:py-5">
 
       {/* Заголовок */}
       <div className="flex items-center justify-between mb-4">
@@ -167,5 +182,6 @@ export default function CatalogGrid({
         </>
       ) : null}
     </main>
+    </BackgroundGradientAnimation>
   );
 }
