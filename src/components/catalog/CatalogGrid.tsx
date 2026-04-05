@@ -115,11 +115,38 @@ export default function CatalogGrid({
         </div>
       )}
 
-      {loading ? (
-        <div className="flex items-center justify-center py-32">
-          <div className="w-8 h-8 border-2 border-white/10 border-t-[#FFD700] rounded-full animate-spin" />
-        </div>
-      ) : filteredItems.length === 0 ? (
+      {/* Skeleton при первой загрузке */}
+      {loading && filteredItems.length === 0 && (
+        <>
+          <div className="flex flex-col gap-2 sm:hidden">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="bg-[#111] rounded-xl flex gap-3 p-3 animate-pulse">
+                <div className="w-14 h-14 bg-[#1A1A1A] rounded-lg shrink-0" />
+                <div className="flex-1 space-y-2 py-1">
+                  <div className="h-3 bg-[#1A1A1A] rounded w-3/4" />
+                  <div className="h-3 bg-[#1A1A1A] rounded w-1/2" />
+                  <div className="h-4 bg-[#1A1A1A] rounded w-1/3" />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="hidden sm:grid sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div key={i} className="bg-[#111] rounded-2xl overflow-hidden animate-pulse">
+                <div className="m-2 aspect-square bg-[#1A1A1A] rounded-xl" />
+                <div className="px-3 pb-3 space-y-2">
+                  <div className="h-3 bg-[#1A1A1A] rounded w-full" />
+                  <div className="h-3 bg-[#1A1A1A] rounded w-2/3" />
+                  <div className="h-5 bg-[#1A1A1A] rounded w-1/2 mt-3" />
+                  <div className="h-8 bg-[#1A1A1A] rounded mt-2" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {!loading && filteredItems.length === 0 ? (
         <div className="text-center py-28">
           <Icon name="Search" size={44} className="text-white/10 mx-auto mb-4" />
           <p className="text-white/30 text-lg font-medium">Ничего не найдено</p>
@@ -127,7 +154,7 @@ export default function CatalogGrid({
             Сбросить фильтры
           </button>
         </div>
-      ) : (
+      ) : !loading ? (
         <>
           {/* Мобилка — строки */}
           <div className="flex flex-col gap-2 sm:hidden">
@@ -138,7 +165,7 @@ export default function CatalogGrid({
             {filteredItems.map(item => <CatalogProductCard key={item.id} item={item} onBuy={onBuy} onAddToCart={onAddToCart} />)}
           </div>
         </>
-      )}
+      ) : null}
     </main>
   );
 }

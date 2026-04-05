@@ -20,7 +20,7 @@ export default function ToolsPage() {
 
   // фильтры
   const [search, setSearch] = useState("");
-  const [activeCategory, setActiveCategory] = useState("");
+  const [activeCategory, setActiveCategory] = useState("Слесарный инструмент");
   const [activeSubcategory, setActiveSubcategory] = useState("");
   const [activeBrand, setActiveBrand] = useState("");
   const [inStockOnly] = useState(false);
@@ -42,6 +42,7 @@ export default function ToolsPage() {
   const loaderRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Параллельный запрос мета и первых товаров
     fetch(`${TOOLS_API}?action=meta`).then(r => r.json()).then((d: Meta) => setMeta(d));
   }, []);
 
@@ -70,7 +71,8 @@ export default function ToolsPage() {
     } finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { load("", 0, "", "", "", false, "popular", "", "", "", false); }, []);
+  // Загружаем сразу самую популярную категорию (Слесарный инструмент)
+  useEffect(() => { load("", 0, "Слесарный инструмент", "", "", false, "popular", "", "", "", false); }, []);
 
   useEffect(() => {
     const el = loaderRef.current; if (!el) return;
@@ -250,7 +252,7 @@ export default function ToolsPage() {
           ))}
         </nav>
 
-        <div className="flex gap-6">
+        <div className="flex gap-4 lg:gap-6">
 
           {/* ── Сайдбар ── */}
           <ToolsSidebar
@@ -354,6 +356,24 @@ export default function ToolsPage() {
               </div>
             )}
 
+            {/* Skeleton при первой загрузке */}
+            {loading && products.length === 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {Array.from({ length: 12 }).map((_, i) => (
+                  <div key={i} className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden animate-pulse">
+                    <div className="bg-gray-800 aspect-square" />
+                    <div className="p-3 space-y-2">
+                      <div className="h-2 bg-gray-800 rounded w-1/3" />
+                      <div className="h-3 bg-gray-800 rounded w-full" />
+                      <div className="h-3 bg-gray-800 rounded w-3/4" />
+                      <div className="h-6 bg-gray-800 rounded w-1/2 mt-2" />
+                      <div className="h-8 bg-gray-800 rounded" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* Сетка товаров */}
             {products.length === 0 && !loading ? (
               <div className="bg-gray-900 rounded-lg border border-gray-800 py-20 text-center">
@@ -365,7 +385,7 @@ export default function ToolsPage() {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 sm:gap-3">
                 {products.map(p => (
                   <ToolsProductCard key={p.article} p={p} onAdd={addToCart} />
                 ))}
