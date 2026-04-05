@@ -24,7 +24,12 @@ const MENU: { key: Tab; label: string; icon: string; group: string }[] = [
 ];
 
 export default function Admin() {
-  const [token, setToken] = useState(() => localStorage.getItem("admin_token") || "");
+  const [token, setToken] = useState(() => {
+    const t = localStorage.getItem("admin_token") || "";
+    // Сбрасываем если токен содержит не-ASCII (старый сломанный)
+    if (t && /[^\u0020-\u007E]/.test(t)) { localStorage.removeItem("admin_token"); return ""; }
+    return t;
+  });
   const [tokenInput, setTokenInput] = useState("");
   const [authed, setAuthed] = useState(false);
   const [tab, setTab] = useState<Tab>("repair");
