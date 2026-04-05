@@ -1,6 +1,6 @@
 import { CATEGORY_PHOTOS } from "@/pages/catalog.types";
 import Icon from "@/components/ui/icon";
-import { SparklesCore } from "@/components/ui/sparkles";
+import ShaderHero from "@/components/ui/animated-shader-hero";
 
 interface Cat {
   title: string;
@@ -42,36 +42,23 @@ export default function CatalogBanners({ onCategory, activeCategory }: Props) {
   return (
     <div className="bg-[#0D0D0D]">
 
-      {/* Hero заголовок со Sparkles */}
-      <div className="relative overflow-hidden" style={{ height: 110 }}>
-        {/* Частицы */}
-        <SparklesCore
-          background="transparent"
-          minSize={0.4}
-          maxSize={1.2}
-          particleDensity={80}
-          className="absolute inset-0 w-full h-full"
-          particleColor="#a5b4fc"
-          speed={1.2}
-        />
-        {/* Градиент снизу */}
-        <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-[#0D0D0D] to-transparent" />
-        {/* Текст */}
-        <div className="relative z-10 px-3 sm:px-5 h-full flex flex-col justify-center">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="inline-flex items-center gap-1 bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-[10px] font-bold px-2 py-0.5 rounded-full">
+      {/* Hero заголовок с WebGL шейдером — золото во всю ширину */}
+      <ShaderHero height={120}>
+        <div className="px-3 sm:px-5 h-full flex flex-col justify-center">
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="inline-flex items-center gap-1 bg-[#FFD700]/15 border border-[#FFD700]/30 text-[#FFD700] text-[10px] font-bold px-2.5 py-0.5 rounded-full">
               <Icon name="Sparkles" size={9} />
               Официальная гарантия
             </span>
             <span className="text-white/20 text-[10px]">·</span>
             <span className="text-white/40 text-[10px]">Рассрочка 0%</span>
           </div>
-          <h1 className="text-white font-extrabold text-2xl sm:text-3xl tracking-tight leading-tight">
+          <h1 className="text-white font-extrabold text-2xl sm:text-3xl tracking-tight leading-tight drop-shadow-lg">
             Каталог новой техники
           </h1>
-          <p className="text-white/40 text-xs mt-0.5">277 товаров · iPhone · MacBook · Samsung · Dyson</p>
+          <p className="text-white/50 text-xs mt-1">277 товаров · iPhone · MacBook · Samsung · Dyson</p>
         </div>
-      </div>
+      </ShaderHero>
 
       {/* Hero баннер iPhone 17 */}
       <div className="px-3 sm:px-4 mb-3">
