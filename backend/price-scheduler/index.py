@@ -7,12 +7,16 @@
 
 import json
 import os
+import threading
+import xml.etree.ElementTree as ET
 import psycopg2
 import urllib.request
 from datetime import datetime, timezone, timedelta
 
 SCHEMA = 't_p31606708_tech_buying_service'
 HEADERS = {'Access-Control-Allow-Origin': '*'}
+FEED_URL = 'https://instrument.ru/api/personalFeed/5492bff915789200fc2d54a3fca417cd/'
+SYNC_HOUR = 3  # 3:00 МСК — синхронизация инструментов
 CONTACT_PHONE = '+7 992 990-33-33'
 GROUP_CHAT_ID = os.environ.get('PRICE_GROUP_CHAT_ID', '')
 MSK = timezone(timedelta(hours=3))
@@ -164,6 +168,97 @@ def do_send_price(chat_id):
     return {'sent': True, 'messages': len(messages), 'items': len(items)}
 
 
+def check_tools_synced_today():
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        f"SELECT 1 FROM {SCHEMA}.tools_sync_log WHERE started_at::date = NOW()::date AND status='done' LIMIT 1"
+    )
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    return row is not None
+
+
+def create_sync_job():
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(f"INSERT INTO {SCHEMA}.tools_sync_log (status) VALUES ('running') RETURNING id")
+    job_id = cur.fetchone()[0]
+    conn.commit()
+    cur.close()
+    conn.close()
+    return job_id
+
+
+def finish_sync_job(job_id, imported=None, error=None):
+    conn = get_conn()
+    cur = conn.cursor()
+    status = 'done' if error is None else 'error'
+    cur.execute(
+        f"UPDATE {SCHEMA}.tools_sync_log SET status=%s, finished_at=NOW(), imported=%s, error=%s WHERE id=%s",
+        (status, imported, error, job_id)
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+def sync_tools_feed(job_id):
+    try:
+        req = urllib.request.Request(FEED_URL, headers={'User-Agent': 'Mozilla/5.0'})
+        conn = get_conn()
+        cur = conn.cursor()
+        categories = {}
+        total = 0
+        batch = []
+
+        with urllib.request.urlopen(req, timeout=300) as resp:
+            for event, elem in ET.iterparse(resp, events=('end',)):
+                if elem.tag == 'category':
+                    categories[elem.get('id', '')] = elem.text or ''
+                    elem.clear()
+                elif elem.tag == 'offer':
+                    article = (elem.findtext('vendorCode') or elem.get('id', '')).strip()
+                    name = (elem.findtext('name') or elem.findtext('model') or '').strip()
+                    brand = (elem.findtext('vendor') or '').strip()
+                    cat_id = (elem.findtext('categoryId') or '').strip()
+                    category = categories.get(cat_id, '').strip()
+                    if article and name:
+                        batch.append((article, name, brand, category))
+                        if len(batch) >= 500:
+                            for a, n, b, c in batch:
+                                cur.execute(
+                                    f"""INSERT INTO {SCHEMA}.tools_products (article,name,brand,category,updated_at)
+                                        VALUES (%s,%s,%s,%s,NOW())
+                                        ON CONFLICT (article) DO UPDATE SET
+                                        name=EXCLUDED.name, brand=EXCLUDED.brand,
+                                        category=EXCLUDED.category, updated_at=NOW()""",
+                                    (a, n, b, c)
+                                )
+                            conn.commit()
+                            total += len(batch)
+                            batch = []
+                    elem.clear()
+
+        for a, n, b, c in batch:
+            cur.execute(
+                f"""INSERT INTO {SCHEMA}.tools_products (article,name,brand,category,updated_at)
+                    VALUES (%s,%s,%s,%s,NOW())
+                    ON CONFLICT (article) DO UPDATE SET
+                    name=EXCLUDED.name, brand=EXCLUDED.brand,
+                    category=EXCLUDED.category, updated_at=NOW()""",
+                (a, n, b, c)
+            )
+        conn.commit()
+        total += len(batch)
+        cur.close()
+        conn.close()
+        finish_sync_job(job_id, imported=total)
+    except Exception as e:
+        finish_sync_job(job_id, error=str(e))
+
+
 def handler(event: dict, context) -> dict:
     """Отправка прайса в Telegram-группу по расписанию (10:00 МСК) или вручную"""
     if event.get('httpMethod') == 'OPTIONS':
@@ -181,6 +276,13 @@ def handler(event: dict, context) -> dict:
 
     if action == 'schedule_check':
         now_msk = datetime.now(MSK)
+
+        # Синхронизация инструментов в 3:00 МСК
+        if now_msk.hour == SYNC_HOUR and not check_tools_synced_today():
+            job_id = create_sync_job()
+            t = threading.Thread(target=sync_tools_feed, args=(job_id,), daemon=False)
+            t.start()
+
         if now_msk.hour != SEND_HOUR:
             return ok({'skipped': True, 'reason': 'not_time_' + str(now_msk.hour) + 'h'})
 
