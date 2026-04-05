@@ -50,23 +50,40 @@ const ToolsImportTab = ({ token }: ToolsImportTabProps) => {
     }
   };
 
+  const pollJob = async (jobId: number) => {
+    try {
+      const res = await fetch(`${SYNC_URL}?token=${token}&job_id=${jobId}`);
+      const data = await res.json();
+      if (data.status === "running") {
+        setTimeout(() => pollJob(jobId), 5000);
+      } else if (data.status === "done") {
+        setResult({ ok: true, imported: data.imported });
+        loadStats();
+        setSyncing(false);
+      } else {
+        setResult({ ok: false, error: data.error || "Неизвестная ошибка" });
+        setSyncing(false);
+      }
+    } catch {
+      setTimeout(() => pollJob(jobId), 5000);
+    }
+  };
+
   const handleSync = async () => {
     setSyncing(true);
     setResult(null);
     try {
-      // tools-sync скачивает 200МБ фид потоково — может занять 2-5 минут
-      // Таймаут функции нужно поставить 300 сек в настройках Ядро → Функции → tools-sync
       const res = await fetch(`${SYNC_URL}?token=${token}`, { method: "POST" });
       const data = await res.json();
-      if (data.ok) {
-        setResult({ ok: true, imported: data.imported });
-        loadStats();
+      if (data.ok && data.job_id) {
+        // Сразу получили job_id — поллим статус
+        setTimeout(() => pollJob(data.job_id), 5000);
       } else {
-        setResult({ ok: false, error: data.error });
+        setResult({ ok: false, error: data.error || "Не удалось запустить" });
+        setSyncing(false);
       }
     } catch (err) {
-      setResult({ ok: false, error: "Превышено время ожидания. Фид большой (200МБ) — увеличь таймаут функции tools-sync до 300 сек в разделе Ядро → Функции." });
-    } finally {
+      setResult({ ok: false, error: String(err) });
       setSyncing(false);
     }
   };
