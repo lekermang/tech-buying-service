@@ -12,13 +12,20 @@ CORS_HEADERS = {
 }
 SCHEMA = os.environ.get("MAIN_DB_SCHEMA", "public")
 
+SORT_MAP = {
+    "price_asc":  "my_price ASC NULLS LAST",
+    "price_desc": "my_price DESC NULLS LAST",
+    "name_asc":   "name ASC",
+    "popular":    "category, name",
+}
+
 
 def get_conn():
     return psycopg2.connect(os.environ["DATABASE_URL"])
 
 
 def handler(event: dict, context) -> dict:
-    """Каталог инструментов: список товаров с ценами, фильтрами и поиском."""
+    """Каталог инструментов: список товаров с ценами, фильтрами, подкатегориями и сортировкой."""
     if event.get("httpMethod") == "OPTIONS":
         return {"statusCode": 200, "headers": CORS_HEADERS, "body": ""}
 
@@ -28,29 +35,55 @@ def handler(event: dict, context) -> dict:
     offset = int(params.get("offset", 0))
     search = params.get("search", "").strip()
     category_filter = params.get("category", "").strip()
+    subcategory_filter = params.get("subcategory", "").strip()
     brand_filter = params.get("brand", "").strip()
     in_stock_only = params.get("in_stock", "") == "1"
+    sort = params.get("sort", "popular")
+    order_by = SORT_MAP.get(sort, SORT_MAP["popular"])
 
     conn = get_conn()
     cur = conn.cursor()
 
     if action == "meta":
+        # Топ-категории с кол-вом товаров
         cur.execute(
-            f"SELECT DISTINCT split_part(category, '/', 1) FROM {SCHEMA}.tools_products "
-            f"WHERE category IS NOT NULL AND category != '' ORDER BY 1"
+            f"""SELECT split_part(category, '/', 1) as top_cat, COUNT(*) as cnt
+                FROM {SCHEMA}.tools_products
+                WHERE category IS NOT NULL AND category != ''
+                GROUP BY top_cat ORDER BY top_cat"""
         )
-        top_cats = [r[0] for r in cur.fetchall()]
+        top_cats = [{"name": r[0], "count": r[1]} for r in cur.fetchall()]
+
+        # Подкатегории (2-й уровень)
         cur.execute(
-            f"SELECT DISTINCT brand FROM {SCHEMA}.tools_products "
-            f"WHERE brand IS NOT NULL AND brand != '' ORDER BY 1"
+            f"""SELECT split_part(category, '/', 1) as top, split_part(category, '/', 2) as sub, COUNT(*) as cnt
+                FROM {SCHEMA}.tools_products
+                WHERE category IS NOT NULL AND category != '' AND position('/' in category) > 0
+                GROUP BY top, sub ORDER BY top, sub"""
         )
-        brands = [r[0] for r in cur.fetchall()]
+        subcats: dict = {}
+        for top, sub, cnt in cur.fetchall():
+            if sub:
+                subcats.setdefault(top, []).append({"name": sub, "count": cnt})
+
+        # Бренды с кол-вом
+        cur.execute(
+            f"""SELECT brand, COUNT(*) as cnt FROM {SCHEMA}.tools_products
+                WHERE brand IS NOT NULL AND brand != ''
+                GROUP BY brand ORDER BY cnt DESC LIMIT 100"""
+        )
+        brands = [{"name": r[0], "count": r[1]} for r in cur.fetchall()]
+
         cur.close()
         conn.close()
         return {
             "statusCode": 200,
             "headers": {**CORS_HEADERS, "Content-Type": "application/json"},
-            "body": json.dumps({"brands": brands, "categories": top_cats}, ensure_ascii=False),
+            "body": json.dumps({
+                "categories": top_cats,
+                "subcategories": subcats,
+                "brands": brands,
+            }, ensure_ascii=False),
         }
 
     # products
@@ -59,9 +92,12 @@ def handler(event: dict, context) -> dict:
     if search:
         conditions.append("(article ILIKE %s OR name ILIKE %s)")
         args += [f"%{search}%", f"%{search}%"]
-    if category_filter:
-        conditions.append("(split_part(category, '/', 1) = %s OR category ILIKE %s)")
-        args += [category_filter, f"{category_filter}%"]
+    if subcategory_filter:
+        conditions.append("(split_part(category, '/', 1) = %s AND split_part(category, '/', 2) = %s)")
+        args += [category_filter or subcategory_filter, subcategory_filter]
+    elif category_filter:
+        conditions.append("split_part(category, '/', 1) = %s")
+        args.append(category_filter)
     if brand_filter:
         conditions.append("brand ILIKE %s")
         args.append(f"%{brand_filter}%")
@@ -74,8 +110,9 @@ def handler(event: dict, context) -> dict:
     total = cur.fetchone()[0]
 
     cur.execute(
-        f"SELECT article, name, brand, category, image_url, base_price, my_price, amount "
-        f"FROM {SCHEMA}.tools_products {where} ORDER BY category, name LIMIT %s OFFSET %s",
+        f"""SELECT article, name, brand, category, image_url, base_price, my_price, amount
+            FROM {SCHEMA}.tools_products {where}
+            ORDER BY {order_by} LIMIT %s OFFSET %s""",
         args + [limit, offset]
     )
     rows = cur.fetchall()
