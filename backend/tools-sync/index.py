@@ -2,12 +2,13 @@
 Асинхронная синхронизация каталога instrument.ru.
 POST — запускает фоновый поток, сразу возвращает job_id.
 GET  — возвращает статус по job_id из БД.
-Фид 200МБ парсится потоково через iterparse.
+Фид в формате CSV (разделитель ;), парсится построчно.
 """
 import json
 import os
 import threading
-import xml.etree.ElementTree as ET
+import csv
+import io
 import urllib.request
 import psycopg2
 
@@ -76,34 +77,30 @@ def save_batch(cur, batch: list):
 
 
 def do_sync(job_id: int):
-    """Фоновый поток: скачивает и парсит фид, обновляет статус в БД."""
+    """Фоновый поток: скачивает CSV-фид, парсит построчно, обновляет статус в БД."""
     try:
         req = urllib.request.Request(FEED_URL, headers={"User-Agent": "Mozilla/5.0"})
         conn = get_conn()
         cur = conn.cursor()
-        categories = {}
         total = 0
         batch = []
 
         with urllib.request.urlopen(req, timeout=300) as resp:
-            for event, elem in ET.iterparse(resp, events=("end",)):
-                if elem.tag == "category":
-                    categories[elem.get("id", "")] = elem.text or ""
-                    elem.clear()
-                elif elem.tag == "offer":
-                    article = (elem.findtext("vendorCode") or elem.get("id", "")).strip()
-                    name = (elem.findtext("name") or elem.findtext("model") or "").strip()
-                    brand = (elem.findtext("vendor") or "").strip()
-                    cat_id = (elem.findtext("categoryId") or "").strip()
-                    category = categories.get(cat_id, "").strip()
-                    if article and name:
-                        batch.append((article, name, brand, category))
-                        if len(batch) >= BATCH_SIZE:
-                            save_batch(cur, batch)
-                            conn.commit()
-                            total += len(batch)
-                            batch = []
-                    elem.clear()
+            raw = resp.read().decode("utf-8-sig")
+
+        reader = csv.DictReader(io.StringIO(raw), delimiter=";")
+        for row in reader:
+            article = (row.get("Код артикула") or "").strip()
+            name = (row.get("Название") or "").strip()
+            brand = (row.get("Бренд") or "").strip()
+            category = (row.get("Раздел") or "").strip()
+            if article and name:
+                batch.append((article, name, brand, category))
+                if len(batch) >= BATCH_SIZE:
+                    save_batch(cur, batch)
+                    conn.commit()
+                    total += len(batch)
+                    batch = []
 
         if batch:
             save_batch(cur, batch)
