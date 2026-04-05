@@ -144,11 +144,11 @@ const Header = ({ scrollTo }: HeaderProps) => {
           <nav className="hidden md:flex lg:hidden items-center gap-3">
             {NAV_LINKS.slice(0, 3).map(l => (
               <button key={l.href} onClick={() => handleNav(l.href)}
-                className="font-roboto text-xs text-white/90 hover:text-[#FFD700] transition-colors uppercase tracking-wide">
+                className="font-roboto text-xs text-white hover:text-[#FFD700] transition-colors uppercase tracking-wide">
                 {l.label}
               </button>
             ))}
-            <a href="/catalog" className="font-roboto text-xs text-white/90 hover:text-[#FFD700] transition-colors uppercase tracking-wide flex items-center gap-1">
+            <a href="/catalog" className="font-roboto text-xs text-white hover:text-[#FFD700] transition-colors uppercase tracking-wide flex items-center gap-1">
               <Icon name="ShoppingBag" size={12} />
               Каталог
             </a>
@@ -158,12 +158,12 @@ const Header = ({ scrollTo }: HeaderProps) => {
           <nav className="hidden lg:flex items-center gap-5">
             {NAV_LINKS.map(l => (
               <button key={l.href} onClick={() => handleNav(l.href)}
-                className="font-roboto text-sm text-white/90 hover:text-[#FFD700] transition-colors uppercase tracking-wide">
+                className="font-roboto text-sm text-white hover:text-[#FFD700] transition-colors uppercase tracking-wide">
                 {l.label}
               </button>
             ))}
             <a href="/catalog"
-              className="font-roboto text-sm text-white/90 hover:text-[#FFD700] transition-colors uppercase tracking-wide flex items-center gap-1">
+              className="font-roboto text-sm text-white hover:text-[#FFD700] transition-colors uppercase tracking-wide flex items-center gap-1">
               <Icon name="ShoppingBag" size={13} />
               Каталог
             </a>
