@@ -103,7 +103,7 @@ export default function Admin() {
       {tab === "sky" && <SkyTab token={token} />}
       {tab === "items" && <CatalogEditTab token={token} />}
       {tab === "catalog" && <CatalogTab token={token} />}
-      {tab === "api-catalog" && <ApiCatalogContent />}
+      {tab === "api-catalog" && <ApiCatalogContent token={token} />}
     </div>
   );
 }

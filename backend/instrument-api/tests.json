@@ -1,0 +1,12 @@
+{
+  "tests": [
+    {
+      "name": "Unauthorized without token",
+      "method": "GET",
+      "path": "/?method=get.products.list&limit=5&offset=0",
+      "expectedStatus": 401,
+      "bodyMatcher": "partial",
+      "expectedBody": {}
+    }
+  ]
+}

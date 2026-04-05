@@ -1,4 +1,5 @@
 {
+  "instrument-api": "https://functions.poehali.dev/894b4895-a528-4a4d-8bef-423c19423565",
   "resold-parser": "https://functions.poehali.dev/a10aef75-50fc-411c-85bb-692d44fb31e7",
   "price-scheduler": "https://functions.poehali.dev/b09271ea-c662-4225-973f-4dd4c6a0e32c",
   "tg-auto-sync": "https://functions.poehali.dev/79437e4a-387b-4d66-952b-a6e8e8d627a2",
