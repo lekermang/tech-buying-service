@@ -3,10 +3,10 @@
     {
       "name": "Status check",
       "method": "GET",
-      "path": "/",
+      "path": "/?action=status",
       "expectedStatus": 200,
       "bodyMatcher": "partial",
-      "expectedBody": {"status": "string"}
+      "expectedBody": {"with_image": 0}
     }
   ]
 }
