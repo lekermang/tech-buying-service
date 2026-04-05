@@ -204,18 +204,24 @@ def finish_sync_job(job_id, imported=None, error=None):
     conn.close()
 
 
-def sync_tools_feed(_job_id):
-    """Запускает синхронизацию каталога через tools-sync функцию."""
+def sync_tools_feed(job_id):
+    """Постраничная синхронизация каталога: вызывает sync_chunk по одному чанку за раз."""
+    tools_sync_url = 'https://functions.poehali.dev/8e9219e9-9dcf-4726-a272-69c6ce976b80'
+    offset = 0
+    total = 0
     try:
-        tools_sync_url = 'https://functions.poehali.dev/8e9219e9-9dcf-4726-a272-69c6ce976b80'
-        req = urllib.request.Request(
-            tools_sync_url + '?action=start',
-            headers={'User-Agent': 'price-scheduler/1.0'}
-        )
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            pass
-    except Exception:
-        pass
+        while True:
+            url = f'{tools_sync_url}?action=sync_chunk&offset={offset}'
+            req = urllib.request.Request(url, headers={'User-Agent': 'price-scheduler/1.0'})
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                data = json.loads(resp.read())
+            total += data.get('saved', 0)
+            if not data.get('has_more'):
+                break
+            offset = data['next_offset']
+        finish_sync_job(job_id, imported=total)
+    except Exception as e:
+        finish_sync_job(job_id, error=str(e)[:500])
 
 
 def handler(event: dict, context) -> dict:
