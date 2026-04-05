@@ -65,14 +65,14 @@ def update_job(job_id: int, status: str, imported: int = None, error: str = None
 
 
 def save_batch(cur, batch: list):
-    for article, name, brand, category in batch:
+    for article, name, brand, category, image_url in batch:
         cur.execute(
-            f"""INSERT INTO {SCHEMA}.tools_products (article, name, brand, category, updated_at)
-                VALUES (%s, %s, %s, %s, NOW())
+            f"""INSERT INTO {SCHEMA}.tools_products (article, name, brand, category, image_url, updated_at)
+                VALUES (%s, %s, %s, %s, %s, NOW())
                 ON CONFLICT (article) DO UPDATE
                 SET name=EXCLUDED.name, brand=EXCLUDED.brand,
-                    category=EXCLUDED.category, updated_at=NOW()""",
-            (article, name, brand, category),
+                    category=EXCLUDED.category, image_url=EXCLUDED.image_url, updated_at=NOW()""",
+            (article, name, brand, category, image_url),
         )
 
 
@@ -94,8 +94,13 @@ def do_sync(job_id: int):
                 name = (row.get("Название") or "").strip()
                 brand = (row.get("Бренд") or "").strip()
                 category = (row.get("Раздел") or "").strip()
+                image_url = ""
+                for key, val in row.items():
+                    if key and "изображени" in key.lower() and val and val.strip().startswith("http"):
+                        image_url = val.strip()
+                        break
                 if article and name:
-                    batch.append((article, name, brand, category))
+                    batch.append((article, name, brand, category, image_url))
                     if len(batch) >= BATCH_SIZE:
                         save_batch(cur, batch)
                         conn.commit()

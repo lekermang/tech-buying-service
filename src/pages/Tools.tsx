@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Icon from "@/components/ui/icon";
 
 const TOOLS_API = "https://functions.poehali.dev/434ea4ea-de14-4074-a738-e5db6e4f9697";
+const SEND_API = "https://functions.poehali.dev/52666ff7-db52-4b6a-a90e-d60aeed699de";
 const PAGE_SIZE = 48;
 
 interface Product {
@@ -17,88 +18,167 @@ interface Product {
   is_new: boolean;
 }
 
+interface CartItem extends Product { qty: number; }
+
 const fmt = (n: number) =>
   n > 0 ? n.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " ₽" : "";
 
-const getDiscount = (p: Product) =>
+const disc = (p: Product) =>
   p.base_price > 0 && p.discount_price > 0 && p.base_price > p.discount_price
-    ? Math.round((1 - p.discount_price / p.base_price) * 100)
-    : 0;
+    ? Math.round((1 - p.discount_price / p.base_price) * 100) : 0;
 
-const ProductCard = ({ p }: { p: Product }) => {
-  const disc = getDiscount(p);
+const ProductCard = ({ p, onAdd }: { p: Product; onAdd: (p: Product) => void }) => {
+  const d = disc(p);
   const inStock = p.amount === "В наличии";
   const myPrice = p.discount_price || p.base_price;
-  const [imgError, setImgError] = useState(false);
+  const [imgErr, setImgErr] = useState(false);
+  const [added, setAdded] = useState(false);
+
+  const handleAdd = () => {
+    onAdd(p);
+    setAdded(true);
+    setTimeout(() => setAdded(false), 1500);
+  };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden flex flex-col hover:shadow-md transition-shadow group">
-      <div className="relative aspect-square bg-gray-50 flex items-center justify-center overflow-hidden">
-        {p.is_hit && (
-          <span className="absolute top-2 left-2 z-10 bg-[#d32f2f] text-white text-[10px] font-bold px-1.5 py-0.5 rounded">Хит</span>
-        )}
-        {disc > 0 && (
-          <span className="absolute top-2 right-2 z-10 bg-[#e53935] text-white text-[10px] font-bold px-1.5 py-0.5 rounded">-{disc}%</span>
-        )}
-        {p.image_url && !imgError ? (
-          <img
-            src={p.image_url}
-            alt={p.name}
-            className="w-full h-full object-contain p-3 group-hover:scale-105 transition-transform duration-300"
-            onError={() => setImgError(true)}
-          />
+    <div className="bg-[#1A1A1A] border border-[#2A2A2A] rounded-lg overflow-hidden flex flex-col hover:border-[#FFD700]/30 transition-all group">
+      <div className="relative aspect-square bg-[#111] flex items-center justify-center overflow-hidden">
+        {p.is_hit && <span className="absolute top-2 left-2 z-10 bg-[#FFD700] text-black text-[10px] font-bold px-2 py-0.5 rounded-sm">Хит</span>}
+        {d > 0 && <span className="absolute top-2 right-2 z-10 bg-red-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-sm">-{d}%</span>}
+        {p.image_url && !imgErr ? (
+          <img src={p.image_url} alt={p.name}
+            className="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-300"
+            onError={() => setImgErr(true)} />
         ) : (
-          <div className="flex items-center justify-center text-gray-200">
-            <Icon name="Package" size={48} />
-          </div>
+          <Icon name="Package" size={40} className="text-[#333]" />
         )}
       </div>
-
       <div className="p-3 flex flex-col flex-1">
-        <div className="text-[11px] text-gray-400 font-mono mb-1">{p.article}</div>
-
-        <div className="flex items-center gap-1 mb-2">
-          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${inStock ? "bg-green-500" : "bg-gray-300"}`} />
-          <span className={`text-[11px] ${inStock ? "text-green-600" : "text-gray-400"}`}>
-            {inStock ? "В наличии" : p.amount || "Уточняйте"}
+        <div className="font-mono text-[11px] text-[#FFD700]/50 mb-1">{p.article}</div>
+        <div className="flex items-center gap-1.5 mb-2">
+          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${inStock ? "bg-green-500" : "bg-[#444]"}`} />
+          <span className={`text-[11px] ${inStock ? "text-green-400" : "text-white/30"}`}>
+            {inStock ? "В наличии" : "Уточняйте"}
           </span>
         </div>
-
-        <p className="text-sm text-gray-800 leading-snug flex-1 mb-3 line-clamp-3">{p.name}</p>
-
-        <div className="mt-auto">
+        <p className="text-sm text-white/85 leading-snug flex-1 mb-3 line-clamp-3">{p.name}</p>
+        <div className="mt-auto mb-3">
           {myPrice > 0 ? (
             <>
-              {p.base_price > 0 && disc > 0 && (
-                <div className="text-[11px] text-gray-400">
-                  Базовая цена: <span className="line-through">{fmt(p.base_price)}</span>
-                </div>
-              )}
-              <div className="flex items-baseline gap-1 flex-wrap">
-                <span className="text-xs text-gray-500">Ваша цена:</span>
-                <span className="text-base font-bold text-gray-900">{fmt(myPrice)}</span>
+              {d > 0 && <div className="text-[11px] text-white/25 line-through">Базовая: {fmt(p.base_price)}</div>}
+              <div className="flex items-baseline gap-1">
+                <span className="text-[11px] text-white/40">Ваша цена:</span>
+                <span className="text-lg font-bold text-[#FFD700]">{fmt(myPrice)}</span>
               </div>
             </>
           ) : (
-            <span className="text-xs text-gray-400">Цена уточняется</span>
+            <span className="text-xs text-white/25">Цена уточняется</span>
           )}
         </div>
-
-        <button className="mt-3 w-full bg-[#d32f2f] hover:bg-[#b71c1c] text-white text-sm font-medium py-2 rounded transition-colors">
-          В корзину
+        <button onClick={handleAdd}
+          className={`w-full py-2 text-sm font-bold rounded-sm transition-all ${added ? "bg-green-600 text-white" : "bg-[#FFD700] hover:bg-[#FFE033] text-black"}`}>
+          {added ? "✓ Добавлено" : "В корзину"}
         </button>
       </div>
     </div>
   );
 };
 
-const ToolsPage = () => {
+const CartModal = ({ cart, onClose, onRemove, onQty }: {
+  cart: CartItem[]; onClose: () => void;
+  onRemove: (a: string) => void; onQty: (a: string, d: number) => void;
+}) => {
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [err, setErr] = useState("");
+  const total = cart.reduce((s, i) => s + (i.discount_price || i.base_price) * i.qty, 0);
+
+  const handleOrder = async () => {
+    if (!name.trim() || !phone.trim()) { setErr("Заполните имя и телефон"); return; }
+    setSending(true); setErr("");
+    try {
+      const lines = cart.map(i =>
+        `• Арт. ${i.article} — ${i.name} × ${i.qty} шт. = ${fmt((i.discount_price || i.base_price) * i.qty)}`
+      ).join("\n");
+      await fetch(SEND_API, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          phone,
+          category: "Инструменты",
+          desc: `${lines}\n\nИтого: ${fmt(total)}`,
+        }),
+      });
+      setSent(true);
+    } catch { setErr("Ошибка отправки"); } finally { setSending(false); }
+  };
+
+  if (sent) return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+      <div className="bg-[#1A1A1A] border border-[#FFD700]/30 rounded-xl p-8 max-w-sm w-full text-center">
+        <div className="text-5xl mb-4">✅</div>
+        <div className="text-xl font-bold text-[#FFD700] mb-2">Заказ принят!</div>
+        <p className="text-white/50 text-sm mb-6">Мы свяжемся с вами в ближайшее время</p>
+        <button onClick={onClose} className="bg-[#FFD700] text-black font-bold px-8 py-2.5 rounded-sm">Закрыть</button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 p-0 sm:p-4">
+      <div className="bg-[#1A1A1A] border border-[#2A2A2A] rounded-t-2xl sm:rounded-xl w-full sm:max-w-lg max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-4 border-b border-[#2A2A2A]">
+          <span className="font-bold text-white text-lg">Корзина {cart.length > 0 && `(${cart.reduce((s,i)=>s+i.qty,0)})`}</span>
+          <button onClick={onClose} className="text-white/30 hover:text-white"><Icon name="X" size={20} /></button>
+        </div>
+        <div className="overflow-y-auto flex-1 p-4 space-y-3">
+          {cart.length === 0 && <p className="text-white/20 text-center py-10">Корзина пуста</p>}
+          {cart.map(item => (
+            <div key={item.article} className="flex gap-3 items-start bg-[#111] rounded-lg p-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-[#FFD700]/50 font-mono">{item.article}</p>
+                <p className="text-sm text-white/80 leading-snug mt-0.5 line-clamp-2">{item.name}</p>
+                <p className="text-sm font-bold text-[#FFD700] mt-1">{fmt((item.discount_price || item.base_price) * item.qty)}</p>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <button onClick={() => onQty(item.article, -1)} className="w-7 h-7 bg-[#2A2A2A] text-white rounded-sm flex items-center justify-center hover:bg-[#333] text-lg font-bold">−</button>
+                <span className="text-white text-sm w-6 text-center font-bold">{item.qty}</span>
+                <button onClick={() => onQty(item.article, 1)} className="w-7 h-7 bg-[#2A2A2A] text-white rounded-sm flex items-center justify-center hover:bg-[#333] text-lg font-bold">+</button>
+                <button onClick={() => onRemove(item.article)} className="w-7 h-7 text-white/20 hover:text-red-400 flex items-center justify-center ml-1"><Icon name="X" size={14} /></button>
+              </div>
+            </div>
+          ))}
+        </div>
+        {cart.length > 0 && (
+          <div className="p-4 border-t border-[#2A2A2A] space-y-3">
+            <div className="flex justify-between font-bold text-white">
+              <span>Итого:</span>
+              <span className="text-[#FFD700] text-lg">{fmt(total)}</span>
+            </div>
+            <input value={name} onChange={e => setName(e.target.value)} placeholder="Ваше имя"
+              className="w-full bg-[#111] border border-[#333] text-white px-3 py-2.5 rounded-sm text-sm focus:outline-none focus:border-[#FFD700]" />
+            <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+7 (___) ___-__-__"
+              className="w-full bg-[#111] border border-[#333] text-white px-3 py-2.5 rounded-sm text-sm focus:outline-none focus:border-[#FFD700]" />
+            {err && <p className="text-red-400 text-xs">{err}</p>}
+            <button onClick={handleOrder} disabled={sending}
+              className="w-full bg-[#FFD700] hover:bg-[#FFE033] disabled:opacity-50 text-black font-bold py-3 rounded-sm transition-colors text-base">
+              {sending ? "Отправляю..." : "Оформить заказ"}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default function ToolsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [brands, setBrands] = useState<string[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("");
   const [activeBrand, setActiveBrand] = useState("");
@@ -106,36 +186,31 @@ const ToolsPage = () => {
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cartOpen, setCartOpen] = useState(false);
   const searchRef = useRef<ReturnType<typeof setTimeout>>();
   const loaderRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch(`${TOOLS_API}?action=meta`)
-      .then(r => r.json())
+    fetch(`${TOOLS_API}?action=meta`).then(r => r.json())
       .then(d => { setCategories(d.categories || []); setBrands(d.brands || []); });
   }, []);
 
   const load = useCallback(async (q: string, off: number, cat: string, brand: string, stock: boolean, append = false) => {
     setLoading(true);
-    setError(null);
     try {
-      const params = new URLSearchParams({ action: "products", limit: String(PAGE_SIZE), offset: String(off) });
-      if (q) params.set("search", q);
-      if (cat) params.set("category", cat);
-      if (brand) params.set("brand", brand);
-      if (stock) params.set("in_stock", "1");
-      const res = await fetch(`${TOOLS_API}?${params}`);
+      const p = new URLSearchParams({ action: "products", limit: String(PAGE_SIZE), offset: String(off) });
+      if (q) p.set("search", q);
+      if (cat) p.set("category", cat);
+      if (brand) p.set("brand", brand);
+      if (stock) p.set("in_stock", "1");
+      const res = await fetch(`${TOOLS_API}?${p}`);
       const data = await res.json();
-      if (data.error) { setError(data.error); return; }
       const items: Product[] = data.items || [];
       setProducts(prev => append ? [...prev, ...items] : items);
       setTotal(data.total || 0);
       setHasMore(data.has_more);
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }, []);
 
   useEffect(() => { load("", 0, "", "", false); }, []);
@@ -154,138 +229,112 @@ const ToolsPage = () => {
     return () => obs.disconnect();
   }, [hasMore, loading, offset, search, activeCategory, activeBrand, inStockOnly, load]);
 
-  const apply = (q: string, cat: string, brand: string, stock: boolean) => {
-    setOffset(0);
-    load(q, 0, cat, brand, stock);
-  };
-
+  const apply = (q: string, cat: string, brand: string, stock: boolean) => { setOffset(0); load(q, 0, cat, brand, stock); };
   const handleSearch = (val: string) => {
     setSearch(val);
     clearTimeout(searchRef.current);
     searchRef.current = setTimeout(() => apply(val, activeCategory, activeBrand, inStockOnly), 350);
   };
+  const handleCat = (c: string) => { const n = activeCategory === c ? "" : c; setActiveCategory(n); apply(search, n, activeBrand, inStockOnly); setSidebarOpen(false); };
+  const handleBrand = (b: string) => { const n = activeBrand === b ? "" : b; setActiveBrand(n); apply(search, activeCategory, n, inStockOnly); };
+  const handleStock = (v: boolean) => { setInStockOnly(v); apply(search, activeCategory, activeBrand, v); };
+  const clearAll = () => { setSearch(""); setActiveCategory(""); setActiveBrand(""); setInStockOnly(false); setOffset(0); load("", 0, "", "", false); };
 
-  const handleCategory = (c: string) => {
-    const next = activeCategory === c ? "" : c;
-    setActiveCategory(next);
-    apply(search, next, activeBrand, inStockOnly);
-    setSidebarOpen(false);
-  };
+  const addToCart = (p: Product) => setCart(prev => {
+    const ex = prev.find(i => i.article === p.article);
+    return ex ? prev.map(i => i.article === p.article ? { ...i, qty: i.qty + 1 } : i) : [...prev, { ...p, qty: 1 }];
+  });
+  const removeFromCart = (a: string) => setCart(prev => prev.filter(i => i.article !== a));
+  const changeQty = (a: string, d: number) => setCart(prev => prev.map(i => i.article === a ? { ...i, qty: Math.max(1, i.qty + d) } : i));
 
-  const handleBrand = (b: string) => {
-    const next = activeBrand === b ? "" : b;
-    setActiveBrand(next);
-    apply(search, activeCategory, next, inStockOnly);
-  };
-
-  const handleStock = (v: boolean) => {
-    setInStockOnly(v);
-    apply(search, activeCategory, activeBrand, v);
-  };
-
-  const clearAll = () => {
-    setSearch(""); setActiveCategory(""); setActiveBrand(""); setInStockOnly(false); setOffset(0);
-    load("", 0, "", "", false);
-  };
-
-  const activeFiltersCount = [activeCategory, activeBrand, inStockOnly ? "1" : ""].filter(Boolean).length;
+  const cartCount = cart.reduce((s, i) => s + i.qty, 0);
+  const activeFilters = [activeCategory, activeBrand, inStockOnly ? "1" : ""].filter(Boolean).length;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#0D0D0D] text-white">
       {/* Шапка */}
-      <div className="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-sm">
+      <div className="sticky top-0 z-30 bg-[#0D0D0D]/95 backdrop-blur-sm border-b border-[#1E1E1E]">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 h-14 flex items-center gap-3">
-          <a href="/" className="text-gray-400 hover:text-gray-700 transition-colors shrink-0">
+          <a href="/" className="text-white/40 hover:text-[#FFD700] transition-colors shrink-0">
             <Icon name="ArrowLeft" size={20} />
           </a>
-          <span className="font-bold text-gray-800 text-base sm:text-lg shrink-0">
-            <span className="hidden sm:inline">Инструменты и расходники</span>
-            <span className="sm:hidden">Инструменты</span>
-          </span>
-
-          <div className="relative flex-1 max-w-lg">
-            <Icon name="Search" size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            <input
-              value={search}
-              onChange={e => handleSearch(e.target.value)}
-              placeholder="Поиск по названию или артикулу..."
-              className="w-full border border-gray-300 rounded-lg pl-9 pr-8 py-2 text-sm text-gray-800 focus:outline-none focus:border-[#d32f2f] bg-white"
-            />
-            {search && (
-              <button onClick={() => handleSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500">
-                <Icon name="X" size={14} />
-              </button>
-            )}
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="w-1 h-5 bg-[#FFD700]" />
+            <span className="font-oswald font-bold text-base sm:text-lg uppercase tracking-wider">Инструменты</span>
+            {total > 0 && <span className="text-white/25 text-xs hidden md:inline">{total.toLocaleString("ru-RU")} товаров</span>}
           </div>
 
-          <button
-            onClick={() => setSidebarOpen(v => !v)}
-            className={`lg:hidden flex items-center gap-1.5 border rounded-lg px-3 py-2 text-sm transition-colors shrink-0 ${activeFiltersCount ? "border-[#d32f2f] text-[#d32f2f]" : "border-gray-300 text-gray-600"}`}
-          >
-            <Icon name="SlidersHorizontal" size={15} />
-            {activeFiltersCount > 0 && (
-              <span className="w-4 h-4 bg-[#d32f2f] text-white text-[10px] rounded-full flex items-center justify-center font-bold">{activeFiltersCount}</span>
-            )}
+          <div className="relative flex-1 max-w-lg">
+            <Icon name="Search" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
+            <input value={search} onChange={e => handleSearch(e.target.value)}
+              placeholder="Поиск по названию или артикулу..."
+              className="w-full bg-[#111] border border-[#2A2A2A] text-white pl-9 pr-8 py-2 text-sm rounded-sm focus:outline-none focus:border-[#FFD700]/50 transition-colors" />
+            {search && <button onClick={() => handleSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/20 hover:text-white"><Icon name="X" size={13} /></button>}
+          </div>
+
+          <button onClick={() => setSidebarOpen(v => !v)}
+            className={`lg:hidden flex items-center gap-1.5 border rounded-sm px-3 py-2 text-xs shrink-0 transition-colors ${activeFilters ? "border-[#FFD700]/60 text-[#FFD700]" : "border-[#2A2A2A] text-white/40 hover:border-[#444]"}`}>
+            <Icon name="SlidersHorizontal" size={13} />
+            {activeFilters > 0 && <span className="w-4 h-4 bg-[#FFD700] text-black text-[10px] rounded-full flex items-center justify-center font-bold">{activeFilters}</span>}
           </button>
 
-          {total > 0 && (
-            <span className="text-gray-400 text-sm shrink-0 hidden md:block">{total.toLocaleString("ru-RU")} товаров</span>
-          )}
+          <button onClick={() => setCartOpen(true)}
+            className="relative flex items-center gap-2 bg-[#FFD700] hover:bg-[#FFE033] text-black px-3 py-2 rounded-sm shrink-0 transition-colors font-bold text-sm">
+            <Icon name="ShoppingCart" size={16} />
+            {cartCount > 0 && <span className="font-bold">{cartCount}</span>}
+          </button>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto flex">
-        {/* Sidebar */}
-        {sidebarOpen && <div className="fixed inset-0 z-20 bg-black/40 lg:hidden" onClick={() => setSidebarOpen(false)} />}
-        <aside className={`fixed top-0 left-0 h-full z-30 w-72 bg-white shadow-xl overflow-y-auto lg:relative lg:top-auto lg:left-auto lg:h-auto lg:w-56 xl:w-64 lg:shadow-none lg:bg-transparent lg:block transition-transform duration-200 ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
+        {/* Сайдбар */}
+        {sidebarOpen && <div className="fixed inset-0 z-20 bg-black/70 lg:hidden" onClick={() => setSidebarOpen(false)} />}
+        <aside className={`fixed top-0 left-0 h-full z-30 w-64 bg-[#111] border-r border-[#1E1E1E] overflow-y-auto lg:relative lg:top-auto lg:left-auto lg:h-auto lg:w-52 xl:w-60 lg:bg-transparent lg:border-r-0 lg:block transition-transform duration-200 ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
           <div className="p-4 lg:pt-6">
-            <div className="flex items-center justify-between mb-4 lg:hidden">
-              <span className="font-semibold text-gray-800">Фильтры</span>
-              <button onClick={() => setSidebarOpen(false)} className="text-gray-400"><Icon name="X" size={20} /></button>
+            <div className="flex items-center justify-between mb-5 lg:hidden">
+              <span className="font-oswald font-bold uppercase tracking-wider text-white">Фильтры</span>
+              <button onClick={() => setSidebarOpen(false)} className="text-white/30"><Icon name="X" size={18} /></button>
             </div>
 
-            {activeFiltersCount > 0 && (
-              <button onClick={clearAll} className="flex items-center gap-1 text-sm text-[#d32f2f] hover:underline mb-4">
-                <Icon name="X" size={13} />Очистить фильтры
+            {activeFilters > 0 && (
+              <button onClick={clearAll} className="flex items-center gap-1 text-xs text-[#FFD700]/60 hover:text-[#FFD700] mb-4 transition-colors">
+                <Icon name="X" size={11} />Очистить фильтры
               </button>
             )}
 
-            {/* Наличие */}
-            <div className="mb-5 pb-5 border-b border-gray-100">
-              <label className="flex items-center gap-2 cursor-pointer" onClick={() => handleStock(!inStockOnly)}>
-                <div className={`w-10 h-5 rounded-full transition-colors relative shrink-0 ${inStockOnly ? "bg-[#d32f2f]" : "bg-gray-200"}`}>
+            <div className="mb-5 pb-5 border-b border-[#1E1E1E]">
+              <label className="flex items-center gap-3 cursor-pointer" onClick={() => handleStock(!inStockOnly)}>
+                <div className={`w-10 h-5 rounded-full transition-colors relative shrink-0 ${inStockOnly ? "bg-[#FFD700]" : "bg-[#2A2A2A]"}`}>
                   <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${inStockOnly ? "translate-x-5" : "translate-x-0.5"}`} />
                 </div>
-                <span className="text-sm text-gray-700">Товар в наличии</span>
+                <span className="text-sm text-white/60">Товар в наличии</span>
               </label>
             </div>
 
-            {/* Категории */}
-            <div className="mb-5 pb-5 border-b border-gray-100">
-              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Категория</div>
+            <div className="mb-5 pb-5 border-b border-[#1E1E1E]">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-white/25 mb-3">Категория</div>
               <div className="space-y-0.5">
-                <button onClick={() => handleCategory("")} className={`w-full text-left px-2 py-1.5 text-sm rounded transition-colors ${!activeCategory ? "bg-[#d32f2f]/8 text-[#d32f2f] font-medium" : "text-gray-600 hover:bg-gray-100"}`}>
+                <button onClick={() => handleCat("")} className={`w-full text-left px-2 py-1.5 text-sm rounded-sm transition-colors ${!activeCategory ? "text-[#FFD700] font-semibold" : "text-white/45 hover:text-white"}`}>
                   Все категории
                 </button>
                 {categories.map(cat => (
-                  <button key={cat} onClick={() => handleCategory(cat)} className={`w-full text-left px-2 py-1.5 text-sm rounded transition-colors ${activeCategory === cat ? "bg-[#d32f2f]/8 text-[#d32f2f] font-medium" : "text-gray-600 hover:bg-gray-100"}`}>
+                  <button key={cat} onClick={() => handleCat(cat)} className={`w-full text-left px-2 py-1.5 text-sm rounded-sm transition-colors ${activeCategory === cat ? "text-[#FFD700] font-semibold" : "text-white/45 hover:text-white"}`}>
                     {cat}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Бренды */}
             {brands.length > 0 && (
-              <div className="mb-5">
-                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Бренд</div>
-                <div className="space-y-1.5">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-widest text-white/25 mb-3">Бренд</div>
+                <div className="space-y-2">
                   {brands.map(b => (
                     <label key={b} className="flex items-center gap-2 cursor-pointer group" onClick={() => handleBrand(b)}>
-                      <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors shrink-0 ${activeBrand === b ? "bg-[#d32f2f] border-[#d32f2f]" : "border-gray-300 group-hover:border-gray-400"}`}>
-                        {activeBrand === b && <Icon name="Check" size={10} className="text-white" />}
+                      <div className={`w-4 h-4 rounded-sm border-2 flex items-center justify-center shrink-0 transition-colors ${activeBrand === b ? "bg-[#FFD700] border-[#FFD700]" : "border-[#333] group-hover:border-[#555]"}`}>
+                        {activeBrand === b && <Icon name="Check" size={10} className="text-black" />}
                       </div>
-                      <span className="text-sm text-gray-700">{b}</span>
+                      <span className="text-sm text-white/45 group-hover:text-white transition-colors">{b}</span>
                     </label>
                   ))}
                 </div>
@@ -294,55 +343,49 @@ const ToolsPage = () => {
           </div>
         </aside>
 
-        {/* Основной контент */}
+        {/* Контент */}
         <main className="flex-1 min-w-0 p-3 sm:p-6">
           {(activeCategory || search) && (
-            <div className="flex items-center gap-1.5 mb-4 text-sm text-gray-500 flex-wrap">
-              <button onClick={clearAll} className="hover:text-gray-800">Все товары</button>
-              {activeCategory && (
-                <>
-                  <Icon name="ChevronRight" size={14} />
-                  <span className="text-gray-800 font-medium">{activeCategory}</span>
-                  <button onClick={() => handleCategory("")} className="text-gray-300 hover:text-gray-500"><Icon name="X" size={13} /></button>
-                </>
-              )}
-              {search && (
-                <>
-                  <Icon name="ChevronRight" size={14} />
-                  <span className="text-gray-800">«{search}»</span>
-                </>
-              )}
+            <div className="flex items-center gap-1.5 mb-4 text-sm text-white/30 flex-wrap">
+              <button onClick={clearAll} className="hover:text-white transition-colors">Все товары</button>
+              {activeCategory && <>
+                <Icon name="ChevronRight" size={13} />
+                <span className="text-white/60">{activeCategory}</span>
+                <button onClick={() => handleCat("")} className="text-white/20 hover:text-white"><Icon name="X" size={12} /></button>
+              </>}
+              {search && <>
+                <Icon name="ChevronRight" size={13} />
+                <span className="text-white/60">«{search}»</span>
+              </>}
             </div>
           )}
 
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 text-sm rounded-lg mb-4">{error}</div>
-          )}
-
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-            {products.map((p, i) => <ProductCard key={`${p.article}-${i}`} p={p} />)}
+            {products.map((p, i) => <ProductCard key={`${p.article}-${i}`} p={p} onAdd={addToCart} />)}
           </div>
 
           {loading && (
-            <div className="flex justify-center py-10 gap-3 text-gray-400">
-              <Icon name="Loader" size={20} className="animate-spin" />
+            <div className="flex justify-center py-12 gap-2 text-white/30">
+              <Icon name="Loader" size={18} className="animate-spin" />
               <span className="text-sm">Загрузка...</span>
             </div>
           )}
 
           {!loading && products.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-24 text-gray-300">
+            <div className="flex flex-col items-center justify-center py-24 text-white/20">
               <Icon name="PackageSearch" size={48} className="mb-3" />
-              <span className="text-base text-gray-400">Ничего не найдено</span>
-              <button onClick={clearAll} className="mt-3 text-[#d32f2f] text-sm hover:underline">Сбросить фильтры</button>
+              <span className="text-white/30 text-base">Ничего не найдено</span>
+              <button onClick={clearAll} className="mt-3 text-[#FFD700]/50 hover:text-[#FFD700] text-sm transition-colors">Сбросить фильтры</button>
             </div>
           )}
 
           <div ref={loaderRef} className="h-8" />
         </main>
       </div>
+
+      {cartOpen && (
+        <CartModal cart={cart} onClose={() => setCartOpen(false)} onRemove={removeFromCart} onQty={changeQty} />
+      )}
     </div>
   );
-};
-
-export default ToolsPage;
+}
