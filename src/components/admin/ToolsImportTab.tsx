@@ -17,7 +17,9 @@ interface ToolsImportTabProps {
 const ToolsImportTab = ({ token }: ToolsImportTabProps) => {
   const [count, setCount] = useState<number | null>(null);
   const [preview, setPreview] = useState<Preview[]>([]);
+  const [hasCredentials, setHasCredentials] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; imported?: number; error?: string } | null>(null);
   const [delimiter, setDelimiter] = useState(",");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -27,9 +29,29 @@ const ToolsImportTab = ({ token }: ToolsImportTabProps) => {
     const data = await res.json();
     setCount(data.count ?? 0);
     setPreview(data.preview ?? []);
+    setHasCredentials(data.has_credentials ?? false);
   };
 
   useEffect(() => { loadStats(); }, []);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    setResult(null);
+    try {
+      const res = await fetch(IMPORT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Admin-Token": token },
+        body: JSON.stringify({ action: "sync" }),
+      });
+      const data = await res.json();
+      setResult(data.ok ? { ok: true, imported: data.imported } : { ok: false, error: data.error });
+      if (data.ok) loadStats();
+    } catch (err) {
+      setResult({ ok: false, error: String(err) });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -82,6 +104,31 @@ const ToolsImportTab = ({ token }: ToolsImportTabProps) => {
         </div>
       )}
 
+      {/* Автосинхронизация */}
+      <div className="border border-[#FFD700]/20 p-4 mb-4 bg-[#FFD700]/5">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <p className="font-oswald font-bold text-sm uppercase text-[#FFD700]">Синхронизация с instrument.ru</p>
+            <p className="font-roboto text-white/40 text-xs mt-0.5">
+              {hasCredentials ? "Логин и пароль настроены — можно запустить синхронизацию" : "Добавьте INSTRUMENT_LOGIN и INSTRUMENT_PASSWORD в секреты"}
+            </p>
+          </div>
+          <button
+            onClick={handleSync}
+            disabled={syncing || !hasCredentials}
+            className="flex items-center gap-2 bg-[#FFD700] text-black font-oswald font-bold uppercase text-sm px-5 py-2.5 hover:bg-yellow-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+            <Icon name={syncing ? "Loader" : "RefreshCw"} size={14} className={syncing ? "animate-spin" : ""} />
+            {syncing ? "Синхронизирую..." : "Синхронизировать"}
+          </button>
+        </div>
+        {result && (
+          <div className={`mt-3 flex items-center gap-2 font-roboto text-sm p-2.5 border ${result.ok ? "border-green-500/30 text-green-400" : "border-red-500/30 text-red-400"}`}>
+            <Icon name={result.ok ? "CheckCircle" : "AlertCircle"} size={15} />
+            {result.ok ? `Загружено ${result.imported?.toLocaleString("ru-RU")} товаров из instrument.ru` : result.error}
+          </div>
+        )}
+      </div>
+
       {/* Форма загрузки */}
       <div className="border border-[#333] p-5 mb-6">
         <div className="flex items-center gap-4 mb-4 flex-wrap">
@@ -107,12 +154,6 @@ const ToolsImportTab = ({ token }: ToolsImportTabProps) => {
           <input ref={fileRef} type="file" accept=".csv,.txt" onChange={handleFile} disabled={uploading} className="hidden" />
         </label>
 
-        {result && (
-          <div className={`mt-4 flex items-center gap-2 font-roboto text-sm p-3 border ${result.ok ? "border-green-500/30 text-green-400 bg-green-500/5" : "border-red-500/30 text-red-400 bg-red-500/5"}`}>
-            <Icon name={result.ok ? "CheckCircle" : "AlertCircle"} size={16} />
-            {result.ok ? `Загружено ${result.imported?.toLocaleString("ru-RU")} записей` : result.error}
-          </div>
-        )}
       </div>
 
       {/* Инструкция по формату */}
