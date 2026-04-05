@@ -8,6 +8,21 @@ export interface CartItem extends Product { qty: number; }
 
 export interface CatMeta { name: string; count: number; }
 
+export interface PriceRange {
+  label: string; min: number; max: number | null; count: number;
+}
+
+export interface Meta {
+  categories: CatMeta[];
+  subcategories: Record<string, CatMeta[]>;
+  brands: CatMeta[];
+  amounts: CatMeta[];
+  price_ranges: PriceRange[];
+  price_min: number;
+  price_max: number;
+  with_image_count: number;
+}
+
 export const fmt = (n: number) =>
   n > 0 ? n.toLocaleString("ru-RU", { maximumFractionDigits: 0 }) + " ₽" : "—";
 

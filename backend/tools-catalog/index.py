@@ -25,7 +25,7 @@ def get_conn():
 
 
 def handler(event: dict, context) -> dict:
-    """Каталог инструментов: список товаров с ценами, фильтрами, подкатегориями и сортировкой."""
+    """Каталог инструментов: товары с расширенными фильтрами."""
     if event.get("httpMethod") == "OPTIONS":
         return {"statusCode": 200, "headers": CORS_HEADERS, "body": ""}
 
@@ -38,6 +38,10 @@ def handler(event: dict, context) -> dict:
     subcategory_filter = params.get("subcategory", "").strip()
     brand_filter = params.get("brand", "").strip()
     in_stock_only = params.get("in_stock", "") == "1"
+    amount_filter = params.get("amount", "").strip()
+    price_min = params.get("price_min", "").strip()
+    price_max = params.get("price_max", "").strip()
+    has_image = params.get("has_image", "").strip()
     sort = params.get("sort", "popular")
     order_by = SORT_MAP.get(sort, SORT_MAP["popular"])
 
@@ -45,7 +49,6 @@ def handler(event: dict, context) -> dict:
     cur = conn.cursor()
 
     if action == "meta":
-        # Топ-категории с кол-вом товаров
         cur.execute(
             f"""SELECT split_part(category, '/', 1) as top_cat, COUNT(*) as cnt
                 FROM {SCHEMA}.tools_products
@@ -54,7 +57,6 @@ def handler(event: dict, context) -> dict:
         )
         top_cats = [{"name": r[0], "count": r[1]} for r in cur.fetchall()]
 
-        # Подкатегории (2-й уровень)
         cur.execute(
             f"""SELECT split_part(category, '/', 1) as top, split_part(category, '/', 2) as sub, COUNT(*) as cnt
                 FROM {SCHEMA}.tools_products
@@ -66,13 +68,46 @@ def handler(event: dict, context) -> dict:
             if sub:
                 subcats.setdefault(top, []).append({"name": sub, "count": cnt})
 
-        # Бренды с кол-вом
         cur.execute(
             f"""SELECT brand, COUNT(*) as cnt FROM {SCHEMA}.tools_products
                 WHERE brand IS NOT NULL AND brand != ''
                 GROUP BY brand ORDER BY cnt DESC LIMIT 100"""
         )
         brands = [{"name": r[0], "count": r[1]} for r in cur.fetchall()]
+
+        cur.execute(
+            f"""SELECT amount, COUNT(*) as cnt FROM {SCHEMA}.tools_products
+                WHERE amount IS NOT NULL AND amount != ''
+                GROUP BY amount ORDER BY cnt DESC"""
+        )
+        amounts = [{"name": r[0], "count": r[1]} for r in cur.fetchall()]
+
+        cur.execute(
+            f"""SELECT
+                COUNT(CASE WHEN my_price > 0 AND my_price < 500 THEN 1 END),
+                COUNT(CASE WHEN my_price >= 500 AND my_price < 1000 THEN 1 END),
+                COUNT(CASE WHEN my_price >= 1000 AND my_price < 3000 THEN 1 END),
+                COUNT(CASE WHEN my_price >= 3000 AND my_price < 10000 THEN 1 END),
+                COUNT(CASE WHEN my_price >= 10000 AND my_price < 50000 THEN 1 END),
+                COUNT(CASE WHEN my_price >= 50000 THEN 1 END),
+                MIN(CASE WHEN my_price > 0 THEN my_price END),
+                MAX(my_price)
+            FROM {SCHEMA}.tools_products"""
+        )
+        pr = cur.fetchone()
+        price_ranges = [
+            {"label": "до 500 ₽",          "min": 0,     "max": 499,   "count": pr[0]},
+            {"label": "500 — 1 000 ₽",     "min": 500,   "max": 999,   "count": pr[1]},
+            {"label": "1 000 — 3 000 ₽",   "min": 1000,  "max": 2999,  "count": pr[2]},
+            {"label": "3 000 — 10 000 ₽",  "min": 3000,  "max": 9999,  "count": pr[3]},
+            {"label": "10 000 — 50 000 ₽", "min": 10000, "max": 49999, "count": pr[4]},
+            {"label": "от 50 000 ₽",       "min": 50000, "max": None,  "count": pr[5]},
+        ]
+
+        cur.execute(
+            f"SELECT COUNT(*) FROM {SCHEMA}.tools_products WHERE image_url IS NOT NULL AND image_url != ''"
+        )
+        with_image_cnt = cur.fetchone()[0]
 
         cur.close()
         conn.close()
@@ -83,6 +118,11 @@ def handler(event: dict, context) -> dict:
                 "categories": top_cats,
                 "subcategories": subcats,
                 "brands": brands,
+                "amounts": amounts,
+                "price_ranges": price_ranges,
+                "price_min": float(pr[6] or 0),
+                "price_max": float(pr[7] or 0),
+                "with_image_count": with_image_cnt,
             }, ensure_ascii=False),
         }
 
@@ -101,8 +141,19 @@ def handler(event: dict, context) -> dict:
     if brand_filter:
         conditions.append("brand ILIKE %s")
         args.append(f"%{brand_filter}%")
-    if in_stock_only:
+    if amount_filter:
+        conditions.append("amount = %s")
+        args.append(amount_filter)
+    elif in_stock_only:
         conditions.append("amount = 'В наличии'")
+    if price_min:
+        conditions.append("my_price >= %s")
+        args.append(float(price_min))
+    if price_max:
+        conditions.append("my_price <= %s AND my_price > 0")
+        args.append(float(price_max))
+    if has_image == "1":
+        conditions.append("image_url IS NOT NULL AND image_url != ''")
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
 
