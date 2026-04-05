@@ -63,7 +63,7 @@ def handler(event: dict, context) -> dict:
 
         cur.execute(
             f"""SELECT id, category, brand, model, color, storage, ram, region,
-                       availability, price, has_photo, photo_url
+                       availability, price, has_photo, photo_url, description, specs
                 FROM {SCHEMA}.catalog
                 WHERE {where_sql}
                 ORDER BY availability DESC, price ASC NULLS LAST
@@ -82,7 +82,8 @@ def handler(event: dict, context) -> dict:
         items = [{
             'id': r[0], 'category': r[1], 'brand': r[2], 'model': r[3],
             'color': r[4], 'storage': r[5], 'ram': r[6], 'region': r[7],
-            'availability': r[8], 'price': r[9], 'has_photo': r[10], 'photo_url': r[11]
+            'availability': r[8], 'price': r[9], 'has_photo': r[10], 'photo_url': r[11],
+            'description': r[12], 'specs': r[13]
         } for r in rows]
 
         return ok({'items': items, 'total': total, 'categories': categories})

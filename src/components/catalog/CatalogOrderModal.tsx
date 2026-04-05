@@ -65,6 +65,26 @@ const CatalogOrderModal = ({ item, onClose }: Props) => {
             )}
           </div>
 
+          {/* Описание */}
+          {item.description && (
+            <p className="text-sm text-[#1d1d1f]/60 mb-4 leading-relaxed">{item.description}</p>
+          )}
+
+          {/* Характеристики */}
+          {item.specs && Object.keys(item.specs).length > 0 && (
+            <div className="bg-[#f5f5f7] rounded-2xl p-4 mb-5">
+              <div className="text-xs font-semibold text-[#1d1d1f]/40 uppercase tracking-wide mb-3">Характеристики</div>
+              <div className="space-y-2">
+                {Object.entries(item.specs).map(([key, val]) => (
+                  <div key={key} className="flex items-start justify-between gap-3">
+                    <span className="text-xs text-[#1d1d1f]/40 shrink-0">{key}</span>
+                    <span className="text-xs font-medium text-[#1d1d1f] text-right">{val}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {sent ? (
             <div className="text-center py-4">
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">

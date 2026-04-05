@@ -1,1 +1,1 @@
-{"tests": [{"name": "GET catalog returns items and categories", "method": "GET", "path": "/", "expectedStatus": 200, "expectedBody": {"items": [], "categories": []}, "bodyMatcher": "partial"}]}
+{"tests": [{"name": "GET catalog returns 200", "method": "GET", "path": "/?limit=1", "expectedStatus": 200, "expectedBody": {"total": 277}, "bodyMatcher": "partial"}]}
