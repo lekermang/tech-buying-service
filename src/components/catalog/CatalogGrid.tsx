@@ -1,6 +1,5 @@
 import Icon from "@/components/ui/icon";
 import CatalogProductCard from "@/components/catalog/CatalogProductCard";
-import CatalogBanners from "@/components/catalog/CatalogBanners";
 import { CatalogItem, REGION_FLAG, MODEL_PHOTOS, CATEGORY_PHOTOS, PRICE_MARKUP } from "@/pages/catalog.types";
 
 // Мобильная карточка-строка
@@ -60,7 +59,6 @@ export default function CatalogGrid({
   activeBrand, activeCategory, activeStorage, activeColor,
   activeFiltersCount, onBuy, onBrandChange, onStorageReset, onColorReset, onResetFilters, onCategory,
 }: CatalogGridProps) {
-  const showBanners = !search && !activeBrand && !activeStorage && !activeColor && filteredItems.length > 0;
 
   return (
     <main className="flex-1 min-w-0 px-3 sm:px-4 lg:px-6 py-4 sm:py-5">
@@ -113,13 +111,6 @@ export default function CatalogGrid({
               <button onClick={onColorReset}><Icon name="X" size={10} /></button>
             </span>
           )}
-        </div>
-      )}
-
-      {/* Баннеры категорий — только мобилка, сверху сетки */}
-      {showBanners && (
-        <div className="sm:hidden -mx-3 mb-4">
-          <CatalogBanners onCategory={onCategory} activeCategory={activeCategory} />
         </div>
       )}
 

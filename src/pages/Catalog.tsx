@@ -120,6 +120,9 @@ const Catalog = () => {
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-white">
 
+      {/* Баннеры категорий — над навигацией */}
+      <CatalogBanners onCategory={handleCategory} activeCategory={activeCategory} />
+
       <CatalogNav
         search={search}
         filterAvail={filterAvail}
@@ -143,13 +146,6 @@ const Catalog = () => {
       />
 
       <div className="max-w-[1400px] mx-auto flex">
-
-        {/* Баннеры категорий в левой колонке на десктопе */}
-        <div className="hidden lg:block w-[280px] shrink-0 py-4 pl-4 pr-2">
-          <div className="sticky top-[57px] overflow-y-auto max-h-[calc(100vh-57px)]">
-            <CatalogBanners onCategory={handleCategory} activeCategory={activeCategory} />
-          </div>
-        </div>
 
         <CatalogSidebar
           categories={categories}
