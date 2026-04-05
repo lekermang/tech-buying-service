@@ -1,0 +1,12 @@
+{
+  "tests": [
+    {
+      "name": "Get catalog",
+      "method": "GET",
+      "path": "/?action=meta",
+      "expectedStatus": 200,
+      "bodyMatcher": "partial",
+      "expectedBody": {"brands": ["string"]}
+    }
+  ]
+}

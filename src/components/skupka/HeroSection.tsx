@@ -137,7 +137,7 @@ const HeroSection = ({ scrollTo }: HeroSectionProps) => {
             </a>
             <UsedGoodsSearch />
             <RepairWidget />
-            <a href="https://instrument.ru" target="_blank" rel="noopener noreferrer"
+            <a href="/tools"
               className="flex items-center justify-between bg-black/30 border border-white/10 hover:border-[#FFD700]/40 px-3 py-3 transition-colors group w-full">
               <div className="flex items-center gap-2">
                 <div className="w-5 h-5 bg-[#FFD700]/20 border border-[#FFD700]/40 flex items-center justify-center shrink-0">
@@ -145,7 +145,7 @@ const HeroSection = ({ scrollTo }: HeroSectionProps) => {
                 </div>
                 <span className="font-oswald font-bold text-xs uppercase text-white tracking-wide">Каталог инструментов и расходных материалов</span>
               </div>
-              <Icon name="ExternalLink" size={13} className="text-white/40 group-hover:text-[#FFD700] transition-colors shrink-0" />
+              <Icon name="ChevronRight" size={13} className="text-white/40 group-hover:text-[#FFD700] transition-colors shrink-0" />
             </a>
             <AppleWidget compact />
           </div>

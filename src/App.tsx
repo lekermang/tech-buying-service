@@ -11,6 +11,7 @@ const Admin = lazy(() => import("./pages/Admin"));
 const Cabinet = lazy(() => import("./pages/Cabinet"));
 const Staff = lazy(() => import("./pages/Staff"));
 const Catalog = lazy(() => import("./pages/Catalog"));
+const Tools = lazy(() => import("./pages/Tools"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -36,6 +37,7 @@ const App = () => (
             <Route path="/admin" element={<Admin />} />
             <Route path="/cabinet" element={<Cabinet />} />
             <Route path="/catalog" element={<Catalog />} />
+            <Route path="/tools" element={<Tools />} />
             <Route path="/staff" element={<Staff />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
