@@ -44,7 +44,7 @@ const CATEGORIES = [
   "Лобзики аккумуляторные", "Шлифовальные машины аккумуляторные",
   "Пилы сабельные аккумуляторные", "Пилы циркулярные аккумуляторные",
   "Насосы фонтанные", "Пылесосы строительные", "Перфораторы аккумуляторные",
-  "Распылители на штанге", "Дождеватели", "Наборы", "Тележки", "Хоппер ковши",
+  "Распылители на штанге", "Дождеватели", "Тележки", "Хоппер ковши",
   "Снегоуборочные машины аккумуляторные", "Горелки сварочные", "Сопла газовые",
   "Наконечники токосъемные", "Подающие ролики", "Цангодержатели",
 ];
@@ -52,24 +52,15 @@ const CATEGORIES = [
 const CATEGORY_NO_YML = new Set(["Машинки для укладки плитки", "Стартеры для бензопил"]);
 const CATEGORY_NO_CSV = new Set(["Стартеры для бензопил"]);
 
-interface FormatBadgeProps {
-  label: string;
-  color: string;
-  href?: string;
-}
-
-const FormatBadge = ({ label, color, href }: FormatBadgeProps) => {
-  if (!href) return null;
-  return (
-    <a
-      href={href}
-      className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-roboto font-bold uppercase tracking-wide border transition-colors hover:opacity-80 ${color}`}
-    >
-      <Icon name="Download" size={11} />
-      {label}
-    </a>
-  );
-};
+const FormatBadge = ({ label, color }: { label: string; color: string }) => (
+  <a
+    href="#"
+    className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-roboto font-bold uppercase tracking-wide border transition-colors hover:opacity-80 ${color}`}
+  >
+    <Icon name="Download" size={11} />
+    {label}
+  </a>
+);
 
 interface RowProps {
   name: string;
@@ -83,122 +74,98 @@ const Row = ({ name, hasYml = true, hasCsv = true, hasExcel = true }: RowProps) 
     <td className="py-3 px-4 font-roboto text-white/90 text-sm">{name}</td>
     <td className="py-3 px-4">
       <div className="flex flex-wrap gap-1.5">
-        {hasYml && (
-          <FormatBadge
-            label="YML"
-            color="border-[#FFD700]/40 text-[#FFD700] hover:border-[#FFD700]"
-            href="#"
-          />
-        )}
-        {hasCsv && (
-          <FormatBadge
-            label="CSV"
-            color="border-blue-400/40 text-blue-300 hover:border-blue-400"
-            href="#"
-          />
-        )}
-        {hasExcel && (
-          <FormatBadge
-            label="Excel"
-            color="border-green-400/40 text-green-300 hover:border-green-400"
-            href="#"
-          />
-        )}
+        {hasYml && <FormatBadge label="YML" color="border-[#FFD700]/40 text-[#FFD700] hover:border-[#FFD700]" />}
+        {hasCsv && <FormatBadge label="CSV" color="border-blue-400/40 text-blue-300 hover:border-blue-400" />}
+        {hasExcel && <FormatBadge label="Excel" color="border-green-400/40 text-green-300 hover:border-green-400" />}
       </div>
     </td>
   </tr>
 );
 
-const ApiCatalog = () => {
-  return (
-    <div className="min-h-screen bg-[#0D0D0D] text-white">
-      {/* Header */}
-      <div className="bg-[#0D0D0D]/95 border-b border-[#FFD700]/20 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-4">
-          <a href="/" className="text-white/50 hover:text-[#FFD700] transition-colors">
-            <Icon name="ArrowLeft" size={20} />
-          </a>
-          <span className="font-oswald font-bold text-base uppercase tracking-wider text-[#FFD700]">
-            Каталог: инструменты и расходные материалы
-          </span>
+export const ApiCatalogContent = () => (
+  <div className="p-6 text-white">
+    <div className="mb-8">
+      <p className="font-roboto text-white/50 text-xs uppercase tracking-widest mb-1">API выгрузка</p>
+      <h2 className="font-oswald text-2xl font-bold uppercase">Каталог: инструменты и расходные материалы</h2>
+      <p className="font-roboto text-white/40 text-sm mt-1">
+        Скачивайте актуальные прайс-листы в удобном формате: YML для маркетплейсов, CSV и Excel для обработки.
+      </p>
+    </div>
+
+    <section className="mb-10">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-1 h-6 bg-[#FFD700]" />
+        <h3 className="font-oswald text-lg font-bold uppercase">Выгрузки по брендам</h3>
+      </div>
+      <div className="border border-[#FFD700]/20 overflow-hidden">
+        <table className="w-full">
+          <thead>
+            <tr className="bg-[#FFD700]/10 border-b border-[#FFD700]/20">
+              <th className="text-left py-2.5 px-4 font-oswald font-bold text-xs uppercase tracking-wide text-[#FFD700]">Бренд</th>
+              <th className="text-left py-2.5 px-4 font-oswald font-bold text-xs uppercase tracking-wide text-[#FFD700]">Скачать выгрузку</th>
+            </tr>
+          </thead>
+          <tbody>
+            {BRANDS.map((brand) => (
+              <Row key={brand} name={brand} />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-1 h-6 bg-[#FFD700]" />
+          <h3 className="font-oswald text-lg font-bold uppercase">Типовые профили по категориям</h3>
+        </div>
+        <div className="flex items-center gap-2 text-white/30 font-roboto text-xs border border-white/10 px-3 py-1.5">
+          <Icon name="Clock" size={12} />
+          Обновлено: {LAST_UPDATED}
         </div>
       </div>
+      <div className="border border-[#FFD700]/20 overflow-hidden">
+        <table className="w-full">
+          <thead>
+            <tr className="bg-[#FFD700]/10 border-b border-[#FFD700]/20">
+              <th className="text-left py-2.5 px-4 font-oswald font-bold text-xs uppercase tracking-wide text-[#FFD700]">Наименование</th>
+              <th className="text-left py-2.5 px-4 font-oswald font-bold text-xs uppercase tracking-wide text-[#FFD700]">Скачать выгрузку</th>
+            </tr>
+          </thead>
+          <tbody>
+            {CATEGORIES.map((cat) => (
+              <Row
+                key={cat}
+                name={cat}
+                hasYml={!CATEGORY_NO_YML.has(cat)}
+                hasCsv={!CATEGORY_NO_CSV.has(cat)}
+                hasExcel
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+);
 
-      <div className="max-w-7xl mx-auto px-4 py-10">
-
-        {/* Intro */}
-        <div className="mb-10">
-          <p className="font-roboto text-white/50 text-sm uppercase tracking-widest mb-2">API выгрузка</p>
-          <h1 className="font-oswald text-3xl md:text-5xl font-bold mb-4">
-            КАТАЛОГ: ИНСТРУМЕНТЫ<br className="hidden md:block" /> И РАСХОДНЫЕ МАТЕРИАЛЫ
-          </h1>
-          <p className="font-roboto text-white/50 text-sm">
-            Скачивайте актуальные прайс-листы в удобном формате: YML для маркетплейсов, CSV и Excel для обработки.
-          </p>
-        </div>
-
-        {/* Бренды */}
-        <section className="mb-14">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-1 h-7 bg-[#FFD700]" />
-            <h2 className="font-oswald text-2xl font-bold uppercase">Выгрузки по брендам</h2>
-          </div>
-
-          <div className="border border-[#FFD700]/20 overflow-hidden">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-[#FFD700]/10 border-b border-[#FFD700]/20">
-                  <th className="text-left py-3 px-4 font-oswald font-bold text-sm uppercase tracking-wide text-[#FFD700]">Бренд</th>
-                  <th className="text-left py-3 px-4 font-oswald font-bold text-sm uppercase tracking-wide text-[#FFD700]">Скачать выгрузку</th>
-                </tr>
-              </thead>
-              <tbody>
-                {BRANDS.map((brand) => (
-                  <Row key={brand} name={brand} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        {/* Категории */}
-        <section>
-          <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-1 h-7 bg-[#FFD700]" />
-              <h2 className="font-oswald text-2xl font-bold uppercase">Типовые профили по категориям</h2>
-            </div>
-            <div className="flex items-center gap-2 text-white/40 font-roboto text-xs border border-white/10 px-3 py-2">
-              <Icon name="Clock" size={13} />
-              Время обновления: {LAST_UPDATED}
-            </div>
-          </div>
-
-          <div className="border border-[#FFD700]/20 overflow-hidden">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-[#FFD700]/10 border-b border-[#FFD700]/20">
-                  <th className="text-left py-3 px-4 font-oswald font-bold text-sm uppercase tracking-wide text-[#FFD700]">Наименование</th>
-                  <th className="text-left py-3 px-4 font-oswald font-bold text-sm uppercase tracking-wide text-[#FFD700]">Скачать выгрузку</th>
-                </tr>
-              </thead>
-              <tbody>
-                {CATEGORIES.map((cat) => (
-                  <Row
-                    key={cat}
-                    name={cat}
-                    hasYml={!CATEGORY_NO_YML.has(cat)}
-                    hasCsv={!CATEGORY_NO_CSV.has(cat)}
-                    hasExcel
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+const ApiCatalog = () => (
+  <div className="min-h-screen bg-[#0D0D0D] text-white">
+    <div className="bg-[#0D0D0D]/95 border-b border-[#FFD700]/20 sticky top-0 z-10">
+      <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-4">
+        <a href="/" className="text-white/50 hover:text-[#FFD700] transition-colors">
+          <Icon name="ArrowLeft" size={20} />
+        </a>
+        <span className="font-oswald font-bold text-base uppercase tracking-wider text-[#FFD700]">
+          Каталог: инструменты и расходные материалы
+        </span>
       </div>
     </div>
-  );
-};
+    <div className="max-w-7xl mx-auto">
+      <ApiCatalogContent />
+    </div>
+  </div>
+);
 
 export default ApiCatalog;
