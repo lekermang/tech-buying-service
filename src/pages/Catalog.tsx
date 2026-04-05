@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import Icon from "@/components/ui/icon";
 import CatalogProductCard from "@/components/catalog/CatalogProductCard";
 import CatalogOrderModal from "@/components/catalog/CatalogOrderModal";
-import { CatalogItem, CATALOG_URL } from "@/pages/catalog.types";
+import { CatalogItem, CATALOG_URL, REGION_FLAG, MODEL_PHOTOS, CATEGORY_PHOTOS, PRICE_MARKUP } from "@/pages/catalog.types";
 
 const CATEGORY_ICONS: Record<string, string> = {
   "Смартфоны": "Smartphone",
@@ -58,6 +58,54 @@ function sortCategories(cats: string[]) {
     ...cats.filter(c => !CAT_PRIORITY.includes(c)),
   ];
 }
+
+const CatalogProductCardRow = ({ item, onBuy }: { item: CatalogItem; onBuy: (item: CatalogItem) => void }) => {
+  const flag = item.region ? (REGION_FLAG[item.region] || "") : "";
+  const inStock = item.availability === "in_stock";
+  const title = [item.brand, item.model].filter(Boolean).join(" ");
+  const sub = [item.storage, item.color].filter(Boolean).join(" · ");
+  const photo = item.photo_url || MODEL_PHOTOS[item.model] || CATEGORY_PHOTOS[item.category] || null;
+
+  return (
+    <div
+      className="bg-[#111] rounded-xl overflow-hidden flex items-center gap-3 px-3 py-2.5 active:bg-[#161616] transition-all cursor-pointer"
+      onClick={() => onBuy(item)}
+    >
+      {/* Фото */}
+      <div className="w-14 h-14 shrink-0 bg-[#1A1A1A] rounded-lg flex items-center justify-center overflow-hidden">
+        {photo
+          ? <img src={photo} alt={title} className="w-11 h-11 object-contain" />
+          : <Icon name="Package" size={24} className="text-white/10" />
+        }
+      </div>
+
+      {/* Инфо */}
+      <div className="flex-1 min-w-0">
+        <div className="font-medium text-white text-sm leading-snug truncate">{title}</div>
+        {sub && <div className="text-white/35 text-xs mt-0.5 truncate">{sub}</div>}
+        <div className="flex items-center gap-2 mt-1">
+          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${inStock ? "bg-green-900/60 text-green-400" : "bg-white/8 text-white/35"}`}>
+            {inStock ? "Есть" : "Заказ"}
+          </span>
+          {flag && <span className="text-xs">{flag}</span>}
+        </div>
+      </div>
+
+      {/* Цена + кнопка */}
+      <div className="shrink-0 flex flex-col items-end gap-2">
+        <div className="font-bold text-[#FFD700] text-sm">
+          {item.price ? `${(item.price + PRICE_MARKUP).toLocaleString("ru-RU")} ₽` : "По запросу"}
+        </div>
+        <button
+          onClick={e => { e.stopPropagation(); onBuy(item); }}
+          className="bg-[#FFD700] text-black text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors active:bg-yellow-400"
+        >
+          Купить
+        </button>
+      </div>
+    </div>
+  );
+};
 
 const Catalog = () => {
   const [items, setItems] = useState<CatalogItem[]>([]);
@@ -341,11 +389,20 @@ const Catalog = () => {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-              {filteredItems.map(item => (
-                <CatalogProductCard key={item.id} item={item} onBuy={setOrderItem} />
-              ))}
-            </div>
+            <>
+              {/* Мобилка — горизонтальные строки */}
+              <div className="flex flex-col gap-2 sm:hidden">
+                {filteredItems.map(item => (
+                  <CatalogProductCardRow key={item.id} item={item} onBuy={setOrderItem} />
+                ))}
+              </div>
+              {/* Планшет и десктоп — сетка */}
+              <div className="hidden sm:grid sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                {filteredItems.map(item => (
+                  <CatalogProductCard key={item.id} item={item} onBuy={setOrderItem} />
+                ))}
+              </div>
+            </>
           )}
         </main>
       </div>
