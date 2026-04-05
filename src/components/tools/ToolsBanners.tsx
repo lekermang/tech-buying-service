@@ -80,61 +80,44 @@ export default function ToolsBanners({ activeCategory, activeBrand, onCategory, 
         </div>
       </div>
 
-      {/* Два hero-баннера категорий */}
-      <div className="px-3 sm:px-4 grid grid-cols-2 gap-2 mb-2">
-        {heroes.map(c => {
-          const isActive = activeCategory === c.cat;
-          return (
-            <button key={c.cat} onClick={() => onCategory(c.cat)}
-              className="relative rounded-xl overflow-hidden text-left group"
-              style={{ height: 130, boxShadow: isActive ? `0 0 0 2px ${c.accent}` : undefined }}>
-              <img src={c.photo} alt={c.title} loading="lazy"
-                className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
-              <div className="absolute inset-0 p-3 flex flex-col justify-end">
-                {c.badge && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full w-fit mb-1"
-                    style={{ background: `${c.accent}40`, color: c.accent }}>{c.badge}</span>
-                )}
-                <div className="font-bold text-white text-sm sm:text-base leading-tight">{c.title}</div>
-                <div className="text-white/50 text-[10px] sm:text-[11px] mt-0.5">{c.subtitle}</div>
-              </div>
-              {isActive && (
-                <div className="absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center"
-                  style={{ background: c.accent }}>
-                  <Icon name="Check" size={10} className="text-white" />
-                </div>
-              )}
-            </button>
-          );
-        })}
-      </div>
+      {/* ── Категории: сетка по центру ── */}
+      {/* мобилка: 5 колонок | планшет md: 4 | десктоп lg: 6 (2 ряда из 6) */}
+      <div className="px-3 sm:px-4 lg:px-6 mb-3">
+        <div className="grid grid-cols-5 md:grid-cols-4 lg:grid-cols-6 gap-2 lg:gap-2.5">
 
-      {/* Горизонтальный скролл категорий */}
-      <div className="overflow-x-auto scrollbar-hide pb-2">
-        <div className="flex gap-2 px-3 sm:px-4" style={{ width: "max-content" }}>
-          <button onClick={() => onCategory("")}
-            className="relative rounded-xl shrink-0 flex flex-col items-center justify-center gap-1 transition-all"
-            style={{ width: 80, height: 72, background: !activeCategory && !activeBrand ? "#f97316" : "#1f2937", boxShadow: !activeCategory && !activeBrand ? "0 0 0 2px #f97316" : undefined }}>
-            <Icon name="LayoutGrid" size={18} className={!activeCategory && !activeBrand ? "text-white" : "text-gray-400"} />
-            <span className={`text-[11px] font-bold ${!activeCategory && !activeBrand ? "text-white" : "text-gray-400"}`}>Все</span>
+          {/* Кнопка «Все» */}
+          <button
+            onClick={() => onCategory("")}
+            className="relative rounded-xl flex flex-col items-center justify-center gap-1 transition-all aspect-[4/3]"
+            style={{
+              background: !activeCategory && !activeBrand ? "#f97316" : "#1f2937",
+              boxShadow: !activeCategory && !activeBrand ? "0 0 0 2px #f97316" : undefined,
+            }}
+          >
+            <Icon name="LayoutGrid" size={16} className={!activeCategory && !activeBrand ? "text-white" : "text-gray-500"} />
+            <span className={`text-[10px] font-bold leading-none ${!activeCategory && !activeBrand ? "text-white" : "text-gray-500"}`}>Все</span>
           </button>
-          {rest.map(c => {
+
+          {/* Все категории включая героев */}
+          {CATS.map(c => {
             const isActive = activeCategory === c.cat;
             return (
-              <button key={c.cat} onClick={() => onCategory(c.cat)}
-                className="relative rounded-xl overflow-hidden shrink-0 text-left group transition-all"
-                style={{ width: 100, height: 72, boxShadow: isActive ? `0 0 0 2px ${c.accent}` : undefined }}>
+              <button
+                key={c.cat}
+                onClick={() => onCategory(c.cat)}
+                className="relative rounded-xl overflow-hidden text-left group transition-all aspect-[4/3]"
+                style={{ boxShadow: isActive ? `0 0 0 2px ${c.accent}` : undefined }}
+              >
                 <img src={c.photo} alt={c.title} loading="lazy"
                   className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent" />
-                <div className="absolute inset-0 p-1.5 flex flex-col justify-end">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
+                <div className="absolute inset-x-0 bottom-0 p-1.5 sm:p-2">
                   {c.badge && (
-                    <span className="text-[8px] font-bold px-1 py-0.5 rounded-full w-fit mb-0.5"
-                      style={{ background: `${c.accent}40`, color: c.accent }}>{c.badge}</span>
+                    <div className="text-[7px] sm:text-[8px] font-bold px-1 py-0.5 rounded-full w-fit mb-0.5 hidden sm:block"
+                      style={{ background: `${c.accent}40`, color: c.accent }}>{c.badge}</div>
                   )}
-                  <div className="text-white font-bold text-[10px] leading-tight">{c.title}</div>
-                  <div className="text-white/40 text-[9px] leading-tight mt-0.5 line-clamp-1">{c.subtitle}</div>
+                  <div className="text-white font-bold text-[9px] sm:text-[11px] leading-tight line-clamp-1">{c.title}</div>
+                  <div className="text-white/40 text-[8px] leading-tight mt-0.5 line-clamp-1 hidden sm:block">{c.subtitle}</div>
                 </div>
                 {isActive && (
                   <div className="absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center"
@@ -148,40 +131,39 @@ export default function ToolsBanners({ activeCategory, activeBrand, onCategory, 
         </div>
       </div>
 
-      {/* ── Бренды ── */}
-      <div className="px-3 sm:px-4 pt-1 pb-1">
+      {/* ── Бренды: сетка по центру ── */}
+      {/* мобилка: 5 колонок | планшет: 4 | десктоп: 6 */}
+      <div className="px-3 sm:px-4 lg:px-6 pb-4">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[11px] font-bold uppercase tracking-widest text-gray-600">Бренды</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-gray-600">Бренды</span>
           {activeBrand && (
-            <button onClick={() => onBrand("")} className="text-[11px] text-orange-400 hover:text-orange-300 flex items-center gap-1">
-              <Icon name="X" size={10} /> Сбросить
+            <button onClick={() => onBrand("")} className="text-[10px] text-orange-400 hover:text-orange-300 flex items-center gap-1">
+              <Icon name="X" size={9} /> Сбросить
             </button>
           )}
         </div>
-      </div>
-
-      {/* Горизонтальный скролл брендов */}
-      <div className="overflow-x-auto scrollbar-hide pb-3">
-        <div className="flex gap-2 px-3 sm:px-4" style={{ width: "max-content" }}>
+        <div className="grid grid-cols-5 md:grid-cols-4 lg:grid-cols-6 gap-2 lg:gap-2.5">
           {BRANDS.map(b => {
             const isActive = activeBrand === b.name;
             return (
-              <button key={b.name} onClick={() => onBrand(isActive ? "" : b.name)}
-                className="relative rounded-xl overflow-hidden shrink-0 text-left group transition-all"
-                style={{ width: 120, height: 90, boxShadow: isActive ? `0 0 0 2.5px ${b.accent}` : undefined }}>
+              <button
+                key={b.name}
+                onClick={() => onBrand(isActive ? "" : b.name)}
+                className="relative rounded-xl overflow-hidden text-left group transition-all aspect-[4/3]"
+                style={{ boxShadow: isActive ? `0 0 0 2.5px ${b.accent}` : undefined }}
+              >
                 <img src={b.photo} alt={b.name} loading="lazy"
                   className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                {/* Тёмный оверлей + цветная полоска снизу */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/50 to-black/10" />
                 <div className="absolute inset-x-0 bottom-0 h-0.5" style={{ background: b.accent }} />
-                <div className="absolute inset-0 p-2 flex flex-col justify-end">
-                  <div className="text-white font-extrabold text-sm leading-none tracking-tight">{b.name}</div>
-                  <div className="text-white/45 text-[9px] mt-0.5">{b.subtitle}</div>
+                <div className="absolute inset-x-0 bottom-0 p-1.5 sm:p-2">
+                  <div className="text-white font-extrabold text-[9px] sm:text-[11px] leading-none tracking-tight">{b.name}</div>
+                  <div className="text-white/40 text-[7px] sm:text-[9px] mt-0.5 hidden sm:block">{b.subtitle}</div>
                 </div>
                 {isActive && (
-                  <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full flex items-center justify-center"
+                  <div className="absolute top-1 right-1 w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center"
                     style={{ background: b.accent }}>
-                    <Icon name="Check" size={10} className="text-white" />
+                    <Icon name="Check" size={8} className="text-white" />
                   </div>
                 )}
               </button>
