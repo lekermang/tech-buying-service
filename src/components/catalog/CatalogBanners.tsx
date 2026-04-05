@@ -1,6 +1,5 @@
 import { CATEGORY_PHOTOS } from "@/pages/catalog.types";
 import Icon from "@/components/ui/icon";
-import { BackgroundGradientAnimation } from "@/components/ui/background-gradient-animation";
 
 interface Cat {
   title: string;
@@ -41,58 +40,43 @@ export default function CatalogBanners({ onCategory, activeCategory }: Props) {
   return (
     <div className="bg-[#0D0D0D]">
 
-      {/* ── Шапка с живым градиентом ── */}
-      <BackgroundGradientAnimation
-        containerClassName="w-full"
-        gradientBackgroundStart="rgb(10, 10, 35)"
-        gradientBackgroundEnd="rgb(5, 5, 18)"
-        firstColor="99, 102, 241"
-        secondColor="139, 92, 246"
-        thirdColor="6, 182, 212"
-        fourthColor="79, 70, 229"
-        fifthColor="16, 185, 129"
-        pointerColor="99, 102, 241"
-        size="60%"
-        interactive
-      >
-        <div className="relative z-10 px-3 sm:px-5 py-5 sm:py-6">
-          {/* Hero баннер iPhone 17 */}
-          <div className="relative w-full rounded-2xl overflow-hidden mb-0" style={{ height: 160 }}>
-            {heroPhoto && (
-              <img src={heroPhoto} alt={hero.title}
-                className="absolute inset-0 w-full h-full object-cover" />
-            )}
-            <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-transparent" />
-            <div className="absolute inset-0 p-4 sm:p-5 flex flex-col justify-center">
-              <span className="inline-flex items-center gap-1.5 bg-indigo-500 text-white text-[11px] font-bold px-2.5 py-1 rounded-full w-fit mb-2">
-                <Icon name="Sparkles" size={11} />
-                {hero.badge}
-              </span>
-              <div className="text-white font-bold text-2xl sm:text-3xl leading-tight">{hero.title}</div>
-              <div className="text-white/55 text-sm mt-1">{hero.subtitle}</div>
-            </div>
-            {activeCategory === hero.cat && (
-              <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-indigo-500 flex items-center justify-center">
-                <Icon name="Check" size={12} className="text-white" />
-              </div>
-            )}
-          </div>
-
-          {/* Заголовок поверх градиента */}
-          <div className="mt-3 flex items-center gap-2 flex-wrap">
-            <span className="inline-flex items-center gap-1 bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-[10px] font-bold px-2 py-0.5 rounded-full">
-              <Icon name="Sparkles" size={9} />
-              Официальная гарантия
+      {/* ── Шапка ── */}
+      <div className="px-3 sm:px-5 py-5 sm:py-6">
+        {/* Hero баннер iPhone 17 */}
+        <div className="relative w-full rounded-2xl overflow-hidden mb-0" style={{ height: 160 }}>
+          {heroPhoto && (
+            <img src={heroPhoto} alt={hero.title}
+              className="absolute inset-0 w-full h-full object-cover" />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-transparent" />
+          <div className="absolute inset-0 p-4 sm:p-5 flex flex-col justify-center">
+            <span className="inline-flex items-center gap-1.5 bg-indigo-500 text-white text-[11px] font-bold px-2.5 py-1 rounded-full w-fit mb-2">
+              <Icon name="Sparkles" size={11} />
+              {hero.badge}
             </span>
-            <span className="text-white/20 text-[10px]">·</span>
-            <span className="text-white/40 text-[10px]">Рассрочка 0%</span>
+            <div className="text-white font-bold text-2xl sm:text-3xl leading-tight">{hero.title}</div>
+            <div className="text-white/55 text-sm mt-1">{hero.subtitle}</div>
           </div>
-          <h1 className="text-white font-extrabold text-2xl sm:text-3xl tracking-tight leading-tight mt-1">
-            Каталог новой техники
-          </h1>
-          <p className="text-white/40 text-xs mt-0.5">iPhone · MacBook · Samsung · Dyson</p>
+          {activeCategory === hero.cat && (
+            <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-indigo-500 flex items-center justify-center">
+              <Icon name="Check" size={12} className="text-white" />
+            </div>
+          )}
         </div>
-      </BackgroundGradientAnimation>
+
+        <div className="mt-3 flex items-center gap-2 flex-wrap">
+          <span className="inline-flex items-center gap-1 bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-[10px] font-bold px-2 py-0.5 rounded-full">
+            <Icon name="Sparkles" size={9} />
+            Официальная гарантия
+          </span>
+          <span className="text-white/20 text-[10px]">·</span>
+          <span className="text-white/40 text-[10px]">Рассрочка 0%</span>
+        </div>
+        <h1 className="text-white font-extrabold text-2xl sm:text-3xl tracking-tight leading-tight mt-1">
+          Каталог новой техники
+        </h1>
+        <p className="text-white/40 text-xs mt-0.5">iPhone · MacBook · Samsung · Dyson</p>
+      </div>
 
       {/* ── Категории: плотная сетка без пробелов ── */}
       {/* мобилка: 4 cols | sm: 5 | md: 8 | lg: 16 (все в 1 ряд) */}
