@@ -1,0 +1,12 @@
+{
+  "tests": [
+    {
+      "name": "Получить первую страницу товаров",
+      "method": "GET",
+      "path": "/?page=1",
+      "expectedStatus": 200,
+      "bodyMatcher": "partial",
+      "expectedBody": {"count": 1}
+    }
+  ]
+}
