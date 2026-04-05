@@ -58,7 +58,18 @@ def upsert_batch(batch: list):
     conn.close()
 
 
-def parse_row(row: dict):
+def parse_row_from_values(headers: list, values: list):
+    """Парсим строку вручную чтобы поймать дублирующиеся колонки Изображения."""
+    row = {}
+    image_url = ""
+    for i, key in enumerate(headers):
+        val = values[i] if i < len(values) else ""
+        # Берём первое изображение из любой колонки "Изображения"
+        if key == "Изображения" and not image_url and val and val.strip().startswith("http"):
+            image_url = val.strip()
+        elif key not in row:
+            row[key] = val
+
     article = (row.get("Код артикула") or "").strip()
     name = (row.get("Название") or "").strip()
     if not article or not name:
@@ -68,11 +79,6 @@ def parse_row(row: dict):
     base_price = parse_price(row.get("Базовая цена") or row.get("Розничная цена") or "")
     my_price = parse_price(row.get("Ваша цена") or "")
     amount = (row.get("Статус") or "").strip()
-    image_url = ""
-    for key, val in row.items():
-        if key and "изображени" in key.lower() and val and val.strip().startswith("http"):
-            image_url = val.strip()
-            break
     return (article, name, brand, category, image_url, base_price, my_price, amount)
 
 
@@ -94,9 +100,10 @@ def handler(event: dict, context) -> dict:
 
         with urllib.request.urlopen(req, timeout=60) as resp:
             stream = io.TextIOWrapper(resp, encoding="utf-8-sig", errors="replace")
-            reader = csv.DictReader(stream, delimiter=";")
-            for row in reader:
-                parsed = parse_row(row)
+            reader = csv.reader(stream, delimiter=";")
+            headers = next(reader)  # первая строка — заголовки
+            for values in reader:
+                parsed = parse_row_from_values(headers, values)
                 if parsed is None:
                     continue
                 if total_seen < offset:
