@@ -1,6 +1,6 @@
 """
-Импорт наименований товаров из CSV в БД.
-Поддерживает: ручную загрузку CSV (base64) и автосинхронизацию с instrument.ru.
+Импорт наименований товаров из CSV/YML-фида instrument.ru в БД.
+Фид: https://instrument.ru/api/personalFeed/5492bff915789200fc2d54a3fca417cd/
 Защищён токеном админа.
 """
 import json
@@ -8,10 +8,10 @@ import os
 import base64
 import csv
 import io
+import re
 import threading
+import xml.etree.ElementTree as ET
 import urllib.request
-import urllib.parse
-import http.cookiejar
 import psycopg2
 
 CORS_HEADERS = {
@@ -20,9 +20,9 @@ CORS_HEADERS = {
     "Access-Control-Allow-Headers": "Content-Type, X-Admin-Token",
 }
 SCHEMA = os.environ.get("MAIN_DB_SCHEMA", "public")
-INSTRUMENT_BASE = "https://instrument.ru"
 
-# Статус текущей синхронизации (в памяти процесса)
+FEED_URL = "https://instrument.ru/api/personalFeed/5492bff915789200fc2d54a3fca417cd/"
+
 _sync_status = {"running": False, "last": None, "error": None}
 
 
@@ -30,38 +30,7 @@ def get_conn():
     return psycopg2.connect(os.environ["DATABASE_URL"])
 
 
-def parse_and_save_csv(csv_text: str, delimiter: str = ",") -> int:
-    reader = csv.DictReader(io.StringIO(csv_text), delimiter=delimiter)
-    fieldnames = [f.strip().lower() for f in (reader.fieldnames or [])]
-
-    article_col = next((f for f in fieldnames if f in (
-        "article", "vendorcode", "артикул", "код", "artic", "vendor_code", "id", "sku")), None)
-    name_col = next((f for f in fieldnames if f in (
-        "name", "наименование", "название", "товар", "product", "full_name", "title")), None)
-    brand_col = next((f for f in fieldnames if f in (
-        "brand", "vendor", "бренд", "производитель", "trademark", "торговая марка")), None)
-    category_col = next((f for f in fieldnames if f in (
-        "category", "категория", "раздел", "section", "group", "группа")), None)
-
-    if not article_col or not name_col:
-        raise ValueError(f"Колонки не найдены. Есть: {fieldnames}. Нужны: article/артикул и name/наименование")
-
-    rows = []
-    for row in reader:
-        norm = {k.strip().lower(): v.strip() for k, v in row.items() if k}
-        article = norm.get(article_col, "").strip()
-        name = norm.get(name_col, "").strip()
-        if not article or not name:
-            continue
-        rows.append((
-            article, name,
-            norm.get(brand_col, "") if brand_col else "",
-            norm.get(category_col, "") if category_col else "",
-        ))
-
-    if not rows:
-        raise ValueError("Файл пуст или не содержит данных")
-
+def save_rows(rows: list) -> int:
     conn = get_conn()
     cur = conn.cursor()
     for article, name, brand, category in rows:
@@ -78,100 +47,92 @@ def parse_and_save_csv(csv_text: str, delimiter: str = ",") -> int:
     return len(rows)
 
 
+def parse_yml(content: bytes) -> list:
+    """Парсим YML-фид (Яндекс.Маркет формат)."""
+    root = ET.fromstring(content)
+    shop = root.find("shop")
+    if shop is None:
+        raise ValueError("Не найден тег <shop> в YML")
+
+    categories = {}
+    for cat in shop.findall(".//category"):
+        categories[cat.get("id", "")] = cat.text or ""
+
+    rows = []
+    for offer in shop.findall(".//offer"):
+        article = offer.findtext("vendorCode", "") or offer.get("id", "")
+        name = offer.findtext("name", "") or offer.findtext("model", "")
+        brand = offer.findtext("vendor", "")
+        cat_id = offer.findtext("categoryId", "")
+        category = categories.get(cat_id, "")
+        if article and name:
+            rows.append((article.strip(), name.strip(), brand.strip(), category.strip()))
+    return rows
+
+
+def parse_csv(content: bytes) -> list:
+    """Парсим CSV с автоопределением кодировки и разделителя."""
+    try:
+        text = content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = content.decode("cp1251", errors="replace")
+
+    first_line = text.split("\n")[0]
+    delimiter = ";" if first_line.count(";") > first_line.count(",") else ","
+
+    reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
+    fieldnames = [f.strip().lower() for f in (reader.fieldnames or [])]
+
+    article_col = next((f for f in fieldnames if f in (
+        "article", "vendorcode", "артикул", "код", "artic", "vendor_code", "sku", "id")), None)
+    name_col = next((f for f in fieldnames if f in (
+        "name", "наименование", "название", "товар", "product", "full_name", "title", "fullname")), None)
+    brand_col = next((f for f in fieldnames if f in (
+        "brand", "vendor", "бренд", "производитель", "trademark")), None)
+    category_col = next((f for f in fieldnames if f in (
+        "category", "категория", "раздел", "section", "group", "группа")), None)
+
+    if not article_col or not name_col:
+        raise ValueError(f"Нет нужных колонок. Найдено: {fieldnames}")
+
+    rows = []
+    for row in reader:
+        norm = {k.strip().lower(): v.strip() for k, v in row.items() if k}
+        article = norm.get(article_col, "").strip()
+        name = norm.get(name_col, "").strip()
+        if article and name:
+            rows.append((
+                article, name,
+                norm.get(brand_col, "") if brand_col else "",
+                norm.get(category_col, "") if category_col else "",
+            ))
+    return rows
+
+
 def do_sync():
-    """Фоновая синхронизация с instrument.ru."""
+    """Скачивает фид и сохраняет в БД."""
     global _sync_status
     _sync_status = {"running": True, "last": None, "error": None}
-
-    login = os.environ.get("INSTRUMENT_LOGIN", "")
-    password = os.environ.get("INSTRUMENT_PASSWORD", "")
-
     try:
-        if not login or not password:
-            raise ValueError("Не заданы INSTRUMENT_LOGIN или INSTRUMENT_PASSWORD")
-
-        cj = http.cookiejar.CookieJar()
-        opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
-
-        # Авторизация
-        auth_data = urllib.parse.urlencode({
-            "login": login,
-            "password": password,
-        }).encode("utf-8")
-        auth_req = urllib.request.Request(
-            f"{INSTRUMENT_BASE}/personal/login/",
-            data=auth_data,
-            headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                "Content-Type": "application/x-www-form-urlencoded",
-                "Referer": f"{INSTRUMENT_BASE}/personal/login/",
-            },
+        req = urllib.request.Request(
+            FEED_URL,
+            headers={"User-Agent": "Mozilla/5.0"},
         )
-        with opener.open(auth_req, timeout=20) as resp:
-            auth_html = resp.read().decode("utf-8", errors="ignore")
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            content = resp.read()
+            content_type = resp.headers.get("Content-Type", "")
 
-        # Проверяем авторизацию
-        if "unloading" not in auth_html and "личный" not in auth_html.lower() and "выйти" not in auth_html.lower():
-            # Пробуем перейти на страницу выгрузки напрямую
-            check_req = urllib.request.Request(
-                f"{INSTRUMENT_BASE}/personal/unloading/",
-                headers={"User-Agent": "Mozilla/5.0", "Referer": f"{INSTRUMENT_BASE}/"},
-            )
-            with opener.open(check_req, timeout=15) as resp:
-                check_html = resp.read().decode("utf-8", errors="ignore")
-            if "авторизац" in check_html.lower() or "login" in check_html.lower():
-                raise ValueError("Авторизация не прошла. Проверь логин и пароль.")
+        # Определяем формат по содержимому
+        if content[:5] in (b"<?xml", b"<yml_") or b"<yml_catalog" in content[:200] or b"<offer" in content[:500]:
+            rows = parse_yml(content)
+        else:
+            rows = parse_csv(content)
 
-        # Скачиваем CSV
-        # Пробуем разные варианты URL выгрузки
-        csv_urls = [
-            f"{INSTRUMENT_BASE}/personal/unloading/?action=download&type=csv",
-            f"{INSTRUMENT_BASE}/personal/unloading/?download=csv",
-            f"{INSTRUMENT_BASE}/export/csv/",
-            f"{INSTRUMENT_BASE}/personal/unloading/",
-        ]
+        if not rows:
+            raise ValueError("Фид пустой или не удалось распарсить")
 
-        csv_bytes = None
-        for csv_url in csv_urls:
-            try:
-                csv_req = urllib.request.Request(
-                    csv_url,
-                    headers={
-                        "User-Agent": "Mozilla/5.0",
-                        "Referer": f"{INSTRUMENT_BASE}/personal/unloading/",
-                        "Accept": "text/csv,application/csv,text/plain,*/*",
-                    },
-                )
-                with opener.open(csv_req, timeout=60) as resp:
-                    content_type = resp.headers.get("Content-Type", "")
-                    content_disp = resp.headers.get("Content-Disposition", "")
-                    data = resp.read()
-                    # Если это CSV-файл или скачивание
-                    if "csv" in content_type.lower() or "attachment" in content_disp.lower() or (len(data) > 1000 and b"\n" in data[:500]):
-                        csv_bytes = data
-                        break
-            except Exception:
-                continue
-
-        if not csv_bytes:
-            raise ValueError(
-                "Не удалось скачать CSV. Возможно, URL выгрузки изменился. "
-                "Попробуй загрузить файл вручную с https://instrument.ru/personal/unloading/"
-            )
-
-        # Декодируем
-        try:
-            csv_text = csv_bytes.decode("utf-8-sig")
-        except UnicodeDecodeError:
-            csv_text = csv_bytes.decode("cp1251", errors="replace")
-
-        # Определяем разделитель
-        first_line = csv_text.split("\n")[0]
-        delimiter = ";" if first_line.count(";") > first_line.count(",") else ","
-
-        imported = parse_and_save_csv(csv_text, delimiter)
+        imported = save_rows(rows)
         _sync_status = {"running": False, "last": imported, "error": None}
-
     except Exception as e:
         _sync_status = {"running": False, "last": None, "error": str(e)}
 
@@ -185,9 +146,8 @@ def handler(event: dict, context) -> dict:
         return {"statusCode": 401, "headers": CORS_HEADERS, "body": json.dumps({"error": "Unauthorized"})}
 
     method = event.get("httpMethod", "GET")
-    params = event.get("queryStringParameters") or {}
 
-    # GET — статистика + статус синхронизации
+    # GET — статистика
     if method == "GET":
         conn = get_conn()
         cur = conn.cursor()
@@ -203,8 +163,9 @@ def handler(event: dict, context) -> dict:
             "body": json.dumps({
                 "count": count,
                 "preview": [{"article": r[0], "name": r[1], "brand": r[2], "category": r[3]} for r in rows],
-                "has_credentials": bool(os.environ.get("INSTRUMENT_LOGIN") and os.environ.get("INSTRUMENT_PASSWORD")),
+                "has_credentials": True,
                 "sync_status": _sync_status,
+                "feed_url": FEED_URL,
             }, ensure_ascii=False),
         }
 
@@ -219,57 +180,22 @@ def handler(event: dict, context) -> dict:
 
     action = data.get("action", "upload")
 
-    # Отладка — найти ссылки на странице выгрузки
-    if action == "debug":
-        login = os.environ.get("INSTRUMENT_LOGIN", "")
-        password = os.environ.get("INSTRUMENT_PASSWORD", "")
-        try:
-            cj = http.cookiejar.CookieJar()
-            opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
-            auth_data = urllib.parse.urlencode({"login": login, "password": password}).encode("utf-8")
-            auth_req = urllib.request.Request(
-                f"{INSTRUMENT_BASE}/personal/login/",
-                data=auth_data,
-                headers={"User-Agent": "Mozilla/5.0", "Content-Type": "application/x-www-form-urlencoded", "Referer": f"{INSTRUMENT_BASE}/personal/login/"},
-            )
-            with opener.open(auth_req, timeout=20) as resp:
-                resp.read()
-            page_req = urllib.request.Request(
-                f"{INSTRUMENT_BASE}/personal/unloading/",
-                headers={"User-Agent": "Mozilla/5.0"},
-            )
-            with opener.open(page_req, timeout=20) as resp:
-                html = resp.read().decode("utf-8", errors="ignore")
-            # Ищем все ссылки с href
-            import re
-            links = re.findall(r'href=["\']([^"\']*(?:csv|xls|yml|download|export|unload)[^"\']*)["\']', html, re.I)
-            # Первые 2000 символов HTML для диагностики
-            snippet = html[:3000]
-            return {
-                "statusCode": 200,
-                "headers": {**CORS_HEADERS, "Content-Type": "application/json"},
-                "body": json.dumps({"links": links, "snippet": snippet}, ensure_ascii=False),
-            }
-        except Exception as e:
-            return {"statusCode": 200, "headers": CORS_HEADERS, "body": json.dumps({"error": str(e)})}
-
-    # Запуск синхронизации в фоне
+    # Синхронизация с фидом
     if action == "sync":
         if _sync_status.get("running"):
             return {
                 "statusCode": 200,
                 "headers": {**CORS_HEADERS, "Content-Type": "application/json"},
-                "body": json.dumps({"ok": True, "running": True, "message": "Синхронизация уже запущена"}),
+                "body": json.dumps({"ok": True, "running": True, "message": "Уже запущено"}),
             }
         t = threading.Thread(target=do_sync, daemon=True)
         t.start()
-        # Ждём до 25 секунд — если успело, отдаём результат
         t.join(timeout=25)
         if _sync_status.get("running"):
             return {
                 "statusCode": 200,
                 "headers": {**CORS_HEADERS, "Content-Type": "application/json"},
-                "body": json.dumps({"ok": True, "running": True, "message": "Синхронизация запущена, это займёт до минуты. Обнови страницу через 30 секунд."}),
+                "body": json.dumps({"ok": True, "running": True, "message": "Загружаю фид, проверь статус через 30 сек"}),
             }
         if _sync_status.get("error"):
             return {
@@ -283,18 +209,19 @@ def handler(event: dict, context) -> dict:
             "body": json.dumps({"ok": True, "imported": _sync_status.get("last"), "running": False}),
         }
 
-    # Ручная загрузка CSV
-    csv_b64 = data.get("file", "")
+    # Ручная загрузка файла (base64)
+    file_b64 = data.get("file", "")
     delimiter = data.get("delimiter", ",")
-    if not csv_b64:
+    if not file_b64:
         return {"statusCode": 400, "headers": CORS_HEADERS, "body": json.dumps({"error": "Нет файла"})}
     try:
-        csv_bytes = base64.b64decode(csv_b64)
-        try:
-            csv_text = csv_bytes.decode("utf-8-sig")
-        except UnicodeDecodeError:
-            csv_text = csv_bytes.decode("cp1251")
-        imported = parse_and_save_csv(csv_text, delimiter)
+        file_bytes = base64.b64decode(file_b64)
+        # Определяем формат
+        if b"<yml_catalog" in file_bytes[:500] or b"<?xml" in file_bytes[:10]:
+            rows = parse_yml(file_bytes)
+        else:
+            rows = parse_csv(file_bytes)
+        imported = save_rows(rows)
         return {
             "statusCode": 200,
             "headers": {**CORS_HEADERS, "Content-Type": "application/json"},
