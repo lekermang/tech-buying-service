@@ -86,16 +86,18 @@ export default function UsedGoodsSearch() {
     : resoldItems;
 
   return (
-    <div className="border border-white/10 bg-black/30 px-3 py-3 w-full">
+    <div className="border border-white/10 bg-black/30 px-4 py-5 w-full">
       <button className="flex items-center justify-between w-full" onClick={() => setOpen(v => !v)}>
-        <div className="flex items-center gap-2">
-          <div className="w-5 h-5 bg-[#FFD700] flex items-center justify-center shrink-0">
-            <Icon name="ShoppingBag" size={11} className="text-black" />
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-[#FFD700] flex items-center justify-center shrink-0">
+            <Icon name="ShoppingBag" size={20} className="text-black" />
           </div>
-          <span className="font-oswald font-bold text-xs uppercase text-white tracking-wide">Б/У техника</span>
-          <span className="bg-[#FFD700]/20 text-[#FFD700] font-roboto text-[10px] px-1.5 py-0.5 border border-[#FFD700]/30">Гарантия 1 год</span>
+          <div>
+            <span className="font-oswald font-bold text-base uppercase text-white tracking-wide block leading-tight">Б/У техника</span>
+            <span className="bg-[#FFD700]/20 text-[#FFD700] font-roboto text-[11px] px-1.5 py-0.5 border border-[#FFD700]/30 mt-1 inline-block">Гарантия 1 год</span>
+          </div>
         </div>
-        <Icon name={open ? "ChevronUp" : "ChevronDown"} size={14} className="text-white/40" />
+        <Icon name={open ? "ChevronUp" : "ChevronDown"} size={20} className="text-white/40" />
       </button>
 
       {open && (

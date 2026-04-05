@@ -86,12 +86,12 @@ const AppleWidget = ({ compact }: AppleWidgetProps) => {
 
   if (compact) {
     return (
-      <div className="border border-white/10 bg-black/30 p-3 mb-5 w-full max-w-sm">
-        <div className="flex items-center gap-2 mb-2.5">
-          <div className="w-5 h-5 bg-white rounded flex items-center justify-center shrink-0 text-black">
-            <AppleLogo size={12} />
+      <div className="border border-white/10 bg-black/30 px-4 py-5 w-full">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 bg-white rounded flex items-center justify-center shrink-0 text-black">
+            <AppleLogo size={22} />
           </div>
-          <span className="font-oswald font-bold text-xs uppercase text-white tracking-wide">Купим дороже всех Apple технику!</span>
+          <span className="font-oswald font-bold text-base uppercase text-white tracking-wide leading-tight">Купим дороже всех Apple технику!</span>
         </div>
 
         <div className="flex gap-1.5 mb-2">
