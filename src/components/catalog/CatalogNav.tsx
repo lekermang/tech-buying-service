@@ -31,33 +31,22 @@ export default function CatalogNav({
 }: CatalogNavProps) {
   return (
     <nav className="bg-[#0D0D0D]/97 backdrop-blur-xl border-b border-white/6 sticky top-0 z-40">
-      <div className="max-w-[1400px] mx-auto px-3 sm:px-4 h-14 flex items-center gap-2 sm:gap-3">
+      <div className="max-w-[1400px] mx-auto px-3 sm:px-4 h-12 flex items-center gap-2">
 
         {/* Назад */}
-        <a href="/" className="flex items-center gap-1.5 shrink-0 text-white/50 hover:text-white transition-colors">
-          <Icon name="ArrowLeft" size={16} />
-          <span className="text-sm hidden sm:block font-medium">Скупка24</span>
+        <a href="/" className="flex items-center gap-1 shrink-0 text-white/40 hover:text-white transition-colors">
+          <Icon name="ArrowLeft" size={15} />
         </a>
 
-        {/* Кнопка категорий (мобилка + планшет) */}
-        <button
-          onClick={onSidebarOpen}
-          className="lg:hidden flex items-center gap-1.5 px-2.5 py-1.5 bg-white/8 hover:bg-white/12 rounded-lg text-white/70 hover:text-white transition-all shrink-0 border border-white/6"
-        >
-          <Icon name="LayoutGrid" size={14} />
-          <span className="text-xs max-w-[90px] truncate hidden xs:block">{activeCategory || "Категории"}</span>
-          <Icon name="ChevronDown" size={11} className="text-white/30" />
-        </button>
-
-        {/* Поиск */}
+        {/* Поиск — растянут на всю ширину */}
         <div className="flex-1 relative min-w-0">
-          <Icon name="Search" size={15} className="text-white/30 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <Icon name="Search" size={14} className="text-white/30 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="text"
             value={search}
             onChange={e => onSearch(e.target.value)}
-            placeholder="Поиск..."
-            className="w-full bg-white/6 border border-white/8 text-white pl-9 pr-8 py-2 rounded-lg text-sm focus:outline-none focus:bg-white/10 focus:border-white/20 transition-all placeholder:text-white/25"
+            placeholder="Поиск по модели, бренду..."
+            className="w-full bg-white/6 border border-white/8 text-white pl-9 pr-8 py-2 rounded-xl text-sm focus:outline-none focus:bg-white/10 focus:border-white/20 transition-all placeholder:text-white/25"
           />
           {search && (
             <button onClick={() => onSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/30 hover:text-white">
@@ -66,19 +55,8 @@ export default function CatalogNav({
           )}
         </div>
 
-        {/* Кнопка фильтров — мобилка */}
-        <button
-          onClick={onFilterPanelToggle}
-          className={`lg:hidden relative shrink-0 flex items-center gap-1.5 px-2.5 py-2 rounded-lg border transition-all ${filterPanelOpen || activeFiltersCount > 0 ? "bg-[#FFD700]/15 border-[#FFD700]/40 text-[#FFD700]" : "bg-white/6 border-white/8 text-white/60 hover:text-white"}`}
-        >
-          <Icon name="SlidersHorizontal" size={15} />
-          {activeFiltersCount > 0 && (
-            <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#FFD700] text-black text-[9px] font-bold rounded-full flex items-center justify-center">{activeFiltersCount}</span>
-          )}
-        </button>
-
-        {/* Наличие — только на больших экранах */}
-        <div className="hidden sm:flex items-center gap-0.5 shrink-0">
+        {/* Наличие */}
+        <div className="flex items-center gap-0.5 shrink-0">
           {[{ val: "", label: "Все" }, { val: "in_stock", label: "Есть" }, { val: "on_order", label: "Заказ" }].map(f => (
             <button key={f.val} onClick={() => onAvail(f.val)}
               className={`text-xs px-2.5 py-1.5 rounded-lg transition-all font-medium ${filterAvail === f.val ? "bg-[#FFD700] text-black" : "text-white/40 hover:text-white hover:bg-white/8"}`}>
@@ -86,6 +64,17 @@ export default function CatalogNav({
             </button>
           ))}
         </div>
+
+        {/* Фильтры — мобилка */}
+        <button
+          onClick={onFilterPanelToggle}
+          className={`lg:hidden relative shrink-0 flex items-center px-2.5 py-2 rounded-lg border transition-all ${filterPanelOpen || activeFiltersCount > 0 ? "bg-[#FFD700]/15 border-[#FFD700]/40 text-[#FFD700]" : "bg-white/6 border-white/8 text-white/60 hover:text-white"}`}
+        >
+          <Icon name="SlidersHorizontal" size={14} />
+          {activeFiltersCount > 0 && (
+            <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#FFD700] text-black text-[9px] font-bold rounded-full flex items-center justify-center">{activeFiltersCount}</span>
+          )}
+        </button>
       </div>
 
       {/* Мобильная панель фильтров */}

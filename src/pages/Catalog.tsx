@@ -10,7 +10,7 @@ import { BRAND_PRIORITY, sortItems, sortCategories } from "@/components/catalog/
 const Catalog = () => {
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
-  const [activeCategory, setActiveCategory] = useState("Смартфоны");
+  const [activeCategory, setActiveCategory] = useState("iPhone 17/AIR/PRO/MAX");
   const [activeBrand, setActiveBrand] = useState("");
   const [activeStorage, setActiveStorage] = useState("");
   const [activeColor, setActiveColor] = useState("");
@@ -40,7 +40,7 @@ const Catalog = () => {
   };
 
   useEffect(() => {
-    load("Смартфоны", "", "");
+    load("iPhone 17/AIR/PRO/MAX", "", "");
     fetch(`${CATALOG_URL}?limit=1`).then(r => r.json()).then(d => {
       if (d.categories?.length) setCategories(sortCategories(d.categories));
     });
