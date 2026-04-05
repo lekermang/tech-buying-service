@@ -6,6 +6,7 @@ import PricesTab from "@/components/admin/PricesTab";
 import CatalogTab from "@/components/admin/CatalogTab";
 import CatalogEditTab from "@/components/admin/CatalogEditTab";
 import { ApiCatalogContent } from "@/pages/ApiCatalog";
+import ToolsImportTab from "@/components/admin/ToolsImportTab";
 
 const ADMIN_URL = "https://functions.poehali.dev/a105aede-d55d-4b99-9d3e-5e977887aa04";
 
@@ -13,7 +14,7 @@ export default function Admin() {
   const [token, setToken] = useState(() => localStorage.getItem("admin_token") || "");
   const [tokenInput, setTokenInput] = useState("");
   const [authed, setAuthed] = useState(false);
-  const [tab, setTab] = useState<"repair" | "prices" | "sky" | "catalog" | "items" | "api-catalog">("repair");
+  const [tab, setTab] = useState<"repair" | "prices" | "sky" | "catalog" | "items" | "api-catalog" | "tools-import">("repair");
   const [error, setError] = useState("");
   const [checking, setChecking] = useState(false);
 
@@ -83,6 +84,7 @@ export default function Admin() {
               { key: "items", label: "Товары", icon: "ShoppingBag" },
               { key: "catalog", label: "Синхронизация", icon: "Bot" },
               { key: "api-catalog", label: "Выгрузка", icon: "PackageOpen" },
+              { key: "tools-import", label: "Импорт", icon: "FileUp" },
             ].map((t) => (
               <button key={t.key} onClick={() => setTab(t.key as typeof tab)}
                 className={`flex items-center gap-1.5 font-oswald font-bold uppercase text-xs px-3 py-1.5 transition-colors ${tab === t.key ? "bg-[#FFD700] text-black" : "text-white/40 hover:text-white"}`}>
@@ -104,6 +106,7 @@ export default function Admin() {
       {tab === "items" && <CatalogEditTab token={token} />}
       {tab === "catalog" && <CatalogTab token={token} />}
       {tab === "api-catalog" && <ApiCatalogContent token={token} />}
+      {tab === "tools-import" && <ToolsImportTab token={token} />}
     </div>
   );
 }
