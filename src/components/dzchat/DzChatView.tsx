@@ -30,8 +30,8 @@ const DzChatView = ({ chat, me, token, onBack, onChatUpdate }: {
   const msgRefs = useRef<Record<number, HTMLDivElement | null>>({});
   // id последнего известного сообщения — скроллим вниз только при появлении нового
   const lastMsgIdRef = useRef<number | null>(null);
-  // флаг: пользователь сам у дна (чтобы не мешать скроллу вверх)
   const isAtBottomRef = useRef(true);
+  const fetchingMsgRef = useRef(false); // защита от параллельных запросов при 1с интервале
 
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
     bottomRef.current?.scrollIntoView({ behavior });
@@ -44,21 +44,26 @@ const DzChatView = ({ chat, me, token, onBack, onChatUpdate }: {
   };
 
   const loadMessages = useCallback(async () => {
-    const data = await api(`messages&chat_id=${chat.id}`, "GET", undefined, token);
-    if (Array.isArray(data)) {
-      setMessages(prev => {
-        const lastNew = data.length > 0 ? data[data.length - 1].id : null;
-        const lastOld = prev.length > 0 ? prev[prev.length - 1].id : null;
-        // Скроллим вниз только если появилось новое сообщение И пользователь у дна
-        if (lastNew !== lastOld && isAtBottomRef.current) {
-          lastMsgIdRef.current = lastNew;
-          setTimeout(() => scrollToBottom("smooth"), 50);
-        }
-        return data;
-      });
+    if (fetchingMsgRef.current) return;
+    fetchingMsgRef.current = true;
+    try {
+      const data = await api(`messages&chat_id=${chat.id}`, "GET", undefined, token);
+      if (Array.isArray(data)) {
+        setMessages(prev => {
+          const lastNew = data.length > 0 ? data[data.length - 1].id : null;
+          const lastOld = prev.length > 0 ? prev[prev.length - 1].id : null;
+          if (lastNew !== lastOld && isAtBottomRef.current) {
+            lastMsgIdRef.current = lastNew;
+            setTimeout(() => scrollToBottom("smooth"), 50);
+          }
+          return data;
+        });
+      }
+      await api("read", "POST", { chat_id: chat.id }, token);
+      onChatUpdate?.();
+    } finally {
+      fetchingMsgRef.current = false;
     }
-    await api("read", "POST", { chat_id: chat.id }, token);
-    onChatUpdate?.();
   }, [chat.id, token, onChatUpdate]);
 
   useEffect(() => {
@@ -67,7 +72,7 @@ const DzChatView = ({ chat, me, token, onBack, onChatUpdate }: {
     lastMsgIdRef.current = null;
     isAtBottomRef.current = true;
     loadMessages().then(() => scrollToBottom("instant"));
-    pollRef.current = setInterval(loadMessages, 3000);
+    pollRef.current = setInterval(loadMessages, 1000);
     return () => clearInterval(pollRef.current);
   }, [chat.id]); // eslint-disable-line react-hooks/exhaustive-deps
 

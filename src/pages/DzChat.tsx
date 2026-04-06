@@ -25,6 +25,9 @@ const DzChat = () => {
   const pollRef = useRef<ReturnType<typeof setInterval>>();
   const pingRef = useRef<ReturnType<typeof setInterval>>();
   const prevUnreadRef = useRef<Record<number, number>>({});
+  const initializedRef = useRef(false); // пропускаем первый цикл — не показываем уведомления при входе
+  const fetchingRef = useRef(false);    // защита от параллельных запросов
+  const notifGrantedRef = useRef(false); // актуальное значение в замыкании
 
   useEffect(() => {
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
@@ -36,55 +39,79 @@ const DzChat = () => {
   const requestNotifications = async () => {
     if (!("Notification" in window)) return;
     const perm = await Notification.requestPermission();
-    setNotifGranted(perm === "granted");
+    const granted = perm === "granted";
+    setNotifGranted(granted);
+    notifGrantedRef.current = granted;
   };
 
   useEffect(() => {
-    if ("Notification" in window && Notification.permission === "granted") setNotifGranted(true);
+    if ("Notification" in window && Notification.permission === "granted") {
+      setNotifGranted(true);
+      notifGrantedRef.current = true;
+    }
   }, []);
 
   const notifyNewMessages = useCallback((newChats: any[]) => {
+    // Первый цикл — просто запоминаем текущие счётчики, без уведомлений
+    if (!initializedRef.current) {
+      newChats.forEach(chat => { prevUnreadRef.current[chat.id] = chat.unread; });
+      initializedRef.current = true;
+      return;
+    }
     newChats.forEach(chat => {
       const prev = prevUnreadRef.current[chat.id] ?? 0;
       if (chat.unread > prev && chat.last_message) {
+        // Звук — всегда когда есть новое сообщение
         const soundId = localStorage.getItem("dzchat_sound") || "default";
         playNotificationSound(soundId);
-        if (notifGranted && document.visibilityState !== "visible") {
-          new Notification(`DzChat — ${chat.name}`, {
-            body: chat.last_message.text || "📷 Фото",
-            icon: NOTIF_ICON,
-            tag: `dzchat-${chat.id}`,
-          });
+        // Пуш — только когда вкладка не активна и разрешения выданы
+        if (notifGrantedRef.current && document.visibilityState !== "visible") {
+          try {
+            new Notification(`DzChat — ${chat.name}`, {
+              body: chat.last_message.text || (chat.last_message.voice_url ? "🎤 Голосовое" : "📷 Фото"),
+              icon: NOTIF_ICON,
+              tag: `dzchat-${chat.id}`,
+              silent: true, // звук уже сыграли через Web Audio
+            });
+          } catch (_e) { /* Notifications not supported */ }
         }
       }
       prevUnreadRef.current[chat.id] = chat.unread;
     });
-  }, [notifGranted]);
+  }, []);
 
   const loadChats = useCallback(async (tok: string) => {
-    const data = await api("chats", "GET", undefined, tok);
-    if (Array.isArray(data)) {
-      setChats(data);
-      notifyNewMessages(data);
-      // обновляем активный чат (онлайн-статус партнёра)
-      setActiveChat((prev: any) => {
-        if (!prev) return prev;
-        const updated = data.find((c: any) => c.id === prev.id);
-        return updated || prev;
-      });
+    if (fetchingRef.current) return; // не запускаем параллельный запрос
+    fetchingRef.current = true;
+    try {
+      const data = await api("chats", "GET", undefined, tok);
+      if (Array.isArray(data)) {
+        setChats(data);
+        notifyNewMessages(data);
+        setActiveChat((prev: any) => {
+          if (!prev) return prev;
+          const updated = data.find((c: any) => c.id === prev.id);
+          return updated || prev;
+        });
+      }
+    } finally {
+      fetchingRef.current = false;
     }
   }, [notifyNewMessages]);
 
   useEffect(() => {
     if (!token) return;
+    initializedRef.current = false; // сброс при смене токена
+    fetchingRef.current = false;
     setLoadingChats(true);
     api("me", "GET", undefined, token).then(u => {
       if (u.error) { localStorage.removeItem("dzchat_token"); setToken(null); return; }
       setMe(u);
       loadChats(token).finally(() => setLoadingChats(false));
-      pollRef.current = setInterval(() => loadChats(token), 4000);
-      // ping каждые 30 секунд для онлайн-статуса
-      pingRef.current = setInterval(() => api("ping", "POST", {}, token), 30000);
+      // Поллинг каждые 1 сек
+      pollRef.current = setInterval(() => loadChats(token), 1000);
+      // Ping каждые 20 сек для онлайн-статуса
+      pingRef.current = setInterval(() => api("ping", "POST", {}, token), 20000);
     });
     return () => { clearInterval(pollRef.current); clearInterval(pingRef.current); };
   }, [token, loadChats]);
