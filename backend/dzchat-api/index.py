@@ -75,6 +75,21 @@ def handler(event: dict, context) -> dict:
 
     conn = get_conn()
 
+    # ── LOGIN OTP (вход по номеру — только существующий аккаунт) ──
+    if action == "login_otp" and method == "POST":
+        phone = body.get("phone", "").strip()
+        if not phone:
+            return resp({"error": "Укажите номер телефона"}, 400)
+        cur = conn.cursor()
+        cur.execute(f"SELECT id FROM {SCHEMA}.dzchat_users WHERE phone=%s", (phone,))
+        row = cur.fetchone()
+        if not row:
+            return resp({"error": "Аккаунт с этим номером не найден. Пройдите регистрацию."}, 404)
+        otp = gen_otp()
+        cur.execute(f"UPDATE {SCHEMA}.dzchat_users SET otp=%s, otp_expires_at=NOW() + INTERVAL '300 seconds' WHERE phone=%s", (otp, phone))
+        conn.commit()
+        return resp({"ok": True, "otp": otp})  # В продакшне — отправить по SMS
+
     # ── REGISTER ──────────────────────────────────────────────────
     if action == "register" and method == "POST":
         phone = body.get("phone", "").strip()
