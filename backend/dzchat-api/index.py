@@ -3,6 +3,7 @@ DzChat API — универсальный эндпоинт для мессенд
 Маршрутизация по query-параметру ?action=...
 
 Действия:
+  login_otp  POST — вход по номеру (только существующий аккаунт)
   register   POST — регистрация / запрос OTP
   verify     POST — проверка OTP, выдача токена
   me         GET  — профиль текущего пользователя
@@ -19,11 +20,38 @@ DzChat API — универсальный эндпоинт для мессенд
 import json, os, random, string, hashlib, time, base64, uuid
 import psycopg2
 import boto3
+import urllib.request
+import urllib.parse
 
 SCHEMA = os.environ["MAIN_DB_SCHEMA"]
 AK = os.environ["AWS_ACCESS_KEY_ID"]
 SK = os.environ["AWS_SECRET_ACCESS_KEY"]
 PAGE = 50
+
+def send_sms(phone: str, otp: str) -> bool:
+    """Отправка SMS через SMS.ru. Возвращает True при успехе."""
+    api_id = os.environ.get("SMSRU_API_ID", "")
+    if not api_id:
+        return False  # Ключ не задан — работаем в демо-режиме
+    try:
+        # Нормализуем номер: оставляем только цифры, добавляем +7
+        digits = "".join(c for c in phone if c.isdigit())
+        if digits.startswith("8") and len(digits) == 11:
+            digits = "7" + digits[1:]
+        normalized = "+" + digits if not digits.startswith("+") else digits
+
+        params = urllib.parse.urlencode({
+            "api_id": api_id,
+            "to": normalized,
+            "msg": f"DzChat: ваш код подтверждения {otp}. Никому не сообщайте.",
+            "json": 1,
+        })
+        url = f"https://sms.ru/sms/send?{params}"
+        with urllib.request.urlopen(url, timeout=10) as r:
+            data = json.loads(r.read())
+            return data.get("status") == "OK"
+    except Exception:
+        return False
 
 def get_conn():
     return psycopg2.connect(os.environ["DATABASE_URL"])
@@ -88,7 +116,9 @@ def handler(event: dict, context) -> dict:
         otp = gen_otp()
         cur.execute(f"UPDATE {SCHEMA}.dzchat_users SET otp=%s, otp_expires_at=NOW() + INTERVAL '300 seconds' WHERE phone=%s", (otp, phone))
         conn.commit()
-        return resp({"ok": True, "otp": otp})  # В продакшне — отправить по SMS
+        sms_sent = send_sms(phone, otp)
+        # Если SMS отправлено — не возвращаем OTP в ответе (безопасность)
+        return resp({"ok": True, "sms_sent": sms_sent, **({"otp": otp} if not sms_sent else {})})
 
     # ── REGISTER ──────────────────────────────────────────────────
     if action == "register" and method == "POST":
@@ -105,7 +135,8 @@ def handler(event: dict, context) -> dict:
                 name=EXCLUDED.name, otp=EXCLUDED.otp, otp_expires_at=EXCLUDED.otp_expires_at
         """, (phone, name, otp))
         conn.commit()
-        return resp({"ok": True, "otp": otp})  # В продакшне — отправить по SMS
+        sms_sent = send_sms(phone, otp)
+        return resp({"ok": True, "sms_sent": sms_sent, **({"otp": otp} if not sms_sent else {})})
 
     # ── VERIFY ────────────────────────────────────────────────────
     if action == "verify" and method == "POST":
