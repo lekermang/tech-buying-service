@@ -4,10 +4,11 @@ import { formatTime } from "./dzchat.utils";
 import DzChatAvatar from "./DzChatAvatar";
 
 // ── ChatHeader ────────────────────────────────────────────────────
-export const ChatHeader = ({ chat, onBack, onGroupInfoClick, showSearch, onToggleSearch }: {
+export const ChatHeader = ({ chat, onBack, onGroupInfoClick, onGroupEditClick, showSearch, onToggleSearch }: {
   chat: any;
   onBack: () => void;
   onGroupInfoClick: () => void;
+  onGroupEditClick?: () => void;
   showSearch: boolean;
   onToggleSearch: () => void;
 }) => {
@@ -37,7 +38,13 @@ export const ChatHeader = ({ chat, onBack, onGroupInfoClick, showSearch, onToggl
           </p>
         </div>
       </button>
-      <div className="flex items-center gap-1 shrink-0">
+      <div className="flex items-center gap-0.5 shrink-0">
+        {chat.type === "group" && onGroupEditClick && (
+          <button onClick={e => { e.stopPropagation(); onGroupEditClick(); }}
+            className="w-9 h-9 flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 rounded-full transition-colors">
+            <Icon name="Settings" size={17} />
+          </button>
+        )}
         <button onClick={onToggleSearch}
           className="w-9 h-9 flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 rounded-full transition-colors">
           <Icon name="Search" size={18} />

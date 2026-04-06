@@ -7,15 +7,31 @@ import { VoiceMessage, MsgStatus } from "./DzChatVoice";
 const REACTIONS = ["❤️", "😂", "😮", "😢", "👍", "🙏"];
 const SENDER_COLORS = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#3b82f6", "#a855f7"];
 
-const DzChatMessage = ({ msg, me, chat, prevMsg, nextMsg, msgRef, contextMsg, reactionPickerMsg, onContextMenu, onReact, onReactionPicker, onReply, onForward, onRemove, onRemoveForAll, onScrollToMsg, onTextareaFocus }: {
-  msg: any;
-  me: any;
-  chat: any;
-  prevMsg: any;
-  nextMsg: any;
+// Сохранить медиа-файл на устройство
+const saveMedia = async (url: string, isVideo = false) => {
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = isVideo ? `dzchat_video_${Date.now()}.mp4` : `dzchat_photo_${Date.now()}.jpg`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } catch (_e) {
+    window.open(url, "_blank");
+  }
+};
+
+const DzChatMessage = ({
+  msg, me, chat, prevMsg, nextMsg, msgRef,
+  contextMsg, reactionPickerMsg,
+  onContextMenu, onReact, onReactionPicker,
+  onReply, onForward, onRemove, onRemoveForAll,
+  onScrollToMsg, onTextareaFocus
+}: {
+  msg: any; me: any; chat: any; prevMsg: any; nextMsg: any;
   msgRef: (el: HTMLDivElement | null) => void;
-  contextMsg: any;
-  reactionPickerMsg: any;
+  contextMsg: any; reactionPickerMsg: any;
   onContextMenu: (msg: any) => void;
   onReact: (msg: any, emoji: string) => void;
   onReactionPicker: (msg: any | null) => void;
@@ -30,6 +46,9 @@ const DzChatMessage = ({ msg, me, chat, prevMsg, nextMsg, msgRef, contextMsg, re
   const showAvatar = !isMine && (!prevMsg || prevMsg.sender_id !== msg.sender_id);
   const isLast = !nextMsg || nextMsg.sender_id !== msg.sender_id;
   const showDateSep = !prevMsg || new Date(msg.created_at).toDateString() !== new Date(prevMsg.created_at).toDateString();
+
+  const hasMedia = msg.photo_url || msg.video_url;
+  const isVideo = !!msg.video_url;
 
   return (
     <div>
@@ -54,45 +73,86 @@ const DzChatMessage = ({ msg, me, chat, prevMsg, nextMsg, msgRef, contextMsg, re
               🚫 Сообщение удалено
             </div>
           ) : (
-            <div className={`px-3 py-2 rounded-2xl text-sm shadow-sm ${
-              isMine
-                ? "bg-[#1e6f3e] text-white rounded-br-sm"
-                : "bg-[#1e2c3a] text-white rounded-bl-sm"
-            }`}>
+            <div className={`rounded-2xl text-sm shadow-sm overflow-hidden ${
+              isMine ? "bg-[#1e6f3e] text-white rounded-br-sm" : "bg-[#1e2c3a] text-white rounded-bl-sm"
+            } ${hasMedia && !msg.text ? "p-0" : "px-3 py-2"}`}>
+
               {/* Имя в группе */}
               {!isMine && showAvatar && chat.type === "group" && (
-                <p className="text-xs font-semibold mb-0.5" style={{ color: SENDER_COLORS[msg.sender_id % 6] }}>
+                <p className={`text-xs font-semibold mb-0.5 ${hasMedia && !msg.text ? "px-3 pt-2" : ""}`}
+                  style={{ color: SENDER_COLORS[msg.sender_id % 6] }}>
                   {msg.sender_name}
                 </p>
               )}
+
               {/* Цитата reply */}
               {msg.reply && (
-                <div className="border-l-2 border-[#25D366] pl-2 mb-1.5 rounded-r cursor-pointer bg-white/5 py-1 pr-2"
+                <div className={`border-l-2 border-[#25D366] pl-2 mb-1.5 rounded-r cursor-pointer bg-white/5 py-1 pr-2 ${hasMedia && !msg.text ? "mx-3 mt-2" : ""}`}
                   onClick={() => onScrollToMsg(msg.reply.id)}>
                   <p className="text-[11px] text-[#25D366] font-medium">{msg.reply.sender_name}</p>
                   <p className="text-[11px] text-white/60 truncate">
-                    {msg.reply.voice_url ? "🎤 Голосовое" : msg.reply.photo_url ? "📷 Фото" : msg.reply.text}
+                    {msg.reply.voice_url ? "🎤 Голосовое" : msg.reply.photo_url ? "📷 Фото" : msg.reply.video_url ? "🎥 Видео" : msg.reply.text}
                   </p>
                 </div>
               )}
+
               {/* Пересланное */}
               {msg.forwarded_from && (
-                <p className="text-xs text-white/40 mb-1 italic">↪ Пересланное сообщение</p>
+                <p className={`text-xs text-white/40 mb-1 italic ${hasMedia && !msg.text ? "px-3 pt-2" : ""}`}>↪ Пересланное</p>
               )}
-              {/* Фото */}
+
+              {/* ФОТО — квадратик */}
               {msg.photo_url && (
-                <img src={msg.photo_url} alt="фото" className="rounded-xl max-w-full mb-1 cursor-pointer block"
-                  style={{ maxHeight: 280 }} loading="lazy"
-                  onClick={() => window.open(msg.photo_url, "_blank")} />
+                <div className="relative group/media">
+                  <img src={msg.photo_url} alt="фото"
+                    className="block w-full cursor-pointer"
+                    style={{ maxWidth: 260, maxHeight: 260, minWidth: 140, objectFit: "cover", aspectRatio: "1/1" }}
+                    loading="lazy"
+                    onClick={() => window.open(msg.photo_url, "_blank")}
+                  />
+                  {/* Кнопка сохранить */}
+                  <button
+                    onClick={e => { e.stopPropagation(); saveMedia(msg.photo_url, false); }}
+                    className="absolute bottom-2 right-2 w-8 h-8 bg-black/50 rounded-full flex items-center justify-center text-white opacity-0 group-hover/media:opacity-100 transition-opacity hover:bg-black/70">
+                    <Icon name="Download" size={14} />
+                  </button>
+                </div>
               )}
+
+              {/* ВИДЕО — квадратик */}
+              {msg.video_url && (
+                <div className="relative group/media">
+                  <video src={msg.video_url} controls
+                    className="block w-full cursor-pointer"
+                    style={{ maxWidth: 260, maxHeight: 260, minWidth: 140, objectFit: "cover", aspectRatio: "1/1", background: "#000" }}
+                    preload="metadata"
+                    playsInline
+                  />
+                  {/* Кнопка сохранить */}
+                  <button
+                    onClick={e => { e.stopPropagation(); saveMedia(msg.video_url, true); }}
+                    className="absolute bottom-2 right-2 w-8 h-8 bg-black/50 rounded-full flex items-center justify-center text-white opacity-0 group-hover/media:opacity-100 transition-opacity hover:bg-black/70">
+                    <Icon name="Download" size={14} />
+                  </button>
+                </div>
+              )}
+
               {/* Голосовое */}
               {msg.voice_url && (
-                <VoiceMessage url={msg.voice_url} duration={msg.voice_duration || 0} isMine={isMine} />
+                <div className={hasMedia && !msg.text ? "px-3 pb-2 pt-1" : ""}>
+                  <VoiceMessage url={msg.voice_url} duration={msg.voice_duration || 0} isMine={isMine} />
+                </div>
               )}
+
               {/* Текст */}
-              {msg.text && <p className="whitespace-pre-wrap break-words leading-relaxed">{msg.text}</p>}
+              {msg.text && (
+                <p className={`whitespace-pre-wrap break-words leading-relaxed ${hasMedia ? "px-3 pt-1" : ""}`}>
+                  {msg.text}
+                </p>
+              )}
+
               {/* Время + статус */}
-              <div className="flex items-center justify-end gap-1 mt-0.5">
+              <div className={`flex items-center justify-end gap-1 mt-0.5 ${hasMedia ? "px-3 pb-2" : ""}`}>
                 <span className={`text-[10px] ${isMine ? "text-white/50" : "text-white/30"}`}>
                   {formatTime(msg.created_at)}
                 </span>
@@ -136,7 +196,7 @@ const DzChatMessage = ({ msg, me, chat, prevMsg, nextMsg, msgRef, contextMsg, re
 
           {/* Контекстное меню */}
           {contextMsg?.id === msg.id && (
-            <div className={`absolute ${isMine ? "right-0" : "left-0"} bottom-full mb-1 bg-[#1e2c3a] border border-white/10 rounded-2xl shadow-2xl z-20 min-w-[180px] overflow-hidden`}
+            <div className={`absolute ${isMine ? "right-0" : "left-0"} bottom-full mb-1 bg-[#1e2c3a] border border-white/10 rounded-2xl shadow-2xl z-20 min-w-[190px] overflow-hidden`}
               onClick={e => e.stopPropagation()}>
               <button onClick={() => { onReply(msg); onTextareaFocus(); }}
                 className="flex items-center gap-3 w-full px-4 py-2.5 text-white/80 hover:bg-white/5 text-sm">
@@ -147,9 +207,15 @@ const DzChatMessage = ({ msg, me, chat, prevMsg, nextMsg, msgRef, contextMsg, re
                 <Icon name="Forward" size={15} className="text-blue-400" /> Переслать
               </button>
               {msg.text && (
-                <button onClick={() => navigator.clipboard.writeText(msg.text || "")}
+                <button onClick={() => { navigator.clipboard.writeText(msg.text || ""); onContextMenu(null as any); }}
                   className="flex items-center gap-3 w-full px-4 py-2.5 text-white/80 hover:bg-white/5 text-sm">
                   <Icon name="Copy" size={15} className="text-white/50" /> Копировать
+                </button>
+              )}
+              {(msg.photo_url || msg.video_url) && (
+                <button onClick={() => { saveMedia(msg.photo_url || msg.video_url, isVideo); onContextMenu(null as any); }}
+                  className="flex items-center gap-3 w-full px-4 py-2.5 text-white/80 hover:bg-white/5 text-sm">
+                  <Icon name="Download" size={15} className="text-white/50" /> Сохранить {isVideo ? "видео" : "фото"}
                 </button>
               )}
               {!msg.removed && (

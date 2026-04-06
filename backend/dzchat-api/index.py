@@ -339,6 +339,54 @@ def handler(event: dict, context) -> dict:
                     "last_seen_at": str(r[4]) if r[4] else None} for r in cur.fetchall()]
         return resp({"members": members})
 
+    # ── GROUP EDIT (переименование) ───────────────────────────────
+    if action == "group_edit" and method == "POST":
+        u = get_user(conn, token)
+        if not u:
+            return resp({"error": "Unauthorized"}, 401)
+        chat_id = body.get("chat_id")
+        name = body.get("name", "").strip()
+        if not chat_id or not name:
+            return resp({"error": "chat_id и name обязательны"}, 400)
+        if not is_member(conn, u["id"], chat_id):
+            return resp({"error": "Forbidden"}, 403)
+        cur = conn.cursor()
+        cur.execute(f"UPDATE {SCHEMA}.dzchat_chats SET name=%s WHERE id=%s AND type='group'", (name, chat_id))
+        conn.commit()
+        return resp({"ok": True})
+
+    # ── GROUP ADD MEMBER ──────────────────────────────────────────
+    if action == "group_add" and method == "POST":
+        u = get_user(conn, token)
+        if not u:
+            return resp({"error": "Unauthorized"}, 401)
+        chat_id = body.get("chat_id")
+        user_id = body.get("user_id")
+        if not chat_id or not user_id:
+            return resp({"error": "chat_id и user_id обязательны"}, 400)
+        if not is_member(conn, u["id"], chat_id):
+            return resp({"error": "Forbidden"}, 403)
+        cur = conn.cursor()
+        cur.execute(f"INSERT INTO {SCHEMA}.dzchat_members (chat_id, user_id) VALUES (%s, %s) ON CONFLICT DO NOTHING", (chat_id, user_id))
+        conn.commit()
+        return resp({"ok": True})
+
+    # ── GROUP REMOVE MEMBER ───────────────────────────────────────
+    if action == "group_remove" and method == "POST":
+        u = get_user(conn, token)
+        if not u:
+            return resp({"error": "Unauthorized"}, 401)
+        chat_id = body.get("chat_id")
+        user_id = body.get("user_id")
+        if not chat_id or not user_id:
+            return resp({"error": "chat_id и user_id обязательны"}, 400)
+        if not is_member(conn, u["id"], chat_id):
+            return resp({"error": "Forbidden"}, 403)
+        cur = conn.cursor()
+        cur.execute(f"DELETE FROM {SCHEMA}.dzchat_members WHERE chat_id=%s AND user_id=%s", (chat_id, user_id))
+        conn.commit()
+        return resp({"ok": True})
+
     # ── GROUP LEAVE ───────────────────────────────────────────────
     if action == "group_leave" and method == "POST":
         u = get_user(conn, token)
@@ -346,7 +394,7 @@ def handler(event: dict, context) -> dict:
             return resp({"error": "Unauthorized"}, 401)
         chat_id = body.get("chat_id")
         cur = conn.cursor()
-        cur.execute(f"UPDATE {SCHEMA}.dzchat_members SET user_id=user_id WHERE chat_id=%s AND user_id=%s", (chat_id, u["id"]))
+        cur.execute(f"DELETE FROM {SCHEMA}.dzchat_members WHERE chat_id=%s AND user_id=%s", (chat_id, u["id"]))
         conn.commit()
         return resp({"ok": True})
 
@@ -366,8 +414,8 @@ def handler(event: dict, context) -> dict:
             cur.execute(f"""
                 SELECT m.id, m.sender_id, us.name, us.avatar_url, m.msg_text, m.photo_url,
                        m.voice_url, m.voice_duration, m.forwarded_from, m.removed, m.created_at,
-                       m.reply_to, m.is_read,
-                       rm.msg_text, rm.photo_url, rm.voice_url, rus.name
+                       m.reply_to, m.is_read, m.video_url,
+                       rm.msg_text, rm.photo_url, rm.voice_url, rus.name, rm.video_url
                 FROM {SCHEMA}.dzchat_messages m
                 JOIN {SCHEMA}.dzchat_users us ON us.id=m.sender_id
                 LEFT JOIN {SCHEMA}.dzchat_messages rm ON rm.id=m.reply_to
@@ -380,8 +428,8 @@ def handler(event: dict, context) -> dict:
             cur.execute(f"""
                 SELECT m.id, m.sender_id, us.name, us.avatar_url, m.msg_text, m.photo_url,
                        m.voice_url, m.voice_duration, m.forwarded_from, m.removed, m.created_at,
-                       m.reply_to, m.is_read,
-                       rm.msg_text, rm.photo_url, rm.voice_url, rus.name
+                       m.reply_to, m.is_read, m.video_url,
+                       rm.msg_text, rm.photo_url, rm.voice_url, rus.name, rm.video_url
                 FROM {SCHEMA}.dzchat_messages m
                 JOIN {SCHEMA}.dzchat_users us ON us.id=m.sender_id
                 LEFT JOIN {SCHEMA}.dzchat_messages rm ON rm.id=m.reply_to
@@ -397,13 +445,14 @@ def handler(event: dict, context) -> dict:
         for r in rows:
             reply = None
             if r[11]:
-                reply = {"id": r[11], "text": r[13], "photo_url": r[14], "voice_url": r[15], "sender_name": r[16]}
+                reply = {"id": r[11], "text": r[14], "photo_url": r[15], "voice_url": r[16], "sender_name": r[17], "video_url": r[18]}
             msgs.append({
                 "id": r[0], "sender_id": r[1], "sender_name": r[2], "sender_avatar": r[3],
                 "text": r[4] if not r[9] else None,
                 "photo_url": r[5] if not r[9] else None,
                 "voice_url": r[6] if not r[9] else None,
                 "voice_duration": r[7],
+                "video_url": r[13] if not r[9] else None,
                 "forwarded_from": r[8], "removed": r[9], "created_at": str(r[10]),
                 "reply": reply, "is_read": r[12],
                 "reactions": reactions.get(r[0], []),
@@ -419,20 +468,21 @@ def handler(event: dict, context) -> dict:
         chat_id = body.get("chat_id")
         text = (body.get("text") or "").strip()
         photo_url = body.get("photo_url", "")
+        video_url = body.get("video_url", "")
         voice_url = body.get("voice_url", "")
         voice_duration = body.get("voice_duration", 0)
         forwarded_from = body.get("forwarded_from")
         reply_to = body.get("reply_to")
-        if not chat_id or (not text and not photo_url and not voice_url):
-            return resp({"error": "Нужен chat_id и текст, фото или голос"}, 400)
+        if not chat_id or (not text and not photo_url and not video_url and not voice_url):
+            return resp({"error": "Нужен chat_id и текст, фото, видео или голос"}, 400)
         if not is_member(conn, u["id"], chat_id):
             return resp({"error": "Forbidden"}, 403)
         cur = conn.cursor()
         cur.execute(f"""
             INSERT INTO {SCHEMA}.dzchat_messages
-                (chat_id, sender_id, msg_text, photo_url, voice_url, voice_duration, forwarded_from, reply_to)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id, created_at
-        """, (chat_id, u["id"], text or None, photo_url or None,
+                (chat_id, sender_id, msg_text, photo_url, video_url, voice_url, voice_duration, forwarded_from, reply_to)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id, created_at
+        """, (chat_id, u["id"], text or None, photo_url or None, video_url or None,
               voice_url or None, voice_duration, forwarded_from, reply_to))
         row = cur.fetchone()
         conn.commit()

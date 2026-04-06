@@ -4,6 +4,7 @@ import { api } from "./dzchat.utils";
 import { ChatHeader, SearchBar, GroupInfoModal } from "./DzChatHeader";
 import DzChatMessage from "./DzChatMessage";
 import { ReplyPreview, ChatInput } from "./DzChatInput";
+import { EditGroupModal } from "./DzChatModals";
 
 const DzChatView = ({ chat, me, token, onBack, onChatUpdate }: {
   chat: any; me: any; token: string; onBack: () => void; onChatUpdate?: () => void;
@@ -22,6 +23,7 @@ const DzChatView = ({ chat, me, token, onBack, onChatUpdate }: {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [showGroupInfo, setShowGroupInfo] = useState(false);
+  const [showGroupEdit, setShowGroupEdit] = useState(false);
   const [groupMembers, setGroupMembers] = useState<any[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -76,9 +78,14 @@ const DzChatView = ({ chat, me, token, onBack, onChatUpdate }: {
     return () => clearInterval(pollRef.current);
   }, [chat.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // imageB64 может содержать видео (data:video/...) или фото
+  const [fileMime, setFileMime] = useState<string>("image/jpeg");
+
   const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const mime = file.type || "image/jpeg";
+    setFileMime(mime);
     const reader = new FileReader();
     reader.onload = ev => {
       const result = ev.target?.result as string;
@@ -93,16 +100,23 @@ const DzChatView = ({ chat, me, token, onBack, onChatUpdate }: {
     if (!text.trim() && !imageB64) return;
     setSending(true);
     let photo_url = "";
+    let video_url = "";
     if (imageB64) {
       setUploadingPhoto(true);
-      const res = await api("upload", "POST", { image: imageB64, mime: "image/jpeg", kind: "photo" }, token);
+      const isVideo = fileMime.startsWith("video/");
+      const kind = isVideo ? "video" : "photo";
+      const res = await api("upload", "POST", { image: imageB64, mime: fileMime, kind }, token);
       setUploadingPhoto(false);
-      if (res.url) photo_url = res.url;
+      if (res.url) {
+        if (isVideo) video_url = res.url;
+        else photo_url = res.url;
+      }
     }
     const res = await api("send", "POST", {
       chat_id: chat.id,
       text: text.trim() || undefined,
       photo_url: photo_url || undefined,
+      video_url: video_url || undefined,
       forwarded_from: forwardMsg?.id,
       reply_to: replyTo?.id,
     }, token);
@@ -174,6 +188,7 @@ const DzChatView = ({ chat, me, token, onBack, onChatUpdate }: {
         chat={chat}
         onBack={onBack}
         onGroupInfoClick={loadGroupInfo}
+        onGroupEditClick={() => setShowGroupEdit(true)}
         showSearch={showSearch}
         onToggleSearch={() => { setShowSearch(s => !s); setSearchQuery(""); setSearchResults([]); }}
       />
@@ -240,9 +255,18 @@ const DzChatView = ({ chat, me, token, onBack, onChatUpdate }: {
         onPhotoSelect={handlePhoto}
       />
 
-      {/* Модал группы */}
+      {/* Модал участников группы */}
       {showGroupInfo && (
         <GroupInfoModal members={groupMembers} onClose={() => setShowGroupInfo(false)} />
+      )}
+
+      {/* Модал редактирования группы */}
+      {showGroupEdit && (
+        <EditGroupModal
+          chat={chat} token={token}
+          onClose={() => setShowGroupEdit(false)}
+          onUpdated={name => { onChatUpdate?.(); setShowGroupEdit(false); }}
+        />
       )}
     </div>
   );

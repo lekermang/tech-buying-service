@@ -74,8 +74,12 @@ export const ReplyPreview = ({ replyTo, forwardMsg, imagePreview, onClearReply, 
       )}
       {imagePreview && (
         <div className="flex items-center gap-2 mt-1">
-          <img src={imagePreview} alt="preview" className="h-12 w-12 object-cover rounded-lg" />
-          <p className="text-xs text-white/50 flex-1">Фото готово к отправке</p>
+          {imagePreview.startsWith("data:video") || imagePreview.startsWith("blob:") ? (
+            <video src={imagePreview} className="h-12 w-12 object-cover rounded-lg" muted playsInline />
+          ) : (
+            <img src={imagePreview} alt="preview" className="h-12 w-12 object-cover rounded-lg" />
+          )}
+          <p className="text-xs text-white/50 flex-1">{imagePreview.startsWith("data:video") || imagePreview.startsWith("blob:") ? "Видео" : "Фото"} готово к отправке</p>
           <button onClick={onClearImage} className="text-white/40 hover:text-white"><Icon name="X" size={16} /></button>
         </div>
       )}

@@ -342,6 +342,112 @@ export const ProfileModal = ({ me, token, onClose, onUpdate, onLogout, onSwitchA
   );
 };
 
+// ── EDIT GROUP MODAL ─────────────────────────────────────────────
+export const EditGroupModal = ({ chat, token, onClose, onUpdated }: {
+  chat: any; token: string; onClose: () => void; onUpdated: (name: string) => void;
+}) => {
+  const [name, setName] = useState(chat.name || "");
+  const [members, setMembers] = useState<any[]>([]);
+  const [query, setQuery] = useState("");
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    api(`group_info&chat_id=${chat.id}`, "GET", undefined, token).then(d => {
+      if (d.members) setMembers(d.members);
+    });
+  }, [chat.id, token]);
+
+  const search = (q: string) => {
+    setQuery(q);
+    clearTimeout(debounceRef.current);
+    if (!q.trim()) { setUsers([]); return; }
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true);
+      const res = await api(`users&q=${encodeURIComponent(q)}`, "GET", undefined, token);
+      setLoading(false);
+      if (Array.isArray(res)) setUsers(res.filter(u => !members.find((m: any) => m.id === u.id)));
+    }, 400);
+  };
+
+  const addMember = async (u: any) => {
+    await api("group_add", "POST", { chat_id: chat.id, user_id: u.id }, token);
+    setMembers(prev => [...prev, u]);
+    setUsers(prev => prev.filter(x => x.id !== u.id));
+    setQuery(""); setUsers([]);
+  };
+
+  const removeMember = async (userId: number) => {
+    await api("group_remove", "POST", { chat_id: chat.id, user_id: userId }, token);
+    setMembers(prev => prev.filter(m => m.id !== userId));
+  };
+
+  const save = async () => {
+    if (!name.trim()) return;
+    setSaving(true);
+    await api("group_edit", "POST", { chat_id: chat.id, name }, token);
+    setSaving(false);
+    onUpdated(name);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center" onClick={onClose}>
+      <div className="bg-[#1a2634] w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl p-4 max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-white font-semibold flex items-center gap-2">
+            <Icon name="Settings" size={16} className="text-[#25D366]" /> Редактировать группу
+          </h3>
+          <button onClick={onClose} className="text-white/40"><Icon name="X" size={18} /></button>
+        </div>
+        <input type="text" value={name} onChange={e => setName(e.target.value)}
+          placeholder="Название группы"
+          className="w-full bg-white/10 text-white placeholder-white/40 px-4 py-2.5 rounded-xl outline-none mb-4 font-semibold focus:ring-1 focus:ring-[#25D366]" />
+
+        <p className="text-white/40 text-xs uppercase tracking-wider mb-2">Участники ({members.length})</p>
+        <div className="space-y-1 mb-3 max-h-40 overflow-y-auto">
+          {members.map((m: any) => (
+            <div key={m.id} className="flex items-center gap-3 px-2 py-1.5 rounded-xl">
+              <DzChatAvatar name={m.name} url={m.avatar_url} size={32} />
+              <span className="text-white text-sm flex-1">{m.name}</span>
+              <button onClick={() => removeMember(m.id)}
+                className="text-white/20 hover:text-red-400 transition-colors">
+                <Icon name="UserMinus" size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <div className="relative mb-3">
+          <input type="text" value={query} onChange={e => search(e.target.value)}
+            placeholder="Добавить участника..."
+            className="w-full bg-white/10 text-white placeholder-white/40 px-4 py-2 rounded-xl outline-none pr-10 text-sm" />
+          {loading && <Icon name="Loader" size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 animate-spin" />}
+        </div>
+        {users.length > 0 && (
+          <div className="space-y-0.5 mb-3 max-h-32 overflow-y-auto">
+            {users.map((u: any) => (
+              <button key={u.id} onClick={() => addMember(u)}
+                className="w-full flex items-center gap-3 px-2 py-1.5 rounded-xl hover:bg-white/5 transition-colors">
+                <DzChatAvatar name={u.name} url={u.avatar_url} size={32} />
+                <span className="text-white text-sm flex-1 text-left">{u.name}</span>
+                <Icon name="UserPlus" size={14} className="text-[#25D366]" />
+              </button>
+            ))}
+          </div>
+        )}
+
+        <button onClick={save} disabled={saving || !name.trim()}
+          className="w-full bg-[#25D366] text-white font-bold py-3 rounded-xl hover:bg-[#1da851] transition-colors disabled:opacity-50">
+          {saving ? "Сохранение..." : "Сохранить"}
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // ── CREATE GROUP MODAL ───────────────────────────────────────────
 export const CreateGroupModal = ({ token, onClose, onCreated }: {
   token: string; onClose: () => void; onCreated: (id: number) => void;
