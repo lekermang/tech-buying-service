@@ -201,6 +201,26 @@ def handler(event: dict, context) -> dict:
         conn.commit()
         return resp({"chat_id": chat_id})
 
+    # ── CREATE GROUP ──────────────────────────────────────────────
+    if action == "create_group" and method == "POST":
+        u = get_user(conn, token)
+        if not u:
+            return resp({"error": "Unauthorized"}, 401)
+        name = body.get("name", "").strip()
+        member_ids = body.get("member_ids", [])
+        avatar_url = body.get("avatar_url", "")
+        if not name:
+            return resp({"error": "Укажите название группы"}, 400)
+        cur = conn.cursor()
+        cur.execute(f"INSERT INTO {SCHEMA}.dzchat_chats (type, name, avatar_url, created_by) VALUES ('group', %s, %s, %s) RETURNING id",
+                    (name, avatar_url or None, u["id"]))
+        chat_id = cur.fetchone()[0]
+        all_members = list(set([u["id"]] + [int(m) for m in member_ids if str(m).isdigit()]))
+        for mid in all_members:
+            cur.execute(f"INSERT INTO {SCHEMA}.dzchat_members (chat_id, user_id) VALUES (%s, %s) ON CONFLICT DO NOTHING", (chat_id, mid))
+        conn.commit()
+        return resp({"chat_id": chat_id, "name": name})
+
     # ── MESSAGES ──────────────────────────────────────────────────
     if action == "messages" and method == "GET":
         u = get_user(conn, token)

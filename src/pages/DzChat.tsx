@@ -431,6 +431,82 @@ const ProfileModal = ({ me, token, onClose, onUpdate }: { me: any; token: string
   );
 };
 
+// ── CREATE GROUP MODAL ───────────────────────────────────────────
+const CreateGroupModal = ({ token, onClose, onCreated }: { token: string; onClose: () => void; onCreated: (id: number) => void }) => {
+  const [name, setName] = useState("");
+  const [query, setQuery] = useState("");
+  const [users, setUsers] = useState<any[]>([]);
+  const [selected, setSelected] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
+
+  const search = async (q: string) => {
+    setQuery(q);
+    if (!q.trim()) return setUsers([]);
+    setLoading(true);
+    const res = await api(`users&q=${encodeURIComponent(q)}`, "GET", undefined, token);
+    setLoading(false);
+    if (Array.isArray(res)) setUsers(res);
+  };
+
+  const toggle = (u: any) => {
+    setSelected(prev => prev.find(x => x.id === u.id) ? prev.filter(x => x.id !== u.id) : [...prev, u]);
+  };
+
+  const create = async () => {
+    if (!name.trim() || selected.length === 0) return;
+    setCreating(true);
+    const res = await api("create_group", "POST", { name, member_ids: selected.map(u => u.id) }, token);
+    setCreating(false);
+    if (res.chat_id) { onCreated(res.chat_id); onClose(); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center" onClick={onClose}>
+      <div className="bg-[#1a2634] w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl p-4 max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-white font-semibold flex items-center gap-2"><Icon name="Users" size={18} className="text-[#25D366]" /> Новая группа</h3>
+          <button onClick={onClose} className="text-white/40"><Icon name="X" size={18} /></button>
+        </div>
+        <input type="text" value={name} onChange={e => setName(e.target.value)}
+          placeholder="Название группы"
+          className="w-full bg-white/10 text-white placeholder-white/40 px-4 py-2.5 rounded-xl outline-none mb-3 font-semibold" />
+        {selected.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {selected.map(u => (
+              <div key={u.id} className="flex items-center gap-1 bg-[#25D366]/20 border border-[#25D366]/40 rounded-full px-2.5 py-1">
+                <span className="text-xs text-white">{u.name}</span>
+                <button onClick={() => toggle(u)} className="text-white/40 hover:text-white"><Icon name="X" size={10} /></button>
+              </div>
+            ))}
+          </div>
+        )}
+        <input type="text" value={query} onChange={e => search(e.target.value)}
+          placeholder="Добавить участников..."
+          className="w-full bg-white/10 text-white placeholder-white/40 px-4 py-2.5 rounded-xl outline-none mb-2" />
+        <div className="flex-1 overflow-y-auto space-y-0.5 mb-3">
+          {loading && <p className="text-white/30 text-xs text-center py-3">Поиск...</p>}
+          {users.map(u => {
+            const sel = selected.some(x => x.id === u.id);
+            return (
+              <button key={u.id} onClick={() => toggle(u)}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${sel ? "bg-[#25D366]/15" : "hover:bg-white/5"}`}>
+                <Avatar name={u.name} url={u.avatar_url} size={36} />
+                <span className="text-white text-sm flex-1 text-left">{u.name}</span>
+                {sel && <Icon name="Check" size={16} className="text-[#25D366]" />}
+              </button>
+            );
+          })}
+        </div>
+        <button onClick={create} disabled={creating || !name.trim() || selected.length === 0}
+          className="w-full bg-[#25D366] text-white font-bold py-3 rounded-xl hover:bg-[#1da851] transition-colors disabled:opacity-40">
+          {creating ? "Создание..." : `Создать группу (${selected.length} уч.)`}
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // ── MAIN ─────────────────────────────────────────────────────────
 const DzChat = () => {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem("dzchat_token"));
@@ -438,15 +514,60 @@ const DzChat = () => {
   const [chats, setChats] = useState<any[]>([]);
   const [activeChat, setActiveChat] = useState<any>(null);
   const [showNewChat, setShowNewChat] = useState(false);
+  const [showNewGroup, setShowNewGroup] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [loadingChats, setLoadingChats] = useState(false);
   const [newChatId, setNewChatId] = useState<number | null>(null);
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [notifGranted, setNotifGranted] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval>>();
+  const prevUnreadRef = useRef<Record<number, number>>({});
+
+  // Регистрация SW
+  useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
+    // PWA install prompt
+    const handler = (e: any) => { e.preventDefault(); setInstallPrompt(e); };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
+
+  // Запрос уведомлений
+  const requestNotifications = async () => {
+    if (!("Notification" in window)) return;
+    const perm = await Notification.requestPermission();
+    setNotifGranted(perm === "granted");
+  };
+
+  useEffect(() => {
+    if ("Notification" in window && Notification.permission === "granted") setNotifGranted(true);
+  }, []);
+
+  // Показ уведомления при новом сообщении
+  const notifyNewMessages = useCallback((newChats: any[]) => {
+    if (!notifGranted || document.visibilityState === "visible") return;
+    newChats.forEach(chat => {
+      const prev = prevUnreadRef.current[chat.id] ?? 0;
+      if (chat.unread > prev && chat.last_message) {
+        new Notification(`DzChat — ${chat.name}`, {
+          body: chat.last_message.text || "📷 Фото",
+          icon: "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/dce22ed0-7e15-4a0f-84c3-9987477dea5a.jpg",
+          tag: `dzchat-${chat.id}`,
+        });
+      }
+      prevUnreadRef.current[chat.id] = chat.unread;
+    });
+  }, [notifGranted]);
 
   const loadChats = useCallback(async (tok: string) => {
     const data = await api("chats", "GET", undefined, tok);
-    if (Array.isArray(data)) setChats(data);
-  }, []);
+    if (Array.isArray(data)) {
+      setChats(data);
+      notifyNewMessages(data);
+    }
+  }, [notifyNewMessages]);
 
   useEffect(() => {
     if (!token) return;
@@ -469,6 +590,13 @@ const DzChat = () => {
 
   const logout = () => { localStorage.removeItem("dzchat_token"); setToken(null); setMe(null); setChats([]); setActiveChat(null); };
 
+  const installApp = async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === "accepted") setInstallPrompt(null);
+  };
+
   if (!token || !me) return <AuthScreen onAuth={(tok, user) => { setToken(tok); setMe(user); }} />;
 
   const totalUnread = chats.reduce((s, c) => s + (c.unread || 0), 0);
@@ -487,7 +615,23 @@ const DzChat = () => {
             </div>
           </button>
           <div className="flex items-center gap-1">
-            <button onClick={() => setShowNewChat(true)}
+            {installPrompt && (
+              <button onClick={installApp} title="Установить приложение"
+                className="w-9 h-9 flex items-center justify-center text-[#FFD700] hover:bg-white/10 rounded-full transition-colors">
+                <Icon name="Download" size={18} />
+              </button>
+            )}
+            {!notifGranted && "Notification" in window && (
+              <button onClick={requestNotifications} title="Включить уведомления"
+                className="w-9 h-9 flex items-center justify-center text-white/40 hover:text-[#25D366] hover:bg-white/10 rounded-full transition-colors">
+                <Icon name="Bell" size={18} />
+              </button>
+            )}
+            <button onClick={() => setShowNewGroup(true)} title="Новая группа"
+              className="w-9 h-9 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 rounded-full transition-colors">
+              <Icon name="Users" size={18} />
+            </button>
+            <button onClick={() => setShowNewChat(true)} title="Новый чат"
               className="w-9 h-9 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 rounded-full transition-colors">
               <Icon name="SquarePen" size={20} />
             </button>
@@ -558,6 +702,7 @@ const DzChat = () => {
       </div>
 
       {showNewChat && <NewChatModal token={token} onClose={() => setShowNewChat(false)} onChatCreated={id => { setNewChatId(id); loadChats(token); }} />}
+      {showNewGroup && <CreateGroupModal token={token} onClose={() => setShowNewGroup(false)} onCreated={id => { setNewChatId(id); loadChats(token); }} />}
       {showProfile && <ProfileModal me={me} token={token} onClose={() => setShowProfile(false)} onUpdate={u => setMe(u)} />}
     </div>
   );
