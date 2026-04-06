@@ -3,6 +3,7 @@ import { useState, useRef } from "react";
 import Icon from "@/components/ui/icon";
 import { api } from "./dzchat.utils";
 import DzChatAvatar from "./DzChatAvatar";
+import DzChatAvatarEditor from "./DzChatAvatarEditor";
 import { NOTIFICATION_SOUNDS, playNotificationSound } from "./dzchat.sounds";
 
 export const ProfileModal = ({ me, token, onClose, onUpdate, onLogout, onSwitchAccount }: {
@@ -12,6 +13,7 @@ export const ProfileModal = ({ me, token, onClose, onUpdate, onLogout, onSwitchA
   const [name, setName] = useState(me.name);
   const [avatarB64, setAvatarB64] = useState<string | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(me.avatar_url || null);
+  const [editSrc, setEditSrc] = useState<string | null>(null);   // исходник для редактора
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [soundId, setSoundId] = useState<string>(() => localStorage.getItem("dzchat_sound") || "default");
@@ -22,37 +24,23 @@ export const ProfileModal = ({ me, token, onClose, onUpdate, onLogout, onSwitchA
   );
   const fileRef = useRef<HTMLInputElement>(null);
   const audioFileRef = useRef<HTMLInputElement>(null);
-  const customAudioRef = useRef<HTMLAudioElement | null>(null);
 
+  // Открываем редактор вместо немедленной обрезки
   const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      const SIZE = 256;
-      const canvas = document.createElement("canvas");
-      canvas.width = SIZE; canvas.height = SIZE;
-      const ctx = canvas.getContext("2d")!;
-      // Круглая обрезка
-      ctx.beginPath();
-      ctx.arc(SIZE / 2, SIZE / 2, SIZE / 2, 0, Math.PI * 2);
-      ctx.closePath();
-      ctx.clip();
-      // Cover-вписывание (центр)
-      const side = Math.min(img.width, img.height);
-      const sx = (img.width - side) / 2;
-      const sy = (img.height - side) / 2;
-      ctx.drawImage(img, sx, sy, side, side, 0, 0, SIZE, SIZE);
-      const dataUrl = canvas.toDataURL("image/jpeg", 0.88);
-      setAvatarPreview(dataUrl);
-      setAvatarB64(dataUrl.split(",")[1]);
-      URL.revokeObjectURL(url);
-    };
-    img.src = url;
+    const reader = new FileReader();
+    reader.onload = ev => setEditSrc(ev.target?.result as string);
+    reader.readAsDataURL(file);
     e.target.value = "";
   };
 
-  // Загрузка кастомного звука из галереи
+  // Редактор вернул готовый b64 + preview
+  const handleEditorSave = (b64: string, preview: string) => {
+    setAvatarB64(b64);
+    setAvatarPreview(preview);
+    setEditSrc(null);
+  };
+
   const handleAudioFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
     const url = URL.createObjectURL(file);
@@ -60,21 +48,15 @@ export const ProfileModal = ({ me, token, onClose, onUpdate, onLogout, onSwitchA
     localStorage.setItem("dzchat_custom_audio", url);
     setSoundId("custom");
     localStorage.setItem("dzchat_sound", "custom");
-    // Предпрослушивание
-    const audio = new Audio(url);
-    audio.play().catch(() => {});
+    new Audio(url).play().catch(() => {});
     e.target.value = "";
   };
 
   const handleSoundChange = (id: string) => {
     setSoundId(id);
     localStorage.setItem("dzchat_sound", id);
-    if (id === "custom" && customAudioUrl) {
-      const audio = new Audio(customAudioUrl);
-      audio.play().catch(() => {});
-    } else {
-      playNotificationSound(id);
-    }
+    if (id === "custom" && customAudioUrl) new Audio(customAudioUrl).play().catch(() => {});
+    else playNotificationSound(id);
   };
 
   const handleVibrateToggle = () => {
@@ -101,14 +83,31 @@ export const ProfileModal = ({ me, token, onClose, onUpdate, onLogout, onSwitchA
       setUploadingAvatar(true);
       const res = await api("upload", "POST", { image: avatarB64, mime: "image/jpeg", kind: "avatar" }, token);
       setUploadingAvatar(false);
-      if (res.url) avatar_url = res.url;
-      else { setSaving(false); return; }
+      if (res.url) {
+        avatar_url = res.url;
+      } else {
+        setSaving(false);
+        return;
+      }
     }
-    await api("profile", "POST", { name, avatar_url }, token);
+    const saved = await api("profile", "POST", { name, avatar_url }, token);
     setSaving(false);
-    onUpdate({ ...me, name, avatar_url });
+    // Используем URL который вернул сервер (или тот что только что загрузили)
+    const finalUrl = saved.avatar_url || avatar_url;
+    onUpdate({ ...me, name, avatar_url: finalUrl });
     onClose();
   };
+
+  // Если открыт редактор — показываем его поверх всего
+  if (editSrc) {
+    return (
+      <DzChatAvatarEditor
+        src={editSrc}
+        onSave={handleEditorSave}
+        onClose={() => setEditSrc(null)}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center" onClick={onClose}>
@@ -121,21 +120,37 @@ export const ProfileModal = ({ me, token, onClose, onUpdate, onLogout, onSwitchA
           <button onClick={onClose} className="text-white/40 hover:text-white"><Icon name="X" size={18} /></button>
         </div>
 
-        {/* Аватарка */}
+        {/* ── Аватарка ── */}
         <div className="flex flex-col items-center gap-3 mb-5">
-          <button className="relative group" onClick={() => fileRef.current?.click()}>
-            <DzChatAvatar name={name || "?"} url={avatarPreview || undefined} size={90} />
-            <div className="absolute inset-0 bg-black/50 rounded-full flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 active:opacity-100 transition-opacity">
-              <Icon name="Camera" size={22} className="text-white" />
-              <span className="text-white text-[10px] mt-0.5">Изменить</span>
-            </div>
-            {uploadingAvatar && (
-              <div className="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center">
-                <Icon name="Loader" size={22} className="text-white animate-spin" />
+          <div className="relative">
+            <button className="relative group" onClick={() => fileRef.current?.click()}>
+              <div className="rounded-full overflow-hidden" style={{ width: 90, height: 90 }}>
+                {avatarPreview ? (
+                  <img src={avatarPreview} alt="avatar"
+                    style={{ width: 90, height: 90, objectFit: "cover", display: "block" }} />
+                ) : (
+                  <DzChatAvatar name={name || "?"} size={90} />
+                )}
               </div>
+              <div className="absolute inset-0 bg-black/55 rounded-full flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 active:opacity-100 transition-opacity">
+                <Icon name="Camera" size={22} className="text-white" />
+                <span className="text-white text-[10px] mt-0.5">Изменить</span>
+              </div>
+              {uploadingAvatar && (
+                <div className="absolute inset-0 bg-black/70 rounded-full flex items-center justify-center">
+                  <Icon name="Loader" size={22} className="text-white animate-spin" />
+                </div>
+              )}
+            </button>
+            {/* Зелёная кнопка редактировать */}
+            {avatarPreview && (
+              <button onClick={() => avatarPreview && setEditSrc(avatarPreview)}
+                className="absolute -bottom-1 -right-1 w-8 h-8 bg-[#25D366] rounded-full flex items-center justify-center border-2 border-[#1a2634]">
+                <Icon name="Pencil" size={14} className="text-white" />
+              </button>
             )}
-          </button>
-          <p className="text-white/30 text-xs">Нажми для смены фото</p>
+          </div>
+          <p className="text-white/30 text-xs">Нажми для смены · ✏️ для редактирования</p>
           <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} className="hidden" />
         </div>
 
@@ -168,7 +183,6 @@ export const ProfileModal = ({ me, token, onClose, onUpdate, onLogout, onSwitchA
             </button>
           )}
 
-          {/* Вибрация */}
           {"vibrate" in navigator && (
             <button onClick={handleVibrateToggle}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors ${
@@ -183,7 +197,7 @@ export const ProfileModal = ({ me, token, onClose, onUpdate, onLogout, onSwitchA
           )}
         </div>
 
-        {/* ── Звук уведомлений ── */}
+        {/* ── Звук ── */}
         <p className="text-white/40 text-xs uppercase tracking-wider mb-2 flex items-center gap-1.5">
           <Icon name="Volume2" size={12} /> Звук уведомлений
         </p>
@@ -191,68 +205,54 @@ export const ProfileModal = ({ me, token, onClose, onUpdate, onLogout, onSwitchA
           {NOTIFICATION_SOUNDS.map(s => (
             <button key={s.id} onClick={() => handleSoundChange(s.id)}
               className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm transition-colors ${
-                soundId === s.id
-                  ? "border-[#25D366] bg-[#25D366]/15 text-white"
-                  : "border-white/10 text-white/50 active:border-white/30"
+                soundId === s.id ? "border-[#25D366] bg-[#25D366]/15 text-white" : "border-white/10 text-white/50 active:border-white/30"
               }`}>
               <span className="text-base">{s.emoji}</span>
               <span className="truncate flex-1 text-left">{s.label}</span>
               {soundId === s.id && <Icon name="Check" size={12} className="text-[#25D366] shrink-0" />}
             </button>
           ))}
-          {/* Кнопка выбора из галереи */}
           <button onClick={() => audioFileRef.current?.click()}
             className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm transition-colors ${
-              soundId === "custom"
-                ? "border-[#25D366] bg-[#25D366]/15 text-white"
-                : "border-white/10 text-white/50 active:border-white/30"
+              soundId === "custom" ? "border-[#25D366] bg-[#25D366]/15 text-white" : "border-white/10 text-white/50"
             }`}>
             <span className="text-base">🎵</span>
             <span className="truncate flex-1 text-left">{soundId === "custom" ? "Мой звук ✓" : "Из галереи"}</span>
           </button>
           <input ref={audioFileRef} type="file" accept="audio/*" onChange={handleAudioFile} className="hidden" />
         </div>
-        <audio ref={customAudioRef} />
 
-        {/* ── Установка приложения ── */}
+        {/* ── Установка ── */}
         <p className="text-white/40 text-xs uppercase tracking-wider mb-2 flex items-center gap-1.5 mt-4">
           <Icon name="Smartphone" size={12} /> Приложение
         </p>
-        <div className="space-y-2 mb-5">
-          <div className="bg-white/5 border border-white/10 rounded-xl p-4">
-            <p className="text-white text-sm font-medium mb-3">Установи DzChat как приложение</p>
-            <div className="space-y-3">
-              {/* iOS */}
-              <div className="flex items-start gap-3">
-                <div className="w-7 h-7 bg-[#007AFF]/20 rounded-lg flex items-center justify-center shrink-0">
-                  <Icon name="Share2" size={14} className="text-[#007AFF]" />
-                </div>
-                <div>
-                  <p className="text-white/80 text-xs font-medium">iPhone / iPad (Safari)</p>
-                  <p className="text-white/40 text-xs mt-0.5">Нажми «Поделиться» → «На экран Домой»</p>
-                </div>
-              </div>
-              {/* Android */}
-              <div className="flex items-start gap-3">
-                <div className="w-7 h-7 bg-[#4285F4]/20 rounded-lg flex items-center justify-center shrink-0">
-                  <Icon name="Chrome" size={14} className="text-[#4285F4]" fallback="Globe" />
-                </div>
-                <div>
-                  <p className="text-white/80 text-xs font-medium">Android (Chrome)</p>
-                  <p className="text-white/40 text-xs mt-0.5">Меню ⋮ → «Добавить на главный экран»</p>
-                </div>
-              </div>
+        <div className="bg-white/5 border border-white/10 rounded-xl p-4 mb-5 space-y-3">
+          <div className="flex items-start gap-3">
+            <div className="w-7 h-7 bg-[#007AFF]/20 rounded-lg flex items-center justify-center shrink-0">
+              <Icon name="Share2" size={14} className="text-[#007AFF]" />
+            </div>
+            <div>
+              <p className="text-white/80 text-xs font-medium">iPhone / iPad (Safari)</p>
+              <p className="text-white/40 text-xs mt-0.5">Нажми «Поделиться» → «На экран Домой»</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <div className="w-7 h-7 bg-[#4285F4]/20 rounded-lg flex items-center justify-center shrink-0">
+              <Icon name="Globe" size={14} className="text-[#4285F4]" />
+            </div>
+            <div>
+              <p className="text-white/80 text-xs font-medium">Android (Chrome)</p>
+              <p className="text-white/40 text-xs mt-0.5">Меню ⋮ → «Добавить на главный экран»</p>
             </div>
           </div>
         </div>
 
         {/* Сохранить */}
         <button onClick={save} disabled={saving || uploadingAvatar}
-          className="w-full bg-[#25D366] text-white font-bold py-3 rounded-xl active:bg-[#1da851] transition-colors disabled:opacity-50 flex items-center justify-center gap-2 mb-3 text-base">
+          className="w-full bg-[#25D366] text-white font-bold py-3 rounded-xl active:bg-[#1da851] disabled:opacity-50 flex items-center justify-center gap-2 mb-3 text-base">
           {saving ? <><Icon name="Loader" size={16} className="animate-spin" /> Сохранение...</> : "Сохранить"}
         </button>
 
-        {/* Выйти / Сменить аккаунт */}
         <div className="flex gap-2">
           {onSwitchAccount && (
             <button onClick={onSwitchAccount}
