@@ -43,14 +43,16 @@ def send_sms(phone: str, otp: str) -> bool:
         params = urllib.parse.urlencode({
             "api_id": api_id,
             "to": normalized,
-            "msg": f"DzChat: ваш код подтверждения {otp}. Никому не сообщайте.",
+            "msg": f"DzChat: ваш kod podtverzhdeniya {otp}. Nikomu ne soobschayte.",
             "json": 1,
         })
         url = f"https://sms.ru/sms/send?{params}"
         with urllib.request.urlopen(url, timeout=10) as r:
             data = json.loads(r.read())
+            print(f"[SMS.ru] phone={normalized} status={data.get('status')} data={data}")
             return data.get("status") == "OK"
-    except Exception:
+    except Exception as e:
+        print(f"[SMS.ru] ERROR: {e}")
         return False
 
 def get_conn():
