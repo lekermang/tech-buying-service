@@ -2,7 +2,7 @@
 import Icon from "@/components/ui/icon";
 
 // ── Константа счётчика ────────────────────────────────────────────
-export const YM_ID = 101026698;
+export const YM_ID = 108421419; // skypka24.com HTTPS
 
 // ── Типы ─────────────────────────────────────────────────────────
 export interface YmStat { date: string; visits: number; pageviews: number; users: number; bounceRate: number; avgDuration: number; }

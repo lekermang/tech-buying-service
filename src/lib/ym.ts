@@ -1,5 +1,5 @@
 // Яндекс.Метрика — хелпер для отправки целей
-const YM_ID = 101026698;
+const YM_ID = 108421419; // skypka24.com HTTPS
 
 declare global {
   interface Window {
