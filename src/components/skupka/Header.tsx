@@ -93,25 +93,25 @@ const Header = ({ scrollTo }: HeaderProps) => {
   return (
     <header className="fixed top-0 left-0 right-0 z-50">
       {/* Gold ticker */}
-      <div className="bg-[#FFD700] px-3 sm:px-4 py-1.5 sm:py-2 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className="text-black text-[11px] sm:text-xs font-oswald font-bold uppercase tracking-wider">🥇 Золото 999:</span>
+      <div className="bg-[#FFD700] px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <span className="text-black text-sm sm:text-base font-oswald font-bold uppercase tracking-wider">🥇 Золото 999:</span>
           {goldPrice ? (
-            <span className="text-black font-roboto font-bold text-sm">
+            <span className="text-black font-roboto font-bold text-base sm:text-xl">
               {goldPrice.buy.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽/г
             </span>
           ) : (
-            <span className="text-black/50 font-roboto text-xs">загрузка...</span>
+            <span className="text-black/50 font-roboto text-sm">загрузка...</span>
           )}
         </div>
 
         {goldPrice && (
-          <div className="hidden md:flex items-center gap-2 text-xs font-roboto">
-            <div className="w-px h-4 bg-black/20" />
-            <span className="bg-black/10 px-2 py-0.5 text-black font-semibold">
+          <div className="hidden md:flex items-center gap-2 font-roboto text-sm">
+            <div className="w-px h-5 bg-black/20" />
+            <span className="bg-black/10 px-2.5 py-1 text-black font-semibold">
               Физлица: {priceRetail999?.toLocaleString('ru-RU')} ₽/г
             </span>
-            <span className="bg-black/10 px-2 py-0.5 text-black font-semibold">
+            <span className="bg-black/10 px-2.5 py-1 text-black font-semibold">
               Опт от 30 г: {priceWholesale999?.toLocaleString('ru-RU')} ₽/г
             </span>
           </div>
@@ -119,8 +119,8 @@ const Header = ({ scrollTo }: HeaderProps) => {
 
         <button
           onClick={() => { setSellOpen(true); setSent(false); setForm({ name: "", phone: "" }); }}
-          className="bg-black text-[#FFD700] font-oswald font-bold text-xs sm:text-sm px-3 sm:px-4 py-1.5 sm:py-2 uppercase tracking-wide hover:bg-[#1A1A1A] active:scale-95 transition-all flex items-center gap-1.5 shrink-0">
-          <Icon name="Zap" size={13} />
+          className="bg-black text-[#FFD700] font-oswald font-bold text-sm sm:text-base px-4 sm:px-5 py-2 sm:py-2.5 uppercase tracking-wide hover:bg-[#1A1A1A] active:scale-95 transition-all flex items-center gap-2 shrink-0">
+          <Icon name="Zap" size={15} />
           Продать
         </button>
       </div>
