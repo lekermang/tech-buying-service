@@ -15,17 +15,17 @@ const SplashScreen = ({ onDone }: { onDone: () => void }) => {
   const [hiding, setHiding] = useState(false);
 
   useEffect(() => {
-    const t1 = setTimeout(() => setHiding(true), 1800);
-    const t2 = setTimeout(() => onDone(), 2200);
+    const t1 = setTimeout(() => setHiding(true), 3000);
+    const t2 = setTimeout(() => onDone(), 3500);
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [onDone]);
 
   return (
-    <div className={`fixed inset-0 z-[100] bg-[#0D0D0D] flex flex-col items-center justify-center transition-opacity duration-400 ${hiding ? "opacity-0" : "opacity-100"}`}>
+    <div className={`fixed inset-0 z-[100] bg-[#0D0D0D] flex flex-col items-center justify-center transition-opacity duration-500 ${hiding ? "opacity-0" : "opacity-100"}`}>
       <div className="absolute inset-0" style={{ backgroundImage: "linear-gradient(rgba(255,215,0,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,215,0,0.04) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
       <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#FFD700]" />
 
-      <div className="relative flex flex-col items-center gap-6">
+      <div className="relative flex flex-col items-center gap-8">
         <div className="flex items-center gap-3 animate-[fadeIn_0.4s_ease]">
           <img
             src="https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/9c9b4fca-bfd7-4841-a827-eb0354dad8da.JPG"
@@ -35,18 +35,24 @@ const SplashScreen = ({ onDone }: { onDone: () => void }) => {
           <span className="font-oswald font-bold text-2xl text-[#FFD700] tracking-widest uppercase">Скупка24</span>
         </div>
 
-        <h2 className="font-oswald text-4xl sm:text-5xl font-bold text-white uppercase text-center animate-[slideDown_0.5s_ease_0.2s_both]">
-          Купим дорого <span className="text-[#FFD700]">всё!</span>
+        <h2 className="font-oswald text-4xl sm:text-5xl font-bold uppercase text-center animate-[slideDown_0.5s_ease_0.2s_both]">
+          Купим дорого{" "}
+          <span className="animate-shimmer">всё!</span>
         </h2>
 
-        <div className="flex gap-1.5 animate-[fadeIn_0.4s_ease_0.5s_both]">
-          {[0, 1, 2].map(i => (
+        {/* Полоса загрузки */}
+        <div className="w-64 sm:w-80 flex flex-col gap-2 animate-[fadeIn_0.4s_ease_0.5s_both]">
+          <div className="h-[3px] w-full bg-white/10 rounded-full overflow-hidden">
             <div
-              key={i}
-              className="w-2 h-2 bg-[#FFD700] rounded-full"
-              style={{ animation: `bounce 0.9s ease ${i * 0.18}s infinite` }}
+              className="h-full rounded-full"
+              style={{
+                background: "linear-gradient(90deg, #ffd700, #fffacd, #ffa500, #ffd700)",
+                backgroundSize: "200% auto",
+                animation: "splashBar 2.8s cubic-bezier(0.4,0,0.2,1) forwards, shimmer 1.5s linear infinite",
+              }}
             />
-          ))}
+          </div>
+          <span className="font-roboto text-white/30 text-xs text-center uppercase tracking-widest">Загрузка...</span>
         </div>
       </div>
     </div>
