@@ -341,6 +341,8 @@ const DzChat = () => {
             const isActive = activeChat?.id === chat.id;
             const lm = chat.last_message;
             const isOnline = chat.partner?.is_online;
+            // Активный звонок: если incomingCall относится к этому чату
+            const hasActiveCall = incomingCall?.chat_id === chat.id;
             return (
               <button key={chat.id} onClick={() => setActiveChat(chat)}
                 className="w-full flex items-center gap-3 px-3 py-3 transition-colors border-b active:bg-white/10"
@@ -350,10 +352,19 @@ const DzChat = () => {
                 }}>
                 <div className="relative shrink-0">
                   <DzChatAvatar name={chat.name || "?"} url={chat.avatar_url} size={48} />
-                  {isOnline && chat.type === "direct" && (
+                  {/* Зелёная точка онлайн */}
+                  {isOnline && chat.type === "direct" && !hasActiveCall && (
                     <span className="absolute bottom-0.5 right-0.5 w-3 h-3 rounded-full border-2"
                       style={{ background: theme.accent, borderColor: theme.sidebar }} />
                   )}
+                  {/* Пульсирующий телефон — активный звонок */}
+                  {hasActiveCall && (
+                    <span className="absolute bottom-0 right-0 w-5 h-5 rounded-full bg-green-500 border-2 flex items-center justify-center animate-pulse"
+                      style={{ borderColor: theme.sidebar }}>
+                      <Icon name="Phone" size={10} className="text-white" />
+                    </span>
+                  )}
+                  {/* Бейдж непрочитанных */}
                   {chat.unread > 0 && (
                     <span className="absolute -top-1 -right-1 text-white text-[10px] font-bold min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center"
                       style={{ background: theme.accent }}>
@@ -373,8 +384,10 @@ const DzChat = () => {
                       {lm && <p className="text-[10px]" style={{ color: theme.textMuted }}>{formatTime(lm.created_at)}</p>}
                     </div>
                   </div>
-                  <p className="text-xs truncate mt-0.5" style={{ color: theme.textMuted }}>
-                    {lm?.voice_url ? "🎤 Голосовое"
+                  <p className="text-xs truncate mt-0.5" style={{ color: hasActiveCall ? "#22c55e" : theme.textMuted }}>
+                    {hasActiveCall
+                      ? "📞 Входящий звонок..."
+                      : lm?.voice_url ? "🎤 Голосовое"
                       : lm?.video_url ? "🎥 Видео"
                       : lm?.photo_url ? "📷 Фото"
                       : lm?.text || "Нет сообщений"}

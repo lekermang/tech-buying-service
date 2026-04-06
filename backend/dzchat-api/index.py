@@ -793,15 +793,31 @@ def handler(event: dict, context) -> dict:
             folder = f"dzchat/video/{u['id']}"
             ext = mime.split("/")[-1] or "mp4"
             out_mime = mime
+        elif kind == "voice" or mime.startswith("audio/"):
+            folder = f"dzchat/voice/{u['id']}"
+            # Правильное расширение для каждого формата
+            if "mp4" in mime or "m4a" in mime or "aac" in mime or "mpeg" in mime:
+                ext = "m4a"
+                out_mime = "audio/mp4"
+            elif "ogg" in mime:
+                ext = "ogg"
+                out_mime = "audio/ogg"
+            else:
+                ext = "webm"
+                out_mime = "audio/webm"
         else:
             folder = f"dzchat/{kind}/{u['id']}"
-            ext = "jpg" if "jpeg" in mime else ("webm" if "webm" in mime else mime.split("/")[-1])
+            ext = "jpg" if "jpeg" in mime else mime.split("/")[-1]
             out_mime = mime
 
         key = f"{folder}/{uuid.uuid4().hex}.{ext}"
         s3 = boto3.client("s3", endpoint_url="https://bucket.poehali.dev",
                           aws_access_key_id=AK, aws_secret_access_key=SK)
-        s3.put_object(Bucket="files", Key=key, Body=data, ContentType=out_mime)
+        s3.put_object(
+            Bucket="files", Key=key, Body=data, ContentType=out_mime,
+            # Принудительно отдаём как аудио (не загрузка файла)
+            ContentDisposition="inline" if kind == "voice" else "attachment",
+        )
         cdn_url = f"https://cdn.poehali.dev/projects/{AK}/files/{key}"
         return resp({"ok": True, "url": cdn_url})
 

@@ -18,19 +18,45 @@ export const VoiceMessage = ({ url, duration, isMine }: { url: string; duration:
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    const onTime = () => { setCurrentTime(audio.currentTime); setProgress(audio.duration ? (audio.currentTime / audio.duration) * 100 : 0); };
-    const onEnd = () => { setPlaying(false); setProgress(0); setCurrentTime(0); };
+    const onTime = () => {
+      setCurrentTime(audio.currentTime);
+      setProgress(audio.duration ? (audio.currentTime / audio.duration) * 100 : 0);
+    };
     audio.addEventListener("timeupdate", onTime);
-    audio.addEventListener("ended", onEnd);
-    return () => { audio.removeEventListener("timeupdate", onTime); audio.removeEventListener("ended", onEnd); };
+    return () => { audio.removeEventListener("timeupdate", onTime); };
   }, []);
 
   const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
+  const handlePlay = async () => {
+    if (!audioRef.current) return;
+    if (playing) {
+      audioRef.current.pause();
+      setPlaying(false);
+    } else {
+      try {
+        // iOS требует setAttribute перед play()
+        audioRef.current.setAttribute("playsinline", "true");
+        await audioRef.current.play();
+        setPlaying(true);
+      } catch (_e) {
+        // Попробуем заново с user gesture
+        setPlaying(false);
+      }
+    }
+  };
+
   return (
-    <div className={`flex items-center gap-2 min-w-[180px] ${isMine ? "flex-row" : "flex-row"}`}>
-      <audio ref={audioRef} src={url} preload="metadata" />
-      <button onClick={toggle}
+    <div className="flex items-center gap-2 min-w-[180px]">
+      {/* audio без autoplay — iOS не позволяет */}
+      <audio
+        ref={audioRef}
+        src={url}
+        preload="metadata"
+        playsInline
+        onEnded={() => { setPlaying(false); setProgress(0); setCurrentTime(0); }}
+      />
+      <button onClick={handlePlay}
         className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${isMine ? "bg-white/20" : "bg-[#25D366]/80"}`}>
         <Icon name={playing ? "Pause" : "Play"} size={16} className="text-white" />
       </button>
@@ -40,7 +66,7 @@ export const VoiceMessage = ({ url, duration, isMine }: { url: string; duration:
             if (!audioRef.current) return;
             const rect = e.currentTarget.getBoundingClientRect();
             const pct = (e.clientX - rect.left) / rect.width;
-            audioRef.current.currentTime = pct * audioRef.current.duration;
+            audioRef.current.currentTime = pct * (audioRef.current.duration || 0);
           }}>
           <div className="absolute inset-y-0 left-0 rounded-full bg-white/70" style={{ width: `${progress}%` }} />
         </div>

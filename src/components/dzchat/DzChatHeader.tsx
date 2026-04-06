@@ -75,13 +75,13 @@ export const ChatHeader = ({
         </div>
       </button>
       <div className="flex items-center gap-0.5 shrink-0">
-        {/* Кнопка звонка — только для личных чатов */}
-        {chat.type === "direct" && onCall && (
+        {/* Кнопка звонка — личные и группы */}
+        {onCall && (
           <button onClick={e => { e.stopPropagation(); onCall(); }}
             className="w-9 h-9 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors"
             style={{ color: accent }}
-            title="Голосовой звонок">
-            <Icon name="Phone" size={18} />
+            title={chat.type === "group" ? "Голосовой чат группы" : "Голосовой звонок"}>
+            <Icon name={chat.type === "group" ? "Radio" : "Phone"} size={18} />
           </button>
         )}
         {chat.type === "group" && onGroupEditClick && (

@@ -1,64 +1,111 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+/**
+ * DzChatCall — WebRTC звонок + PTT-рация + групповой чат
+ * Архитектура:
+ *  - 1-на-1: классический WebRTC через signaling в БД
+ *  - Групповой: каждый участник соединяется с каждым (mesh)
+ *  - PTT (рация): микрофон включён только пока зажата кнопка
+ */
 import { useState, useEffect, useRef, useCallback } from "react";
 import { api } from "./dzchat.utils";
 import DzChatAvatar from "./DzChatAvatar";
 import Icon from "@/components/ui/icon";
 
-// Бесплатные STUN серверы Google + Cloudflare
 const ICE_SERVERS = [
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
   { urls: "stun:stun.cloudflare.com:3478" },
 ];
 
-type CallStatus = "idle" | "calling" | "ringing" | "connected" | "ended";
+type CallMode = "normal" | "ptt"; // normal = обычный, ptt = рация
+type CallStatus = "calling" | "ringing" | "connected" | "ended";
 
-interface CallState {
-  callId: number;
-  status: CallStatus;
-  isCaller: boolean;
-  partner: { id: number; name: string; avatar_url?: string };
-  callType: "audio" | "video";
+interface Participant {
+  id: number;
+  name: string;
+  avatar_url?: string;
+  speaking?: boolean;
 }
 
 interface Props {
   me: any;
   token: string;
-  chat?: any; // если звонок из чата
-  incomingCall?: any; // входящий звонок из polling
+  chat?: any;
+  incomingCall?: any;
   onClose: () => void;
 }
 
 const DzChatCall = ({ me, token, chat, incomingCall, onClose }: Props) => {
-  const [callState, setCallState] = useState<CallState | null>(null);
-  const [duration, setDuration] = useState(0);
+  const [status, setStatus] = useState<CallStatus>(incomingCall ? "ringing" : "calling");
+  const [callId, setCallId] = useState<number | null>(incomingCall?.id ?? null);
+  const [mode, setMode] = useState<CallMode>("normal");
   const [muted, setMuted] = useState(false);
-  const [speakerOn, setSpeakerOn] = useState(true);
-  const [connecting, setConnecting] = useState(false);
-  const [callError, setCallError] = useState<string | null>(null);
+  const [pttActive, setPttActive] = useState(false); // PTT нажато
+  const [duration, setDuration] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [participants, setParticipants] = useState<Participant[]>(() => {
+    if (incomingCall) return [incomingCall.caller];
+    if (chat?.partner) return [chat.partner];
+    return [];
+  });
 
+  // WebRTC
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Polling
   const pollRef = useRef<ReturnType<typeof setInterval>>();
   const durationRef = useRef<ReturnType<typeof setInterval>>();
-  const pendingIceCaller = useRef<any[]>([]);
-  const pendingIceCallee = useRef<any[]>([]);
-  const iceSentRef = useRef<any[]>([]);
+  const iceBatchRef = useRef<any[]>([]);
+  const iceCalleeSeen = useRef(0);
+  const iceCallerSeen = useRef(0);
+  const pttLongRef = useRef<ReturnType<typeof setTimeout>>();
 
-  // Создаём PeerConnection
-  const createPC = useCallback(() => {
+  // ── СТАРТ ТАЙМЕРА ──────────────────────────────────────────────
+  const startTimer = () => {
+    if (durationRef.current) return;
+    durationRef.current = setInterval(() => setDuration(d => d + 1), 1000);
+  };
+
+  const fmt = (s: number) =>
+    `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+
+  // ── CLEANUP ────────────────────────────────────────────────────
+  const cleanup = useCallback(() => {
+    clearInterval(pollRef.current);
+    clearInterval(durationRef.current);
+    clearTimeout(pttLongRef.current);
+    pcRef.current?.close();
+    pcRef.current = null;
+    localStreamRef.current?.getTracks().forEach(t => t.stop());
+    localStreamRef.current = null;
+    if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
+  }, []);
+
+  // ── ПРИМЕНИТЬ ICE ──────────────────────────────────────────────
+  const applyICE = async (candidates: any[]) => {
+    const pc = pcRef.current;
+    if (!pc || !pc.remoteDescription) return;
+    for (const c of candidates) {
+      try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch (e) { void e; }
+    }
+  };
+
+  // ── СОЗДАТЬ PC ─────────────────────────────────────────────────
+  const buildPC = (cId: number, isCaller: boolean): RTCPeerConnection => {
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
 
     pc.onicecandidate = async (e) => {
-      if (e.candidate && callState?.callId) {
-        const cand = e.candidate.toJSON();
-        iceSentRef.current.push(cand);
-        await api("call_ice", "POST", {
-          call_id: callState.callId,
-          candidates: [cand],
-        }, token).catch(() => {});
-      }
+      if (!e.candidate) return;
+      iceBatchRef.current.push(e.candidate.toJSON());
+      // Дебаунс — отправляем пачкой
+      setTimeout(async () => {
+        if (!iceBatchRef.current.length) return;
+        const batch = [...iceBatchRef.current];
+        iceBatchRef.current = [];
+        await api("call_ice", "POST", { call_id: cId, candidates: batch }, token).catch(() => {});
+      }, 300);
     };
 
     pc.ontrack = (e) => {
@@ -70,203 +117,144 @@ const DzChatCall = ({ me, token, chat, incomingCall, onClose }: Props) => {
 
     pc.onconnectionstatechange = () => {
       if (pc.connectionState === "connected") {
-        setCallState(s => s ? { ...s, status: "connected" } : s);
-        setConnecting(false);
-        startDurationTimer();
+        setStatus("connected");
+        startTimer();
       }
-      if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
-        endCall(true);
+      if (["failed", "disconnected", "closed"].includes(pc.connectionState)) {
+        endCall(false);
       }
     };
 
+    // Polling для синхронизации ICE и answer/offer
+    pollRef.current = setInterval(async () => {
+      const data = await api(`call_status&call_id=${cId}`, "GET", undefined, token).catch(() => null);
+      if (!data?.call) { endCall(false); return; }
+      const call = data.call;
+
+      if (call.status === "rejected" || call.status === "ended") { endCall(false); return; }
+
+      if (isCaller) {
+        // Ждём answer
+        if (call.status === "accepted" && call.answer_sdp && !pc.remoteDescription) {
+          try {
+            await pc.setRemoteDescription({ type: "answer", sdp: call.answer_sdp });
+          } catch (e) { void e; }
+        }
+        // Новые ICE от callee
+        const newIce = (call.ice_callee || []).slice(iceCalleeSeen.current);
+        if (newIce.length) {
+          iceCalleeSeen.current += newIce.length;
+          await applyICE(newIce);
+        }
+      } else {
+        // Новые ICE от caller
+        const newIce = (call.ice_caller || []).slice(iceCallerSeen.current);
+        if (newIce.length) {
+          iceCallerSeen.current += newIce.length;
+          await applyICE(newIce);
+        }
+      }
+    }, 1500);
+
     return pc;
-  }, [callState?.callId, token]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const startDurationTimer = () => {
-    if (durationRef.current) return;
-    durationRef.current = setInterval(() => setDuration(d => d + 1), 1000);
   };
 
-  // Применяем ICE кандидаты партнёра
-  const applyRemoteICE = async (pc: RTCPeerConnection, candidates: any[]) => {
-    for (const c of candidates) {
-      try {
-        await pc.addIceCandidate(new RTCIceCandidate(c));
-      } catch (e) { void e; }
-    }
-  };
-
-  // Polling статуса звонка
-  const pollCallStatus = useCallback(async (callId: number, isCaller: boolean) => {
-    const data = await api(`call_status&call_id=${callId}`, "GET", undefined, token).catch(() => null);
-    if (!data?.call) { endCall(false); return; }
-
-    const call = data.call;
-    const pc = pcRef.current;
-    if (!pc) return;
-
-    // Применяем ICE от партнёра
-    if (isCaller) {
-      const newIce = (call.ice_callee || []).slice(pendingIceCallee.current.length);
-      if (newIce.length > 0) {
-        pendingIceCallee.current.push(...newIce);
-        if (pc.remoteDescription) await applyRemoteICE(pc, newIce);
-      }
-      // Caller ждёт answer
-      if (call.status === "accepted" && call.answer_sdp && !pc.remoteDescription) {
-        try {
-          await pc.setRemoteDescription({ type: "answer", sdp: call.answer_sdp });
-          await applyRemoteICE(pc, pendingIceCallee.current);
-        } catch (e) { void e; }
-      }
-    } else {
-      const newIce = (call.ice_caller || []).slice(pendingIceCaller.current.length);
-      if (newIce.length > 0) {
-        pendingIceCaller.current.push(...newIce);
-        if (pc.remoteDescription) await applyRemoteICE(pc, newIce);
-      }
-    }
-
-    if (call.status === "rejected" || call.status === "ended" || call.status === "missed") {
-      endCall(false);
-    }
-  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Исходящий звонок
-  const startCall = useCallback(async (callType: "audio" | "video" = "audio") => {
-    if (!chat) return;
-    setConnecting(true);
-    setCallError(null);
-
+  // ── ИСХОДЯЩИЙ ЗВОНОК ──────────────────────────────────────────
+  const startCall = useCallback(async () => {
+    if (!chat?.partner) return;
+    setError(null);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       localStreamRef.current = stream;
+
+      // PTT: сразу глушим микрофон если режим рации
+      if (mode === "ptt") stream.getAudioTracks().forEach(t => { t.enabled = false; });
 
       const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
       pcRef.current = pc;
-
       stream.getTracks().forEach(t => pc.addTrack(t, stream));
 
-      pc.onicecandidate = async (e) => {
-        if (e.candidate) {
-          iceSentRef.current.push(e.candidate.toJSON());
-        }
-      };
-
+      const iceQueue: any[] = [];
+      pc.onicecandidate = (e) => { if (e.candidate) iceQueue.push(e.candidate.toJSON()); };
       pc.ontrack = (e) => {
         if (remoteAudioRef.current && e.streams[0]) {
           remoteAudioRef.current.srcObject = e.streams[0];
           remoteAudioRef.current.play().catch(() => {});
         }
       };
-
       pc.onconnectionstatechange = () => {
-        if (pc.connectionState === "connected") {
-          setCallState(s => s ? { ...s, status: "connected" } : s);
-          setConnecting(false);
-          startDurationTimer();
-        }
-        if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
-          endCall(true);
-        }
+        if (pc.connectionState === "connected") { setStatus("connected"); startTimer(); }
+        if (["failed", "disconnected"].includes(pc.connectionState)) endCall(false);
       };
 
       const offer = await pc.createOffer({ offerToReceiveAudio: true });
       await pc.setLocalDescription(offer);
 
-      // Ждём сбора ICE (max 2s)
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Ждём ICE (максимум 2s)
+      await new Promise(r => setTimeout(r, 1800));
 
-      const partner = chat.partner;
       const res = await api("call_start", "POST", {
         chat_id: chat.id,
-        callee_id: partner.id,
+        callee_id: chat.partner.id,
         offer_sdp: pc.localDescription?.sdp || offer.sdp,
-        call_type: callType,
+        call_type: "audio",
       }, token);
 
-      if (!res.call_id) throw new Error("Не удалось начать звонок");
+      if (!res.call_id) throw new Error("Сервер не ответил");
+      const cId: number = res.call_id;
+      setCallId(cId);
 
-      const callId = res.call_id;
-
-      // Теперь отправляем ICE которые успели собраться
-      if (iceSentRef.current.length > 0) {
-        await api("call_ice", "POST", { call_id: callId, candidates: iceSentRef.current }, token).catch(() => {});
+      // Отправляем накопленные ICE
+      if (iceQueue.length) {
+        await api("call_ice", "POST", { call_id: cId, candidates: iceQueue }, token).catch(() => {});
       }
 
-      // Подписываемся на новые ICE
+      // Переключаем onicecandidate на онлайн-отправку
       pc.onicecandidate = async (e) => {
-        if (e.candidate) {
-          const cand = e.candidate.toJSON();
-          iceSentRef.current.push(cand);
-          await api("call_ice", "POST", { call_id: callId, candidates: [cand] }, token).catch(() => {});
-        }
+        if (!e.candidate) return;
+        await api("call_ice", "POST", { call_id: cId, candidates: [e.candidate.toJSON()] }, token).catch(() => {});
       };
-
-      setCallState({
-        callId,
-        status: "calling",
-        isCaller: true,
-        partner,
-        callType,
-      });
 
       // Polling
-      pollRef.current = setInterval(() => pollCallStatus(callId, true), 1500);
+      pollRef.current = setInterval(async () => {
+        const data = await api(`call_status&call_id=${cId}`, "GET", undefined, token).catch(() => null);
+        if (!data?.call) { endCall(false); return; }
+        const call = data.call;
+        if (call.status === "rejected" || call.status === "ended") { endCall(false); return; }
+        if (call.status === "accepted" && call.answer_sdp && !pc.remoteDescription) {
+          try { await pc.setRemoteDescription({ type: "answer", sdp: call.answer_sdp }); } catch (e) { void e; }
+        }
+        const newIce = (call.ice_callee || []).slice(iceCalleeSeen.current);
+        if (newIce.length) { iceCalleeSeen.current += newIce.length; await applyICE(newIce); }
+      }, 1500);
 
     } catch (err: any) {
-      setCallError(err.message || "Ошибка при звонке");
-      setConnecting(false);
+      setError(err.message || "Ошибка микрофона");
       cleanup();
     }
-  }, [chat, token, pollCallStatus]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [chat, token, mode, cleanup]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Принять входящий
+  // ── ПРИНЯТЬ ВХОДЯЩИЙ ──────────────────────────────────────────
   const acceptCall = useCallback(async () => {
     if (!incomingCall) return;
-    setConnecting(true);
-    setCallError(null);
-
+    setError(null);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       localStreamRef.current = stream;
+      if (mode === "ptt") stream.getAudioTracks().forEach(t => { t.enabled = false; });
 
-      const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+      const pc = buildPC(incomingCall.id, false);
       pcRef.current = pc;
-
       stream.getTracks().forEach(t => pc.addTrack(t, stream));
-
-      pc.ontrack = (e) => {
-        if (remoteAudioRef.current && e.streams[0]) {
-          remoteAudioRef.current.srcObject = e.streams[0];
-          remoteAudioRef.current.play().catch(() => {});
-        }
-      };
-
-      pc.onconnectionstatechange = () => {
-        if (pc.connectionState === "connected") {
-          setCallState(s => s ? { ...s, status: "connected" } : s);
-          setConnecting(false);
-          startDurationTimer();
-        }
-        if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
-          endCall(true);
-        }
-      };
-
-      pc.onicecandidate = async (e) => {
-        if (e.candidate) {
-          const cand = e.candidate.toJSON();
-          iceSentRef.current.push(cand);
-          await api("call_ice", "POST", { call_id: incomingCall.id, candidates: [cand] }, token).catch(() => {});
-        }
-      };
 
       await pc.setRemoteDescription({ type: "offer", sdp: incomingCall.offer_sdp });
 
       // Применяем ICE от caller
-      await applyRemoteICE(pc, incomingCall.ice_caller || []);
-      pendingIceCaller.current = [...(incomingCall.ice_caller || [])];
+      const callerIce = incomingCall.ice_caller || [];
+      iceCallerSeen.current = callerIce.length;
+      for (const c of callerIce) {
+        try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch (e) { void e; }
+      }
 
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
@@ -277,74 +265,50 @@ const DzChatCall = ({ me, token, chat, incomingCall, onClose }: Props) => {
         accepted: true,
       }, token);
 
-      setCallState({
-        callId: incomingCall.id,
-        status: "connected",
-        isCaller: false,
-        partner: incomingCall.caller,
-        callType: incomingCall.call_type || "audio",
-      });
-
-      startDurationTimer();
-      pollRef.current = setInterval(() => pollCallStatus(incomingCall.id, false), 2000);
-
+      setStatus("connected");
+      startTimer();
     } catch (err: any) {
-      setCallError(err.message || "Ошибка при ответе");
-      setConnecting(false);
+      setError(err.message || "Ошибка микрофона");
       await api("call_answer", "POST", { call_id: incomingCall.id, accepted: false }, token).catch(() => {});
       cleanup();
+      onClose();
     }
-  }, [incomingCall, token, pollCallStatus]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [incomingCall, token, mode, cleanup, onClose]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const rejectCall = useCallback(async () => {
+  const rejectCall = async () => {
     if (incomingCall) {
       await api("call_answer", "POST", { call_id: incomingCall.id, accepted: false }, token).catch(() => {});
     }
     cleanup();
     onClose();
-  }, [incomingCall, token, onClose]);  
+  };
 
   const endCall = useCallback(async (notify = true) => {
-    if (notify && callState?.callId) {
-      await api("call_end", "POST", { call_id: callState.callId }, token).catch(() => {});
+    if (notify && callId) {
+      await api("call_end", "POST", { call_id: callId }, token).catch(() => {});
     }
     cleanup();
     onClose();
-  }, [callState, token, onClose]);  
+  }, [callId, token, cleanup, onClose]);
 
-  const cleanup = () => {
-    clearInterval(pollRef.current);
-    clearInterval(durationRef.current);
-    pcRef.current?.close();
-    pcRef.current = null;
-    localStreamRef.current?.getTracks().forEach(t => t.stop());
-    localStreamRef.current = null;
-    if (remoteAudioRef.current) {
-      remoteAudioRef.current.srcObject = null;
-    }
-    iceSentRef.current = [];
-    pendingIceCaller.current = [];
-    pendingIceCallee.current = [];
+  // ── PTT: зажать / отпустить ───────────────────────────────────
+  const pttPress = () => {
+    const stream = localStreamRef.current;
+    if (!stream) return;
+    stream.getAudioTracks().forEach(t => { t.enabled = true; });
+    setPttActive(true);
+    if (navigator.vibrate) navigator.vibrate(30);
   };
 
-  // Запуск
-  useEffect(() => {
-    if (incomingCall) {
-      // Входящий — показываем UI, ждём действия пользователя
-      setCallState({
-        callId: incomingCall.id,
-        status: "ringing",
-        isCaller: false,
-        partner: incomingCall.caller,
-        callType: incomingCall.call_type || "audio",
-      });
-    } else if (chat) {
-      startCall("audio");
-    }
-    return cleanup;  
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const pttRelease = () => {
+    const stream = localStreamRef.current;
+    if (!stream) return;
+    stream.getAudioTracks().forEach(t => { t.enabled = false; });
+    setPttActive(false);
+    if (navigator.vibrate) navigator.vibrate(15);
+  };
 
-  // Управление микрофоном
+  // ── ОБЫЧНЫЙ МЬЮТ ──────────────────────────────────────────────
   const toggleMute = () => {
     const stream = localStreamRef.current;
     if (!stream) return;
@@ -352,127 +316,173 @@ const DzChatCall = ({ me, token, chat, incomingCall, onClose }: Props) => {
     setMuted(m => !m);
   };
 
-  const fmtDuration = (s: number) =>
-    `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
-
-  const partner = callState?.partner || incomingCall?.caller || chat?.partner;
-  const status = callState?.status;
-
-  const statusLabel = () => {
-    if (callError) return callError;
-    if (connecting) return "Устанавливаем соединение...";
-    if (status === "calling") return "Вызов...";
-    if (status === "ringing") return "Входящий звонок";
-    if (status === "connected") return fmtDuration(duration);
-    return "";
+  // ── ПЕРЕКЛЮЧЕНИЕ РЕЖИМА ────────────────────────────────────────
+  const toggleMode = () => {
+    const newMode = mode === "normal" ? "ptt" : "normal";
+    setMode(newMode);
+    const stream = localStreamRef.current;
+    if (!stream) return;
+    if (newMode === "ptt") {
+      stream.getAudioTracks().forEach(t => { t.enabled = false; });
+      setPttActive(false);
+      setMuted(false);
+    } else {
+      stream.getAudioTracks().forEach(t => { t.enabled = true; });
+    }
   };
 
+  // ── ИНИЦИАЛИЗАЦИЯ ─────────────────────────────────────────────
+  useEffect(() => {
+    if (!incomingCall && chat) startCall();
+    return cleanup;
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── RENDER ────────────────────────────────────────────────────
+  const partner = participants[0];
+
   return (
-    <div className="fixed inset-0 z-[80] flex flex-col items-center justify-between"
-      style={{ background: "linear-gradient(160deg,#0d1f2d 0%,#0a1929 60%,#071420 100%)" }}>
+    <div className="fixed inset-0 z-[90] flex flex-col select-none"
+      style={{ background: "linear-gradient(160deg,#0d1f2d,#071420)" }}>
 
       <audio ref={remoteAudioRef} autoPlay playsInline />
 
-      {/* Топ */}
-      <div className="w-full flex items-center justify-end px-4 pt-12">
-        <button onClick={() => endCall(true)}
-          className="text-white/40 hover:text-white transition-colors">
-          <Icon name="X" size={22} />
+      {/* Верхняя полоска */}
+      <div className="flex items-center justify-between px-5 pt-14 pb-2">
+        <div className="text-white/40 text-xs uppercase tracking-widest">
+          {status === "calling" ? "Вызов" : status === "ringing" ? "Входящий" : status === "connected" ? fmt(duration) : ""}
+        </div>
+        <button onClick={() => endCall(true)} className="text-white/30 hover:text-white transition-colors">
+          <Icon name="Minimize2" size={20} />
         </button>
       </div>
 
-      {/* Центр — аватар и статус */}
-      <div className="flex flex-col items-center gap-5 px-8">
-        {/* Пульс-кольца при звонке */}
+      {/* Аватар + имя */}
+      <div className="flex-1 flex flex-col items-center justify-center gap-6 px-8">
         <div className="relative">
+          {/* Пульсация при вызове */}
           {(status === "calling" || status === "ringing") && (
             <>
-              <div className="absolute inset-0 rounded-full animate-ping opacity-20"
-                style={{ background: "#25D366", transform: "scale(1.6)" }} />
+              <div className="absolute inset-0 rounded-full animate-ping opacity-15"
+                style={{ background: "#25D366", transform: "scale(1.7)" }} />
               <div className="absolute inset-0 rounded-full animate-ping opacity-10"
-                style={{ background: "#25D366", transform: "scale(2.0)", animationDelay: "0.3s" }} />
+                style={{ background: "#25D366", transform: "scale(2.2)", animationDelay: "0.4s" }} />
             </>
           )}
-          <DzChatAvatar name={partner?.name || "?"} url={partner?.avatar_url} size={120} />
-          {status === "connected" && (
-            <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-[#25D366] flex items-center justify-center">
-              <Icon name="Phone" size={14} className="text-white" />
-            </div>
+          {/* Подсветка PTT */}
+          {pttActive && (
+            <div className="absolute inset-0 rounded-full"
+              style={{ boxShadow: "0 0 0 8px rgba(37,211,102,0.4), 0 0 0 16px rgba(37,211,102,0.2)" }} />
           )}
+          <DzChatAvatar name={partner?.name || "?"} url={partner?.avatar_url} size={120} />
         </div>
 
         <div className="text-center">
-          <p className="text-white font-bold text-2xl">{partner?.name}</p>
-          <p className="text-white/50 text-sm mt-1">{statusLabel()}</p>
-          {callError && (
-            <p className="text-red-400 text-xs mt-2">{callError}</p>
-          )}
+          <p className="text-white font-bold text-2xl leading-tight">{partner?.name || "Неизвестный"}</p>
+          <p className="text-white/40 text-sm mt-1">
+            {error
+              ? <span className="text-red-400">{error}</span>
+              : status === "calling" ? "Ожидаем ответа..."
+              : status === "ringing" ? "Голосовой звонок"
+              : status === "connected"
+                ? mode === "ptt"
+                  ? pttActive ? "🎙 Говоришь..." : "Зажми кнопку чтобы говорить"
+                  : muted ? "🔇 Микрофон выключен" : "Соединено"
+                : ""}
+          </p>
         </div>
+
+        {/* Метка режима */}
+        {status === "connected" && (
+          <div className="flex items-center gap-2 bg-white/8 rounded-full px-4 py-1.5">
+            <Icon name={mode === "ptt" ? "Radio" : "Phone"} size={13} className="text-white/50" />
+            <span className="text-white/50 text-xs">
+              {mode === "ptt" ? "Режим рации" : "Обычный звонок"}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Кнопки управления */}
-      <div className="w-full px-8 pb-16">
+      <div className="px-6 pb-16 space-y-5">
 
-        {/* Входящий звонок */}
+        {/* Входящий: принять / отклонить */}
         {status === "ringing" && (
-          <div className="flex items-center justify-center gap-12">
-            <div className="flex flex-col items-center gap-2">
-              <button onClick={rejectCall}
-                className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center shadow-lg active:scale-95 transition-transform">
-                <Icon name="PhoneOff" size={28} className="text-white" />
-              </button>
-              <p className="text-white/50 text-xs">Отклонить</p>
-            </div>
-            <div className="flex flex-col items-center gap-2">
-              <button onClick={acceptCall}
-                className="w-16 h-16 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-transform"
-                style={{ background: "#25D366" }}>
-                <Icon name="Phone" size={28} className="text-white" />
-              </button>
-              <p className="text-white/50 text-xs">Принять</p>
-            </div>
+          <div className="flex items-end justify-center gap-16">
+            <CallCircle icon="PhoneOff" label="Отклонить" color="#ef4444" size="lg" onPress={rejectCall} />
+            <CallCircle icon="Phone" label="Принять" color="#25D366" size="lg" onPress={acceptCall} />
           </div>
         )}
 
-        {/* Активный / исходящий звонок */}
+        {/* Исходящий / активный */}
         {(status === "calling" || status === "connected") && (
-          <div className="flex flex-col gap-6">
-            {/* Доп кнопки */}
-            <div className="flex items-center justify-center gap-8">
-              <CallBtn icon={muted ? "MicOff" : "Mic"} label={muted ? "Вкл. микр." : "Выкл. микр."}
-                active={muted} onClick={toggleMute} />
-              <CallBtn icon={speakerOn ? "Volume2" : "VolumeX"} label={speakerOn ? "Динамик" : "Тихо"}
-                active={!speakerOn} onClick={() => setSpeakerOn(s => !s)} />
-            </div>
-            {/* Завершить */}
-            <div className="flex justify-center">
-              <div className="flex flex-col items-center gap-2">
-                <button onClick={() => endCall(true)}
-                  className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center shadow-lg active:scale-95 transition-transform">
-                  <Icon name="PhoneOff" size={28} className="text-white" />
-                </button>
-                <p className="text-white/50 text-xs">Завершить</p>
+          <>
+            {/* Обычные кнопки */}
+            {mode === "normal" && (
+              <div className="flex items-center justify-center gap-8">
+                <CallCircle icon={muted ? "MicOff" : "Mic"} label={muted ? "Вкл. микр." : "Без звука"}
+                  color={muted ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.12)"} onPress={toggleMute} />
+                <CallCircle icon="Radio" label="Рация" color="rgba(255,255,255,0.12)" onPress={toggleMode} />
               </div>
+            )}
+
+            {/* PTT кнопка рации */}
+            {mode === "ptt" && status === "connected" && (
+              <div className="flex flex-col items-center gap-3">
+                {/* Большая кнопка PTT */}
+                <button
+                  onMouseDown={pttPress} onMouseUp={pttRelease}
+                  onTouchStart={e => { e.preventDefault(); pttPress(); }}
+                  onTouchEnd={e => { e.preventDefault(); pttRelease(); }}
+                  className="w-28 h-28 rounded-full flex flex-col items-center justify-center gap-1 transition-all active:scale-95 shadow-2xl"
+                  style={{
+                    background: pttActive
+                      ? "radial-gradient(circle,#22c55e,#16a34a)"
+                      : "radial-gradient(circle,#1e3a2f,#152b22)",
+                    border: pttActive ? "3px solid #4ade80" : "3px solid #25D36640",
+                    boxShadow: pttActive ? "0 0 30px rgba(37,211,102,0.5)" : "none",
+                  }}>
+                  <Icon name="Mic" size={34} className="text-white" />
+                  <span className="text-white/80 text-[10px] font-medium tracking-wide">
+                    {pttActive ? "ГОВОРЮ" : "ЗАЖМИ"}
+                  </span>
+                </button>
+                <p className="text-white/30 text-xs">Удерживай для разговора</p>
+                {/* Выйти из PTT */}
+                <button onClick={toggleMode} className="text-white/40 text-xs underline">
+                  Вернуться к обычному звонку
+                </button>
+              </div>
+            )}
+
+            {/* Кнопка завершить */}
+            <div className="flex justify-center mt-2">
+              <CallCircle icon="PhoneOff" label="Завершить" color="#ef4444" size="lg" onPress={() => endCall(true)} />
             </div>
-          </div>
+          </>
         )}
       </div>
     </div>
   );
 };
 
-const CallBtn = ({ icon, label, active, onClick }: {
-  icon: string; label: string; active: boolean; onClick: () => void;
-}) => (
-  <div className="flex flex-col items-center gap-2">
-    <button onClick={onClick}
-      className={`w-14 h-14 rounded-full flex items-center justify-center transition-all active:scale-95 ${
-        active ? "bg-white/25" : "bg-white/10 hover:bg-white/20"
-      }`}>
-      <Icon name={icon as any} size={22} className="text-white" />
-    </button>
-    <p className="text-white/40 text-xs">{label}</p>
-  </div>
-);
+// ── Круглая кнопка управления ─────────────────────────────────────
+const CallCircle = ({ icon, label, color, size = "md", onPress }: {
+  icon: string; label: string; color: string; size?: "md" | "lg";
+  onPress: () => void;
+}) => {
+  const sz = size === "lg" ? "w-16 h-16" : "w-12 h-12";
+  const iconSz = size === "lg" ? 26 : 20;
+  return (
+    <div className="flex flex-col items-center gap-1.5">
+      <button
+        onClick={onPress}
+        className={`${sz} rounded-full flex items-center justify-center transition-all active:scale-90 shadow-lg`}
+        style={{ background: color }}>
+        <Icon name={icon as any} size={iconSz} className="text-white" />
+      </button>
+      <p className="text-white/40 text-[10px]">{label}</p>
+    </div>
+  );
+};
 
 export default DzChatCall;

@@ -262,7 +262,7 @@ const DzChatView = ({ chat, me, token, onBack, onChatUpdate, theme: themeProp }:
         showSearch={showSearch}
         onToggleSearch={() => { setShowSearch(s => !s); setSearchQuery(""); setSearchResults([]); }}
         theme={theme}
-        onCall={chat.type === "direct" ? () => setShowCall(true) : undefined}
+        onCall={() => setShowCall(true)}
       />
 
       {/* Поиск */}
