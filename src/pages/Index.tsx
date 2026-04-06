@@ -1,3 +1,4 @@
+import { useState } from "react";
 import Header from "@/components/skupka/Header";
 import HeroSection from "@/components/skupka/HeroSection";
 import InfoSections from "@/components/skupka/InfoSections";
@@ -11,10 +12,12 @@ const scrollTo = (href: string) => {
 };
 
 const Index = () => {
+  const [evalOpen, setEvalOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-white pb-[72px] md:pb-0">
       <Header scrollTo={scrollTo} />
-      <HeroSection scrollTo={scrollTo} />
+      <HeroSection scrollTo={scrollTo} externalModalOpen={evalOpen} onExternalModalClose={() => setEvalOpen(false)} />
       <InfoSections />
       <ContactsFooter scrollTo={scrollTo} />
       <Consultant />
@@ -27,7 +30,7 @@ const Index = () => {
             <Icon name="Phone" size={22} />
             <span className="font-roboto text-[10px] uppercase tracking-wide">Позвонить</span>
           </a>
-          <button onClick={() => scrollTo("#evaluate")}
+          <button onClick={() => setEvalOpen(true)}
             className="flex-[2] flex flex-col items-center justify-center gap-1 bg-[#FFD700] text-black active:bg-yellow-400 transition-colors">
             <Icon name="Zap" size={22} />
             <span className="font-oswald font-bold text-sm uppercase tracking-wide">Оценить онлайн</span>
