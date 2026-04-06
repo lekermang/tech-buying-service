@@ -81,7 +81,81 @@ const HeroSection = ({ scrollTo }: HeroSectionProps) => {
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-8 md:py-14 lg:py-16 grid lg:grid-cols-2 gap-8 lg:gap-12 items-start w-full">
 
-        {/* Quick evaluate form — теперь СЛЕВА */}
+        {/* СЛЕВА — заголовок + виджеты */}
+        <div className="flex flex-col">
+          {/* Бейдж */}
+          <div className="inline-flex items-center gap-2 bg-[#FFD700]/10 border border-[#FFD700]/30 px-3 py-1.5 mb-4 md:mb-5 self-start">
+            <div className="w-2 h-2 bg-[#FFD700] rounded-full animate-pulse" />
+            <span className="font-roboto text-[11px] md:text-xs text-[#FFD700] uppercase tracking-widest">Работаем 24/7 без выходных</span>
+          </div>
+
+          {/* Заголовок */}
+          <h1 className="font-oswald text-[2.8rem] sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-none mb-4 md:mb-5">
+            ПРОДАЙ<br />
+            <span className="animate-shimmer">ТЕХНИКУ</span><br />
+            ВЫГОДНО
+          </h1>
+
+          <p className="font-roboto text-white/65 text-sm sm:text-base md:text-lg mb-5 md:mb-7 max-w-md leading-relaxed">
+            Честная оценка за 15 минут. Смартфоны, ноутбуки, ювелирные украшения — принимаем всё. Выплата в день обращения.
+          </p>
+
+          {/* CTA кнопки */}
+          <div className="flex gap-3 mb-6 md:mb-8">
+            <button onClick={() => scrollTo("#evaluate")}
+              className="flex-1 sm:flex-none bg-[#FFD700] text-black font-oswald font-bold text-base sm:text-lg px-6 sm:px-8 py-4 uppercase tracking-wide hover:bg-yellow-400 active:scale-95 transition-all flex items-center justify-center gap-2">
+              <Icon name="Zap" size={18} />
+              Оценить онлайн
+            </button>
+            <a href="tel:+79929990333"
+              className="flex-1 sm:flex-none border-2 border-[#FFD700] text-[#FFD700] font-oswald font-bold text-base sm:text-lg px-6 sm:px-8 py-4 uppercase tracking-wide hover:bg-[#FFD700] hover:text-black active:scale-95 transition-all flex items-center justify-center gap-2">
+              <Icon name="Phone" size={18} />
+              Позвонить
+            </a>
+          </div>
+
+          {/* Статистика */}
+          <div className="flex gap-6 md:gap-8 mb-6 md:mb-8 pb-6 md:pb-8 border-b border-white/5">
+            {[["50 000+", "клиентов"], ["9 лет", "на рынке"], ["2", "филиала"]].map(([num, label]) => (
+              <div key={label}>
+                <div className="font-oswald text-xl md:text-2xl font-bold text-[#FFD700]">{num}</div>
+                <div className="font-roboto text-white/40 text-[10px] md:text-xs uppercase tracking-wide">{label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Виджеты — крупные */}
+          <div className="space-y-2">
+            <a href="/catalog"
+              className="flex items-center justify-between bg-black/30 border border-white/10 hover:border-[#FFD700]/60 px-4 py-5 transition-colors group w-full">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-[#FFD700] flex items-center justify-center shrink-0">
+                  <Icon name="ShoppingBag" size={20} className="text-black" />
+                </div>
+                <div>
+                  <span className="font-oswald font-bold text-base uppercase text-white tracking-wide block leading-tight">Каталог новой техники</span>
+                  <span className="bg-[#FFD700]/20 text-[#FFD700] font-roboto text-[11px] px-1.5 py-0.5 border border-[#FFD700]/30 mt-1 inline-block">Гарантия 2 года</span>
+                </div>
+              </div>
+              <Icon name="ChevronRight" size={20} className="text-white/40 group-hover:text-[#FFD700] transition-colors shrink-0" />
+            </a>
+            <UsedGoodsSearch />
+            <RepairWidget />
+            <a href="/tools"
+              className="flex items-center justify-between bg-black/30 border border-white/10 hover:border-[#FFD700]/60 px-4 py-5 transition-colors group w-full">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-[#FFD700]/20 border border-[#FFD700]/40 flex items-center justify-center shrink-0">
+                  <Icon name="Wrench" size={20} className="text-[#FFD700]" />
+                </div>
+                <span className="font-oswald font-bold text-base uppercase text-white tracking-wide leading-tight">Каталог инструментов и расходных материалов</span>
+              </div>
+              <Icon name="ChevronRight" size={20} className="text-white/40 group-hover:text-[#FFD700] transition-colors shrink-0" />
+            </a>
+            <AppleWidget compact />
+          </div>
+        </div>
+
+        {/* СПРАВА — форма быстрой оценки */}
         <div id="evaluate">
           <div className="bg-[#1A1A1A] border border-[#FFD700]/30 p-4 sm:p-6">
             <div className="flex items-center gap-3 mb-6">
@@ -186,80 +260,6 @@ const HeroSection = ({ scrollTo }: HeroSectionProps) => {
                 </p>
               </form>
             )}
-          </div>
-        </div>
-
-        {/* Виджеты — теперь СПРАВА */}
-        <div className="flex flex-col">
-          {/* Бейдж */}
-          <div className="inline-flex items-center gap-2 bg-[#FFD700]/10 border border-[#FFD700]/30 px-3 py-1.5 mb-4 md:mb-5 self-start">
-            <div className="w-2 h-2 bg-[#FFD700] rounded-full animate-pulse" />
-            <span className="font-roboto text-[11px] md:text-xs text-[#FFD700] uppercase tracking-widest">Работаем 24/7 без выходных</span>
-          </div>
-
-          {/* Заголовок */}
-          <h1 className="font-oswald text-[2.8rem] sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-none mb-4 md:mb-5">
-            ПРОДАЙ<br />
-            <span className="animate-shimmer">ТЕХНИКУ</span><br />
-            ВЫГОДНО
-          </h1>
-
-          <p className="font-roboto text-white/65 text-sm sm:text-base md:text-lg mb-5 md:mb-7 max-w-md leading-relaxed">
-            Честная оценка за 15 минут. Смартфоны, ноутбуки, ювелирные украшения — принимаем всё. Выплата в день обращения.
-          </p>
-
-          {/* CTA кнопки */}
-          <div className="flex gap-3 mb-6 md:mb-8">
-            <button onClick={() => scrollTo("#evaluate")}
-              className="flex-1 sm:flex-none bg-[#FFD700] text-black font-oswald font-bold text-base sm:text-lg px-6 sm:px-8 py-4 uppercase tracking-wide hover:bg-yellow-400 active:scale-95 transition-all flex items-center justify-center gap-2">
-              <Icon name="Zap" size={18} />
-              Оценить онлайн
-            </button>
-            <a href="tel:+79929990333"
-              className="flex-1 sm:flex-none border-2 border-[#FFD700] text-[#FFD700] font-oswald font-bold text-base sm:text-lg px-6 sm:px-8 py-4 uppercase tracking-wide hover:bg-[#FFD700] hover:text-black active:scale-95 transition-all flex items-center justify-center gap-2">
-              <Icon name="Phone" size={18} />
-              Позвонить
-            </a>
-          </div>
-
-          {/* Статистика */}
-          <div className="flex gap-6 md:gap-8 mb-6 md:mb-8 pb-6 md:pb-8 border-b border-white/5">
-            {[["50 000+", "клиентов"], ["9 лет", "на рынке"], ["2", "филиала"]].map(([num, label]) => (
-              <div key={label}>
-                <div className="font-oswald text-xl md:text-2xl font-bold text-[#FFD700]">{num}</div>
-                <div className="font-roboto text-white/40 text-[10px] md:text-xs uppercase tracking-wide">{label}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Виджеты — крупные */}
-          <div className="space-y-2">
-            <a href="/catalog"
-              className="flex items-center justify-between bg-black/30 border border-white/10 hover:border-[#FFD700]/60 px-4 py-5 transition-colors group w-full">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-[#FFD700] flex items-center justify-center shrink-0">
-                  <Icon name="ShoppingBag" size={20} className="text-black" />
-                </div>
-                <div>
-                  <span className="font-oswald font-bold text-base uppercase text-white tracking-wide block leading-tight">Каталог новой техники</span>
-                  <span className="bg-[#FFD700]/20 text-[#FFD700] font-roboto text-[11px] px-1.5 py-0.5 border border-[#FFD700]/30 mt-1 inline-block">Гарантия 2 года</span>
-                </div>
-              </div>
-              <Icon name="ChevronRight" size={20} className="text-white/40 group-hover:text-[#FFD700] transition-colors shrink-0" />
-            </a>
-            <UsedGoodsSearch />
-            <RepairWidget />
-            <a href="/tools"
-              className="flex items-center justify-between bg-black/30 border border-white/10 hover:border-[#FFD700]/60 px-4 py-5 transition-colors group w-full">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-[#FFD700]/20 border border-[#FFD700]/40 flex items-center justify-center shrink-0">
-                  <Icon name="Wrench" size={20} className="text-[#FFD700]" />
-                </div>
-                <span className="font-oswald font-bold text-base uppercase text-white tracking-wide leading-tight">Каталог инструментов и расходных материалов</span>
-              </div>
-              <Icon name="ChevronRight" size={20} className="text-white/40 group-hover:text-[#FFD700] transition-colors shrink-0" />
-            </a>
-            <AppleWidget compact />
           </div>
         </div>
 
