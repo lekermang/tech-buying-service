@@ -1,5 +1,5 @@
 """
-Автоматическая отправка прайса в Telegram-группу + ping sitemap в Яндекс.Вебмастер. v4
+Автоматическая отправка прайса в Telegram-группу + ping sitemap в Яндекс.Вебмастер. v5
 - ?action=send_now — немедленная отправка прайса (для теста)
 - ?action=ping_sitemap — отправить sitemap прямо сейчас (для теста)
 - ?action=schedule_check — проверка расписания (вызывается каждые 5 мин)
@@ -341,6 +341,15 @@ def handler(event: dict, context) -> dict:
     if action == 'ping_sitemap':
         result = ping_sitemap_to_yandex()
         return ok(result)
+
+    if action == 'token_debug':
+        token = os.environ.get('YANDEX_WEBMASTER_TOKEN', '')
+        return ok({
+            'length': len(token),
+            'prefix': token[:10] if token else '',
+            'starts_with_y0': token.startswith('y0_'),
+            'has_spaces': ' ' in token,
+        })
 
     if action == 'schedule_check':
         now_msk = datetime.now(MSK)
