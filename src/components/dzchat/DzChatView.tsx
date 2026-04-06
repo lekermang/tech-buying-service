@@ -30,20 +30,36 @@ const DzChatView = ({ chat, me, token, onBack, onChatUpdate, theme: themeProp }:
   const [showGroupInfo, setShowGroupInfo] = useState(false);
   const [showGroupEdit, setShowGroupEdit] = useState(false);
   const [groupMembers, setGroupMembers] = useState<any[]>([]);
-  // Онлайн-статус партнёра — обновляется отдельным поллингом
+  // Онлайн-статус и typing партнёра — обновляется отдельным поллингом
   const [partnerOnline, setPartnerOnline] = useState<boolean>(!!chat.partner?.is_online);
   const [partnerLastSeen, setPartnerLastSeen] = useState<string | null>(chat.partner?.last_seen_at ?? null);
+  const [partnerTyping, setPartnerTyping] = useState<boolean>(false);
   const [liveChatData, setLiveChatData] = useState<any>(chat);
   const bottomRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval>>();
   const onlinePollRef = useRef<ReturnType<typeof setInterval>>();
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const isTypingRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const msgRefs = useRef<Record<number, HTMLDivElement | null>>({});
   // id последнего известного сообщения — скроллим вниз только при появлении нового
   const lastMsgIdRef = useRef<number | null>(null);
   const isAtBottomRef = useRef(true);
   const fetchingMsgRef = useRef(false); // защита от параллельных запросов при 1с интервале
+
+  // Отправляем typing=true, через 4с — typing=false
+  const handleTyping = useCallback(() => {
+    if (!isTypingRef.current) {
+      isTypingRef.current = true;
+      api("typing", "POST", { chat_id: chat.id, is_typing: true }, token).catch(() => {});
+    }
+    clearTimeout(typingTimerRef.current);
+    typingTimerRef.current = setTimeout(() => {
+      isTypingRef.current = false;
+      api("typing", "POST", { chat_id: chat.id, is_typing: false }, token).catch(() => {});
+    }, 4000);
+  }, [chat.id, token]);
 
   const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
     bottomRef.current?.scrollIntoView({ behavior });
@@ -89,28 +105,36 @@ const DzChatView = ({ chat, me, token, onBack, onChatUpdate, theme: themeProp }:
     loadMessages().then(() => scrollToBottom("instant"));
     pollRef.current = setInterval(loadMessages, 1000);
 
-    // Polling онлайн-статуса партнёра каждые 8 сек
+    // Polling онлайн-статуса и typing партнёра каждые 3 сек
     if (chat.type === "direct" && chat.partner?.id) {
       const pollOnline = async () => {
         try {
           const data = await api(`chats`, "GET", undefined, token);
           if (Array.isArray(data)) {
             const updated = data.find((c: any) => c.id === chat.id);
-            if (updated?.partner) {
-              setPartnerOnline(!!updated.partner.is_online);
-              setPartnerLastSeen(updated.partner.last_seen_at ?? null);
-              setLiveChatData((prev: any) => ({ ...prev, partner: updated.partner }));
+            if (updated) {
+              if (updated.partner) {
+                setPartnerOnline(!!updated.partner.is_online);
+                setPartnerLastSeen(updated.partner.last_seen_at ?? null);
+              }
+              setPartnerTyping(!!updated.partner_typing);
+              setLiveChatData((prev: any) => ({ ...prev, partner: updated.partner, partner_typing: updated.partner_typing }));
             }
           }
         } catch (e) { void e; }
       };
       pollOnline();
-      onlinePollRef.current = setInterval(pollOnline, 8000);
+      onlinePollRef.current = setInterval(pollOnline, 3000);
     }
 
     return () => {
       clearInterval(pollRef.current);
       clearInterval(onlinePollRef.current);
+      clearTimeout(typingTimerRef.current);
+      // Сбрасываем typing при выходе из чата
+      if (isTypingRef.current) {
+        api("typing", "POST", { chat_id: chat.id, is_typing: false }, token).catch(() => {});
+      }
     };
   }, [chat.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -229,6 +253,7 @@ const DzChatView = ({ chat, me, token, onBack, onChatUpdate, theme: themeProp }:
         chat={liveChatData}
         partnerOnline={partnerOnline}
         partnerLastSeen={partnerLastSeen}
+        partnerTyping={partnerTyping}
         onBack={onBack}
         onGroupInfoClick={loadGroupInfo}
         onGroupEditClick={() => setShowGroupEdit(true)}
@@ -301,6 +326,7 @@ const DzChatView = ({ chat, me, token, onBack, onChatUpdate, theme: themeProp }:
         onSend={send}
         onSendVoice={sendVoice}
         onPhotoSelect={handlePhoto}
+        onTyping={handleTyping}
       />
 
       {/* Модал участников группы */}

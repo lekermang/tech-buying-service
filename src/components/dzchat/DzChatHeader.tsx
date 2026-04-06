@@ -7,7 +7,7 @@ import type { DzTheme } from "./dzchat.theme";
 // ── ChatHeader ────────────────────────────────────────────────────
 export const ChatHeader = ({
   chat, onBack, onGroupInfoClick, onGroupEditClick, showSearch, onToggleSearch,
-  partnerOnline: partnerOnlineProp, partnerLastSeen, theme,
+  partnerOnline: partnerOnlineProp, partnerLastSeen, partnerTyping, theme,
 }: {
   chat: any;
   onBack: () => void;
@@ -17,6 +17,7 @@ export const ChatHeader = ({
   onToggleSearch: () => void;
   partnerOnline?: boolean;
   partnerLastSeen?: string | null;
+  partnerTyping?: boolean;
   theme?: DzTheme;
 }) => {
   // Используем live-данные если переданы, иначе из chat
@@ -46,15 +47,30 @@ export const ChatHeader = ({
         </div>
         <div className="flex-1 min-w-0 text-left">
           <p className="font-semibold truncate text-sm" style={{ color: textColor }}>{chat.name}</p>
-          <p className="text-xs truncate">
+          <div className="text-xs truncate flex items-center gap-1 h-4">
             {chat.type === "group"
               ? <span style={{ color: textMuted }}>Нажми чтобы увидеть участников</span>
-              : isOnline
-                ? <span style={{ color: accent }}>● в сети</span>
-                : lastSeen
-                  ? <span style={{ color: textMuted }}>был(а) {formatTime(lastSeen)}</span>
-                  : <span style={{ color: textMuted }}>не в сети</span>}
-          </p>
+              : partnerTyping
+                ? (
+                  <span style={{ color: accent }} className="flex items-center gap-1">
+                    печатает
+                    <span className="flex gap-0.5 items-end">
+                      {[0, 1, 2].map(i => (
+                        <span key={i} className="inline-block w-1 h-1 rounded-full"
+                          style={{
+                            background: accent,
+                            animation: `typingDot 1.2s ease-in-out ${i * 0.2}s infinite`,
+                          }} />
+                      ))}
+                    </span>
+                  </span>
+                )
+                : isOnline
+                  ? <span style={{ color: accent }}>● в сети</span>
+                  : lastSeen
+                    ? <span style={{ color: textMuted }}>был(а) {formatTime(lastSeen)}</span>
+                    : <span style={{ color: textMuted }}>не в сети</span>}
+          </div>
         </div>
       </button>
       <div className="flex items-center gap-0.5 shrink-0">

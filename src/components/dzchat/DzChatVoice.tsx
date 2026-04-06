@@ -53,8 +53,27 @@ export const VoiceMessage = ({ url, duration, isMine }: { url: string; duration:
 // ── MsgStatus ─────────────────────────────────────────────────────
 export const MsgStatus = ({ msg, me }: { msg: any; me: any }) => {
   if (msg.sender_id !== me.id) return null;
-  if (msg.is_read) return <span className="text-blue-400 inline-flex items-center ml-1"><Icon name="CheckCheck" size={12} /></span>;
-  return <span className="opacity-50 inline-flex items-center ml-1"><Icon name="CheckCheck" size={12} /></span>;
+
+  // Прочитано — синие двойные галочки с анимацией
+  if (msg.is_read) {
+    return (
+      <span
+        className="inline-flex items-center ml-0.5 transition-all duration-500"
+        style={{ color: "#60a5fa" }}
+        title="Прочитано">
+        <Icon name="CheckCheck" size={13} />
+      </span>
+    );
+  }
+
+  // Доставлено (серые двойные галочки)
+  return (
+    <span
+      className="inline-flex items-center ml-0.5 opacity-40 transition-all duration-300"
+      title="Доставлено">
+      <Icon name="CheckCheck" size={13} />
+    </span>
+  );
 };
 
 // ── VoiceRecorder ─────────────────────────────────────────────────

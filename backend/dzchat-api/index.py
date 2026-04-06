@@ -108,6 +108,32 @@ def handler(event: dict, context) -> dict:
             return resp({"error": "Unauthorized"}, 401)
         return resp({"ok": True})
 
+    # ── TYPING (пользователь печатает) ────────────────────────────
+    if action == "typing" and method == "POST":
+        u = get_user(conn, token)
+        if not u:
+            return resp({"error": "Unauthorized"}, 401)
+        chat_id = body.get("chat_id")
+        is_typing = body.get("is_typing", True)
+        if not chat_id:
+            return resp({"error": "chat_id required"}, 400)
+        cur = conn.cursor()
+        if is_typing:
+            # Ставим typing_until = NOW() + 5 секунд
+            cur.execute(f"""
+                UPDATE {SCHEMA}.dzchat_members
+                SET typing_until = NOW() + INTERVAL '5 seconds'
+                WHERE chat_id=%s AND user_id=%s
+            """, (chat_id, u["id"]))
+        else:
+            cur.execute(f"""
+                UPDATE {SCHEMA}.dzchat_members
+                SET typing_until = NULL
+                WHERE chat_id=%s AND user_id=%s
+            """, (chat_id, u["id"]))
+        conn.commit()
+        return resp({"ok": True})
+
     # ── REGISTER ──────────────────────────────────────────────────
     if action == "register" and method == "POST":
         phone = body.get("phone", "").strip()
@@ -255,7 +281,12 @@ def handler(event: dict, context) -> dict:
                    lm.id, lm.msg_text, lm.photo_url, lm.voice_url, lm.created_at, lm.sender_id, lm.is_read,
                    (SELECT COUNT(*) FROM {SCHEMA}.dzchat_messages mx
                     WHERE mx.chat_id=c.id AND mx.created_at > mb.last_read_at
-                      AND mx.sender_id != %s AND mx.removed=FALSE) AS unread
+                      AND mx.sender_id != %s AND mx.removed=FALSE) AS unread,
+                   (SELECT mb3.typing_until > NOW()
+                    FROM {SCHEMA}.dzchat_members mb3
+                    WHERE mb3.chat_id=c.id AND mb3.user_id != %s
+                      AND mb3.typing_until IS NOT NULL
+                    LIMIT 1) AS partner_typing
             FROM {SCHEMA}.dzchat_chats c
             JOIN {SCHEMA}.dzchat_members mb ON mb.chat_id=c.id AND mb.user_id=%s
             LEFT JOIN {SCHEMA}.dzchat_members mb2 ON mb2.chat_id=c.id AND mb2.user_id != %s
@@ -267,7 +298,7 @@ def handler(event: dict, context) -> dict:
                 ORDER BY created_at DESC LIMIT 1
             ) lm ON TRUE
             ORDER BY COALESCE(lm.created_at, c.created_at) DESC
-        """, (u["id"], u["id"], u["id"]))
+        """, (u["id"], u["id"], u["id"], u["id"]))
         rows = cur.fetchall()
         return resp([{
             "id": r[0], "type": r[1],
@@ -279,6 +310,7 @@ def handler(event: dict, context) -> dict:
             "last_message": {"id": r[9], "text": r[10], "photo_url": r[11], "voice_url": r[12],
                              "created_at": str(r[13]), "sender_id": r[14], "is_read": r[15]} if r[13] else None,
             "unread": int(r[16]) if r[16] else 0,
+            "partner_typing": bool(r[17]) if r[17] else False,
         } for r in rows])
 
     # ── CREATE CHAT ───────────────────────────────────────────────

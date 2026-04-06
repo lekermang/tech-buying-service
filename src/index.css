@@ -82,6 +82,20 @@
     background-color: #ffd700;
   }
 
+  /* ── Анимация «печатает» ── */
+  @keyframes typingDot {
+    0%,
+    60%,
+    100% {
+      transform: translateY(0);
+      opacity: 0.4;
+    }
+    30% {
+      transform: translateY(-4px);
+      opacity: 1;
+    }
+  }
+
   /* ── DzChat CSS переменные (тема) ── */
   :root {
     --dz-bg: #0a1929;

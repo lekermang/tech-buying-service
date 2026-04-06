@@ -88,7 +88,7 @@ export const ReplyPreview = ({ replyTo, forwardMsg, imagePreview, onClearReply, 
 };
 
 // ── ChatInput ─────────────────────────────────────────────────────
-export const ChatInput = ({ text, setText, sending, uploadingPhoto, imageB64, textareaRef, onSend, onSendVoice, onPhotoSelect }: {
+export const ChatInput = ({ text, setText, sending, uploadingPhoto, imageB64, textareaRef, onSend, onSendVoice, onPhotoSelect, onTyping }: {
   text: string;
   setText: (v: string) => void;
   sending: boolean;
@@ -98,6 +98,7 @@ export const ChatInput = ({ text, setText, sending, uploadingPhoto, imageB64, te
   onSend: () => void;
   onSendVoice: (b64: string, dur: number) => void;
   onPhotoSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onTyping?: () => void;
 }) => {
   const fileRef = useRef<HTMLInputElement>(null);
   const [showEmoji, setShowEmoji] = useState(false);
@@ -147,7 +148,7 @@ export const ChatInput = ({ text, setText, sending, uploadingPhoto, imageB64, te
         <textarea
           ref={textareaRef}
           value={text}
-          onChange={e => { setText(e.target.value); autoResize(); }}
+          onChange={e => { setText(e.target.value); autoResize(); onTyping?.(); }}
           rows={1}
           placeholder="Сообщение..."
           className="flex-1 bg-transparent text-white placeholder-white/30 outline-none resize-none text-sm leading-relaxed min-w-0"

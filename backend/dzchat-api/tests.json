@@ -25,6 +25,15 @@
       "expectedStatus": 401,
       "expectedBody": {"error": "Unauthorized"},
       "bodyMatcher": "partial"
+    },
+    {
+      "name": "Typing unauthorized",
+      "method": "POST",
+      "path": "/?action=typing",
+      "body": {"chat_id": 1, "is_typing": true},
+      "expectedStatus": 401,
+      "expectedBody": {"error": "Unauthorized"},
+      "bodyMatcher": "partial"
     }
   ]
 }
