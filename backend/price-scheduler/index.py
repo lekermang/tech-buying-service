@@ -242,7 +242,7 @@ def ym_get_user_id(token):
 
 
 def ym_get_host_id(token, user_id, site_url):
-    """Найти host_id сайта в списке добавленных хостов."""
+    """Найти host_id сайта. Приоритет: HTTPS verified > HTTP verified > любой."""
     req = urllib.request.Request(
         f'{YM_API}/user/{user_id}/hosts',
         headers={'Authorization': f'OAuth {token}'}
@@ -250,12 +250,24 @@ def ym_get_host_id(token, user_id, site_url):
     with urllib.request.urlopen(req, timeout=10) as resp:
         data = json.loads(resp.read())
     hosts = data.get('hosts', [])
-    # Ищем по совпадению URL
-    site_clean = site_url.rstrip('/').replace('https://', '').replace('http://', '')
+
+    # 1. Ищем HTTPS подтверждённый
     for h in hosts:
-        if site_clean in h.get('unicode_host_url', ''):
+        url = h.get('unicode_host_url', '')
+        if url.startswith('https://') and h.get('verified'):
             return h['host_id']
-    # Если не нашли — берём первый
+
+    # 2. Ищем любой HTTPS
+    for h in hosts:
+        if h.get('unicode_host_url', '').startswith('https://'):
+            return h['host_id']
+
+    # 3. Берём первый подтверждённый
+    for h in hosts:
+        if h.get('verified'):
+            return h['host_id']
+
+    # 4. Берём первый
     if hosts:
         return hosts[0]['host_id']
     return None
