@@ -5,6 +5,7 @@ import { ChatHeader, SearchBar, GroupInfoModal } from "./DzChatHeader";
 import DzChatMessage from "./DzChatMessage";
 import { ReplyPreview, ChatInput } from "./DzChatInput";
 import { EditGroupModal } from "./DzChatModals";
+import { playSendSound, playVoiceSentSound, unlockAudio } from "./dzchat.sounds";
 
 const DzChatView = ({ chat, me, token, onBack, onChatUpdate }: {
   chat: any; me: any; token: string; onBack: () => void; onChatUpdate?: () => void;
@@ -98,6 +99,8 @@ const DzChatView = ({ chat, me, token, onBack, onChatUpdate }: {
 
   const send = async () => {
     if (!text.trim() && !imageB64) return;
+    unlockAudio();
+    playSendSound();
     setSending(true);
     let photo_url = "";
     let video_url = "";
@@ -129,6 +132,8 @@ const DzChatView = ({ chat, me, token, onBack, onChatUpdate }: {
   };
 
   const sendVoice = async (b64: string, duration: number) => {
+    unlockAudio();
+    playVoiceSentSound();
     setSending(true);
     const res = await api("upload", "POST", { image: b64, mime: "audio/webm", kind: "voice" }, token);
     if (res.url) {

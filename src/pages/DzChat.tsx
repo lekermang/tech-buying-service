@@ -7,6 +7,7 @@ import DzChatAuth from "@/components/dzchat/DzChatAuth";
 import DzChatView from "@/components/dzchat/DzChatView";
 import { NewChatModal, ProfileModal, CreateGroupModal, playNotificationSound } from "@/components/dzchat/DzChatModals";
 import { DzChatInstallBanner } from "@/components/dzchat/DzChatInstall";
+import { unlockAudio } from "@/components/dzchat/dzchat.sounds";
 
 const NOTIF_ICON = "/dzchat-icon.svg";
 
@@ -191,7 +192,7 @@ const DzChat = () => {
 
         {/* Header */}
         <div className="flex items-center justify-between px-3 py-2.5 bg-[#1a2634] border-b border-white/10 safe-top">
-          <button onClick={() => setShowProfile(true)}
+          <button onClick={() => { unlockAudio(); setShowProfile(true); }}
             className="flex items-center gap-2.5 hover:opacity-80 transition-opacity min-w-0 flex-1">
             {/* Аватар всегда виден на мобайле */}
             <div className="shrink-0">
@@ -228,7 +229,7 @@ const DzChat = () => {
               <Icon name="SquarePen" size={17} />
             </button>
             {/* Настройки */}
-            <button onClick={() => setShowProfile(true)}
+            <button onClick={() => { unlockAudio(); setShowProfile(true); }}
               className="w-8 h-8 flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 rounded-full">
               <Icon name="Settings" size={17} />
             </button>

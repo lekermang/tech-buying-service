@@ -5,37 +5,162 @@ export const NOTIFICATION_SOUNDS = [
   { id: "chime",   label: "Колокольчик", emoji: "🎵" },
   { id: "pop",     label: "Поп",         emoji: "💬" },
   { id: "ping",    label: "Пинг",        emoji: "📳" },
+  { id: "soft",    label: "Мягкий",      emoji: "🎶" },
   { id: "none",    label: "Без звука",   emoji: "🔇" },
 ];
 
-export const playNotificationSound = (soundId: string) => {
-  if (soundId === "none") return;
+// Единый AudioContext — создаём один раз и переиспользуем
+let _ctx: AudioContext | null = null;
+
+function getCtx(): AudioContext | null {
   try {
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    if (!_ctx || _ctx.state === "closed") {
+      _ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    return _ctx;
+  } catch (_e) {
+    return null;
+  }
+}
+
+// Разблокировать AudioContext после первого касания пользователя
+export function unlockAudio() {
+  const ctx = getCtx();
+  if (!ctx) return;
+  if (ctx.state === "suspended") {
+    ctx.resume().catch(() => {});
+  }
+}
+
+// Инициализируем разблокировку при любом тапе
+if (typeof window !== "undefined") {
+  const unlock = () => { unlockAudio(); };
+  window.addEventListener("touchstart", unlock, { once: true, passive: true });
+  window.addEventListener("click", unlock, { once: true });
+  window.addEventListener("keydown", unlock, { once: true });
+}
+
+function playTone(
+  type: OscillatorType,
+  freq: number | number[],
+  gainVal: number,
+  duration: number,
+  freqTimes?: number[]
+) {
+  const ctx = getCtx();
+  if (!ctx) return;
+
+  const resume = ctx.state === "suspended" ? ctx.resume() : Promise.resolve();
+  resume.then(() => {
+    const freqs = Array.isArray(freq) ? freq : [freq];
+    const times = freqTimes ?? freqs.map((_, i) => i * (duration / freqs.length));
+
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.connect(gain);
     gain.connect(ctx.destination);
-    if (soundId === "chime") {
-      osc.type = "sine"; osc.frequency.value = 880;
-      gain.gain.setValueAtTime(0.3, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.7);
-      osc.start(); osc.stop(ctx.currentTime + 0.7);
-    } else if (soundId === "pop") {
-      osc.type = "sine"; osc.frequency.value = 440;
-      gain.gain.setValueAtTime(0.4, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
-      osc.start(); osc.stop(ctx.currentTime + 0.12);
-    } else if (soundId === "ping") {
-      osc.type = "triangle"; osc.frequency.value = 1200;
-      gain.gain.setValueAtTime(0.2, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-      osc.start(); osc.stop(ctx.currentTime + 0.3);
-    } else {
-      osc.type = "sine"; osc.frequency.value = 660;
-      gain.gain.setValueAtTime(0.25, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
-      osc.start(); osc.stop(ctx.currentTime + 0.25);
+
+    osc.type = type;
+    osc.frequency.setValueAtTime(freqs[0], ctx.currentTime);
+    freqs.forEach((f, i) => {
+      if (i > 0) osc.frequency.setValueAtTime(f, ctx.currentTime + times[i]);
+    });
+
+    gain.gain.setValueAtTime(gainVal, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + duration);
+  }).catch(() => {});
+}
+
+// ── Звуки входящих уведомлений ────────────────────────────────────
+export const playNotificationSound = (soundId: string) => {
+  if (soundId === "none") return;
+
+  // Кастомный файл
+  if (soundId === "custom") {
+    const url = localStorage.getItem("dzchat_custom_audio");
+    if (url) {
+      const audio = new Audio(url);
+      audio.volume = 0.8;
+      audio.play().catch(() => {});
     }
-  } catch (_e) { /* Web Audio not supported */ }
+    return;
+  }
+
+  switch (soundId) {
+    case "chime":
+      // Двойной колокольчик: до-ми
+      playTone("sine", [880, 1100], 0.3, 0.8, [0, 0.25]);
+      break;
+    case "pop":
+      // Короткий «буль»
+      playTone("sine", [520, 260], 0.45, 0.15, [0, 0.05]);
+      break;
+    case "ping":
+      // Высокий пинг
+      playTone("triangle", 1320, 0.2, 0.35);
+      break;
+    case "soft":
+      // Мягкий низкий тон
+      playTone("sine", 440, 0.18, 0.5);
+      break;
+    default:
+      // default — короткий восходящий тон
+      playTone("sine", [660, 880], 0.25, 0.3, [0, 0.1]);
+      break;
+  }
+};
+
+// ── Звук отправки сообщения ───────────────────────────────────────
+export const playSendSound = () => {
+  if (localStorage.getItem("dzchat_send_sound") === "off") return;
+
+  const ctx = getCtx();
+  if (!ctx) return;
+
+  const resume = ctx.state === "suspended" ? ctx.resume() : Promise.resolve();
+  resume.then(() => {
+    // Лёгкий «вжух» — короткий щелчок вверх
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(400, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.08);
+
+    gain.gain.setValueAtTime(0.18, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.12);
+  }).catch(() => {});
+};
+
+// ── Звук голосового сообщения ─────────────────────────────────────
+export const playVoiceSentSound = () => {
+  if (localStorage.getItem("dzchat_send_sound") === "off") return;
+
+  const ctx = getCtx();
+  if (!ctx) return;
+
+  const resume = ctx.state === "suspended" ? ctx.resume() : Promise.resolve();
+  resume.then(() => {
+    // Два коротких «тик»
+    [0, 0.1].forEach(delay => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "triangle";
+      osc.frequency.value = 1000;
+      gain.gain.setValueAtTime(0.12, ctx.currentTime + delay);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.07);
+      osc.start(ctx.currentTime + delay);
+      osc.stop(ctx.currentTime + delay + 0.07);
+    });
+  }).catch(() => {});
 };

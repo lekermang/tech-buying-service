@@ -4,7 +4,13 @@ import Icon from "@/components/ui/icon";
 import { api } from "./dzchat.utils";
 import DzChatAvatar from "./DzChatAvatar";
 import DzChatAvatarEditor from "./DzChatAvatarEditor";
-import { NOTIFICATION_SOUNDS, playNotificationSound } from "./dzchat.sounds";
+import { NOTIFICATION_SOUNDS, playNotificationSound, playSendSound, unlockAudio } from "./dzchat.sounds";
+
+const Toggle = ({ on }: { on: boolean }) => (
+  <div className={`w-10 h-5 rounded-full transition-colors relative shrink-0 ${on ? "bg-[#25D366]" : "bg-white/20"}`}>
+    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${on ? "translate-x-5" : "translate-x-0.5"}`} />
+  </div>
+);
 
 export const ProfileModal = ({ me, token, onClose, onUpdate, onLogout, onSwitchAccount }: {
   me: any; token: string; onClose: () => void; onUpdate: (u: any) => void;
@@ -18,6 +24,7 @@ export const ProfileModal = ({ me, token, onClose, onUpdate, onLogout, onSwitchA
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [soundId, setSoundId] = useState<string>(() => localStorage.getItem("dzchat_sound") || "default");
   const [vibrateOn, setVibrateOn] = useState(() => localStorage.getItem("dzchat_vibrate") !== "off");
+  const [sendSoundOn, setSendSoundOn] = useState(() => localStorage.getItem("dzchat_send_sound") !== "off");
   const [customAudioUrl, setCustomAudioUrl] = useState<string | null>(() => localStorage.getItem("dzchat_custom_audio") || null);
   const [notifPerm, setNotifPerm] = useState<NotificationPermission>(() =>
     "Notification" in window ? Notification.permission : "denied"
@@ -53,6 +60,7 @@ export const ProfileModal = ({ me, token, onClose, onUpdate, onLogout, onSwitchA
   };
 
   const handleSoundChange = (id: string) => {
+    unlockAudio();
     setSoundId(id);
     localStorage.setItem("dzchat_sound", id);
     if (id === "custom" && customAudioUrl) new Audio(customAudioUrl).play().catch(() => {});
@@ -64,6 +72,14 @@ export const ProfileModal = ({ me, token, onClose, onUpdate, onLogout, onSwitchA
     setVibrateOn(next);
     localStorage.setItem("dzchat_vibrate", next ? "on" : "off");
     if (next && navigator.vibrate) navigator.vibrate([100, 50, 100]);
+  };
+
+  const handleSendSoundToggle = () => {
+    unlockAudio();
+    const next = !sendSoundOn;
+    setSendSoundOn(next);
+    localStorage.setItem("dzchat_send_sound", next ? "on" : "off");
+    if (next) playSendSound();
   };
 
   const requestNotifications = async () => {
@@ -182,26 +198,45 @@ export const ProfileModal = ({ me, token, onClose, onUpdate, onLogout, onSwitchA
               <Icon name="Bell" size={16} /> Разрешить пуш-уведомления
             </button>
           )}
+        </div>
 
+        {/* ── Звук и вибрация ── */}
+        <p className="text-white/40 text-xs uppercase tracking-wider mb-2 flex items-center gap-1.5">
+          <Icon name="Volume2" size={12} /> Звук и вибрация
+        </p>
+        <div className="space-y-2 mb-3">
+          {/* Звук отправки */}
+          <button onClick={handleSendSoundToggle}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors ${
+              sendSoundOn ? "border-[#25D366]/40 bg-[#25D366]/10" : "border-white/10 bg-white/5"
+            }`}>
+            <Icon name="Send" size={17} className={sendSoundOn ? "text-[#25D366]" : "text-white/40"} />
+            <div className="flex-1 text-left">
+              <p className={`text-sm ${sendSoundOn ? "text-white" : "text-white/50"}`}>Звук отправки</p>
+              <p className="text-white/30 text-xs">При нажатии «Отправить»</p>
+            </div>
+            <Toggle on={sendSoundOn} />
+          </button>
+
+          {/* Вибрация */}
           {"vibrate" in navigator && (
             <button onClick={handleVibrateToggle}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors ${
                 vibrateOn ? "border-[#25D366]/40 bg-[#25D366]/10" : "border-white/10 bg-white/5"
               }`}>
-              <Icon name="Smartphone" size={18} className={vibrateOn ? "text-[#25D366]" : "text-white/40"} />
-              <span className={`flex-1 text-left text-sm ${vibrateOn ? "text-white" : "text-white/50"}`}>Вибрация при сообщении</span>
-              <div className={`w-10 h-5 rounded-full transition-colors relative ${vibrateOn ? "bg-[#25D366]" : "bg-white/20"}`}>
-                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${vibrateOn ? "translate-x-5" : "translate-x-0.5"}`} />
+              <Icon name="Smartphone" size={17} className={vibrateOn ? "text-[#25D366]" : "text-white/40"} />
+              <div className="flex-1 text-left">
+                <p className={`text-sm ${vibrateOn ? "text-white" : "text-white/50"}`}>Вибрация</p>
+                <p className="text-white/30 text-xs">При входящих сообщениях</p>
               </div>
+              <Toggle on={vibrateOn} />
             </button>
           )}
         </div>
 
-        {/* ── Звук ── */}
-        <p className="text-white/40 text-xs uppercase tracking-wider mb-2 flex items-center gap-1.5">
-          <Icon name="Volume2" size={12} /> Звук уведомлений
-        </p>
-        <div className="grid grid-cols-2 gap-2 mb-3">
+        {/* Звук уведомлений — выбор */}
+        <p className="text-white/40 text-xs mb-2 px-1">Звук входящих сообщений:</p>
+        <div className="grid grid-cols-2 gap-2 mb-2">
           {NOTIFICATION_SOUNDS.map(s => (
             <button key={s.id} onClick={() => handleSoundChange(s.id)}
               className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm transition-colors ${
@@ -212,7 +247,7 @@ export const ProfileModal = ({ me, token, onClose, onUpdate, onLogout, onSwitchA
               {soundId === s.id && <Icon name="Check" size={12} className="text-[#25D366] shrink-0" />}
             </button>
           ))}
-          <button onClick={() => audioFileRef.current?.click()}
+          <button onClick={() => { unlockAudio(); audioFileRef.current?.click(); }}
             className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm transition-colors ${
               soundId === "custom" ? "border-[#25D366] bg-[#25D366]/15 text-white" : "border-white/10 text-white/50"
             }`}>
@@ -221,6 +256,7 @@ export const ProfileModal = ({ me, token, onClose, onUpdate, onLogout, onSwitchA
           </button>
           <input ref={audioFileRef} type="file" accept="audio/*" onChange={handleAudioFile} className="hidden" />
         </div>
+        <p className="text-white/25 text-xs mb-5 px-1">Нажми на звук чтобы послушать</p>
 
         {/* ── Установка ── */}
         <p className="text-white/40 text-xs uppercase tracking-wider mb-2 flex items-center gap-1.5 mt-4">
