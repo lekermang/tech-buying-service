@@ -5,43 +5,34 @@ import { api } from "./dzchat.utils";
 
 const DzChatAuth = ({ onAuth }: { onAuth: (token: string, user: any) => void }) => {
   const [mode, setMode] = useState<"login" | "register">("login");
-  const [step, setStep] = useState<"form" | "otp">("form");
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
-  const [otp, setOtp] = useState("");
-  const [demoOtp, setDemoOtp] = useState("");
-  const [smsSent, setSmsSent] = useState(false);
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const resetToForm = () => { setStep("form"); setError(""); setOtp(""); setSmsSent(false); };
   const switchMode = (m: "login" | "register") => {
-    setMode(m); setStep("form"); setError(""); setOtp(""); setPhone(""); setName(""); setSmsSent(false);
+    setMode(m); setError(""); setPhone(""); setName(""); setPassword("");
   };
 
-  const handleContinue = async () => {
-    if (!phone.trim()) return setError("Введите номер телефона");
+  const handleSubmit = async () => {
+    if (!phone.trim() || !password.trim()) return setError("Заполните все поля");
     if (mode === "register" && !name.trim()) return setError("Введите ваше имя");
+    if (mode === "register" && password.length < 6) return setError("Пароль — минимум 6 символов");
+
     setLoading(true); setError("");
 
-    const action = mode === "login" ? "login_otp" : "register";
-    const body = mode === "login" ? { phone } : { phone, name };
+    const action = mode === "login" ? "login" : "register";
+    const body = mode === "login"
+      ? { phone, password }
+      : { phone, name, password };
+
     const res = await api(action, "POST", body);
     setLoading(false);
 
     if (res.error) return setError(res.error);
-    // Если SMS отправлено — otp скрыт (безопасность), показываем статус
-    setSmsSent(!!res.sms_sent);
-    setDemoOtp(res.sms_sent ? "" : (res.otp || ""));
-    setStep("otp");
-  };
 
-  const handleVerify = async () => {
-    if (!otp.trim()) return setError("Введите код");
-    setLoading(true); setError("");
-    const res = await api("verify", "POST", { phone, otp });
-    setLoading(false);
-    if (res.error) return setError(res.error);
     const me = await api("me", "GET", undefined, res.token);
     localStorage.setItem("dzchat_token", res.token);
     onAuth(res.token, me);
@@ -56,10 +47,10 @@ const DzChatAuth = ({ onAuth }: { onAuth: (token: string, user: any) => void }) 
             <Icon name="MessageCircle" size={40} className="text-white" />
           </div>
           <h1 className="text-3xl font-bold text-white">DzChat</h1>
-          <p className="text-white/50 text-sm mt-1">Мессенджер нового поколения</p>
+          <p className="text-white/40 text-sm mt-1">Безопасный мессенджер</p>
         </div>
 
-        {/* Переключатель режимов */}
+        {/* Переключатель */}
         <div className="flex bg-white/5 rounded-xl p-1 mb-6">
           <button onClick={() => switchMode("login")}
             className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${mode === "login" ? "bg-[#25D366] text-white" : "text-white/40 hover:text-white"}`}>
@@ -71,78 +62,47 @@ const DzChatAuth = ({ onAuth }: { onAuth: (token: string, user: any) => void }) 
           </button>
         </div>
 
-        {step === "form" ? (
-          <div className="space-y-3">
-            {mode === "register" && (
-              <input
-                type="text" value={name} onChange={e => setName(e.target.value)}
-                placeholder="Ваше имя"
-                className="w-full bg-white/10 text-white placeholder-white/40 px-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-[#25D366]"
-              />
-            )}
+        <div className="space-y-3">
+          {mode === "register" && (
             <input
-              type="tel" value={phone} onChange={e => setPhone(e.target.value)}
-              placeholder="+7 (999) 000-00-00"
+              type="text" value={name} onChange={e => setName(e.target.value)}
+              placeholder="Ваше имя"
               className="w-full bg-white/10 text-white placeholder-white/40 px-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-[#25D366]"
-              onKeyDown={e => e.key === "Enter" && handleContinue()}
             />
-            {mode === "login" && (
-              <p className="text-white/30 text-xs text-center">
-                Введите номер — пришлём код подтверждения по SMS
-              </p>
-            )}
-            {error && <p className="text-red-400 text-sm text-center">{error}</p>}
-            <button onClick={handleContinue} disabled={loading}
-              className="w-full bg-[#25D366] text-white font-bold py-3 rounded-xl hover:bg-[#1da851] transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-              {loading
-                ? <><Icon name="Loader" size={18} className="animate-spin" /> Отправка...</>
-                : mode === "login" ? "Получить код" : "Зарегистрироваться"
-              }
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {smsSent ? (
-              <div className="bg-[#25D366]/15 border border-[#25D366]/40 rounded-xl p-4 text-center">
-                <Icon name="MessageSquare" size={28} className="text-[#25D366] mx-auto mb-2" />
-                <p className="text-white text-sm font-semibold">SMS отправлено!</p>
-                <p className="text-white/50 text-xs mt-1">
-                  Код придёт на номер <b className="text-white">{phone}</b>
-                </p>
-              </div>
-            ) : (
-              <>
-                <p className="text-white/60 text-sm text-center">
-                  Код подтверждения для <b className="text-white">{phone}</b>
-                </p>
-                {demoOtp && (
-                  <div className="bg-yellow-500/20 border border-yellow-500/40 rounded-xl p-3 text-center">
-                    <p className="text-yellow-400 text-xs mb-1">Демо-режим (SMS не настроен): ваш код</p>
-                    <p className="text-yellow-300 text-2xl font-bold tracking-widest">{demoOtp}</p>
-                  </div>
-                )}
-              </>
-            )}
+          )}
+          <input
+            type="tel" value={phone} onChange={e => setPhone(e.target.value)}
+            placeholder="+7 (999) 000-00-00"
+            className="w-full bg-white/10 text-white placeholder-white/40 px-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-[#25D366]"
+          />
+          <div className="relative">
             <input
-              type="text" value={otp} onChange={e => setOtp(e.target.value)} maxLength={6}
-              placeholder="000000"
-              className="w-full bg-white/10 text-white placeholder-white/40 px-4 py-3 rounded-xl outline-none focus:ring-2 focus:ring-[#25D366] text-center text-xl tracking-widest"
-              onKeyDown={e => e.key === "Enter" && handleVerify()}
-              autoFocus
+              type={showPassword ? "text" : "password"}
+              value={password} onChange={e => setPassword(e.target.value)}
+              placeholder={mode === "register" ? "Придумайте пароль (мин. 6 символов)" : "Пароль"}
+              className="w-full bg-white/10 text-white placeholder-white/40 px-4 py-3 pr-12 rounded-xl outline-none focus:ring-2 focus:ring-[#25D366]"
+              onKeyDown={e => e.key === "Enter" && handleSubmit()}
             />
-            {error && <p className="text-red-400 text-sm text-center">{error}</p>}
-            <button onClick={handleVerify} disabled={loading}
-              className="w-full bg-[#25D366] text-white font-bold py-3 rounded-xl hover:bg-[#1da851] transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-              {loading
-                ? <><Icon name="Loader" size={18} className="animate-spin" /> Проверка...</>
-                : "Войти"
-              }
-            </button>
-            <button onClick={resetToForm} className="w-full text-white/40 text-sm py-2 hover:text-white/60 transition-colors">
-              ← Изменить номер
+            <button type="button" onClick={() => setShowPassword(s => !s)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/70 transition-colors">
+              <Icon name={showPassword ? "EyeOff" : "Eye"} size={18} />
             </button>
           </div>
-        )}
+
+          {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+
+          <button onClick={handleSubmit} disabled={loading}
+            className="w-full bg-[#25D366] text-white font-bold py-3 rounded-xl hover:bg-[#1da851] transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+            {loading
+              ? <><Icon name="Loader" size={18} className="animate-spin" /> Загрузка...</>
+              : mode === "login" ? "Войти" : "Создать аккаунт"
+            }
+          </button>
+
+          <p className="text-white/20 text-xs text-center pt-1">
+            🔒 Пароль хранится в зашифрованном виде
+          </p>
+        </div>
       </div>
     </div>
   );

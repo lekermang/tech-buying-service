@@ -1,41 +1,18 @@
 """
 DzChat API — WhatsApp-like мессенджер.
-Действия: login_otp, register, verify, me, profile, chats, users,
+Действия: register, login, me, profile, chats, users,
           create, create_group, messages, send, remove, read,
           react, upload, ping, search_messages, group_info, group_leave
 """
-import json, os, random, string, hashlib, time, base64, uuid
+import json, os, hashlib, time, base64, uuid, random
 import psycopg2
 import boto3
-import urllib.request
-import urllib.parse
+import bcrypt
 
 SCHEMA = os.environ["MAIN_DB_SCHEMA"]
 AK = os.environ["AWS_ACCESS_KEY_ID"]
 SK = os.environ["AWS_SECRET_ACCESS_KEY"]
 PAGE = 50
-
-def send_sms(phone: str, otp: str) -> bool:
-    api_id = os.environ.get("SMSRU_API_ID", "")
-    if not api_id:
-        return False
-    try:
-        digits = "".join(c for c in phone if c.isdigit())
-        if digits.startswith("8") and len(digits) == 11:
-            digits = "7" + digits[1:]
-        normalized = "+" + digits if not digits.startswith("+") else digits
-        params = urllib.parse.urlencode({
-            "api_id": api_id, "to": normalized,
-            "msg": f"DzChat: kod {otp}. Ne soobschayte nikomu.",
-            "json": 1,
-        })
-        with urllib.request.urlopen(f"https://sms.ru/sms/send?{params}", timeout=10) as r:
-            data = json.loads(r.read())
-            print(f"[SMS.ru] {normalized} → {data}")
-            return data.get("status") == "OK"
-    except Exception as e:
-        print(f"[SMS.ru] ERROR: {e}")
-        return False
 
 def get_conn():
     return psycopg2.connect(os.environ["DATABASE_URL"])
@@ -51,12 +28,18 @@ def resp(data, code=200):
     return {"statusCode": code, "headers": {**cors(), "Content-Type": "application/json"},
             "body": json.dumps(data, ensure_ascii=False, default=str)}
 
-def gen_otp():
-    return "".join(random.choices(string.digits, k=6))
-
-def gen_token(phone):
-    raw = f"{phone}{time.time()}{random.random()}"
+def gen_token(seed):
+    raw = f"{seed}{time.time()}{random.random()}"
     return hashlib.sha256(raw.encode()).hexdigest()[:48]
+
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
+def check_password(password: str, hashed: str) -> bool:
+    try:
+        return bcrypt.checkpw(password.encode(), hashed.encode())
+    except Exception:
+        return False
 
 def get_user(conn, token):
     if not token:
@@ -120,55 +103,49 @@ def handler(event: dict, context) -> dict:
             return resp({"error": "Unauthorized"}, 401)
         return resp({"ok": True})
 
-    # ── LOGIN OTP ──────────────────────────────────────────────────
-    if action == "login_otp" and method == "POST":
-        phone = body.get("phone", "").strip()
-        if not phone:
-            return resp({"error": "Укажите номер телефона"}, 400)
-        cur = conn.cursor()
-        cur.execute(f"SELECT id FROM {SCHEMA}.dzchat_users WHERE phone=%s", (phone,))
-        row = cur.fetchone()
-        if not row:
-            return resp({"error": "Аккаунт с этим номером не найден. Пройдите регистрацию."}, 404)
-        otp = gen_otp()
-        cur.execute(f"UPDATE {SCHEMA}.dzchat_users SET otp=%s, otp_expires_at=NOW() + INTERVAL '300 seconds' WHERE phone=%s", (otp, phone))
-        conn.commit()
-        sms_sent = send_sms(phone, otp)
-        return resp({"ok": True, "sms_sent": sms_sent, **({"otp": otp} if not sms_sent else {})})
-
     # ── REGISTER ──────────────────────────────────────────────────
     if action == "register" and method == "POST":
         phone = body.get("phone", "").strip()
         name = body.get("name", "").strip()
-        if not phone or not name:
-            return resp({"error": "Укажите имя и телефон"}, 400)
-        otp = gen_otp()
+        password = body.get("password", "").strip()
+        if not phone or not name or not password:
+            return resp({"error": "Укажите имя, телефон и пароль"}, 400)
+        if len(password) < 6:
+            return resp({"error": "Пароль должен быть не менее 6 символов"}, 400)
         cur = conn.cursor()
+        cur.execute(f"SELECT id FROM {SCHEMA}.dzchat_users WHERE phone=%s", (phone,))
+        if cur.fetchone():
+            return resp({"error": "Аккаунт с этим номером уже существует. Войдите."}, 409)
+        pw_hash = hash_password(password)
         cur.execute(f"""
-            INSERT INTO {SCHEMA}.dzchat_users (phone, name, otp, otp_expires_at)
-            VALUES (%s, %s, %s, NOW() + INTERVAL '300 seconds')
-            ON CONFLICT (phone) DO UPDATE SET
-                name=EXCLUDED.name, otp=EXCLUDED.otp, otp_expires_at=EXCLUDED.otp_expires_at
-        """, (phone, name, otp))
-        conn.commit()
-        sms_sent = send_sms(phone, otp)
-        return resp({"ok": True, "sms_sent": sms_sent, **({"otp": otp} if not sms_sent else {})})
-
-    # ── VERIFY ────────────────────────────────────────────────────
-    if action == "verify" and method == "POST":
-        phone = body.get("phone", "").strip()
-        otp = body.get("otp", "").strip()
-        if not phone or not otp:
-            return resp({"error": "phone и otp обязательны"}, 400)
-        cur = conn.cursor()
-        cur.execute(f"SELECT id FROM {SCHEMA}.dzchat_users WHERE phone=%s AND otp=%s AND otp_expires_at > NOW()", (phone, otp))
-        r = cur.fetchone()
-        if not r:
-            return resp({"error": "Неверный или истёкший код"}, 400)
+            INSERT INTO {SCHEMA}.dzchat_users (phone, name, password_hash, is_online, last_seen_at)
+            VALUES (%s, %s, %s, TRUE, NOW()) RETURNING id
+        """, (phone, name, pw_hash))
+        user_id = cur.fetchone()[0]
         tok = gen_token(phone)
-        cur.execute(f"UPDATE {SCHEMA}.dzchat_users SET session_token=%s, session_expires_at=NOW() + INTERVAL '30 days', otp=NULL, is_online=TRUE, last_seen_at=NOW() WHERE id=%s", (tok, r[0]))
+        cur.execute(f"UPDATE {SCHEMA}.dzchat_users SET session_token=%s, session_expires_at=NOW() + INTERVAL '30 days' WHERE id=%s", (tok, user_id))
         conn.commit()
-        return resp({"ok": True, "token": tok, "user_id": r[0]})
+        return resp({"ok": True, "token": tok, "user_id": user_id})
+
+    # ── LOGIN ─────────────────────────────────────────────────────
+    if action == "login" and method == "POST":
+        phone = body.get("phone", "").strip()
+        password = body.get("password", "").strip()
+        if not phone or not password:
+            return resp({"error": "Укажите телефон и пароль"}, 400)
+        cur = conn.cursor()
+        cur.execute(f"SELECT id, password_hash FROM {SCHEMA}.dzchat_users WHERE phone=%s", (phone,))
+        row = cur.fetchone()
+        if not row:
+            return resp({"error": "Аккаунт с этим номером не найден"}, 404)
+        if not row[1]:
+            return resp({"error": "Пароль не установлен. Обратитесь в поддержку."}, 400)
+        if not check_password(password, row[1]):
+            return resp({"error": "Неверный пароль"}, 401)
+        tok = gen_token(phone)
+        cur.execute(f"UPDATE {SCHEMA}.dzchat_users SET session_token=%s, session_expires_at=NOW() + INTERVAL '30 days', is_online=TRUE, last_seen_at=NOW() WHERE id=%s", (tok, row[0]))
+        conn.commit()
+        return resp({"ok": True, "token": tok, "user_id": row[0]})
 
     # ── ME ────────────────────────────────────────────────────────
     if action == "me" and method == "GET":

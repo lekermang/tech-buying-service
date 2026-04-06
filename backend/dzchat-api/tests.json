@@ -4,9 +4,18 @@
       "name": "Register new user",
       "method": "POST",
       "path": "/?action=register",
-      "body": {"phone": "+79001112233", "name": "Тест DzChat"},
+      "body": {"phone": "+79001119988", "name": "Тест DzChat", "password": "test123"},
       "expectedStatus": 200,
       "expectedBody": {"ok": true},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Login with wrong password",
+      "method": "POST",
+      "path": "/?action=login",
+      "body": {"phone": "+79001119988", "password": "wrongpassword"},
+      "expectedStatus": 401,
+      "expectedBody": {"error": "Неверный пароль"},
       "bodyMatcher": "partial"
     },
     {
