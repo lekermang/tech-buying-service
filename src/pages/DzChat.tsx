@@ -189,7 +189,11 @@ const DzChat = () => {
   const isGlass = theme.isGlass;
 
   return (
-    <div className="h-[100dvh] flex overflow-hidden relative"
+    /* Внешняя обёртка — центрирует чат, запрещает растягивание */
+    <div className="h-[100dvh] w-full flex items-stretch justify-center overflow-hidden"
+      style={{ background: isGlass ? "linear-gradient(135deg,#0a0a2e,#001a0e)" : "#000" }}>
+
+    <div className="flex w-full max-w-[430px] h-[100dvh] overflow-hidden relative"
       style={{ background: isGlass ? "transparent" : theme.bg }}>
 
       {/* Glass: системный фон просвечивает насквозь */}
@@ -200,7 +204,7 @@ const DzChat = () => {
 
       {/* ── SIDEBAR ── */}
       <div
-        className={`${activeChat ? "hidden md:flex" : "flex"} flex-col w-full md:w-80 lg:w-96 shrink-0 border-r ${isGlass ? "dz-glass" : ""}`}
+        className={`${activeChat ? "hidden" : "flex"} flex-col w-full shrink-0 border-r ${isGlass ? "dz-glass" : ""}`}
         style={{ background: theme.sidebar, borderColor: theme.border }}>
 
         {/* Header */}
@@ -349,8 +353,8 @@ const DzChat = () => {
       </div>
 
       {/* ── CHAT AREA ── */}
-      <div className={`${activeChat ? "flex" : "hidden md:flex"} flex-1 flex-col relative overflow-hidden md:rounded-2xl md:m-2 ${isGlass ? "dz-glass" : ""}`}
-        style={{ background: isGlass ? theme.chatBg : theme.chatBg, border: `1px solid ${theme.border}` }}>
+      <div className={`${activeChat ? "flex" : "hidden"} flex-1 flex-col relative overflow-hidden ${isGlass ? "dz-glass" : ""}`}
+        style={{ background: theme.chatBg }}>
         {activeChat ? (
           <DzChatView
             chat={activeChat}
@@ -385,6 +389,7 @@ const DzChat = () => {
           onThemeChange={() => setTheme(getTheme(localStorage.getItem("dzchat_theme") ?? "dark"))}
         />
       )}
+    </div>
     </div>
   );
 };

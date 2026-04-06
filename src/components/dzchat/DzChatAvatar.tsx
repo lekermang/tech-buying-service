@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const COLORS = ["#e53e3e","#dd6b20","#d69e2e","#38a169","#3182ce","#805ad5","#d53f8c"];
 
@@ -6,6 +6,9 @@ const DzChatAvatar = ({ name, url, size = 40 }: { name: string; url?: string; si
   const [imgError, setImgError] = useState(false);
   const color = COLORS[(name?.charCodeAt(0) || 0) % COLORS.length];
   const initials = (name || "?").split(" ").map((w: string) => w[0]).slice(0, 2).join("").toUpperCase();
+
+  // Сбрасываем ошибку при смене URL (например после загрузки новой аватарки)
+  useEffect(() => { setImgError(false); }, [url]);
 
   if (url && !imgError) {
     return (
@@ -17,9 +20,7 @@ const DzChatAvatar = ({ name, url, size = 40 }: { name: string; url?: string; si
           alt={name}
           onError={() => setImgError(true)}
           style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center", display: "block" }}
-          loading="lazy"
           referrerPolicy="no-referrer"
-          crossOrigin="anonymous"
         />
       </div>
     );

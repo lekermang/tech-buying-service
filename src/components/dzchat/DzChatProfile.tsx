@@ -116,8 +116,11 @@ export const ProfileModal = ({ me, token, onClose, onUpdate, onLogout, onSwitchA
     }
     const saved = await api("profile", "POST", { name, avatar_url }, token);
     setSaving(false);
-    // Используем URL который вернул сервер (или тот что только что загрузили)
-    const finalUrl = saved.avatar_url || avatar_url;
+    // Добавляем timestamp чтобы сбросить кэш браузера
+    const rawUrl = saved.avatar_url || avatar_url;
+    const finalUrl = rawUrl ? `${rawUrl}?t=${Date.now()}` : rawUrl;
+    // Сразу обновляем превью чтобы пользователь видел новую аватарку
+    if (finalUrl) setAvatarPreview(finalUrl);
     onUpdate({ ...me, name, avatar_url: finalUrl });
     onClose();
   };

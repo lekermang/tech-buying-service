@@ -40,6 +40,37 @@ if (typeof window !== "undefined") {
   window.addEventListener("keydown", unlock, { once: true });
 }
 
+// ── Очередь звуков пока страница скрыта (Page Visibility API) ─────
+let _pendingSound: string | null = null;
+
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && _pendingSound) {
+      const s = _pendingSound;
+      _pendingSound = null;
+      // Небольшая задержка чтобы AudioContext успел разблокироваться
+      setTimeout(() => playNotificationSoundImmediate(s), 300);
+    }
+  });
+}
+
+// Внутренняя функция без проверки видимости
+function playNotificationSoundImmediate(soundId: string) {
+  if (soundId === "none") return;
+  if (soundId === "custom") {
+    const url = localStorage.getItem("dzchat_custom_audio");
+    if (url) { const a = new Audio(url); a.volume = 0.8; a.play().catch(() => {}); }
+    return;
+  }
+  switch (soundId) {
+    case "chime": playTone("sine", [880, 1100], 0.3, 0.8, [0, 0.25]); break;
+    case "pop":   playTone("sine", [520, 260], 0.45, 0.15, [0, 0.05]); break;
+    case "ping":  playTone("triangle", 1320, 0.2, 0.35); break;
+    case "soft":  playTone("sine", 440, 0.18, 0.5); break;
+    default:      playTone("sine", [660, 880], 0.25, 0.3, [0, 0.1]); break;
+  }
+}
+
 function playTone(
   type: OscillatorType,
   freq: number | number[],
@@ -77,40 +108,16 @@ function playTone(
 // ── Звуки входящих уведомлений ────────────────────────────────────
 export const playNotificationSound = (soundId: string) => {
   if (soundId === "none") return;
-
-  // Кастомный файл
-  if (soundId === "custom") {
-    const url = localStorage.getItem("dzchat_custom_audio");
-    if (url) {
-      const audio = new Audio(url);
-      audio.volume = 0.8;
-      audio.play().catch(() => {});
-    }
+  // Вибрация (Android + некоторые iOS)
+  if (localStorage.getItem("dzchat_vibrate") !== "off" && navigator.vibrate) {
+    navigator.vibrate([120, 60, 80]);
+  }
+  // Если страница скрыта — откладываем звук до возврата
+  if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+    _pendingSound = soundId;
     return;
   }
-
-  switch (soundId) {
-    case "chime":
-      // Двойной колокольчик: до-ми
-      playTone("sine", [880, 1100], 0.3, 0.8, [0, 0.25]);
-      break;
-    case "pop":
-      // Короткий «буль»
-      playTone("sine", [520, 260], 0.45, 0.15, [0, 0.05]);
-      break;
-    case "ping":
-      // Высокий пинг
-      playTone("triangle", 1320, 0.2, 0.35);
-      break;
-    case "soft":
-      // Мягкий низкий тон
-      playTone("sine", 440, 0.18, 0.5);
-      break;
-    default:
-      // default — короткий восходящий тон
-      playTone("sine", [660, 880], 0.25, 0.3, [0, 0.1]);
-      break;
-  }
+  playNotificationSoundImmediate(soundId);
 };
 
 // ── Звук отправки сообщения ───────────────────────────────────────

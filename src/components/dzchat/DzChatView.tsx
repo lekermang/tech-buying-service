@@ -30,9 +30,14 @@ const DzChatView = ({ chat, me, token, onBack, onChatUpdate, theme: themeProp }:
   const [showGroupInfo, setShowGroupInfo] = useState(false);
   const [showGroupEdit, setShowGroupEdit] = useState(false);
   const [groupMembers, setGroupMembers] = useState<any[]>([]);
+  // Онлайн-статус партнёра — обновляется отдельным поллингом
+  const [partnerOnline, setPartnerOnline] = useState<boolean>(!!chat.partner?.is_online);
+  const [partnerLastSeen, setPartnerLastSeen] = useState<string | null>(chat.partner?.last_seen_at ?? null);
+  const [liveChatData, setLiveChatData] = useState<any>(chat);
   const bottomRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval>>();
+  const onlinePollRef = useRef<ReturnType<typeof setInterval>>();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const msgRefs = useRef<Record<number, HTMLDivElement | null>>({});
   // id последнего известного сообщения — скроллим вниз только при появлении нового
@@ -78,9 +83,35 @@ const DzChatView = ({ chat, me, token, onBack, onChatUpdate, theme: themeProp }:
     setMessages([]); setReplyTo(null); setContextMsg(null); setShowSearch(false);
     lastMsgIdRef.current = null;
     isAtBottomRef.current = true;
+    setPartnerOnline(!!chat.partner?.is_online);
+    setPartnerLastSeen(chat.partner?.last_seen_at ?? null);
+    setLiveChatData(chat);
     loadMessages().then(() => scrollToBottom("instant"));
     pollRef.current = setInterval(loadMessages, 1000);
-    return () => clearInterval(pollRef.current);
+
+    // Polling онлайн-статуса партнёра каждые 8 сек
+    if (chat.type === "direct" && chat.partner?.id) {
+      const pollOnline = async () => {
+        try {
+          const data = await api(`chats`, "GET", undefined, token);
+          if (Array.isArray(data)) {
+            const updated = data.find((c: any) => c.id === chat.id);
+            if (updated?.partner) {
+              setPartnerOnline(!!updated.partner.is_online);
+              setPartnerLastSeen(updated.partner.last_seen_at ?? null);
+              setLiveChatData((prev: any) => ({ ...prev, partner: updated.partner }));
+            }
+          }
+        } catch (e) { void e; }
+      };
+      pollOnline();
+      onlinePollRef.current = setInterval(pollOnline, 8000);
+    }
+
+    return () => {
+      clearInterval(pollRef.current);
+      clearInterval(onlinePollRef.current);
+    };
   }, [chat.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // imageB64 может содержать видео (data:video/...) или фото
@@ -189,17 +220,21 @@ const DzChatView = ({ chat, me, token, onBack, onChatUpdate, theme: themeProp }:
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#0a1929]"
+    <div className="flex flex-col h-full"
+      style={{ background: theme.chatBg }}
       onClick={() => { setContextMsg(null); setReactionPickerMsg(null); }}>
 
       {/* Шапка */}
       <ChatHeader
-        chat={chat}
+        chat={liveChatData}
+        partnerOnline={partnerOnline}
+        partnerLastSeen={partnerLastSeen}
         onBack={onBack}
         onGroupInfoClick={loadGroupInfo}
         onGroupEditClick={() => setShowGroupEdit(true)}
         showSearch={showSearch}
         onToggleSearch={() => { setShowSearch(s => !s); setSearchQuery(""); setSearchResults([]); }}
+        theme={theme}
       />
 
       {/* Поиск */}
