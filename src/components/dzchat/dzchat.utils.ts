@@ -14,7 +14,9 @@ export const api = async (action: string, method = "GET", body?: object, token?:
 };
 
 export const formatTime = (iso: string) => {
-  const d = new Date(iso);
+  // Сервер отдаёт время без суффикса Z — добавляем, чтобы браузер понял UTC
+  const normalized = iso && !iso.endsWith("Z") && !iso.includes("+") ? iso + "Z" : iso;
+  const d = new Date(normalized);
   const now = new Date();
   const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000);
   if (diffDays === 0) return d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });

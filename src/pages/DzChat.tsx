@@ -261,7 +261,7 @@ const DzChat = () => {
         )}
       </div>
 
-      {showNewChat && <NewChatModal token={token} onClose={() => setShowNewChat(false)} onChatCreated={id => { setNewChatId(id); loadChats(token); }} />}
+      {showNewChat && <NewChatModal token={token} chats={chats} onClose={() => setShowNewChat(false)} onChatCreated={id => { setNewChatId(id); loadChats(token); }} />}
       {showNewGroup && <CreateGroupModal token={token} onClose={() => setShowNewGroup(false)} onCreated={id => { setNewChatId(id); loadChats(token); }} />}
       {showProfile && <ProfileModal me={me} token={token} onClose={() => setShowProfile(false)} onUpdate={u => setMe(u)} />}
     </div>

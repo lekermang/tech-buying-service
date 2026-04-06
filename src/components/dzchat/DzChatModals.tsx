@@ -42,8 +42,8 @@ export const playNotificationSound = (soundId: string) => {
 };
 
 // ── NEW CHAT MODAL ───────────────────────────────────────────────
-export const NewChatModal = ({ token, onClose, onChatCreated }: {
-  token: string; onClose: () => void; onChatCreated: (id: number) => void;
+export const NewChatModal = ({ token, chats = [], onClose, onChatCreated }: {
+  token: string; chats?: any[]; onClose: () => void; onChatCreated: (id: number) => void;
 }) => {
   const [query, setQuery] = useState("");
   const [users, setUsers] = useState<any[]>([]);
@@ -136,16 +136,29 @@ export const NewChatModal = ({ token, onClose, onChatCreated }: {
         {loading && <p className="text-white/40 text-sm text-center py-4">Поиск...</p>}
 
         <div className="flex-1 overflow-y-auto space-y-1">
-          {displayUsers.map(u => (
-            <button key={u.id} onClick={() => start(u.id)}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 transition-colors">
-              <DzChatAvatar name={u.name} url={u.avatar_url} size={40} />
-              <div className="text-left">
-                <p className="text-white text-sm font-medium">{u.name}</p>
-                <p className="text-white/40 text-xs">{u.phone}</p>
-              </div>
-            </button>
-          ))}
+          {displayUsers.map(u => {
+            const existingChat = chats.find(c => c.type === "direct" && c.partner?.id === u.id);
+            return (
+              <button key={u.id} onClick={() => start(u.id)}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 transition-colors">
+                <div className="relative">
+                  <DzChatAvatar name={u.name} url={u.avatar_url} size={40} />
+                  {u.is_online && <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-[#25D366] border-2 border-[#1a2634] rounded-full" />}
+                </div>
+                <div className="text-left flex-1 min-w-0">
+                  <p className="text-white text-sm font-medium">{u.name}</p>
+                  <p className="text-white/40 text-xs">{u.phone}</p>
+                </div>
+                {existingChat ? (
+                  <span className="text-[11px] text-[#25D366] bg-[#25D366]/10 border border-[#25D366]/30 px-2 py-0.5 rounded-full shrink-0">
+                    Открыть чат
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-white/30 shrink-0">Написать</span>
+                )}
+              </button>
+            );
+          })}
           {!loading && !contactsLoading && query && users.length === 0 && contactsFound.length === 0 && (
             <p className="text-white/30 text-sm text-center py-4">Никого не найдено</p>
           )}

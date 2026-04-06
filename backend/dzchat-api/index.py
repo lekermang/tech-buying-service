@@ -373,8 +373,9 @@ def handler(event: dict, context) -> dict:
                 LEFT JOIN {SCHEMA}.dzchat_messages rm ON rm.id=m.reply_to
                 LEFT JOIN {SCHEMA}.dzchat_users rus ON rus.id=rm.sender_id
                 WHERE m.chat_id=%s AND m.created_at < %s
+                  AND NOT (%s = ANY(COALESCE(m.hidden_for, '{{}}'::integer[])))
                 ORDER BY m.created_at DESC LIMIT %s
-            """, (chat_id, before, PAGE))
+            """, (chat_id, before, u["id"], PAGE))
         else:
             cur.execute(f"""
                 SELECT m.id, m.sender_id, us.name, us.avatar_url, m.msg_text, m.photo_url,
@@ -386,8 +387,9 @@ def handler(event: dict, context) -> dict:
                 LEFT JOIN {SCHEMA}.dzchat_messages rm ON rm.id=m.reply_to
                 LEFT JOIN {SCHEMA}.dzchat_users rus ON rus.id=rm.sender_id
                 WHERE m.chat_id=%s
+                  AND NOT (%s = ANY(COALESCE(m.hidden_for, '{{}}'::integer[])))
                 ORDER BY m.created_at DESC LIMIT %s
-            """, (chat_id, PAGE))
+            """, (chat_id, u["id"], PAGE))
         rows = cur.fetchall()
         msg_ids = [r[0] for r in rows]
         reactions = get_msg_reactions(conn, msg_ids)
@@ -437,7 +439,7 @@ def handler(event: dict, context) -> dict:
         return resp({"ok": True, "id": row[0], "created_at": str(row[1]),
                      "sender_id": u["id"], "sender_name": u["name"], "sender_avatar": u["avatar_url"]})
 
-    # ── REMOVE MESSAGE ────────────────────────────────────────────
+    # ── REMOVE MESSAGE (для всех — помечает removed=TRUE) ─────────
     if action == "remove" and method == "POST":
         u = get_user(conn, token)
         if not u:
@@ -447,7 +449,18 @@ def handler(event: dict, context) -> dict:
         if not msg_id:
             return resp({"error": "msg_id required"}, 400)
         cur = conn.cursor()
-        cur.execute(f"UPDATE {SCHEMA}.dzchat_messages SET removed=TRUE WHERE id=%s AND sender_id=%s", (msg_id, u["id"]))
+        if everyone:
+            # Удалить для всех — только отправитель может
+            cur.execute(f"UPDATE {SCHEMA}.dzchat_messages SET removed=TRUE WHERE id=%s AND sender_id=%s", (msg_id, u["id"]))
+        else:
+            # Удалить для себя — добавляем user_id в hidden_for
+            cur.execute(f"SELECT hidden_for FROM {SCHEMA}.dzchat_messages WHERE id=%s", (msg_id,))
+            row = cur.fetchone()
+            if row is not None:
+                hidden = row[0] or []
+                if u["id"] not in hidden:
+                    hidden.append(u["id"])
+                cur.execute(f"UPDATE {SCHEMA}.dzchat_messages SET hidden_for=%s WHERE id=%s", (hidden, msg_id))
         conn.commit()
         return resp({"ok": True})
 

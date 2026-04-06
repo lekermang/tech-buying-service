@@ -7,7 +7,7 @@ import { VoiceMessage, MsgStatus } from "./DzChatVoice";
 const REACTIONS = ["❤️", "😂", "😮", "😢", "👍", "🙏"];
 const SENDER_COLORS = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#3b82f6", "#a855f7"];
 
-const DzChatMessage = ({ msg, me, chat, prevMsg, nextMsg, msgRef, contextMsg, reactionPickerMsg, onContextMenu, onReact, onReactionPicker, onReply, onForward, onRemove, onScrollToMsg, onTextareaFocus }: {
+const DzChatMessage = ({ msg, me, chat, prevMsg, nextMsg, msgRef, contextMsg, reactionPickerMsg, onContextMenu, onReact, onReactionPicker, onReply, onForward, onRemove, onRemoveForAll, onScrollToMsg, onTextareaFocus }: {
   msg: any;
   me: any;
   chat: any;
@@ -22,6 +22,7 @@ const DzChatMessage = ({ msg, me, chat, prevMsg, nextMsg, msgRef, contextMsg, re
   onReply: (msg: any) => void;
   onForward: (msg: any) => void;
   onRemove: (msg: any) => void;
+  onRemoveForAll: (msg: any) => void;
   onScrollToMsg: (id: number) => void;
   onTextareaFocus: () => void;
 }) => {
@@ -46,7 +47,7 @@ const DzChatMessage = ({ msg, me, chat, prevMsg, nextMsg, msgRef, contextMsg, re
             {showAvatar && <DzChatAvatar name={msg.sender_name} url={msg.sender_avatar} size={28} />}
           </div>
         )}
-        <div className="relative max-w-[78%] group"
+        <div className="relative max-w-[85%] group"
           onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onContextMenu(msg); }}>
           {msg.removed ? (
             <div className={`px-3 py-2 rounded-2xl text-sm italic text-white/30 ${isMine ? "bg-[#1e4a2e]/60" : "bg-white/8"}`}>
@@ -151,11 +152,19 @@ const DzChatMessage = ({ msg, me, chat, prevMsg, nextMsg, msgRef, contextMsg, re
                   <Icon name="Copy" size={15} className="text-white/50" /> Копировать
                 </button>
               )}
-              {isMine && !msg.removed && (
-                <button onClick={() => onRemove(msg)}
-                  className="flex items-center gap-3 w-full px-4 py-2.5 text-red-400 hover:bg-white/5 text-sm border-t border-white/5">
-                  <Icon name="Trash2" size={15} /> Удалить
-                </button>
+              {!msg.removed && (
+                <div className="border-t border-white/5">
+                  {isMine && (
+                    <button onClick={() => onRemoveForAll(msg)}
+                      className="flex items-center gap-3 w-full px-4 py-2.5 text-red-400 hover:bg-white/5 text-sm">
+                      <Icon name="Trash2" size={15} /> Удалить для всех
+                    </button>
+                  )}
+                  <button onClick={() => onRemove(msg)}
+                    className="flex items-center gap-3 w-full px-4 py-2.5 text-red-300/70 hover:bg-white/5 text-sm">
+                    <Icon name="EyeOff" size={15} /> Удалить для себя
+                  </button>
+                </div>
               )}
             </div>
           )}

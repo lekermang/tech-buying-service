@@ -121,7 +121,13 @@ const DzChatView = ({ chat, me, token, onBack, onChatUpdate }: {
   };
 
   const removeMsg = async (msg: any) => {
-    await api("remove", "POST", { msg_id: msg.id }, token);
+    await api("remove", "POST", { msg_id: msg.id, everyone: false }, token);
+    setContextMsg(null);
+    await loadMessages();
+  };
+
+  const removeMsgForAll = async (msg: any) => {
+    await api("remove", "POST", { msg_id: msg.id, everyone: true }, token);
     setContextMsg(null);
     await loadMessages();
   };
@@ -198,6 +204,7 @@ const DzChatView = ({ chat, me, token, onBack, onChatUpdate }: {
             onReply={m => { setReplyTo(m); setContextMsg(null); }}
             onForward={m => { setForwardMsg(m); setContextMsg(null); }}
             onRemove={removeMsg}
+            onRemoveForAll={removeMsgForAll}
             onScrollToMsg={scrollToMsg}
             onTextareaFocus={() => textareaRef.current?.focus()}
           />
