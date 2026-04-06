@@ -6,6 +6,7 @@ import DzChatAvatar from "@/components/dzchat/DzChatAvatar";
 import DzChatAuth from "@/components/dzchat/DzChatAuth";
 import DzChatView from "@/components/dzchat/DzChatView";
 import { NewChatModal, ProfileModal, CreateGroupModal, playNotificationSound } from "@/components/dzchat/DzChatModals";
+import { DzChatInstallBanner } from "@/components/dzchat/DzChatInstall";
 
 const NOTIF_ICON = "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/dce22ed0-7e15-4a0f-84c3-9987477dea5a.jpg";
 
@@ -188,12 +189,6 @@ const DzChat = () => {
             </div>
           </button>
           <div className="flex items-center gap-0.5 shrink-0">
-            {installPrompt && (
-              <button onClick={installApp} title="Установить приложение"
-                className="w-9 h-9 flex items-center justify-center text-[#FFD700] hover:bg-white/10 rounded-full transition-colors">
-                <Icon name="Download" size={18} />
-              </button>
-            )}
             {notifGranted
               ? <button title="Уведомления включены" className="w-9 h-9 flex items-center justify-center text-[#25D366]/60 rounded-full">
                   <Icon name="BellRing" size={17} />
@@ -216,6 +211,9 @@ const DzChat = () => {
             </button>
           </div>
         </div>
+
+        {/* Баннер установки PWA */}
+        <DzChatInstallBanner installPrompt={installPrompt} onInstall={installApp} />
 
         {/* Поиск по чатам */}
         <div className="px-3 py-2 bg-[#111b26] border-b border-white/5">
