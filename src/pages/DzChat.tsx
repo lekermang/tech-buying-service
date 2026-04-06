@@ -194,12 +194,18 @@ const DzChat = () => {
                 <Icon name="Download" size={18} />
               </button>
             )}
-            {!notifGranted && "Notification" in window && (
-              <button onClick={requestNotifications} title="Уведомления"
-                className="w-9 h-9 flex items-center justify-center text-white/40 hover:text-[#25D366] hover:bg-white/10 rounded-full transition-colors">
-                <Icon name="Bell" size={18} />
-              </button>
-            )}
+            {notifGranted
+              ? <button title="Уведомления включены" className="w-9 h-9 flex items-center justify-center text-[#25D366]/60 rounded-full">
+                  <Icon name="BellRing" size={17} />
+                </button>
+              : "Notification" in window && (
+                <button onClick={requestNotifications} title="Разрешить уведомления"
+                  className="w-9 h-9 flex items-center justify-center text-yellow-400 hover:bg-white/10 rounded-full transition-colors animate-pulse"
+                  style={{ animation: "pulse 2s infinite" }}>
+                  <Icon name="Bell" size={18} />
+                </button>
+              )
+            }
             <button onClick={() => setShowNewGroup(true)} title="Новая группа"
               className="w-9 h-9 flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 rounded-full transition-colors">
               <Icon name="Users" size={18} />
@@ -207,10 +213,6 @@ const DzChat = () => {
             <button onClick={() => setShowNewChat(true)} title="Новый чат"
               className="w-9 h-9 flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 rounded-full transition-colors">
               <Icon name="SquarePen" size={19} />
-            </button>
-            <button onClick={logout} title="Выйти"
-              className="w-9 h-9 flex items-center justify-center text-white/30 hover:text-red-400 hover:bg-white/10 rounded-full transition-colors">
-              <Icon name="LogOut" size={17} />
             </button>
           </div>
         </div>
@@ -296,7 +298,7 @@ const DzChat = () => {
       </div>
 
       {/* ── CHAT AREA ── */}
-      <div className={`${activeChat ? "flex" : "hidden md:flex"} flex-1 flex-col relative`}>
+      <div className={`${activeChat ? "flex" : "hidden md:flex"} flex-1 flex-col relative border border-white/5 rounded-none md:rounded-2xl md:m-2 overflow-hidden`}>
         {activeChat ? (
           <DzChatView
             chat={activeChat}
@@ -319,7 +321,15 @@ const DzChat = () => {
 
       {showNewChat && <NewChatModal token={token} chats={chats} onClose={() => setShowNewChat(false)} onChatCreated={id => { setNewChatId(id); loadChats(token); }} />}
       {showNewGroup && <CreateGroupModal token={token} onClose={() => setShowNewGroup(false)} onCreated={id => { setNewChatId(id); loadChats(token); }} />}
-      {showProfile && <ProfileModal me={me} token={token} onClose={() => setShowProfile(false)} onUpdate={u => setMe(u)} />}
+      {showProfile && (
+        <ProfileModal
+          me={me} token={token}
+          onClose={() => setShowProfile(false)}
+          onUpdate={u => setMe(u)}
+          onLogout={() => { setShowProfile(false); logout(); }}
+          onSwitchAccount={() => { setShowProfile(false); logout(); }}
+        />
+      )}
     </div>
   );
 };

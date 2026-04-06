@@ -1,18 +1,18 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import { api } from "./dzchat.utils";
 import DzChatAvatar from "./DzChatAvatar";
 
 // ── ЗВУКИ УВЕДОМЛЕНИЙ ────────────────────────────────────────────
 export const NOTIFICATION_SOUNDS = [
-  { id: "default",  label: "Стандартный",   emoji: "🔔", url: "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/dce22ed0-7e15-4a0f-84c3-9987477dea5a.jpg" },
-  { id: "chime",    label: "Колокольчик",   emoji: "🔕", url: null },
-  { id: "pop",      label: "Поп",           emoji: "💬", url: null },
-  { id: "none",     label: "Без звука",     emoji: "🔇", url: null },
+  { id: "default", label: "Стандартный", emoji: "🔔" },
+  { id: "chime",   label: "Колокольчик", emoji: "🎵" },
+  { id: "pop",     label: "Поп",         emoji: "💬" },
+  { id: "ping",    label: "Пинг",        emoji: "📳" },
+  { id: "none",    label: "Без звука",   emoji: "🔇" },
 ];
 
-// Воспроизводим звук через Web Audio API (short beep)
 export const playNotificationSound = (soundId: string) => {
   if (soundId === "none") return;
   try {
@@ -22,18 +22,22 @@ export const playNotificationSound = (soundId: string) => {
     osc.connect(gain);
     gain.connect(ctx.destination);
     if (soundId === "chime") {
-      osc.frequency.value = 880;
+      osc.type = "sine"; osc.frequency.value = 880;
       gain.gain.setValueAtTime(0.3, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
-      osc.start(); osc.stop(ctx.currentTime + 0.6);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.7);
+      osc.start(); osc.stop(ctx.currentTime + 0.7);
     } else if (soundId === "pop") {
-      osc.frequency.value = 440;
+      osc.type = "sine"; osc.frequency.value = 440;
       gain.gain.setValueAtTime(0.4, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
-      osc.start(); osc.stop(ctx.currentTime + 0.15);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+      osc.start(); osc.stop(ctx.currentTime + 0.12);
+    } else if (soundId === "ping") {
+      osc.type = "triangle"; osc.frequency.value = 1200;
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+      osc.start(); osc.stop(ctx.currentTime + 0.3);
     } else {
-      // default — двойной мягкий сигнал
-      osc.frequency.value = 660;
+      osc.type = "sine"; osc.frequency.value = 660;
       gain.gain.setValueAtTime(0.25, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
       osc.start(); osc.stop(ctx.currentTime + 0.25);
@@ -50,23 +54,29 @@ export const NewChatModal = ({ token, chats = [], onClose, onChatCreated }: {
   const [loading, setLoading] = useState(false);
   const [contactsLoading, setContactsLoading] = useState(false);
   const [contactsFound, setContactsFound] = useState<any[]>([]);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
-  const search = async (q: string) => {
+  // debounce поиска — ждём 400мс после последнего нажатия
+  const handleSearch = (q: string) => {
     setQuery(q);
     setContactsFound([]);
-    if (!q.trim()) return setUsers([]);
-    setLoading(true);
-    const res = await api(`users&q=${encodeURIComponent(q)}`, "GET", undefined, token);
-    setLoading(false);
-    if (Array.isArray(res)) setUsers(res);
+    clearTimeout(debounceRef.current);
+    if (!q.trim()) { setUsers([]); return; }
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true);
+      const res = await api(`users&q=${encodeURIComponent(q)}`, "GET", undefined, token);
+      setLoading(false);
+      if (Array.isArray(res)) setUsers(res);
+    }, 400);
   };
+
+  useEffect(() => () => clearTimeout(debounceRef.current), []);
 
   const start = async (partnerId: number) => {
     const res = await api("create", "POST", { partner_id: partnerId }, token);
     if (res.chat_id) { onChatCreated(res.chat_id); onClose(); }
   };
 
-  // Синхронизация с контактами телефона через Contact Picker API
   const syncContacts = async () => {
     const contacts = (navigator as any).contacts;
     if (!contacts) {
@@ -77,19 +87,15 @@ export const NewChatModal = ({ token, chats = [], onClose, onChatCreated }: {
     try {
       const selected: any[] = await contacts.select(["name", "tel"], { multiple: true });
       if (!selected || selected.length === 0) { setContactsLoading(false); return; }
-
-      // Собираем все номера
       const phones: string[] = [];
       selected.forEach((c: any) => {
         (c.tel || []).forEach((t: string) => {
-          const cleaned = t.replace(/\s/g, "").replace(/[()]/g, "");
+          const cleaned = t.replace(/[\s()]/g, "").replace(/-/g, "");
           if (cleaned) phones.push(cleaned);
         });
       });
-
-      // Ищем каждый номер в DzChat
       const found: any[] = [];
-      for (const phone of phones.slice(0, 20)) {
+      for (const phone of phones.slice(0, 30)) {
         const res = await api(`users&q=${encodeURIComponent(phone)}`, "GET", undefined, token);
         if (Array.isArray(res) && res.length > 0) {
           res.forEach(u => { if (!found.find(f => f.id === u.id)) found.push(u); });
@@ -97,7 +103,7 @@ export const NewChatModal = ({ token, chats = [], onClose, onChatCreated }: {
       }
       setContactsFound(found);
       if (found.length === 0) alert("Никто из ваших контактов пока не зарегистрирован в DzChat");
-    } catch (_e) { /* Contact Picker cancelled or not supported */ }
+    } catch (_e) { /* cancelled */ }
     setContactsLoading(false);
   };
 
@@ -111,57 +117,52 @@ export const NewChatModal = ({ token, chats = [], onClose, onChatCreated }: {
           <button onClick={onClose} className="text-white/40"><Icon name="X" size={18} /></button>
         </div>
 
-        {/* Синхронизация контактов */}
         {"contacts" in navigator && (
           <button onClick={syncContacts} disabled={contactsLoading}
             className="w-full flex items-center justify-center gap-2 bg-[#25D366]/15 border border-[#25D366]/40 text-[#25D366] py-2.5 rounded-xl mb-3 hover:bg-[#25D366]/25 transition-colors disabled:opacity-50 text-sm font-medium">
             {contactsLoading
               ? <><Icon name="Loader" size={15} className="animate-spin" /> Поиск в контактах...</>
-              : <><Icon name="BookUser" size={15} /> Найти из телефонной книги</>
-            }
+              : <><Icon name="BookUser" size={15} /> Найти из телефонной книги</>}
           </button>
         )}
 
         {contactsFound.length > 0 && (
           <div className="flex items-center justify-between mb-2">
-            <p className="text-white/50 text-xs">Найдено из контактов: {contactsFound.length}</p>
+            <p className="text-white/50 text-xs">Из контактов: {contactsFound.length}</p>
             <button onClick={() => setContactsFound([])} className="text-white/30 text-xs hover:text-white/60">Очистить</button>
           </div>
         )}
 
-        <input type="text" value={query} onChange={e => search(e.target.value)}
-          placeholder="Поиск по имени или телефону..."
-          className="w-full bg-white/10 text-white placeholder-white/40 px-4 py-2.5 rounded-xl outline-none mb-3" />
+        <div className="relative mb-3">
+          <input type="text" value={query} onChange={e => handleSearch(e.target.value)}
+            placeholder="Поиск по имени или телефону..."
+            className="w-full bg-white/10 text-white placeholder-white/40 px-4 py-2.5 rounded-xl outline-none pr-10" />
+          {loading && <Icon name="Loader" size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 animate-spin" />}
+        </div>
 
-        {loading && <p className="text-white/40 text-sm text-center py-4">Поиск...</p>}
-
-        <div className="flex-1 overflow-y-auto space-y-1">
+        <div className="flex-1 overflow-y-auto space-y-1 min-h-[40px]">
+          {!loading && query && users.length === 0 && contactsFound.length === 0 && (
+            <p className="text-white/30 text-sm text-center py-4">Никого не найдено</p>
+          )}
           {displayUsers.map(u => {
             const existingChat = chats.find(c => c.type === "direct" && c.partner?.id === u.id);
             return (
               <button key={u.id} onClick={() => start(u.id)}
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 transition-colors">
                 <div className="relative">
-                  <DzChatAvatar name={u.name} url={u.avatar_url} size={40} />
+                  <DzChatAvatar name={u.name} url={u.avatar_url} size={42} />
                   {u.is_online && <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-[#25D366] border-2 border-[#1a2634] rounded-full" />}
                 </div>
                 <div className="text-left flex-1 min-w-0">
                   <p className="text-white text-sm font-medium">{u.name}</p>
                   <p className="text-white/40 text-xs">{u.phone}</p>
                 </div>
-                {existingChat ? (
-                  <span className="text-[11px] text-[#25D366] bg-[#25D366]/10 border border-[#25D366]/30 px-2 py-0.5 rounded-full shrink-0">
-                    Открыть чат
-                  </span>
-                ) : (
-                  <span className="text-[11px] text-white/30 shrink-0">Написать</span>
-                )}
+                {existingChat
+                  ? <span className="text-[11px] text-[#25D366] bg-[#25D366]/10 border border-[#25D366]/30 px-2 py-0.5 rounded-full shrink-0">Открыть</span>
+                  : <span className="text-[11px] text-white/25 shrink-0">Написать</span>}
               </button>
             );
           })}
-          {!loading && !contactsLoading && query && users.length === 0 && contactsFound.length === 0 && (
-            <p className="text-white/30 text-sm text-center py-4">Никого не найдено</p>
-          )}
         </div>
       </div>
     </div>
@@ -169,21 +170,40 @@ export const NewChatModal = ({ token, chats = [], onClose, onChatCreated }: {
 };
 
 // ── PROFILE MODAL ────────────────────────────────────────────────
-export const ProfileModal = ({ me, token, onClose, onUpdate }: {
+export const ProfileModal = ({ me, token, onClose, onUpdate, onLogout, onSwitchAccount }: {
   me: any; token: string; onClose: () => void; onUpdate: (u: any) => void;
+  onLogout?: () => void; onSwitchAccount?: () => void;
 }) => {
   const [name, setName] = useState(me.name);
   const [avatarB64, setAvatarB64] = useState<string | null>(null);
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(me.avatar_url);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(me.avatar_url || null);
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [soundId, setSoundId] = useState<string>(() => localStorage.getItem("dzchat_sound") || "default");
+  const [notifPerm, setNotifPerm] = useState<NotificationPermission>(() =>
+    "Notification" in window ? Notification.permission : "denied"
+  );
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => { const r = ev.target?.result as string; setAvatarPreview(r); setAvatarB64(r.split(",")[1]); };
-    reader.readAsDataURL(file);
+    // Сжимаем через canvas чтобы не превысить лимит base64
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX = 512;
+      const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+      setAvatarPreview(dataUrl);
+      setAvatarB64(dataUrl.split(",")[1]);
+      URL.revokeObjectURL(url);
+    };
+    img.src = url;
     e.target.value = "";
   };
 
@@ -193,12 +213,26 @@ export const ProfileModal = ({ me, token, onClose, onUpdate }: {
     playNotificationSound(id);
   };
 
+  const requestNotifications = async () => {
+    if (!("Notification" in window)) return;
+    const perm = await Notification.requestPermission();
+    setNotifPerm(perm);
+    // Передаём статус в SW
+    if ("serviceWorker" in navigator) {
+      const reg = await navigator.serviceWorker.ready.catch(() => null);
+      reg?.active?.postMessage({ type: "NOTIF_PERM", granted: perm === "granted" });
+    }
+  };
+
   const save = async () => {
     setSaving(true);
     let avatar_url = me.avatar_url;
     if (avatarB64) {
-      const res = await api("upload", "POST", { image: avatarB64, mime: "image/jpeg" }, token);
+      setUploadingAvatar(true);
+      const res = await api("upload", "POST", { image: avatarB64, mime: "image/jpeg", kind: "avatar" }, token);
+      setUploadingAvatar(false);
       if (res.url) avatar_url = res.url;
+      else { setSaving(false); return; }
     }
     await api("profile", "POST", { name, avatar_url }, token);
     setSaving(false);
@@ -208,29 +242,62 @@ export const ProfileModal = ({ me, token, onClose, onUpdate }: {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center" onClick={onClose}>
-      <div className="bg-[#1a2634] w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl p-5 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+      <div className="bg-[#1a2634] w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl p-5 max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-5">
           <h3 className="text-white font-semibold">Профиль</h3>
-          <button onClick={onClose} className="text-white/40"><Icon name="X" size={18} /></button>
+          <button onClick={onClose} className="text-white/40 hover:text-white"><Icon name="X" size={18} /></button>
         </div>
-        <div className="flex flex-col items-center gap-4 mb-5">
-          <div className="relative cursor-pointer" onClick={() => fileRef.current?.click()}>
-            <DzChatAvatar name={name || "?"} url={avatarPreview || undefined} size={80} />
-            <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-              <Icon name="Camera" size={20} className="text-white" />
+
+        {/* Аватарка */}
+        <div className="flex flex-col items-center gap-3 mb-5">
+          <button className="relative group" onClick={() => fileRef.current?.click()}>
+            <DzChatAvatar name={name || "?"} url={avatarPreview || undefined} size={90} />
+            <div className="absolute inset-0 bg-black/50 rounded-full flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+              <Icon name="Camera" size={22} className="text-white" />
+              <span className="text-white text-[10px] mt-0.5">Изменить</span>
             </div>
-          </div>
+            {uploadingAvatar && (
+              <div className="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center">
+                <Icon name="Loader" size={22} className="text-white animate-spin" />
+              </div>
+            )}
+          </button>
+          <p className="text-white/30 text-xs">Нажми чтобы изменить фото</p>
           <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} className="hidden" />
         </div>
 
+        {/* Имя */}
         <input type="text" value={name} onChange={e => setName(e.target.value)}
           placeholder="Ваше имя"
-          className="w-full bg-white/10 text-white placeholder-white/40 px-4 py-2.5 rounded-xl outline-none mb-2" />
-        <p className="text-white/30 text-xs mb-5">Телефон: {me.phone}</p>
+          className="w-full bg-white/10 text-white placeholder-white/40 px-4 py-2.5 rounded-xl outline-none mb-1 focus:ring-1 focus:ring-[#25D366]" />
+        <p className="text-white/30 text-xs mb-5 px-1">📱 {me.phone}</p>
 
-        {/* Звук уведомлений */}
+        {/* Уведомления */}
+        <div className="mb-4">
+          <p className="text-white/50 text-xs uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <Icon name="Bell" size={13} /> Уведомления
+          </p>
+          {notifPerm === "granted" ? (
+            <div className="flex items-center gap-2 bg-[#25D366]/10 border border-[#25D366]/30 rounded-xl px-3 py-2.5">
+              <Icon name="BellRing" size={16} className="text-[#25D366]" />
+              <span className="text-[#25D366] text-sm">Уведомления включены</span>
+            </div>
+          ) : notifPerm === "denied" ? (
+            <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2.5">
+              <Icon name="BellOff" size={16} className="text-red-400" />
+              <span className="text-red-400 text-sm flex-1">Заблокированы в браузере</span>
+            </div>
+          ) : (
+            <button onClick={requestNotifications}
+              className="w-full flex items-center justify-center gap-2 bg-[#25D366] text-white font-semibold py-2.5 rounded-xl hover:bg-[#1da851] transition-colors text-sm">
+              <Icon name="Bell" size={16} /> Разрешить уведомления
+            </button>
+          )}
+        </div>
+
+        {/* Звук */}
         <div className="mb-5">
-          <p className="text-white/60 text-xs uppercase tracking-wider mb-2 flex items-center gap-1.5">
+          <p className="text-white/50 text-xs uppercase tracking-wider mb-2 flex items-center gap-1.5">
             <Icon name="Volume2" size={13} /> Звук уведомлений
           </p>
           <div className="grid grid-cols-2 gap-2">
@@ -239,20 +306,37 @@ export const ProfileModal = ({ me, token, onClose, onUpdate }: {
                 className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm transition-colors ${
                   soundId === s.id
                     ? "border-[#25D366] bg-[#25D366]/15 text-white"
-                    : "border-white/10 text-white/50 hover:border-white/30 hover:text-white"
+                    : "border-white/10 text-white/50 hover:border-white/30 hover:text-white/80"
                 }`}>
                 <span className="text-base">{s.emoji}</span>
-                <span className="truncate">{s.label}</span>
-                {soundId === s.id && <Icon name="Check" size={13} className="text-[#25D366] ml-auto shrink-0" />}
+                <span className="truncate flex-1 text-left">{s.label}</span>
+                {soundId === s.id && <Icon name="Check" size={13} className="text-[#25D366] shrink-0" />}
               </button>
             ))}
           </div>
         </div>
 
-        <button onClick={save} disabled={saving}
-          className="w-full bg-[#25D366] text-white font-bold py-3 rounded-xl hover:bg-[#1da851] transition-colors disabled:opacity-50">
-          {saving ? "Сохранение..." : "Сохранить"}
+        {/* Сохранить */}
+        <button onClick={save} disabled={saving || uploadingAvatar}
+          className="w-full bg-[#25D366] text-white font-bold py-3 rounded-xl hover:bg-[#1da851] transition-colors disabled:opacity-50 flex items-center justify-center gap-2 mb-3">
+          {saving ? <><Icon name="Loader" size={16} className="animate-spin" /> Сохранение...</> : "Сохранить"}
         </button>
+
+        {/* Выйти / Сменить аккаунт */}
+        <div className="flex gap-2">
+          {onSwitchAccount && (
+            <button onClick={onSwitchAccount}
+              className="flex-1 flex items-center justify-center gap-1.5 border border-white/10 text-white/50 hover:text-white hover:border-white/30 py-2.5 rounded-xl text-sm transition-colors">
+              <Icon name="RefreshCw" size={14} /> Сменить аккаунт
+            </button>
+          )}
+          {onLogout && (
+            <button onClick={onLogout}
+              className="flex-1 flex items-center justify-center gap-1.5 border border-red-500/20 text-red-400 hover:bg-red-500/10 py-2.5 rounded-xl text-sm transition-colors">
+              <Icon name="LogOut" size={14} /> Выйти
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -268,15 +352,21 @@ export const CreateGroupModal = ({ token, onClose, onCreated }: {
   const [selected, setSelected] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
-  const search = async (q: string) => {
+  const search = (q: string) => {
     setQuery(q);
-    if (!q.trim()) return setUsers([]);
-    setLoading(true);
-    const res = await api(`users&q=${encodeURIComponent(q)}`, "GET", undefined, token);
-    setLoading(false);
-    if (Array.isArray(res)) setUsers(res);
+    clearTimeout(debounceRef.current);
+    if (!q.trim()) { setUsers([]); return; }
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true);
+      const res = await api(`users&q=${encodeURIComponent(q)}`, "GET", undefined, token);
+      setLoading(false);
+      if (Array.isArray(res)) setUsers(res);
+    }, 400);
   };
+
+  useEffect(() => () => clearTimeout(debounceRef.current), []);
 
   const toggle = (u: any) => {
     setSelected(prev => prev.find((x: any) => x.id === u.id) ? prev.filter((x: any) => x.id !== u.id) : [...prev, u]);
@@ -294,7 +384,9 @@ export const CreateGroupModal = ({ token, onClose, onCreated }: {
     <div className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center" onClick={onClose}>
       <div className="bg-[#1a2634] w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl p-4 max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-white font-semibold flex items-center gap-2"><Icon name="Users" size={18} className="text-[#25D366]" /> Новая группа</h3>
+          <h3 className="text-white font-semibold flex items-center gap-2">
+            <Icon name="Users" size={18} className="text-[#25D366]" /> Новая группа
+          </h3>
           <button onClick={onClose} className="text-white/40"><Icon name="X" size={18} /></button>
         </div>
         <input type="text" value={name} onChange={e => setName(e.target.value)}
@@ -305,16 +397,18 @@ export const CreateGroupModal = ({ token, onClose, onCreated }: {
             {selected.map((u: any) => (
               <div key={u.id} className="flex items-center gap-1 bg-[#25D366]/20 border border-[#25D366]/40 rounded-full px-2.5 py-1">
                 <span className="text-xs text-white">{u.name}</span>
-                <button onClick={() => toggle(u)} className="text-white/40 hover:text-white"><Icon name="X" size={10} /></button>
+                <button onClick={() => toggle(u)} className="text-white/40 hover:text-white ml-0.5"><Icon name="X" size={10} /></button>
               </div>
             ))}
           </div>
         )}
-        <input type="text" value={query} onChange={e => search(e.target.value)}
-          placeholder="Добавить участников..."
-          className="w-full bg-white/10 text-white placeholder-white/40 px-4 py-2.5 rounded-xl outline-none mb-2" />
-        <div className="flex-1 overflow-y-auto space-y-0.5 mb-3">
-          {loading && <p className="text-white/30 text-xs text-center py-3">Поиск...</p>}
+        <div className="relative mb-2">
+          <input type="text" value={query} onChange={e => search(e.target.value)}
+            placeholder="Добавить участников..."
+            className="w-full bg-white/10 text-white placeholder-white/40 px-4 py-2.5 rounded-xl outline-none pr-10" />
+          {loading && <Icon name="Loader" size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 animate-spin" />}
+        </div>
+        <div className="flex-1 overflow-y-auto space-y-0.5 mb-3 min-h-[40px]">
           {users.map((u: any) => {
             const sel = selected.some((x: any) => x.id === u.id);
             return (
