@@ -147,6 +147,49 @@ def handler(event: dict, context) -> dict:
         conn.commit()
         return resp({"ok": True, "token": tok, "user_id": row[0]})
 
+    # ── RESET PASSWORD — шаг 1: проверить телефон + имя ──────────
+    if action == "reset_check" and method == "POST":
+        phone = body.get("phone", "").strip()
+        name = body.get("name", "").strip()
+        if not phone or not name:
+            return resp({"error": "Укажите телефон и имя"}, 400)
+        cur = conn.cursor()
+        cur.execute(f"SELECT id FROM {SCHEMA}.dzchat_users WHERE phone=%s AND name=%s", (phone, name))
+        row = cur.fetchone()
+        if not row:
+            return resp({"error": "Аккаунт не найден. Проверьте телефон и имя."}, 404)
+        # Генерируем одноразовый reset-токен на 15 минут
+        reset_tok = gen_token(phone + name)
+        cur.execute(f"UPDATE {SCHEMA}.dzchat_users SET otp=%s, otp_expires_at=NOW() + INTERVAL '15 minutes' WHERE id=%s", (reset_tok[:32], row[0]))
+        conn.commit()
+        return resp({"ok": True, "reset_token": reset_tok[:32]})
+
+    # ── RESET PASSWORD — шаг 2: установить новый пароль ──────────
+    if action == "reset_password" and method == "POST":
+        phone = body.get("phone", "").strip()
+        reset_token = body.get("reset_token", "").strip()
+        new_password = body.get("new_password", "").strip()
+        if not phone or not reset_token or not new_password:
+            return resp({"error": "Все поля обязательны"}, 400)
+        if len(new_password) < 6:
+            return resp({"error": "Пароль — минимум 6 символов"}, 400)
+        cur = conn.cursor()
+        cur.execute(f"SELECT id FROM {SCHEMA}.dzchat_users WHERE phone=%s AND otp=%s AND otp_expires_at > NOW()", (phone, reset_token))
+        row = cur.fetchone()
+        if not row:
+            return resp({"error": "Токен недействителен или истёк. Начните заново."}, 400)
+        pw_hash = hash_password(new_password)
+        tok = gen_token(phone)
+        cur.execute(f"""
+            UPDATE {SCHEMA}.dzchat_users
+            SET password_hash=%s, otp=NULL, otp_expires_at=NULL,
+                session_token=%s, session_expires_at=NOW() + INTERVAL '30 days',
+                is_online=TRUE, last_seen_at=NOW()
+            WHERE id=%s
+        """, (pw_hash, tok, row[0]))
+        conn.commit()
+        return resp({"ok": True, "token": tok})
+
     # ── ME ────────────────────────────────────────────────────────
     if action == "me" and method == "GET":
         u = get_user(conn, token)

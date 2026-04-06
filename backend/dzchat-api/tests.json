@@ -1,12 +1,12 @@
 {
   "tests": [
     {
-      "name": "Register new user",
+      "name": "Reset check - account not found",
       "method": "POST",
-      "path": "/?action=register",
-      "body": {"phone": "+79001119988", "name": "Тест DzChat", "password": "test123"},
-      "expectedStatus": 200,
-      "expectedBody": {"ok": true},
+      "path": "/?action=reset_check",
+      "body": {"phone": "+70000000000", "name": "Несуществующий"},
+      "expectedStatus": 404,
+      "expectedBody": {"error": "Аккаунт не найден. Проверьте телефон и имя."},
       "bodyMatcher": "partial"
     },
     {
