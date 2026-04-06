@@ -5,7 +5,7 @@ import { api, formatTime } from "@/components/dzchat/dzchat.utils";
 import DzChatAvatar from "@/components/dzchat/DzChatAvatar";
 import DzChatAuth from "@/components/dzchat/DzChatAuth";
 import DzChatView from "@/components/dzchat/DzChatView";
-import { NewChatModal, ProfileModal, CreateGroupModal } from "@/components/dzchat/DzChatModals";
+import { NewChatModal, ProfileModal, CreateGroupModal, playNotificationSound } from "@/components/dzchat/DzChatModals";
 
 const NOTIF_ICON = "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/dce22ed0-7e15-4a0f-84c3-9987477dea5a.jpg";
 
@@ -48,15 +48,18 @@ const DzChat = () => {
 
   // Показ уведомления при новом сообщении
   const notifyNewMessages = useCallback((newChats: any[]) => {
-    if (!notifGranted || document.visibilityState === "visible") return;
     newChats.forEach(chat => {
       const prev = prevUnreadRef.current[chat.id] ?? 0;
       if (chat.unread > prev && chat.last_message) {
-        new Notification(`DzChat — ${chat.name}`, {
-          body: chat.last_message.text || "📷 Фото",
-          icon: NOTIF_ICON,
-          tag: `dzchat-${chat.id}`,
-        });
+        const soundId = localStorage.getItem("dzchat_sound") || "default";
+        playNotificationSound(soundId);
+        if (notifGranted && document.visibilityState !== "visible") {
+          new Notification(`DzChat — ${chat.name}`, {
+            body: chat.last_message.text || "📷 Фото",
+            icon: NOTIF_ICON,
+            tag: `dzchat-${chat.id}`,
+          });
+        }
       }
       prevUnreadRef.current[chat.id] = chat.unread;
     });

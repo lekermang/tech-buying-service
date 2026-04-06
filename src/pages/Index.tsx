@@ -64,6 +64,27 @@ const SplashScreen = ({ onDone }: { onDone: () => void }) => {
 const Index = () => {
   const [splashDone, setSplashDone] = useState(false);
   const [evalOpen, setEvalOpen] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [installed, setInstalled] = useState(false);
+
+  useEffect(() => {
+    // Слушаем событие установки PWA
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handler = (e: any) => { e.preventDefault(); setInstallPrompt(e); };
+    window.addEventListener("beforeinstallprompt", handler);
+    // Уже установлено (standalone mode)
+    if (window.matchMedia("(display-mode: standalone)").matches) setInstalled(true);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
+
+  const installApp = async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { outcome } = await (installPrompt as any).userChoice;
+    if (outcome === "accepted") { setInstallPrompt(null); setInstalled(true); }
+  };
 
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-white pb-[72px] md:pb-0">
@@ -92,11 +113,20 @@ const Index = () => {
             <Icon name="MessageCircle" size={22} />
             <span className="font-roboto text-[10px] uppercase tracking-wide">Telegram</span>
           </a>
-          <a href="/catalog"
-            className="flex-1 flex flex-col items-center justify-center gap-1 text-white/50 hover:text-[#FFD700] active:text-[#FFD700] transition-colors">
-            <Icon name="ShoppingBag" size={22} />
-            <span className="font-roboto text-[10px] uppercase tracking-wide">Каталог</span>
-          </a>
+          {/* Кнопка установки PWA — показывается только если доступна */}
+          {installPrompt && !installed ? (
+            <button onClick={installApp}
+              className="flex-1 flex flex-col items-center justify-center gap-1 text-[#FFD700] hover:bg-[#FFD700]/5 active:bg-[#FFD700]/10 transition-colors">
+              <Icon name="Download" size={22} />
+              <span className="font-roboto text-[10px] uppercase tracking-wide">Установить</span>
+            </button>
+          ) : (
+            <a href="/catalog"
+              className="flex-1 flex flex-col items-center justify-center gap-1 text-white/50 hover:text-[#FFD700] active:text-[#FFD700] transition-colors">
+              <Icon name="ShoppingBag" size={22} />
+              <span className="font-roboto text-[10px] uppercase tracking-wide">Каталог</span>
+            </a>
+          )}
         </div>
       </div>
     </div>
