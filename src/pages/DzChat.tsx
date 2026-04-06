@@ -29,8 +29,36 @@ const DzChat = () => {
   const fetchingRef = useRef(false);    // защита от параллельных запросов
   const notifGrantedRef = useRef(false); // актуальное значение в замыкании
 
+  // Отправляем токен в Service Worker
+  const sendTokenToSW = async (tok: string | null) => {
+    if (!("serviceWorker" in navigator)) return;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      reg.active?.postMessage({ type: tok ? "SET_TOKEN" : "LOGOUT", token: tok });
+    } catch (_swErr) { /* SW not available */ }
+  };
+
   useEffect(() => {
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").then(async () => {
+        // SW только что зарегистрирован — передаём токен если уже есть
+        const tok = localStorage.getItem("dzchat_token");
+        if (tok) await sendTokenToSW(tok);
+      }).catch(() => {});
+
+      // Слушаем PLAY_SOUND от SW (когда вкладка открыта но не видима)
+      const onMsg = (e: MessageEvent) => {
+        if (e.data?.type === "PLAY_SOUND") {
+          const soundId = localStorage.getItem("dzchat_sound") || "default";
+          playNotificationSound(soundId);
+        }
+      };
+      navigator.serviceWorker.addEventListener("message", onMsg);
+      return () => navigator.serviceWorker.removeEventListener("message", onMsg);
+    }
+  }, []);
+
+  useEffect(() => {
     const handler = (e: any) => { e.preventDefault(); setInstallPrompt(e); };
     window.addEventListener("beforeinstallprompt", handler);
     return () => window.removeEventListener("beforeinstallprompt", handler);
@@ -101,20 +129,20 @@ const DzChat = () => {
 
   useEffect(() => {
     if (!token) return;
-    initializedRef.current = false; // сброс при смене токена
+    initializedRef.current = false;
     fetchingRef.current = false;
     setLoadingChats(true);
+    // Передаём токен в SW сразу
+    sendTokenToSW(token);
     api("me", "GET", undefined, token).then(u => {
-      if (u.error) { localStorage.removeItem("dzchat_token"); setToken(null); return; }
+      if (u.error) { localStorage.removeItem("dzchat_token"); setToken(null); sendTokenToSW(null); return; }
       setMe(u);
       loadChats(token).finally(() => setLoadingChats(false));
-      // Поллинг каждые 1 сек
       pollRef.current = setInterval(() => loadChats(token), 1000);
-      // Ping каждые 20 сек для онлайн-статуса
       pingRef.current = setInterval(() => api("ping", "POST", {}, token), 20000);
     });
     return () => { clearInterval(pollRef.current); clearInterval(pingRef.current); };
-  }, [token, loadChats]);
+  }, [token, loadChats]);  
 
   useEffect(() => {
     if (newChatId && chats.length > 0) {
@@ -125,6 +153,7 @@ const DzChat = () => {
 
   const logout = () => {
     localStorage.removeItem("dzchat_token");
+    sendTokenToSW(null);
     setToken(null); setMe(null); setChats([]); setActiveChat(null);
   };
 
@@ -135,7 +164,7 @@ const DzChat = () => {
     if (outcome === "accepted") setInstallPrompt(null);
   };
 
-  if (!token || !me) return <DzChatAuth onAuth={(tok, user) => { setToken(tok); setMe(user); }} />;
+  if (!token || !me) return <DzChatAuth onAuth={(tok, user) => { sendTokenToSW(tok); setToken(tok); setMe(user); }} />;
 
   const totalUnread = chats.reduce((s, c) => s + (c.unread || 0), 0);
 
