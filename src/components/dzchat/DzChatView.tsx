@@ -24,27 +24,52 @@ const DzChatView = ({ chat, me, token, onBack, onChatUpdate }: {
   const [showGroupInfo, setShowGroupInfo] = useState(false);
   const [groupMembers, setGroupMembers] = useState<any[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval>>();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const msgRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  // id последнего известного сообщения — скроллим вниз только при появлении нового
+  const lastMsgIdRef = useRef<number | null>(null);
+  // флаг: пользователь сам у дна (чтобы не мешать скроллу вверх)
+  const isAtBottomRef = useRef(true);
+
+  const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+    bottomRef.current?.scrollIntoView({ behavior });
+  };
+
+  const handleScroll = () => {
+    const el = listRef.current;
+    if (!el) return;
+    isAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  };
 
   const loadMessages = useCallback(async () => {
     const data = await api(`messages&chat_id=${chat.id}`, "GET", undefined, token);
-    if (Array.isArray(data)) setMessages(data);
+    if (Array.isArray(data)) {
+      setMessages(prev => {
+        const lastNew = data.length > 0 ? data[data.length - 1].id : null;
+        const lastOld = prev.length > 0 ? prev[prev.length - 1].id : null;
+        // Скроллим вниз только если появилось новое сообщение И пользователь у дна
+        if (lastNew !== lastOld && isAtBottomRef.current) {
+          lastMsgIdRef.current = lastNew;
+          setTimeout(() => scrollToBottom("smooth"), 50);
+        }
+        return data;
+      });
+    }
     await api("read", "POST", { chat_id: chat.id }, token);
     onChatUpdate?.();
   }, [chat.id, token, onChatUpdate]);
 
   useEffect(() => {
+    // При смене чата — сброс и мгновенный скролл вниз
     setMessages([]); setReplyTo(null); setContextMsg(null); setShowSearch(false);
-    loadMessages();
+    lastMsgIdRef.current = null;
+    isAtBottomRef.current = true;
+    loadMessages().then(() => scrollToBottom("instant"));
     pollRef.current = setInterval(loadMessages, 3000);
     return () => clearInterval(pollRef.current);
-  }, [chat.id, loadMessages]);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length]);
+  }, [chat.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -79,6 +104,7 @@ const DzChatView = ({ chat, me, token, onBack, onChatUpdate }: {
     setSending(false);
     if (res.ok) {
       setText(""); setImagePreview(null); setImageB64(null); setForwardMsg(null); setReplyTo(null);
+      isAtBottomRef.current = true;
       await loadMessages();
     }
   };
@@ -88,6 +114,7 @@ const DzChatView = ({ chat, me, token, onBack, onChatUpdate }: {
     const res = await api("upload", "POST", { image: b64, mime: "audio/webm", kind: "voice" }, token);
     if (res.url) {
       await api("send", "POST", { chat_id: chat.id, voice_url: res.url, voice_duration: duration }, token);
+      isAtBottomRef.current = true;
       await loadMessages();
     }
     setSending(false);
@@ -151,7 +178,8 @@ const DzChatView = ({ chat, me, token, onBack, onChatUpdate }: {
       )}
 
       {/* Сообщения */}
-      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5"
+      <div ref={listRef} onScroll={handleScroll}
+        className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5"
         style={{ backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.03) 1px, transparent 0)", backgroundSize: "24px 24px" }}>
         {messages.map((msg, i) => (
           <DzChatMessage
