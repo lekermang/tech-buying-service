@@ -15,8 +15,8 @@ const SplashScreen = ({ onDone }: { onDone: () => void }) => {
   const [hiding, setHiding] = useState(false);
 
   useEffect(() => {
-    const t1 = setTimeout(() => setHiding(true), 3000);
-    const t2 = setTimeout(() => onDone(), 3500);
+    const t1 = setTimeout(() => setHiding(true), 2500);
+    const t2 = setTimeout(() => onDone(), 2900);
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [onDone]);
 
@@ -50,7 +50,7 @@ const SplashScreen = ({ onDone }: { onDone: () => void }) => {
               style={{
                 background: "linear-gradient(90deg, #ffd700, #fffacd, #ffa500, #ffd700)",
                 backgroundSize: "200% auto",
-                animation: "splashBar 2.8s cubic-bezier(0.4,0,0.2,1) forwards, shimmer 1.5s linear infinite",
+                animation: "splashBar 2.3s cubic-bezier(0.4,0,0.2,1) forwards, shimmer 1.5s linear infinite",
               }}
             />
           </div>

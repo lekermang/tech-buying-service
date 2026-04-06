@@ -7,70 +7,80 @@ export const VoiceMessage = ({ url, duration, isMine }: { url: string; duration:
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
+  const [loadError, setLoadError] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
-
-  const toggle = () => {
-    if (!audioRef.current) return;
-    if (playing) { audioRef.current.pause(); setPlaying(false); }
-    else { audioRef.current.play(); setPlaying(true); }
-  };
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
+    setLoadError(false);
+    setPlaying(false); setProgress(0); setCurrentTime(0);
     const onTime = () => {
       setCurrentTime(audio.currentTime);
       setProgress(audio.duration ? (audio.currentTime / audio.duration) * 100 : 0);
     };
     audio.addEventListener("timeupdate", onTime);
     return () => { audio.removeEventListener("timeupdate", onTime); };
-  }, []);
+  }, [url]);
 
   const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
   const handlePlay = async () => {
-    if (!audioRef.current) return;
+    const audio = audioRef.current;
+    if (!audio || loadError) return;
     if (playing) {
-      audioRef.current.pause();
+      audio.pause();
       setPlaying(false);
     } else {
       try {
-        // iOS требует setAttribute перед play()
-        audioRef.current.setAttribute("playsinline", "true");
-        await audioRef.current.play();
+        // Принудительно загружаем если не загружено
+        if (audio.readyState < 2) audio.load();
+        await audio.play();
         setPlaying(true);
       } catch (_e) {
-        // Попробуем заново с user gesture
         setPlaying(false);
+        setLoadError(true);
       }
     }
   };
 
   return (
     <div className="flex items-center gap-2 min-w-[180px]">
-      {/* audio без autoplay — iOS не позволяет */}
       <audio
         ref={audioRef}
         src={url}
         preload="metadata"
         playsInline
         onEnded={() => { setPlaying(false); setProgress(0); setCurrentTime(0); }}
+        onError={() => setLoadError(true)}
       />
-      <button onClick={handlePlay}
-        className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${isMine ? "bg-white/20" : "bg-[#25D366]/80"}`}>
-        <Icon name={playing ? "Pause" : "Play"} size={16} className="text-white" />
+      <button
+        onClick={handlePlay}
+        disabled={loadError}
+        className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-opacity ${
+          loadError ? "opacity-40" : ""
+        } ${isMine ? "bg-white/20" : "bg-[#25D366]/80"}`}
+        title={loadError ? "Ошибка загрузки" : undefined}>
+        <Icon name={loadError ? "AlertCircle" : playing ? "Pause" : "Play"} size={16} className="text-white" />
       </button>
       <div className="flex-1">
-        <div className="relative h-1.5 rounded-full bg-white/20 cursor-pointer"
-          onClick={e => {
-            if (!audioRef.current) return;
-            const rect = e.currentTarget.getBoundingClientRect();
-            const pct = (e.clientX - rect.left) / rect.width;
-            audioRef.current.currentTime = pct * (audioRef.current.duration || 0);
-          }}>
-          <div className="absolute inset-y-0 left-0 rounded-full bg-white/70" style={{ width: `${progress}%` }} />
-        </div>
-        <p className="text-[10px] mt-0.5 opacity-60">{fmt(currentTime || 0)} / {fmt(duration || 0)}</p>
+        {loadError ? (
+          <p className="text-[11px] opacity-50">Не удалось загрузить</p>
+        ) : (
+          <>
+            <div className="relative h-1.5 rounded-full bg-white/20 cursor-pointer"
+              onClick={e => {
+                const audio = audioRef.current;
+                if (!audio) return;
+                const rect = e.currentTarget.getBoundingClientRect();
+                const pct = (e.clientX - rect.left) / rect.width;
+                audio.currentTime = pct * (audio.duration || 0);
+              }}>
+              <div className="absolute inset-y-0 left-0 rounded-full bg-white/70" style={{ width: `${progress}%` }} />
+            </div>
+            <p className="text-[10px] mt-0.5 opacity-60">{fmt(currentTime || 0)} / {fmt(duration || 0)}</p>
+          </>
+        )}
       </div>
     </div>
   );
@@ -103,6 +113,21 @@ export const MsgStatus = ({ msg, me }: { msg: any; me: any }) => {
 };
 
 // ── VoiceRecorder ─────────────────────────────────────────────────
+// Приоритет: webm/opus (Chrome/Android) → mp4 (iOS Safari) → fallback
+function getSupportedMime(): string {
+  const candidates = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/ogg;codecs=opus",
+    "audio/mp4;codecs=mp4a.40.2",
+    "audio/mp4",
+  ];
+  for (const m of candidates) {
+    if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(m)) return m;
+  }
+  return "";
+}
+
 export const VoiceRecorder = ({ onSend, disabled }: { onSend: (b64: string, dur: number, mime: string) => void; disabled: boolean }) => {
   const [recording, setRecording] = useState(false);
   const [seconds, setSeconds] = useState(0);
@@ -113,41 +138,38 @@ export const VoiceRecorder = ({ onSend, disabled }: { onSend: (b64: string, dur:
 
   const start = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 16000 },
+      });
 
-      // Определяем поддерживаемый формат: iOS Safari → mp4, остальные → webm
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-        ? "audio/webm;codecs=opus"
-        : MediaRecorder.isTypeSupported("audio/mp4")
-          ? "audio/mp4"
-          : "";
-
+      const mimeType = getSupportedMime();
       const mr = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
-      const actualMime = mr.mimeType || "audio/webm";
+      // Реальный mime из рекордера (иногда отличается)
+      const actualMime = mr.mimeType || mimeType || "audio/webm";
 
       chunksRef.current = [];
-      mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      mr.ondataavailable = e => { if (e.data && e.data.size > 0) chunksRef.current.push(e.data); };
       mr.onstop = () => {
         const dur = Math.max(1, Math.round((Date.now() - startRef.current) / 1000));
         const blob = new Blob(chunksRef.current, { type: actualMime });
         const reader = new FileReader();
         reader.onload = ev => {
           const dataUrl = ev.target?.result as string;
+          if (!dataUrl) return;
           const b64 = dataUrl.split(",")[1];
-          // Передаём mime чтобы бэкенд корректно сохранил расширение
           onSend(b64, dur, actualMime);
         };
         reader.readAsDataURL(blob);
         stream.getTracks().forEach(t => t.stop());
       };
-      mr.start(200); // собираем чанки каждые 200мс
+      mr.start(250);
       mediaRef.current = mr;
       startRef.current = Date.now();
       setRecording(true);
       setSeconds(0);
       timerRef.current = setInterval(() => setSeconds(s => s + 1), 1000);
     } catch {
-      alert("Нет доступа к микрофону");
+      alert("Нет доступа к микрофону. Проверьте настройки браузера.");
     }
   };
 

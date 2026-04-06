@@ -8,16 +8,18 @@ import CatalogTab from "@/components/admin/CatalogTab";
 import CatalogEditTab from "@/components/admin/CatalogEditTab";
 import { ApiCatalogContent } from "@/pages/ApiCatalog";
 import ToolsImportTab from "@/components/admin/ToolsImportTab";
+import AnalyticsTab from "@/components/admin/AnalyticsTab";
 
 const ADMIN_URL = "https://functions.poehali.dev/a105aede-d55d-4b99-9d3e-5e977887aa04";
 
-type Tab = "repair" | "prices" | "sky" | "catalog" | "items" | "api-catalog" | "tools-import";
+type Tab = "repair" | "prices" | "sky" | "catalog" | "items" | "api-catalog" | "tools-import" | "analytics";
 
 const MENU: { key: Tab; label: string; icon: string; group: string }[] = [
-  { key: "repair",       label: "Ремонт",        icon: "Wrench",      group: "Заявки" },
+  { key: "analytics",    label: "Аналитика",      icon: "BarChart2",   group: "Статистика" },
+  { key: "repair",       label: "Ремонт",         icon: "Wrench",      group: "Заявки" },
   { key: "prices",       label: "Цены",           icon: "Tag",         group: "Заявки" },
   { key: "sky",          label: "SKY",            icon: "Package",     group: "Каталог" },
-  { key: "items",        label: "Товары",          icon: "ShoppingBag", group: "Каталог" },
+  { key: "items",        label: "Товары",         icon: "ShoppingBag", group: "Каталог" },
   { key: "api-catalog",  label: "Выгрузка API",   icon: "PackageOpen", group: "Каталог" },
   { key: "catalog",      label: "Синхронизация",  icon: "Bot",         group: "Инструменты" },
   { key: "tools-import", label: "Импорт CSV",     icon: "FileUp",      group: "Инструменты" },
@@ -162,6 +164,7 @@ export default function Admin() {
         </div>
 
         <div className="flex-1 overflow-auto">
+          {tab === "analytics"    && <AnalyticsTab />}
           {tab === "repair"       && <RepairTab token={token} />}
           {tab === "prices"       && <PricesTab token={token} />}
           {tab === "sky"          && <SkyTab token={token} />}

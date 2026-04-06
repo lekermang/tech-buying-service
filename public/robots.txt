@@ -1,19 +1,32 @@
-User-agent: Googlebot
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: facebookexternalhit
-Allow: /
-
-User-agent: YandexBot
-Allow: /
-
 User-agent: *
 Allow: /
+Disallow: /admin
+Disallow: /cabinet
+Disallow: /staff
+Disallow: /tools
+Disallow: /tools-sync
+Disallow: /dzchat
+
+# Разрешаем главное и каталог
+Allow: /catalog
 
 Sitemap: https://skypka24.com/sitemap.xml
+
+# Яндекс
+User-agent: Yandex
+Allow: /
+Disallow: /admin
+Disallow: /cabinet
+Disallow: /staff
+Disallow: /tools
+Disallow: /dzchat
+Crawl-delay: 1
+
+# Google
+User-agent: Googlebot
+Allow: /
+Disallow: /admin
+Disallow: /cabinet
+Disallow: /staff
+Disallow: /tools
+Disallow: /dzchat
