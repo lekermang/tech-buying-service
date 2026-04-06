@@ -1,129 +1,110 @@
-const CACHE_NAME = 'dzchat-v4';
+const CACHE_NAME = 'dzchat-v5';
 const STATIC_ASSETS = ['/', '/catalog', '/dzchat'];
 const ICON = "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/dce22ed0-7e15-4a0f-84c3-9987477dea5a.jpg";
 const API = "https://functions.poehali.dev/608c7976-816a-4e3e-b374-5dd617b045bf";
 
-// ── INSTALL / ACTIVATE ────────────────────────────────────────────
-self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(STATIC_ASSETS)));
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(STATIC_ASSETS).catch(() => {})));
   self.skipWaiting();
 });
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    )
-  );
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(keys =>
+    Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+  ));
   self.clients.claim();
 });
 
-self.addEventListener('fetch', (event) => {
-  const { request } = event;
+self.addEventListener('fetch', e => {
+  const { request } = e;
   const url = new URL(request.url);
   if (url.hostname === 'functions.poehali.dev' || url.hostname === 'mc.yandex.ru' || request.method !== 'GET') return;
-  event.respondWith(
+  e.respondWith(
     fetch(request)
-      .then(response => {
-        if (response.ok && ['document','script','style','font'].includes(request.destination)) {
-          caches.open(CACHE_NAME).then(c => c.put(request, response.clone()));
+      .then(r => {
+        if (r.ok && ['document','script','style','font'].includes(request.destination)) {
+          caches.open(CACHE_NAME).then(c => c.put(request, r.clone()));
         }
-        return response;
+        return r;
       })
       .catch(() => caches.match(request).then(cached => cached || caches.match('/')))
   );
 });
 
-// ── СОСТОЯНИЕ ПОЛЛИНГА ────────────────────────────────────────────
+// ── Состояние ─────────────────────────────────────────────────────
 let pollToken = null;
 let pollInterval = null;
-let prevUnread = {}; // { chatId: unreadCount }
+let prevUnread = {};
 let initialized = false;
 
-// ── Отправка звука клиентам ───────────────────────────────────────
-function notifyClients(type, extra) {
-  self.clients.matchAll({ type: 'window' }).then(clients => {
-    clients.forEach(c => c.postMessage({ type, ...extra }));
-  });
+function notifyClients(type, data) {
+  self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients =>
+    clients.forEach(c => c.postMessage({ type, ...data }))
+  );
 }
 
-// ── Badge API — количество непрочитанных на иконке приложения ─────
-async function updateBadge(totalUnread) {
+async function updateBadge(n) {
   try {
     if ('setAppBadge' in self.navigator) {
-      if (totalUnread > 0) {
-        await self.navigator.setAppBadge(totalUnread);
-      } else {
-        await self.navigator.clearAppBadge();
-      }
+      n > 0 ? await self.navigator.setAppBadge(n) : await self.navigator.clearAppBadge();
     }
-  } catch(_e) {}
+  } catch(_) {}
 }
 
 async function pollChats() {
   if (!pollToken) return;
   try {
-    const res = await fetch(`${API}?action=chats`, {
-      headers: { 'X-Session-Token': pollToken }
-    });
+    const res = await fetch(`${API}?action=chats`, { headers: { 'X-Session-Token': pollToken } });
     if (!res.ok) { if (res.status === 401) stopPolling(); return; }
     const chats = await res.json();
     if (!Array.isArray(chats)) return;
 
-    // Считаем суммарный unread для Badge
-    const totalUnread = chats.reduce((sum, c) => sum + (c.unread || 0), 0);
+    const totalUnread = chats.reduce((s, c) => s + (c.unread || 0), 0);
     updateBadge(totalUnread);
 
-    // Первый цикл — только запоминаем счётчики, не шлём уведомления
     if (!initialized) {
       chats.forEach(c => { prevUnread[c.id] = c.unread; });
       initialized = true;
       return;
     }
 
-    // Проверяем видимость вкладки DzChat
     const allClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    const dzchatOpen = allClients.some(c => c.url.includes('/dzchat'));
     const dzchatVisible = allClients.some(c => c.url.includes('/dzchat') && c.visibilityState === 'visible');
 
     for (const chat of chats) {
       const prev = prevUnread[chat.id] ?? 0;
       if (chat.unread > prev && chat.last_message) {
         const lm = chat.last_message;
-        const msgText = lm.voice_url ? '🎤 Голосовое'
-                      : lm.video_url ? '🎥 Видео'
-                      : lm.photo_url ? '📷 Фото'
-                      : (lm.text || 'Новое сообщение');
-        // Имя отправителя — для групп из sender_name, для личных — имя чата
-        const body = msgText;
+        const body = lm.voice_url ? '🎤 Голосовое'
+                   : lm.video_url ? '🎥 Видео'
+                   : lm.photo_url ? '📷 Фото'
+                   : (lm.text || 'Новое сообщение');
 
-        // Звук — если вкладка открыта (пусть даже скрыта)
-        if (dzchatOpen) {
-          notifyClients('PLAY_SOUND', {});
-        }
+        // Всегда шлём звук клиентам (они сами решат играть ли)
+        notifyClients('PLAY_SOUND', {});
 
-        // Показываем уведомление только если DzChat НЕ виден
+        // Push только если DzChat не виден прямо сейчас
         if (!dzchatVisible) {
           try {
-            await self.registration.showNotification(chat.name, {
+            await self.registration.showNotification(chat.name || 'DzChat', {
               body,
               icon: ICON,
               badge: ICON,
-              vibrate: [150, 80, 150, 80, 150],
-              tag: `dzchat-${chat.id}`,
+              vibrate: [200, 100, 200],
+              tag: `msg-${chat.id}`,
               renotify: true,
-              silent: false, // iOS нужен звук из системы
-              data: { url: '/dzchat', chatId: chat.id }
+              silent: false,
+              data: { chatId: chat.id, url: '/dzchat' }
             });
-          } catch(_e) {
-            // Уведомления заблокированы — хотя бы звук через клиент
-            notifyClients('PLAY_SOUND', {});
-          }
+          } catch(_) {}
         }
       }
       prevUnread[chat.id] = chat.unread;
     }
-  } catch(_e) {}
+
+    // Проверяем входящие звонки
+    notifyClients('POLL_CALLS', {});
+  } catch(_) {}
 }
 
 function startPolling() {
@@ -131,7 +112,7 @@ function startPolling() {
   initialized = false;
   prevUnread = {};
   pollInterval = setInterval(pollChats, 3000);
-  pollChats(); // сразу
+  pollChats();
 }
 
 function stopPolling() {
@@ -142,60 +123,35 @@ function stopPolling() {
   updateBadge(0);
 }
 
-// ── СООБЩЕНИЯ ОТ ФРОНТЕНДА ───────────────────────────────────────
-self.addEventListener('message', (event) => {
-  const msg = event.data || {};
-
+self.addEventListener('message', e => {
+  const msg = e.data || {};
   if (msg.type === 'SET_TOKEN') {
     pollToken = msg.token;
-    if (msg.token) {
-      startPolling();
-    } else {
-      stopPolling();
-    }
+    msg.token ? startPolling() : stopPolling();
   }
-
-  if (msg.type === 'LOGOUT') {
-    stopPolling();
-  }
-
-  // Фронт сообщает что открыл чат — сбрасываем badge
-  if (msg.type === 'CLEAR_BADGE') {
-    updateBadge(0);
-  }
-
-  if (msg.type === 'NOTIF_PERM') {
-    // игнорируем, просто логируем
-  }
+  if (msg.type === 'LOGOUT') stopPolling();
+  if (msg.type === 'CLEAR_BADGE') updateBadge(0);
 });
 
-// ── КЛИК ПО УВЕДОМЛЕНИЮ ───────────────────────────────────────────
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-  event.waitUntil(
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
       for (const c of list) {
-        if (c.url.includes('/dzchat') && 'focus' in c) {
-          c.focus();
-          return;
-        }
+        if (c.url.includes('/dzchat') && 'focus' in c) { c.focus(); return; }
       }
       return clients.openWindow('/dzchat');
     })
   );
 });
 
-// ── ВНЕШНИЙ PUSH (если настроен сервер) ───────────────────────────
-self.addEventListener('push', (event) => {
+self.addEventListener('push', e => {
   let data = { title: 'DzChat', body: 'Новое сообщение' };
-  if (event.data) {
-    try { data = { ...data, ...event.data.json() }; } catch(_e) { data.body = event.data.text(); }
-  }
-  event.waitUntil(
+  if (e.data) { try { data = { ...data, ...e.data.json() }; } catch(_) { data.body = e.data.text(); } }
+  e.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body, icon: ICON, badge: ICON,
       vibrate: [200, 100, 200], tag: 'dzchat-push', renotify: true,
-      silent: false,
       data: { url: '/dzchat' }
     })
   );

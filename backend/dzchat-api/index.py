@@ -2,7 +2,8 @@
 DzChat API — WhatsApp-like мессенджер.
 Действия: register, login, me, profile, chats, users,
           create, create_group, messages, send, remove, read,
-          react, upload, ping, search_messages, group_info, group_leave
+          react, upload, ping, search_messages, group_info, group_leave,
+          call_start, call_answer, call_ice, call_end, call_status
 """
 import json, os, hashlib, time, base64, uuid, random, io
 import psycopg2
@@ -133,6 +134,129 @@ def handler(event: dict, context) -> dict:
             """, (chat_id, u["id"]))
         conn.commit()
         return resp({"ok": True})
+
+    # ── CALL: начать звонок (caller отправляет offer) ────────────
+    if action == "call_start" and method == "POST":
+        u = get_user(conn, token)
+        if not u: return resp({"error": "Unauthorized"}, 401)
+        chat_id = body.get("chat_id")
+        callee_id = body.get("callee_id")
+        offer_sdp = body.get("offer_sdp", "")
+        call_type = body.get("call_type", "audio")
+        if not chat_id or not callee_id:
+            return resp({"error": "chat_id and callee_id required"}, 400)
+        cur = conn.cursor()
+        # Завершаем старые активные звонки
+        cur.execute(f"""
+            UPDATE {SCHEMA}.dzchat_calls SET status='ended', ended_at=NOW(), updated_at=NOW()
+            WHERE (caller_id=%s OR callee_id=%s) AND status IN ('ringing','accepted')
+        """, (u["id"], u["id"]))
+        cur.execute(f"""
+            INSERT INTO {SCHEMA}.dzchat_calls (chat_id, caller_id, callee_id, status, call_type, offer_sdp, updated_at)
+            VALUES (%s,%s,%s,'ringing',%s,%s,NOW()) RETURNING id
+        """, (chat_id, u["id"], callee_id, call_type, offer_sdp))
+        call_id = cur.fetchone()[0]
+        conn.commit()
+        return resp({"ok": True, "call_id": call_id})
+
+    # ── CALL: ответить (callee отправляет answer) ─────────────────
+    if action == "call_answer" and method == "POST":
+        u = get_user(conn, token)
+        if not u: return resp({"error": "Unauthorized"}, 401)
+        call_id = body.get("call_id")
+        answer_sdp = body.get("answer_sdp", "")
+        accepted = body.get("accepted", True)
+        cur = conn.cursor()
+        new_status = "accepted" if accepted else "rejected"
+        cur.execute(f"""
+            UPDATE {SCHEMA}.dzchat_calls SET status=%s, answer_sdp=%s, updated_at=NOW()
+            WHERE id=%s AND callee_id=%s AND status='ringing'
+        """, (new_status, answer_sdp, call_id, u["id"]))
+        if not accepted:
+            cur.execute(f"UPDATE {SCHEMA}.dzchat_calls SET ended_at=NOW() WHERE id=%s", (call_id,))
+        conn.commit()
+        return resp({"ok": True})
+
+    # ── CALL: передать ICE candidates ────────────────────────────
+    if action == "call_ice" and method == "POST":
+        u = get_user(conn, token)
+        if not u: return resp({"error": "Unauthorized"}, 401)
+        call_id = body.get("call_id")
+        candidates = body.get("candidates", [])
+        cur = conn.cursor()
+        cur.execute(f"SELECT caller_id, callee_id FROM {SCHEMA}.dzchat_calls WHERE id=%s", (call_id,))
+        row = cur.fetchone()
+        if not row: return resp({"error": "Call not found"}, 404)
+        caller_id, callee_id = row
+        if u["id"] == caller_id:
+            cur.execute(f"""
+                UPDATE {SCHEMA}.dzchat_calls
+                SET ice_caller = ice_caller || %s::jsonb, updated_at=NOW()
+                WHERE id=%s
+            """, (json.dumps(candidates), call_id))
+        else:
+            cur.execute(f"""
+                UPDATE {SCHEMA}.dzchat_calls
+                SET ice_callee = ice_callee || %s::jsonb, updated_at=NOW()
+                WHERE id=%s
+            """, (json.dumps(candidates), call_id))
+        conn.commit()
+        return resp({"ok": True})
+
+    # ── CALL: завершить звонок ────────────────────────────────────
+    if action == "call_end" and method == "POST":
+        u = get_user(conn, token)
+        if not u: return resp({"error": "Unauthorized"}, 401)
+        call_id = body.get("call_id")
+        cur = conn.cursor()
+        cur.execute(f"""
+            UPDATE {SCHEMA}.dzchat_calls
+            SET status='ended', ended_at=NOW(), updated_at=NOW()
+            WHERE id=%s AND (caller_id=%s OR callee_id=%s)
+        """, (call_id, u["id"], u["id"]))
+        conn.commit()
+        return resp({"ok": True})
+
+    # ── CALL: получить статус звонка (polling) ───────────────────
+    if action == "call_status" and method == "GET":
+        u = get_user(conn, token)
+        if not u: return resp({"error": "Unauthorized"}, 401)
+        call_id = qs.get("call_id")
+        cur = conn.cursor()
+        if call_id:
+            cur.execute(f"""
+                SELECT c.id, c.status, c.offer_sdp, c.answer_sdp,
+                       c.ice_caller, c.ice_callee, c.call_type,
+                       c.caller_id, caller.name, caller.avatar_url,
+                       c.callee_id, callee.name, callee.avatar_url
+                FROM {SCHEMA}.dzchat_calls c
+                JOIN {SCHEMA}.dzchat_users caller ON caller.id=c.caller_id
+                JOIN {SCHEMA}.dzchat_users callee ON callee.id=c.callee_id
+                WHERE c.id=%s AND (c.caller_id=%s OR c.callee_id=%s)
+            """, (call_id, u["id"], u["id"]))
+        else:
+            # Входящий — ищем активный ringing звонок где я callee
+            cur.execute(f"""
+                SELECT c.id, c.status, c.offer_sdp, c.answer_sdp,
+                       c.ice_caller, c.ice_callee, c.call_type,
+                       c.caller_id, caller.name, caller.avatar_url,
+                       c.callee_id, callee.name, callee.avatar_url
+                FROM {SCHEMA}.dzchat_calls c
+                JOIN {SCHEMA}.dzchat_users caller ON caller.id=c.caller_id
+                JOIN {SCHEMA}.dzchat_users callee ON callee.id=c.callee_id
+                WHERE c.callee_id=%s AND c.status='ringing'
+                  AND c.created_at > NOW() - INTERVAL '60 seconds'
+                ORDER BY c.created_at DESC LIMIT 1
+            """, (u["id"],))
+        row = cur.fetchone()
+        if not row: return resp({"call": None})
+        return resp({"call": {
+            "id": row[0], "status": row[1], "offer_sdp": row[2], "answer_sdp": row[3],
+            "ice_caller": row[4] or [], "ice_callee": row[5] or [],
+            "call_type": row[6],
+            "caller": {"id": row[7], "name": row[8], "avatar_url": row[9]},
+            "callee": {"id": row[10], "name": row[11], "avatar_url": row[12]},
+        }})
 
     # ── REGISTER ──────────────────────────────────────────────────
     if action == "register" and method == "POST":

@@ -34,6 +34,15 @@
       "expectedStatus": 401,
       "expectedBody": {"error": "Unauthorized"},
       "bodyMatcher": "partial"
+    },
+    {
+      "name": "Call end unauthorized",
+      "method": "POST",
+      "path": "/?action=call_end",
+      "body": {"call_id": 1},
+      "expectedStatus": 401,
+      "expectedBody": {"error": "Unauthorized"},
+      "bodyMatcher": "partial"
     }
   ]
 }

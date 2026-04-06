@@ -7,7 +7,7 @@ import type { DzTheme } from "./dzchat.theme";
 // ── ChatHeader ────────────────────────────────────────────────────
 export const ChatHeader = ({
   chat, onBack, onGroupInfoClick, onGroupEditClick, showSearch, onToggleSearch,
-  partnerOnline: partnerOnlineProp, partnerLastSeen, partnerTyping, theme,
+  partnerOnline: partnerOnlineProp, partnerLastSeen, partnerTyping, theme, onCall,
 }: {
   chat: any;
   onBack: () => void;
@@ -19,6 +19,7 @@ export const ChatHeader = ({
   partnerLastSeen?: string | null;
   partnerTyping?: boolean;
   theme?: DzTheme;
+  onCall?: () => void;
 }) => {
   // Используем live-данные если переданы, иначе из chat
   const isOnline = partnerOnlineProp !== undefined ? partnerOnlineProp : !!chat.partner?.is_online;
@@ -74,6 +75,15 @@ export const ChatHeader = ({
         </div>
       </button>
       <div className="flex items-center gap-0.5 shrink-0">
+        {/* Кнопка звонка — только для личных чатов */}
+        {chat.type === "direct" && onCall && (
+          <button onClick={e => { e.stopPropagation(); onCall(); }}
+            className="w-9 h-9 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors"
+            style={{ color: accent }}
+            title="Голосовой звонок">
+            <Icon name="Phone" size={18} />
+          </button>
+        )}
         {chat.type === "group" && onGroupEditClick && (
           <button onClick={e => { e.stopPropagation(); onGroupEditClick(); }}
             className="w-9 h-9 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors"

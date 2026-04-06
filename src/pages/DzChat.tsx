@@ -9,6 +9,7 @@ import { NewChatModal, ProfileModal, CreateGroupModal, playNotificationSound } f
 import { DzChatInstallBanner, DzChatSetupGuide } from "@/components/dzchat/DzChatInstall";
 import { unlockAudio } from "@/components/dzchat/dzchat.sounds";
 import { loadAndApplyTheme, getTheme } from "@/components/dzchat/dzchat.theme";
+import DzChatCall from "@/components/dzchat/DzChatCall";
 
 const NOTIF_ICON = "/dzchat-icon.svg";
 
@@ -29,6 +30,8 @@ const DzChat = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [theme, setTheme] = useState(() => loadAndApplyTheme());
   const [showSetupGuide, setShowSetupGuide] = useState(false);
+  const [incomingCall, setIncomingCall] = useState<any>(null);
+  const callPollRef = useRef<ReturnType<typeof setInterval>>();
   const pollRef = useRef<ReturnType<typeof setInterval>>();
   const pingRef = useRef<ReturnType<typeof setInterval>>();
   const prevUnreadRef = useRef<Record<number, number>>({});
@@ -164,8 +167,21 @@ const DzChat = () => {
       loadChats(token).finally(() => setLoadingChats(false));
       pollRef.current = setInterval(() => loadChats(token), 1500);
       pingRef.current = setInterval(() => api("ping", "POST", {}, token), 20000);
+
+      // Polling входящих звонков каждые 3 сек
+      const pollIncoming = async () => {
+        const data = await api("call_status", "GET", undefined, token).catch(() => null);
+        if (data?.call && data.call.status === "ringing") {
+          setIncomingCall((prev: any) => prev?.id === data.call.id ? prev : data.call);
+        }
+      };
+      callPollRef.current = setInterval(pollIncoming, 3000);
     });
-    return () => { clearInterval(pollRef.current); clearInterval(pingRef.current); };
+    return () => {
+      clearInterval(pollRef.current);
+      clearInterval(pingRef.current);
+      clearInterval(callPollRef.current);
+    };
   }, [token, loadChats]);  
 
   useEffect(() => {
@@ -431,6 +447,16 @@ const DzChat = () => {
             <DzChatSetupGuide installPrompt={installPrompt} onInstall={installApp} />
           </div>
         </div>
+      )}
+
+      {/* Входящий звонок */}
+      {incomingCall && (
+        <DzChatCall
+          me={me}
+          token={token}
+          incomingCall={incomingCall}
+          onClose={() => setIncomingCall(null)}
+        />
       )}
     </div>
     </div>

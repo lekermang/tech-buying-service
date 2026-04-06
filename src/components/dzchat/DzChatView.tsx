@@ -8,6 +8,7 @@ import { EditGroupModal } from "./DzChatModals";
 import { playSendSound, playVoiceSentSound, unlockAudio } from "./dzchat.sounds";
 import type { DzTheme } from "./dzchat.theme";
 import { loadAndApplyTheme } from "./dzchat.theme";
+import DzChatCall from "./DzChatCall";
 
 const DzChatView = ({ chat, me, token, onBack, onChatUpdate, theme: themeProp }: {
   chat: any; me: any; token: string; onBack: () => void; onChatUpdate?: () => void;
@@ -30,6 +31,7 @@ const DzChatView = ({ chat, me, token, onBack, onChatUpdate, theme: themeProp }:
   const [showGroupInfo, setShowGroupInfo] = useState(false);
   const [showGroupEdit, setShowGroupEdit] = useState(false);
   const [groupMembers, setGroupMembers] = useState<any[]>([]);
+  const [showCall, setShowCall] = useState(false);
   // Онлайн-статус и typing партнёра — обновляется отдельным поллингом
   const [partnerOnline, setPartnerOnline] = useState<boolean>(!!chat.partner?.is_online);
   const [partnerLastSeen, setPartnerLastSeen] = useState<string | null>(chat.partner?.last_seen_at ?? null);
@@ -260,6 +262,7 @@ const DzChatView = ({ chat, me, token, onBack, onChatUpdate, theme: themeProp }:
         showSearch={showSearch}
         onToggleSearch={() => { setShowSearch(s => !s); setSearchQuery(""); setSearchResults([]); }}
         theme={theme}
+        onCall={chat.type === "direct" ? () => setShowCall(true) : undefined}
       />
 
       {/* Поиск */}
@@ -339,7 +342,17 @@ const DzChatView = ({ chat, me, token, onBack, onChatUpdate, theme: themeProp }:
         <EditGroupModal
           chat={chat} token={token}
           onClose={() => setShowGroupEdit(false)}
-          onUpdated={name => { onChatUpdate?.(); setShowGroupEdit(false); }}
+          onUpdated={() => { onChatUpdate?.(); setShowGroupEdit(false); }}
+        />
+      )}
+
+      {/* Звонок */}
+      {showCall && (
+        <DzChatCall
+          me={me}
+          token={token}
+          chat={chat}
+          onClose={() => setShowCall(false)}
         />
       )}
     </div>
