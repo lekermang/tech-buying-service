@@ -11,7 +11,9 @@ import { DzChatInstallBanner } from "@/components/dzchat/DzChatInstall";
 const NOTIF_ICON = "/dzchat-icon.svg";
 
 const DzChat = () => {
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem("dzchat_token"));
+  const [token, setToken] = useState<string | null>(
+    () => localStorage.getItem("dzchat_token") || sessionStorage.getItem("dzchat_token_session")
+  );
   const [me, setMe] = useState<any>(null);
   const [chats, setChats] = useState<any[]>([]);
   const [activeChat, setActiveChat] = useState<any>(null);

@@ -14,6 +14,7 @@ const DzChatAuth = ({ onAuth }: { onAuth: (token: string, user: any) => void }) 
   const [newPassword, setNewPassword] = useState("");
   const [newPassword2, setNewPassword2] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [resetStep, setResetStep] = useState<ResetStep>("check");
@@ -36,7 +37,8 @@ const DzChatAuth = ({ onAuth }: { onAuth: (token: string, user: any) => void }) 
     setLoading(false);
     if (res.error) return setError(res.error);
     const me = await api("me", "GET", undefined, res.token);
-    localStorage.setItem("dzchat_token", res.token);
+    if (rememberMe) localStorage.setItem("dzchat_token", res.token);
+    else sessionStorage.setItem("dzchat_token_session", res.token);
     onAuth(res.token, me);
   };
 
@@ -178,6 +180,21 @@ const DzChatAuth = ({ onAuth }: { onAuth: (token: string, user: any) => void }) 
               </div>
 
               {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+
+              {/* Запомнить меня */}
+              <button
+                type="button"
+                onClick={() => setRememberMe(v => !v)}
+                className="flex items-center gap-2.5 w-full py-1 select-none">
+                <div className={`w-5 h-5 rounded flex items-center justify-center border-2 transition-colors shrink-0 ${rememberMe ? "bg-[#25D366] border-[#25D366]" : "border-white/30 bg-transparent"}`}>
+                  {rememberMe && (
+                    <svg width="11" height="8" viewBox="0 0 11 8" fill="none">
+                      <path d="M1 4L4 7L10 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
+                </div>
+                <span className="text-white/60 text-sm">Оставаться в системе</span>
+              </button>
 
               <button onClick={handleSubmit} disabled={loading}
                 className="w-full bg-[#25D366] text-white font-bold py-3 rounded-xl hover:bg-[#1da851] transition-colors disabled:opacity-50 flex items-center justify-center gap-2">

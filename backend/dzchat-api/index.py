@@ -4,10 +4,15 @@ DzChat API — WhatsApp-like мессенджер.
           create, create_group, messages, send, remove, read,
           react, upload, ping, search_messages, group_info, group_leave
 """
-import json, os, hashlib, time, base64, uuid, random
+import json, os, hashlib, time, base64, uuid, random, io
 import psycopg2
 import boto3
 import bcrypt
+try:
+    from PIL import Image as PILImage
+    HAS_PIL = True
+except ImportError:
+    HAS_PIL = False
 
 SCHEMA = os.environ["MAIN_DB_SCHEMA"]
 AK = os.environ["AWS_ACCESS_KEY_ID"]
@@ -593,19 +598,54 @@ def handler(event: dict, context) -> dict:
             return resp({"error": "Unauthorized"}, 401)
         image_b64 = body.get("image", "")
         mime = body.get("mime", "image/jpeg")
-        kind = body.get("kind", "photo")  # photo | voice | avatar
+        kind = body.get("kind", "photo")  # photo | voice | avatar | video
         if not image_b64:
             return resp({"error": "image required"}, 400)
-        ext = "jpg" if "jpeg" in mime else ("webm" if "webm" in mime else mime.split("/")[-1])
-        folder = f"dzchat/{kind}/{u['id']}"
-        key = f"{folder}/{uuid.uuid4().hex}.{ext}"
         try:
             data = base64.b64decode(image_b64)
         except Exception:
             return resp({"error": "Invalid base64"}, 400)
+
+        # Аватарки — папка DZChatAv, сжатие до 256px
+        if kind == "avatar":
+            folder = f"DZChatAv/{u['id']}"
+            ext = "jpg"
+            out_mime = "image/jpeg"
+            if HAS_PIL:
+                try:
+                    img = PILImage.open(io.BytesIO(data)).convert("RGB")
+                    img.thumbnail((256, 256), PILImage.LANCZOS)
+                    buf = io.BytesIO()
+                    img.save(buf, format="JPEG", quality=82, optimize=True)
+                    data = buf.getvalue()
+                except Exception:
+                    pass
+        # Фото в сообщениях — сжатие до 1024px
+        elif kind == "photo" and HAS_PIL and not mime.startswith("video/"):
+            folder = f"dzchat/photo/{u['id']}"
+            ext = "jpg"
+            out_mime = "image/jpeg"
+            try:
+                img = PILImage.open(io.BytesIO(data)).convert("RGB")
+                img.thumbnail((1024, 1024), PILImage.LANCZOS)
+                buf = io.BytesIO()
+                img.save(buf, format="JPEG", quality=80, optimize=True)
+                data = buf.getvalue()
+            except Exception:
+                pass
+        elif mime.startswith("video/"):
+            folder = f"dzchat/video/{u['id']}"
+            ext = mime.split("/")[-1] or "mp4"
+            out_mime = mime
+        else:
+            folder = f"dzchat/{kind}/{u['id']}"
+            ext = "jpg" if "jpeg" in mime else ("webm" if "webm" in mime else mime.split("/")[-1])
+            out_mime = mime
+
+        key = f"{folder}/{uuid.uuid4().hex}.{ext}"
         s3 = boto3.client("s3", endpoint_url="https://bucket.poehali.dev",
                           aws_access_key_id=AK, aws_secret_access_key=SK)
-        s3.put_object(Bucket="files", Key=key, Body=data, ContentType=mime)
+        s3.put_object(Bucket="files", Key=key, Body=data, ContentType=out_mime)
         cdn_url = f"https://cdn.poehali.dev/projects/{AK}/files/{key}"
         return resp({"ok": True, "url": cdn_url})
 

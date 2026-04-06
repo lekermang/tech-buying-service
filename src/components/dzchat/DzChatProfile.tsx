@@ -29,13 +29,21 @@ export const ProfileModal = ({ me, token, onClose, onUpdate, onLogout, onSwitchA
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = () => {
-      const MAX = 512;
-      const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+      const SIZE = 256;
       const canvas = document.createElement("canvas");
-      canvas.width = img.width * scale;
-      canvas.height = img.height * scale;
-      canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+      canvas.width = SIZE; canvas.height = SIZE;
+      const ctx = canvas.getContext("2d")!;
+      // Круглая обрезка
+      ctx.beginPath();
+      ctx.arc(SIZE / 2, SIZE / 2, SIZE / 2, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+      // Cover-вписывание (центр)
+      const side = Math.min(img.width, img.height);
+      const sx = (img.width - side) / 2;
+      const sy = (img.height - side) / 2;
+      ctx.drawImage(img, sx, sy, side, side, 0, 0, SIZE, SIZE);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.88);
       setAvatarPreview(dataUrl);
       setAvatarB64(dataUrl.split(",")[1]);
       URL.revokeObjectURL(url);
