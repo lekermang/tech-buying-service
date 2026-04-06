@@ -1,21 +1,8 @@
 """
-DzChat API — универсальный эндпоинт для мессенджера DzChat.
-Маршрутизация по query-параметру ?action=...
-
-Действия:
-  login_otp  POST — вход по номеру (только существующий аккаунт)
-  register   POST — регистрация / запрос OTP
-  verify     POST — проверка OTP, выдача токена
-  me         GET  — профиль текущего пользователя
-  profile    POST — обновить имя / аватарку
-  chats      GET  — список чатов
-  users      GET  — поиск пользователей (?q=)
-  create     POST — создать личный чат (?partner_id=)
-  messages   GET  — сообщения чата (?chat_id=&before=)
-  send       POST — отправить сообщение
-  remove     POST — удалить сообщение
-  read       POST — отметить прочитанными
-  upload     POST — загрузить фото в S3
+DzChat API — WhatsApp-like мессенджер.
+Действия: login_otp, register, verify, me, profile, chats, users,
+          create, create_group, messages, send, remove, read,
+          react, upload, ping, search_messages, group_info, group_leave
 """
 import json, os, random, string, hashlib, time, base64, uuid
 import psycopg2
@@ -29,27 +16,22 @@ SK = os.environ["AWS_SECRET_ACCESS_KEY"]
 PAGE = 50
 
 def send_sms(phone: str, otp: str) -> bool:
-    """Отправка SMS через SMS.ru. Возвращает True при успехе."""
     api_id = os.environ.get("SMSRU_API_ID", "")
     if not api_id:
-        return False  # Ключ не задан — работаем в демо-режиме
+        return False
     try:
-        # Нормализуем номер: оставляем только цифры, добавляем +7
         digits = "".join(c for c in phone if c.isdigit())
         if digits.startswith("8") and len(digits) == 11:
             digits = "7" + digits[1:]
         normalized = "+" + digits if not digits.startswith("+") else digits
-
         params = urllib.parse.urlencode({
-            "api_id": api_id,
-            "to": normalized,
-            "msg": f"DzChat: ваш kod podtverzhdeniya {otp}. Nikomu ne soobschayte.",
+            "api_id": api_id, "to": normalized,
+            "msg": f"DzChat: kod {otp}. Ne soobschayte nikomu.",
             "json": 1,
         })
-        url = f"https://sms.ru/sms/send?{params}"
-        with urllib.request.urlopen(url, timeout=10) as r:
+        with urllib.request.urlopen(f"https://sms.ru/sms/send?{params}", timeout=10) as r:
             data = json.loads(r.read())
-            print(f"[SMS.ru] phone={normalized} status={data.get('status')} data={data}")
+            print(f"[SMS.ru] {normalized} → {data}")
             return data.get("status") == "OK"
     except Exception as e:
         print(f"[SMS.ru] ERROR: {e}")
@@ -66,7 +48,8 @@ def cors():
     }
 
 def resp(data, code=200):
-    return {"statusCode": code, "headers": {**cors(), "Content-Type": "application/json"}, "body": json.dumps(data, ensure_ascii=False, default=str)}
+    return {"statusCode": code, "headers": {**cors(), "Content-Type": "application/json"},
+            "body": json.dumps(data, ensure_ascii=False, default=str)}
 
 def gen_otp():
     return "".join(random.choices(string.digits, k=6))
@@ -81,14 +64,39 @@ def get_user(conn, token):
     cur = conn.cursor()
     cur.execute(f"SELECT id, name, avatar_url, phone FROM {SCHEMA}.dzchat_users WHERE session_token=%s AND session_expires_at > NOW()", (token,))
     r = cur.fetchone()
-    return {"id": r[0], "name": r[1], "avatar_url": r[2], "phone": r[3]} if r else None
+    if not r:
+        return None
+    # обновляем онлайн-статус
+    cur.execute(f"UPDATE {SCHEMA}.dzchat_users SET is_online=TRUE, last_seen_at=NOW() WHERE id=%s", (r[0],))
+    conn.commit()
+    return {"id": r[0], "name": r[1], "avatar_url": r[2], "phone": r[3]}
 
 def is_member(conn, user_id, chat_id):
     cur = conn.cursor()
     cur.execute(f"SELECT 1 FROM {SCHEMA}.dzchat_members WHERE chat_id=%s AND user_id=%s", (chat_id, user_id))
     return cur.fetchone() is not None
 
+def get_msg_reactions(conn, msg_ids):
+    if not msg_ids:
+        return {}
+    cur = conn.cursor()
+    cur.execute(f"""
+        SELECT r.msg_id, r.emoji, COUNT(*) as cnt, array_agg(u.name) as users
+        FROM {SCHEMA}.dzchat_reactions r
+        JOIN {SCHEMA}.dzchat_users u ON u.id = r.user_id
+        WHERE r.msg_id = ANY(%s)
+        GROUP BY r.msg_id, r.emoji
+    """, (list(msg_ids),))
+    result = {}
+    for row in cur.fetchall():
+        mid = row[0]
+        if mid not in result:
+            result[mid] = []
+        result[mid].append({"emoji": row[1], "count": row[2], "users": row[3]})
+    return result
+
 def handler(event: dict, context) -> dict:
+    """DzChat WhatsApp-like API handler."""
     if event.get("httpMethod") == "OPTIONS":
         return {"statusCode": 200, "headers": cors(), "body": ""}
 
@@ -105,7 +113,14 @@ def handler(event: dict, context) -> dict:
 
     conn = get_conn()
 
-    # ── LOGIN OTP (вход по номеру — только существующий аккаунт) ──
+    # ── PING (обновить онлайн-статус) ─────────────────────────────
+    if action == "ping" and method == "POST":
+        u = get_user(conn, token)
+        if not u:
+            return resp({"error": "Unauthorized"}, 401)
+        return resp({"ok": True})
+
+    # ── LOGIN OTP ──────────────────────────────────────────────────
     if action == "login_otp" and method == "POST":
         phone = body.get("phone", "").strip()
         if not phone:
@@ -119,7 +134,6 @@ def handler(event: dict, context) -> dict:
         cur.execute(f"UPDATE {SCHEMA}.dzchat_users SET otp=%s, otp_expires_at=NOW() + INTERVAL '300 seconds' WHERE phone=%s", (otp, phone))
         conn.commit()
         sms_sent = send_sms(phone, otp)
-        # Если SMS отправлено — не возвращаем OTP в ответе (безопасность)
         return resp({"ok": True, "sms_sent": sms_sent, **({"otp": otp} if not sms_sent else {})})
 
     # ── REGISTER ──────────────────────────────────────────────────
@@ -152,7 +166,7 @@ def handler(event: dict, context) -> dict:
         if not r:
             return resp({"error": "Неверный или истёкший код"}, 400)
         tok = gen_token(phone)
-        cur.execute(f"UPDATE {SCHEMA}.dzchat_users SET session_token=%s, session_expires_at=NOW() + INTERVAL '30 days', otp=NULL WHERE id=%s", (tok, r[0]))
+        cur.execute(f"UPDATE {SCHEMA}.dzchat_users SET session_token=%s, session_expires_at=NOW() + INTERVAL '30 days', otp=NULL, is_online=TRUE, last_seen_at=NOW() WHERE id=%s", (tok, r[0]))
         conn.commit()
         return resp({"ok": True, "token": tok, "user_id": r[0]})
 
@@ -183,12 +197,13 @@ def handler(event: dict, context) -> dict:
         q = qs.get("q", "").strip()
         cur = conn.cursor()
         cur.execute(f"""
-            SELECT id, name, avatar_url, phone FROM {SCHEMA}.dzchat_users
+            SELECT id, name, avatar_url, phone, is_online, last_seen_at FROM {SCHEMA}.dzchat_users
             WHERE id != %s AND (name ILIKE %s OR phone ILIKE %s)
             ORDER BY name LIMIT 20
         """, (u["id"], f"%{q}%", f"%{q}%"))
         rows = cur.fetchall()
-        return resp([{"id": r[0], "name": r[1], "avatar_url": r[2], "phone": r[3]} for r in rows])
+        return resp([{"id": r[0], "name": r[1], "avatar_url": r[2], "phone": r[3],
+                      "is_online": r[4], "last_seen_at": str(r[5]) if r[5] else None} for r in rows])
 
     # ── CHATS LIST ────────────────────────────────────────────────
     if action == "chats" and method == "GET":
@@ -198,17 +213,17 @@ def handler(event: dict, context) -> dict:
         cur = conn.cursor()
         cur.execute(f"""
             SELECT c.id, c.type, c.name, c.avatar_url,
-                   p.id, p.name, p.avatar_url, p.last_seen_at,
-                   lm.msg_text, lm.photo_url, lm.created_at, lm.sender_id,
+                   p.id, p.name, p.avatar_url, p.last_seen_at, p.is_online,
+                   lm.id, lm.msg_text, lm.photo_url, lm.voice_url, lm.created_at, lm.sender_id, lm.is_read,
                    (SELECT COUNT(*) FROM {SCHEMA}.dzchat_messages mx
                     WHERE mx.chat_id=c.id AND mx.created_at > mb.last_read_at
                       AND mx.sender_id != %s AND mx.removed=FALSE) AS unread
             FROM {SCHEMA}.dzchat_chats c
             JOIN {SCHEMA}.dzchat_members mb ON mb.chat_id=c.id AND mb.user_id=%s
             LEFT JOIN {SCHEMA}.dzchat_members mb2 ON mb2.chat_id=c.id AND mb2.user_id != %s
-            LEFT JOIN {SCHEMA}.dzchat_users p ON p.id=mb2.user_id
+            LEFT JOIN {SCHEMA}.dzchat_users p ON p.id=mb2.user_id AND c.type='direct'
             LEFT JOIN LATERAL (
-                SELECT msg_text, photo_url, created_at, sender_id
+                SELECT id, msg_text, photo_url, voice_url, created_at, sender_id, is_read
                 FROM {SCHEMA}.dzchat_messages
                 WHERE chat_id=c.id AND removed=FALSE
                 ORDER BY created_at DESC LIMIT 1
@@ -220,9 +235,12 @@ def handler(event: dict, context) -> dict:
             "id": r[0], "type": r[1],
             "name": r[2] or r[5] or "Чат",
             "avatar_url": r[3] or r[6],
-            "partner": {"id": r[4], "name": r[5], "avatar_url": r[6], "last_seen_at": str(r[7]) if r[7] else None} if r[4] else None,
-            "last_message": {"text": r[8], "photo_url": r[9], "created_at": str(r[10]), "sender_id": r[11]} if r[10] else None,
-            "unread": int(r[12]) if r[12] else 0,
+            "partner": {"id": r[4], "name": r[5], "avatar_url": r[6],
+                        "last_seen_at": str(r[7]) if r[7] else None,
+                        "is_online": r[8]} if r[4] else None,
+            "last_message": {"id": r[9], "text": r[10], "photo_url": r[11], "voice_url": r[12],
+                             "created_at": str(r[13]), "sender_id": r[14], "is_read": r[15]} if r[13] else None,
+            "unread": int(r[16]) if r[16] else 0,
         } for r in rows])
 
     # ── CREATE CHAT ───────────────────────────────────────────────
@@ -269,6 +287,36 @@ def handler(event: dict, context) -> dict:
         conn.commit()
         return resp({"chat_id": chat_id, "name": name})
 
+    # ── GROUP INFO ────────────────────────────────────────────────
+    if action == "group_info" and method == "GET":
+        u = get_user(conn, token)
+        if not u:
+            return resp({"error": "Unauthorized"}, 401)
+        chat_id = qs.get("chat_id")
+        if not is_member(conn, u["id"], chat_id):
+            return resp({"error": "Forbidden"}, 403)
+        cur = conn.cursor()
+        cur.execute(f"""
+            SELECT us.id, us.name, us.avatar_url, us.is_online, us.last_seen_at
+            FROM {SCHEMA}.dzchat_members mb
+            JOIN {SCHEMA}.dzchat_users us ON us.id = mb.user_id
+            WHERE mb.chat_id=%s ORDER BY us.name
+        """, (chat_id,))
+        members = [{"id": r[0], "name": r[1], "avatar_url": r[2], "is_online": r[3],
+                    "last_seen_at": str(r[4]) if r[4] else None} for r in cur.fetchall()]
+        return resp({"members": members})
+
+    # ── GROUP LEAVE ───────────────────────────────────────────────
+    if action == "group_leave" and method == "POST":
+        u = get_user(conn, token)
+        if not u:
+            return resp({"error": "Unauthorized"}, 401)
+        chat_id = body.get("chat_id")
+        cur = conn.cursor()
+        cur.execute(f"UPDATE {SCHEMA}.dzchat_members SET user_id=user_id WHERE chat_id=%s AND user_id=%s", (chat_id, u["id"]))
+        conn.commit()
+        return resp({"ok": True})
+
     # ── MESSAGES ──────────────────────────────────────────────────
     if action == "messages" and method == "GET":
         u = get_user(conn, token)
@@ -284,25 +332,47 @@ def handler(event: dict, context) -> dict:
         if before:
             cur.execute(f"""
                 SELECT m.id, m.sender_id, us.name, us.avatar_url, m.msg_text, m.photo_url,
-                       m.forwarded_from, m.removed, m.created_at
+                       m.voice_url, m.voice_duration, m.forwarded_from, m.removed, m.created_at,
+                       m.reply_to, m.is_read,
+                       rm.msg_text, rm.photo_url, rm.voice_url, rus.name
                 FROM {SCHEMA}.dzchat_messages m
                 JOIN {SCHEMA}.dzchat_users us ON us.id=m.sender_id
+                LEFT JOIN {SCHEMA}.dzchat_messages rm ON rm.id=m.reply_to
+                LEFT JOIN {SCHEMA}.dzchat_users rus ON rus.id=rm.sender_id
                 WHERE m.chat_id=%s AND m.created_at < %s
                 ORDER BY m.created_at DESC LIMIT %s
             """, (chat_id, before, PAGE))
         else:
             cur.execute(f"""
                 SELECT m.id, m.sender_id, us.name, us.avatar_url, m.msg_text, m.photo_url,
-                       m.forwarded_from, m.removed, m.created_at
+                       m.voice_url, m.voice_duration, m.forwarded_from, m.removed, m.created_at,
+                       m.reply_to, m.is_read,
+                       rm.msg_text, rm.photo_url, rm.voice_url, rus.name
                 FROM {SCHEMA}.dzchat_messages m
                 JOIN {SCHEMA}.dzchat_users us ON us.id=m.sender_id
+                LEFT JOIN {SCHEMA}.dzchat_messages rm ON rm.id=m.reply_to
+                LEFT JOIN {SCHEMA}.dzchat_users rus ON rus.id=rm.sender_id
                 WHERE m.chat_id=%s
                 ORDER BY m.created_at DESC LIMIT %s
             """, (chat_id, PAGE))
         rows = cur.fetchall()
-        msgs = [{"id": r[0], "sender_id": r[1], "sender_name": r[2], "sender_avatar": r[3],
-                 "text": r[4] if not r[7] else None, "photo_url": r[5] if not r[7] else None,
-                 "forwarded_from": r[6], "removed": r[7], "created_at": str(r[8])} for r in rows]
+        msg_ids = [r[0] for r in rows]
+        reactions = get_msg_reactions(conn, msg_ids)
+        msgs = []
+        for r in rows:
+            reply = None
+            if r[11]:
+                reply = {"id": r[11], "text": r[13], "photo_url": r[14], "voice_url": r[15], "sender_name": r[16]}
+            msgs.append({
+                "id": r[0], "sender_id": r[1], "sender_name": r[2], "sender_avatar": r[3],
+                "text": r[4] if not r[9] else None,
+                "photo_url": r[5] if not r[9] else None,
+                "voice_url": r[6] if not r[9] else None,
+                "voice_duration": r[7],
+                "forwarded_from": r[8], "removed": r[9], "created_at": str(r[10]),
+                "reply": reply, "is_read": r[12],
+                "reactions": reactions.get(r[0], []),
+            })
         msgs.reverse()
         return resp(msgs)
 
@@ -314,16 +384,21 @@ def handler(event: dict, context) -> dict:
         chat_id = body.get("chat_id")
         text = (body.get("text") or "").strip()
         photo_url = body.get("photo_url", "")
+        voice_url = body.get("voice_url", "")
+        voice_duration = body.get("voice_duration", 0)
         forwarded_from = body.get("forwarded_from")
-        if not chat_id or (not text and not photo_url):
-            return resp({"error": "Нужен chat_id и текст или фото"}, 400)
+        reply_to = body.get("reply_to")
+        if not chat_id or (not text and not photo_url and not voice_url):
+            return resp({"error": "Нужен chat_id и текст, фото или голос"}, 400)
         if not is_member(conn, u["id"], chat_id):
             return resp({"error": "Forbidden"}, 403)
         cur = conn.cursor()
         cur.execute(f"""
-            INSERT INTO {SCHEMA}.dzchat_messages (chat_id, sender_id, msg_text, photo_url, forwarded_from)
-            VALUES (%s, %s, %s, %s, %s) RETURNING id, created_at
-        """, (chat_id, u["id"], text or None, photo_url or None, forwarded_from))
+            INSERT INTO {SCHEMA}.dzchat_messages
+                (chat_id, sender_id, msg_text, photo_url, voice_url, voice_duration, forwarded_from, reply_to)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id, created_at
+        """, (chat_id, u["id"], text or None, photo_url or None,
+              voice_url or None, voice_duration, forwarded_from, reply_to))
         row = cur.fetchone()
         conn.commit()
         return resp({"ok": True, "id": row[0], "created_at": str(row[1]),
@@ -335,6 +410,7 @@ def handler(event: dict, context) -> dict:
         if not u:
             return resp({"error": "Unauthorized"}, 401)
         msg_id = body.get("msg_id")
+        everyone = body.get("everyone", False)
         if not msg_id:
             return resp({"error": "msg_id required"}, 400)
         cur = conn.cursor()
@@ -352,27 +428,89 @@ def handler(event: dict, context) -> dict:
             return resp({"error": "chat_id required"}, 400)
         cur = conn.cursor()
         cur.execute(f"UPDATE {SCHEMA}.dzchat_members SET last_read_at=NOW() WHERE chat_id=%s AND user_id=%s", (chat_id, u["id"]))
+        # помечаем is_read у сообщений для отправителя
+        cur.execute(f"""
+            UPDATE {SCHEMA}.dzchat_messages SET is_read=TRUE
+            WHERE chat_id=%s AND sender_id != %s AND is_read=FALSE
+        """, (chat_id, u["id"]))
         conn.commit()
         return resp({"ok": True})
 
-    # ── UPLOAD PHOTO ──────────────────────────────────────────────
+    # ── REACT ─────────────────────────────────────────────────────
+    if action == "react" and method == "POST":
+        u = get_user(conn, token)
+        if not u:
+            return resp({"error": "Unauthorized"}, 401)
+        msg_id = body.get("msg_id")
+        emoji = body.get("emoji", "").strip()
+        if not msg_id or not emoji:
+            return resp({"error": "msg_id и emoji обязательны"}, 400)
+        cur = conn.cursor()
+        # Если та же реакция — удаляем (toggle), иначе вставляем/обновляем
+        cur.execute(f"SELECT emoji FROM {SCHEMA}.dzchat_reactions WHERE msg_id=%s AND user_id=%s", (msg_id, u["id"]))
+        existing = cur.fetchone()
+        if existing and existing[0] == emoji:
+            cur.execute(f"UPDATE {SCHEMA}.dzchat_reactions SET emoji=NULL WHERE msg_id=%s AND user_id=%s", (msg_id, u["id"]))
+        else:
+            cur.execute(f"""
+                INSERT INTO {SCHEMA}.dzchat_reactions (msg_id, user_id, emoji)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (msg_id, user_id) DO UPDATE SET emoji=EXCLUDED.emoji
+            """, (msg_id, u["id"], emoji))
+        conn.commit()
+        return resp({"ok": True})
+
+    # ── SEARCH MESSAGES ───────────────────────────────────────────
+    if action == "search_messages" and method == "GET":
+        u = get_user(conn, token)
+        if not u:
+            return resp({"error": "Unauthorized"}, 401)
+        q = qs.get("q", "").strip()
+        chat_id = qs.get("chat_id")
+        if not q:
+            return resp([])
+        cur = conn.cursor()
+        if chat_id:
+            cur.execute(f"""
+                SELECT m.id, m.chat_id, m.msg_text, m.created_at, us.name
+                FROM {SCHEMA}.dzchat_messages m
+                JOIN {SCHEMA}.dzchat_users us ON us.id=m.sender_id
+                WHERE m.chat_id=%s AND m.msg_text ILIKE %s AND m.removed=FALSE
+                ORDER BY m.created_at DESC LIMIT 30
+            """, (chat_id, f"%{q}%"))
+        else:
+            cur.execute(f"""
+                SELECT m.id, m.chat_id, m.msg_text, m.created_at, us.name
+                FROM {SCHEMA}.dzchat_messages m
+                JOIN {SCHEMA}.dzchat_users us ON us.id=m.sender_id
+                JOIN {SCHEMA}.dzchat_members mb ON mb.chat_id=m.chat_id AND mb.user_id=%s
+                WHERE m.msg_text ILIKE %s AND m.removed=FALSE
+                ORDER BY m.created_at DESC LIMIT 30
+            """, (u["id"], f"%{q}%"))
+        rows = cur.fetchall()
+        return resp([{"id": r[0], "chat_id": r[1], "text": r[2], "created_at": str(r[3]), "sender_name": r[4]} for r in rows])
+
+    # ── UPLOAD (photo or voice) ───────────────────────────────────
     if action == "upload" and method == "POST":
         u = get_user(conn, token)
         if not u:
             return resp({"error": "Unauthorized"}, 401)
         image_b64 = body.get("image", "")
         mime = body.get("mime", "image/jpeg")
+        kind = body.get("kind", "photo")  # photo | voice | avatar
         if not image_b64:
             return resp({"error": "image required"}, 400)
-        ext = "jpg" if "jpeg" in mime else mime.split("/")[-1]
-        key = f"dzchat/{u['id']}/{uuid.uuid4().hex}.{ext}"
+        ext = "jpg" if "jpeg" in mime else ("webm" if "webm" in mime else mime.split("/")[-1])
+        folder = f"dzchat/{kind}/{u['id']}"
+        key = f"{folder}/{uuid.uuid4().hex}.{ext}"
         try:
             data = base64.b64decode(image_b64)
         except Exception:
             return resp({"error": "Invalid base64"}, 400)
-        s3 = boto3.client("s3", endpoint_url="https://bucket.poehali.dev", aws_access_key_id=AK, aws_secret_access_key=SK)
+        s3 = boto3.client("s3", endpoint_url="https://bucket.poehali.dev",
+                          aws_access_key_id=AK, aws_secret_access_key=SK)
         s3.put_object(Bucket="files", Key=key, Body=data, ContentType=mime)
-        cdn_url = f"https://cdn.poehali.dev/projects/{AK}/bucket/{key}"
+        cdn_url = f"https://cdn.poehali.dev/projects/{AK}/files/{key}"
         return resp({"ok": True, "url": cdn_url})
 
     return resp({"error": "Unknown action"}, 404)
