@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import CatalogOrderModal from "@/components/catalog/CatalogOrderModal";
 import CatalogNav from "@/components/catalog/CatalogNav";
 import CatalogSidebar from "@/components/catalog/CatalogSidebar";
@@ -113,35 +113,35 @@ const Catalog = () => {
     load(activeCategory, search, "");
   };
 
-  const addToCart = (item: CatalogItem) => {
+  const addToCart = useCallback((item: CatalogItem) => {
     setCart(prev => {
       const ex = prev.find(e => e.item.id === item.id);
       if (ex) return prev.map(e => e.item.id === item.id ? { ...e, qty: e.qty + 1 } : e);
       return [...prev, { item, qty: 1 }];
     });
-  };
+  }, []);
 
-  const removeFromCart = (id: number) => setCart(prev => prev.filter(e => e.item.id !== id));
+  const removeFromCart = useCallback((id: number) => setCart(prev => prev.filter(e => e.item.id !== id)), []);
 
-  const cartTotal = cart.reduce((s, e) => s + ((e.item.price || 0) + PRICE_MARKUP) * e.qty, 0);
-  const cartCount = cart.reduce((s, e) => s + e.qty, 0);
+  const cartTotal = useMemo(() => cart.reduce((s, e) => s + ((e.item.price || 0) + PRICE_MARKUP) * e.qty, 0), [cart]);
+  const cartCount = useMemo(() => cart.reduce((s, e) => s + e.qty, 0), [cart]);
 
-  const brandsInCategory = Array.from(new Set(items.map(i => i.brand))).sort((a, b) => {
+  const brandsInCategory = useMemo(() => Array.from(new Set(items.map(i => i.brand))).sort((a, b) => {
     const ai = BRAND_PRIORITY.indexOf(a), bi = BRAND_PRIORITY.indexOf(b);
     return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
-  });
+  }), [items]);
 
-  const itemsForFilters = activeBrand ? items.filter(i => i.brand === activeBrand) : items;
+  const itemsForFilters = useMemo(() => activeBrand ? items.filter(i => i.brand === activeBrand) : items, [items, activeBrand]);
 
-  const storagesInCategory = Array.from(new Set(
+  const storagesInCategory = useMemo(() => Array.from(new Set(
     itemsForFilters.map(i => i.storage).filter(Boolean)
-  )).sort((a, b) => parseInt(a || "0") - parseInt(b || "0")) as string[];
+  )).sort((a, b) => parseInt(a || "0") - parseInt(b || "0")) as string[], [itemsForFilters]);
 
-  const colorsInCategory = Array.from(new Set(
+  const colorsInCategory = useMemo(() => Array.from(new Set(
     itemsForFilters.map(i => i.color).filter(Boolean)
-  )).sort() as string[];
+  )).sort() as string[], [itemsForFilters]);
 
-  const filteredItems = items.filter(i => {
+  const filteredItems = useMemo(() => items.filter(i => {
     if (activeBrand && i.brand !== activeBrand) return false;
     if (activeStorage && i.storage !== activeStorage) return false;
     if (activeColor && i.color !== activeColor) return false;
@@ -149,7 +149,6 @@ const Catalog = () => {
       const name = `${i.model}`.toLowerCase();
       const f = modelFilter.toLowerCase();
       if (f === "pro" || f === "pro max" || f === "air" || f === "plus" || f === "ultra") {
-        // Точное совпадение слов: "pro" не должен захватывать "pro max"
         const words = name.split(/[\s/]+/);
         if (f === "pro max") {
           if (!name.includes("pro max")) return false;
@@ -167,9 +166,9 @@ const Catalog = () => {
       }
     }
     return true;
-  });
+  }), [items, activeBrand, activeStorage, activeColor, modelFilter]);
 
-  const activeFiltersCount = [activeBrand, activeStorage, activeColor, filterAvail, modelFilter !== "Все" ? modelFilter : ""].filter(Boolean).length;
+  const activeFiltersCount = useMemo(() => [activeBrand, activeStorage, activeColor, filterAvail, modelFilter !== "Все" ? modelFilter : ""].filter(Boolean).length, [activeBrand, activeStorage, activeColor, filterAvail, modelFilter]);
 
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-white">

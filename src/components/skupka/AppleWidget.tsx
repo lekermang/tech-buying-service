@@ -69,7 +69,7 @@ const useAppleWidget = () => {
           name: "Заявка Apple",
           phone,
           category: "Apple техника",
-          desc: `${result.model} — цена скупки: ${result.skupka_price.toLocaleString("ru-RU")} ₽ (Авито ~${result.avito_avg.toLocaleString("ru-RU")} ₽)`,
+          desc: `${result.model} — цена скупки: ${(result.skupka_price ?? 0).toLocaleString("ru-RU")} ₽ (Авито ~${(result.avito_avg ?? 0).toLocaleString("ru-RU")} ₽)`,
         }),
       });
       setSent(true);

@@ -91,6 +91,8 @@ const ContactsFooter = ({ scrollTo }: ContactsFooterProps) => {
               src="https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/9c9b4fca-bfd7-4841-a827-eb0354dad8da.JPG"
               alt="Скупка24"
               className="w-8 h-8 rounded-full object-cover"
+              loading="lazy"
+              decoding="async"
             />
             <span className="font-oswald font-bold text-[#FFD700]">СКУПКА24</span>
           </div>

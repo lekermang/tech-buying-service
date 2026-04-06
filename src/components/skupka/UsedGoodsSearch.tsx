@@ -180,7 +180,7 @@ export default function UsedGoodsSearch() {
                 >
                   <div className="min-w-0 flex-1 flex items-center gap-2">
                     {item.photo
-                      ? <img src={item.photo} alt="" className="w-7 h-7 object-cover shrink-0 rounded" />
+                      ? <img src={item.photo} alt="" className="w-7 h-7 object-cover shrink-0 rounded" loading="lazy" decoding="async" />
                       : <div className="w-7 h-7 bg-white/5 shrink-0 rounded flex items-center justify-center"><Icon name="Package" size={12} className="text-white/20" /></div>
                     }
                     <span className="font-roboto text-xs text-white truncate group-hover:text-[#FFD700] transition-colors">{item.name}</span>

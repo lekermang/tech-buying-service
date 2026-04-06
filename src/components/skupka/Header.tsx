@@ -133,6 +133,8 @@ const Header = ({ scrollTo }: HeaderProps) => {
               src="https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/9c9b4fca-bfd7-4841-a827-eb0354dad8da.JPG"
               alt="Скупка24"
               className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover"
+              loading="eager"
+              decoding="async"
             />
             <div>
               <span className="font-oswald font-bold text-lg sm:text-xl tracking-wider animate-shimmer">СКУПКА24</span>

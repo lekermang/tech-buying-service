@@ -144,7 +144,7 @@ const EvaluateModal = ({ onClose }: { onClose: () => void }) => {
                 <label className="font-roboto text-white/50 text-xs uppercase tracking-wider block mb-1">
                   Фото товара <span className="text-[#FFD700]">{photos.length}/5</span>
                 </label>
-                <div className="grid grid-cols-5 gap-2 mb-1">
+                <div className="grid grid-cols-4 sm:grid-cols-5 gap-2 mb-1">
                   {photos.map((p, idx) => (
                     <div key={idx} className="relative group aspect-square">
                       <img src={p.preview} alt={`фото ${idx + 1}`} className="w-full h-full object-cover border border-[#333]" />

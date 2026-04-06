@@ -13,7 +13,7 @@ const CatalogRowCard = ({ item, onBuy }: { item: CatalogItem; onBuy: (item: Cata
   return (
     <div className="bg-[#111] rounded-xl flex items-center gap-3 px-3 py-2.5 active:bg-[#181818] transition-all cursor-pointer" onClick={() => onBuy(item)}>
       <div className="w-14 h-14 shrink-0 bg-[#1A1A1A] rounded-lg flex items-center justify-center overflow-hidden">
-        {photo ? <img src={photo} alt={title} className="w-11 h-11 object-contain" /> : <Icon name="Package" size={24} className="text-white/10" />}
+        {photo ? <img src={photo} alt={title} className="w-11 h-11 object-contain" loading="lazy" decoding="async" /> : <Icon name="Package" size={24} className="text-white/10" />}
       </div>
       <div className="flex-1 min-w-0">
         <div className="font-medium text-white text-sm leading-snug truncate">{title}</div>
