@@ -82,6 +82,20 @@
     background-color: #ffd700;
   }
 
+  /* Safe area для iPhone notch */
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Отключить bounce scroll на iOS в чате */
+  .overscroll-contain {
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
   .border-yellow {
     border-color: #ffd700;
   }

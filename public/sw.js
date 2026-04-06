@@ -76,23 +76,27 @@ async function pollChats() {
       const prev = prevUnread[chat.id] ?? 0;
       if (chat.unread > prev && chat.last_message) {
         const lm = chat.last_message;
-        const body = lm.voice_url ? '🎤 Голосовое сообщение'
-                   : lm.photo_url ? '📷 Фото'
-                   : (lm.text || 'Новое сообщение');
+        // Формируем текст с именем отправителя
+        const senderName = lm.sender_name || '';
+        const msgText = lm.voice_url ? '🎤 Голосовое'
+                      : lm.video_url ? '🎥 Видео'
+                      : lm.photo_url ? '📷 Фото'
+                      : (lm.text || 'Новое сообщение');
+        const body = senderName ? `${senderName}: ${msgText}` : msgText;
 
-        // Звук — отправляем всем открытым вкладкам
+        // Звук — всем открытым вкладкам
         playBeep();
 
-        // Пуш — показываем если DzChat не виден
+        // Пуш с текстом если DzChat не виден
         if (!dzchatVisible) {
-          await self.registration.showNotification(`DzChat — ${chat.name}`, {
+          await self.registration.showNotification(chat.name, {
             body,
             icon: ICON,
             badge: ICON,
-            vibrate: [200, 100, 200],
+            vibrate: [150, 80, 150],
             tag: `dzchat-${chat.id}`,
             renotify: true,
-            silent: false, // системный звук уведомления
+            silent: true,
             data: { url: '/dzchat', chatId: chat.id }
           });
         }

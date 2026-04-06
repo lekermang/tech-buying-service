@@ -125,7 +125,8 @@ export const ChatInput = ({ text, setText, sending, uploadingPhoto, imageB64, te
   };
 
   return (
-    <div className="px-2 py-2 bg-[#1a2634] border-t border-white/10 flex items-end gap-1.5 shrink-0 relative">
+    <div className="px-2 py-2 bg-[#1a2634] border-t border-white/10 flex items-end gap-1.5 shrink-0 relative"
+      style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}>
       {/* Эмодзи-пикер */}
       {showEmoji && (
         <EmojiPicker
@@ -134,22 +135,22 @@ export const ChatInput = ({ text, setText, sending, uploadingPhoto, imageB64, te
         />
       )}
 
-      {/* Скрепка (фото) */}
+      {/* Кнопка фото/видео — всегда видна */}
       <button onClick={() => fileRef.current?.click()}
-        className="text-white/50 hover:text-white p-2 shrink-0 transition-colors">
-        <Icon name="Paperclip" size={22} />
+        className="w-10 h-10 flex items-center justify-center text-white/60 hover:text-[#25D366] active:text-[#25D366] transition-colors shrink-0">
+        <Icon name="Image" size={23} />
       </button>
       <input ref={fileRef} type="file" accept="image/*,video/*" onChange={onPhotoSelect} className="hidden" />
 
-      {/* Поле ввода + кнопка эмодзи */}
-      <div className="flex-1 bg-[#0f1923] rounded-2xl px-3 py-2 flex items-end gap-1">
+      {/* Поле ввода + эмодзи */}
+      <div className="flex-1 bg-[#0f1923] rounded-2xl px-3 py-2 flex items-end gap-1 min-w-0">
         <textarea
           ref={textareaRef}
           value={text}
           onChange={e => { setText(e.target.value); autoResize(); }}
           rows={1}
           placeholder="Сообщение..."
-          className="flex-1 bg-transparent text-white placeholder-white/30 outline-none resize-none text-sm leading-relaxed"
+          className="flex-1 bg-transparent text-white placeholder-white/30 outline-none resize-none text-sm leading-relaxed min-w-0"
           style={{ maxHeight: 120 }}
           onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend(); } }}
           onFocus={() => setShowEmoji(false)}
@@ -158,14 +159,14 @@ export const ChatInput = ({ text, setText, sending, uploadingPhoto, imageB64, te
           type="button"
           onClick={() => setShowEmoji(s => !s)}
           className={`shrink-0 transition-colors mb-0.5 ${showEmoji ? "text-[#25D366]" : "text-white/30 hover:text-white/70"}`}>
-          <Icon name="Smile" size={20} />
+          <Icon name="Smile" size={19} />
         </button>
       </div>
 
       {/* Отправить / микрофон */}
       {text.trim() || imageB64 ? (
         <button onClick={onSend} disabled={sending}
-          className="w-10 h-10 bg-[#25D366] rounded-full flex items-center justify-center text-white hover:bg-[#1da851] transition-colors disabled:opacity-50 shrink-0">
+          className="w-10 h-10 bg-[#25D366] rounded-full flex items-center justify-center text-white active:bg-[#1da851] transition-colors disabled:opacity-50 shrink-0">
           {sending || uploadingPhoto
             ? <Icon name="Loader" size={18} className="animate-spin" />
             : <Icon name="Send" size={18} />}
