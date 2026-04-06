@@ -5,6 +5,7 @@ import { api } from "./dzchat.utils";
 import DzChatAvatar from "./DzChatAvatar";
 import DzChatAvatarEditor from "./DzChatAvatarEditor";
 import { NOTIFICATION_SOUNDS, playNotificationSound, playSendSound, unlockAudio } from "./dzchat.sounds";
+import { THEMES, saveTheme, loadAndApplyTheme } from "./dzchat.theme";
 
 const Toggle = ({ on }: { on: boolean }) => (
   <div className={`w-10 h-5 rounded-full transition-colors relative shrink-0 ${on ? "bg-[#25D366]" : "bg-white/20"}`}>
@@ -12,9 +13,9 @@ const Toggle = ({ on }: { on: boolean }) => (
   </div>
 );
 
-export const ProfileModal = ({ me, token, onClose, onUpdate, onLogout, onSwitchAccount }: {
+export const ProfileModal = ({ me, token, onClose, onUpdate, onLogout, onSwitchAccount, onThemeChange }: {
   me: any; token: string; onClose: () => void; onUpdate: (u: any) => void;
-  onLogout?: () => void; onSwitchAccount?: () => void;
+  onLogout?: () => void; onSwitchAccount?: () => void; onThemeChange?: () => void;
 }) => {
   const [name, setName] = useState(me.name);
   const [avatarB64, setAvatarB64] = useState<string | null>(null);
@@ -25,6 +26,7 @@ export const ProfileModal = ({ me, token, onClose, onUpdate, onLogout, onSwitchA
   const [soundId, setSoundId] = useState<string>(() => localStorage.getItem("dzchat_sound") || "default");
   const [vibrateOn, setVibrateOn] = useState(() => localStorage.getItem("dzchat_vibrate") !== "off");
   const [sendSoundOn, setSendSoundOn] = useState(() => localStorage.getItem("dzchat_send_sound") !== "off");
+  const [themeId, setThemeId] = useState(() => localStorage.getItem("dzchat_theme") ?? "dark");
   const [customAudioUrl, setCustomAudioUrl] = useState<string | null>(() => localStorage.getItem("dzchat_custom_audio") || null);
   const [notifPerm, setNotifPerm] = useState<NotificationPermission>(() =>
     "Notification" in window ? Notification.permission : "denied"
@@ -72,6 +74,12 @@ export const ProfileModal = ({ me, token, onClose, onUpdate, onLogout, onSwitchA
     setVibrateOn(next);
     localStorage.setItem("dzchat_vibrate", next ? "on" : "off");
     if (next && navigator.vibrate) navigator.vibrate([100, 50, 100]);
+  };
+
+  const handleThemeChange = (id: string) => {
+    setThemeId(id);
+    saveTheme(id);
+    onThemeChange?.();
   };
 
   const handleSendSoundToggle = () => {
@@ -257,6 +265,56 @@ export const ProfileModal = ({ me, token, onClose, onUpdate, onLogout, onSwitchA
           <input ref={audioFileRef} type="file" accept="audio/*" onChange={handleAudioFile} className="hidden" />
         </div>
         <p className="text-white/25 text-xs mb-5 px-1">Нажми на звук чтобы послушать</p>
+
+        {/* ── Оформление ── */}
+        <p className="text-white/40 text-xs uppercase tracking-wider mb-3 flex items-center gap-1.5 mt-5">
+          <Icon name="Palette" size={12} /> Оформление
+        </p>
+        <div className="grid grid-cols-2 gap-2 mb-5">
+          {THEMES.map(t => {
+            const active = themeId === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => handleThemeChange(t.id)}
+                className={`relative flex items-center gap-2.5 px-3 py-3 rounded-xl border text-sm transition-all overflow-hidden ${
+                  active ? "border-[#25D366] ring-1 ring-[#25D366]/50" : "border-white/10 hover:border-white/25"
+                }`}
+                style={{
+                  background: t.isGlass
+                    ? "linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)"
+                    : t.sidebar,
+                }}>
+                {/* Мини-превью пузырей */}
+                <div className="flex flex-col gap-1 shrink-0">
+                  <div className="w-8 h-2.5 rounded-full opacity-90"
+                    style={{ background: t.bubbleOut }} />
+                  <div className="w-6 h-2.5 rounded-full opacity-70 self-end"
+                    style={{ background: t.bubbleIn }} />
+                </div>
+                <div className="flex-1 min-w-0 text-left">
+                  <p className="text-xs font-medium leading-tight" style={{ color: t.text }}>
+                    {t.emoji} {t.label}
+                  </p>
+                  {t.isGlass && (
+                    <p className="text-[10px] mt-0.5" style={{ color: "rgba(255,255,255,0.35)" }}>
+                      прозрачный
+                    </p>
+                  )}
+                </div>
+                {active && (
+                  <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full flex items-center justify-center"
+                    style={{ background: t.accent }}>
+                    <Icon name="Check" size={10} className="text-white" />
+                  </div>
+                )}
+                {/* Акцент-полоска */}
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 rounded-b-xl"
+                  style={{ background: active ? t.accent : "transparent" }} />
+              </button>
+            );
+          })}
+        </div>
 
         {/* ── Установка ── */}
         <p className="text-white/40 text-xs uppercase tracking-wider mb-2 flex items-center gap-1.5 mt-4">

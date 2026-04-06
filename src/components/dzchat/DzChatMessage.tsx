@@ -69,13 +69,15 @@ const DzChatMessage = ({
         <div className="relative max-w-[85%] group"
           onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onContextMenu(msg); }}>
           {msg.removed ? (
-            <div className={`px-3 py-2 rounded-2xl text-sm italic text-white/30 ${isMine ? "bg-[#1e4a2e]/60" : "bg-white/8"}`}>
+            <div className={`px-3 py-2 rounded-2xl text-sm italic text-white/30 ${isMine ? "" : "bg-white/8"}`}
+              style={isMine ? { background: "color-mix(in srgb, var(--dz-bubble-out) 60%, transparent)" } : undefined}>
               🚫 Сообщение удалено
             </div>
           ) : (
-            <div className={`rounded-2xl text-sm shadow-sm overflow-hidden ${
-              isMine ? "bg-[#1e6f3e] text-white rounded-br-sm" : "bg-[#1e2c3a] text-white rounded-bl-sm"
-            } ${hasMedia && !msg.text ? "p-0" : "px-3 py-2"}`}>
+            <div className={`rounded-2xl text-sm shadow-sm overflow-hidden text-white ${
+              isMine ? "rounded-br-sm" : "rounded-bl-sm"
+            } ${hasMedia && !msg.text ? "p-0" : "px-3 py-2"}`}
+              style={{ background: isMine ? "var(--dz-bubble-out)" : "var(--dz-bubble-in)" }}>
 
               {/* Имя в группе */}
               {!isMine && showAvatar && chat.type === "group" && (

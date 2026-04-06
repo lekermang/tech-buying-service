@@ -82,6 +82,31 @@
     background-color: #ffd700;
   }
 
+  /* ── DzChat CSS переменные (тема) ── */
+  :root {
+    --dz-bg: #0a1929;
+    --dz-sidebar: #111b26;
+    --dz-sidebar-header: #1a2634;
+    --dz-chat-bg: #0a1929;
+    --dz-input: #0f1923;
+    --dz-input-bar: #1a2634;
+    --dz-header: #1a2634;
+    --dz-bubble-out: #005c4b;
+    --dz-bubble-in: #1e2d3d;
+    --dz-accent: #25d366;
+    --dz-accent-hover: #1da851;
+    --dz-text: #ffffff;
+    --dz-text-muted: rgba(255, 255, 255, 0.45);
+    --dz-border: rgba(255, 255, 255, 0.08);
+    --dz-blur: none;
+  }
+
+  /* Glass-режим: размываем фон за чатом */
+  .dz-glass {
+    backdrop-filter: var(--dz-blur);
+    -webkit-backdrop-filter: var(--dz-blur);
+  }
+
   /* Safe area для iPhone notch */
   .safe-top {
     padding-top: env(safe-area-inset-top);

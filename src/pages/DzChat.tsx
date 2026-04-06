@@ -8,6 +8,7 @@ import DzChatView from "@/components/dzchat/DzChatView";
 import { NewChatModal, ProfileModal, CreateGroupModal, playNotificationSound } from "@/components/dzchat/DzChatModals";
 import { DzChatInstallBanner } from "@/components/dzchat/DzChatInstall";
 import { unlockAudio } from "@/components/dzchat/dzchat.sounds";
+import { loadAndApplyTheme, getTheme } from "@/components/dzchat/dzchat.theme";
 
 const NOTIF_ICON = "/dzchat-icon.svg";
 
@@ -26,6 +27,7 @@ const DzChat = () => {
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [notifGranted, setNotifGranted] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [theme, setTheme] = useState(() => loadAndApplyTheme());
   const pollRef = useRef<ReturnType<typeof setInterval>>();
   const pingRef = useRef<ReturnType<typeof setInterval>>();
   const prevUnreadRef = useRef<Record<number, number>>({});
@@ -184,53 +186,61 @@ const DzChat = () => {
     ? chats.filter(c => c.name?.toLowerCase().includes(searchQuery.toLowerCase()))
     : chats;
 
+  const isGlass = theme.isGlass;
+
   return (
-    <div className="h-[100dvh] bg-[#0a1929] flex overflow-hidden">
+    <div className="h-[100dvh] flex overflow-hidden relative"
+      style={{ background: isGlass ? "transparent" : theme.bg }}>
+
+      {/* Glass: системный фон просвечивает насквозь */}
+      {isGlass && (
+        <div className="absolute inset-0 -z-10"
+          style={{ background: "linear-gradient(135deg, #0a0a2e 0%, #001a0e 50%, #0a0a2e 100%)" }} />
+      )}
 
       {/* ── SIDEBAR ── */}
-      <div className={`${activeChat ? "hidden md:flex" : "flex"} flex-col w-full md:w-80 lg:w-96 bg-[#111b26] border-r border-white/8 shrink-0`}>
+      <div
+        className={`${activeChat ? "hidden md:flex" : "flex"} flex-col w-full md:w-80 lg:w-96 shrink-0 border-r ${isGlass ? "dz-glass" : ""}`}
+        style={{ background: theme.sidebar, borderColor: theme.border }}>
 
         {/* Header */}
-        <div className="flex items-center justify-between px-3 py-2.5 bg-[#1a2634] border-b border-white/10 safe-top">
+        <div className={`flex items-center justify-between px-3 py-2.5 border-b safe-top ${isGlass ? "dz-glass" : ""}`}
+          style={{ background: theme.sidebarHeader, borderColor: theme.border }}>
           <button onClick={() => { unlockAudio(); setShowProfile(true); }}
             className="flex items-center gap-2.5 hover:opacity-80 transition-opacity min-w-0 flex-1">
-            {/* Аватар всегда виден на мобайле */}
             <div className="shrink-0">
               <DzChatAvatar name={me.name || "?"} url={me.avatar_url} size={38} />
             </div>
             <div className="text-left min-w-0 flex-1">
-              <p className="text-white text-sm font-semibold leading-tight truncate">{me.name}</p>
-              <p className="text-[#25D366] text-xs">● в сети</p>
+              <p className="text-sm font-semibold leading-tight truncate" style={{ color: theme.text }}>{me.name}</p>
+              <p className="text-xs" style={{ color: theme.accent }}>● в сети</p>
             </div>
           </button>
 
-          {/* Кнопки действий */}
           <div className="flex items-center gap-0.5 shrink-0 ml-1">
-            {/* Уведомления */}
             {notifGranted ? (
-              <div className="w-8 h-8 flex items-center justify-center text-[#25D366]/50">
+              <div className="w-8 h-8 flex items-center justify-center opacity-50" style={{ color: theme.accent }}>
                 <Icon name="BellRing" size={16} />
               </div>
             ) : "Notification" in window ? (
-              <button onClick={requestNotifications}
-                title="Разрешить уведомления"
+              <button onClick={requestNotifications} title="Разрешить уведомления"
                 className="w-8 h-8 flex items-center justify-center text-yellow-400 hover:bg-white/10 rounded-full">
                 <Icon name="Bell" size={17} />
               </button>
             ) : null}
-            {/* Новая группа */}
             <button onClick={() => setShowNewGroup(true)}
-              className="w-8 h-8 flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 rounded-full">
+              className="w-8 h-8 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors"
+              style={{ color: theme.textMuted }}>
               <Icon name="Users" size={17} />
             </button>
-            {/* Новый чат */}
             <button onClick={() => setShowNewChat(true)}
-              className="w-8 h-8 flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 rounded-full">
+              className="w-8 h-8 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors"
+              style={{ color: theme.textMuted }}>
               <Icon name="SquarePen" size={17} />
             </button>
-            {/* Настройки */}
             <button onClick={() => { unlockAudio(); setShowProfile(true); }}
-              className="w-8 h-8 flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 rounded-full">
+              className="w-8 h-8 flex items-center justify-center hover:bg-white/10 rounded-full transition-colors"
+              style={{ color: theme.textMuted }}>
               <Icon name="Settings" size={17} />
             </button>
           </div>
@@ -240,23 +250,22 @@ const DzChat = () => {
         <DzChatInstallBanner installPrompt={installPrompt} onInstall={installApp} />
 
         {/* Поиск */}
-        <div className="px-3 py-2 bg-[#111b26] border-b border-white/5">
-          <div className="flex items-center gap-2 bg-white/8 rounded-xl px-3 py-2">
-            <Icon name="Search" size={15} className="text-white/30 shrink-0" />
+        <div className="px-3 py-2 border-b" style={{ background: theme.sidebar, borderColor: theme.border }}>
+          <div className="flex items-center gap-2 rounded-xl px-3 py-2" style={{ background: "rgba(255,255,255,0.07)" }}>
+            <Icon name="Search" size={15} className="shrink-0" style={{ color: theme.textMuted } as any} />
             <input
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Поиск чатов..."
-              className="flex-1 bg-transparent text-white placeholder-white/30 text-sm outline-none min-w-0"
+              className="flex-1 bg-transparent text-sm outline-none min-w-0 placeholder-white/30"
+              style={{ color: theme.text }}
             />
             {searchQuery && (
-              <button onClick={() => setSearchQuery("")} className="text-white/30 hover:text-white shrink-0">
+              <button onClick={() => setSearchQuery("")} className="shrink-0" style={{ color: theme.textMuted }}>
                 <Icon name="X" size={14} />
               </button>
             )}
-            {/* Кнопка нового чата прямо в поиске */}
-            <button onClick={() => setShowNewChat(true)}
-              className="shrink-0 text-[#25D366] hover:text-[#1da851]">
+            <button onClick={() => setShowNewChat(true)} style={{ color: theme.accent }}>
               <Icon name="UserPlus" size={16} />
             </button>
           </div>
@@ -265,18 +274,20 @@ const DzChat = () => {
         {/* Список чатов */}
         <div className="flex-1 overflow-y-auto overscroll-contain">
           {loadingChats && chats.length === 0 ? (
-            <div className="flex items-center justify-center py-16 text-white/30">
+            <div className="flex items-center justify-center py-16" style={{ color: theme.textMuted }}>
               <Icon name="Loader" size={28} className="animate-spin" />
             </div>
           ) : filteredChats.length === 0 ? (
             <div className="text-center py-12 px-4">
-              <div className="w-16 h-16 bg-[#25D366]/10 rounded-full flex items-center justify-center mx-auto mb-3">
-                <Icon name="MessageSquarePlus" size={32} className="text-[#25D366]/40" />
+              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3"
+                style={{ background: theme.accent + "18" }}>
+                <Icon name="MessageSquarePlus" size={32} style={{ color: theme.accent + "66" } as any} />
               </div>
-              <p className="text-white/30 text-sm">{searchQuery ? "Не найдено" : "Нет чатов"}</p>
+              <p className="text-sm" style={{ color: theme.textMuted }}>{searchQuery ? "Не найдено" : "Нет чатов"}</p>
               {!searchQuery && (
                 <button onClick={() => setShowNewChat(true)}
-                  className="mt-4 bg-[#25D366] text-white text-sm px-5 py-2.5 rounded-xl font-medium">
+                  className="mt-4 text-white text-sm px-5 py-2.5 rounded-xl font-medium"
+                  style={{ background: theme.accent }}>
                   Начать диалог
                 </button>
               )}
@@ -287,31 +298,37 @@ const DzChat = () => {
             const isOnline = chat.partner?.is_online;
             return (
               <button key={chat.id} onClick={() => setActiveChat(chat)}
-                className={`w-full flex items-center gap-3 px-3 py-3 transition-colors border-b border-white/4 active:bg-white/10 ${isActive ? "bg-[#2a3d52]" : "hover:bg-white/5"}`}>
+                className="w-full flex items-center gap-3 px-3 py-3 transition-colors border-b active:bg-white/10"
+                style={{
+                  background: isActive ? (theme.accent + "20") : "transparent",
+                  borderColor: theme.border,
+                }}>
                 <div className="relative shrink-0">
                   <DzChatAvatar name={chat.name || "?"} url={chat.avatar_url} size={48} />
                   {isOnline && chat.type === "direct" && (
-                    <span className="absolute bottom-0.5 right-0.5 w-3 h-3 bg-[#25D366] border-2 border-[#111b26] rounded-full" />
+                    <span className="absolute bottom-0.5 right-0.5 w-3 h-3 rounded-full border-2"
+                      style={{ background: theme.accent, borderColor: theme.sidebar }} />
                   )}
                   {chat.unread > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-[#25D366] text-white text-[10px] font-bold min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center">
+                    <span className="absolute -top-1 -right-1 text-white text-[10px] font-bold min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center"
+                      style={{ background: theme.accent }}>
                       {chat.unread > 99 ? "99+" : chat.unread}
                     </span>
                   )}
                 </div>
                 <div className="flex-1 min-w-0 text-left">
                   <div className="flex items-center justify-between gap-1">
-                    <p className="text-white text-sm font-semibold truncate">{chat.name}</p>
+                    <p className="text-sm font-semibold truncate" style={{ color: theme.text }}>{chat.name}</p>
                     <div className="flex items-center gap-1 shrink-0">
                       {lm?.sender_id === me.id && (
                         lm.is_read
                           ? <Icon name="CheckCheck" size={12} className="text-blue-400" />
-                          : <Icon name="CheckCheck" size={12} className="text-white/30" />
+                          : <Icon name="CheckCheck" size={12} style={{ color: theme.textMuted } as any} />
                       )}
-                      {lm && <p className="text-white/30 text-[10px]">{formatTime(lm.created_at)}</p>}
+                      {lm && <p className="text-[10px]" style={{ color: theme.textMuted }}>{formatTime(lm.created_at)}</p>}
                     </div>
                   </div>
-                  <p className="text-white/40 text-xs truncate mt-0.5">
+                  <p className="text-xs truncate mt-0.5" style={{ color: theme.textMuted }}>
                     {lm?.voice_url ? "🎤 Голосовое"
                       : lm?.video_url ? "🎥 Видео"
                       : lm?.photo_url ? "📷 Фото"
@@ -323,32 +340,35 @@ const DzChat = () => {
           })}
         </div>
 
-        {/* Непрочитанные */}
         {totalUnread > 0 && (
-          <div className="px-4 py-1.5 bg-[#111b26] border-t border-white/5 text-center safe-bottom">
-            <p className="text-[#25D366] text-xs">{totalUnread} непрочитанных</p>
+          <div className="px-4 py-1.5 border-t text-center safe-bottom"
+            style={{ background: theme.sidebar, borderColor: theme.border }}>
+            <p className="text-xs" style={{ color: theme.accent }}>{totalUnread} непрочитанных</p>
           </div>
         )}
       </div>
 
       {/* ── CHAT AREA ── */}
-      <div className={`${activeChat ? "flex" : "hidden md:flex"} flex-1 flex-col relative overflow-hidden md:border md:border-white/5 md:rounded-2xl md:m-2`}>
+      <div className={`${activeChat ? "flex" : "hidden md:flex"} flex-1 flex-col relative overflow-hidden md:rounded-2xl md:m-2 ${isGlass ? "dz-glass" : ""}`}
+        style={{ background: isGlass ? theme.chatBg : theme.chatBg, border: `1px solid ${theme.border}` }}>
         {activeChat ? (
           <DzChatView
             chat={activeChat}
             me={me}
             token={token}
+            theme={theme}
             onBack={() => setActiveChat(null)}
             onChatUpdate={() => loadChats(token)}
           />
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-white/15"
-            style={{ backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.03) 1px, transparent 0)", backgroundSize: "24px 24px" }}>
-            <div className="w-24 h-24 bg-[#25D366]/10 rounded-full flex items-center justify-center mb-6">
-              <Icon name="MessageCircle" size={48} className="text-[#25D366]/40" />
+          <div className="flex-1 flex flex-col items-center justify-center"
+            style={{ backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.025) 1px, transparent 0)", backgroundSize: "24px 24px" }}>
+            <div className="w-24 h-24 rounded-full flex items-center justify-center mb-6"
+              style={{ background: theme.accent + "18" }}>
+              <Icon name="MessageCircle" size={48} style={{ color: theme.accent + "55" } as any} />
             </div>
-            <p className="text-white/30 text-xl font-light">DzChat</p>
-            <p className="text-white/20 text-sm mt-2">Выберите чат или начните новый</p>
+            <p className="text-xl font-light" style={{ color: theme.textMuted }}>DzChat</p>
+            <p className="text-sm mt-2" style={{ color: theme.textMuted + "99" }}>Выберите чат или начните новый</p>
           </div>
         )}
       </div>
@@ -362,6 +382,7 @@ const DzChat = () => {
           onUpdate={u => setMe(u)}
           onLogout={() => { setShowProfile(false); logout(); }}
           onSwitchAccount={() => { setShowProfile(false); logout(); }}
+          onThemeChange={() => setTheme(getTheme(localStorage.getItem("dzchat_theme") ?? "dark"))}
         />
       )}
     </div>

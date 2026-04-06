@@ -6,10 +6,14 @@ import DzChatMessage from "./DzChatMessage";
 import { ReplyPreview, ChatInput } from "./DzChatInput";
 import { EditGroupModal } from "./DzChatModals";
 import { playSendSound, playVoiceSentSound, unlockAudio } from "./dzchat.sounds";
+import type { DzTheme } from "./dzchat.theme";
+import { loadAndApplyTheme } from "./dzchat.theme";
 
-const DzChatView = ({ chat, me, token, onBack, onChatUpdate }: {
+const DzChatView = ({ chat, me, token, onBack, onChatUpdate, theme: themeProp }: {
   chat: any; me: any; token: string; onBack: () => void; onChatUpdate?: () => void;
+  theme?: DzTheme;
 }) => {
+  const theme = themeProp ?? loadAndApplyTheme();
   const [messages, setMessages] = useState<any[]>([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
@@ -211,7 +215,11 @@ const DzChatView = ({ chat, me, token, onBack, onChatUpdate }: {
       {/* Сообщения */}
       <div ref={listRef} onScroll={handleScroll}
         className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5"
-        style={{ backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.03) 1px, transparent 0)", backgroundSize: "24px 24px" }}>
+        style={{
+          background: theme.chatBg,
+          backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.025) 1px, transparent 0)",
+          backgroundSize: "24px 24px",
+        }}>
         {messages.map((msg, i) => (
           <DzChatMessage
             key={msg.id}
