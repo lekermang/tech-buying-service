@@ -93,6 +93,14 @@ const DzChat = () => {
       initializedRef.current = true;
       return;
     }
+
+    // Суммарный unread для Badge API
+    const totalUnread = newChats.reduce((sum, c) => sum + (c.unread || 0), 0);
+    if ("setAppBadge" in navigator) {
+      if (totalUnread > 0) (navigator as any).setAppBadge(totalUnread).catch(() => {});
+      else (navigator as any).clearAppBadge().catch(() => {});
+    }
+
     newChats.forEach(chat => {
       const prev = prevUnreadRef.current[chat.id] ?? 0;
       if (chat.unread > prev && chat.last_message) {
@@ -102,7 +110,7 @@ const DzChat = () => {
         if (localStorage.getItem("dzchat_vibrate") !== "off" && navigator.vibrate) {
           navigator.vibrate([150, 60, 150]);
         }
-        // Пуш с именем отправителя и текстом
+        // Пуш — только если страница не видима (SW сам показывает если она закрыта)
         if (notifGrantedRef.current && document.visibilityState !== "visible") {
           try {
             const lm = chat.last_message;
@@ -116,7 +124,7 @@ const DzChat = () => {
               badge: NOTIF_ICON,
               tag: `dzchat-${chat.id}`,
               renotify: true,
-              silent: true,
+              silent: false,
             });
           } catch (_e) { /* not supported */ }
         }
@@ -165,6 +173,22 @@ const DzChat = () => {
       if (chat) { setActiveChat(chat); setNewChatId(null); }
     }
   }, [chats, newChatId]);
+
+  // При открытии чата — сбрасываем badge
+  useEffect(() => {
+    if (activeChat) {
+      // Сбрасываем бэдж через SW
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.ready.then(reg => {
+          reg.active?.postMessage({ type: "CLEAR_BADGE" });
+        }).catch(() => {});
+      }
+      // Сбрасываем бэдж напрямую тоже (на случай если SW не ответил)
+      if ("clearAppBadge" in navigator) {
+        (navigator as any).clearAppBadge().catch(() => {});
+      }
+    }
+  }, [activeChat?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const logout = () => {
     localStorage.removeItem("dzchat_token");

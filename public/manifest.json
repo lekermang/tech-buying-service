@@ -12,16 +12,16 @@
   "categories": ["social", "communication"],
   "icons": [
     {
-      "src": "/dzchat-icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/dce22ed0-7e15-4a0f-84c3-9987477dea5a.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg",
       "purpose": "any"
     },
     {
-      "src": "/dzchat-icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "maskable"
+      "src": "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/dce22ed0-7e15-4a0f-84c3-9987477dea5a.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
     }
   ],
   "shortcuts": [
@@ -31,13 +31,6 @@
       "description": "Открыть мессенджер",
       "url": "/dzchat",
       "icons": [{ "src": "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/dce22ed0-7e15-4a0f-84c3-9987477dea5a.jpg", "sizes": "96x96" }]
-    },
-    {
-      "name": "Оценить технику",
-      "short_name": "Оценить",
-      "description": "Быстрая оценка техники",
-      "url": "/#evaluate",
-      "icons": [{ "src": "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/9c9b4fca-bfd7-4841-a827-eb0354dad8da.JPG", "sizes": "96x96" }]
     }
   ]
 }

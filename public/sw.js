@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dzchat-v3';
+const CACHE_NAME = 'dzchat-v4';
 const STATIC_ASSETS = ['/', '/catalog', '/dzchat'];
 const ICON = "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/dce22ed0-7e15-4a0f-84c3-9987477dea5a.jpg";
 const API = "https://functions.poehali.dev/608c7976-816a-4e3e-b374-5dd617b045bf";
@@ -40,14 +40,23 @@ let pollInterval = null;
 let prevUnread = {}; // { chatId: unreadCount }
 let initialized = false;
 
-// Звук через AudioContext внутри SW (работает в некоторых браузерах)
-// Основной канал — showNotification с vibrate
-function playBeep() {
+// ── Отправка звука клиентам ───────────────────────────────────────
+function notifyClients(type, extra) {
+  self.clients.matchAll({ type: 'window' }).then(clients => {
+    clients.forEach(c => c.postMessage({ type, ...extra }));
+  });
+}
+
+// ── Badge API — количество непрочитанных на иконке приложения ─────
+async function updateBadge(totalUnread) {
   try {
-    // SW не имеет AudioContext — отправляем сообщение клиентам чтобы сыграли звук
-    self.clients.matchAll({ type: 'window' }).then(clients => {
-      clients.forEach(c => c.postMessage({ type: 'PLAY_SOUND' }));
-    });
+    if ('setAppBadge' in self.navigator) {
+      if (totalUnread > 0) {
+        await self.navigator.setAppBadge(totalUnread);
+      } else {
+        await self.navigator.clearAppBadge();
+      }
+    }
   } catch(_e) {}
 }
 
@@ -57,48 +66,59 @@ async function pollChats() {
     const res = await fetch(`${API}?action=chats`, {
       headers: { 'X-Session-Token': pollToken }
     });
-    if (!res.ok) return;
+    if (!res.ok) { if (res.status === 401) stopPolling(); return; }
     const chats = await res.json();
     if (!Array.isArray(chats)) return;
 
-    // Первый цикл — только запоминаем счётчики
+    // Считаем суммарный unread для Badge
+    const totalUnread = chats.reduce((sum, c) => sum + (c.unread || 0), 0);
+    updateBadge(totalUnread);
+
+    // Первый цикл — только запоминаем счётчики, не шлём уведомления
     if (!initialized) {
       chats.forEach(c => { prevUnread[c.id] = c.unread; });
       initialized = true;
       return;
     }
 
-    // Проверяем нет ли активных клиентов (вкладок) на DzChat
+    // Проверяем видимость вкладки DzChat
     const allClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const dzchatOpen = allClients.some(c => c.url.includes('/dzchat'));
     const dzchatVisible = allClients.some(c => c.url.includes('/dzchat') && c.visibilityState === 'visible');
 
     for (const chat of chats) {
       const prev = prevUnread[chat.id] ?? 0;
       if (chat.unread > prev && chat.last_message) {
         const lm = chat.last_message;
-        // Формируем текст с именем отправителя
-        const senderName = lm.sender_name || '';
         const msgText = lm.voice_url ? '🎤 Голосовое'
                       : lm.video_url ? '🎥 Видео'
                       : lm.photo_url ? '📷 Фото'
                       : (lm.text || 'Новое сообщение');
-        const body = senderName ? `${senderName}: ${msgText}` : msgText;
+        // Имя отправителя — для групп из sender_name, для личных — имя чата
+        const body = msgText;
 
-        // Звук — всем открытым вкладкам
-        playBeep();
+        // Звук — если вкладка открыта (пусть даже скрыта)
+        if (dzchatOpen) {
+          notifyClients('PLAY_SOUND', {});
+        }
 
-        // Пуш с текстом если DzChat не виден
+        // Показываем уведомление только если DzChat НЕ виден
         if (!dzchatVisible) {
-          await self.registration.showNotification(chat.name, {
-            body,
-            icon: ICON,
-            badge: ICON,
-            vibrate: [150, 80, 150],
-            tag: `dzchat-${chat.id}`,
-            renotify: true,
-            silent: true,
-            data: { url: '/dzchat', chatId: chat.id }
-          });
+          try {
+            await self.registration.showNotification(chat.name, {
+              body,
+              icon: ICON,
+              badge: ICON,
+              vibrate: [150, 80, 150, 80, 150],
+              tag: `dzchat-${chat.id}`,
+              renotify: true,
+              silent: false, // iOS нужен звук из системы
+              data: { url: '/dzchat', chatId: chat.id }
+            });
+          } catch(_e) {
+            // Уведомления заблокированы — хотя бы звук через клиент
+            notifyClients('PLAY_SOUND', {});
+          }
         }
       }
       prevUnread[chat.id] = chat.unread;
@@ -110,7 +130,7 @@ function startPolling() {
   if (pollInterval) clearInterval(pollInterval);
   initialized = false;
   prevUnread = {};
-  pollInterval = setInterval(pollChats, 2000); // каждые 2с из SW
+  pollInterval = setInterval(pollChats, 3000);
   pollChats(); // сразу
 }
 
@@ -119,23 +139,33 @@ function stopPolling() {
   pollInterval = null;
   pollToken = null;
   initialized = false;
+  updateBadge(0);
 }
 
 // ── СООБЩЕНИЯ ОТ ФРОНТЕНДА ───────────────────────────────────────
 self.addEventListener('message', (event) => {
-  const { type, token } = event.data || {};
+  const msg = event.data || {};
 
-  if (type === 'SET_TOKEN') {
-    pollToken = token;
-    if (token) {
+  if (msg.type === 'SET_TOKEN') {
+    pollToken = msg.token;
+    if (msg.token) {
       startPolling();
     } else {
       stopPolling();
     }
   }
 
-  if (type === 'LOGOUT') {
+  if (msg.type === 'LOGOUT') {
     stopPolling();
+  }
+
+  // Фронт сообщает что открыл чат — сбрасываем badge
+  if (msg.type === 'CLEAR_BADGE') {
+    updateBadge(0);
+  }
+
+  if (msg.type === 'NOTIF_PERM') {
+    // игнорируем, просто логируем
   }
 });
 
@@ -145,7 +175,10 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
       for (const c of list) {
-        if (c.url.includes('/dzchat') && 'focus' in c) return c.focus();
+        if (c.url.includes('/dzchat') && 'focus' in c) {
+          c.focus();
+          return;
+        }
       }
       return clients.openWindow('/dzchat');
     })
@@ -162,6 +195,7 @@ self.addEventListener('push', (event) => {
     self.registration.showNotification(data.title, {
       body: data.body, icon: ICON, badge: ICON,
       vibrate: [200, 100, 200], tag: 'dzchat-push', renotify: true,
+      silent: false,
       data: { url: '/dzchat' }
     })
   );

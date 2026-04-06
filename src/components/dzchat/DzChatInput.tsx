@@ -96,7 +96,7 @@ export const ChatInput = ({ text, setText, sending, uploadingPhoto, imageB64, te
   imageB64: string | null;
   textareaRef: React.RefObject<HTMLTextAreaElement>;
   onSend: () => void;
-  onSendVoice: (b64: string, dur: number) => void;
+  onSendVoice: (b64: string, dur: number, mime: string) => void;
   onPhotoSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onTyping?: () => void;
 }) => {

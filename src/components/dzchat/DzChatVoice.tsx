@@ -77,7 +77,7 @@ export const MsgStatus = ({ msg, me }: { msg: any; me: any }) => {
 };
 
 // ── VoiceRecorder ─────────────────────────────────────────────────
-export const VoiceRecorder = ({ onSend, disabled }: { onSend: (b64: string, dur: number) => void; disabled: boolean }) => {
+export const VoiceRecorder = ({ onSend, disabled }: { onSend: (b64: string, dur: number, mime: string) => void; disabled: boolean }) => {
   const [recording, setRecording] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const mediaRef = useRef<MediaRecorder | null>(null);
@@ -88,21 +88,33 @@ export const VoiceRecorder = ({ onSend, disabled }: { onSend: (b64: string, dur:
   const start = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = new MediaRecorder(stream);
+
+      // Определяем поддерживаемый формат: iOS Safari → mp4, остальные → webm
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/mp4")
+          ? "audio/mp4"
+          : "";
+
+      const mr = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      const actualMime = mr.mimeType || "audio/webm";
+
       chunksRef.current = [];
-      mr.ondataavailable = e => chunksRef.current.push(e.data);
+      mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       mr.onstop = () => {
-        const dur = Math.round((Date.now() - startRef.current) / 1000);
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        const dur = Math.max(1, Math.round((Date.now() - startRef.current) / 1000));
+        const blob = new Blob(chunksRef.current, { type: actualMime });
         const reader = new FileReader();
         reader.onload = ev => {
-          const b64 = (ev.target?.result as string).split(",")[1];
-          onSend(b64, dur);
+          const dataUrl = ev.target?.result as string;
+          const b64 = dataUrl.split(",")[1];
+          // Передаём mime чтобы бэкенд корректно сохранил расширение
+          onSend(b64, dur, actualMime);
         };
         reader.readAsDataURL(blob);
         stream.getTracks().forEach(t => t.stop());
       };
-      mr.start();
+      mr.start(200); // собираем чанки каждые 200мс
       mediaRef.current = mr;
       startRef.current = Date.now();
       setRecording(true);

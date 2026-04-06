@@ -190,11 +190,11 @@ const DzChatView = ({ chat, me, token, onBack, onChatUpdate, theme: themeProp }:
     }
   };
 
-  const sendVoice = async (b64: string, duration: number) => {
+  const sendVoice = async (b64: string, duration: number, mime = "audio/webm") => {
     unlockAudio();
     playVoiceSentSound();
     setSending(true);
-    const res = await api("upload", "POST", { image: b64, mime: "audio/webm", kind: "voice" }, token);
+    const res = await api("upload", "POST", { image: b64, mime, kind: "voice" }, token);
     if (res.url) {
       await api("send", "POST", { chat_id: chat.id, voice_url: res.url, voice_duration: duration }, token);
       isAtBottomRef.current = true;
