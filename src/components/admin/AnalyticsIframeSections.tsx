@@ -1,7 +1,9 @@
  
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import Icon from "@/components/ui/icon";
 import { YM_ID, YmGeo, HBar, TipCard } from "./analytics.shared";
+
+const SCHEDULER_URL = "https://functions.poehali.dev/b09271ea-c662-4225-973f-4dd4c6a0e32c";
 
 // ── ГЕОГРАФИЯ ─────────────────────────────────────────────────────
 export const GeoSection = ({ geo }: { geo: YmGeo[] }) => (
@@ -64,10 +66,67 @@ export const HeatmapSection = () => (
   </div>
 );
 
+// ── Кнопка пинга sitemap ──────────────────────────────────────────
+const PingSitemapButton = () => {
+  const [status, setStatus] = useState<"idle"|"loading"|"ok"|"error">("idle");
+  const [info, setInfo] = useState("");
+
+  const ping = async () => {
+    setStatus("loading");
+    setInfo("");
+    try {
+      const res = await fetch(`${SCHEDULER_URL}?action=ping_sitemap`);
+      const data = await res.json();
+      if (data.ok) {
+        setStatus("ok");
+        setInfo(`task_id: ${data.response?.task_id ?? "—"} · quota: ${data.response?.quota_remainder ?? "—"}`);
+      } else {
+        setStatus("error");
+        setInfo(data.error || JSON.stringify(data));
+      }
+    } catch (e) {
+      setStatus("error");
+      setInfo(e instanceof Error ? e.message : "Ошибка сети");
+    }
+  };
+
+  return (
+    <div className="bg-[#111] border border-[#222] p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <p className="text-white text-sm font-bold">Отправить sitemap в Яндекс</p>
+          <p className="text-white/30 text-xs mt-0.5">Робот Яндекса сразу пойдёт переиндексировать сайт</p>
+        </div>
+        <button
+          onClick={ping}
+          disabled={status === "loading"}
+          className="flex items-center gap-2 px-4 py-2 bg-[#FFD700] text-black text-xs font-bold uppercase tracking-wide hover:bg-yellow-400 active:scale-95 transition-all disabled:opacity-50 rounded"
+        >
+          {status === "loading"
+            ? <><Icon name="Loader" size={13} className="animate-spin" /> Отправляем...</>
+            : status === "ok"
+            ? <><Icon name="Check" size={13} /> Отправлено</>
+            : <><Icon name="Send" size={13} /> Ping sitemap</>
+          }
+        </button>
+      </div>
+      {info && (
+        <p className={`text-xs font-mono px-2 py-1.5 rounded ${status === "ok" ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
+          {status === "ok" ? "✓ " : "✗ "}{info}
+        </p>
+      )}
+      <p className="text-white/20 text-[10px] mt-2">Автоматически — каждый день в 10:00 МСК</p>
+    </div>
+  );
+};
+
 // ── SEO ────────────────────────────────────────────────────────────
 export const SeoSection = () => (
   <div className="p-5 space-y-5">
     <h3 className="text-white font-bold text-sm">SEO — продвижение в топ поиска</h3>
+
+    {/* Ping sitemap */}
+    <PingSitemapButton />
 
     <div className="bg-[#111] border border-[#222] p-4">
       <p className="text-white/50 text-xs uppercase tracking-widest font-bold mb-4">Чеклист готовности</p>
@@ -78,8 +137,9 @@ export const SeoSection = () => (
           { done: true,  label: "OpenGraph для соцсетей",          detail: "Превью при репосте настроено" },
           { done: true,  label: "robots.txt",                      detail: "Закрыты служебные страницы" },
           { done: true,  label: "sitemap.xml",                     detail: "Карта сайта доступна по /sitemap.xml" },
-          { done: true,  label: "Яндекс.Метрика",                 detail: "ID 101026698 установлен" },
-          { done: false, label: "Яндекс.Вебмастер",               detail: "Нужна регистрация и подтверждение сайта" },
+          { done: true,  label: "Яндекс.Метрика",                 detail: "ID 108421419 установлен" },
+          { done: true,  label: "Яндекс.Вебмастер",               detail: "https://skypka24.com подтверждён" },
+          { done: true,  label: "Автопинг sitemap",                detail: "Каждый день в 10:00 МСК" },
           { done: false, label: "Google Search Console",           detail: "Нужна регистрация и загрузка sitemap" },
           { done: false, label: "Яндекс.Бизнес (карты)",          detail: "Добавить организацию в Яндекс.Карты" },
           { done: false, label: "2ГИС профиль",                   detail: "Бесплатный профиль с рейтингом и фото" },
@@ -99,10 +159,10 @@ export const SeoSection = () => (
 
     <div className="grid grid-cols-2 gap-3">
       {[
-        { label: "Яндекс.Вебмастер",      url: "https://webmaster.yandex.ru",                    desc: "Шаг 1 — самое важное",   color: "#f97316" },
-        { label: "Google Search Console", url: "https://search.google.com/search-console",        desc: "Шаг 2",                  color: "#60a5fa" },
-        { label: "Яндекс.Бизнес",         url: "https://business.yandex.ru",                     desc: "Отображение на картах",  color: "#34d399" },
-        { label: "2ГИС для бизнеса",      url: "https://business.2gis.ru",                       desc: "Бесплатный профиль",     color: "#a78bfa" },
+        { label: "Яндекс.Вебмастер",      url: "https://webmaster.yandex.ru",                 desc: "✓ Подключён",             color: "#34d399" },
+        { label: "Google Search Console", url: "https://search.google.com/search-console",    desc: "Шаг 1 — добавить сайт",  color: "#60a5fa" },
+        { label: "Яндекс.Бизнес",         url: "https://business.yandex.ru",                  desc: "Отображение на картах",  color: "#f97316" },
+        { label: "2ГИС для бизнеса",      url: "https://business.2gis.ru",                    desc: "Бесплатный профиль",     color: "#a78bfa" },
       ].map((s, i) => (
         <a key={i} href={s.url} target="_blank" rel="noopener noreferrer"
           className="bg-[#111] border border-[#222] hover:border-[#333] p-4 flex flex-col gap-1 transition-colors group">
@@ -116,7 +176,7 @@ export const SeoSection = () => (
     </div>
 
     <TipCard icon="TrendingUp" color="#FFD700"
-      title="Топ-1 Яндекса за 4–8 недель"
-      text="Зарегистрируйте сайт в Яндекс.Вебмастер и загрузите sitemap.xml — это самое быстрое действие для роста позиций. После этого добавьте организацию в Яндекс.Бизнес — клиенты найдут вас на картах." />
+      title="Следующий шаг — Google Search Console"
+      text="Зарегистрируйте сайт в Google Search Console и загрузите sitemap.xml — это выведет сайт в топ Google. Яндекс уже подключён и работает автоматически." />
   </div>
 );
