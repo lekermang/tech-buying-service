@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Header from "@/components/skupka/Header";
 import HeroSection from "@/components/skupka/HeroSection";
 import InfoSections from "@/components/skupka/InfoSections";
@@ -11,11 +11,55 @@ const scrollTo = (href: string) => {
   if (el) el.scrollIntoView({ behavior: "smooth" });
 };
 
+const SplashScreen = ({ onDone }: { onDone: () => void }) => {
+  const [hiding, setHiding] = useState(false);
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setHiding(true), 1800);
+    const t2 = setTimeout(() => onDone(), 2200);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [onDone]);
+
+  return (
+    <div className={`fixed inset-0 z-[100] bg-[#0D0D0D] flex flex-col items-center justify-center transition-opacity duration-400 ${hiding ? "opacity-0" : "opacity-100"}`}>
+      <div className="absolute inset-0" style={{ backgroundImage: "linear-gradient(rgba(255,215,0,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,215,0,0.04) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
+      <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#FFD700]" />
+
+      <div className="relative flex flex-col items-center gap-6">
+        <div className="flex items-center gap-3 animate-[fadeIn_0.4s_ease]">
+          <img
+            src="https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/9c9b4fca-bfd7-4841-a827-eb0354dad8da.JPG"
+            alt="Скупка24"
+            className="w-12 h-12 rounded-full object-cover border border-[#FFD700]/40"
+          />
+          <span className="font-oswald font-bold text-2xl text-[#FFD700] tracking-widest uppercase">Скупка24</span>
+        </div>
+
+        <h2 className="font-oswald text-4xl sm:text-5xl font-bold text-white uppercase text-center animate-[slideDown_0.5s_ease_0.2s_both]">
+          Купим дорого <span className="text-[#FFD700]">всё!</span>
+        </h2>
+
+        <div className="flex gap-1.5 animate-[fadeIn_0.4s_ease_0.5s_both]">
+          {[0, 1, 2].map(i => (
+            <div
+              key={i}
+              className="w-2 h-2 bg-[#FFD700] rounded-full"
+              style={{ animation: `bounce 0.9s ease ${i * 0.18}s infinite` }}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const Index = () => {
+  const [splashDone, setSplashDone] = useState(false);
   const [evalOpen, setEvalOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-white pb-[72px] md:pb-0">
+      {!splashDone && <SplashScreen onDone={() => setSplashDone(true)} />}
       <Header scrollTo={scrollTo} />
       <HeroSection scrollTo={scrollTo} externalModalOpen={evalOpen} onExternalModalClose={() => setEvalOpen(false)} />
       <InfoSections />
