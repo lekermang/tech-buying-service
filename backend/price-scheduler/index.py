@@ -274,40 +274,27 @@ def ym_get_host_id(token, user_id, site_url):
 
 
 def ym_add_sitemap(token, user_id, host_id, sitemap_url):
-    """Отправить sitemap в Яндекс.Вебмастер.
-    Пробуем все известные методы API v4.
+    """Пингуем sitemap через /recrawl/queue — добавляем sitemap.xml на переобход.
+    Это надёжный способ сообщить Яндексу об обновлении сайта.
     """
-    sitemap_id = urllib.parse.quote(sitemap_url, safe='')
-    headers = {'Authorization': f'OAuth {token}', 'Content-Type': 'application/json'}
+    headers = {
+        'Authorization': f'OAuth {token}',
+        'Content-Type': 'application/json',
+    }
 
-    attempts = [
-        # 1. PUT /sitemaps/{id} — основной метод
-        ('PUT',  f'{YM_API}/user/{user_id}/hosts/{host_id}/sitemaps/{sitemap_id}', b''),
-        # 2. POST /sitemaps с телом
-        ('POST', f'{YM_API}/user/{user_id}/hosts/{host_id}/sitemaps',
-         json.dumps({'url': sitemap_url}).encode('utf-8')),
-        # 3. POST /recrawl — запросить переобход (работает для любого хоста)
-        ('POST', f'{YM_API}/user/{user_id}/hosts/{host_id}/recrawl/queue',
-         json.dumps({'url': sitemap_url}).encode('utf-8')),
-    ]
-
-    last_error = None
-    for method, url, payload in attempts:
-        req = urllib.request.Request(url, data=payload, headers=headers)
-        req.get_method = lambda m=method: m
-        try:
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                body = resp.read()
-                result = json.loads(body) if body else {}
-                return {'ok': True, 'method': method, 'url': url, 'status': resp.status, 'response': result}
-        except urllib.error.HTTPError as e:
-            body = e.read().decode('utf-8', errors='replace')
-            last_error = {'method': method, 'status': e.code, 'error': body}
-            if e.code not in (404, 405):
-                return {'ok': False, **last_error}
-            # 404/405 — пробуем следующий метод
-
-    return {'ok': False, 'error': 'all methods failed', 'last': last_error}
+    # Отправляем sitemap.xml на переобход
+    url = f'{YM_API}/user/{user_id}/hosts/{host_id}/recrawl/queue'
+    payload = json.dumps({'url': sitemap_url}).encode('utf-8')
+    req = urllib.request.Request(url, data=payload, headers=headers)
+    req.get_method = lambda: 'POST'
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            body = resp.read()
+            result = json.loads(body) if body else {'queued': True}
+            return {'ok': True, 'method': 'recrawl', 'status': resp.status, 'response': result}
+    except urllib.error.HTTPError as e:
+        body = e.read().decode('utf-8', errors='replace')
+        return {'ok': False, 'method': 'recrawl', 'status': e.code, 'error': body}
 
 
 def ping_sitemap_to_yandex():
