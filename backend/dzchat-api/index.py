@@ -113,17 +113,30 @@ def handler(event: dict, context) -> dict:
         if len(password) < 6:
             return resp({"error": "Пароль должен быть не менее 6 символов"}, 400)
         cur = conn.cursor()
-        cur.execute(f"SELECT id FROM {SCHEMA}.dzchat_users WHERE phone=%s", (phone,))
-        if cur.fetchone():
+        cur.execute(f"SELECT id, password_hash FROM {SCHEMA}.dzchat_users WHERE phone=%s", (phone,))
+        existing = cur.fetchone()
+        # Если аккаунт существует И у него уже есть пароль — не даём перезаписать
+        if existing and existing[1]:
             return resp({"error": "Аккаунт с этим номером уже существует. Войдите."}, 409)
         pw_hash = hash_password(password)
-        cur.execute(f"""
-            INSERT INTO {SCHEMA}.dzchat_users (phone, name, password_hash, is_online, last_seen_at)
-            VALUES (%s, %s, %s, TRUE, NOW()) RETURNING id
-        """, (phone, name, pw_hash))
-        user_id = cur.fetchone()[0]
         tok = gen_token(phone)
-        cur.execute(f"UPDATE {SCHEMA}.dzchat_users SET session_token=%s, session_expires_at=NOW() + INTERVAL '30 days' WHERE id=%s", (tok, user_id))
+        if existing:
+            # Аккаунт без пароля (сброшенный) — переактивируем
+            cur.execute(f"""
+                UPDATE {SCHEMA}.dzchat_users
+                SET name=%s, password_hash=%s, session_token=%s,
+                    session_expires_at=NOW() + INTERVAL '30 days',
+                    is_online=TRUE, last_seen_at=NOW()
+                WHERE id=%s
+            """, (name, pw_hash, tok, existing[0]))
+            user_id = existing[0]
+        else:
+            cur.execute(f"""
+                INSERT INTO {SCHEMA}.dzchat_users (phone, name, password_hash, is_online, last_seen_at)
+                VALUES (%s, %s, %s, TRUE, NOW()) RETURNING id
+            """, (phone, name, pw_hash))
+            user_id = cur.fetchone()[0]
+            cur.execute(f"UPDATE {SCHEMA}.dzchat_users SET session_token=%s, session_expires_at=NOW() + INTERVAL '30 days' WHERE id=%s", (tok, user_id))
         conn.commit()
         return resp({"ok": True, "token": tok, "user_id": user_id})
 

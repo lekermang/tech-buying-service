@@ -1,7 +1,44 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import Icon from "@/components/ui/icon";
 import { VoiceRecorder } from "./DzChatVoice";
+
+// ── Эмодзи по категориям ──────────────────────────────────────────
+const EMOJI_CATEGORIES = [
+  { label: "😊", emojis: ["😀","😃","😄","😁","😆","😅","😂","🤣","😊","😇","🙂","🙃","😉","😌","😍","🥰","😘","😗","😙","😚","😋","😛","😝","😜","🤪","🤨","🧐","🤓","😎","🤩","🥳","😏","😒","😞","😔","😟","😕","🙁","☹️","😣","😖","😫","😩","🥺","😢","😭","😤","😠","😡","🤬","🤯","😳","🥵","🥶","😱","😨","😰","😥","😓","🤗","🤔","🫣","🤭","🫡","🤫","🫠","🤥","😶","😐","😑","😬","🙄","😯","😦","😧","😮","😲","🥱","😴","🤤","😪","😵","🤐","🥴","🤢","🤮","🤧","😷","🤒","🤕"] },
+  { label: "👍", emojis: ["👋","🤚","🖐","✋","🖖","🫱","🫲","🤙","👌","🤌","🤏","✌️","🤞","🫰","🤟","🤘","👈","👉","👆","🖕","👇","☝️","🫵","👍","👎","✊","👊","🤛","🤜","👏","🙌","🫶","👐","🤲","🤝","🙏","✍️","💅","🤳","💪","🦾","🦿","🦵","🦶","👂","🦻","👃","🫀","🫁","🧠","🦷","🦴","👀","👁","👅","👄","🫦"] },
+  { label: "❤️", emojis: ["❤️","🧡","💛","💚","💙","💜","🖤","🤍","🤎","❤️‍🔥","❤️‍🩹","💔","💕","💞","💓","💗","💖","💘","💝","💟","☮️","✝️","☯️","🕉","🛐","💯","💢","💥","💫","💦","💨","🕳","💬","💭","💤","🔥","🌟","✨","🎉","🎊","🥂","🍾","🎁","🎈"] },
+  { label: "🐶", emojis: ["🐶","🐱","🐭","🐹","🐰","🦊","🐻","🐼","🐨","🐯","🦁","🐮","🐷","🐸","🐵","🙈","🙉","🙊","🐔","🐧","🐦","🦆","🦅","🦉","🦇","🐺","🐗","🐴","🦄","🐝","🐛","🦋","🐌","🐞","🐜","🦟","🦗","🕷","🦂","🐢","🐍","🦎","🦖","🦕","🐙","🦑","🦐","🦞","🦀","🐡","🐠","🐟","🐬","🐳","🐋","🦈","🐊","🐅","🐆","🦓","🦍","🦧","🦣","🐘","🦛","🦏","🐪","🐫","🦒","🦘","🦬","🐃","🐂","🐄","🐎","🐖","🐏","🐑","🦙","🐐","🦌","🐕","🐩","🦮","🐈","🐓","🦃","🦤","🦚","🦜","🦢","🦩","🕊","🐇","🦝","🦨","🦡","🦫","🦦","🦥","🐿","🦔"] },
+  { label: "🍕", emojis: ["🍎","🍐","🍊","🍋","🍌","🍉","🍇","🍓","🫐","🍈","🍒","🍑","🥭","🍍","🥥","🥝","🍅","🍆","🥑","🥦","🥬","🥒","🌶","🫑","🧄","🧅","🥔","🍠","🥐","🥯","🍞","🥖","🥨","🧀","🥚","🍳","🧈","🥞","🧇","🥓","🥩","🍗","🍖","🦴","🌭","🍔","🍟","🍕","🫓","🥪","🥙","🧆","🌮","🌯","🫔","🥗","🥘","🫕","🍝","🍜","🍲","🍛","🍣","🍱","🥟","🦪","🍤","🍙","🍚","🍘","🍥","🥮","🍢","🧁","🍰","🎂","🍮","🍭","🍬","🍫","🍿","🍩","🍪","🌰","🥜","🍯","🧃","🥤","🧋","☕","🍵","🍺","🍻","🥂","🍷","🥃","🍸","🍹","🧉","🍾"] },
+  { label: "⚽", emojis: ["⚽","🏀","🏈","⚾","🥎","🎾","🏐","🏉","🥏","🎱","🪀","🏓","🏸","🏒","🥍","🏑","🥅","⛳","🪁","🎣","🤿","🎽","🎿","🛷","🥌","🎯","🪃","🏋️","🤼","🤸","⛹️","🤺","🤾","🏌️","🏇","🧘","🏄","🏊","🤽","🚣","🧗","🚵","🚴","🏆","🥇","🥈","🥉","🏅","🎖","🎗","🎫","🎟","🎪","🎭","🎨","🎬","🎤","🎧","🎼","🎹","🎸","🎺","🎻","🪕","🥁","🪘","🎷"] },
+];
+
+// ── EmojiPicker ────────────────────────────────────────────────────
+const EmojiPicker = ({ onSelect, onClose }: { onSelect: (e: string) => void; onClose: () => void }) => {
+  const [cat, setCat] = useState(0);
+  return (
+    <div className="absolute bottom-14 left-0 w-72 bg-[#1a2634] border border-white/10 rounded-2xl shadow-2xl z-40 overflow-hidden">
+      {/* Категории */}
+      <div className="flex border-b border-white/10">
+        {EMOJI_CATEGORIES.map((c, i) => (
+          <button key={i} onClick={() => setCat(i)}
+            className={`flex-1 py-2 text-base transition-colors ${cat === i ? "bg-white/10" : "hover:bg-white/5"}`}>
+            {c.label}
+          </button>
+        ))}
+      </div>
+      {/* Сетка эмодзи */}
+      <div className="grid grid-cols-8 gap-0.5 p-2 max-h-52 overflow-y-auto">
+        {EMOJI_CATEGORIES[cat].emojis.map(e => (
+          <button key={e} onClick={() => { onSelect(e); onClose(); }}
+            className="text-xl p-1 hover:bg-white/10 rounded-lg transition-colors leading-none">
+            {e}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 // ── ReplyPreview ──────────────────────────────────────────────────
 export const ReplyPreview = ({ replyTo, forwardMsg, imagePreview, onClearReply, onClearForward, onClearImage }: {
@@ -59,6 +96,7 @@ export const ChatInput = ({ text, setText, sending, uploadingPhoto, imageB64, te
   onPhotoSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }) => {
   const fileRef = useRef<HTMLInputElement>(null);
+  const [showEmoji, setShowEmoji] = useState(false);
 
   const autoResize = () => {
     if (textareaRef.current) {
@@ -67,25 +105,60 @@ export const ChatInput = ({ text, setText, sending, uploadingPhoto, imageB64, te
     }
   };
 
+  const insertEmoji = (emoji: string) => {
+    const ta = textareaRef.current;
+    if (!ta) { setText(text + emoji); return; }
+    const start = ta.selectionStart ?? text.length;
+    const end = ta.selectionEnd ?? text.length;
+    const next = text.slice(0, start) + emoji + text.slice(end);
+    setText(next);
+    // восстанавливаем курсор после emoji
+    requestAnimationFrame(() => {
+      ta.focus();
+      ta.setSelectionRange(start + emoji.length, start + emoji.length);
+      autoResize();
+    });
+  };
+
   return (
-    <div className="px-2 py-2 bg-[#1a2634] border-t border-white/10 flex items-end gap-1.5 shrink-0">
+    <div className="px-2 py-2 bg-[#1a2634] border-t border-white/10 flex items-end gap-1.5 shrink-0 relative">
+      {/* Эмодзи-пикер */}
+      {showEmoji && (
+        <EmojiPicker
+          onSelect={insertEmoji}
+          onClose={() => setShowEmoji(false)}
+        />
+      )}
+
+      {/* Скрепка (фото) */}
       <button onClick={() => fileRef.current?.click()}
         className="text-white/50 hover:text-white p-2 shrink-0 transition-colors">
         <Icon name="Paperclip" size={22} />
       </button>
       <input ref={fileRef} type="file" accept="image/*,video/*" onChange={onPhotoSelect} className="hidden" />
-      <div className="flex-1 bg-[#0f1923] rounded-2xl px-3 py-2">
+
+      {/* Поле ввода + кнопка эмодзи */}
+      <div className="flex-1 bg-[#0f1923] rounded-2xl px-3 py-2 flex items-end gap-1">
         <textarea
           ref={textareaRef}
           value={text}
           onChange={e => { setText(e.target.value); autoResize(); }}
           rows={1}
           placeholder="Сообщение..."
-          className="w-full bg-transparent text-white placeholder-white/30 outline-none resize-none text-sm leading-relaxed"
+          className="flex-1 bg-transparent text-white placeholder-white/30 outline-none resize-none text-sm leading-relaxed"
           style={{ maxHeight: 120 }}
           onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend(); } }}
+          onFocus={() => setShowEmoji(false)}
         />
+        <button
+          type="button"
+          onClick={() => setShowEmoji(s => !s)}
+          className={`shrink-0 transition-colors mb-0.5 ${showEmoji ? "text-[#25D366]" : "text-white/30 hover:text-white/70"}`}>
+          <Icon name="Smile" size={20} />
+        </button>
       </div>
+
+      {/* Отправить / микрофон */}
       {text.trim() || imageB64 ? (
         <button onClick={onSend} disabled={sending}
           className="w-10 h-10 bg-[#25D366] rounded-full flex items-center justify-center text-white hover:bg-[#1da851] transition-colors disabled:opacity-50 shrink-0">

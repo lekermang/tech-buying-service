@@ -10,12 +10,12 @@
       "bodyMatcher": "partial"
     },
     {
-      "name": "Login with wrong password",
+      "name": "Login - account not found",
       "method": "POST",
       "path": "/?action=login",
-      "body": {"phone": "+79001119988", "password": "wrongpassword"},
-      "expectedStatus": 401,
-      "expectedBody": {"error": "Неверный пароль"},
+      "body": {"phone": "+70000000000", "password": "wrongpassword"},
+      "expectedStatus": 404,
+      "expectedBody": {"error": "Аккаунт с этим номером не найден"},
       "bodyMatcher": "partial"
     },
     {
