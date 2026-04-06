@@ -1,8 +1,9 @@
 """
-Автоматическая отправка прайса в Telegram-группу.
-- ?action=send_now — немедленная отправка (для теста)
+Автоматическая отправка прайса в Telegram-группу + ping sitemap в Яндекс.Вебмастер.
+- ?action=send_now — немедленная отправка прайса (для теста)
+- ?action=ping_sitemap — отправить sitemap прямо сейчас (для теста)
 - ?action=schedule_check — проверка расписания (вызывается каждые 5 мин)
-Расписание: каждый день в 10:00 по МСК
+Расписание: 10:00 МСК — прайс в Telegram + ping sitemap в Яндекс.Вебмастер
 """
 
 import json
@@ -11,6 +12,7 @@ import threading
 import xml.etree.ElementTree as ET
 import psycopg2
 import urllib.request
+import urllib.parse
 from datetime import datetime, timezone, timedelta
 
 SCHEMA = 't_p31606708_tech_buying_service'
@@ -21,6 +23,10 @@ CONTACT_PHONE = '+7 992 990-33-33'
 GROUP_CHAT_ID = os.environ.get('PRICE_GROUP_CHAT_ID', '')
 MSK = timezone(timedelta(hours=3))
 SEND_HOUR = 10
+
+SITE_URL = 'https://skypka24.com'
+SITEMAP_URL = 'https://skypka24.com/sitemap.xml'
+YM_API = 'https://api.webmaster.yandex.net/v4'
 
 
 def get_conn():
@@ -224,8 +230,75 @@ def sync_tools_feed(job_id):
         finish_sync_job(job_id, error=str(e)[:500])
 
 
+def ym_get_user_id(token):
+    """Получить числовой user_id Яндекс.Вебмастер по OAuth-токену."""
+    req = urllib.request.Request(
+        f'{YM_API}/user',
+        headers={'Authorization': f'OAuth {token}', 'Content-Type': 'application/json'}
+    )
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        data = json.loads(resp.read())
+    return data['user_id']
+
+
+def ym_get_host_id(token, user_id, site_url):
+    """Найти host_id сайта в списке добавленных хостов."""
+    req = urllib.request.Request(
+        f'{YM_API}/user/{user_id}/hosts',
+        headers={'Authorization': f'OAuth {token}'}
+    )
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        data = json.loads(resp.read())
+    hosts = data.get('hosts', [])
+    # Ищем по совпадению URL
+    site_clean = site_url.rstrip('/').replace('https://', '').replace('http://', '')
+    for h in hosts:
+        if site_clean in h.get('unicode_host_url', ''):
+            return h['host_id']
+    # Если не нашли — берём первый
+    if hosts:
+        return hosts[0]['host_id']
+    return None
+
+
+def ym_add_sitemap(token, user_id, host_id, sitemap_url):
+    """Отправить sitemap в Яндекс.Вебмастер через API v4."""
+    url = f'{YM_API}/user/{user_id}/hosts/{host_id}/sitemaps'
+    payload = json.dumps({'url': sitemap_url}).encode('utf-8')
+    req = urllib.request.Request(
+        url,
+        data=payload,
+        headers={
+            'Authorization': f'OAuth {token}',
+            'Content-Type': 'application/json',
+        }
+    )
+    req.get_method = lambda: 'POST'
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return {'ok': True, 'status': resp.status, 'response': json.loads(resp.read())}
+    except urllib.error.HTTPError as e:
+        body = e.read().decode('utf-8', errors='replace')
+        return {'ok': False, 'status': e.code, 'error': body}
+
+
+def ping_sitemap_to_yandex():
+    """Полный флоу: получить user_id → host_id → отправить sitemap."""
+    token = os.environ.get('YANDEX_WEBMASTER_TOKEN', '')
+    if not token:
+        return {'ok': False, 'error': 'YANDEX_WEBMASTER_TOKEN not set'}
+
+    user_id = ym_get_user_id(token)
+    host_id = ym_get_host_id(token, user_id, SITE_URL)
+    if not host_id:
+        return {'ok': False, 'error': 'host not found in Yandex Webmaster — add site first'}
+
+    result = ym_add_sitemap(token, user_id, host_id, SITEMAP_URL)
+    return result
+
+
 def handler(event: dict, context) -> dict:
-    """Отправка прайса в Telegram-группу по расписанию (10:00 МСК) или вручную"""
+    """Отправка прайса в Telegram + ping sitemap в Яндекс.Вебмастер (10:00 МСК)"""
     if event.get('httpMethod') == 'OPTIONS':
         return {'statusCode': 200, 'headers': HEADERS, 'body': ''}
 
@@ -237,6 +310,10 @@ def handler(event: dict, context) -> dict:
         if not chat_id:
             return err(400, 'chat_id required')
         result = do_send_price(chat_id)
+        return ok(result)
+
+    if action == 'ping_sitemap':
+        result = ping_sitemap_to_yandex()
         return ok(result)
 
     if action == 'schedule_check':
@@ -258,9 +335,15 @@ def handler(event: dict, context) -> dict:
         if not chat_id:
             return err(400, 'PRICE_GROUP_CHAT_ID not set')
 
+        # Отправляем прайс в Telegram
         result = do_send_price(chat_id)
         if result.get('sent'):
             mark_sent()
+
+        # Пингуем sitemap в Яндекс.Вебмастер (тот же час 10:00)
+        sitemap_result = ping_sitemap_to_yandex()
+        result['sitemap_ping'] = sitemap_result
+
         return ok(result)
 
     return err(400, 'unknown action: ' + action)

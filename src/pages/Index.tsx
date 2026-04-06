@@ -6,6 +6,7 @@ import ContactsFooter from "@/components/skupka/ContactsFooter";
 import Consultant from "@/components/skupka/Consultant";
 import Icon from "@/components/ui/icon";
 import { ymGoal, Goals } from "@/lib/ym";
+import ExitPopup from "@/components/skupka/ExitPopup";
 
 const scrollTo = (href: string) => {
   const el = document.querySelector(href);
@@ -93,6 +94,7 @@ const Index = () => {
       <InfoSections />
       <ContactsFooter scrollTo={scrollTo} />
       <Consultant />
+      <ExitPopup onOpenEval={() => setEvalOpen(true)} />
 
       {/* Sticky нижняя панель — только мобильные */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0D0D0D]/98 backdrop-blur-sm border-t border-[#FFD700]/20">

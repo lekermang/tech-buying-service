@@ -6,6 +6,13 @@
       "path": "/?action=schedule_check",
       "expectedStatus": 200,
       "bodyMatcher": "partial"
+    },
+    {
+      "name": "ping_sitemap — без токена возвращает 200",
+      "method": "GET",
+      "path": "/?action=ping_sitemap",
+      "expectedStatus": 200,
+      "bodyMatcher": "partial"
     }
   ]
 }
