@@ -6,7 +6,7 @@ import DzChatAvatar from "@/components/dzchat/DzChatAvatar";
 import DzChatAuth from "@/components/dzchat/DzChatAuth";
 import DzChatView from "@/components/dzchat/DzChatView";
 import { NewChatModal, ProfileModal, CreateGroupModal, playNotificationSound } from "@/components/dzchat/DzChatModals";
-import { DzChatInstallBanner } from "@/components/dzchat/DzChatInstall";
+import { DzChatInstallBanner, DzChatSetupGuide } from "@/components/dzchat/DzChatInstall";
 import { unlockAudio } from "@/components/dzchat/dzchat.sounds";
 import { loadAndApplyTheme, getTheme } from "@/components/dzchat/dzchat.theme";
 
@@ -28,6 +28,7 @@ const DzChat = () => {
   const [notifGranted, setNotifGranted] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [theme, setTheme] = useState(() => loadAndApplyTheme());
+  const [showSetupGuide, setShowSetupGuide] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval>>();
   const pingRef = useRef<ReturnType<typeof setInterval>>();
   const prevUnreadRef = useRef<Record<number, number>>({});
@@ -275,7 +276,7 @@ const DzChat = () => {
         </div>
 
         {/* PWA баннер */}
-        <DzChatInstallBanner installPrompt={installPrompt} onInstall={installApp} />
+        <DzChatInstallBanner installPrompt={installPrompt} onInstall={installApp} onOpenGuide={() => setShowSetupGuide(true)} />
 
         {/* Поиск */}
         <div className="px-3 py-2 border-b" style={{ background: theme.sidebar, borderColor: theme.border }}>
@@ -411,7 +412,25 @@ const DzChat = () => {
           onLogout={() => { setShowProfile(false); logout(); }}
           onSwitchAccount={() => { setShowProfile(false); logout(); }}
           onThemeChange={() => setTheme(getTheme(localStorage.getItem("dzchat_theme") ?? "dark"))}
+          onOpenSetupGuide={() => { setShowProfile(false); setShowSetupGuide(true); }}
         />
+      )}
+
+      {/* Экран установки и уведомлений */}
+      {showSetupGuide && (
+        <div className="absolute inset-0 z-[70] flex flex-col" style={{ background: theme.bg }}>
+          <div className="flex items-center gap-2 px-3 py-3 border-b" style={{ background: theme.sidebarHeader, borderColor: theme.border }}>
+            <button onClick={() => setShowSetupGuide(false)}
+              className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors"
+              style={{ color: theme.textMuted }}>
+              <Icon name="ArrowLeft" size={20} />
+            </button>
+            <p className="text-white font-semibold text-sm flex-1">Установка и уведомления</p>
+          </div>
+          <div className="flex-1 overflow-hidden">
+            <DzChatSetupGuide installPrompt={installPrompt} onInstall={installApp} />
+          </div>
+        </div>
       )}
     </div>
     </div>

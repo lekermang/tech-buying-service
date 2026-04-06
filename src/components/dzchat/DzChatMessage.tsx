@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { useRef } from "react";
 import Icon from "@/components/ui/icon";
 import { formatTime } from "./dzchat.utils";
 import DzChatAvatar from "./DzChatAvatar";
@@ -50,6 +51,22 @@ const DzChatMessage = ({
   const hasMedia = msg.photo_url || msg.video_url;
   const isVideo = !!msg.video_url;
 
+  // Long-press для iOS (и всех touch-устройств)
+  const longPressTimer = useRef<ReturnType<typeof setTimeout>>();
+  const touchMoved = useRef(false);
+
+  const onTouchStart = () => {
+    touchMoved.current = false;
+    longPressTimer.current = setTimeout(() => {
+      if (!touchMoved.current) {
+        if (navigator.vibrate) navigator.vibrate(40);
+        onContextMenu(msg);
+      }
+    }, 500);
+  };
+  const onTouchMove = () => { touchMoved.current = true; clearTimeout(longPressTimer.current); };
+  const onTouchEnd = () => clearTimeout(longPressTimer.current);
+
   return (
     <div>
       {showDateSep && (
@@ -67,7 +84,10 @@ const DzChatMessage = ({
           </div>
         )}
         <div className="relative max-w-[85%] group"
-          onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onContextMenu(msg); }}>
+          onContextMenu={e => { e.preventDefault(); e.stopPropagation(); onContextMenu(msg); }}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}>
           {msg.removed ? (
             <div className={`px-3 py-2 rounded-2xl text-sm italic text-white/30 ${isMine ? "" : "bg-white/8"}`}
               style={isMine ? { background: "color-mix(in srgb, var(--dz-bubble-out) 60%, transparent)" } : undefined}>

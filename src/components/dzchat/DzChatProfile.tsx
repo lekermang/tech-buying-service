@@ -13,9 +13,9 @@ const Toggle = ({ on }: { on: boolean }) => (
   </div>
 );
 
-export const ProfileModal = ({ me, token, onClose, onUpdate, onLogout, onSwitchAccount, onThemeChange }: {
+export const ProfileModal = ({ me, token, onClose, onUpdate, onLogout, onSwitchAccount, onThemeChange, onOpenSetupGuide }: {
   me: any; token: string; onClose: () => void; onUpdate: (u: any) => void;
-  onLogout?: () => void; onSwitchAccount?: () => void; onThemeChange?: () => void;
+  onLogout?: () => void; onSwitchAccount?: () => void; onThemeChange?: () => void; onOpenSetupGuide?: () => void;
 }) => {
   const [name, setName] = useState(me.name);
   const [avatarB64, setAvatarB64] = useState<string | null>(null);
@@ -317,30 +317,19 @@ export const ProfileModal = ({ me, token, onClose, onUpdate, onLogout, onSwitchA
           })}
         </div>
 
-        {/* ── Установка ── */}
-        <p className="text-white/40 text-xs uppercase tracking-wider mb-2 flex items-center gap-1.5 mt-4">
-          <Icon name="Smartphone" size={12} /> Приложение
-        </p>
-        <div className="bg-white/5 border border-white/10 rounded-xl p-4 mb-5 space-y-3">
-          <div className="flex items-start gap-3">
-            <div className="w-7 h-7 bg-[#007AFF]/20 rounded-lg flex items-center justify-center shrink-0">
-              <Icon name="Share2" size={14} className="text-[#007AFF]" />
-            </div>
-            <div>
-              <p className="text-white/80 text-xs font-medium">iPhone / iPad (Safari)</p>
-              <p className="text-white/40 text-xs mt-0.5">Нажми «Поделиться» → «На экран Домой»</p>
-            </div>
+        {/* ── Установка и уведомления ── */}
+        <button onClick={onOpenSetupGuide}
+          className="w-full flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 hover:bg-white/10 transition-colors mb-5 mt-4">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+            style={{ background: "linear-gradient(135deg,#25D366,#128C7E)" }}>
+            <Icon name="MonitorSmartphone" size={18} className="text-white" />
           </div>
-          <div className="flex items-start gap-3">
-            <div className="w-7 h-7 bg-[#4285F4]/20 rounded-lg flex items-center justify-center shrink-0">
-              <Icon name="Globe" size={14} className="text-[#4285F4]" />
-            </div>
-            <div>
-              <p className="text-white/80 text-xs font-medium">Android (Chrome)</p>
-              <p className="text-white/40 text-xs mt-0.5">Меню ⋮ → «Добавить на главный экран»</p>
-            </div>
+          <div className="flex-1 text-left">
+            <p className="text-white text-sm font-semibold">Установка и уведомления</p>
+            <p className="text-white/40 text-xs">iOS, Android, бейдж, push</p>
           </div>
-        </div>
+          <Icon name="ChevronRight" size={16} className="text-white/30" />
+        </button>
 
         {/* Сохранить */}
         <button onClick={save} disabled={saving || uploadingAvatar}
