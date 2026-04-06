@@ -1,5 +1,5 @@
 """
-Автоматическая отправка прайса в Telegram-группу + ping sitemap в Яндекс.Вебмастер. v7
+Автоматическая отправка прайса в Telegram-группу + ping sitemap в Яндекс.Вебмастер. v8
 - ?action=send_now — немедленная отправка прайса (для теста)
 - ?action=ping_sitemap — отправить sitemap прямо сейчас (для теста)
 - ?action=schedule_check — проверка расписания (вызывается каждые 5 мин)
@@ -262,24 +262,25 @@ def ym_get_host_id(token, user_id, site_url):
 
 
 def ym_add_sitemap(token, user_id, host_id, sitemap_url):
-    """Отправить sitemap в Яндекс.Вебмастер через API v4."""
-    url = f'{YM_API}/user/{user_id}/hosts/{host_id}/sitemaps'
-    payload = json.dumps({'url': sitemap_url}).encode('utf-8')
+    """Отправить/обновить sitemap в Яндекс.Вебмастер через API v4.
+    Используем PUT /sitemaps/{sitemap_url} — стандартный способ добавления sitemap.
+    """
+    sitemap_id = urllib.parse.quote(sitemap_url, safe='')
+    url = f'{YM_API}/user/{user_id}/hosts/{host_id}/sitemaps/{sitemap_id}'
     req = urllib.request.Request(
         url,
-        data=payload,
-        headers={
-            'Authorization': f'OAuth {token}',
-            'Content-Type': 'application/json',
-        }
+        data=b'',
+        headers={'Authorization': f'OAuth {token}', 'Content-Length': '0'},
     )
-    req.get_method = lambda: 'POST'
+    req.get_method = lambda: 'PUT'
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
-            return {'ok': True, 'status': resp.status, 'response': json.loads(resp.read())}
+            body = resp.read()
+            result = json.loads(body) if body else {}
+            return {'ok': True, 'method': 'PUT', 'status': resp.status, 'response': result}
     except urllib.error.HTTPError as e:
         body = e.read().decode('utf-8', errors='replace')
-        return {'ok': False, 'status': e.code, 'error': body}
+        return {'ok': False, 'method': 'PUT', 'status': e.code, 'error': body}
 
 
 def ping_sitemap_to_yandex():
