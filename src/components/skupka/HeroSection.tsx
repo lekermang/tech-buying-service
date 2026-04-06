@@ -75,9 +75,9 @@ const EvaluateModal = ({ onClose }: { onClose: () => void }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-[fadeIn_0.2s_ease]">
       <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-[#141414] border border-[#FFD700]/30 shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div className="relative w-full max-w-lg bg-[#141414] border border-[#FFD700]/30 shadow-2xl max-h-[90vh] overflow-y-auto animate-[slideDown_0.25s_ease]">
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
           <div className="flex items-center gap-3">
             <div className="w-1 h-7 bg-[#FFD700]" />
