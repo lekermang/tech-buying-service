@@ -8,6 +8,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 
 const Admin = lazy(() => import("./pages/Admin"));
+const DzChat = lazy(() => import("./pages/DzChat"));
 const Cabinet = lazy(() => import("./pages/Cabinet"));
 const Staff = lazy(() => import("./pages/Staff"));
 const Catalog = lazy(() => import("./pages/Catalog"));
@@ -41,6 +42,7 @@ const App = () => (
             <Route path="/tools" element={<Tools />} />
             <Route path="/tools-sync" element={<ToolsSync />} />
             <Route path="/staff" element={<Staff />} />
+            <Route path="/dzchat" element={<DzChat />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

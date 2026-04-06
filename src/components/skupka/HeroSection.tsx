@@ -253,6 +253,20 @@ const HeroSection = ({ scrollTo, externalModalOpen, onExternalModalClose }: Hero
 
           {/* СПРАВА — виджеты */}
           <div id="evaluate" className="space-y-2">
+            {/* DzChat Мессенджер */}
+            <a href="/dzchat"
+              className="flex items-center justify-between bg-[#25D366]/10 border border-[#25D366]/40 hover:border-[#25D366]/80 hover:bg-[#25D366]/15 px-4 py-5 transition-colors group w-full">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-[#25D366] flex items-center justify-center shrink-0 rounded-full">
+                  <Icon name="MessageCircle" size={20} className="text-white" />
+                </div>
+                <div>
+                  <span className="font-oswald font-bold text-base uppercase text-white tracking-wide block leading-tight">DzChat — Мессенджер</span>
+                  <span className="font-roboto text-[11px] text-white/50 mt-0.5 block">Личные сообщения · Фото · Без рекламы</span>
+                </div>
+              </div>
+              <Icon name="ChevronRight" size={20} className="text-white/40 group-hover:text-[#25D366] transition-colors shrink-0" />
+            </a>
             <a href="/catalog"
               className="flex items-center justify-between bg-black/30 border border-white/10 hover:border-[#FFD700]/60 px-4 py-5 transition-colors group w-full">
               <div className="flex items-center gap-3">

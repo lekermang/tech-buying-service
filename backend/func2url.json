@@ -1,4 +1,5 @@
 {
+  "dzchat-api": "https://functions.poehali.dev/608c7976-816a-4e3e-b374-5dd617b045bf",
   "tools-sync": "https://functions.poehali.dev/8e9219e9-9dcf-4726-a272-69c6ce976b80",
   "tools-import": "https://functions.poehali.dev/465711ab-0bef-49fe-b8c4-18c7f3064970",
   "tools-catalog": "https://functions.poehali.dev/434ea4ea-de14-4074-a738-e5db6e4f9697",
@@ -6,7 +7,6 @@
   "price-scheduler": "https://functions.poehali.dev/b09271ea-c662-4225-973f-4dd4c6a0e32c",
   "tg-auto-sync": "https://functions.poehali.dev/79437e4a-387b-4d66-952b-a6e8e8d627a2",
   "tg-catalog-parser": "https://functions.poehali.dev/2e98b33f-0f6a-4bc3-9c93-6bbb80277fac",
-  "catalog-photos": "https://functions.poehali.dev/76998fa9-f1f9-4986-8449-ecfe56cc3ee8",
   "catalog-api": "https://functions.poehali.dev/e0e6576c-f000-4288-86ef-1de08ad7bcc4",
   "auth-client": "https://functions.poehali.dev/58edd0bc-cce3-4ece-acca-a003e2260758",
   "sales-api": "https://functions.poehali.dev/1610b50a-9d00-450f-a2ca-6311f04eafe7",
