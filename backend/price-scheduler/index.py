@@ -262,25 +262,40 @@ def ym_get_host_id(token, user_id, site_url):
 
 
 def ym_add_sitemap(token, user_id, host_id, sitemap_url):
-    """Отправить/обновить sitemap в Яндекс.Вебмастер через API v4.
-    Используем PUT /sitemaps/{sitemap_url} — стандартный способ добавления sitemap.
+    """Отправить sitemap в Яндекс.Вебмастер.
+    Пробуем все известные методы API v4.
     """
     sitemap_id = urllib.parse.quote(sitemap_url, safe='')
-    url = f'{YM_API}/user/{user_id}/hosts/{host_id}/sitemaps/{sitemap_id}'
-    req = urllib.request.Request(
-        url,
-        data=b'',
-        headers={'Authorization': f'OAuth {token}', 'Content-Length': '0'},
-    )
-    req.get_method = lambda: 'PUT'
-    try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            body = resp.read()
-            result = json.loads(body) if body else {}
-            return {'ok': True, 'method': 'PUT', 'status': resp.status, 'response': result}
-    except urllib.error.HTTPError as e:
-        body = e.read().decode('utf-8', errors='replace')
-        return {'ok': False, 'method': 'PUT', 'status': e.code, 'error': body}
+    headers = {'Authorization': f'OAuth {token}', 'Content-Type': 'application/json'}
+
+    attempts = [
+        # 1. PUT /sitemaps/{id} — основной метод
+        ('PUT',  f'{YM_API}/user/{user_id}/hosts/{host_id}/sitemaps/{sitemap_id}', b''),
+        # 2. POST /sitemaps с телом
+        ('POST', f'{YM_API}/user/{user_id}/hosts/{host_id}/sitemaps',
+         json.dumps({'url': sitemap_url}).encode('utf-8')),
+        # 3. POST /recrawl — запросить переобход (работает для любого хоста)
+        ('POST', f'{YM_API}/user/{user_id}/hosts/{host_id}/recrawl/queue',
+         json.dumps({'url': sitemap_url}).encode('utf-8')),
+    ]
+
+    last_error = None
+    for method, url, payload in attempts:
+        req = urllib.request.Request(url, data=payload, headers=headers)
+        req.get_method = lambda m=method: m
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                body = resp.read()
+                result = json.loads(body) if body else {}
+                return {'ok': True, 'method': method, 'url': url, 'status': resp.status, 'response': result}
+        except urllib.error.HTTPError as e:
+            body = e.read().decode('utf-8', errors='replace')
+            last_error = {'method': method, 'status': e.code, 'error': body}
+            if e.code not in (404, 405):
+                return {'ok': False, **last_error}
+            # 404/405 — пробуем следующий метод
+
+    return {'ok': False, 'error': 'all methods failed', 'last': last_error}
 
 
 def ping_sitemap_to_yandex():
@@ -342,6 +357,19 @@ def handler(event: dict, context) -> dict:
     if action == 'ping_sitemap':
         result = ping_sitemap_to_yandex()
         return ok(result)
+
+    if action == 'list_hosts':
+        token = os.environ.get('YANDEX_WEBMASTER_TOKEN', '').strip()
+        if not token:
+            return err(400, 'no token')
+        user_id = ym_get_user_id(token)
+        req = urllib.request.Request(
+            f'{YM_API}/user/{user_id}/hosts',
+            headers={'Authorization': f'OAuth {token}'}
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+        return ok({'user_id': user_id, 'hosts': data.get('hosts', [])})
 
     if action == 'token_debug':
         token = os.environ.get('YANDEX_WEBMASTER_TOKEN', '')
