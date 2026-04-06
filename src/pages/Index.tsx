@@ -99,7 +99,7 @@ const Index = () => {
       <CookieBanner />
 
       {/* Sticky нижняя панель — только мобильные */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0D0D0D]/98 backdrop-blur-sm border-t border-[#FFD700]/20">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0D0D0D]/98 backdrop-blur-sm border-t border-[#FFD700]/20 pb-safe">
         <div className="flex h-[68px]">
           <a
             href="tel:+79929990333"

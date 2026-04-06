@@ -346,8 +346,9 @@ const DzChatCall = ({ me, token, chat, incomingCall, onClose }: Props) => {
 
       <audio ref={remoteAudioRef} autoPlay playsInline />
 
-      {/* Верхняя полоска */}
-      <div className="flex items-center justify-between px-5 pt-14 pb-2">
+      {/* Верхняя полоска — с safe-area для Dynamic Island */}
+      <div className="flex items-center justify-between px-5 pb-2"
+        style={{ paddingTop: "max(env(safe-area-inset-top), 3.5rem)" }}>
         <div className="text-white/40 text-xs uppercase tracking-widest">
           {status === "calling" ? "Вызов" : status === "ringing" ? "Входящий" : status === "connected" ? fmt(duration) : ""}
         </div>
@@ -403,7 +404,7 @@ const DzChatCall = ({ me, token, chat, incomingCall, onClose }: Props) => {
       </div>
 
       {/* Кнопки управления */}
-      <div className="px-6 pb-16 space-y-5">
+      <div className="px-6 space-y-5" style={{ paddingBottom: "max(env(safe-area-inset-bottom), 4rem)" }}>
 
         {/* Входящий: принять / отклонить */}
         {status === "ringing" && (
