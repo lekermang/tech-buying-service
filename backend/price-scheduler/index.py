@@ -283,17 +283,43 @@ def ym_add_sitemap(token, user_id, host_id, sitemap_url):
 
 
 def ping_sitemap_to_yandex():
-    """Полный флоу: получить user_id → host_id → отправить sitemap."""
-    token = os.environ.get('YANDEX_WEBMASTER_TOKEN', '')
+    """Полный флоу: получить user_id → host_id → отправить sitemap.
+    Все ошибки перехватываются — функция никогда не падает из-за YM.
+    """
+    token = os.environ.get('YANDEX_WEBMASTER_TOKEN', '').strip()
     if not token:
         return {'ok': False, 'error': 'YANDEX_WEBMASTER_TOKEN not set'}
 
-    user_id = ym_get_user_id(token)
-    host_id = ym_get_host_id(token, user_id, SITE_URL)
+    try:
+        user_id = ym_get_user_id(token)
+    except urllib.error.HTTPError as e:
+        body = e.read().decode('utf-8', errors='replace')
+        return {
+            'ok': False,
+            'step': 'get_user_id',
+            'http_status': e.code,
+            'error': body,
+            'hint': 'Check token: go to https://oauth.yandex.ru, create app with webmaster:hostinfo + webmaster:verify scopes, get fresh token',
+        }
+    except Exception as e:
+        return {'ok': False, 'step': 'get_user_id', 'error': str(e)}
+
+    try:
+        host_id = ym_get_host_id(token, user_id, SITE_URL)
+    except Exception as e:
+        return {'ok': False, 'step': 'get_host_id', 'user_id': user_id, 'error': str(e)}
+
     if not host_id:
-        return {'ok': False, 'error': 'host not found in Yandex Webmaster — add site first'}
+        return {
+            'ok': False,
+            'step': 'get_host_id',
+            'user_id': user_id,
+            'error': f'site {SITE_URL} not found — add it to webmaster.yandex.ru first',
+        }
 
     result = ym_add_sitemap(token, user_id, host_id, SITEMAP_URL)
+    result['user_id'] = user_id
+    result['host_id'] = host_id
     return result
 
 
@@ -341,7 +367,11 @@ def handler(event: dict, context) -> dict:
             mark_sent()
 
         # Пингуем sitemap в Яндекс.Вебмастер (тот же час 10:00)
-        sitemap_result = ping_sitemap_to_yandex()
+        # Ошибки YM не должны ломать отправку прайса
+        try:
+            sitemap_result = ping_sitemap_to_yandex()
+        except Exception as e:
+            sitemap_result = {'ok': False, 'error': str(e)}
         result['sitemap_ping'] = sitemap_result
 
         return ok(result)
