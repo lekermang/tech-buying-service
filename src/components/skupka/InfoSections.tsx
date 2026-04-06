@@ -1,5 +1,6 @@
 import Icon from "@/components/ui/icon";
 import Reveal from "@/components/skupka/Reveal";
+import { ymGoal, Goals } from "@/lib/ym";
 
 const CATEGORIES = [
   { icon: "Smartphone", title: "Смартфоны", desc: "iPhone, Samsung, Xiaomi и другие", price: "до 95 000 ₽" },
@@ -154,7 +155,7 @@ const InfoSections = () => {
                   {b.phones.map(phone => (
                     <div key={phone} className="flex items-center gap-2">
                       <Icon name="Phone" size={14} className="text-[#FFD700] shrink-0" />
-                      <a href={`tel:${phone.replace(/\D/g, '')}`} className="font-roboto text-white/70 text-sm hover:text-[#FFD700] transition-colors">{phone}</a>
+                      <a href={`tel:${phone.replace(/\D/g, '')}`} onClick={() => ymGoal(Goals.CALL_CLICK, { place: "info_section" })} className="font-roboto text-white/70 text-sm hover:text-[#FFD700] transition-colors">{phone}</a>
                     </div>
                   ))}
                 </div>

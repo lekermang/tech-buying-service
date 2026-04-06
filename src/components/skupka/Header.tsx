@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import Icon from "@/components/ui/icon";
+import { ymGoal, Goals } from "@/lib/ym";
 
 const GOLD_PRICE_URL = "https://functions.poehali.dev/0e3260ee-7b92-4be2-833b-d3fcc9d2472d";
 const SEND_LEAD_URL = "https://functions.poehali.dev/52666ff7-db52-4b6a-a90e-d60aeed699de";
@@ -172,12 +173,12 @@ const Header = ({ scrollTo }: HeaderProps) => {
           </nav>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            <a href="tel:+79929990333" className="hidden lg:flex items-center gap-2 text-[#FFD700] font-oswald font-semibold text-base hover:opacity-80 transition-opacity">
+            <a href="tel:+79929990333" onClick={() => ymGoal(Goals.CALL_CLICK, { place: "header" })} className="hidden lg:flex items-center gap-2 text-[#FFD700] font-oswald font-semibold text-base hover:opacity-80 transition-opacity">
               <Icon name="Phone" size={16} />
               +7 (992) 999-03-33
             </a>
             {/* Планшет: только иконка телефона */}
-            <a href="tel:+79929990333" className="hidden md:flex lg:hidden items-center justify-center w-9 h-9 border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10 transition-colors">
+            <a href="tel:+79929990333" onClick={() => ymGoal(Goals.CALL_CLICK, { place: "header" })} className="hidden md:flex lg:hidden items-center justify-center w-9 h-9 border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10 transition-colors">
               <Icon name="Phone" size={16} />
             </a>
             <a href="/staff" className="hidden md:flex items-center gap-1.5 border border-[#FFD700]/30 text-[#FFD700]/70 hover:text-[#FFD700] hover:border-[#FFD700] font-roboto text-xs px-2.5 py-1.5 transition-colors">

@@ -3,6 +3,7 @@ import Icon from "@/components/ui/icon";
 import AppleWidget from "@/components/skupka/AppleWidget";
 import RepairWidget from "@/components/skupka/RepairWidget";
 import UsedGoodsSearch from "@/components/skupka/UsedGoodsSearch";
+import { ymGoal, Goals } from "@/lib/ym";
 
 const CATEGORIES = [
   { icon: "Smartphone", title: "Смартфоны", desc: "iPhone, Samsung, Xiaomi и другие", price: "до 95 000 ₽" },
@@ -57,6 +58,7 @@ const EvaluateModal = ({ onClose }: { onClose: () => void }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    ymGoal(Goals.FORM_SUBMIT, { category: formData.category });
     setLoading(true);
     setError(null);
     try {
@@ -66,6 +68,7 @@ const EvaluateModal = ({ onClose }: { onClose: () => void }) => {
         body: JSON.stringify({ ...formData, photos: photos.map(p => p.base64) }),
       });
       if (!res.ok) throw new Error("Ошибка отправки");
+      ymGoal(Goals.FORM_SUCCESS, { category: formData.category });
       setSubmitted(true);
     } catch {
       setError("Не удалось отправить заявку. Позвоните нам по телефону.");
@@ -229,12 +232,13 @@ const HeroSection = ({ scrollTo, externalModalOpen, onExternalModalClose }: Hero
             </p>
 
             <div className="flex gap-3 mb-6 md:mb-8">
-              <button onClick={() => setModalOpen(true)}
+              <button onClick={() => { setModalOpen(true); ymGoal(Goals.FORM_OPEN, { place: "hero" }); }}
                 className="flex-1 sm:flex-none bg-[#FFD700] text-black font-oswald font-bold text-base sm:text-lg px-6 sm:px-8 py-4 uppercase tracking-wide hover:bg-yellow-400 active:scale-95 transition-all flex items-center justify-center gap-2">
                 <Icon name="Zap" size={18} />
                 Оценить онлайн
               </button>
               <a href="tel:+79929990333"
+                onClick={() => ymGoal(Goals.CALL_CLICK, { place: "hero" })}
                 className="flex-1 sm:flex-none border-2 border-[#FFD700] text-[#FFD700] font-oswald font-bold text-base sm:text-lg px-6 sm:px-8 py-4 uppercase tracking-wide hover:bg-[#FFD700] hover:text-black active:scale-95 transition-all flex items-center justify-center gap-2">
                 <Icon name="Phone" size={18} />
                 Позвонить

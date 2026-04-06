@@ -34,7 +34,7 @@ export default function Admin() {
   });
   const [tokenInput, setTokenInput] = useState("");
   const [authed, setAuthed] = useState(false);
-  const [tab, setTab] = useState<Tab>("repair");
+  const [tab, setTab] = useState<Tab>("analytics");
   const [error, setError] = useState("");
   const [checking, setChecking] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -163,7 +163,7 @@ export default function Admin() {
           <span className="font-bold uppercase tracking-wide text-sm">{active?.label}</span>
         </div>
 
-        <div className="flex-1 overflow-auto">
+        <div className={`flex-1 ${tab === "analytics" ? "overflow-hidden flex flex-col" : "overflow-auto"}`}>
           {tab === "analytics"    && <AnalyticsTab />}
           {tab === "repair"       && <RepairTab token={token} />}
           {tab === "prices"       && <PricesTab token={token} />}

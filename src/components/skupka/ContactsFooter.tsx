@@ -1,5 +1,6 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
+import { ymGoal, Goals } from "@/lib/ym";
 
 const ShareButton = () => {
   const [copied, setCopied] = useState(false);
@@ -48,6 +49,10 @@ const ContactsFooter = ({ scrollTo }: ContactsFooterProps) => {
               { icon: "Mail", title: "Email", lines: ["lekermany@yandex.ru", "Деловые запросы"], href: "mailto:lekermany@yandex.ru" },
             ].map((c) => (
               <a key={c.title} href={c.href}
+                onClick={() => {
+                  if (c.href.startsWith("tel:")) ymGoal(Goals.CALL_CLICK, { place: "footer" });
+                  else if (c.href.startsWith("https://t.me")) ymGoal(Goals.TELEGRAM_CLICK, { place: "footer" });
+                }}
                 className="border border-[#FFD700]/20 p-4 md:p-6 hover:border-[#FFD700] active:bg-[#FFD700]/5 transition-colors group block">
                 <div className="w-10 h-10 md:w-12 md:h-12 border border-[#FFD700]/20 flex items-center justify-center mb-3 group-hover:bg-[#FFD700]/10 transition-colors">
                   <Icon name={c.icon} size={20} className="text-[#FFD700]" />

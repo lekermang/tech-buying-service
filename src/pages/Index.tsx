@@ -5,6 +5,7 @@ import InfoSections from "@/components/skupka/InfoSections";
 import ContactsFooter from "@/components/skupka/ContactsFooter";
 import Consultant from "@/components/skupka/Consultant";
 import Icon from "@/components/ui/icon";
+import { ymGoal, Goals } from "@/lib/ym";
 
 const scrollTo = (href: string) => {
   const el = document.querySelector(href);
@@ -42,7 +43,6 @@ const SplashScreen = ({ onDone }: { onDone: () => void }) => {
           <span className="animate-shimmer">всё!</span>
         </h2>
 
-        {/* Полоса загрузки */}
         <div className="w-64 sm:w-80 flex flex-col gap-2 animate-[fadeIn_0.4s_ease_0.5s_both]">
           <div className="h-[3px] w-full bg-white/10 rounded-full overflow-hidden">
             <div
@@ -69,17 +69,16 @@ const Index = () => {
   const [installed, setInstalled] = useState(false);
 
   useEffect(() => {
-    // Слушаем событие установки PWA
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handler = (e: any) => { e.preventDefault(); setInstallPrompt(e); };
     window.addEventListener("beforeinstallprompt", handler);
-    // Уже установлено (standalone mode)
     if (window.matchMedia("(display-mode: standalone)").matches) setInstalled(true);
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
   const installApp = async () => {
     if (!installPrompt) return;
+    ymGoal(Goals.INSTALL_PWA);
     installPrompt.prompt();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { outcome } = await (installPrompt as any).userChoice;
@@ -98,30 +97,38 @@ const Index = () => {
       {/* Sticky нижняя панель — только мобильные */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0D0D0D]/98 backdrop-blur-sm border-t border-[#FFD700]/20">
         <div className="flex h-[68px]">
-          <a href="tel:+79929990333"
+          <a
+            href="tel:+79929990333"
+            onClick={() => ymGoal(Goals.CALL_CLICK, { place: "sticky_bar" })}
             className="flex-1 flex flex-col items-center justify-center gap-1 text-[#FFD700] hover:bg-[#FFD700]/5 active:bg-[#FFD700]/10 transition-colors">
             <Icon name="Phone" size={22} />
             <span className="font-roboto text-[10px] uppercase tracking-wide">Позвонить</span>
           </a>
-          <button onClick={() => setEvalOpen(true)}
+          <button
+            onClick={() => { ymGoal(Goals.FORM_OPEN, { place: "sticky_bar" }); setEvalOpen(true); }}
             className="flex-[2] flex flex-col items-center justify-center gap-1 bg-[#FFD700] text-black active:bg-yellow-400 transition-colors">
             <Icon name="Zap" size={22} />
             <span className="font-oswald font-bold text-sm uppercase tracking-wide">Оценить онлайн</span>
           </button>
-          <a href="https://t.me/skypka24" target="_blank" rel="noopener noreferrer"
+          <a
+            href="https://t.me/skypka24"
+            target="_blank" rel="noopener noreferrer"
+            onClick={() => ymGoal(Goals.TELEGRAM_CLICK, { place: "sticky_bar" })}
             className="flex-1 flex flex-col items-center justify-center gap-1 text-[#FFD700] hover:bg-[#FFD700]/5 active:bg-[#FFD700]/10 transition-colors">
             <Icon name="MessageCircle" size={22} />
             <span className="font-roboto text-[10px] uppercase tracking-wide">Telegram</span>
           </a>
-          {/* Кнопка установки PWA — показывается только если доступна */}
           {installPrompt && !installed ? (
-            <button onClick={installApp}
+            <button
+              onClick={installApp}
               className="flex-1 flex flex-col items-center justify-center gap-1 text-[#FFD700] hover:bg-[#FFD700]/5 active:bg-[#FFD700]/10 transition-colors">
               <Icon name="Download" size={22} />
               <span className="font-roboto text-[10px] uppercase tracking-wide">Установить</span>
             </button>
           ) : (
-            <a href="/catalog"
+            <a
+              href="/catalog"
+              onClick={() => ymGoal(Goals.CATALOG_OPEN, { place: "sticky_bar" })}
               className="flex-1 flex flex-col items-center justify-center gap-1 text-white/50 hover:text-[#FFD700] active:text-[#FFD700] transition-colors">
               <Icon name="ShoppingBag" size={22} />
               <span className="font-roboto text-[10px] uppercase tracking-wide">Каталог</span>
