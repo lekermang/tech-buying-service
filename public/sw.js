@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dzchat-v5';
+const CACHE_NAME = 'dzchat-v6';
 const STATIC_ASSETS = ['/', '/catalog', '/dzchat'];
 const ICON = "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/dce22ed0-7e15-4a0f-84c3-9987477dea5a.jpg";
 const API = "https://functions.poehali.dev/608c7976-816a-4e3e-b374-5dd617b045bf";
@@ -31,7 +31,7 @@ self.addEventListener('fetch', e => {
   );
 });
 
-// ── Состояние ─────────────────────────────────────────────────────
+// ── Состояние polling ─────────────────────────────────────────────────────────
 let pollToken = null;
 let pollInterval = null;
 let prevUnread = {};
@@ -80,10 +80,8 @@ async function pollChats() {
                    : lm.photo_url ? '📷 Фото'
                    : (lm.text || 'Новое сообщение');
 
-        // Всегда шлём звук клиентам (они сами решат играть ли)
         notifyClients('PLAY_SOUND', {});
 
-        // Push только если DzChat не виден прямо сейчас
         if (!dzchatVisible) {
           try {
             await self.registration.showNotification(chat.name || 'DzChat', {
@@ -102,7 +100,6 @@ async function pollChats() {
       prevUnread[chat.id] = chat.unread;
     }
 
-    // Проверяем входящие звонки
     notifyClients('POLL_CALLS', {});
   } catch(_) {}
 }
@@ -123,36 +120,90 @@ function stopPolling() {
   updateBadge(0);
 }
 
+// ── Сообщения от страницы ─────────────────────────────────────────────────────
 self.addEventListener('message', e => {
   const msg = e.data || {};
+
   if (msg.type === 'SET_TOKEN') {
     pollToken = msg.token;
     msg.token ? startPolling() : stopPolling();
   }
   if (msg.type === 'LOGOUT') stopPolling();
   if (msg.type === 'CLEAR_BADGE') updateBadge(0);
+
+  // Запрос на оформление Web Push подписки от страницы
+  if (msg.type === 'SUBSCRIBE_PUSH' && msg.vapidPublicKey && msg.token) {
+    self.registration.pushManager.getSubscription().then(existing => {
+      if (existing) {
+        // Уже подписаны — просто сохраняем на сервер
+        return savePushSubscription(existing, msg.token);
+      }
+      // Подписываемся
+      const key = urlBase64ToUint8Array(msg.vapidPublicKey);
+      return self.registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: key,
+      }).then(sub => savePushSubscription(sub, msg.token));
+    }).catch(() => {});
+  }
 });
 
+async function savePushSubscription(subscription, token) {
+  try {
+    const sub = subscription.toJSON();
+    await fetch(`${API}?action=push_subscribe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Session-Token': token },
+      body: JSON.stringify({
+        subscription: sub,
+        user_agent: self.navigator?.userAgent || '',
+      }),
+    });
+  } catch(_) {}
+}
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+// ── Клик по уведомлению ────────────────────────────────────────────────────────
 self.addEventListener('notificationclick', e => {
   e.notification.close();
+  const targetUrl = (e.notification.data?.url) || '/dzchat';
   e.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
       for (const c of list) {
         if (c.url.includes('/dzchat') && 'focus' in c) { c.focus(); return; }
       }
-      return clients.openWindow('/dzchat');
+      return clients.openWindow(targetUrl);
     })
   );
 });
 
+// ── Входящий Web Push (когда страница закрыта) ────────────────────────────────
 self.addEventListener('push', e => {
   let data = { title: 'DzChat', body: 'Новое сообщение' };
-  if (e.data) { try { data = { ...data, ...e.data.json() }; } catch(_) { data.body = e.data.text(); } }
+  if (e.data) {
+    try { data = { ...data, ...e.data.json() }; }
+    catch(_) { data.body = e.data.text(); }
+  }
   e.waitUntil(
     self.registration.showNotification(data.title, {
-      body: data.body, icon: ICON, badge: ICON,
-      vibrate: [200, 100, 200], tag: 'dzchat-push', renotify: true,
-      data: { url: '/dzchat' }
+      body: data.body,
+      icon: ICON,
+      badge: ICON,
+      vibrate: [200, 100, 200],
+      tag: `dzchat-push-${data.chat_id || 'new'}`,
+      renotify: true,
+      silent: false,
+      data: { url: data.url || '/dzchat', chatId: data.chat_id }
     })
   );
 });

@@ -1,9 +1,11 @@
 {
-  "name": "Скупка24 — DzChat",
+  "id": "/dzchat",
+  "name": "DzChat — Мессенджер",
   "short_name": "DzChat",
-  "description": "Мессенджер DzChat. Личные сообщения, фото, групповые чаты.",
+  "description": "Мессенджер DzChat. Личные сообщения, фото, групповые чаты, голосовые.",
   "start_url": "/dzchat",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
   "background_color": "#0f1923",
   "theme_color": "#0f1923",
   "orientation": "portrait-primary",
@@ -30,7 +32,14 @@
       "short_name": "DzChat",
       "description": "Открыть мессенджер",
       "url": "/dzchat",
-      "icons": [{ "src": "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/dce22ed0-7e15-4a0f-84c3-9987477dea5a.jpg", "sizes": "96x96" }]
+      "icons": [
+        {
+          "src": "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/dce22ed0-7e15-4a0f-84c3-9987477dea5a.jpg",
+          "sizes": "96x96"
+        }
+      ]
     }
-  ]
+  ],
+  "prefer_related_applications": false,
+  "handle_links": "preferred"
 }

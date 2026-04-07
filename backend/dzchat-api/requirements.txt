@@ -2,3 +2,4 @@ boto3
 psycopg2
 bcrypt
 Pillow
+cryptography>=41.0.0

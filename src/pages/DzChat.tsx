@@ -48,6 +48,49 @@ const DzChat = () => {
     } catch (_e) { /* SW not available */ }
   };
 
+  // ── Web Push подписка ─────────────────────────────────────────
+  const subscribePush = async (tok: string) => {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    if (Notification.permission !== "granted") return;
+    try {
+      // Получаем VAPID public key с сервера
+      const data = await api("vapid_public_key", "GET", undefined, tok);
+      if (!data?.ready || !data?.public_key) return;
+
+      const reg = await navigator.serviceWorker.ready;
+
+      // Проверяем существующую подписку
+      const existing = await reg.pushManager.getSubscription();
+      let sub = existing;
+
+      if (!sub) {
+        // Новая подписка
+        const key = urlBase64ToUint8Array(data.public_key);
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: key,
+        });
+      }
+
+      if (sub) {
+        const subJson = sub.toJSON() as { endpoint: string; keys: { p256dh: string; auth: string } };
+        await api("push_subscribe", "POST", {
+          subscription: subJson,
+          user_agent: navigator.userAgent,
+        }, tok);
+      }
+    } catch (_e) { /* push not supported or denied */ }
+  };
+
+  function urlBase64ToUint8Array(base64String: string): Uint8Array {
+    const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+    return outputArray;
+  }
+
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
     navigator.serviceWorker.register("/sw.js").then(async () => {
@@ -81,7 +124,8 @@ const DzChat = () => {
     const granted = perm === "granted";
     setNotifGranted(granted);
     notifGrantedRef.current = granted;
-    sendTokenToSW(token); // заново посылаем токен чтобы SW знал о разрешении
+    sendTokenToSW(token);
+    if (granted && token) subscribePush(token);
   };
 
   useEffect(() => {
@@ -167,6 +211,10 @@ const DzChat = () => {
       loadChats(token).finally(() => setLoadingChats(false));
       pollRef.current = setInterval(() => loadChats(token), 1500);
       pingRef.current = setInterval(() => api("ping", "POST", {}, token), 20000);
+      // Автоматически подписываемся на Web Push если уже есть разрешение
+      if ("Notification" in window && Notification.permission === "granted") {
+        subscribePush(token);
+      }
 
       // Polling входящих звонков каждые 3 сек
       const pollIncoming = async () => {

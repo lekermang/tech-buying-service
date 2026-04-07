@@ -43,6 +43,23 @@
       "expectedStatus": 401,
       "expectedBody": {"error": "Unauthorized"},
       "bodyMatcher": "partial"
+    },
+    {
+      "name": "VAPID public key",
+      "method": "GET",
+      "path": "/?action=vapid_public_key",
+      "expectedStatus": 200,
+      "expectedBody": {"ready": false},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Push subscribe unauthorized",
+      "method": "POST",
+      "path": "/?action=push_subscribe",
+      "body": {"subscription": {}},
+      "expectedStatus": 401,
+      "expectedBody": {"error": "Unauthorized"},
+      "bodyMatcher": "partial"
     }
   ]
 }

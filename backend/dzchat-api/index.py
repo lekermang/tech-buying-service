@@ -3,12 +3,15 @@ DzChat API — WhatsApp-like мессенджер.
 Действия: register, login, me, profile, chats, users,
           create, create_group, messages, send, remove, read,
           react, upload, ping, search_messages, group_info, group_leave,
-          call_start, call_answer, call_ice, call_end, call_status
+          call_start, call_answer, call_ice, call_end, call_status,
+          vapid_public_key, push_subscribe, push_unsubscribe
 """
-import json, os, hashlib, time, base64, uuid, random, io
+import json, os, hashlib, time, base64, uuid, random, io, struct, hmac
 import psycopg2
 import boto3
 import bcrypt
+from urllib.request import urlopen, Request
+from urllib.error import HTTPError
 try:
     from PIL import Image as PILImage
     HAS_PIL = True
@@ -84,6 +87,112 @@ def get_msg_reactions(conn, msg_ids):
         result[mid].append({"emoji": row[1], "count": row[2], "users": row[3]})
     return result
 
+# ── Web Push (VAPID) ──────────────────────────────────────────────────────────
+
+def _b64url_encode(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
+
+def _b64url_decode(s: str) -> bytes:
+    pad = 4 - len(s) % 4
+    return base64.urlsafe_b64decode(s + "=" * (pad % 4))
+
+def _make_vapid_jwt(audience: str, private_key_b64: str) -> str:
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.backends import default_backend
+    from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
+    header = _b64url_encode(json.dumps({"typ": "JWT", "alg": "ES256"}).encode())
+    exp = int(time.time()) + 43200
+    payload = _b64url_encode(json.dumps({"aud": audience, "exp": exp, "sub": "mailto:admin@skypka24.com"}).encode())
+    signing_input = f"{header}.{payload}".encode()
+    raw = _b64url_decode(private_key_b64)
+    if len(raw) == 32:
+        private_key = ec.derive_private_key(int.from_bytes(raw, "big"), ec.SECP256R1(), default_backend())
+    else:
+        private_key = serialization.load_der_private_key(raw, password=None, backend=default_backend())
+    sig_der = private_key.sign(signing_input, ec.ECDSA(hashes.SHA256()))
+    r, s = decode_dss_signature(sig_der)
+    return f"{header}.{payload}.{_b64url_encode(r.to_bytes(32,'big') + s.to_bytes(32,'big'))}"
+
+def send_web_push(subscription: dict, push_payload: dict) -> bool | None:
+    try:
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.backends import default_backend
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    except ImportError:
+        return False
+    vapid_private = os.environ.get("VAPID_PRIVATE_KEY", "")
+    vapid_public = os.environ.get("VAPID_PUBLIC_KEY", "")
+    if not vapid_private or not vapid_public:
+        return False
+    endpoint = subscription["endpoint"]
+    from urllib.parse import urlparse
+    audience = f"{urlparse(endpoint).scheme}://{urlparse(endpoint).netloc}"
+    jwt_token = _make_vapid_jwt(audience, vapid_private)
+    server_public_raw = _b64url_decode(vapid_public)
+    client_pub_bytes = _b64url_decode(subscription["keys"]["p256dh"])
+    auth_secret = _b64url_decode(subscription["keys"]["auth"])
+    client_pub_key = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), client_pub_bytes)
+    ephemeral_key = ec.generate_private_key(ec.SECP256R1(), default_backend())
+    ephemeral_pub = ephemeral_key.public_key().public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
+    shared_secret = ephemeral_key.exchange(ec.ECDH(), client_pub_key)
+    def hkdf(salt: bytes, ikm: bytes, info: bytes, length: int) -> bytes:
+        prk = hmac.new(salt, ikm, hashlib.sha256).digest()
+        t, okm = b"", b""
+        for i in range(1, (length // 32) + 2):
+            t = hmac.new(prk, t + info + bytes([i]), hashlib.sha256).digest()
+            okm += t
+        return okm[:length]
+    prk_key = hmac.new(auth_secret, shared_secret, hashlib.sha256).digest()
+    key_info = b"WebPush: info\x00" + client_pub_bytes + ephemeral_pub
+    ik_bytes = hkdf(prk_key, b"", key_info + b"\x01", 32)
+    salt = os.urandom(16)
+    prk_nonce = hmac.new(salt, ik_bytes, hashlib.sha256).digest()
+    cek = hkdf(prk_nonce, b"", b"Content-Encoding: aes128gcm\x00\x01", 16)
+    nonce = hkdf(prk_nonce, b"", b"Content-Encoding: nonce\x00\x01", 12)
+    header = salt + struct.pack(">I", 4096) + bytes([len(ephemeral_pub)]) + ephemeral_pub
+    plaintext = json.dumps(push_payload, ensure_ascii=False).encode() + b"\x02"
+    body = header + AESGCM(cek).encrypt(nonce, plaintext, None)
+    req = Request(endpoint, data=body, headers={
+        "Content-Type": "application/octet-stream",
+        "Content-Encoding": "aes128gcm",
+        "Authorization": f"vapid t={jwt_token},k={vapid_public}",
+        "TTL": "86400",
+        "Urgency": "normal",
+    }, method="POST")
+    try:
+        with urlopen(req, timeout=10) as r:
+            return r.status in (200, 201)
+    except HTTPError as e:
+        return None if e.code == 410 else False
+    except Exception:
+        return False
+
+def push_to_chat_members(conn, chat_id: int, exclude_user_id: int, push_payload: dict):
+    """Отправляем Web Push всем участникам чата кроме отправителя."""
+    try:
+        cur = conn.cursor()
+        cur.execute(f"""
+            SELECT ps.endpoint, ps.p256dh, ps.auth
+            FROM {SCHEMA}.dzchat_push_subscriptions ps
+            JOIN {SCHEMA}.dzchat_members m ON m.user_id = ps.user_id
+            WHERE m.chat_id = %s AND ps.user_id != %s
+        """, (chat_id, exclude_user_id))
+        subs = cur.fetchall()
+        stale = []
+        for row in subs:
+            result = send_web_push({"endpoint": row[0], "keys": {"p256dh": row[1], "auth": row[2]}}, push_payload)
+            if result is None:
+                stale.append(row[0])
+        for ep in stale:
+            cur.execute(f"UPDATE {SCHEMA}.dzchat_push_subscriptions SET endpoint=endpoint WHERE endpoint=%s", (ep,))
+        if stale:
+            conn.commit()
+    except Exception:
+        pass
+
+
 def handler(event: dict, context) -> dict:
     """DzChat WhatsApp-like API handler."""
     if event.get("httpMethod") == "OPTIONS":
@@ -101,6 +210,56 @@ def handler(event: dict, context) -> dict:
             pass
 
     conn = get_conn()
+
+    # ── VAPID PUBLIC KEY ──────────────────────────────────────────
+    if action == "vapid_public_key" and method == "GET":
+        key = os.environ.get("VAPID_PUBLIC_KEY", "")
+        conn.close()
+        return resp({"public_key": key, "ready": bool(key)})
+
+    # ── PUSH SUBSCRIBE ────────────────────────────────────────────
+    if action == "push_subscribe" and method == "POST":
+        u = get_user(conn, token)
+        if not u:
+            conn.close()
+            return resp({"error": "Unauthorized"}, 401)
+        sub = body.get("subscription", {})
+        endpoint = sub.get("endpoint", "")
+        keys = sub.get("keys", {})
+        p256dh = keys.get("p256dh", "")
+        auth_key = keys.get("auth", "")
+        ua = body.get("user_agent", "")[:255] if body.get("user_agent") else ""
+        if not endpoint or not p256dh or not auth_key:
+            conn.close()
+            return resp({"error": "invalid subscription"}, 400)
+        cur = conn.cursor()
+        cur.execute(f"""
+            INSERT INTO {SCHEMA}.dzchat_push_subscriptions (user_id, endpoint, p256dh, auth, user_agent, updated_at)
+            VALUES (%s, %s, %s, %s, %s, NOW())
+            ON CONFLICT (user_id, endpoint) DO UPDATE
+              SET p256dh=EXCLUDED.p256dh, auth=EXCLUDED.auth,
+                  user_agent=EXCLUDED.user_agent, updated_at=NOW()
+        """, (u["id"], endpoint, p256dh, auth_key, ua))
+        conn.commit()
+        conn.close()
+        return resp({"ok": True})
+
+    # ── PUSH UNSUBSCRIBE ──────────────────────────────────────────
+    if action == "push_unsubscribe" and method == "POST":
+        u = get_user(conn, token)
+        if not u:
+            conn.close()
+            return resp({"error": "Unauthorized"}, 401)
+        endpoint = body.get("endpoint", "")
+        if endpoint:
+            cur = conn.cursor()
+            cur.execute(
+                f"UPDATE {SCHEMA}.dzchat_push_subscriptions SET updated_at=NOW() WHERE user_id=%s AND endpoint=%s",
+                (u["id"], endpoint)
+            )
+            conn.commit()
+        conn.close()
+        return resp({"ok": True})
 
     # ── PING (обновить онлайн-статус) ─────────────────────────────
     if action == "ping" and method == "POST":
@@ -647,6 +806,21 @@ def handler(event: dict, context) -> dict:
               voice_url or None, voice_duration, forwarded_from, reply_to))
         row = cur.fetchone()
         conn.commit()
+
+        # Web Push — уведомляем участников чата (кроме отправителя)
+        body_text = (
+            "🎤 Голосовое сообщение" if voice_url else
+            "📷 Фото" if photo_url else
+            "🎥 Видео" if video_url else
+            (text[:80] + "…" if len(text) > 80 else text) if text else "Новое сообщение"
+        )
+        push_to_chat_members(conn, chat_id, u["id"], {
+            "title": f"DzChat — {u['name']}",
+            "body": body_text,
+            "url": "/dzchat",
+            "chat_id": chat_id,
+        })
+
         return resp({"ok": True, "id": row[0], "created_at": str(row[1]),
                      "sender_id": u["id"], "sender_name": u["name"], "sender_avatar": u["avatar_url"]})
 
