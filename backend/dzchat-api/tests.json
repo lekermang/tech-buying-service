@@ -49,7 +49,7 @@
       "method": "GET",
       "path": "/?action=vapid_public_key",
       "expectedStatus": 200,
-      "expectedBody": {"ready": false},
+      "expectedBody": {"ready": true},
       "bodyMatcher": "partial"
     },
     {
