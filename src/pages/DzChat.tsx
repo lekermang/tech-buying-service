@@ -125,7 +125,6 @@ const DzChat = () => {
           onOpenSetupGuide={() => { setShowProfile(false); setShowSetupGuide(true); }}
           onInstallApp={installApp}
           onCloseCall={() => setIncomingCall(null)}
-          setTheme={setTheme}
         />
       </div>
     </div>

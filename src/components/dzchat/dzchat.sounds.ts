@@ -171,3 +171,68 @@ export const playVoiceSentSound = () => {
     });
   }).catch(() => {});
 };
+
+// ── Рингтон звонка (возвращает функцию-стоп) ─────────────────────
+export function startRingtone(): () => void {
+  const ctx = getCtx();
+  if (!ctx) return () => {};
+
+  let stopped = false;
+  let timeoutId: ReturnType<typeof setTimeout>;
+
+  const playRing = () => {
+    if (stopped) return;
+    const resume = ctx.state === "suspended" ? ctx.resume() : Promise.resolve();
+    resume.then(() => {
+      if (stopped) return;
+      // Два тона — имитация телефонного звонка
+      const freqs = [480, 620];
+      const now = ctx.currentTime;
+      freqs.forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        const start = now + i * 0.05;
+        gain.gain.setValueAtTime(0, start);
+        gain.gain.linearRampToValueAtTime(0.22, start + 0.04);
+        gain.gain.setValueAtTime(0.22, start + 0.35);
+        gain.gain.linearRampToValueAtTime(0, start + 0.45);
+        osc.start(start);
+        osc.stop(start + 0.5);
+      });
+      // Повторяем каждые 3 сек
+      timeoutId = setTimeout(playRing, 3000);
+    }).catch(() => {});
+  };
+
+  playRing();
+  return () => {
+    stopped = true;
+    clearTimeout(timeoutId);
+  };
+}
+
+// ── Звук сброса/завершения звонка ────────────────────────────────
+export function playHangupSound() {
+  const ctx = getCtx();
+  if (!ctx) return;
+  const resume = ctx.state === "suspended" ? ctx.resume() : Promise.resolve();
+  resume.then(() => {
+    // Три нисходящих коротких тона
+    [0, 0.12, 0.24].forEach((delay, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "sine";
+      osc.frequency.value = 480 - i * 80;
+      gain.gain.setValueAtTime(0.18, ctx.currentTime + delay);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.1);
+      osc.start(ctx.currentTime + delay);
+      osc.stop(ctx.currentTime + delay + 0.1);
+    });
+  }).catch(() => {});
+}

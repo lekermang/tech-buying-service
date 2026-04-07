@@ -10,6 +10,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { api } from "./dzchat.utils";
 import DzChatAvatar from "./DzChatAvatar";
 import Icon from "@/components/ui/icon";
+import { startRingtone, playHangupSound, unlockAudio } from "./dzchat.sounds";
 
 const ICE_SERVERS = [
   { urls: "stun:stun.l.google.com:19302" },
@@ -61,6 +62,7 @@ const DzChatCall = ({ me, token, chat, incomingCall, onClose }: Props) => {
   const iceCalleeSeen = useRef(0);
   const iceCallerSeen = useRef(0);
   const pttLongRef = useRef<ReturnType<typeof setTimeout>>();
+  const stopRingtoneRef = useRef<(() => void) | null>(null);
 
   // ── СТАРТ ТАЙМЕРА ──────────────────────────────────────────────
   const startTimer = () => {
@@ -76,6 +78,8 @@ const DzChatCall = ({ me, token, chat, incomingCall, onClose }: Props) => {
     clearInterval(pollRef.current);
     clearInterval(durationRef.current);
     clearTimeout(pttLongRef.current);
+    stopRingtoneRef.current?.();
+    stopRingtoneRef.current = null;
     pcRef.current?.close();
     pcRef.current = null;
     localStreamRef.current?.getTracks().forEach(t => t.stop());
@@ -287,6 +291,7 @@ const DzChatCall = ({ me, token, chat, incomingCall, onClose }: Props) => {
     if (notify && callId) {
       await api("call_end", "POST", { call_id: callId }, token).catch(() => {});
     }
+    playHangupSound();
     cleanup();
     onClose();
   }, [callId, token, cleanup, onClose]);
@@ -331,11 +336,22 @@ const DzChatCall = ({ me, token, chat, incomingCall, onClose }: Props) => {
     }
   };
 
-  // ── ИНИЦИАЛИЗАЦИЯ ─────────────────────────────────────────────
+  // ── ИНИЦИАЛИЗАЦИЯ + рингтон ────────────────────────────────────
   useEffect(() => {
+    unlockAudio();
+    // Запускаем рингтон при вызове или входящем
+    stopRingtoneRef.current = startRingtone();
     if (!incomingCall && chat) startCall();
     return cleanup;
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Останавливаем рингтон когда соединились
+  useEffect(() => {
+    if (status === "connected") {
+      stopRingtoneRef.current?.();
+      stopRingtoneRef.current = null;
+    }
+  }, [status]);
 
   // ── RENDER ────────────────────────────────────────────────────
   const partner = participants[0];

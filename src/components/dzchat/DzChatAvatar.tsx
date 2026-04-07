@@ -2,21 +2,22 @@ import { useState, useEffect } from "react";
 
 const COLORS = ["#e53e3e","#dd6b20","#d69e2e","#38a169","#3182ce","#805ad5","#d53f8c"];
 
-// Чистим ?t= и лишние параметры которые ломают CDN
-function cleanUrl(url?: string): string | undefined {
+// Добавляем ?t= для CDN-кэш-бастера при обновлении аватарки
+function buildUrl(url?: string, bust?: number): string | undefined {
   if (!url) return undefined;
-  // Если это data: URL — возвращаем как есть
   if (url.startsWith("data:")) return url;
   try {
     const u = new URL(url);
-    u.searchParams.delete("t");
+    // bust — версия, меняется когда пользователь обновил аватарку
+    if (bust) u.searchParams.set("t", String(bust));
+    else u.searchParams.delete("t");
     return u.toString();
   } catch {
     return url;
   }
 }
 
-const DzChatAvatar = ({ name, url, size = 40 }: { name: string; url?: string; size?: number }) => {
+const DzChatAvatar = ({ name, url, size = 40, bust }: { name: string; url?: string; size?: number; bust?: number }) => {
   const [imgError, setImgError] = useState(false);
   const [imgKey, setImgKey] = useState(0);
   const color = COLORS[(name?.charCodeAt(0) || 0) % COLORS.length];
@@ -25,9 +26,9 @@ const DzChatAvatar = ({ name, url, size = 40 }: { name: string; url?: string; si
   useEffect(() => {
     setImgError(false);
     setImgKey(k => k + 1);
-  }, [url]);
+  }, [url, bust]);
 
-  const src = cleanUrl(url);
+  const src = buildUrl(url, bust);
 
   if (src && !imgError) {
     return (

@@ -105,21 +105,30 @@ export const ProfileModal = ({ me, token, onClose, onUpdate, onLogout, onSwitchA
     let avatar_url = me.avatar_url;
     if (avatarB64) {
       setUploadingAvatar(true);
-      const res = await api("upload", "POST", { image: avatarB64, mime: "image/jpeg", kind: "avatar" }, token);
-      setUploadingAvatar(false);
-      if (res.url) {
-        avatar_url = res.url;
-      } else {
+      try {
+        const res = await api("upload", "POST", { image: avatarB64, mime: "image/jpeg", kind: "avatar" }, token);
+        setUploadingAvatar(false);
+        if (res?.url) {
+          avatar_url = res.url;
+        } else {
+          setSaving(false);
+          alert("Не удалось загрузить фото. Попробуй ещё раз.");
+          return;
+        }
+      } catch {
+        setUploadingAvatar(false);
         setSaving(false);
+        alert("Ошибка сети при загрузке фото.");
         return;
       }
     }
     const saved = await api("profile", "POST", { name, avatar_url }, token);
     setSaving(false);
     const finalUrl = saved.avatar_url || avatar_url;
-    // Сразу обновляем превью (DzChatAvatar сам перезагрузит через key при смене url)
+    // Кэш-бастер — заставляем браузер перезагрузить новую аватарку
+    const bust = avatarB64 ? Date.now() : me.avatar_bust;
     if (finalUrl) setAvatarPreview(finalUrl);
-    onUpdate({ ...me, name, avatar_url: finalUrl });
+    onUpdate({ ...me, name, avatar_url: finalUrl, avatar_bust: bust });
     onClose();
   };
 

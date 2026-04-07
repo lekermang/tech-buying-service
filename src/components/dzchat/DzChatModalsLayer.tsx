@@ -29,7 +29,6 @@ interface DzChatModalsLayerProps {
   onOpenSetupGuide: () => void;
   onInstallApp: () => void;
   onCloseCall: () => void;
-  setTheme: (t: any) => void;
 }
 
 const DzChatModalsLayer = ({
