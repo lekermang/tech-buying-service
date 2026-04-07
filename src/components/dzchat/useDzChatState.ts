@@ -177,7 +177,9 @@ export function useDzChatState() {
     setLoadingChats(true);
     sendTokenToSW(token);
     api("me", "GET", undefined, token).then(u => {
-      if (u.error) { localStorage.removeItem("dzchat_token"); setToken(null); sendTokenToSW(null); return; }
+      // Выкидываем только при явном 401 (истёкший/неверный токен), но не при сетевых ошибках
+      if (u?.error === "Unauthorized") { localStorage.removeItem("dzchat_token"); sessionStorage.removeItem("dzchat_token_session"); setToken(null); sendTokenToSW(null); return; }
+      if (u?.error) { setLoadingChats(false); return; } // сетевая ошибка — просто ждём
       setMe(u);
       loadChats(token).finally(() => setLoadingChats(false));
       pollRef.current = setInterval(() => loadChats(token), 1500);

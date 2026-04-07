@@ -261,11 +261,18 @@ def handler(event: dict, context) -> dict:
         conn.close()
         return resp({"ok": True})
 
-    # ── PING (обновить онлайн-статус) ─────────────────────────────
+    # ── PING (обновить онлайн-статус + продлить сессию) ──────────
     if action == "ping" and method == "POST":
         u = get_user(conn, token)
         if not u:
             return resp({"error": "Unauthorized"}, 401)
+        # Продлеваем сессию до 30 дней от текущего момента
+        cur = conn.cursor()
+        cur.execute(
+            f"UPDATE {SCHEMA}.dzchat_users SET session_expires_at=NOW() + INTERVAL '30 days' WHERE id=%s",
+            (u["id"],)
+        )
+        conn.commit()
         return resp({"ok": True})
 
     # ── TYPING (пользователь печатает) ────────────────────────────
