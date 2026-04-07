@@ -48,8 +48,8 @@ const DzChatSidebar = ({
 
   return (
     <div
-      className={`${activeChat ? "hidden" : "flex"} flex-col w-full shrink-0`}
-      style={{ background: "#000", height: "100dvh" }}>
+      className={`${activeChat ? "hidden" : "flex"} flex-col w-full h-full`}
+      style={{ background: "#000" }}>
 
       {/* ── Шапка ── */}
       <div className="flex items-center justify-between px-4 pt-[max(env(safe-area-inset-top),14px)] pb-1">
@@ -222,53 +222,6 @@ const DzChatSidebar = ({
         })}
       </div>
 
-      {/* ── Нижний таббар (WhatsApp стиль) ── */}
-      <div
-        className="flex items-center justify-around border-t"
-        style={{
-          background: "#111",
-          borderColor: "rgba(255,255,255,0.08)",
-          paddingBottom: "max(env(safe-area-inset-bottom), 8px)",
-          paddingTop: "8px",
-        }}>
-        {/* Статус */}
-        <button className="flex flex-col items-center gap-0.5 min-w-[48px]" onClick={onShowProfile}>
-          <Icon name="Circle" size={22} className="text-white/30" />
-          <span className="text-[10px] text-white/30">Статус</span>
-        </button>
-        {/* Звонки */}
-        <button className="flex flex-col items-center gap-0.5 min-w-[48px]" onClick={onShowNewChat}>
-          <Icon name="Phone" size={22} className="text-white/30" />
-          <span className="text-[10px] text-white/30">Звонки</span>
-        </button>
-        {/* Инструменты */}
-        <button className="flex flex-col items-center gap-0.5 min-w-[48px]" onClick={onShowNewGroup}>
-          <Icon name="Grid3x3" size={22} className="text-white/30" />
-          <span className="text-[10px] text-white/30">Инструменты</span>
-        </button>
-        {/* Чаты — активный */}
-        <button className="flex flex-col items-center gap-0.5 min-w-[48px] relative">
-          <div className="relative">
-            <Icon name="MessageCircle" size={24} className="text-[#25D366]" />
-            {totalUnread > 0 && (
-              <span className="absolute -top-1 -right-1 bg-[#25D366] text-white text-[9px] font-bold min-w-[14px] h-[14px] rounded-full flex items-center justify-center px-0.5">
-                {totalUnread > 9 ? "9+" : totalUnread}
-              </span>
-            )}
-          </div>
-          <span className="text-[10px] text-[#25D366] font-medium">Чаты</span>
-        </button>
-        {/* Настройки */}
-        <button className="flex flex-col items-center gap-0.5 min-w-[48px] relative" onClick={onOpenSetupGuide}>
-          <div className="relative">
-            <Icon name="Settings" size={22} className="text-white/30" />
-            {!notifGranted && "Notification" in window && (
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full" />
-            )}
-          </div>
-          <span className="text-[10px] text-white/30">Настройки</span>
-        </button>
-      </div>
     </div>
   );
 };
