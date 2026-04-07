@@ -2,7 +2,6 @@
 import { useState, useRef } from "react";
 import Icon from "@/components/ui/icon";
 import DzChatAvatar from "./DzChatAvatar";
-import { api } from "./dzchat.utils";
 
 interface Props {
   me: any;

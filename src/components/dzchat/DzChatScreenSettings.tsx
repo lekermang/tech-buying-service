@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import DzChatAvatar from "./DzChatAvatar";
 import DzChatAvatarEditor from "./DzChatAvatarEditor";

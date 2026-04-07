@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import DzChatAuth from "@/components/dzchat/DzChatAuth";
 import DzChatView from "@/components/dzchat/DzChatView";
@@ -14,39 +14,38 @@ import { getTheme } from "@/components/dzchat/dzchat.theme";
 
 type TabId = "status" | "calls" | "tools" | "chats" | "settings";
 
-// ── Splash Screen ──────────────────────────────────────────────────
+// ── Splash ─────────────────────────────────────────────────────────
 const DzChatSplash = ({ onDone }: { onDone: () => void }) => {
   useEffect(() => {
-    const t = setTimeout(onDone, 1600);
+    const t = setTimeout(onDone, 1500);
     return () => clearTimeout(t);
   }, [onDone]);
-
   return (
     <div className="fixed inset-0 z-[999] flex flex-col items-center justify-center"
-      style={{ background: "linear-gradient(160deg, #050d14 0%, #0a1929 50%, #06131f 100%)" }}>
+      style={{ background: "linear-gradient(160deg,#050d14,#0a1929)" }}>
       <div className="relative mb-6" style={{ animation: "dz-pop 0.5s cubic-bezier(0.34,1.56,0.64,1) both" }}>
-        <div className="w-24 h-24 rounded-[28px] flex items-center justify-center shadow-2xl"
-          style={{ background: "linear-gradient(135deg, #25D366 0%, #128C7E 100%)" }}>
+        <div className="w-24 h-24 rounded-[28px] flex items-center justify-center"
+          style={{ background: "linear-gradient(135deg,#25D366,#128C7E)", boxShadow: "0 20px 60px rgba(37,211,102,0.4)" }}>
           <Icon name="MessageCircle" size={48} className="text-white" />
         </div>
         <div className="absolute inset-0 rounded-[28px]"
-          style={{ background: "rgba(37,211,102,0.25)", animation: "dz-pulse-ring 1.2s ease-out 0.5s infinite" }} />
+          style={{ background: "rgba(37,211,102,0.2)", animation: "dz-pulse-ring 1.2s ease-out 0.5s infinite" }} />
       </div>
       <p className="text-white text-3xl font-black tracking-tight mb-1"
-        style={{ fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif", animation: "dz-slide-up 0.4s 0.3s both" }}>
+        style={{ fontFamily: "-apple-system,BlinkMacSystemFont,sans-serif", animation: "dz-slide-up 0.4s 0.3s both" }}>
         DzChat
       </p>
       <p className="text-white/35 text-sm" style={{ animation: "dz-slide-up 0.4s 0.5s both" }}>
         Мессенджер нового поколения
       </p>
       <div className="absolute bottom-16 w-32 h-[2px] rounded-full overflow-hidden bg-white/10">
-        <div className="h-full bg-[#25D366] rounded-full" style={{ animation: "splashBar 1.4s ease both" }} />
+        <div className="h-full bg-[#25D366] rounded-full" style={{ animation: "splashBar 1.3s ease both" }} />
       </div>
     </div>
   );
 };
 
-// ── Tab Bar ────────────────────────────────────────────────────────
+// ── TabBar ─────────────────────────────────────────────────────────
 const TABS: { id: TabId; icon: string; label: string }[] = [
   { id: "status",   icon: "Circle",        label: "Статус" },
   { id: "calls",    icon: "Phone",         label: "Звонки" },
@@ -76,8 +75,7 @@ const TabBar = ({ active, onChange, totalUnread, notifGranted }: {
           className="flex flex-col items-center gap-[3px] relative transition-all active:scale-90"
           style={{ minWidth: 52, padding: "2px 8px" }}>
           {isActive && (
-            <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-[#25D366]"
-              style={{ animation: "dz-tab-dot 0.2s ease both" }} />
+            <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-[#25D366]" />
           )}
           <div className="relative">
             <Icon name={tab.icon as any} size={23}
@@ -91,7 +89,6 @@ const TabBar = ({ active, onChange, totalUnread, notifGranted }: {
                 style={{
                   background: tab.id === "settings" ? "#ff3b30" : "#25D366",
                   fontSize: 9, minWidth: 15, height: 15, padding: "0 3px",
-                  fontFamily: "-apple-system,sans-serif",
                 }}>
                 {badge > 9 ? "9+" : badge}
               </span>
@@ -103,7 +100,6 @@ const TabBar = ({ active, onChange, totalUnread, notifGranted }: {
             color: isActive ? "#25D366" : "rgba(255,255,255,0.28)",
             fontFamily: "-apple-system,BlinkMacSystemFont,sans-serif",
             transition: "color 0.18s",
-            letterSpacing: "-0.1px",
           }}>
             {tab.label}
           </span>
@@ -117,7 +113,6 @@ const TabBar = ({ active, onChange, totalUnread, notifGranted }: {
 const DzChat = () => {
   const [activeTab, setActiveTab] = useState<TabId>("chats");
   const [showSplash, setShowSplash] = useState(() => {
-    // Показываем сплэш только один раз за сессию
     const shown = sessionStorage.getItem("dzchat_splash");
     if (!shown) { sessionStorage.setItem("dzchat_splash", "1"); return true; }
     return false;
@@ -146,14 +141,29 @@ const DzChat = () => {
     installApp,
   } = useDzChatState();
 
+  // Экран авторизации — me ещё null, рендерим только Auth
+  if (!token || !me) {
+    return (
+      <div className="dzchat-root h-[100dvh] w-full flex justify-center bg-black">
+        {showSplash && <DzChatSplash onDone={() => setShowSplash(false)} />}
+        <div className="w-full max-w-[430px] h-[100dvh] overflow-hidden">
+          <DzChatAuth onAuth={(tok, user) => {
+            sendTokenToSW(tok); setToken(tok); setMe(user);
+          }} />
+        </div>
+      </div>
+    );
+  }
+
+  // Отсюда me гарантированно не null
   const totalUnread = chats.reduce((s, c) => s + (c.unread || 0), 0);
   const filteredChats = searchQuery.trim()
     ? chats.filter(c => c.name?.toLowerCase().includes(searchQuery.toLowerCase()))
     : chats;
 
-  const modals = (
+  const makeModals = () => (
     <DzChatModalsLayer
-      token={token ?? ""} me={me} chats={chats} theme={theme}
+      token={token} me={me} chats={chats} theme={theme}
       showNewChat={showNewChat} showNewGroup={showNewGroup}
       showProfile={showProfile} showSetupGuide={showSetupGuide}
       installPrompt={installPrompt} incomingCall={incomingCall}
@@ -161,8 +171,8 @@ const DzChat = () => {
       onCloseNewGroup={() => setShowNewGroup(false)}
       onCloseProfile={() => setShowProfile(false)}
       onCloseSetupGuide={() => setShowSetupGuide(false)}
-      onChatCreated={id => { setNewChatId(id); if (token) loadChats(token); setActiveTab("chats"); }}
-      onGroupCreated={id => { setNewChatId(id); if (token) loadChats(token); setActiveTab("chats"); }}
+      onChatCreated={id => { setNewChatId(id); loadChats(token); setActiveTab("chats"); }}
+      onGroupCreated={id => { setNewChatId(id); loadChats(token); setActiveTab("chats"); }}
       onMeUpdate={u => setMe(u)}
       onLogout={() => { setShowProfile(false); logout(); }}
       onSwitchAccount={() => { setShowProfile(false); logout(); }}
@@ -173,8 +183,8 @@ const DzChat = () => {
     />
   );
 
-  // ── Режим открытого чата (полный экран) ──
-  if (token && me && activeChat) {
+  // Открытый чат — полноэкранный режим
+  if (activeChat) {
     return (
       <div className="dzchat-root h-[100dvh] w-full flex justify-center bg-black">
         <div className="w-full max-w-[430px] h-[100dvh] flex flex-col overflow-hidden bg-[#0f1923]">
@@ -183,24 +193,13 @@ const DzChat = () => {
             onBack={() => setActiveChat(null)}
             onChatUpdate={() => loadChats(token)}
           />
-          {modals}
+          {makeModals()}
         </div>
       </div>
     );
   }
 
-  // ── Авторизация ──
-  if (!token || !me) {
-    return (
-      <div className="dzchat-root h-[100dvh] w-full flex justify-center bg-black">
-        <div className="w-full max-w-[430px] h-[100dvh] overflow-hidden">
-          <DzChatAuth onAuth={(tok, user) => { sendTokenToSW(tok); setToken(tok); setMe(user); }} />
-        </div>
-      </div>
-    );
-  }
-
-  // ── Основной UI с таббаром ──
+  // Основной UI
   const renderScreen = () => {
     switch (activeTab) {
       case "status":
@@ -244,9 +243,8 @@ const DzChat = () => {
   return (
     <div className="dzchat-root h-[100dvh] w-full flex justify-center bg-black">
       {showSplash && <DzChatSplash onDone={() => setShowSplash(false)} />}
-
       <div className="w-full max-w-[430px] h-[100dvh] flex flex-col overflow-hidden bg-black">
-        <div className="flex-1 overflow-hidden relative" style={{ animation: "dz-slide-up 0.3s ease both" }}>
+        <div className="flex-1 overflow-hidden relative">
           {renderScreen()}
         </div>
         <TabBar
@@ -255,7 +253,7 @@ const DzChat = () => {
           totalUnread={totalUnread}
           notifGranted={notifGranted}
         />
-        {modals}
+        {makeModals()}
       </div>
     </div>
   );
