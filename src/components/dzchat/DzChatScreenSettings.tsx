@@ -61,6 +61,14 @@ const DzChatScreenSettings = ({
   const [themeId, setThemeId] = useState(() => localStorage.getItem("dzchat_theme") ?? "dark");
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Синхронизируем превью когда me обновляется извне (после сохранения)
+  useEffect(() => {
+    if (!avatarB64) {
+      setAvatarPreview(me.avatar_url || null);
+      setName(me.name);
+    }
+  }, [me.avatar_url, me.name, me.avatar_bust]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return;
     const reader = new FileReader();

@@ -60,7 +60,8 @@ const DzChatSidebar = ({
           <DzChatAvatar name={me.name || "?"} url={me.avatar_url} size={36} bust={me.avatar_bust} />
         </button>
 
-        <h1 className="text-white font-bold text-[22px] tracking-tight flex-1 ml-3">Чаты</h1>
+        <p className="text-white font-bold text-[22px] tracking-tight flex-1 ml-3"
+          style={{ fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif" }}>Чаты</p>
 
         <div className="flex items-center gap-1">
           {/* Камера */}

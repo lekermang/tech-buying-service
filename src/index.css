@@ -353,4 +353,110 @@
     background-clip: text;
     animation: shimmer 2.5s linear infinite;
   }
+
+  /* ── DzChat: сброс глобальных стилей внутри чата ── */
+  .dzchat-root h1,
+  .dzchat-root h2,
+  .dzchat-root h3,
+  .dzchat-root h4,
+  .dzchat-root p,
+  .dzchat-root span,
+  .dzchat-root button,
+  .dzchat-root input {
+    font-family:
+      -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto,
+      sans-serif;
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
+  /* ── DzChat premium анимации ── */
+  @keyframes dz-slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes dz-slide-in {
+    from {
+      opacity: 0;
+      transform: translateX(-12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  @keyframes dz-pop {
+    0% {
+      transform: scale(0.85);
+      opacity: 0;
+    }
+    60% {
+      transform: scale(1.04);
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+  @keyframes dz-pulse-ring {
+    0% {
+      transform: scale(1);
+      opacity: 0.6;
+    }
+    100% {
+      transform: scale(1.8);
+      opacity: 0;
+    }
+  }
+  @keyframes dz-tab-dot {
+    0% {
+      transform: scaleX(0);
+    }
+    100% {
+      transform: scaleX(1);
+    }
+  }
+  @keyframes dz-msg-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .dz-slide-up {
+    animation: dz-slide-up 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+  .dz-slide-in {
+    animation: dz-slide-in 0.22s cubic-bezier(0.34, 1.2, 0.64, 1) both;
+  }
+  .dz-pop {
+    animation: dz-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+  .dz-msg-in {
+    animation: dz-msg-in 0.2s ease both;
+  }
+
+  /* Нет выделения в DzChat */
+  .dzchat-root * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Скроллбар скрыт */
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }

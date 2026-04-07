@@ -177,13 +177,19 @@ export function useDzChatState() {
     setLoadingChats(true);
     sendTokenToSW(token);
     api("me", "GET", undefined, token).then(u => {
-      // Выкидываем только при явном 401 (истёкший/неверный токен), но не при сетевых ошибках
-      if (u?.error === "Unauthorized") { localStorage.removeItem("dzchat_token"); sessionStorage.removeItem("dzchat_token_session"); setToken(null); sendTokenToSW(null); return; }
-      if (u?.error) { setLoadingChats(false); return; } // сетевая ошибка — просто ждём
+      // Выкидываем ТОЛЬКО при явном Unauthorized — никогда при сетевых ошибках
+      if (u?.error === "Unauthorized") {
+        localStorage.removeItem("dzchat_token");
+        sessionStorage.removeItem("dzchat_token_session");
+        setToken(null); sendTokenToSW(null); return;
+      }
+      if (!u || u?.error) { setLoadingChats(false); return; } // сетевая ошибка — ждём
       setMe(u);
       loadChats(token).finally(() => setLoadingChats(false));
-      pollRef.current = setInterval(() => loadChats(token), 1500);
-      pingRef.current = setInterval(() => api("ping", "POST", {}, token), 20000);
+      // Интервал polling: 2 сек — баланс скорости и батарейки
+      pollRef.current = setInterval(() => loadChats(token), 2000);
+      // Ping каждые 30 сек — продлевает сессию
+      pingRef.current = setInterval(() => api("ping", "POST", {}, token).catch(() => {}), 30000);
       if ("Notification" in window && Notification.permission === "granted") {
         subscribePush(token);
       }
@@ -194,6 +200,9 @@ export function useDzChatState() {
         }
       };
       callPollRef.current = setInterval(pollIncoming, 3000);
+    }).catch(() => {
+      // Сетевая ошибка при запуске — не выкидываем, просто ждём
+      setLoadingChats(false);
     });
     return () => {
       clearInterval(pollRef.current);
