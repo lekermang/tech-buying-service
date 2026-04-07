@@ -166,7 +166,7 @@ const DzChatAvatarEditor = ({ src, onSave, onClose }: Props) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[60] bg-black/90 flex flex-col items-center justify-center px-4"
+    <div className="dzchat-root fixed inset-0 z-[60] bg-black/90 flex flex-col items-center justify-center px-4"
       onClick={e => e.stopPropagation()}>
 
       {/* Шапка */}

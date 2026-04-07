@@ -3,7 +3,6 @@ import Icon from "@/components/ui/icon";
 import { NewChatModal, ProfileModal, CreateGroupModal } from "@/components/dzchat/DzChatModals";
 import { DzChatSetupGuide } from "@/components/dzchat/DzChatInstall";
 import DzChatCall from "@/components/dzchat/DzChatCall";
-import { getTheme } from "@/components/dzchat/dzchat.theme";
 
 interface DzChatModalsLayerProps {
   token: string;
