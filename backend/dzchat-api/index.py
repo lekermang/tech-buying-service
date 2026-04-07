@@ -211,6 +211,27 @@ def handler(event: dict, context) -> dict:
 
     conn = get_conn()
 
+    # ── GENERATE VAPID KEYS (one-time setup) ─────────────────────
+    if action == "generate_vapid_keys" and method == "GET":
+        conn.close()
+        try:
+            from cryptography.hazmat.primitives.asymmetric import ec
+            from cryptography.hazmat.primitives import serialization
+            from cryptography.hazmat.backends import default_backend
+            private_key = ec.generate_private_key(ec.SECP256R1(), default_backend())
+            private_bytes = private_key.private_numbers().private_value.to_bytes(32, "big")
+            public_bytes = private_key.public_key().public_bytes(
+                serialization.Encoding.X962,
+                serialization.PublicFormat.UncompressedPoint,
+            )
+            return resp({
+                "VAPID_PUBLIC_KEY": _b64url_encode(public_bytes),
+                "VAPID_PRIVATE_KEY": _b64url_encode(private_bytes),
+                "note": "Copy these to your project secrets, then delete this endpoint"
+            })
+        except Exception as ex:
+            return resp({"error": str(ex)}, 500)
+
     # ── VAPID PUBLIC KEY ──────────────────────────────────────────
     if action == "vapid_public_key" and method == "GET":
         key = os.environ.get("VAPID_PUBLIC_KEY", "")
