@@ -139,9 +139,20 @@ const DzChat = () => {
     loadChats,
     logout,
     installApp,
+    bootLoading,
   } = useDzChatState();
 
-  // Экран авторизации — me ещё null, рендерим только Auth
+  // Пока идёт первая загрузка (есть токен но me ещё не получен) — показываем сплэш,
+  // а не экран авторизации. Это предотвращает мигание при запуске PWA.
+  if (bootLoading) {
+    return (
+      <div className="dzchat-root h-[100dvh] w-full flex justify-center bg-black">
+        <DzChatSplash onDone={() => {}} />
+      </div>
+    );
+  }
+
+  // Экран авторизации — токена нет или me не загрузился
   if (!token || !me) {
     return (
       <div className="dzchat-root h-[100dvh] w-full flex justify-center bg-black">

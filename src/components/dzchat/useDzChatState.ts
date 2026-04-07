@@ -5,14 +5,31 @@ import { playNotificationSound } from "@/components/dzchat/DzChatModals";
 import { loadAndApplyTheme } from "@/components/dzchat/dzchat.theme";
 
 const NOTIF_ICON = "/dzchat-icon.svg";
+const POLL_INTERVAL = 2500;   // polling чатов
+const PING_INTERVAL = 30000;  // keep-alive
+const CALL_POLL_INTERVAL = 3000;
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
   const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
-  return outputArray;
+  const out = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) out[i] = rawData.charCodeAt(i);
+  return out;
+}
+
+// Retry fetch /me до 3 раз с паузой — защита от медленной сети при старте PWA
+async function fetchMeWithRetry(token: string, attempts = 3, delay = 1500): Promise<any> {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const u = await api("me", "GET", undefined, token);
+      if (u && !u.error) return u;
+      if (u?.error === "Unauthorized") return { __unauthorized: true };
+      // Любая другая ошибка — ждём и пробуем снова
+    } catch (_) { /* сетевой сбой */ }
+    if (i < attempts - 1) await new Promise(r => setTimeout(r, delay));
+  }
+  return null; // все попытки провалились
 }
 
 export function useDzChatState() {
@@ -20,6 +37,11 @@ export function useDzChatState() {
     () => localStorage.getItem("dzchat_token") || sessionStorage.getItem("dzchat_token_session")
   );
   const [me, setMe] = useState<any>(null);
+  // bootLoading: true пока идёт первая загрузка — чтобы не мигал экран авторизации
+  const [bootLoading, setBootLoading] = useState<boolean>(() => {
+    const t = localStorage.getItem("dzchat_token") || sessionStorage.getItem("dzchat_token_session");
+    return !!t; // если токен есть — показываем лоадер, не Auth экран
+  });
   const [chats, setChats] = useState<any[]>([]);
   const [activeChat, setActiveChat] = useState<any>(null);
   const [showNewChat, setShowNewChat] = useState(false);
@@ -43,16 +65,16 @@ export function useDzChatState() {
   const notifGrantedRef = useRef(false);
 
   // ── Service Worker ────────────────────────────────────────────
-  const sendTokenToSW = async (tok: string | null) => {
+  const sendTokenToSW = useCallback(async (tok: string | null) => {
     if (!("serviceWorker" in navigator)) return;
     try {
       const reg = await navigator.serviceWorker.ready;
       reg.active?.postMessage({ type: tok ? "SET_TOKEN" : "LOGOUT", token: tok });
     } catch (_e) { /* SW not available */ }
-  };
+  }, []);
 
   // ── Web Push подписка ─────────────────────────────────────────
-  const subscribePush = async (tok: string) => {
+  const subscribePush = useCallback(async (tok: string) => {
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
     if (Notification.permission !== "granted") return;
     try {
@@ -60,24 +82,39 @@ export function useDzChatState() {
       if (!data?.ready || !data?.public_key) return;
       const reg = await navigator.serviceWorker.ready;
       const existing = await reg.pushManager.getSubscription();
-      let sub = existing;
-      if (!sub) {
-        const key = urlBase64ToUint8Array(data.public_key);
-        sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
-      }
+      const sub = existing || await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(data.public_key),
+      });
       if (sub) {
-        const subJson = sub.toJSON() as { endpoint: string; keys: { p256dh: string; auth: string } };
-        await api("push_subscribe", "POST", { subscription: subJson, user_agent: navigator.userAgent }, tok);
+        const j = sub.toJSON() as { endpoint: string; keys: { p256dh: string; auth: string } };
+        await api("push_subscribe", "POST", { subscription: j, user_agent: navigator.userAgent }, tok);
       }
-    } catch (_e) { /* push not supported or denied */ }
-  };
+    } catch (_e) { /* push not supported */ }
+  }, []);
 
+  // ── SW регистрация + pushsubscriptionchange ───────────────────
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
-    navigator.serviceWorker.register("/sw.js").then(async () => {
+    navigator.serviceWorker.register("/sw.js").then(async (reg) => {
       const tok = localStorage.getItem("dzchat_token");
       if (tok) await sendTokenToSW(tok);
+
+      // Обновление подписки когда она протухает (особенно нужно для Android)
+      reg.addEventListener("pushsubscriptionchange" as any, async (event: any) => {
+        const tok2 = localStorage.getItem("dzchat_token");
+        if (!tok2) return;
+        try {
+          const newSub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: event.oldSubscription?.options?.applicationServerKey,
+          });
+          const j = newSub.toJSON() as any;
+          await api("push_subscribe", "POST", { subscription: j, user_agent: navigator.userAgent }, tok2);
+        } catch (_e) { /* resubscribe failed */ }
+      });
     }).catch(() => {});
+
     const onMsg = (e: MessageEvent) => {
       if (e.data?.type === "PLAY_SOUND") {
         const soundId = localStorage.getItem("dzchat_sound") || "default";
@@ -89,8 +126,9 @@ export function useDzChatState() {
     };
     navigator.serviceWorker.addEventListener("message", onMsg);
     return () => navigator.serviceWorker.removeEventListener("message", onMsg);
-  }, []);
+  }, [sendTokenToSW]);
 
+  // ── beforeinstallprompt ───────────────────────────────────────
   useEffect(() => {
     const handler = (e: any) => { e.preventDefault(); setInstallPrompt(e); };
     window.addEventListener("beforeinstallprompt", handler);
@@ -98,15 +136,15 @@ export function useDzChatState() {
   }, []);
 
   // ── Уведомления ───────────────────────────────────────────────
-  const requestNotifications = async () => {
+  const requestNotifications = useCallback(async () => {
     if (!("Notification" in window)) return;
     const perm = await Notification.requestPermission();
     const granted = perm === "granted";
     setNotifGranted(granted);
     notifGrantedRef.current = granted;
-    sendTokenToSW(token);
+    if (token) sendTokenToSW(token);
     if (granted && token) subscribePush(token);
-  };
+  }, [token, sendTokenToSW, subscribePush]);
 
   useEffect(() => {
     if ("Notification" in window && Notification.permission === "granted") {
@@ -115,6 +153,7 @@ export function useDzChatState() {
     }
   }, []);
 
+  // ── Уведомления о новых сообщениях ───────────────────────────
   const notifyNewMessages = useCallback((newChats: any[]) => {
     if (!initializedRef.current) {
       newChats.forEach(c => { prevUnreadRef.current[c.id] = c.unread; });
@@ -137,7 +176,7 @@ export function useDzChatState() {
         if (notifGrantedRef.current && document.visibilityState !== "visible") {
           try {
             const lm = chat.last_message;
-            const body = lm.voice_url ? "🎤 Голосовое сообщение"
+            const body = lm.voice_url ? "🎤 Голосовое"
               : lm.photo_url ? "📷 Фото"
               : lm.video_url ? "🎥 Видео"
               : (lm.text || "Новое сообщение");
@@ -145,13 +184,14 @@ export function useDzChatState() {
               body, icon: NOTIF_ICON, badge: NOTIF_ICON,
               tag: `dzchat-${chat.id}`, renotify: true, silent: false,
             });
-          } catch (_e) { /* not supported */ }
+          } catch (_e) { /* notification not supported */ }
         }
       }
       prevUnreadRef.current[chat.id] = chat.unread;
     });
   }, []);
 
+  // ── Загрузка чатов ────────────────────────────────────────────
   const loadChats = useCallback(async (tok: string) => {
     if (fetchingRef.current) return;
     fetchingRef.current = true;
@@ -170,47 +210,57 @@ export function useDzChatState() {
     }
   }, [notifyNewMessages]);
 
+  // ── Инициализация: загрузка /me с retry ───────────────────────
   useEffect(() => {
-    if (!token) return;
+    if (!token) {
+      setBootLoading(false);
+      return;
+    }
     initializedRef.current = false;
     fetchingRef.current = false;
     setLoadingChats(true);
     sendTokenToSW(token);
-    api("me", "GET", undefined, token).then(u => {
-      // Выкидываем ТОЛЬКО при явном Unauthorized — никогда при сетевых ошибках
-      if (u?.error === "Unauthorized") {
+
+    fetchMeWithRetry(token).then(u => {
+      setBootLoading(false);
+
+      if (!u || u.__unauthorized) {
+        // Только явный 401 — выкидываем
         localStorage.removeItem("dzchat_token");
         sessionStorage.removeItem("dzchat_token_session");
-        setToken(null); sendTokenToSW(null); return;
+        setToken(null);
+        sendTokenToSW(null);
+        setLoadingChats(false);
+        return;
       }
-      if (!u || u?.error) { setLoadingChats(false); return; } // сетевая ошибка — ждём
+
       setMe(u);
       loadChats(token).finally(() => setLoadingChats(false));
-      // Интервал polling: 2 сек — баланс скорости и батарейки
-      pollRef.current = setInterval(() => loadChats(token), 2000);
-      // Ping каждые 30 сек — продлевает сессию
-      pingRef.current = setInterval(() => api("ping", "POST", {}, token).catch(() => {}), 30000);
+
+      pollRef.current = setInterval(() => loadChats(token), POLL_INTERVAL);
+      pingRef.current = setInterval(() => api("ping", "POST", {}, token).catch(() => {}), PING_INTERVAL);
+
       if ("Notification" in window && Notification.permission === "granted") {
         subscribePush(token);
       }
+
       const pollIncoming = async () => {
         const data = await api("call_status", "GET", undefined, token).catch(() => null);
         if (data?.call && data.call.status === "ringing") {
           setIncomingCall((prev: any) => prev?.id === data.call.id ? prev : data.call);
         }
       };
-      callPollRef.current = setInterval(pollIncoming, 3000);
-    }).catch(() => {
-      // Сетевая ошибка при запуске — не выкидываем, просто ждём
-      setLoadingChats(false);
+      callPollRef.current = setInterval(pollIncoming, CALL_POLL_INTERVAL);
     });
+
     return () => {
       clearInterval(pollRef.current);
       clearInterval(pingRef.current);
       clearInterval(callPollRef.current);
     };
-  }, [token, loadChats]);
+  }, [token, loadChats, sendTokenToSW, subscribePush]);
 
+  // ── Открытие нового чата ──────────────────────────────────────
   useEffect(() => {
     if (newChatId && chats.length > 0) {
       const chat = chats.find(c => c.id === newChatId);
@@ -218,35 +268,39 @@ export function useDzChatState() {
     }
   }, [chats, newChatId]);
 
+  // ── Сброс badge при открытии чата ────────────────────────────
   useEffect(() => {
     if (activeChat) {
       if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.ready.then(reg => {
-          reg.active?.postMessage({ type: "CLEAR_BADGE" });
-        }).catch(() => {});
+        navigator.serviceWorker.ready
+          .then(reg => reg.active?.postMessage({ type: "CLEAR_BADGE" }))
+          .catch(() => {});
       }
-      if ("clearAppBadge" in navigator) {
-        (navigator as any).clearAppBadge().catch(() => {});
-      }
+      if ("clearAppBadge" in navigator) (navigator as any).clearAppBadge().catch(() => {});
     }
   }, [activeChat?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const logout = () => {
+  // ── Logout ────────────────────────────────────────────────────
+  const logout = useCallback(() => {
     localStorage.removeItem("dzchat_token");
+    sessionStorage.removeItem("dzchat_token_session");
     sendTokenToSW(null);
     setToken(null); setMe(null); setChats([]); setActiveChat(null);
-  };
+    setBootLoading(false);
+  }, [sendTokenToSW]);
 
-  const installApp = async () => {
+  // ── Установка PWA ─────────────────────────────────────────────
+  const installApp = useCallback(async () => {
     if (!installPrompt) return;
     installPrompt.prompt();
     const { outcome } = await installPrompt.userChoice;
     if (outcome === "accepted") setInstallPrompt(null);
-  };
+  }, [installPrompt]);
 
   return {
     token, setToken,
     me, setMe,
+    bootLoading,
     chats,
     activeChat, setActiveChat,
     showNewChat, setShowNewChat,

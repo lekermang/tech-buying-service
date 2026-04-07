@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dzchat-v6';
+const CACHE_NAME = 'dzchat-v7';
 const STATIC_ASSETS = ['/', '/catalog', '/dzchat'];
 const ICON = "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/dce22ed0-7e15-4a0f-84c3-9987477dea5a.jpg";
 const API = "https://functions.poehali.dev/608c7976-816a-4e3e-b374-5dd617b045bf";
@@ -172,6 +172,22 @@ function urlBase64ToUint8Array(base64String) {
   }
   return outputArray;
 }
+
+// ── Обновление push-подписки когда она протухает (Android Chrome) ────────────
+self.addEventListener('pushsubscriptionchange', e => {
+  e.waitUntil(
+    (async () => {
+      const token = pollToken;
+      if (!token) return;
+      try {
+        const newSub = await self.registration.pushManager.subscribe(
+          e.oldSubscription?.options || { userVisibleOnly: true }
+        );
+        await savePushSubscription(newSub, token);
+      } catch (_) { /* ignore */ }
+    })()
+  );
+});
 
 // ── Клик по уведомлению ────────────────────────────────────────────────────────
 self.addEventListener('notificationclick', e => {
