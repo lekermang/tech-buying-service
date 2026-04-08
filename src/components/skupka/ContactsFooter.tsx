@@ -99,7 +99,13 @@ const ContactsFooter = ({ scrollTo }: ContactsFooterProps) => {
               loading="lazy"
               decoding="async"
             />
-            <span className="font-oswald font-bold text-[#FFD700]">СКУПКА24</span>
+            <div>
+              <span className="font-oswald font-bold text-[#FFD700]">СКУПКА24</span>
+              <div className="flex flex-col">
+                <a href="tel:88006006833" className="font-roboto text-[#FFD700] text-[10px] font-bold hover:opacity-80 transition-opacity leading-tight">+7 (800) 600-68-33</a>
+                <span className="font-roboto text-white/40 text-[10px] leading-tight">звонок бесплатный</span>
+              </div>
+            </div>
           </div>
           <p className="font-roboto text-white/30 text-sm">© 2015–2026 Скупка24. Все права защищены.</p>
           <div className="flex items-center gap-4">
