@@ -117,8 +117,12 @@ def format_category_message(cat, cat_items, date_str):
         else:
             price_str = 'по запросу'
         lines.append(f'{avail} {reg} {name} — <b>{price_str}</b>')
-    lines.append(f'\n📞 Заказ и наличие: <b>{CONTACT_PHONE}</b>')
-    return '\n'.join(lines)
+    text = '\n'.join(lines)
+    phone_digits = CONTACT_PHONE.replace(' ', '').replace('-', '')
+    order_button = {'inline_keyboard': [[
+        {'text': f'📞 Заказать  {CONTACT_PHONE}', 'url': f'tel:{phone_digits}'}
+    ]]}
+    return text, order_button
 
 
 def send_tg_message(chat_id, text, reply_markup=None):
@@ -209,8 +213,8 @@ def do_send_price(chat_id):
     # Отправляем каждую категорию отдельным сообщением, запоминаем message_id
     cat_message_ids = {}
     for cat, cat_items in by_cat.items():
-        text = format_category_message(cat, cat_items, date_str)
-        result = send_tg_message(chat_id, text)
+        text, order_button = format_category_message(cat, cat_items, date_str)
+        result = send_tg_message(chat_id, text, reply_markup=order_button)
         msg_id = result.get('result', {}).get('message_id')
         if msg_id:
             cat_message_ids[cat] = msg_id
