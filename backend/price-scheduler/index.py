@@ -118,9 +118,10 @@ def format_category_message(cat, cat_items, date_str):
             price_str = 'по запросу'
         lines.append(f'{avail} {reg} {name} — <b>{price_str}</b>')
     text = '\n'.join(lines)
-    phone_digits = CONTACT_PHONE.replace(' ', '').replace('-', '')
+    wa_number = CONTACT_PHONE.replace('+', '').replace(' ', '').replace('-', '')
     order_button = {'inline_keyboard': [[
-        {'text': f'📞 Заказать  {CONTACT_PHONE}', 'url': f'tel:{phone_digits}'}
+        {'text': '💬 WhatsApp', 'url': f'https://wa.me/{wa_number}'},
+        {'text': '✍️ Написать менеджеру', 'url': 'https://t.me/KalygaSkypka24'},
     ]]}
     return text, order_button
 
