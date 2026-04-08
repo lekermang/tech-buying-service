@@ -1,14 +1,16 @@
 """
-Автоматическая отправка прайса в Telegram-группу + ping sitemap в Яндекс.Вебмастер. v8
+Автоматическая отправка прайса в Telegram-группу + ping sitemap в Яндекс.Вебмастер + автопостинг новостей. v9
 - ?action=send_now — немедленная отправка прайса (для теста)
 - ?action=ping_sitemap — отправить sitemap прямо сейчас (для теста)
+- ?action=post_news_now — немедленно опубликовать новость (для теста)
 - ?action=schedule_check — проверка расписания (вызывается каждые 5 мин)
-Расписание: 10:00 МСК — прайс в Telegram + ping sitemap в Яндекс.Вебмастер
+Расписание: 10:00 МСК — прайс + ping sitemap; каждый час — новость в новостную группу
 """
 
 import json
 import os
 import threading
+import base64
 import xml.etree.ElementTree as ET
 import psycopg2
 import urllib.request
@@ -27,6 +29,34 @@ SEND_HOUR = 10
 SITE_URL = 'https://skypka24.com'
 SITEMAP_URL = 'https://skypka24.com/sitemap.xml'
 YM_API = 'https://api.webmaster.yandex.net/v4'
+
+NEWS_TOPICS = [
+    "Новые функции последней версии iOS",
+    "Чем отличается OLED от AMOLED дисплей в смартфонах",
+    "Зачем нужен быстрый процессор в смартфоне",
+    "Советы по уходу за аккумулятором iPhone",
+    "Что такое 5G и стоит ли переходить",
+    "Как выбрать смартфон для игр",
+    "Лучшие камеры в смартфонах 2024–2025",
+    "Чем хорош iPhone 15 Pro Max",
+    "Samsung Galaxy S25 — что нового",
+    "Xiaomi 14 Ultra: флагман за разумные деньги",
+    "Зачем покупать б/у iPhone вместо нового",
+    "Как правильно заряжать смартфон",
+    "Что такое IP68 и зачем это нужно",
+    "Беспроводные наушники: AirPods vs конкуренты",
+    "MacBook vs Windows ноутбук — что выбрать",
+    "iPad для работы и учёбы — стоит ли брать",
+    "Apple Watch: зачем умные часы в 2025 году",
+    "Как перенести данные со старого смартфона",
+    "Face ID vs сканер отпечатка — что надёжнее",
+    "Топ аксессуаров для iPhone",
+    "Почему смартфоны из США и Европы ценятся выше",
+    "Что нужно проверить при покупке б/у смартфона",
+    "Облачные хранилища: iCloud, Google Drive, Яндекс.Диск",
+    "Как смартфоны снимают видео 4K и зачем это",
+    "Snapdragon 8 Elite — самый мощный чип 2025 года",
+]
 
 
 def get_conn():
@@ -338,8 +368,194 @@ def ping_sitemap_to_yandex():
     return result
 
 
+def get_used_news_topics():
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        f"SELECT topic FROM {SCHEMA}.news_post_log WHERE posted_at > NOW() - INTERVAL '7 days' AND error IS NULL"
+    )
+    rows = cur.fetchall()
+    cur.close(); conn.close()
+    return {r[0] for r in rows}
+
+
+def get_last_news_posted_hour():
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        f"SELECT posted_at FROM {SCHEMA}.news_post_log WHERE error IS NULL ORDER BY posted_at DESC LIMIT 1"
+    )
+    row = cur.fetchone()
+    cur.close(); conn.close()
+    return row[0] if row else None
+
+
+def check_news_already_posted_this_hour():
+    last = get_last_news_posted_hour()
+    if not last:
+        return False
+    now_msk = datetime.now(MSK)
+    last_msk = last.astimezone(MSK)
+    return last_msk.date() == now_msk.date() and last_msk.hour == now_msk.hour
+
+
+def log_news_post(topic, message_id=None, error=None):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        f"INSERT INTO {SCHEMA}.news_post_log (topic, message_id, error) VALUES (%s, %s, %s)",
+        (topic, message_id, error)
+    )
+    conn.commit()
+    cur.close(); conn.close()
+
+
+def pick_news_topic():
+    used = get_used_news_topics()
+    available = [t for t in NEWS_TOPICS if t not in used]
+    if not available:
+        available = NEWS_TOPICS
+    now_msk = datetime.now(MSK)
+    idx = (now_msk.hour + now_msk.day * 24) % len(available)
+    return available[idx]
+
+
+def generate_news_text(topic: str) -> str:
+    api_key = os.environ.get('POLZA_AI_API_KEY', '')
+    if not api_key:
+        raise ValueError('POLZA_AI_API_KEY not set')
+
+    prompt = (
+        f"Напиши короткую интересную новость или полезный пост для Telegram-канала о технике на тему: «{topic}».\n"
+        "Требования:\n"
+        "- Длина 150–250 слов\n"
+        "- Живой, разговорный стиль, без официоза\n"
+        "- Используй 2–3 эмодзи в тексте\n"
+        "- НЕ упоминай источники, издания, сайты\n"
+        "- НЕ добавляй контакты, телефоны, ссылки\n"
+        "- НЕ добавляй хэштеги\n"
+        "- Текст должен быть законченным и полезным\n"
+        "- Язык: русский\n"
+        "Верни только текст поста, без предисловий."
+    )
+
+    payload = json.dumps({
+        "model": "gpt-4o-mini",
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 600,
+        "temperature": 0.85,
+    }).encode('utf-8')
+
+    req = urllib.request.Request(
+        'https://api.polza.ai/v1/chat/completions',
+        data=payload,
+        headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'}
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        data = json.loads(resp.read())
+    return data['choices'][0]['message']['content'].strip()
+
+
+def generate_news_image(topic: str):
+    api_key = os.environ.get('POLZA_AI_API_KEY', '')
+    if not api_key:
+        return None
+
+    image_prompt = (
+        f"High quality product photo related to: {topic}. "
+        "Modern smartphone or tech gadget, clean white background, professional photography, "
+        "sharp focus, studio lighting, commercial style."
+    )
+
+    payload = json.dumps({
+        "model": "flux-schnell",
+        "prompt": image_prompt,
+        "size": "1024x1024",
+        "n": 1,
+    }).encode('utf-8')
+
+    try:
+        req = urllib.request.Request(
+            'https://api.polza.ai/v1/images/generations',
+            data=payload,
+            headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'}
+        )
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = json.loads(resp.read())
+
+        item = data['data'][0]
+        img_url = item.get('url')
+        b64 = item.get('b64_json')
+        if img_url:
+            with urllib.request.urlopen(img_url, timeout=30) as r:
+                return r.read()
+        elif b64:
+            return base64.b64decode(b64)
+    except Exception:
+        pass
+    return None
+
+
+def send_tg_photo_caption(chat_id: str, photo_bytes: bytes, caption: str):
+    token = os.environ.get('CATALOG_BOT_TOKEN', '')
+    if not token:
+        raise ValueError('CATALOG_BOT_TOKEN not set')
+
+    boundary = 'FormBoundaryNewsPhoto'
+    body = (
+        f'--{boundary}\r\n'
+        f'Content-Disposition: form-data; name="chat_id"\r\n\r\n'
+        f'{chat_id}\r\n'
+        f'--{boundary}\r\n'
+        f'Content-Disposition: form-data; name="caption"\r\n\r\n'
+        f'{caption}\r\n'
+        f'--{boundary}\r\n'
+        f'Content-Disposition: form-data; name="photo"; filename="news.jpg"\r\n'
+        f'Content-Type: image/jpeg\r\n\r\n'
+    ).encode('utf-8') + photo_bytes + f'\r\n--{boundary}--\r\n'.encode('utf-8')
+
+    req = urllib.request.Request(
+        f'https://api.telegram.org/bot{token}/sendPhoto',
+        data=body,
+        headers={'Content-Type': f'multipart/form-data; boundary={boundary}'}
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return json.loads(resp.read())
+
+
+def do_post_news():
+    news_chat_id = os.environ.get('NEWS_GROUP_CHAT_ID', '')
+    if not news_chat_id:
+        return {'ok': False, 'reason': 'NEWS_GROUP_CHAT_ID not set'}
+
+    topic = pick_news_topic()
+
+    try:
+        text = generate_news_text(topic)
+    except Exception as e:
+        log_news_post(topic, error=str(e)[:500])
+        return {'ok': False, 'topic': topic, 'reason': f'GPT error: {e}'}
+
+    try:
+        photo_bytes = generate_news_image(topic)
+    except Exception:
+        photo_bytes = None
+
+    try:
+        if photo_bytes:
+            result = send_tg_photo_caption(news_chat_id, photo_bytes, text)
+        else:
+            result = send_tg_message(news_chat_id, text)
+        msg_id = result.get('result', {}).get('message_id')
+        log_news_post(topic, message_id=msg_id)
+        return {'ok': True, 'topic': topic, 'message_id': msg_id, 'has_photo': photo_bytes is not None}
+    except Exception as e:
+        log_news_post(topic, error=str(e)[:500])
+        return {'ok': False, 'topic': topic, 'reason': f'Telegram error: {e}'}
+
+
 def handler(event: dict, context) -> dict:
-    """Отправка прайса в Telegram + ping sitemap в Яндекс.Вебмастер (10:00 МСК)"""
+    """Отправка прайса в Telegram + ping sitemap в Яндекс.Вебмастер (10:00 МСК) + автопостинг новостей каждый час"""
     if event.get('httpMethod') == 'OPTIONS':
         return {'statusCode': 200, 'headers': HEADERS, 'body': ''}
 
@@ -355,6 +571,10 @@ def handler(event: dict, context) -> dict:
 
     if action == 'ping_sitemap':
         result = ping_sitemap_to_yandex()
+        return ok(result)
+
+    if action == 'post_news_now':
+        result = do_post_news()
         return ok(result)
 
     if action == 'list_hosts':
@@ -387,6 +607,10 @@ def handler(event: dict, context) -> dict:
             job_id = create_sync_job()
             t = threading.Thread(target=sync_tools_feed, args=(job_id,), daemon=False)
             t.start()
+
+        # Автопостинг новостей — каждый час
+        if not check_news_already_posted_this_hour():
+            threading.Thread(target=do_post_news, daemon=False).start()
 
         if now_msk.hour != SEND_HOUR:
             return ok({'skipped': True, 'reason': 'not_time_' + str(now_msk.hour) + 'h'})
