@@ -139,7 +139,10 @@ const Header = ({ scrollTo }: HeaderProps) => {
             />
             <div>
               <span className="font-oswald font-bold text-lg sm:text-xl tracking-wider animate-shimmer">СКУПКА24</span>
-              <div className="font-roboto text-white/40 text-[10px] leading-tight hidden sm:block">Кирова 7/47 · Кирова 11</div>
+              <div className="font-roboto text-[10px] leading-tight hidden sm:flex flex-col gap-0">
+                <a href="tel:88006006833" className="text-[#FFD700] font-bold hover:opacity-80 transition-opacity">+7 (800) 600-68-33</a>
+                <span className="text-white/40">звонок бесплатный</span>
+              </div>
             </div>
           </div>
 
