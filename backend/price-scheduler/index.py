@@ -608,8 +608,8 @@ def handler(event: dict, context) -> dict:
             t = threading.Thread(target=sync_tools_feed, args=(job_id,), daemon=False)
             t.start()
 
-        # Автопостинг новостей — каждый час
-        if not check_news_already_posted_this_hour():
+        # Автопостинг новостей — каждый час, только с 9:00 до 22:00 МСК
+        if 9 <= now_msk.hour < 22 and not check_news_already_posted_this_hour():
             threading.Thread(target=do_post_news, daemon=False).start()
 
         if now_msk.hour != SEND_HOUR:
