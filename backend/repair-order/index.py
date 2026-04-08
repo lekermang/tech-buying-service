@@ -42,8 +42,7 @@ def handler(event: dict, context) -> dict:
     cur.close()
     conn.close()
 
-    token = os.environ['TELEGRAM_BOT_TOKEN']
-    chat_id = os.environ['TELEGRAM_CHAT_ID']
+    token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
     price_str = f'{int(price):,} ₽'.replace(',', ' ') if price else 'не определена'
 
     text = (
@@ -57,10 +56,26 @@ def handler(event: dict, context) -> dict:
         + f"\n\n🔑 ID заявки: `{order_id}`"
     )
 
-    requests.post(
-        f'https://api.telegram.org/bot{token}/sendMessage',
-        json={'chat_id': chat_id, 'text': text, 'parse_mode': 'Markdown'},
-        timeout=10,
-    )
+    if token:
+        conn2 = psycopg2.connect(os.environ['DATABASE_URL'])
+        cur2 = conn2.cursor()
+        cur2.execute(
+            "SELECT telegram_chat_id FROM t_p31606708_tech_buying_service.notification_recipients WHERE is_active=true AND notify_repair=true"
+        )
+        rows2 = cur2.fetchall()
+        cur2.close(); conn2.close()
+        chat_ids = [r[0] for r in rows2]
+        default_chat = os.environ.get('TELEGRAM_CHAT_ID', '')
+        if default_chat and default_chat not in chat_ids:
+            chat_ids.insert(0, default_chat)
+        for cid in chat_ids:
+            try:
+                requests.post(
+                    f'https://api.telegram.org/bot{token}/sendMessage',
+                    json={'chat_id': cid, 'text': text, 'parse_mode': 'Markdown'},
+                    timeout=10,
+                )
+            except Exception:
+                pass
 
     return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'order_id': order_id})}

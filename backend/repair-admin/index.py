@@ -99,6 +99,19 @@ def handler(event: dict, context) -> dict:
             ]
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'stats': stats}, ensure_ascii=False)}
 
+        # Список получателей уведомлений
+        if action == 'recipients':
+            cur.execute(
+                f"SELECT id, name, telegram_chat_id, is_active, notify_repair, created_at FROM {SCHEMA}.notification_recipients ORDER BY created_at"
+            )
+            rows = cur.fetchall()
+            cur.close(); conn.close()
+            recipients = [
+                {'id': r[0], 'name': r[1], 'telegram_chat_id': r[2], 'is_active': r[3], 'notify_repair': r[4], 'created_at': r[5].isoformat() if r[5] else None}
+                for r in rows
+            ]
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'recipients': recipients}, ensure_ascii=False)}
+
         # Список заявок
         status_filter = params.get('status', '')
         if status_filter:
@@ -129,6 +142,60 @@ def handler(event: dict, context) -> dict:
         raw_body = event.get('body') or '{}'
         body = json.loads(raw_body) if isinstance(raw_body, str) else (raw_body or {})
         action = body.get('action', 'update_status')
+
+        # Добавить получателя уведомлений
+        if action == 'add_recipient':
+            if not is_owner(event):
+                cur.close(); conn.close()
+                return {'statusCode': 403, 'headers': HEADERS, 'body': json.dumps({'error': 'Только владелец'}, ensure_ascii=False)}
+            name = (body.get('name') or '').strip()
+            chat_id_val = (body.get('telegram_chat_id') or '').strip()
+            if not name or not chat_id_val:
+                cur.close(); conn.close()
+                return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'Укажите имя и chat_id'}, ensure_ascii=False)}
+            notify_repair = body.get('notify_repair', True)
+            cur.execute(
+                f"INSERT INTO {SCHEMA}.notification_recipients (name, telegram_chat_id, is_active, notify_repair) VALUES (%s, %s, true, %s) RETURNING id",
+                (name, chat_id_val, bool(notify_repair))
+            )
+            new_id = cur.fetchone()[0]
+            conn.commit(); cur.close(); conn.close()
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'id': new_id}, ensure_ascii=False)}
+
+        # Удалить получателя уведомлений
+        if action == 'delete_recipient':
+            if not is_owner(event):
+                cur.close(); conn.close()
+                return {'statusCode': 403, 'headers': HEADERS, 'body': json.dumps({'error': 'Только владелец'}, ensure_ascii=False)}
+            rec_id = body.get('id')
+            if not rec_id:
+                cur.close(); conn.close()
+                return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'Укажите id'}, ensure_ascii=False)}
+            cur.execute(f"DELETE FROM {SCHEMA}.notification_recipients WHERE id=%s RETURNING id", (int(rec_id),))
+            deleted = cur.fetchone()
+            conn.commit(); cur.close(); conn.close()
+            if not deleted:
+                return {'statusCode': 404, 'headers': HEADERS, 'body': json.dumps({'error': 'Не найден'}, ensure_ascii=False)}
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True}, ensure_ascii=False)}
+
+        # Переключить активность получателя
+        if action == 'toggle_recipient':
+            if not is_owner(event):
+                cur.close(); conn.close()
+                return {'statusCode': 403, 'headers': HEADERS, 'body': json.dumps({'error': 'Только владелец'}, ensure_ascii=False)}
+            rec_id = body.get('id')
+            if not rec_id:
+                cur.close(); conn.close()
+                return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'Укажите id'}, ensure_ascii=False)}
+            cur.execute(
+                f"UPDATE {SCHEMA}.notification_recipients SET is_active = NOT is_active WHERE id=%s RETURNING is_active",
+                (int(rec_id),)
+            )
+            row = cur.fetchone()
+            conn.commit(); cur.close(); conn.close()
+            if not row:
+                return {'statusCode': 404, 'headers': HEADERS, 'body': json.dumps({'error': 'Не найден'}, ensure_ascii=False)}
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'is_active': row[0]}, ensure_ascii=False)}
 
         # Создание заявки
         if action == 'create':
@@ -257,6 +324,34 @@ def handler(event: dict, context) -> dict:
     return {'statusCode': 405, 'headers': HEADERS, 'body': json.dumps({'error': 'Method not allowed'}, ensure_ascii=False)}
 
 
+def get_repair_recipients() -> list:
+    import psycopg2
+    conn = psycopg2.connect(os.environ['DATABASE_URL'])
+    cur = conn.cursor()
+    cur.execute(
+        f"SELECT telegram_chat_id FROM {SCHEMA}.notification_recipients WHERE is_active=true AND notify_repair=true"
+    )
+    rows = cur.fetchall()
+    cur.close(); conn.close()
+    chat_ids = [r[0] for r in rows]
+    default = os.environ.get('TELEGRAM_CHAT_ID', '')
+    if default and default not in chat_ids:
+        chat_ids.insert(0, default)
+    return chat_ids
+
+
+def send_telegram(token: str, chat_id: str, text: str):
+    import requests
+    try:
+        requests.post(
+            f'https://api.telegram.org/bot{token}/sendMessage',
+            json={'chat_id': chat_id, 'text': text, 'parse_mode': 'Markdown'},
+            timeout=10,
+        )
+    except Exception:
+        pass
+
+
 def notify_client(order_id: int, status: str, note: str):
     STATUS_LABELS = {
         'new': '📋 Заявка принята',
@@ -267,23 +362,17 @@ def notify_client(order_id: int, status: str, note: str):
         'cancelled': '❌ Отменено',
     }
     token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
-    chat_id = os.environ.get('TELEGRAM_CHAT_ID', '')
-    if not token or not chat_id:
+    if not token:
         return
     label = STATUS_LABELS.get(status, status)
     text = f"🔄 *Статус заявки #{order_id} обновлён*\n{label}" + (f"\n📝 {note}" if note else "")
-    import requests
-    requests.post(
-        f'https://api.telegram.org/bot{token}/sendMessage',
-        json={'chat_id': chat_id, 'text': text, 'parse_mode': 'Markdown'},
-        timeout=10,
-    )
+    for chat_id in get_repair_recipients():
+        send_telegram(token, chat_id, text)
 
 
 def notify_telegram(order_id: int, name: str, phone: str, model, repair_type, price, comment):
     token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
-    chat_id = os.environ.get('TELEGRAM_CHAT_ID', '')
-    if not token or not chat_id:
+    if not token:
         return
     lines = [f"📋 *Новая заявка #{order_id}*"]
     lines.append(f"👤 {name} | 📞 {phone}")
@@ -295,9 +384,6 @@ def notify_telegram(order_id: int, name: str, phone: str, model, repair_type, pr
         lines.append(f"💰 {int(price):,} ₽".replace(',', ' '))
     if comment:
         lines.append(f"💬 {comment}")
-    import requests
-    requests.post(
-        f'https://api.telegram.org/bot{token}/sendMessage',
-        json={'chat_id': chat_id, 'text': '\n'.join(lines), 'parse_mode': 'Markdown'},
-        timeout=10,
-    )
+    text = '\n'.join(lines)
+    for chat_id in get_repair_recipients():
+        send_telegram(token, chat_id, text)
