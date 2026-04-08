@@ -143,8 +143,12 @@ def send_tg_message(chat_id, text, reply_markup=None):
     url = 'https://api.telegram.org/bot' + token + '/sendMessage'
     payload = json.dumps(payload_dict).encode('utf-8')
     req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'})
-    with urllib.request.urlopen(req, timeout=15) as resp:
-        return json.loads(resp.read())
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        body = e.read().decode('utf-8', errors='replace')
+        raise ValueError(f'Telegram API {e.code}: {body}')
 
 
 def format_price_messages(items):
