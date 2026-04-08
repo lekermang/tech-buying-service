@@ -118,12 +118,29 @@ const Header = ({ scrollTo }: HeaderProps) => {
           </div>
         )}
 
-        <button
-          onClick={() => { setSellOpen(true); setSent(false); setForm({ name: "", phone: "" }); }}
-          className="bg-black text-[#FFD700] font-oswald font-bold text-sm sm:text-base px-4 sm:px-5 py-2 sm:py-2.5 uppercase tracking-wide hover:bg-[#1A1A1A] active:scale-95 transition-all flex items-center gap-2 shrink-0">
-          <Icon name="Zap" size={15} />
-          Продать
-        </button>
+        <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+          <a href="tel:88006006833"
+            onClick={() => ymGoal(Goals.CALL_CLICK, { place: "ticker" })}
+            className="hidden sm:flex items-center gap-1.5 bg-black/15 hover:bg-black/25 active:scale-95 transition-all px-3 py-1.5 rounded">
+            <Icon name="Phone" size={14} className="text-black" />
+            <div className="flex flex-col leading-none">
+              <span className="font-oswald font-bold text-black text-sm tracking-wide">8 800 600-68-33</span>
+              <span className="font-roboto text-black/60 text-[10px]">звонок бесплатный</span>
+            </div>
+          </a>
+          <a href="tel:88006006833"
+            onClick={() => ymGoal(Goals.CALL_CLICK, { place: "ticker" })}
+            className="sm:hidden flex items-center gap-1 bg-black/15 hover:bg-black/25 active:scale-95 transition-all px-2.5 py-1.5 rounded">
+            <Icon name="Phone" size={14} className="text-black" />
+            <span className="font-oswald font-bold text-black text-sm">8-800</span>
+          </a>
+          <button
+            onClick={() => { setSellOpen(true); setSent(false); setForm({ name: "", phone: "" }); }}
+            className="bg-black text-[#FFD700] font-oswald font-bold text-sm sm:text-base px-4 sm:px-5 py-2 sm:py-2.5 uppercase tracking-wide hover:bg-[#1A1A1A] active:scale-95 transition-all flex items-center gap-2 shrink-0">
+            <Icon name="Zap" size={15} />
+            Продать
+          </button>
+        </div>
       </div>
 
       {/* Main header */}
@@ -139,10 +156,7 @@ const Header = ({ scrollTo }: HeaderProps) => {
             />
             <div>
               <span className="font-oswald font-bold text-lg sm:text-xl tracking-wider animate-shimmer">СКУПКА24</span>
-              <div className="font-roboto text-[10px] leading-tight hidden sm:flex flex-col gap-0">
-                <a href="tel:88006006833" className="text-[#FFD700] font-bold hover:opacity-80 transition-opacity">+7 (800) 600-68-33</a>
-                <span className="text-white/40">звонок бесплатный</span>
-              </div>
+              <div className="font-roboto text-white/40 text-[10px] leading-tight hidden sm:block">Кирова 7/47 · Кирова 11</div>
             </div>
           </div>
 
