@@ -94,81 +94,64 @@ def get_catalog():
     ]
 
 
-def format_price_messages(items):
-    if not items:
-        return []
+AVAIL_ICON = {'in_stock': '✅', 'on_order': '🚗'}
+REG_FLAG = {
+    'EU': '🇪🇺', 'US': '🇺🇸', 'RU': '🇷🇺', 'CN': '🇨🇳',
+    'HK': '🇭🇰', 'UK': '🇬🇧', 'JP': '🇯🇵', 'KZ': '🇰🇿',
+}
 
-    now_msk = datetime.now(MSK)
-    date_str = now_msk.strftime('%d.%m.%Y')
 
-    by_cat = {}
-    for it in items:
-        cat = it['category'] or 'Другое'
-        by_cat.setdefault(cat, []).append(it)
-
-    avail_icon = {'in_stock': '\u2705', 'on_order': '\U0001F697'}
-    reg_flag = {
-        'EU': '\U0001F1EA\U0001F1FA', 'US': '\U0001F1FA\U0001F1F8',
-        'RU': '\U0001F1F7\U0001F1FA', 'CN': '\U0001F1E8\U0001F1F3',
-        'HK': '\U0001F1ED\U0001F1F0', 'UK': '\U0001F1EC\U0001F1E7',
-        'JP': '\U0001F1EF\U0001F1F5', 'KZ': '\U0001F1F0\U0001F1FF',
-    }
-
-    lines = ['\U0001F4CB <b>\u041f\u0440\u0430\u0439\u0441-\u043b\u0438\u0441\u0442 ' + date_str + '</b>\n']
-
-    for cat, cat_items in by_cat.items():
-        lines.append('\n<b>\u2014 ' + cat + ' \u2014</b>')
-        for it in cat_items:
-            avail = avail_icon.get(it['availability'], '?')
-            reg = reg_flag.get((it['region'] or '').upper(), '')
-            parts = [it['model'] or it['brand'] or '']
-            if it['storage']:
-                parts.append(it['storage'])
-            if it['color']:
-                parts.append(it['color'])
-            name = ' '.join(parts)
-            if it['price']:
-                price_str = '{:,}\u20bd'.format(int(it['price']) + 3500).replace(',', '\u00a0')
-            else:
-                price_str = '\u043f\u043e \u0437\u0430\u043f\u0440\u043e\u0441\u0443'
-            lines.append(avail + ' ' + reg + ' ' + name + ' \u2014 <b>' + price_str + '</b>')
-
-    footer = '\n\n\U0001F4DE \u0414\u043b\u044f \u0437\u0430\u043a\u0430\u0437\u0430 \u0438\u043b\u0438 \u0443\u0442\u043e\u0447\u043d\u0435\u043d\u0438\u044f \u043d\u0430\u043b\u0438\u0447\u0438\u044f:\n<b>' + CONTACT_PHONE + '</b>'
-
-    messages = []
-    current = ''
-    for line in lines:
-        if len(current) + len(line) + 1 > 4000:
-            messages.append(current)
-            current = line
+def format_category_message(cat, cat_items, date_str):
+    lines = [f'📋 <b>{cat}</b>  —  {date_str}\n']
+    for it in cat_items:
+        avail = AVAIL_ICON.get(it['availability'], '?')
+        reg = REG_FLAG.get((it['region'] or '').upper(), '')
+        parts = [it['model'] or it['brand'] or '']
+        if it['storage']:
+            parts.append(it['storage'])
+        if it['color']:
+            parts.append(it['color'])
+        name = ' '.join(parts)
+        if it['price']:
+            price_str = '{:,}₽'.format(int(it['price']) + 3500).replace(',', '\u00a0')
         else:
-            current = (current + '\n' + line) if current else line
-
-    if current:
-        current += footer
-        messages.append(current)
-    elif messages:
-        messages[-1] += footer
-
-    return messages
+            price_str = 'по запросу'
+        lines.append(f'{avail} {reg} {name} — <b>{price_str}</b>')
+    lines.append(f'\n📞 Заказ и наличие: <b>{CONTACT_PHONE}</b>')
+    return '\n'.join(lines)
 
 
-def send_tg_message(chat_id, text):
+def send_tg_message(chat_id, text, reply_markup=None):
     token = os.environ.get('CATALOG_BOT_TOKEN', '')
     if not token:
         raise ValueError('CATALOG_BOT_TOKEN not set')
 
-    url = 'https://api.telegram.org/bot' + token + '/sendMessage'
-    payload = json.dumps({
+    payload_dict = {
         'chat_id': chat_id,
         'text': text,
         'parse_mode': 'HTML',
         'disable_web_page_preview': True,
-    }).encode('utf-8')
+    }
+    if reply_markup:
+        payload_dict['reply_markup'] = reply_markup
 
+    url = 'https://api.telegram.org/bot' + token + '/sendMessage'
+    payload = json.dumps(payload_dict).encode('utf-8')
     req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'})
     with urllib.request.urlopen(req, timeout=15) as resp:
         return json.loads(resp.read())
+
+
+def format_price_messages(items):
+    if not items:
+        return []
+    now_msk = datetime.now(MSK)
+    date_str = now_msk.strftime('%d.%m.%Y')
+    by_cat = {}
+    for it in items:
+        cat = it['category'] or 'Другое'
+        by_cat.setdefault(cat, []).append(it)
+    return by_cat, date_str
 
 
 def check_already_sent_today():
@@ -192,16 +175,72 @@ def mark_sent():
     conn.close()
 
 
+def get_channel_username():
+    token = os.environ.get('CATALOG_BOT_TOKEN', '')
+    chat_id = os.environ.get('PRICE_GROUP_CHAT_ID', '')
+    if not token or not chat_id:
+        return None
+    try:
+        url = f'https://api.telegram.org/bot{token}/getChat'
+        payload = json.dumps({'chat_id': chat_id}).encode('utf-8')
+        req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+        return data.get('result', {}).get('username')
+    except Exception:
+        return None
+
+
 def do_send_price(chat_id):
     items = get_catalog()
     if not items:
         return {'sent': False, 'reason': 'catalog_empty'}
 
-    messages = format_price_messages(items)
-    for msg in messages:
-        send_tg_message(chat_id, msg)
+    now_msk = datetime.now(MSK)
+    date_str = now_msk.strftime('%d.%m.%Y')
 
-    return {'sent': True, 'messages': len(messages), 'items': len(items)}
+    by_cat = {}
+    for it in items:
+        cat = it['category'] or 'Другое'
+        by_cat.setdefault(cat, []).append(it)
+
+    channel_username = get_channel_username()
+
+    # Отправляем каждую категорию отдельным сообщением, запоминаем message_id
+    cat_message_ids = {}
+    for cat, cat_items in by_cat.items():
+        text = format_category_message(cat, cat_items, date_str)
+        result = send_tg_message(chat_id, text)
+        msg_id = result.get('result', {}).get('message_id')
+        if msg_id:
+            cat_message_ids[cat] = msg_id
+
+    # Формируем inline-кнопки навигации (2 в ряд)
+    cats = list(cat_message_ids.keys())
+    keyboard_rows = []
+    for i in range(0, len(cats), 2):
+        row = []
+        for cat in cats[i:i+2]:
+            mid = cat_message_ids[cat]
+            if channel_username:
+                url = f'https://t.me/{channel_username}/{mid}'
+            else:
+                # Для приватных групп используем tg://
+                cid = str(chat_id).replace('-100', '')
+                url = f'https://t.me/c/{cid}/{mid}'
+            row.append({'text': cat, 'url': url})
+        keyboard_rows.append(row)
+
+    now_msk = datetime.now(MSK)
+    menu_text = (
+        f'📲 <b>Прайс-лист Скупки24</b>\n'
+        f'Обновлён: {date_str}\n\n'
+        f'Выбери категорию 👇'
+    )
+    reply_markup = {'inline_keyboard': keyboard_rows}
+    send_tg_message(chat_id, menu_text, reply_markup=reply_markup)
+
+    return {'sent': True, 'categories': len(by_cat), 'items': len(items)}
 
 
 def check_tools_synced_today():
