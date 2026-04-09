@@ -8,7 +8,6 @@ import psycopg2
 import boto3
 
 SCHEMA = 't_p31606708_tech_buying_service'
-PRICE_MARKUP = 5500
 MAX_PHOTOS = 5
 
 HEADERS = {
@@ -45,6 +44,24 @@ BRAND_RULES = [
     (['xbox'],                 'Microsoft', 'Xbox',         'Игровые консоли'),
     (['gopro'],                'GoPro',     'GoPro',        'Камеры'),
 ]
+
+
+def get_conn():
+    return psycopg2.connect(os.environ['DATABASE_URL'])
+
+
+def get_price_markup():
+    """Читает наценку из таблицы settings, fallback = 5500."""
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute(f"SELECT value FROM {SCHEMA}.settings WHERE key='price_markup'")
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+        return int(row[0]) if row else 5500
+    except Exception:
+        return 5500
 
 
 def ok(data):
@@ -136,7 +153,7 @@ def parse_price_line(line, current_model):
         return None
     price_raw = re.sub(r'\s', '', price_match.group(1))
     try:
-        price = int(price_raw) + PRICE_MARKUP
+        price = int(price_raw) + get_price_markup()
     except ValueError:
         return None
 

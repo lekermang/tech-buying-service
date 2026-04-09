@@ -63,6 +63,20 @@ def get_conn():
     return psycopg2.connect(os.environ['DATABASE_URL'])
 
 
+def get_price_markup():
+    """Читает наценку из таблицы settings, fallback = 5500."""
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute(f"SELECT value FROM {SCHEMA}.settings WHERE key='price_markup'")
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+        return int(row[0]) if row else 5500
+    except Exception:
+        return 5500
+
+
 def ok(data):
     return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps(data, ensure_ascii=False)}
 
@@ -101,7 +115,7 @@ REG_FLAG = {
 }
 
 
-def format_category_message(cat, cat_items, date_str):
+def format_category_message(cat, cat_items, date_str, markup=5500):
     lines = [f'📋 <b>{cat}</b>  —  {date_str}\n']
     for it in cat_items:
         avail = AVAIL_ICON.get(it['availability'], '?')
@@ -113,7 +127,7 @@ def format_category_message(cat, cat_items, date_str):
             parts.append(it['color'])
         name = ' '.join(parts)
         if it['price']:
-            price_str = '{:,}₽'.format(int(it['price']) + 5500).replace(',', '\u00a0')
+            price_str = '{:,}₽'.format(int(it['price']) + markup).replace(',', '\u00a0')
         else:
             price_str = 'по запросу'
         lines.append(f'{avail} {reg} {name} — <b>{price_str}</b>')
@@ -205,6 +219,7 @@ def do_send_price(chat_id):
     if not items:
         return {'sent': False, 'reason': 'catalog_empty'}
 
+    markup = get_price_markup()
     now_msk = datetime.now(MSK)
     date_str = now_msk.strftime('%d.%m.%Y')
 
@@ -218,7 +233,7 @@ def do_send_price(chat_id):
     # Отправляем каждую категорию отдельным сообщением, запоминаем message_id
     cat_message_ids = {}
     for cat, cat_items in by_cat.items():
-        text, order_button = format_category_message(cat, cat_items, date_str)
+        text, order_button = format_category_message(cat, cat_items, date_str, markup)
         result = send_tg_message(chat_id, text, reply_markup=order_button)
         msg_id = result.get('result', {}).get('message_id')
         if msg_id:

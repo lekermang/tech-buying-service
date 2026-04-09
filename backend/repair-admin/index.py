@@ -99,6 +99,14 @@ def handler(event: dict, context) -> dict:
             ]
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'stats': stats}, ensure_ascii=False)}
 
+        # Настройки системы
+        if action == 'settings_get':
+            cur.execute(f"SELECT key, value, description, updated_at FROM {SCHEMA}.settings ORDER BY key")
+            rows = cur.fetchall()
+            cur.close(); conn.close()
+            settings = [{'key': r[0], 'value': r[1], 'description': r[2], 'updated_at': r[3].isoformat() if r[3] else None} for r in rows]
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'settings': settings}, ensure_ascii=False)}
+
         # Список получателей уведомлений
         if action == 'recipients':
             cur.execute(
@@ -142,6 +150,20 @@ def handler(event: dict, context) -> dict:
         raw_body = event.get('body') or '{}'
         body = json.loads(raw_body) if isinstance(raw_body, str) else (raw_body or {})
         action = body.get('action', 'update_status')
+
+        # Сохранить настройку
+        if action == 'settings_set':
+            key = (body.get('key') or '').strip()
+            value = str(body.get('value') or '').strip()
+            if not key:
+                cur.close(); conn.close()
+                return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'key required'}, ensure_ascii=False)}
+            cur.execute(f"UPDATE {SCHEMA}.settings SET value=%s, updated_at=NOW() WHERE key=%s RETURNING key", (value, key))
+            row = cur.fetchone()
+            conn.commit(); cur.close(); conn.close()
+            if not row:
+                return {'statusCode': 404, 'headers': HEADERS, 'body': json.dumps({'error': 'setting not found'}, ensure_ascii=False)}
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'key': key, 'value': value}, ensure_ascii=False)}
 
         # Добавить получателя уведомлений
         if action == 'add_recipient':
