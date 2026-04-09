@@ -83,17 +83,18 @@ export const MODEL_PHOTOS: Record<string, string> = {
   "Watch S11 46mm":     LAB + "14b/0jo96zg7prf0hw2m1ebvm2yepc9ap944.webp",
   "Watch SE3 40mm":     LAB + "512/qusj8b6gajppzi1g41dkahrq8efprieq.webp",
   "Watch SE3 44mm":     LAB + "512/qusj8b6gajppzi1g41dkahrq8efprieq.webp",
-  "Galaxy S26 Ultra":   "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/66893a13-7a9d-48f5-bb83-ac5ca67d8ae9.jpg",
-  "Galaxy S25 Ultra":   "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/29809be7-a72d-4efb-9ad2-3df9651c85af.jpg",
-  "Galaxy S26 Plus":    "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/8d0b1eaa-43d1-492d-bec8-c890b5ab0b19.jpg",
-  "Galaxy S26":         "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/8d0b1eaa-43d1-492d-bec8-c890b5ab0b19.jpg",
-  "Galaxy S25 Plus":    "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/54c7d998-024c-4c68-b157-2eeb8f0bc6b3.jpg",
-  "Galaxy S25":         "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/54c7d998-024c-4c68-b157-2eeb8f0bc6b3.jpg",
-  "Galaxy A56":         "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/cc5e8350-751b-4246-9d7e-d74f81dccf30.jpg",
-  "Galaxy A36":         "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/cc5e8350-751b-4246-9d7e-d74f81dccf30.jpg",
-  "Galaxy A17":         "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/cc5e8350-751b-4246-9d7e-d74f81dccf30.jpg",
-  "Galaxy Buds 4 Pro":  "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/184dd3a4-04c7-4f4a-94b0-b7c73465262e.jpg",
-  "Flip 7":             "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/790db2f4-413a-435b-9b26-f796fbbd2551.jpg",
+  // ── Samsung ── реальные фото с Билайн CDN
+  "Galaxy S26 Ultra":   "https://3bqdrb5nxj.a.trbcdn.net/shop/media/goods/196x302/ebadf9cf-4655-47d1-8e60-58103e2934eb.jpg",
+  "Galaxy S26 Plus":    "https://3bqdrb5nxj.a.trbcdn.net/shop/media/goods/196x302/419247e8-c13a-4818-b351-7fad4e933dbd.jpg",
+  "Galaxy S26":         "https://3bqdrb5nxj.a.trbcdn.net/shop/media/goods/196x302/e224197b-b12f-46f8-9f41-2a6e222aadd6.jpg",
+  "Galaxy S25 Ultra":   "https://3bqdrb5nxj.a.trbcdn.net/shop/media/goods/196x302/887249ae-1efd-4d51-8f98-34d609c1afef.jpg",
+  "Galaxy S25 Plus":    "https://3bqdrb5nxj.a.trbcdn.net/shop/media/goods/196x302/e2b24c6d-b37b-4258-a72f-e1aee93ab3be.jpg",
+  "Galaxy S25":         "https://3bqdrb5nxj.a.trbcdn.net/shop/media/goods/196x302/7964b496-ba09-4b78-9fbe-bdc6b0bc9674.jpg",
+  "Flip 7":             "https://3bqdrb5nxj.a.trbcdn.net/shop/media/goods/196x302/7320c785-f0e9-48e3-8229-00dce0229cfb.jpg",
+  "Galaxy A56":         "https://3bqdrb5nxj.a.trbcdn.net/shop/media/goods/196x302/2e5d36dd-bb95-4f4e-8aae-60dcb4125c1f.jpg",
+  "Galaxy A36":         "https://3bqdrb5nxj.a.trbcdn.net/shop/media/goods/196x302/c6cf8334-500a-411e-95ab-6413fe563e1b.jpg",
+  "Galaxy A17":         "https://3bqdrb5nxj.a.trbcdn.net/shop/media/goods/196x302/a0f04acf-776a-4862-ba05-5046d040a5cc.jpg",
+  "Galaxy Buds 4 Pro":  "https://3bqdrb5nxj.a.trbcdn.net/shop/media/goods/196x302/db07d9aa-4579-47db-b296-69a10323e92d.jpg",
   "Xiaomi 17 Ultra":    "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/bf1b1e1a-5e6e-4881-8f86-4e818e32a3b6.jpg",
   "Xiaomi 15T Pro":     "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/36e70db0-cffe-4d9f-8366-12b232516370.jpg",
   "Xiaomi 15T":         "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/9ac1ebb6-5c0e-4e3e-94d7-98f40d970baf.jpg",
@@ -155,9 +156,14 @@ export const MODEL_PHOTOS_EXTRA: Record<string, string[]> = {
   // Dyson — второй ракурс (реальные фото)
   "V15 SV47 Detect Absolute": [LAB + "592/bmdemquopq6bbxr70od90xbkwsbwrgcb.webp"],
   "HS08 Long Vinca Blue":     [LAB + "93a/urwoksf8v3xiff14tjlmj93v0x3fv3i6.png"],
-  // Samsung
-  "Galaxy S26 Ultra":   [LAB + "8be/ebu3e124bo146qu9zdwhq9ymnckjvkgq.webp"],
-  "Flip 7":             [LAB + "ff3/8xasgaci7klcjn47oq17ax566feurapl.webp"],
+  // Samsung — второй ракурс (реальные фото Билайн CDN)
+  "Galaxy S26 Ultra":   ["https://3bqdrb5nxj.a.trbcdn.net/shop/media/goods/196x302/80d16039-8842-4e08-bda3-ffae796f4c58.jpg", "https://3bqdrb5nxj.a.trbcdn.net/shop/media/goods/196x302/05a6fe27-b107-4146-bcc6-c0645cd8bdcb.jpg"],
+  "Galaxy S26 Plus":    ["https://3bqdrb5nxj.a.trbcdn.net/shop/media/goods/196x302/94597ccb-48c9-417c-a65d-e189cf31a84c.jpg"],
+  "Galaxy S26":         ["https://3bqdrb5nxj.a.trbcdn.net/shop/media/goods/196x302/9e2d06be-2570-4767-87a1-23a8b7d8ff68.jpg"],
+  "Galaxy S25 Ultra":   ["https://3bqdrb5nxj.a.trbcdn.net/shop/media/goods/196x302/952542a9-a75c-4933-87d8-42abfe974c40.jpg"],
+  "Flip 7":             ["https://3bqdrb5nxj.a.trbcdn.net/shop/media/goods/196x302/51709169-ea69-46fe-9a09-cfdf11d9fc1d.jpg", "https://3bqdrb5nxj.a.trbcdn.net/shop/media/goods/196x302/954d27c1-6e82-43fa-a843-7870fb8c9429.jpg"],
+  "Galaxy A56":         ["https://3bqdrb5nxj.a.trbcdn.net/shop/media/goods/196x302/5843d1ef-940d-4d0c-bad3-498055228dcb.jpg"],
+  "Galaxy A36":         ["https://3bqdrb5nxj.a.trbcdn.net/shop/media/goods/196x302/a6949339-647f-4e79-b975-9a88bbc06c1a.jpg"],
 };
 
 export const CATEGORY_PHOTOS: Record<string, string> = {
