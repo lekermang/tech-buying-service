@@ -260,12 +260,39 @@ def parse_price_line(line, current_model):
     }
 
 
+SIM_TYPE_RE = re.compile(
+    r'\b(nano\s*sim\s*\+\s*e[-\s]?sim|sim\s*\+\s*e[-\s]?sim|dual\s*sim\s*\+\s*e[-\s]?sim'
+    r'|e[-\s]?sim\s*\+\s*sim|dual\s*e[-\s]?sim|e[-\s]?sim only|only\s*e[-\s]?sim'
+    r'|nano\s*sim|dual\s*sim|2\s*sim|e[-\s]?sim)\b',
+    re.IGNORECASE
+)
+
+def extract_sim_from_header(text):
+    """Извлекает sim_type из заголовка секции прайса."""
+    m = SIM_TYPE_RE.search(text)
+    if not m:
+        return None
+    raw = m.group(1).lower().replace(' ', '')
+    if 'nanosim+esim' in raw or 'sim+esim' in raw or 'dualsim+esim' in raw or 'esim+sim' in raw:
+        return 'nanoSIM+eSIM'
+    if 'dualesiim' in raw or 'dualesim' in raw:
+        return 'Dual eSIM'
+    if 'esimonly' in raw or 'onlyesim' in raw or 'esim' in raw:
+        return 'eSIM'
+    if 'dualsim' in raw or '2sim' in raw:
+        return 'Dual SIM'
+    if 'nanosim' in raw:
+        return 'nanoSIM'
+    return None
+
+
 def parse_price_message(text):
     if not text:
         return []
     lines = text.split('\n')
     items = []
     current_model = None
+    current_sim_type = None
     price_line_re = re.compile(r'[-–—]\s*\d[\d\s]{2,}')
 
     for line in lines:
@@ -275,14 +302,23 @@ def parse_price_message(text):
         if price_line_re.search(line):
             item = parse_price_line(line, current_model)
             if item:
+                # sim_type из заголовка имеет приоритет над определённым внутри строки
+                if current_sim_type:
+                    item['sim_type'] = current_sim_type
                 items.append(item)
         else:
             clean_line = strip_emojis(line).strip()
+            # Проверяем — есть ли sim_type в заголовке
+            sim_from_header = extract_sim_from_header(clean_line)
             brand, _, _ = detect_brand(clean_line)
             if brand and len(clean_line) > 2:
-                current_model = clean_line
-            elif re.search(r'\b(Pro|Max|Plus|Ultra|Mini|Air|SE)\b', clean_line, re.IGNORECASE) and len(clean_line) < 60:
-                current_model = clean_line
+                current_model = re.sub(SIM_TYPE_RE, '', clean_line).strip().rstrip('-').strip()
+                if sim_from_header:
+                    current_sim_type = sim_from_header
+            elif re.search(r'\b(Pro|Max|Plus|Ultra|Mini|Air|SE)\b', clean_line, re.IGNORECASE) and len(clean_line) < 80:
+                current_model = re.sub(SIM_TYPE_RE, '', clean_line).strip().rstrip('-').strip()
+                if sim_from_header:
+                    current_sim_type = sim_from_header
 
     return items
 

@@ -187,6 +187,49 @@ export const CATEGORY_PHOTOS: Record<string, string> = {
   "SKY":                        "",
 };
 
+// Фото по модели + цвету (реальные фото с lab-store40.ru)
+// Ключ: "Модель::цвет_lowercase"
+export const MODEL_COLOR_PHOTOS: Record<string, string> = {
+  // iPhone 17 Pro Max
+  "iPhone 17 Pro Max::silver":  LAB + "2cf/o2qdv008u61ioutiva9zhf7e5nsmddb0.webp",
+  "iPhone 17 Pro Max::orange":  LAB + "6a6/v2mowf4hlwhx4ozb1b0nnt6two4d46ai.webp",
+  "iPhone 17 Pro Max::blue":    LAB + "5f2/lvcm2iwd38flks3rayk878o6t9vhyid5.webp",
+  "iPhone 17 Pro Max::black":   LAB + "63e/2snq76p0cmduaajhn9of7u4e8p25wo8a.webp",
+  // iPhone 17 Pro
+  "iPhone 17 Pro::silver":      LAB + "def/h77k70t9pt0b6maibq36pwcjt6es61og.webp",
+  "iPhone 17 Pro::orange":      LAB + "822/x72xmx9ggha10cyw111r359prp8fh2pa.webp",
+  "iPhone 17 Pro::blue":        LAB + "577/p7wcuzty1hr79si6wmtiuc495kae7vmg.webp",
+  "iPhone 17 Pro::black":       LAB + "8be/ebu3e124bo146qu9zdwhq9ymnckjvkgq.webp",
+  // iPhone Air
+  "iPhone Air::silver":         LAB + "a5e/i67zm8riu1xbgh3075fmtcsnzd2my7jy.webp",
+  "iPhone Air::blue":           LAB + "65f/w4aqj9drz9hyh5533r2i1glfjfvoeqk9.webp",
+  "iPhone Air::black":          LAB + "58f/33s3dncidga2ht518s7kyoib8t3qrj0d.webp",
+  // iPhone 17
+  "iPhone 17::black":           LAB + "ff3/8xasgaci7klcjn47oq17ax566feurapl.webp",
+  "iPhone 17::silver":          LAB + "fb2/ue7201us7cxkhku3oqcqmj1qk0q0ubph.webp",
+  "iPhone 17::blue":            LAB + "d0a/eykc20lqt6i5ljhbytaphdhsawvji3nb.webp",
+  // iPhone 16 Pro Max
+  "iPhone 16 Pro Max::black":   LAB + "4c9/e5p1f50b1en3p8fk4hvgmnfizuovo1yv.webp",
+  "iPhone 16 Pro Max::white":   LAB + "b9a/qb808n0o4ra72z53o6nr89qt7myoj9eh.webp",
+  "iPhone 16 Pro Max::desert":  LAB + "f6d/l8p0kinrbjhtvrkf33e13wvou96e34be.webp",
+  "iPhone 16 Pro Max::natural": LAB + "d0e/lp6vue4trxrqvo4ncqd2y0tjfzxj8qmu.webp",
+  // iPhone 16 Pro
+  "iPhone 16 Pro::black":       LAB + "8e1/7zhk17sklzt5oj7xzz3i2b1p6u9xadvt.webp",
+  "iPhone 16 Pro::white":       LAB + "255/hxz5ljd3rstsw4cn3juv8w1ayezly4s0.webp",
+  "iPhone 16 Pro::desert":      LAB + "6f0/ten6l27b6jt36of71cfdjr0kip984mkg.webp",
+  "iPhone 16 Pro::natural":     LAB + "a06/at6z2fno4l81bqm1z2q341hm8qkjxveu.webp",
+  // iPhone 16
+  "iPhone 16::black":           LAB + "5f5/il5218nwl1077j7wqpmrvira2843de66.webp",
+  "iPhone 16::pink":            LAB + "409/1gqdo6mmh1t2jvd60elqptlfqjgdmgkm.webp",
+  "iPhone 16::teal":            LAB + "0db/5g1jny5delnf1nz1jkr920v1ixkafbmo.webp",
+  "iPhone 16::white":           LAB + "0f4/7b7d2fvmzyeri3rjqmzk3k6464lej63z.webp",
+  // MacBook Air M4
+  "MacBook Air M4 13 (2025)::midnight": LAB + "2f3/w5buzevpm08uutp7tf0q6d974h3g7uyi.webp",
+  "MacBook Air M4 13 (2025)::silver":   LAB + "6c2/rbjkn22kybgfzpmka6zmwbnsrxqzjbis.webp",
+  "MacBook Air M4 13 (2025)::starlight":LAB + "dec/g718p084gv7sglzrw4l4yvt0yo2kn4as.webp",
+  "MacBook Air M4 13 (2025)::sky blue": LAB + "a06/at6z2fno4l81bqm1z2q341hm8qkjxveu.webp",
+};
+
 const COLOR_MAP: Record<string, string> = {
   black: "#1a1a1a", white: "#f5f5f5", silver: "#c0c0c0", gold: "#ffd700",
   blue: "#3b82f6", midnight: "#1e293b", starlight: "#e8e4d9", pink: "#f9a8d4",

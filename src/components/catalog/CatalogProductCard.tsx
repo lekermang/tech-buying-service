@@ -1,6 +1,6 @@
 import { memo, useState, useRef, useEffect, useCallback } from "react";
 import Icon from "@/components/ui/icon";
-import { CatalogItem, REGION_FLAG, MODEL_PHOTOS, MODEL_PHOTOS_EXTRA, CATEGORY_PHOTOS, PRICE_MARKUP, getColorHex } from "@/pages/catalog.types";
+import { CatalogItem, REGION_FLAG, MODEL_PHOTOS, MODEL_PHOTOS_EXTRA, MODEL_COLOR_PHOTOS, CATEGORY_PHOTOS, PRICE_MARKUP, getColorHex } from "@/pages/catalog.types";
 
 interface Props {
   item: CatalogItem;
@@ -13,7 +13,9 @@ const CatalogProductCard = memo(function CatalogProductCard({ item, onBuy, onAdd
   const inStock = item.availability === "in_stock";
   const title = [item.brand, item.model].filter(Boolean).join(" ");
   const sub = [item.storage, item.ram].filter(Boolean).join(" · ");
-  const mainPhoto = item.photo_url || MODEL_PHOTOS[item.model] || CATEGORY_PHOTOS[item.category] || null;
+  const colorKey = item.color ? `${item.model}::${item.color.toLowerCase()}` : null;
+  const colorPhoto = colorKey ? (MODEL_COLOR_PHOTOS[colorKey] || null) : null;
+  const mainPhoto = item.photo_url || colorPhoto || MODEL_PHOTOS[item.model] || CATEGORY_PHOTOS[item.category] || null;
   const extraPhotos = MODEL_PHOTOS_EXTRA[item.model] || [];
   const allPhotos = mainPhoto ? [mainPhoto, ...extraPhotos] : extraPhotos;
   const colorHex = getColorHex(item.color);

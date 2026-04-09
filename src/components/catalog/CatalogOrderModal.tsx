@@ -1,6 +1,6 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
-import { CatalogItem, SEND_LEAD_URL, PRICE_MARKUP, MODEL_PHOTOS, MODEL_PHOTOS_EXTRA, CATEGORY_PHOTOS } from "@/pages/catalog.types";
+import { CatalogItem, SEND_LEAD_URL, PRICE_MARKUP, MODEL_PHOTOS, MODEL_PHOTOS_EXTRA, MODEL_COLOR_PHOTOS, CATEGORY_PHOTOS } from "@/pages/catalog.types";
 
 interface Props {
   item: CatalogItem;
@@ -16,7 +16,9 @@ const CatalogOrderModal = ({ item, onClose }: Props) => {
   const title = [item.brand, item.model, item.storage, item.color].filter(Boolean).join(" ");
   const displayPrice = item.price ? (item.price + PRICE_MARKUP).toLocaleString("ru-RU") + " ₽" : "Цену уточняйте";
 
-  const mainPhoto = item.photo_url || MODEL_PHOTOS[item.model] || CATEGORY_PHOTOS[item.category] || null;
+  const colorKey = item.color ? `${item.model}::${item.color.toLowerCase()}` : null;
+  const colorPhoto = colorKey ? (MODEL_COLOR_PHOTOS[colorKey] || null) : null;
+  const mainPhoto = item.photo_url || colorPhoto || MODEL_PHOTOS[item.model] || CATEGORY_PHOTOS[item.category] || null;
   const extraPhotos = MODEL_PHOTOS_EXTRA[item.model] || [];
   const allPhotos = mainPhoto ? [mainPhoto, ...extraPhotos] : extraPhotos;
 
