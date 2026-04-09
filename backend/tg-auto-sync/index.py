@@ -25,28 +25,43 @@ REGION_FLAGS = {
 }
 
 BRAND_RULES = [
+    # Apple — полные названия (приоритет выше)
     (['iphone'],               'Apple',     'iPhone',       'Смартфоны'),
     (['ipad'],                 'Apple',     'iPad',         'Планшеты'),
     (['macbook'],              'Apple',     'MacBook',      'Ноутбуки'),
     (['airpods'],              'Apple',     'AirPods',      'Наушники'),
-    (['apple watch', 'watch'], 'Apple',     'Apple Watch',  'Умные часы'),
+    (['airtag'],               'Apple',     'AirTag',       'Аксессуары'),
+    (['apple watch'],          'Apple',     'Apple Watch',  'Умные часы'),
     (['mac mini'],             'Apple',     'Mac Mini',     'Компьютеры'),
     (['imac'],                 'Apple',     'iMac',         'Компьютеры'),
-    # iPhone без слова "iphone" — только номер модели
+    (['magic mouse'],          'Apple',     'Magic Mouse',  'Аксессуары'),
+    (['magic keyboard'],       'Apple',     'Magic Keyboard','Аксессуары'),
+    (['apple pencil', 'pencil pro', 'pencil usb'], 'Apple', 'Apple Pencil', 'Аксессуары'),
+    (['earpods'],              'Apple',     'EarPods',      'Наушники'),
+    # Watch без "apple" — SE, S9, S10, S11, Ultra
+    (['ultra 3', 'ultra 2', 'ultra 1'], 'Apple', 'Apple Watch', 'Умные часы'),
+    (['se3', 'se2', ' se '],   'Apple',     'Apple Watch',  'Умные часы'),
+    ([' s11 ', ' s10 ', ' s9 ', ' s8 '], 'Apple', 'Apple Watch', 'Умные часы'),
+    # iPhone без слова "iphone"
     (['17 pro max'],           'Apple',     'iPhone',       'Смартфоны'),
     (['17 pro'],               'Apple',     'iPhone',       'Смартфоны'),
     (['17 plus'],              'Apple',     'iPhone',       'Смартфоны'),
-    (['17 ultra'],             'Apple',     'iPhone',       'Смартфоны'),
+    (['17e'],                  'Apple',     'iPhone',       'Смартфоны'),
+    (['17 air', 'air 256', 'air 512', 'air 1tb'], 'Apple', 'iPhone', 'Смартфоны'),
     (['16 pro max'],           'Apple',     'iPhone',       'Смартфоны'),
     (['16 pro'],               'Apple',     'iPhone',       'Смартфоны'),
     (['16 plus'],              'Apple',     'iPhone',       'Смартфоны'),
+    (['16e'],                  'Apple',     'iPhone',       'Смартфоны'),
     (['15 pro max'],           'Apple',     'iPhone',       'Смартфоны'),
     (['15 pro'],               'Apple',     'iPhone',       'Смартфоны'),
     (['15 plus'],              'Apple',     'iPhone',       'Смартфоны'),
     (['14 pro max'],           'Apple',     'iPhone',       'Смартфоны'),
     (['14 pro'],               'Apple',     'iPhone',       'Смартфоны'),
     (['14 plus'],              'Apple',     'iPhone',       'Смартфоны'),
-    (['samsung'],              'Samsung',   'Samsung',      'Смартфоны'),
+    # Другие бренды
+    (['huawei'],               'Huawei',    'Huawei',       'Смартфоны'),
+    (['nothing phone'],        'Nothing',   'Nothing Phone','Смартфоны'),
+    (['samsung', 'galaxy'],    'Samsung',   'Samsung',      'Смартфоны'),
     (['xiaomi', 'redmi'],      'Xiaomi',    'Xiaomi',       'Смартфоны'),
     (['poco'],                 'Xiaomi',    'POCO',         'Смартфоны'),
     (['realme'],               'Realme',    'Realme',       'Смартфоны'),
@@ -54,11 +69,15 @@ BRAND_RULES = [
     (['honor'],                'Honor',     'Honor',        'Смартфоны'),
     (['pixel'],                'Google',    'Pixel',        'Смартфоны'),
     (['dyson'],                'Dyson',     'Dyson',        'Техника'),
-    (['sony'],                 'Sony',      'Sony',         'Техника'),
-    (['garmin'],               'Garmin',    'Garmin',       'Умные часы'),
+    (['marshall'],             'Marshall',  'Marshall',     'Наушники'),
     (['jbl'],                  'JBL',       'JBL',          'Наушники'),
+    (['sony', 'ps5', 'ps4', 'ps portal', 'ps vr'], 'Sony', 'Sony', 'Техника'),
     (['xbox'],                 'Microsoft', 'Xbox',         'Игровые консоли'),
+    (['nintendo'],             'Nintendo',  'Nintendo',     'Игровые консоли'),
     (['gopro'],                'GoPro',     'GoPro',        'Камеры'),
+    (['insta 360'],            'Insta360',  'Insta360',     'Камеры'),
+    (['garmin'],               'Garmin',    'Garmin',       'Умные часы'),
+    (['яндекс', 'yandex'],     'Яндекс',   'Яндекс',       'Колонки'),
 ]
 
 
@@ -260,30 +279,42 @@ def parse_price_line(line, current_model):
     }
 
 
-SIM_TYPE_RE = re.compile(
-    r'\b(nano\s*sim\s*\+\s*e[-\s]?sim|sim\s*\+\s*e[-\s]?sim|dual\s*sim\s*\+\s*e[-\s]?sim'
-    r'|e[-\s]?sim\s*\+\s*sim|dual\s*e[-\s]?sim|e[-\s]?sim only|only\s*e[-\s]?sim'
-    r'|nano\s*sim|dual\s*sim|2\s*sim|e[-\s]?sim)\b',
+def extract_sim_from_header(text):
+    """Извлекает sim_type из заголовка секции прайса.
+    
+    Поддерживаемые форматы из прайса:
+    - iPhone AIR eSIM
+    - iPhone 17 eSIM
+    - iPhone 17 nanoSIM+eSIM
+    - iPhone 17 PRO Только eSIM
+    - iPhone 17 PRO MAX nanoSIM+eSIM
+    - 16 Pro 2sim
+    - 16 Pro Sim+Esim
+    - 16 Pro Max Esim
+    """
+    tl = text.lower()
+    # nanoSIM+eSIM / Sim+Esim / SIM+eSIM
+    if re.search(r'nano\s*sim\s*\+\s*e[-\s]?sim|sim\s*\+\s*e[-\s]?sim|sim\+esim', tl):
+        return 'nanoSIM+eSIM'
+    # Только eSIM / only eSIM / eSIM only
+    if re.search(r'только\s+e[-\s]?sim|only\s+e[-\s]?sim|e[-\s]?sim\s+only', tl):
+        return 'eSIM'
+    # 2sim / dual sim (без eSIM)
+    if re.search(r'\b2\s*sim\b|dual\s*sim(?!\s*\+)', tl):
+        return 'Dual SIM'
+    # eSIM (просто)
+    if re.search(r'\be[-\s]?sim\b', tl):
+        return 'eSIM'
+    return None
+
+
+SIM_RE_STRIP = re.compile(
+    r'\s*(nano\s*sim\s*\+\s*e[-\s]?sim|sim\s*\+\s*e[-\s]?sim|только\s+e[-\s]?sim'
+    r'|only\s+e[-\s]?sim|e[-\s]?sim\s+only|dual\s*sim|2\s*sim|e[-\s]?sim)\s*',
     re.IGNORECASE
 )
-
-def extract_sim_from_header(text):
-    """Извлекает sim_type из заголовка секции прайса."""
-    m = SIM_TYPE_RE.search(text)
-    if not m:
-        return None
-    raw = m.group(1).lower().replace(' ', '')
-    if 'nanosim+esim' in raw or 'sim+esim' in raw or 'dualsim+esim' in raw or 'esim+sim' in raw:
-        return 'nanoSIM+eSIM'
-    if 'dualesiim' in raw or 'dualesim' in raw:
-        return 'Dual eSIM'
-    if 'esimonly' in raw or 'onlyesim' in raw or 'esim' in raw:
-        return 'eSIM'
-    if 'dualsim' in raw or '2sim' in raw:
-        return 'Dual SIM'
-    if 'nanosim' in raw:
-        return 'nanoSIM'
-    return None
+CATEGORY_HEADER_RE = re.compile(r'^Категория:', re.IGNORECASE)
+FLAGS_ONLY_RE = re.compile(r'^[\U0001F1E0-\U0001F1FF\s]+$')
 
 
 def parse_price_message(text):
@@ -293,32 +324,55 @@ def parse_price_message(text):
     items = []
     current_model = None
     current_sim_type = None
-    price_line_re = re.compile(r'[-–—]\s*\d[\d\s]{2,}')
+    price_line_re = re.compile(r'[-–—]\s*(\d[\d\s]*\d|\d)')
 
     for line in lines:
         line = line.strip()
         if not line:
             continue
+
+        # Строка категории — сбрасываем контекст
+        if CATEGORY_HEADER_RE.match(line):
+            current_model = None
+            current_sim_type = None
+            continue
+
+        # Строка только из флагов-стран — пропускаем
+        if FLAGS_ONLY_RE.match(strip_emojis(line)):
+            continue
+
         if price_line_re.search(line):
             item = parse_price_line(line, current_model)
             if item:
-                # sim_type из заголовка имеет приоритет над определённым внутри строки
                 if current_sim_type:
                     item['sim_type'] = current_sim_type
                 items.append(item)
         else:
             clean_line = strip_emojis(line).strip()
-            # Проверяем — есть ли sim_type в заголовке
+            if not clean_line or len(clean_line) < 2:
+                continue
+
             sim_from_header = extract_sim_from_header(clean_line)
+            # Очищаем заголовок от SIM-текста, чтобы остался чистый model
+            clean_for_model = re.sub(SIM_RE_STRIP, ' ', clean_line).strip().strip('-').strip()
+
             brand, _, _ = detect_brand(clean_line)
-            if brand and len(clean_line) > 2:
-                current_model = re.sub(SIM_TYPE_RE, '', clean_line).strip().rstrip('-').strip()
-                if sim_from_header:
+            is_model_header = (
+                brand and len(clean_for_model) > 2
+            ) or (
+                re.search(r'\b(Pro|Max|Plus|Ultra|Mini|Air|SE|iPhone|iPad|Watch|MacBook|AirPods)\b',
+                          clean_line, re.IGNORECASE)
+                and not price_line_re.search(line)
+                and len(clean_line) < 100
+            )
+
+            if is_model_header:
+                current_model = clean_for_model if len(clean_for_model) > 2 else current_model
+                if sim_from_header is not None:
                     current_sim_type = sim_from_header
-            elif re.search(r'\b(Pro|Max|Plus|Ultra|Mini|Air|SE)\b', clean_line, re.IGNORECASE) and len(clean_line) < 80:
-                current_model = re.sub(SIM_TYPE_RE, '', clean_line).strip().rstrip('-').strip()
-                if sim_from_header:
-                    current_sim_type = sim_from_header
+                # Если заголовок содержит SIM но не содержит модели — только обновляем sim_type
+                elif sim_from_header is None and extract_sim_from_header(clean_line) is None:
+                    pass  # не трогаем current_sim_type
 
     return items
 
