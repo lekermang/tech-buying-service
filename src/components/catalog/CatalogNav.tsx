@@ -97,8 +97,41 @@ export default function CatalogNav({
         </button>
       </div>
 
+      {/* Активные фильтры — теги */}
+      {hasFilters && !filterPanelOpen && (
+        <div className="overflow-x-auto scrollbar-hide border-t border-white/5">
+          <div className="flex gap-1.5 px-3 py-2 items-center" style={{ width: "max-content" }}>
+            {filterAvail === "in_stock" && (
+              <FilterTag label="Есть в наличии" color="green" onRemove={() => onAvail("")} />
+            )}
+            {filterAvail === "on_order" && (
+              <FilterTag label="Под заказ" onRemove={() => onAvail("")} />
+            )}
+            {modelFilter && modelFilter !== "Все" && onModelFilter && (
+              <FilterTag label={modelFilter} onRemove={() => onModelFilter("Все")} />
+            )}
+            {activeSimType && onSimTypeChange && (
+              <FilterTag label={activeSimType} color="blue" onRemove={() => onSimTypeChange("")} />
+            )}
+            {activeBrand && (
+              <FilterTag label={activeBrand} onRemove={() => onBrandChange("")} />
+            )}
+            {activeStorage && (
+              <FilterTag label={activeStorage} color="yellow" onRemove={() => onStorageChange("")} />
+            )}
+            {activeColor && (
+              <FilterTag label={activeColor} color="yellow" onRemove={() => onColorChange("")} />
+            )}
+            <button onClick={onResetFilters}
+              className="shrink-0 text-[10px] text-white/30 hover:text-white/60 transition-colors ml-1">
+              Сбросить всё
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Фильтр по подмоделям (Pro Max / Pro / Air...) — горизонтальная прокрутка */}
-      {modelFilters && modelFilters.length > 1 && onModelFilter && !filterPanelOpen && (
+      {modelFilters && modelFilters.length > 1 && onModelFilter && !filterPanelOpen && !hasFilters && (
         <div className="overflow-x-auto scrollbar-hide border-t border-white/5">
           <div className="flex gap-1 px-3 py-2" style={{ width: "max-content" }}>
             {modelFilters.map(f => (
@@ -107,6 +140,22 @@ export default function CatalogNav({
                   modelFilter === f
                     ? "bg-white text-black"
                     : "text-white/40 hover:text-white"
+                }`}>
+                {f}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Подмодели + теги вместе когда оба активны */}
+      {modelFilters && modelFilters.length > 1 && onModelFilter && !filterPanelOpen && hasFilters && (
+        <div className="overflow-x-auto scrollbar-hide border-t border-white/5">
+          <div className="flex gap-1 px-3 py-1.5" style={{ width: "max-content" }}>
+            {modelFilters.map(f => (
+              <button key={f} onClick={() => onModelFilter(f)}
+                className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-all ${
+                  modelFilter === f ? "bg-white text-black" : "text-white/35 hover:text-white"
                 }`}>
                 {f}
               </button>
@@ -228,6 +277,23 @@ export default function CatalogNav({
         </div>
       )}
     </nav>
+  );
+}
+
+function FilterTag({ label, color, onRemove }: { label: string; color?: "yellow"|"green"|"blue"; onRemove: () => void }) {
+  const colors = {
+    yellow: "bg-[#FFD700]/15 text-[#FFD700] border-[#FFD700]/30",
+    green:  "bg-green-500/10 text-green-400 border-green-500/20",
+    blue:   "bg-blue-500/10 text-blue-400 border-blue-500/20",
+  };
+  const cls = colors[color || "yellow"] ?? colors.yellow;
+  return (
+    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-medium shrink-0 ${cls}`}>
+      {label}
+      <button onClick={onRemove} className="opacity-60 hover:opacity-100 transition-opacity ml-0.5">
+        <Icon name="X" size={10} />
+      </button>
+    </span>
   );
 }
 
