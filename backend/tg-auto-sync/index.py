@@ -32,6 +32,20 @@ BRAND_RULES = [
     (['apple watch', 'watch'], 'Apple',     'Apple Watch',  'Умные часы'),
     (['mac mini'],             'Apple',     'Mac Mini',     'Компьютеры'),
     (['imac'],                 'Apple',     'iMac',         'Компьютеры'),
+    # iPhone без слова "iphone" — только номер модели
+    (['17 pro max'],           'Apple',     'iPhone',       'Смартфоны'),
+    (['17 pro'],               'Apple',     'iPhone',       'Смартфоны'),
+    (['17 plus'],              'Apple',     'iPhone',       'Смартфоны'),
+    (['17 ultra'],             'Apple',     'iPhone',       'Смартфоны'),
+    (['16 pro max'],           'Apple',     'iPhone',       'Смартфоны'),
+    (['16 pro'],               'Apple',     'iPhone',       'Смартфоны'),
+    (['16 plus'],              'Apple',     'iPhone',       'Смартфоны'),
+    (['15 pro max'],           'Apple',     'iPhone',       'Смартфоны'),
+    (['15 pro'],               'Apple',     'iPhone',       'Смартфоны'),
+    (['15 plus'],              'Apple',     'iPhone',       'Смартфоны'),
+    (['14 pro max'],           'Apple',     'iPhone',       'Смартфоны'),
+    (['14 pro'],               'Apple',     'iPhone',       'Смартфоны'),
+    (['14 plus'],              'Apple',     'iPhone',       'Смартфоны'),
     (['samsung'],              'Samsung',   'Samsung',      'Смартфоны'),
     (['xiaomi', 'redmi'],      'Xiaomi',    'Xiaomi',       'Смартфоны'),
     (['poco'],                 'Xiaomi',    'POCO',         'Смартфоны'),
@@ -163,21 +177,26 @@ def parse_price_line(line, current_model):
     desc = clean[:price_match.start()].strip()
 
     storage = None
+    # Сначала ищем явный суффикс GB/TB
     storage_match = re.search(r'\b(\d+)\s*(GB|TB|gb|tb)\b', desc)
     if storage_match:
         storage = storage_match.group(1) + storage_match.group(2).upper()
         desc_no_storage = desc[:storage_match.start()] + desc[storage_match.end():]
     else:
-        storage_num_match = re.search(r'\b(64|128|256|512|1024|2048|1|2)\b', desc)
+        # Ищем только стандартные объёмы памяти (не 1 и 2 без TB — они могут быть частью модели)
+        storage_num_match = re.search(r'\b(64|128|256|512|1024|2048)\b', desc)
         if storage_num_match:
             val = storage_num_match.group(1)
-            if int(val) in (1, 2) and 'tb' in desc[storage_num_match.start():storage_num_match.start()+5].lower():
-                storage = val + 'TB'
-            elif int(val) >= 64:
-                storage = val + 'GB'
+            storage = val + 'GB'
             desc_no_storage = desc[:storage_num_match.start()] + desc[storage_num_match.end():]
         else:
-            desc_no_storage = desc
+            # 1TB / 2TB вида "1TB" или "1 TB"
+            tb_match = re.search(r'\b([12])\s*TB\b', desc, re.IGNORECASE)
+            if tb_match:
+                storage = tb_match.group(1) + 'TB'
+                desc_no_storage = desc[:tb_match.start()] + desc[tb_match.end():]
+            else:
+                desc_no_storage = desc
 
     desc_no_storage = re.sub(r'\s+', ' ', desc_no_storage).strip()
 
@@ -185,10 +204,26 @@ def parse_price_line(line, current_model):
     if not brand:
         brand, base_model, category = detect_brand(desc_no_storage)
 
-    full_model = (current_model or desc_no_storage).strip()
+    # Если бренд Apple и base_model = 'iPhone', строим полное имя модели из desc_no_storage
+    if current_model:
+        full_model = current_model.strip()
+    elif brand == 'Apple' and base_model == 'iPhone':
+        # Вытаскиваем из desc_no_storage часть модели: номер + Pro/Max/Plus/Ultra
+        model_match = re.search(r'(\d{2}\s*(?:Pro\s*Max|Pro|Plus|Ultra|Mini)?)', desc_no_storage, re.IGNORECASE)
+        if model_match:
+            full_model = 'iPhone ' + re.sub(r'\s+', ' ', model_match.group(1)).strip()
+            # Убираем модель из desc_no_storage чтобы осталось только цвет
+            desc_no_storage = desc_no_storage[:model_match.start()] + desc_no_storage[model_match.end():]
+            desc_no_storage = re.sub(r'\s+', ' ', desc_no_storage).strip()
+        else:
+            full_model = desc_no_storage
+    else:
+        full_model = desc_no_storage
 
     color_part = desc_no_storage
-    if full_model:
+    if full_model and not current_model:
+        pass  # desc_no_storage уже без модели, это и есть цвет
+    elif full_model:
         for w in full_model.lower().split():
             color_part = re.sub(r'\b' + re.escape(w) + r'\b', '', color_part, flags=re.IGNORECASE)
     color_part = re.sub(r'\s+', ' ', color_part).strip()
