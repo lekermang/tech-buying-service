@@ -9,6 +9,8 @@ import boto3
 
 SCHEMA = 't_p31606708_tech_buying_service'
 MAX_PHOTOS = 5
+PRICE_SOURCE_CHAT_ID = os.environ.get('PRICE_SOURCE_CHAT_ID', '')  # чат-источник прайсов
+PHOTO_SOURCE_USERNAME = 'appledysonphoto'  # канал-источник фото
 
 HEADERS = {
     'Access-Control-Allow-Origin': '*',
@@ -399,8 +401,12 @@ def find_items_by_caption(cur, caption):
 
 
 def setup_webhook(self_url):
-    """Устанавливает webhook на текущий URL функции"""
-    res = tg_api('setWebhook', {'url': self_url, 'allowed_updates': json.dumps(['message', 'channel_post'])})
+    """Устанавливает webhook на текущий URL функции. Принимает сообщения и посты каналов."""
+    res = tg_api('setWebhook', {
+        'url': self_url,
+        'allowed_updates': json.dumps(['message', 'channel_post']),
+        'drop_pending_updates': True,
+    })
     return res
 
 
@@ -454,22 +460,28 @@ def handler(event: dict, context) -> dict:
         if not msg:
             return ok({'ok': True})
 
+        chat_id_str = str(msg.get('chat', {}).get('id', ''))
+        chat_username = (msg.get('chat', {}).get('username') or '').lower()
         text = msg.get('text') or msg.get('caption') or ''
         has_photo = bool(msg.get('photo'))
 
-        # Проверяем есть ли строки с ценой (прайс от @Bas713bot)
+        # Прайсы — только из разрешённого чата-источника
         price_line_re = re.compile(r'[-–—]\s*\d[\d\s]{2,}')
         is_price_msg = bool(price_line_re.search(text))
+        from_price_source = (not PRICE_SOURCE_CHAT_ID) or (chat_id_str == PRICE_SOURCE_CHAT_ID)
+
+        # Фото — только из канала @appledysonphoto
+        from_photo_source = (chat_username == PHOTO_SOURCE_USERNAME)
 
         conn = psycopg2.connect(os.environ['DATABASE_URL'])
         cur = conn.cursor()
-        stats = {'photos_saved': 0}
+        stats = {'photos_saved': 0, 'chat_id': chat_id_str}
 
-        if is_price_msg:
+        if is_price_msg and from_price_source:
             price_stats = process_price_message(cur, text)
             stats.update(price_stats)
 
-        if has_photo:
+        if has_photo and from_photo_source:
             saved = process_photo_message(cur, msg)
             stats['photos_saved'] += saved
 

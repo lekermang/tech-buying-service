@@ -645,6 +645,22 @@ def handler(event: dict, context) -> dict:
         result = do_send_price(chat_id)
         return ok(result)
 
+    if action == 'setup_webhook':
+        webhook_url = 'https://functions.poehali.dev/79437e4a-387b-4d66-952b-a6e8e8d627a2'
+        token = os.environ.get('CATALOG_BOT_TOKEN', '')
+        req = urllib.request.Request(
+            f'https://api.telegram.org/bot{token}/setWebhook',
+            data=json.dumps({
+                'url': webhook_url,
+                'allowed_updates': ['message', 'channel_post'],
+                'drop_pending_updates': True,
+            }).encode(),
+            headers={'Content-Type': 'application/json'},
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            result = json.loads(resp.read())
+        return ok({'webhook_set': result, 'url': webhook_url})
+
     if action == 'ping_sitemap':
         result = ping_sitemap_to_yandex()
         return ok(result)
