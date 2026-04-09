@@ -1,3 +1,4 @@
+import { useRef, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 
 interface CatalogNavProps {
@@ -9,9 +10,11 @@ interface CatalogNavProps {
   activeBrand: string;
   activeStorage: string;
   activeColor: string;
+  activeSimType?: string;
   brandsInCategory: string[];
   storagesInCategory: string[];
   colorsInCategory: string[];
+  simTypesInCategory?: string[];
   onSearch: (val: string) => void;
   onAvail: (val: string) => void;
   onFilterPanelToggle: () => void;
@@ -19,6 +22,7 @@ interface CatalogNavProps {
   onBrandChange: (brand: string) => void;
   onStorageChange: (storage: string) => void;
   onColorChange: (color: string) => void;
+  onSimTypeChange?: (sim: string) => void;
   onResetFilters: () => void;
   cartCount?: number;
   onCartOpen?: () => void;
@@ -29,82 +33,80 @@ interface CatalogNavProps {
 
 export default function CatalogNav({
   search, filterAvail, filterPanelOpen, activeFiltersCount, activeCategory,
-  activeBrand, activeStorage, activeColor,
-  brandsInCategory, storagesInCategory, colorsInCategory,
+  activeBrand, activeStorage, activeColor, activeSimType = "",
+  brandsInCategory, storagesInCategory, colorsInCategory, simTypesInCategory = [],
   onSearch, onAvail, onFilterPanelToggle, onSidebarOpen,
-  onBrandChange, onStorageChange, onColorChange, onResetFilters,
+  onBrandChange, onStorageChange, onColorChange, onSimTypeChange, onResetFilters,
   cartCount = 0, onCartOpen,
   modelFilters, modelFilter = "Все", onModelFilter,
 }: CatalogNavProps) {
-  return (
-    <nav className="bg-[#0D0D0D]/97 backdrop-blur-xl border-b border-white/6 sticky top-0 z-40">
-      <div className="max-w-[1400px] mx-auto px-3 sm:px-4 h-12 flex items-center gap-2">
+  const inputRef = useRef<HTMLInputElement>(null);
 
-        {/* Назад */}
-        <a href="/" className="flex items-center gap-1 shrink-0 text-white/40 hover:text-white transition-colors">
-          <Icon name="ArrowLeft" size={15} />
+  const hasFilters = activeFiltersCount > 0;
+
+  return (
+    <nav className="bg-[#0D0D0D] border-b border-white/5 sticky top-0 z-40">
+
+      {/* Строка поиска */}
+      <div className="max-w-[1400px] mx-auto px-3 sm:px-4 h-13 flex items-center gap-2 py-2">
+        <a href="/" className="shrink-0 text-white/30 hover:text-white transition-colors p-1">
+          <Icon name="ArrowLeft" size={16} />
         </a>
 
-        {/* Поиск — растянут на всю ширину */}
         <div className="flex-1 relative min-w-0">
-          <Icon name="Search" size={14} className="text-white/30 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <Icon name="Search" size={14} className="text-white/25 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
+            ref={inputRef}
             type="text"
             value={search}
             onChange={e => onSearch(e.target.value)}
-            placeholder="Поиск по модели, бренду..."
-            className="w-full bg-white/6 border border-white/8 text-white pl-9 pr-8 py-2 rounded-xl text-sm focus:outline-none focus:bg-white/10 focus:border-white/20 transition-all placeholder:text-white/25"
+            placeholder="Модель, бренд..."
+            className="w-full bg-white/5 text-white pl-9 pr-8 py-2 rounded-xl text-sm focus:outline-none focus:bg-white/8 transition-all placeholder:text-white/20"
           />
           {search && (
-            <button onClick={() => onSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/30 hover:text-white">
+            <button onClick={() => onSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/25 hover:text-white">
               <Icon name="X" size={13} />
             </button>
           )}
         </div>
 
-        {/* Наличие */}
-        <div className="flex items-center gap-0.5 shrink-0">
-          {[{ val: "", label: "Все" }, { val: "in_stock", label: "Есть" }, { val: "on_order", label: "Заказ" }].map(f => (
-            <button key={f.val} onClick={() => onAvail(f.val)}
-              className={`text-xs px-2.5 py-1.5 rounded-lg transition-all font-medium ${filterAvail === f.val ? "bg-[#FFD700] text-black" : "text-white/40 hover:text-white hover:bg-white/8"}`}>
-              {f.label}
-            </button>
-          ))}
-        </div>
-
         {/* Корзина */}
         {onCartOpen && (
           <button onClick={onCartOpen}
-            className="relative shrink-0 flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-[#FFD700] hover:bg-yellow-400 transition-colors text-black font-semibold">
-            <Icon name="ShoppingCart" size={15} />
+            className="relative shrink-0 w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 transition-colors">
+            <Icon name="ShoppingCart" size={16} className="text-white/60" />
             {cartCount > 0 && (
-              <span className="text-xs font-bold">{cartCount}</span>
+              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-[#FFD700] text-black text-[9px] font-bold rounded-full flex items-center justify-center">{cartCount}</span>
             )}
           </button>
         )}
 
-        {/* Фильтры — мобилка */}
+        {/* Кнопка фильтров */}
         <button
           onClick={onFilterPanelToggle}
-          className={`lg:hidden relative shrink-0 flex items-center px-2.5 py-2 rounded-lg border transition-all ${filterPanelOpen || activeFiltersCount > 0 ? "bg-[#FFD700]/15 border-[#FFD700]/40 text-[#FFD700]" : "bg-white/6 border-white/8 text-white/60 hover:text-white"}`}
+          className={`shrink-0 relative w-9 h-9 flex items-center justify-center rounded-xl border transition-all ${
+            filterPanelOpen || hasFilters
+              ? "bg-[#FFD700] border-[#FFD700] text-black"
+              : "bg-white/5 border-white/8 text-white/50 hover:text-white hover:bg-white/10"
+          }`}
         >
-          <Icon name="SlidersHorizontal" size={14} />
-          {activeFiltersCount > 0 && (
-            <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#FFD700] text-black text-[9px] font-bold rounded-full flex items-center justify-center">{activeFiltersCount}</span>
+          <Icon name="SlidersHorizontal" size={15} />
+          {hasFilters && !filterPanelOpen && (
+            <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-[#FFD700] text-black text-[9px] font-bold rounded-full flex items-center justify-center">{activeFiltersCount}</span>
           )}
         </button>
       </div>
 
-      {/* Фильтры модели (Pro / Pro Max / Air / ...) */}
-      {modelFilters && modelFilters.length > 1 && onModelFilter && (
+      {/* Фильтр по подмоделям (Pro Max / Pro / Air...) — горизонтальная прокрутка */}
+      {modelFilters && modelFilters.length > 1 && onModelFilter && !filterPanelOpen && (
         <div className="overflow-x-auto scrollbar-hide border-t border-white/5">
-          <div className="flex gap-1.5 px-3 sm:px-4 py-2" style={{ width: "max-content" }}>
+          <div className="flex gap-1 px-3 py-2" style={{ width: "max-content" }}>
             {modelFilters.map(f => (
               <button key={f} onClick={() => onModelFilter(f)}
-                className={`shrink-0 px-3 py-1 rounded-full text-xs font-semibold border transition-all ${
+                className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all ${
                   modelFilter === f
-                    ? "bg-white text-black border-white"
-                    : "border-white/15 text-white/50 hover:border-white/30 hover:text-white"
+                    ? "bg-white text-black"
+                    : "text-white/40 hover:text-white"
                 }`}>
                 {f}
               </button>
@@ -113,71 +115,127 @@ export default function CatalogNav({
         </div>
       )}
 
-      {/* Мобильная панель фильтров */}
+      {/* Панель фильтров — выдвигается снизу строки поиска */}
       {filterPanelOpen && (
-        <div className="lg:hidden border-t border-white/6 bg-[#0D0D0D] px-3 py-3 space-y-3">
+        <div className="border-t border-white/5 bg-[#0D0D0D] px-4 pb-4 pt-3 space-y-4 max-h-[70vh] overflow-y-auto">
 
-          <div>
-            <div className="text-[10px] uppercase tracking-widest text-white/25 mb-1.5">Наличие</div>
-            <div className="flex gap-1.5 flex-wrap">
-              {[{ val: "", label: "Все" }, { val: "in_stock", label: "Есть" }, { val: "on_order", label: "Под заказ" }].map(f => (
+          {/* Наличие */}
+          <FilterSection label="Наличие">
+            <div className="flex gap-2">
+              {[
+                { val: "", label: "Все" },
+                { val: "in_stock", label: "Есть в наличии" },
+                { val: "on_order", label: "Под заказ" },
+              ].map(f => (
                 <button key={f.val} onClick={() => onAvail(f.val)}
-                  className={`text-xs px-3 py-1.5 rounded-full border transition-all ${filterAvail === f.val ? "bg-[#FFD700] text-black border-[#FFD700] font-semibold" : "border-white/10 text-white/50 hover:text-white"}`}>
+                  className={`text-xs px-3 py-1.5 rounded-lg border transition-all ${
+                    filterAvail === f.val
+                      ? "bg-[#FFD700] text-black border-[#FFD700] font-semibold"
+                      : "border-white/10 text-white/50 hover:text-white hover:border-white/25"
+                  }`}>
                   {f.label}
                 </button>
               ))}
             </div>
-          </div>
+          </FilterSection>
 
+          {/* Тип SIM */}
+          {simTypesInCategory.length > 0 && onSimTypeChange && (
+            <FilterSection label="Тип SIM">
+              <div className="flex gap-2 flex-wrap">
+                {simTypesInCategory.map(s => (
+                  <button key={s} onClick={() => onSimTypeChange(s)}
+                    className={`text-xs px-3 py-1.5 rounded-lg border transition-all ${
+                      activeSimType === s
+                        ? "bg-[#FFD700] text-black border-[#FFD700] font-semibold"
+                        : "border-white/10 text-white/50 hover:text-white hover:border-white/25"
+                    }`}>
+                    {s}
+                  </button>
+                ))}
+                {activeSimType && (
+                  <button onClick={() => onSimTypeChange("")}
+                    className="text-xs px-2 py-1.5 text-white/25 hover:text-white">
+                    <Icon name="X" size={11} />
+                  </button>
+                )}
+              </div>
+            </FilterSection>
+          )}
+
+          {/* Бренд */}
           {brandsInCategory.length > 1 && (
-            <div>
-              <div className="text-[10px] uppercase tracking-widest text-white/25 mb-1.5">Бренд</div>
-              <div className="flex gap-1.5 flex-wrap">
+            <FilterSection label="Бренд">
+              <div className="flex gap-2 flex-wrap">
                 {brandsInCategory.map(b => (
                   <button key={b} onClick={() => onBrandChange(b)}
-                    className={`text-xs px-3 py-1.5 rounded-full border transition-all ${activeBrand === b ? "bg-white text-black border-white font-semibold" : "border-white/10 text-white/50 hover:text-white"}`}>
+                    className={`text-xs px-3 py-1.5 rounded-lg border transition-all ${
+                      activeBrand === b
+                        ? "bg-white text-black border-white font-semibold"
+                        : "border-white/10 text-white/50 hover:text-white hover:border-white/25"
+                    }`}>
                     {b}
                   </button>
                 ))}
               </div>
-            </div>
+            </FilterSection>
           )}
 
+          {/* Объём памяти */}
           {storagesInCategory.length > 0 && (
-            <div>
-              <div className="text-[10px] uppercase tracking-widest text-white/25 mb-1.5">Объём памяти</div>
-              <div className="flex gap-1.5 flex-wrap">
+            <FilterSection label="Объём памяти">
+              <div className="flex gap-2 flex-wrap">
                 {storagesInCategory.map(s => (
                   <button key={s} onClick={() => onStorageChange(s)}
-                    className={`text-xs px-3 py-1.5 rounded-full border transition-all ${activeStorage === s ? "bg-[#FFD700] text-black border-[#FFD700] font-semibold" : "border-white/10 text-white/50 hover:text-white"}`}>
+                    className={`text-xs px-3 py-1.5 rounded-lg border transition-all font-medium ${
+                      activeStorage === s
+                        ? "bg-[#FFD700] text-black border-[#FFD700]"
+                        : "border-white/10 text-white/50 hover:text-white hover:border-white/25"
+                    }`}>
                     {s}
                   </button>
                 ))}
               </div>
-            </div>
+            </FilterSection>
           )}
 
+          {/* Цвет */}
           {colorsInCategory.length > 0 && (
-            <div>
-              <div className="text-[10px] uppercase tracking-widest text-white/25 mb-1.5">Цвет</div>
-              <div className="flex gap-1.5 flex-wrap">
+            <FilterSection label="Цвет">
+              <div className="flex gap-2 flex-wrap">
                 {colorsInCategory.map(c => (
                   <button key={c} onClick={() => onColorChange(c)}
-                    className={`text-xs px-3 py-1.5 rounded-full border transition-all capitalize ${activeColor === c ? "bg-[#FFD700] text-black border-[#FFD700] font-semibold" : "border-white/10 text-white/50 hover:text-white"}`}>
+                    className={`text-xs px-3 py-1.5 rounded-lg border capitalize transition-all ${
+                      activeColor === c
+                        ? "bg-[#FFD700] text-black border-[#FFD700] font-semibold"
+                        : "border-white/10 text-white/50 hover:text-white hover:border-white/25"
+                    }`}>
                     {c}
                   </button>
                 ))}
               </div>
-            </div>
+            </FilterSection>
           )}
 
-          {activeFiltersCount > 0 && (
-            <button onClick={onResetFilters} className="text-xs text-white/40 hover:text-white flex items-center gap-1 transition-colors">
-              <Icon name="X" size={12} /> Сбросить все фильтры
+          {/* Сброс */}
+          {hasFilters && (
+            <button onClick={() => { onResetFilters(); onFilterPanelToggle(); }}
+              className="flex items-center gap-1.5 text-xs text-[#FFD700]/70 hover:text-[#FFD700] transition-colors">
+              <Icon name="RotateCcw" size={12} />
+              Сбросить все фильтры
             </button>
           )}
         </div>
       )}
     </nav>
+  );
+}
+
+function FilterSection({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="text-[10px] font-semibold uppercase tracking-widest text-white/25 mb-2">{label}</div>
+      {children}
+    </div>
   );
 }

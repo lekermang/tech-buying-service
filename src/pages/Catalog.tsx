@@ -178,7 +178,7 @@ const Catalog = () => {
       }
     }
     return true;
-  }), [items, activeBrand, activeStorage, activeColor, modelFilter]);
+  }), [items, activeBrand, activeStorage, activeColor, activeSimType, modelFilter]);
 
   const activeFiltersCount = useMemo(() => [activeBrand, activeStorage, activeColor, activeSimType, filterAvail, modelFilter !== "Все" ? modelFilter : ""].filter(Boolean).length, [activeBrand, activeStorage, activeColor, activeSimType, filterAvail, modelFilter]);
 
@@ -201,9 +201,11 @@ const Catalog = () => {
         activeBrand={activeBrand}
         activeStorage={activeStorage}
         activeColor={activeColor}
+        activeSimType={activeSimType}
         brandsInCategory={brandsInCategory}
         storagesInCategory={storagesInCategory}
         colorsInCategory={colorsInCategory}
+        simTypesInCategory={simTypesInCategory}
         onSearch={handleSearch}
         onAvail={handleAvail}
         onFilterPanelToggle={() => setFilterPanelOpen(v => !v)}
@@ -211,6 +213,7 @@ const Catalog = () => {
         onBrandChange={handleBrandChange}
         onStorageChange={handleStorageChange}
         onColorChange={handleColorChange}
+        onSimTypeChange={handleSimTypeChange}
         onResetFilters={resetFilters}
         cartCount={cartCount}
         onCartOpen={() => setCartOpen(true)}
