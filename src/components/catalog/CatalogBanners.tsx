@@ -1,22 +1,56 @@
+import { useState, useEffect } from "react";
 import { CATEGORY_PHOTOS } from "@/pages/catalog.types";
 
+const HERO_SLIDES = [
+  {
+    cat: "iPhone 17/AIR/PRO/MAX",
+    title: "iPhone 17 Pro Max",
+    subtitle: "Titanium. Brilliant.",
+    desc: "Camera Control · ProMotion · USB‑C",
+    bg: "linear-gradient(135deg, #1a0a00 0%, #3d1a00 40%, #7c3500 70%, #c55800 100%)",
+    photo: CATEGORY_PHOTOS["iPhone 17/AIR/PRO/MAX"] || "",
+    badge: "NEW",
+    color: "#f97316",
+  },
+  {
+    cat: "Samsung S-Z",
+    title: "Galaxy S26 Ultra",
+    subtitle: "Built for the bold.",
+    desc: "Galaxy AI · S Pen · 200MP",
+    bg: "linear-gradient(135deg, #000818 0%, #001a3d 50%, #003080 100%)",
+    photo: "https://3bqdrb5nxj.a.trbcdn.net/shop/media/goods/196x302/ebadf9cf-4655-47d1-8e60-58103e2934eb.jpg",
+    badge: "AI",
+    color: "#3b82f6",
+  },
+  {
+    cat: "MacBook",
+    title: "MacBook Air M4",
+    subtitle: "Impossibly thin. Incredibly capable.",
+    desc: "M4 chip · 18h battery · 13\" & 15\"",
+    bg: "linear-gradient(135deg, #0a0015 0%, #200040 50%, #4a0080 100%)",
+    photo: CATEGORY_PHOTOS["MacBook"] || "",
+    badge: "",
+    color: "#a855f7",
+  },
+];
+
 const CATS = [
-  { title: "iPhone 17",         cat: "iPhone 17/AIR/PRO/MAX",      accent: "#f97316", badge: "NEW", icon: "📱" },
-  { title: "iPhone 16",         cat: "iPhone 16/e/+/PRO/MAX",      accent: "#f59e0b",               icon: "📱" },
-  { title: "iPhone 15",         cat: "iPhone 15/+/PRO/MAX",        accent: "#3b82f6",               icon: "📱" },
-  { title: "iPhone 11–14",      cat: "iPhone 11/12/13/14",         accent: "#6b7280",               icon: "📱" },
-  { title: "MacBook",           cat: "MacBook",                    accent: "#8b5cf6",               icon: "💻" },
-  { title: "Apple Watch",       cat: "Apple Watch",                accent: "#ef4444",               icon: "⌚" },
-  { title: "AirPods",           cat: "AirPods",                    accent: "#06b6d4",               icon: "🎧" },
-  { title: "Apple iPad",        cat: "Apple iPad",                 accent: "#3b82f6",               icon: "📲" },
-  { title: "Samsung S",         cat: "Samsung S-Z",                accent: "#1d4ed8", badge: "AI",  icon: "📱" },
-  { title: "Samsung A",         cat: "Samsung A-M",                accent: "#0ea5e9",               icon: "📱" },
-  { title: "Dyson",             cat: "Dyson / Garmin",             accent: "#f97316",               icon: "💨" },
-  { title: "Pixel · Honor",     cat: "Honor / PIXEL",              accent: "#16a34a",               icon: "📱" },
-  { title: "POCO · Xiaomi",     cat: "POCO M-X-F",                 accent: "#f43f5e",               icon: "📱" },
-  { title: "Sony · GoPro",      cat: "Sony / XBOX / GoPro",        accent: "#7c3aed",               icon: "🎮" },
-  { title: "OnePlus · Nothing", cat: "Realme / OnePlus / Nothing", accent: "#dc2626",               icon: "📱" },
-  { title: "JBL · Яндекс",     cat: "Яндекс / JBL / Marshall",    accent: "#ca8a04",               icon: "🔊" },
+  { title: "iPhone 17",    cat: "iPhone 17/AIR/PRO/MAX",      accent: "#f97316" },
+  { title: "iPhone 16",    cat: "iPhone 16/e/+/PRO/MAX",      accent: "#f59e0b" },
+  { title: "iPhone 15",    cat: "iPhone 15/+/PRO/MAX",        accent: "#3b82f6" },
+  { title: "iPhone 11–14", cat: "iPhone 11/12/13/14",         accent: "#6b7280" },
+  { title: "MacBook",      cat: "MacBook",                    accent: "#8b5cf6" },
+  { title: "Apple Watch",  cat: "Apple Watch",                accent: "#ef4444" },
+  { title: "AirPods",      cat: "AirPods",                    accent: "#06b6d4" },
+  { title: "iPad",         cat: "Apple iPad",                 accent: "#3b82f6" },
+  { title: "Samsung S",    cat: "Samsung S-Z",                accent: "#1d4ed8" },
+  { title: "Samsung A",    cat: "Samsung A-M",                accent: "#0ea5e9" },
+  { title: "Dyson",        cat: "Dyson / Garmin",             accent: "#f97316" },
+  { title: "Pixel·Honor",  cat: "Honor / PIXEL",              accent: "#16a34a" },
+  { title: "POCO·Xiaomi",  cat: "POCO M-X-F",                 accent: "#f43f5e" },
+  { title: "Sony·GoPro",   cat: "Sony / XBOX / GoPro",        accent: "#7c3aed" },
+  { title: "OnePlus",      cat: "Realme / OnePlus / Nothing", accent: "#dc2626" },
+  { title: "JBL·Яндекс",  cat: "Яндекс / JBL / Marshall",    accent: "#ca8a04" },
 ];
 
 interface Props {
@@ -25,41 +59,90 @@ interface Props {
 }
 
 export default function CatalogBanners({ onCategory, activeCategory }: Props) {
-  const hero = CATS[0];
-  const heroPhoto = CATEGORY_PHOTOS[hero.cat];
+  const [slide, setSlide] = useState(0);
+  const [animating, setAnimating] = useState(false);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setAnimating(true);
+      setTimeout(() => {
+        setSlide(s => (s + 1) % HERO_SLIDES.length);
+        setAnimating(false);
+      }, 300);
+    }, 5000);
+    return () => clearInterval(id);
+  }, []);
+
+  const s = HERO_SLIDES[slide];
 
   return (
-    <div className="bg-[#0D0D0D]">
+    <div className="bg-black select-none">
 
-      {/* Hero баннер */}
-      <div className="px-3 sm:px-4 pt-4 pb-3">
-        <button
-          onClick={() => onCategory(hero.cat)}
-          className="relative w-full rounded-2xl overflow-hidden cursor-pointer"
-          style={{ height: 150 }}
-        >
-          <div className="absolute inset-0" style={{
-            background: "linear-gradient(120deg, #431407 0%, #9a3412 40%, #ea580c 75%, #fdba74 100%)"
-          }} />
-          {heroPhoto && (
-            <img src={heroPhoto} alt="iPhone 17"
-              className="absolute right-0 top-0 h-full w-2/5 object-cover opacity-60"
-              style={{ maskImage: "linear-gradient(to left, rgba(0,0,0,0.8), transparent)" }} />
-          )}
-          <div className="absolute inset-0 px-5 flex flex-col justify-center">
-            {hero.badge && (
-              <span className="text-[11px] font-black text-orange-200 tracking-widest uppercase mb-1">{hero.badge} 2025</span>
-            )}
-            <div className="text-white font-black text-4xl leading-none tracking-tight">iPhone 17</div>
-            <div className="text-white/60 text-sm font-medium mt-1.5">Pro Max · Pro · Air · 17e</div>
+      {/* ── HERO SLIDER ── */}
+      <div
+        className="relative overflow-hidden cursor-pointer"
+        style={{ minHeight: 220 }}
+        onClick={() => onCategory(s.cat)}
+      >
+        {/* Background */}
+        <div
+          className="absolute inset-0 transition-all duration-700"
+          style={{ background: s.bg }}
+        />
+
+        {/* Noise texture overlay */}
+        <div className="absolute inset-0 opacity-[0.03]"
+          style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E\")" }}
+        />
+
+        {/* Product photo */}
+        {s.photo && (
+          <div className={`absolute right-0 top-0 bottom-0 w-1/2 transition-opacity duration-300 ${animating ? "opacity-0" : "opacity-100"}`}>
+            <img
+              src={s.photo}
+              alt={s.title}
+              className="absolute right-4 top-1/2 -translate-y-1/2 h-[85%] w-auto object-contain drop-shadow-2xl"
+              style={{ filter: "drop-shadow(0 0 40px rgba(255,255,255,0.08))" }}
+            />
+            <div className="absolute inset-0" style={{ background: "linear-gradient(to right, rgba(0,0,0,0.7) 0%, transparent 60%)" }} />
           </div>
-          {activeCategory === hero.cat && (
-            <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-white text-[10px]">✓</div>
+        )}
+
+        {/* Content */}
+        <div className={`relative z-10 px-6 py-8 sm:py-10 max-w-sm transition-opacity duration-300 ${animating ? "opacity-0" : "opacity-100"}`}>
+          {s.badge && (
+            <span className="inline-block text-[10px] font-black tracking-[0.25em] uppercase px-2.5 py-1 rounded-full mb-3"
+              style={{ background: `${s.color}25`, color: s.color, border: `1px solid ${s.color}40` }}>
+              {s.badge}
+            </span>
           )}
-        </button>
+          <h1 className="text-white font-black text-3xl sm:text-4xl leading-none tracking-tight mb-1">{s.title}</h1>
+          <p className="font-light tracking-widest text-sm mb-3" style={{ color: `${s.color}cc` }}>{s.subtitle}</p>
+          <p className="text-white/40 text-xs">{s.desc}</p>
+
+          <div className="mt-5 inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-2 text-white text-xs font-semibold">
+            Смотреть цены →
+          </div>
+        </div>
+
+        {/* Dots */}
+        <div className="absolute bottom-4 left-6 flex gap-1.5">
+          {HERO_SLIDES.map((_, i) => (
+            <button
+              key={i}
+              onClick={e => { e.stopPropagation(); setSlide(i); }}
+              className="rounded-full transition-all duration-300"
+              style={{
+                width: i === slide ? 20 : 6,
+                height: 6,
+                background: i === slide ? s.color : "rgba(255,255,255,0.25)",
+              }}
+            />
+          ))}
+        </div>
       </div>
 
-      {/* Сетка категорий */}
+      {/* ── КАТЕГОРИИ ── */}
       <div className="grid grid-cols-4 sm:grid-cols-8 lg:grid-cols-16">
         {CATS.map(c => {
           const photo = CATEGORY_PHOTOS[c.cat];
@@ -68,40 +151,52 @@ export default function CatalogBanners({ onCategory, activeCategory }: Props) {
             <button
               key={c.cat}
               onClick={() => onCategory(c.cat)}
-              className="relative overflow-hidden aspect-square group"
+              className="relative aspect-square overflow-hidden group transition-all"
               style={{
-                outline: isActive ? `2px solid ${c.accent}` : "1px solid rgba(255,255,255,0.05)",
+                outline: isActive ? `2px solid ${c.accent}` : "1px solid rgba(255,255,255,0.06)",
                 outlineOffset: "-1px",
               }}
             >
-              {photo ? (
-                <img src={photo} alt={c.title}
-                  className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-              ) : (
-                <>
-                  <div className="absolute inset-0"
-                    style={{ background: `linear-gradient(135deg, ${c.accent}40, ${c.accent}10)` }} />
-                  <div className="absolute inset-0 flex items-center justify-center pb-4">
-                    <span className="text-2xl sm:text-3xl opacity-60">{c.icon}</span>
-                  </div>
-                </>
+              {/* Background */}
+              <div
+                className="absolute inset-0 transition-opacity duration-300"
+                style={{
+                  background: photo
+                    ? "transparent"
+                    : `linear-gradient(145deg, ${c.accent}30 0%, ${c.accent}08 100%)`,
+                }}
+              />
+              {photo && (
+                <img
+                  src={photo}
+                  alt={c.title}
+                  className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                />
               )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-              <div className="absolute inset-x-0 bottom-0 px-1.5 pb-1.5">
-                {c.badge && (
-                  <div className="text-[7px] font-bold mb-0.5 hidden sm:block" style={{ color: c.accent }}>{c.badge}</div>
-                )}
-                <div className="text-white font-bold text-[8px] sm:text-[9px] leading-tight line-clamp-2">{c.title}</div>
+
+              {/* Gradient overlay */}
+              <div className="absolute inset-0" style={{
+                background: isActive
+                  ? `linear-gradient(to top, ${c.accent}80 0%, ${c.accent}10 60%, transparent 100%)`
+                  : "linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.2) 60%, transparent 100%)"
+              }} />
+
+              {/* Title */}
+              <div className="absolute inset-x-0 bottom-0 pb-2 px-1.5 text-center">
+                <div className={`font-bold leading-tight text-[8px] sm:text-[9px] transition-colors ${isActive ? "text-white" : "text-white/70 group-hover:text-white"}`}>
+                  {c.title}
+                </div>
               </div>
+
+              {/* Active dot */}
               {isActive && (
-                <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center text-white text-[8px] font-bold"
-                  style={{ background: c.accent }}>✓</div>
+                <div className="absolute top-1.5 right-1.5 w-3 h-3 rounded-full border-2 border-black"
+                  style={{ background: c.accent }} />
               )}
             </button>
           );
         })}
       </div>
-
     </div>
   );
 }
