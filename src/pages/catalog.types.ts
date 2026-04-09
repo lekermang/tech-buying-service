@@ -167,23 +167,27 @@ export const MODEL_PHOTOS_EXTRA: Record<string, string[]> = {
 };
 
 export const CATEGORY_PHOTOS: Record<string, string> = {
-  "iPhone 17/AIR/PRO/MAX":      "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/b8ee9456-ba97-4dc8-af93-5ee436332c5e.jpg",
-  "iPhone 16/e/+/PRO/MAX":      "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/2e6a9047-65e8-4c05-839d-bdab5bbdbcd3.jpg",
-  "iPhone 15/+/PRO/MAX":        "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/16d49a33-5c15-4683-84e4-2b4c6ac8cb5d.jpg",
-  "iPhone 11/12/13/14":         "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/bd9e4c92-3ff4-44d8-8519-ac68e4bb7033.jpg",
-  "MacBook":                    "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/bc4bfd3e-97ae-454a-ae9e-c1e771178679.jpg",
-  "Apple Watch":                "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/95cbb711-93b7-4b11-81a2-22ce587b23e8.jpg",
-  "AirPods":                    "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/0b5f7d2e-3b4e-47db-b321-a81c62701e82.jpg",
-  "Apple iPad":                 "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/a256c099-f9fd-4b16-a8e3-2268ccfd3824.jpg",
-  "Samsung S-Z":                "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/af80c041-d754-4c52-a6b8-d7d86e9579f6.jpg",
-  "Samsung A-M":                "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/f1460027-ebea-440c-8989-ccf7e3167ac2.jpg",
-  "Dyson / Garmin":             "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/bcfe8033-51c9-4eec-804b-58a3006ab48f.jpg",
-  "Honor / PIXEL":              "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/2227a12f-7615-4151-beaa-6d70debb35d2.jpg",
-  "POCO M-X-F":                 "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/e266bc31-56ed-4fda-958e-92cb59bf7492.jpg",
-  "Xiaomi/Redmi/Pad":           "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/e266bc31-56ed-4fda-958e-92cb59bf7492.jpg",
-  "Sony / XBOX / GoPro":        "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/f16efab6-9d20-480a-8e49-9d8752825ca6.jpg",
-  "Realme / OnePlus / Nothing": "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/ec500aee-01bb-4dba-8c6c-47b883bcd95c.jpg",
-  "Яндекс / JBL / Marshall":    "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/66af3c22-7013-4c51-b199-bfe11c4f179f.jpg",
+  // iPhone — реальные фото с lab-store40.ru
+  "iPhone 17/AIR/PRO/MAX":      LAB + "2cf/o2qdv008u61ioutiva9zhf7e5nsmddb0.webp",
+  "iPhone 16/e/+/PRO/MAX":      LAB + "def/h77k70t9pt0b6maibq36pwcjt6es61og.webp",
+  "iPhone 15/+/PRO/MAX":        LAB + "65f/w4aqj9drz9hyh5533r2i1glfjfvoeqk9.webp",
+  "iPhone 11/12/13/14":         LAB + "8e1/7zhk17sklzt5oj7xzz3i2b1p6u9xadvt.webp",
+  // Apple
+  "MacBook":                    LAB + "2f3/w5buzevpm08uutp7tf0q6d974h3g7uyi.webp",
+  "Apple Watch":                LAB + "1b4/8sjyh1qtjz72b9cftqcqwbjbgipvibk6.webp",
+  "AirPods":                    LAB + "446/npy4at2wxk7qcy50czzie23lofbdv4d6.webp",
+  "Apple iPad":                 LAB + "fc8/9lk3puz4v42lmxaqm4m3qmupvio7rtx5.png",
+  // Samsung — реальные фото с Билайн CDN
+  "Samsung S-Z":                "https://3bqdrb5nxj.a.trbcdn.net/shop/media/goods/196x302/ebadf9cf-4655-47d1-8e60-58103e2934eb.jpg",
+  "Samsung A-M":                "https://3bqdrb5nxj.a.trbcdn.net/shop/media/goods/196x302/5843d1ef-940d-4d0c-bad3-498055228dcb.jpg",
+  // Остальные
+  "Dyson / Garmin":             LAB + "d8a/cjuatj6iy0zikrwy10ac2ybb5q8ti2vf.png",
+  "Honor / PIXEL":              "https://3bqdrb5nxj.a.trbcdn.net/shop/media/goods/196x302/f4da192b-8904-4cb7-91db-ed04e495eca2.jpg",
+  "POCO M-X-F":                 "https://3bqdrb5nxj.a.trbcdn.net/shop/media/goods/196x302/a9cdccd4-ed58-4696-88aa-8b6f0f956bbd.jpg",
+  "Xiaomi/Redmi/Pad":           "https://3bqdrb5nxj.a.trbcdn.net/shop/media/goods/196x302/d57529a0-1ac6-4000-a7d1-f458138c748f.jpg",
+  "Sony / XBOX / GoPro":        LAB + "b10/b1055cc7f9dd0bbd6882235595bed103.png",
+  "Realme / OnePlus / Nothing": "https://3bqdrb5nxj.a.trbcdn.net/shop/media/goods/196x302/0bbc54cc-f51d-4a2b-9f0f-e2e10d787952.jpg",
+  "Яндекс / JBL / Marshall":    LAB + "beb/p01r5ohj50a11u09677suml7h9cuvdi8.webp",
   "SKY":                        "",
 };
 

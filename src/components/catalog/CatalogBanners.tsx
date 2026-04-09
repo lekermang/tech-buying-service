@@ -1,31 +1,22 @@
 import { CATEGORY_PHOTOS } from "@/pages/catalog.types";
-import Icon from "@/components/ui/icon";
 
-interface Cat {
-  title: string;
-  subtitle: string;
-  cat: string;
-  accent: string;
-  badge?: string;
-}
-
-const CATS: Cat[] = [
-  { title: "iPhone 17",         subtitle: "Pro · Air · Max",       cat: "iPhone 17/AIR/PRO/MAX",      accent: "#f97316", badge: "Новинки" },
-  { title: "iPhone 16",         subtitle: "Pro · Plus · e",        cat: "iPhone 16/e/+/PRO/MAX",      accent: "#f59e0b", badge: "Хит" },
-  { title: "iPhone 15",         subtitle: "Pro · Plus",            cat: "iPhone 15/+/PRO/MAX",        accent: "#10b981" },
-  { title: "iPhone 11–14",      subtitle: "11 · 12 · 13 · 14",     cat: "iPhone 11/12/13/14",         accent: "#64748b", badge: "Доступно" },
-  { title: "MacBook",           subtitle: "Air M4 · Pro M4",       cat: "MacBook",                    accent: "#8b5cf6" },
-  { title: "Apple Watch",       subtitle: "Ultra 3 · S11",         cat: "Apple Watch",                accent: "#ef4444" },
-  { title: "AirPods",           subtitle: "Pro 3 · Max 2",         cat: "AirPods",                    accent: "#06b6d4" },
-  { title: "Apple iPad",        subtitle: "Air M4 · Mini 7",       cat: "Apple iPad",                 accent: "#3b82f6" },
-  { title: "Samsung S",         subtitle: "S25 Ultra · S25+",      cat: "Samsung S-Z",                accent: "#1d4ed8", badge: "Galaxy AI" },
-  { title: "Samsung A",         subtitle: "A55 · A35",             cat: "Samsung A-M",                accent: "#0ea5e9" },
-  { title: "Dyson",             subtitle: "Фен · Стайлер",         cat: "Dyson / Garmin",             accent: "#f97316", badge: "Премиум" },
-  { title: "Pixel · Honor",     subtitle: "Pixel 10 · Honor 400",  cat: "Honor / PIXEL",              accent: "#16a34a" },
-  { title: "POCO · Xiaomi",     subtitle: "F6 Pro · 15 Ultra",     cat: "POCO M-X-F",                 accent: "#f43f5e", badge: "Топ цена" },
-  { title: "Sony · GoPro",      subtitle: "PS5 · GoPro 13",        cat: "Sony / XBOX / GoPro",        accent: "#7c3aed" },
-  { title: "OnePlus · Nothing", subtitle: "13 · Phone 3",          cat: "Realme / OnePlus / Nothing", accent: "#dc2626" },
-  { title: "JBL · Marshall",    subtitle: "Колонки · Яндекс",      cat: "Яндекс / JBL / Marshall",    accent: "#ca8a04" },
+const CATS = [
+  { title: "iPhone 17",         sub: "Pro Max · Pro · Air",   cat: "iPhone 17/AIR/PRO/MAX",      accent: "#f97316", badge: "NEW" },
+  { title: "iPhone 16",         sub: "Pro · Plus · 16e",      cat: "iPhone 16/e/+/PRO/MAX",      accent: "#f59e0b" },
+  { title: "iPhone 15",         sub: "Pro Max · Pro · Plus",  cat: "iPhone 15/+/PRO/MAX",        accent: "#3b82f6" },
+  { title: "iPhone 11–14",      sub: "11 · 12 · 13 · 14",    cat: "iPhone 11/12/13/14",         accent: "#6b7280" },
+  { title: "MacBook",           sub: "Air M4 · Pro M5",       cat: "MacBook",                    accent: "#8b5cf6" },
+  { title: "Apple Watch",       sub: "Ultra 3 · S11 · SE3",   cat: "Apple Watch",                accent: "#ef4444" },
+  { title: "AirPods",           sub: "Pro 3 · Max 2",         cat: "AirPods",                    accent: "#06b6d4" },
+  { title: "Apple iPad",        sub: "Air M4 · Mini 7",       cat: "Apple iPad",                 accent: "#3b82f6" },
+  { title: "Samsung S",         sub: "S26 Ultra · S25+",      cat: "Samsung S-Z",                accent: "#1d4ed8", badge: "AI" },
+  { title: "Samsung A",         sub: "A56 · A36 · A26",       cat: "Samsung A-M",                accent: "#0ea5e9" },
+  { title: "Dyson",             sub: "Фен · Стайлер · Пылесос", cat: "Dyson / Garmin",           accent: "#f97316", badge: "💎" },
+  { title: "Pixel · Honor",     sub: "Pixel 10 · Honor 400",  cat: "Honor / PIXEL",              accent: "#16a34a" },
+  { title: "POCO · Xiaomi",     sub: "F8 · X7 · 15T Pro",    cat: "POCO M-X-F",                 accent: "#f43f5e" },
+  { title: "Sony · GoPro",      sub: "PS5 · Xbox · GoPro",   cat: "Sony / XBOX / GoPro",        accent: "#7c3aed" },
+  { title: "OnePlus · Nothing", sub: "15 · Phone 4A",         cat: "Realme / OnePlus / Nothing", accent: "#dc2626" },
+  { title: "JBL · Яндекс",     sub: "Charge 6 · Станция",    cat: "Яндекс / JBL / Marshall",    accent: "#ca8a04" },
 ];
 
 interface Props {
@@ -40,106 +31,71 @@ export default function CatalogBanners({ onCategory, activeCategory }: Props) {
   return (
     <div className="bg-[#0D0D0D]">
 
-      {/* ── Шапка ── */}
-      <div className="px-3 sm:px-5 py-5 sm:py-6">
-        {/* Hero баннер iPhone 17 — Orange */}
+      {/* Hero баннер */}
+      <div className="px-3 sm:px-4 pt-4 pb-3">
         <button
           onClick={() => onCategory(hero.cat)}
-          className="relative w-full rounded-2xl overflow-hidden mb-0 cursor-pointer block"
-          style={{ height: 180 }}
+          className="relative w-full rounded-2xl overflow-hidden cursor-pointer"
+          style={{ height: 150 }}
         >
-          {/* Оранжевый градиентный фон */}
           <div className="absolute inset-0" style={{
-            background: "linear-gradient(135deg, #7c2d12 0%, #c2410c 30%, #f97316 60%, #fdba74 100%)"
+            background: "linear-gradient(120deg, #431407 0%, #9a3412 40%, #ea580c 75%, #fdba74 100%)"
           }} />
-          {/* Декоративные круги */}
-          <div className="absolute -right-8 -top-8 w-48 h-48 rounded-full opacity-20" style={{ background: "#fff3" }} />
-          <div className="absolute right-16 bottom-0 w-32 h-32 rounded-full opacity-10" style={{ background: "#fff5" }} />
-          {/* Фото категории поверх если есть */}
           {heroPhoto && (
-            <img src={heroPhoto} alt={hero.title}
-              className="absolute right-0 top-0 h-full w-1/2 object-cover opacity-30 mix-blend-luminosity" />
+            <img src={heroPhoto} alt="iPhone 17"
+              className="absolute right-0 top-0 h-full w-2/5 object-cover opacity-60"
+              style={{ maskImage: "linear-gradient(to left, rgba(0,0,0,0.8), transparent)" }} />
           )}
-          <div className="absolute inset-0 p-5 sm:p-6 flex flex-col justify-center">
-            <span className="inline-flex items-center gap-1.5 text-white text-[11px] font-bold px-2.5 py-1 rounded-full w-fit mb-3"
-              style={{ background: "rgba(0,0,0,0.3)" }}>
-              <Icon name="Sparkles" size={11} />
-              {hero.badge} 2025
-            </span>
-            <div className="text-white font-black text-3xl sm:text-4xl leading-none tracking-tight">iPhone 17</div>
-            <div className="text-white/80 text-base font-semibold mt-1">Pro Max · Pro · Air · Plus</div>
-            <div className="flex items-center gap-2 mt-3">
-              <span className="text-white/60 text-xs">Cosmic Orange • Desert Titanium • Blue</span>
-            </div>
+          <div className="absolute inset-0 px-5 flex flex-col justify-center">
+            {hero.badge && (
+              <span className="text-[11px] font-black text-orange-200 tracking-widest uppercase mb-1">{hero.badge} 2025</span>
+            )}
+            <div className="text-white font-black text-3xl leading-none">iPhone 17</div>
+            <div className="text-white/70 text-sm mt-1">Pro Max · Pro · Air · 17e</div>
+            <div className="text-white/40 text-xs mt-2">Orange · Silver · Blue</div>
           </div>
           {activeCategory === hero.cat && (
-            <div className="absolute top-3 right-3 w-6 h-6 rounded-full flex items-center justify-center"
-              style={{ background: "rgba(0,0,0,0.4)" }}>
-              <Icon name="Check" size={12} className="text-white" />
-            </div>
+            <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-white text-[10px]">✓</div>
           )}
         </button>
-
-        <div className="mt-3 flex items-center gap-2 flex-wrap">
-          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
-            style={{ background: "rgba(249,115,22,0.2)", border: "1px solid rgba(249,115,22,0.4)", color: "#fb923c" }}>
-            <Icon name="Sparkles" size={9} />
-            Официальная гарантия
-          </span>
-          <span className="text-white/20 text-[10px]">·</span>
-          <span className="text-white/40 text-[10px]">Рассрочка 0%</span>
-        </div>
-        <h1 className="text-white font-extrabold text-2xl sm:text-3xl tracking-tight leading-tight mt-1">
-          Каталог новой техники
-        </h1>
-        <p className="text-white/40 text-xs mt-0.5">iPhone · MacBook · Samsung · Dyson</p>
       </div>
 
-      {/* ── Категории: плотная сетка без пробелов ── */}
-      {/* мобилка: 4 cols | sm: 5 | md: 8 | lg: 16 (все в 1 ряд) */}
-      <div>
-        <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-8 lg:grid-cols-16 gap-0">
-          {CATS.map(c => {
-            const photo = CATEGORY_PHOTOS[c.cat];
-            const isActive = activeCategory === c.cat;
-            return (
-              <button
-                key={c.cat}
-                onClick={() => onCategory(c.cat)}
-                className="relative overflow-hidden text-left group transition-all"
-                style={{
-                  aspectRatio: "1 / 1",
-                  outline: isActive ? `2px solid ${c.accent}` : "1px solid rgba(255,255,255,0.05)",
-                  outlineOffset: "-1px",
-                }}
-              >
-                {photo ? (
-                  <img src={photo} alt={c.title}
-                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                ) : (
-                  <div className="absolute inset-0"
-                    style={{ background: `linear-gradient(135deg, ${c.accent}50, ${c.accent}18)` }} />
+      {/* Сетка категорий */}
+      <div className="grid grid-cols-4 sm:grid-cols-8 lg:grid-cols-16">
+        {CATS.map(c => {
+          const photo = CATEGORY_PHOTOS[c.cat];
+          const isActive = activeCategory === c.cat;
+          return (
+            <button
+              key={c.cat}
+              onClick={() => onCategory(c.cat)}
+              className="relative overflow-hidden aspect-square group"
+              style={{
+                outline: isActive ? `2px solid ${c.accent}` : "1px solid rgba(255,255,255,0.05)",
+                outlineOffset: "-1px",
+              }}
+            >
+              {photo ? (
+                <img src={photo} alt={c.title}
+                  className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+              ) : (
+                <div className="absolute inset-0"
+                  style={{ background: `linear-gradient(135deg, ${c.accent}55, ${c.accent}15)` }} />
+              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+              <div className="absolute inset-x-0 bottom-0 px-1.5 pb-1.5">
+                {c.badge && (
+                  <div className="text-[7px] font-bold mb-0.5 hidden sm:block" style={{ color: c.accent }}>{c.badge}</div>
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
-                <div className="absolute inset-x-0 bottom-0 p-1 sm:p-1.5 md:p-2">
-                  {c.badge && (
-                    <span className="text-[7px] font-bold px-1 py-px rounded-full w-fit mb-0.5 hidden sm:block"
-                      style={{ background: `${c.accent}40`, color: c.accent }}>
-                      {c.badge}
-                    </span>
-                  )}
-                  <div className="text-white font-bold text-[8px] sm:text-[9px] md:text-[10px] leading-tight line-clamp-2">{c.title}</div>
-                </div>
-                {isActive && (
-                  <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center"
-                    style={{ background: c.accent }}>
-                    <Icon name="Check" size={7} className="text-white" />
-                  </div>
-                )}
-              </button>
-            );
-          })}
-        </div>
+                <div className="text-white font-bold text-[8px] sm:text-[9px] leading-tight line-clamp-2">{c.title}</div>
+              </div>
+              {isActive && (
+                <div className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center text-white text-[8px] font-bold"
+                  style={{ background: c.accent }}>✓</div>
+              )}
+            </button>
+          );
+        })}
       </div>
 
     </div>

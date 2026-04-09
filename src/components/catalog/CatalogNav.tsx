@@ -97,69 +97,38 @@ export default function CatalogNav({
         </button>
       </div>
 
-      {/* Активные фильтры — теги */}
-      {hasFilters && !filterPanelOpen && (
+      {/* Подмодели + активные теги — единая строка */}
+      {!filterPanelOpen && (modelFilters && modelFilters.length > 1 || hasFilters) && (
         <div className="overflow-x-auto scrollbar-hide border-t border-white/5">
           <div className="flex gap-1.5 px-3 py-2 items-center" style={{ width: "max-content" }}>
-            {filterAvail === "in_stock" && (
-              <FilterTag label="Есть в наличии" color="green" onRemove={() => onAvail("")} />
-            )}
-            {filterAvail === "on_order" && (
-              <FilterTag label="Под заказ" onRemove={() => onAvail("")} />
-            )}
-            {modelFilter && modelFilter !== "Все" && onModelFilter && (
-              <FilterTag label={modelFilter} onRemove={() => onModelFilter("Все")} />
-            )}
-            {activeSimType && onSimTypeChange && (
-              <FilterTag label={activeSimType} color="blue" onRemove={() => onSimTypeChange("")} />
-            )}
-            {activeBrand && (
-              <FilterTag label={activeBrand} onRemove={() => onBrandChange("")} />
-            )}
-            {activeStorage && (
-              <FilterTag label={activeStorage} color="yellow" onRemove={() => onStorageChange("")} />
-            )}
-            {activeColor && (
-              <FilterTag label={activeColor} color="yellow" onRemove={() => onColorChange("")} />
-            )}
-            <button onClick={onResetFilters}
-              className="shrink-0 text-[10px] text-white/30 hover:text-white/60 transition-colors ml-1">
-              Сбросить всё
-            </button>
-          </div>
-        </div>
-      )}
 
-      {/* Фильтр по подмоделям (Pro Max / Pro / Air...) — горизонтальная прокрутка */}
-      {modelFilters && modelFilters.length > 1 && onModelFilter && !filterPanelOpen && !hasFilters && (
-        <div className="overflow-x-auto scrollbar-hide border-t border-white/5">
-          <div className="flex gap-1 px-3 py-2" style={{ width: "max-content" }}>
-            {modelFilters.map(f => (
-              <button key={f} onClick={() => onModelFilter(f)}
-                className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all ${
-                  modelFilter === f
-                    ? "bg-white text-black"
-                    : "text-white/40 hover:text-white"
-                }`}>
-                {f}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Подмодели + теги вместе когда оба активны */}
-      {modelFilters && modelFilters.length > 1 && onModelFilter && !filterPanelOpen && hasFilters && (
-        <div className="overflow-x-auto scrollbar-hide border-t border-white/5">
-          <div className="flex gap-1 px-3 py-1.5" style={{ width: "max-content" }}>
-            {modelFilters.map(f => (
+            {/* Подмодели */}
+            {modelFilters && modelFilters.length > 1 && onModelFilter && modelFilters.map(f => (
               <button key={f} onClick={() => onModelFilter(f)}
                 className={`shrink-0 px-3 py-1 rounded-full text-xs font-medium transition-all ${
-                  modelFilter === f ? "bg-white text-black" : "text-white/35 hover:text-white"
+                  modelFilter === f ? "bg-white text-black" : "text-white/40 hover:text-white"
                 }`}>
                 {f}
               </button>
             ))}
+
+            {/* Разделитель если есть и то и другое */}
+            {modelFilters && modelFilters.length > 1 && hasFilters && (
+              <span className="text-white/15 shrink-0">|</span>
+            )}
+
+            {/* Активные теги фильтров */}
+            {filterAvail === "in_stock" && <FilterTag label="В наличии" color="green" onRemove={() => onAvail("")} />}
+            {filterAvail === "on_order" && <FilterTag label="Заказ" onRemove={() => onAvail("")} />}
+            {activeSimType && onSimTypeChange && <FilterTag label={activeSimType} color="blue" onRemove={() => onSimTypeChange("")} />}
+            {activeBrand && <FilterTag label={activeBrand} onRemove={() => onBrandChange("")} />}
+            {activeStorage && <FilterTag label={activeStorage} color="yellow" onRemove={() => onStorageChange("")} />}
+            {activeColor && <FilterTag label={activeColor} color="yellow" onRemove={() => onColorChange("")} />}
+            {hasFilters && (
+              <button onClick={onResetFilters} className="shrink-0 text-[10px] text-white/25 hover:text-white/60 transition-colors">
+                ✕ Сброс
+              </button>
+            )}
           </div>
         </div>
       )}
