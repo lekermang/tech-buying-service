@@ -202,7 +202,7 @@ def parse_price_line(line, current_model):
     price_raw = re.sub(r'\s', '', price_match.group(1))
     try:
         original_price = int(price_raw)
-        price = original_price + get_price_markup()
+        price = original_price  # Наценка применяется на фронте из настроек
     except ValueError:
         return None
 

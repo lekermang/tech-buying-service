@@ -1,14 +1,15 @@
 import { memo, useState, useRef, useEffect, useCallback } from "react";
 import Icon from "@/components/ui/icon";
-import { CatalogItem, REGION_FLAG, MODEL_PHOTOS, MODEL_PHOTOS_EXTRA, MODEL_COLOR_PHOTOS, CATEGORY_PHOTOS, PRICE_MARKUP, getColorHex } from "@/pages/catalog.types";
+import { CatalogItem, REGION_FLAG, MODEL_PHOTOS, MODEL_PHOTOS_EXTRA, MODEL_COLOR_PHOTOS, CATEGORY_PHOTOS, getColorHex } from "@/pages/catalog.types";
 
 interface Props {
   item: CatalogItem;
   onBuy: (item: CatalogItem) => void;
   onAddToCart?: (item: CatalogItem) => void;
+  markup?: number;
 }
 
-const CatalogProductCard = memo(function CatalogProductCard({ item, onBuy, onAddToCart }: Props) {
+const CatalogProductCard = memo(function CatalogProductCard({ item, onBuy, onAddToCart, markup = 3500 }: Props) {
   const flag = item.region ? (REGION_FLAG[item.region] || "") : "";
   const inStock = item.availability === "in_stock";
 
@@ -51,7 +52,7 @@ const CatalogProductCard = memo(function CatalogProductCard({ item, onBuy, onAdd
   };
 
   const currentPhoto = allPhotos[photoIdx] || null;
-  const price = item.price ? (item.price + PRICE_MARKUP).toLocaleString("ru-RU") + " ₽" : "По запросу";
+  const price = item.price ? (item.price + markup).toLocaleString("ru-RU") + " ₽" : "По запросу";
 
   return (
     <div

@@ -5,7 +5,7 @@ import CatalogSidebar from "@/components/catalog/CatalogSidebar";
 import CatalogGrid from "@/components/catalog/CatalogGrid";
 import CatalogBanners from "@/components/catalog/CatalogBanners";
 import Icon from "@/components/ui/icon";
-import { CatalogItem, CATALOG_URL, PRICE_MARKUP } from "@/pages/catalog.types";
+import { CatalogItem, CATALOG_URL } from "@/pages/catalog.types";
 
 const MODEL_FILTERS: Record<string, string[]> = {
   "iPhone 17/AIR/PRO/MAX":   ["Все", "Pro Max", "Pro", "Air", "iPhone 17"],
@@ -26,6 +26,7 @@ interface CartEntry { item: CatalogItem; qty: number; }
 const Catalog = () => {
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
+  const [markup, setMarkup] = useState(3500);
   const [activeCategory, setActiveCategory] = useState("iPhone 17/AIR/PRO/MAX");
   const [activeBrand, setActiveBrand] = useState("");
   const [activeStorage, setActiveStorage] = useState("");
@@ -54,6 +55,7 @@ const Catalog = () => {
       .then(d => {
         setItems(sortItems(d.items || []));
         if (d.categories?.length) setCategories(sortCategories(d.categories));
+        if (typeof d.markup === 'number') setMarkup(d.markup);
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -130,7 +132,7 @@ const Catalog = () => {
 
   const removeFromCart = useCallback((id: number) => setCart(prev => prev.filter(e => e.item.id !== id)), []);
 
-  const cartTotal = useMemo(() => cart.reduce((s, e) => s + ((e.item.price || 0) + PRICE_MARKUP) * e.qty, 0), [cart]);
+  const cartTotal = useMemo(() => cart.reduce((s, e) => s + ((e.item.price || 0) + markup) * e.qty, 0), [cart, markup]);
   const cartCount = useMemo(() => cart.reduce((s, e) => s + e.qty, 0), [cart]);
 
   const brandsInCategory = useMemo(() => Array.from(new Set(items.map(i => i.brand))).sort((a, b) => {
@@ -258,6 +260,7 @@ const Catalog = () => {
           activeStorage={activeStorage}
           activeColor={activeColor}
           activeFiltersCount={activeFiltersCount}
+          markup={markup}
           onBuy={setOrderItem}
           onAddToCart={addToCart}
           onBrandChange={handleBrandChange}
@@ -275,7 +278,7 @@ const Catalog = () => {
       </footer>
 
       {/* Модалка заказа */}
-      {orderItem && <CatalogOrderModal item={orderItem} onClose={() => setOrderItem(null)} />}
+      {orderItem && <CatalogOrderModal item={orderItem} markup={markup} onClose={() => setOrderItem(null)} />}
 
       {/* Корзина */}
       {cartOpen && (
@@ -306,7 +309,7 @@ const Catalog = () => {
                       {[e.item.brand, e.item.model, e.item.storage, e.item.color].filter(Boolean).join(" ")}
                     </div>
                     <div className="text-sm font-semibold text-[#1d1d1f] mt-0.5">
-                      {e.item.price ? ((e.item.price + PRICE_MARKUP) * e.qty).toLocaleString("ru-RU") + " ₽" : "—"}
+                      {e.item.price ? ((e.item.price + markup) * e.qty).toLocaleString("ru-RU") + " ₽" : "—"}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">

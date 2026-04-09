@@ -17,7 +17,7 @@ export interface CatalogItem {
 }
 
 export const SEND_LEAD_URL = "https://functions.poehali.dev/52666ff7-db52-4b6a-a90e-d60aeed699de";
-export const PRICE_MARKUP = 3500;
+export const PRICE_MARKUP = 3500; // fallback — реальное значение приходит из API в поле markup
 export const CATALOG_URL = "https://functions.poehali.dev/e0e6576c-f000-4288-86ef-1de08ad7bcc4";
 
 export const REGION_FLAG: Record<string, string> = {

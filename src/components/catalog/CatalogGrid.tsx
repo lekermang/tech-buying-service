@@ -1,14 +1,14 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import CatalogProductCard from "@/components/catalog/CatalogProductCard";
-import { CatalogItem, REGION_FLAG, MODEL_PHOTOS, CATEGORY_PHOTOS, PRICE_MARKUP, getColorHex } from "@/pages/catalog.types";
+import { CatalogItem, REGION_FLAG, MODEL_PHOTOS, CATEGORY_PHOTOS, getColorHex } from "@/pages/catalog.types";
 
 // ─── Карточка-строка (список) ──────────────────────────────────────
-const ListCard = ({ item, onBuy }: { item: CatalogItem; onBuy: (i: CatalogItem) => void }) => {
+const ListCard = ({ item, onBuy, markup }: { item: CatalogItem; onBuy: (i: CatalogItem) => void; markup: number }) => {
   const flag = item.region ? (REGION_FLAG[item.region] || "") : "";
   const inStock = item.availability === "in_stock";
   const photo = item.photo_url || MODEL_PHOTOS[item.model] || CATEGORY_PHOTOS[item.category] || null;
-  const price = item.price ? (item.price + PRICE_MARKUP).toLocaleString("ru-RU") + " ₽" : "По запросу";
+  const price = item.price ? (item.price + markup).toLocaleString("ru-RU") + " ₽" : "По запросу";
   const colorHex = getColorHex(item.color);
 
   return (
@@ -112,6 +112,7 @@ interface Props {
   activeStorage: string;
   activeColor: string;
   activeFiltersCount: number;
+  markup: number;
   onBuy: (item: CatalogItem) => void;
   onAddToCart: (item: CatalogItem) => void;
   onBrandChange: (brand: string) => void;
@@ -125,7 +126,7 @@ interface Props {
 export default function CatalogGrid({
   filteredItems, brandsInCategory, loading, search,
   activeBrand, activeCategory, activeStorage, activeColor,
-  activeFiltersCount, onBuy, onAddToCart, onBrandChange,
+  activeFiltersCount, markup, onBuy, onAddToCart, onBrandChange,
   onStorageReset, onColorReset, onResetFilters,
 }: Props) {
   const [mode, setMode] = useState<"grid" | "list">("grid");
@@ -194,14 +195,14 @@ export default function CatalogGrid({
         /* ── СПИСОК ── */
         <div className="divide-y divide-white/0">
           {filteredItems.map(item => (
-            <ListCard key={item.id} item={item} onBuy={onBuy} />
+            <ListCard key={item.id} item={item} onBuy={onBuy} markup={markup} />
           ))}
         </div>
       ) : (
         /* ── СЕТКА ── */
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 p-4">
           {filteredItems.map(item => (
-            <CatalogProductCard key={item.id} item={item} onBuy={onBuy} onAddToCart={onAddToCart} />
+            <CatalogProductCard key={item.id} item={item} onBuy={onBuy} onAddToCart={onAddToCart} markup={markup} />
           ))}
         </div>
       )}

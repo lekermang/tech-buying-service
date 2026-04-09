@@ -1,20 +1,21 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
-import { CatalogItem, SEND_LEAD_URL, PRICE_MARKUP, MODEL_PHOTOS, MODEL_PHOTOS_EXTRA, MODEL_COLOR_PHOTOS, CATEGORY_PHOTOS } from "@/pages/catalog.types";
+import { CatalogItem, SEND_LEAD_URL, MODEL_PHOTOS, MODEL_PHOTOS_EXTRA, MODEL_COLOR_PHOTOS, CATEGORY_PHOTOS } from "@/pages/catalog.types";
 
 interface Props {
   item: CatalogItem;
   onClose: () => void;
+  markup?: number;
 }
 
-const CatalogOrderModal = ({ item, onClose }: Props) => {
+const CatalogOrderModal = ({ item, onClose, markup = 3500 }: Props) => {
   const [form, setForm] = useState({ name: "", phone: "" });
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [photoIdx, setPhotoIdx] = useState(0);
 
   const title = [item.brand, item.model, item.storage, item.color].filter(Boolean).join(" ");
-  const displayPrice = item.price ? (item.price + PRICE_MARKUP).toLocaleString("ru-RU") + " ₽" : "Цену уточняйте";
+  const displayPrice = item.price ? (item.price + markup).toLocaleString("ru-RU") + " ₽" : "Цену уточняйте";
 
   const colorKey = item.color ? `${item.model}::${item.color.toLowerCase()}` : null;
   const colorPhoto = colorKey ? (MODEL_COLOR_PHOTOS[colorKey] || null) : null;
@@ -164,7 +165,7 @@ const CatalogOrderModal = ({ item, onClose }: Props) => {
                 {item.price && (
                   <div className="mt-3 pt-3 border-t border-black/6 flex items-center justify-between">
                     <span className="text-xs text-[#1d1d1f]/40">Сумма к переводу:</span>
-                    <span className="text-base font-bold text-[#1d1d1f]">{(item.price + PRICE_MARKUP).toLocaleString("ru-RU")} ₽</span>
+                    <span className="text-base font-bold text-[#1d1d1f]">{(item.price + markup).toLocaleString("ru-RU")} ₽</span>
                   </div>
                 )}
               </div>

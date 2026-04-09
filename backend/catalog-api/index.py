@@ -80,6 +80,11 @@ def handler(event: dict, context) -> dict:
         cur.execute(f"SELECT DISTINCT category FROM {SCHEMA}.catalog WHERE is_active = true ORDER BY category")
         categories = [r[0] for r in cur.fetchall()]
 
+        # Наценка из настроек
+        cur.execute(f"SELECT value FROM {SCHEMA}.settings WHERE key = 'price_markup' LIMIT 1")
+        row_markup = cur.fetchone()
+        markup = int(row_markup[0]) if row_markup else 3500
+
         cur.close()
         conn.close()
 
@@ -90,7 +95,7 @@ def handler(event: dict, context) -> dict:
             'description': r[12], 'specs': r[13], 'sim_type': r[14]
         } for r in rows]
 
-        return ok({'items': items, 'total': total, 'categories': categories})
+        return ok({'items': items, 'total': total, 'categories': categories, 'markup': markup})
 
     # POST /catalog — добавить товар (admin)
     if method == 'POST':
