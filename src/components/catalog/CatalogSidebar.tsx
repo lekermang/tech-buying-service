@@ -8,26 +8,29 @@ interface CatalogSidebarProps {
   activeBrand: string;
   activeStorage: string;
   activeColor: string;
+  activeSimType: string;
   activeFiltersCount: number;
   search: string;
   items: CatalogItem[];
   brandsInCategory: string[];
   storagesInCategory: string[];
   colorsInCategory: string[];
+  simTypesInCategory: string[];
   sidebarOpen: boolean;
   onCategory: (cat: string) => void;
   onBrandChange: (brand: string) => void;
   onStorageChange: (storage: string) => void;
   onColorChange: (color: string) => void;
+  onSimTypeChange: (sim: string) => void;
   onResetFilters: () => void;
   onSidebarClose: () => void;
 }
 
 export default function CatalogSidebar({
-  categories, activeCategory, activeBrand, activeStorage, activeColor,
+  categories, activeCategory, activeBrand, activeStorage, activeColor, activeSimType,
   activeFiltersCount, search, items,
-  brandsInCategory, storagesInCategory, colorsInCategory,
-  sidebarOpen, onCategory, onBrandChange, onStorageChange, onColorChange,
+  brandsInCategory, storagesInCategory, colorsInCategory, simTypesInCategory,
+  sidebarOpen, onCategory, onBrandChange, onStorageChange, onColorChange, onSimTypeChange,
   onResetFilters, onSidebarClose,
 }: CatalogSidebarProps) {
   return (
@@ -87,6 +90,22 @@ export default function CatalogSidebar({
                 <button key={c} onClick={() => onColorChange(c)}
                   className={`text-xs px-2.5 py-1 rounded-lg border transition-all capitalize ${activeColor === c ? "bg-[#FFD700] text-black border-[#FFD700] font-semibold" : "border-white/10 text-white/40 hover:text-white hover:border-white/30"}`}>
                   {c}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
+        {simTypesInCategory.length > 0 && !search && (
+          <>
+            <div className="px-4 mt-5 mb-2">
+              <span className="text-[10px] uppercase tracking-widest text-white/20 font-medium">Тип SIM</span>
+            </div>
+            <div className="px-3 flex flex-wrap gap-1.5">
+              {simTypesInCategory.map(s => (
+                <button key={s} onClick={() => onSimTypeChange(s)}
+                  className={`text-xs px-2.5 py-1 rounded-lg border transition-all ${activeSimType === s ? "bg-[#FFD700] text-black border-[#FFD700] font-semibold" : "border-white/10 text-white/40 hover:text-white hover:border-white/30"}`}>
+                  {s}
                 </button>
               ))}
             </div>

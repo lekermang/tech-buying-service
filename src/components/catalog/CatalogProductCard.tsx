@@ -51,6 +51,12 @@ const CatalogProductCard = memo(function CatalogProductCard({ item, onBuy, onAdd
 
         {sub && <div className="text-white/35 text-xs mb-1">{sub}</div>}
 
+        {item.sim_type && (
+          <div className="inline-flex items-center gap-1 mb-1">
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/8 text-white/40">{item.sim_type}</span>
+          </div>
+        )}
+
         {colorHex && (
           <div className="flex items-center gap-1.5 mt-1 mb-1.5">
             <div className="w-3 h-3 rounded-full border border-white/10 shrink-0" style={{ backgroundColor: colorHex }} />

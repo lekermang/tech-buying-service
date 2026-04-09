@@ -30,6 +30,7 @@ const Catalog = () => {
   const [activeBrand, setActiveBrand] = useState("");
   const [activeStorage, setActiveStorage] = useState("");
   const [activeColor, setActiveColor] = useState("");
+  const [activeSimType, setActiveSimType] = useState("");
   const [modelFilter, setModelFilter] = useState("Все");
   const [search, setSearch] = useState("");
   const [filterAvail, setFilterAvail] = useState("");
@@ -94,6 +95,7 @@ const Catalog = () => {
     setActiveBrand(prev => prev === brand ? "" : brand);
     setActiveStorage("");
     setActiveColor("");
+    setActiveSimType("");
   };
 
   const handleStorageChange = (storage: string) => {
@@ -104,10 +106,15 @@ const Catalog = () => {
     setActiveColor(prev => prev === color ? "" : color);
   };
 
+  const handleSimTypeChange = (sim: string) => {
+    setActiveSimType(prev => prev === sim ? "" : sim);
+  };
+
   const resetFilters = () => {
     setActiveBrand("");
     setActiveStorage("");
     setActiveColor("");
+    setActiveSimType("");
     setFilterAvail("");
     setModelFilter("Все");
     load(activeCategory, search, "");
@@ -141,10 +148,15 @@ const Catalog = () => {
     itemsForFilters.map(i => i.color).filter(Boolean)
   )).sort() as string[], [itemsForFilters]);
 
+  const simTypesInCategory = useMemo(() => Array.from(new Set(
+    itemsForFilters.map(i => i.sim_type).filter(Boolean)
+  )).sort() as string[], [itemsForFilters]);
+
   const filteredItems = useMemo(() => items.filter(i => {
     if (activeBrand && i.brand !== activeBrand) return false;
     if (activeStorage && i.storage !== activeStorage) return false;
     if (activeColor && i.color !== activeColor) return false;
+    if (activeSimType && i.sim_type !== activeSimType) return false;
     if (modelFilter && modelFilter !== "Все") {
       const name = `${i.model}`.toLowerCase();
       const f = modelFilter.toLowerCase();
@@ -168,7 +180,7 @@ const Catalog = () => {
     return true;
   }), [items, activeBrand, activeStorage, activeColor, modelFilter]);
 
-  const activeFiltersCount = useMemo(() => [activeBrand, activeStorage, activeColor, filterAvail, modelFilter !== "Все" ? modelFilter : ""].filter(Boolean).length, [activeBrand, activeStorage, activeColor, filterAvail, modelFilter]);
+  const activeFiltersCount = useMemo(() => [activeBrand, activeStorage, activeColor, activeSimType, filterAvail, modelFilter !== "Все" ? modelFilter : ""].filter(Boolean).length, [activeBrand, activeStorage, activeColor, activeSimType, filterAvail, modelFilter]);
 
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-white">
@@ -215,17 +227,20 @@ const Catalog = () => {
           activeBrand={activeBrand}
           activeStorage={activeStorage}
           activeColor={activeColor}
+          activeSimType={activeSimType}
           activeFiltersCount={activeFiltersCount}
           search={search}
           items={items}
           brandsInCategory={brandsInCategory}
           storagesInCategory={storagesInCategory}
           colorsInCategory={colorsInCategory}
+          simTypesInCategory={simTypesInCategory}
           sidebarOpen={sidebarOpen}
           onCategory={handleCategory}
           onBrandChange={handleBrandChange}
           onStorageChange={handleStorageChange}
           onColorChange={handleColorChange}
+          onSimTypeChange={handleSimTypeChange}
           onResetFilters={resetFilters}
           onSidebarClose={() => setSidebarOpen(false)}
         />

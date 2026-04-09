@@ -13,6 +13,7 @@ export interface CatalogItem {
   photo_url: string | null;
   description?: string | null;
   specs?: Record<string, string> | null;
+  sim_type?: string | null;
 }
 
 export const SEND_LEAD_URL = "https://functions.poehali.dev/52666ff7-db52-4b6a-a90e-d60aeed699de";

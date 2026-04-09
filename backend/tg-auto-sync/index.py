@@ -152,6 +152,18 @@ def detect_brand(text):
     return None, None, 'Прочее'
 
 
+def detect_sim_type(line):
+    """Определяет тип SIM из строки прайса."""
+    tl = line.lower()
+    if 'dual sim' in tl or 'dualsim' in tl or 'sim+esim' in tl or 'sim esim' in tl:
+        return 'Dual SIM+eSIM'
+    if 'esim' in tl or 'e-sim' in tl:
+        return 'eSIM'
+    if '2sim' in tl or '2 sim' in tl:
+        return 'Dual SIM'
+    return None
+
+
 def parse_price_line(line, current_model):
     region = None
     for flag, code in REGION_FLAGS.items():
@@ -161,6 +173,7 @@ def parse_price_line(line, current_model):
 
     availability = 'in_stock' if '✅' in line else 'on_order'
     has_photo_marker = '📸' in line or '📷' in line
+    sim_type = detect_sim_type(line)
     clean = strip_emojis(line)
     clean = re.sub(r'\s+', ' ', clean).strip()
 
@@ -243,6 +256,7 @@ def parse_price_line(line, current_model):
         'price': price,
         'original_price': original_price,
         'has_photo_marker': has_photo_marker,
+        'sim_type': sim_type,
     }
 
 
@@ -290,20 +304,20 @@ def upsert_item(cur, item):
         old_price = row[1]
         cur.execute(
             f"""UPDATE {SCHEMA}.catalog SET
-                price=%s, original_price=%s, availability=%s, updated_at=now(), is_active=true
+                price=%s, original_price=%s, availability=%s, sim_type=%s, updated_at=now(), is_active=true
                 WHERE id=%s""",
-            (item.get('price'), item.get('original_price'), item['availability'], row[0])
+            (item.get('price'), item.get('original_price'), item['availability'], item.get('sim_type'), row[0])
         )
         changed = (old_price != item.get('price'))
         return 'updated', row[0], changed
     else:
         cur.execute(
             f"""INSERT INTO {SCHEMA}.catalog
-                (category, brand, model, color, storage, ram, region, availability, price, original_price, has_photo, photo_url)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,false,null) RETURNING id""",
+                (category, brand, model, color, storage, ram, region, availability, price, original_price, sim_type, has_photo, photo_url)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,false,null) RETURNING id""",
             (item['category'], item['brand'], item['model'],
              item.get('color'), item.get('storage'), item.get('ram'),
-             item.get('region'), item['availability'], item.get('price'), item.get('original_price'))
+             item.get('region'), item['availability'], item.get('price'), item.get('original_price'), item.get('sim_type'))
         )
         return 'inserted', cur.fetchone()[0], True
 
