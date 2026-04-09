@@ -17,6 +17,7 @@ export default function SettingsTab({ token }: { token: string }) {
   const [saving, setSaving] = useState<string | null>(null);
   const [edited, setEdited] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState<string | null>(null);
+  const [savedMsg, setSavedMsg] = useState("");
   const [error, setError] = useState("");
 
   const load = async () => {
@@ -48,8 +49,14 @@ export default function SettingsTab({ token }: { token: string }) {
         body: JSON.stringify({ action: "settings_set", key, value: edited[key] }),
       });
       if (!res.ok) throw new Error("Ошибка сохранения");
+      const data = await res.json();
       setSaved(key);
-      setTimeout(() => setSaved(null), 2000);
+      if (data.prices_updated > 0) {
+        setSavedMsg(`Сохранено. Обновлено цен в каталоге: ${data.prices_updated}`);
+      } else {
+        setSavedMsg("Сохранено");
+      }
+      setTimeout(() => { setSaved(null); setSavedMsg(""); }, 3000);
       await load();
     } catch {
       setError("Не удалось сохранить");
@@ -102,6 +109,9 @@ export default function SettingsTab({ token }: { token: string }) {
                 {saving === s.key ? "..." : saved === s.key ? "Сохранено" : "Сохранить"}
               </button>
             </div>
+            {saved === s.key && savedMsg && (
+              <div className="text-green-400 text-xs mt-2">{savedMsg}</div>
+            )}
             {s.updated_at && (
               <div className="text-white/20 text-xs mt-2">
                 Обновлено: {new Date(s.updated_at).toLocaleString("ru-RU")}

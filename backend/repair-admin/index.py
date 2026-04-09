@@ -160,10 +160,22 @@ def handler(event: dict, context) -> dict:
                 return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'key required'}, ensure_ascii=False)}
             cur.execute(f"UPDATE {SCHEMA}.settings SET value=%s, updated_at=NOW() WHERE key=%s RETURNING key", (value, key))
             row = cur.fetchone()
-            conn.commit(); cur.close(); conn.close()
             if not row:
+                conn.commit(); cur.close(); conn.close()
                 return {'statusCode': 404, 'headers': HEADERS, 'body': json.dumps({'error': 'setting not found'}, ensure_ascii=False)}
-            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'key': key, 'value': value}, ensure_ascii=False)}
+            # При смене наценки — пересчитываем все цены в каталоге
+            updated_count = 0
+            if key == 'price_markup':
+                new_markup = int(value)
+                cur.execute(
+                    f"""UPDATE {SCHEMA}.catalog
+                        SET price = original_price + %s, updated_at = NOW()
+                        WHERE original_price IS NOT NULL AND is_active = true""",
+                    (new_markup,)
+                )
+                updated_count = cur.rowcount
+            conn.commit(); cur.close(); conn.close()
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'key': key, 'value': value, 'prices_updated': updated_count}, ensure_ascii=False)}
 
         # Добавить получателя уведомлений
         if action == 'add_recipient':

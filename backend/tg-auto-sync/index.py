@@ -153,7 +153,8 @@ def parse_price_line(line, current_model):
         return None
     price_raw = re.sub(r'\s', '', price_match.group(1))
     try:
-        price = int(price_raw) + get_price_markup()
+        original_price = int(price_raw)
+        price = original_price + get_price_markup()
     except ValueError:
         return None
 
@@ -203,6 +204,7 @@ def parse_price_line(line, current_model):
         'region': region,
         'availability': availability,
         'price': price,
+        'original_price': original_price,
         'has_photo_marker': has_photo_marker,
     }
 
@@ -251,20 +253,20 @@ def upsert_item(cur, item):
         old_price = row[1]
         cur.execute(
             f"""UPDATE {SCHEMA}.catalog SET
-                price=%s, availability=%s, updated_at=now(), is_active=true
+                price=%s, original_price=%s, availability=%s, updated_at=now(), is_active=true
                 WHERE id=%s""",
-            (item.get('price'), item['availability'], row[0])
+            (item.get('price'), item.get('original_price'), item['availability'], row[0])
         )
         changed = (old_price != item.get('price'))
         return 'updated', row[0], changed
     else:
         cur.execute(
             f"""INSERT INTO {SCHEMA}.catalog
-                (category, brand, model, color, storage, ram, region, availability, price, has_photo, photo_url)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,false,null) RETURNING id""",
+                (category, brand, model, color, storage, ram, region, availability, price, original_price, has_photo, photo_url)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,false,null) RETURNING id""",
             (item['category'], item['brand'], item['model'],
              item.get('color'), item.get('storage'), item.get('ram'),
-             item.get('region'), item['availability'], item.get('price'))
+             item.get('region'), item['availability'], item.get('price'), item.get('original_price'))
         )
         return 'inserted', cur.fetchone()[0], True
 
