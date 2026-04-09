@@ -8,7 +8,7 @@ import psycopg2
 import boto3
 
 SCHEMA = 't_p31606708_tech_buying_service'
-PRICE_MARKUP = 3500
+PRICE_MARKUP = 5500
 MAX_PHOTOS = 5
 
 HEADERS = {

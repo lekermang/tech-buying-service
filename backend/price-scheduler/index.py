@@ -113,7 +113,7 @@ def format_category_message(cat, cat_items, date_str):
             parts.append(it['color'])
         name = ' '.join(parts)
         if it['price']:
-            price_str = '{:,}₽'.format(int(it['price']) + 3500).replace(',', '\u00a0')
+            price_str = '{:,}₽'.format(int(it['price']) + 5500).replace(',', '\u00a0')
         else:
             price_str = 'по запросу'
         lines.append(f'{avail} {reg} {name} — <b>{price_str}</b>')
@@ -257,6 +257,19 @@ def check_tools_synced_today():
     cur = conn.cursor()
     cur.execute(
         f"SELECT 1 FROM {SCHEMA}.tools_sync_log WHERE started_at::date = NOW()::date AND status='done' LIMIT 1"
+    )
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    return row is not None
+
+
+def check_tools_syncing_now():
+    """Проверяет, идёт ли уже синхронизация прямо сейчас (запущена в последние 10 минут)."""
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        f"SELECT 1 FROM {SCHEMA}.tools_sync_log WHERE status='running' AND started_at > NOW() - INTERVAL '10 minutes' LIMIT 1"
     )
     row = cur.fetchone()
     cur.close()
@@ -650,8 +663,8 @@ def handler(event: dict, context) -> dict:
     if action == 'schedule_check':
         now_msk = datetime.now(MSK)
 
-        # Синхронизация инструментов в 3:00 МСК
-        if now_msk.hour == SYNC_HOUR and not check_tools_synced_today():
+        # Синхронизация инструментов каждый час (для актуальных цен и наличия)
+        if not check_tools_syncing_now():
             job_id = create_sync_job()
             t = threading.Thread(target=sync_tools_feed, args=(job_id,), daemon=False)
             t.start()
