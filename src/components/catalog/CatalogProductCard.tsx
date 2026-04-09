@@ -1,6 +1,6 @@
-import { memo, useState } from "react";
+import { memo, useState, useRef } from "react";
 import Icon from "@/components/ui/icon";
-import { CatalogItem, REGION_FLAG, MODEL_PHOTOS, CATEGORY_PHOTOS, PRICE_MARKUP, getColorHex } from "@/pages/catalog.types";
+import { CatalogItem, REGION_FLAG, MODEL_PHOTOS, MODEL_PHOTOS_EXTRA, CATEGORY_PHOTOS, PRICE_MARKUP, getColorHex } from "@/pages/catalog.types";
 
 interface Props {
   item: CatalogItem;
@@ -13,9 +13,38 @@ const CatalogProductCard = memo(function CatalogProductCard({ item, onBuy, onAdd
   const inStock = item.availability === "in_stock";
   const title = [item.brand, item.model].filter(Boolean).join(" ");
   const sub = [item.storage, item.ram].filter(Boolean).join(" · ");
-  const photo = item.photo_url || MODEL_PHOTOS[item.model] || CATEGORY_PHOTOS[item.category] || null;
+  const mainPhoto = item.photo_url || MODEL_PHOTOS[item.model] || CATEGORY_PHOTOS[item.category] || null;
+  const extraPhotos = MODEL_PHOTOS_EXTRA[item.model] || [];
+  const allPhotos = mainPhoto ? [mainPhoto, ...extraPhotos] : extraPhotos;
   const colorHex = getColorHex(item.color);
+  const [photoIdx, setPhotoIdx] = useState(0);
   const [imgLoaded, setImgLoaded] = useState(false);
+  const touchStartX = useRef<number | null>(null);
+
+  const goNext = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPhotoIdx(i => (i + 1) % allPhotos.length);
+    setImgLoaded(false);
+  };
+  const goPrev = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPhotoIdx(i => (i - 1 + allPhotos.length) % allPhotos.length);
+    setImgLoaded(false);
+  };
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null || allPhotos.length < 2) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    if (Math.abs(dx) > 40) {
+      setPhotoIdx(i => dx < 0 ? (i + 1) % allPhotos.length : (i - 1 + allPhotos.length) % allPhotos.length);
+      setImgLoaded(false);
+    }
+    touchStartX.current = null;
+  };
+
+  const currentPhoto = allPhotos[photoIdx] || null;
 
   return (
     <div
@@ -23,22 +52,54 @@ const CatalogProductCard = memo(function CatalogProductCard({ item, onBuy, onAdd
       onClick={() => onBuy(item)}
     >
       {/* Image */}
-      <div className="relative bg-[#1A1A1A] m-2 rounded-xl aspect-square flex items-center justify-center overflow-hidden">
-        {photo ? (
+      <div
+        className="relative bg-[#1A1A1A] m-2 rounded-xl aspect-square flex items-center justify-center overflow-hidden"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        {currentPhoto ? (
           <>
             {!imgLoaded && <div className="absolute inset-0 bg-[#1A1A1A] animate-pulse" />}
             <img
-              src={photo}
+              key={currentPhoto}
+              src={currentPhoto}
               alt={title}
               loading="lazy"
               decoding="async"
-              className={`w-4/5 h-4/5 object-contain group-hover:scale-105 transition-all duration-400 ${imgLoaded ? "opacity-100" : "opacity-0"}`}
+              className={`w-4/5 h-4/5 object-contain transition-all duration-300 ${imgLoaded ? "opacity-100" : "opacity-0"} ${allPhotos.length < 2 ? "group-hover:scale-105 duration-400" : ""}`}
               onLoad={() => setImgLoaded(true)}
             />
           </>
         ) : (
           <Icon name="Package" size={48} className="text-white/10" />
         )}
+
+        {/* Стрелки навигации — только если >1 фото */}
+        {allPhotos.length > 1 && (
+          <>
+            <button
+              onClick={goPrev}
+              className="absolute left-1 top-1/2 -translate-y-1/2 w-6 h-6 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
+              <Icon name="ChevronLeft" size={12} className="text-white" />
+            </button>
+            <button
+              onClick={goNext}
+              className="absolute right-1 top-1/2 -translate-y-1/2 w-6 h-6 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
+              <Icon name="ChevronRight" size={12} className="text-white" />
+            </button>
+            {/* Точки */}
+            <div className="absolute bottom-1.5 left-0 right-0 flex justify-center gap-1">
+              {allPhotos.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={e => { e.stopPropagation(); setPhotoIdx(i); setImgLoaded(false); }}
+                  className={`rounded-full transition-all ${i === photoIdx ? "w-3 h-1.5 bg-white" : "w-1.5 h-1.5 bg-white/30"}`}
+                />
+              ))}
+            </div>
+          </>
+        )}
+
         <div className={`absolute top-2 left-2 text-[10px] font-medium px-2 py-0.5 rounded-full ${inStock ? "bg-green-900/70 text-green-400" : "bg-white/10 text-white/40"}`}>
           {inStock ? "Есть" : "Заказ"}
         </div>

@@ -117,6 +117,36 @@ export const MODEL_PHOTOS: Record<string, string> = {
   "Станция Лайт 2": "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/2c7049ab-23fa-4a93-a739-d975548cde74.jpg",
 };
 
+export const MODEL_PHOTOS_EXTRA: Record<string, string[]> = {
+  "iPhone 17 Pro Max":  ["https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/38a4c221-2526-4c77-86fd-af70275574f7.jpg"],
+  "iPhone 17 Pro":      ["https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/5b419e47-9ce8-4cfc-8721-626b3dbbe5ce.jpg"],
+  "iPhone Air":         ["https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/e908f060-367a-4ddb-bb2c-148fe06a2755.jpg"],
+  "iPhone 16 Pro":      ["https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/1f9929e9-1825-4412-97da-4bd6bd28b087.jpg"],
+  "iPhone 16 Pro Max":  ["https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/1e943871-d485-4374-8b2f-bfebf8f05966.jpg"],
+  "iPhone 16":          ["https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/5265cbeb-f726-4c49-840d-7c363cb3ba43.jpg"],
+  "iPhone 15 Pro":      ["https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/1a344b98-8b08-4207-827e-bec143a92c5c.jpg"],
+  "iPhone 15 Pro Max":  ["https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/1a344b98-8b08-4207-827e-bec143a92c5c.jpg"],
+  "iPhone 15":          ["https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/9ab31394-2870-43b8-a7d1-1a8a576144a2.jpg"],
+  "iPhone 13":          ["https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/da89a495-57e3-42ca-8307-e72936efeb1d.jpg"],
+  "iPhone 12":          ["https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/8544aa9a-0bcc-492d-b782-81a9a15fbf62.jpg"],
+  "Galaxy S26 Ultra":   ["https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/aeb1724f-7358-40e1-98e8-ea5233715ff8.jpg"],
+  "Galaxy S26":         ["https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/3e7fc308-6800-4ee0-b90f-fc5b57177c3b.jpg"],
+  "Galaxy S26 Plus":    ["https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/3e7fc308-6800-4ee0-b90f-fc5b57177c3b.jpg"],
+  "Flip 7":             ["https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/cc4eb332-6269-495b-a3d4-1704e71367d8.jpg"],
+  "Xiaomi 17 Ultra":    ["https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/9915d10a-80cf-4fa8-a8ce-2220108b7690.jpg"],
+  "MacBook Air M4 13 (2025)": ["https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/5fe75f02-b974-40ba-bf79-402b844545cf.jpg"],
+  "MacBook Air M4 15 (2025)": ["https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/5fe75f02-b974-40ba-bf79-402b844545cf.jpg"],
+  "MacBook Pro 14 M5 (2025)":     ["https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/f2e3524f-7553-441f-8983-20b07871b288.jpg"],
+  "MacBook Pro 14 M5 Pro (2026)": ["https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/f2e3524f-7553-441f-8983-20b07871b288.jpg"],
+  "MacBook Pro 14 M5 Max (2026)": ["https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/f2e3524f-7553-441f-8983-20b07871b288.jpg"],
+  "Watch Ultra 3 49mm": ["https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/e7a05a15-bf2d-41ba-96c8-a05ef821235e.jpg"],
+  "Nothing Phone (3)":  ["https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/ade59e50-a7e5-445e-99e2-df7574b699a3.jpg"],
+  "V15 SV47 Detect Absolute": ["https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/45c986e3-abd1-4142-b890-6283eab96bce.jpg"],
+  "Charge 6":           ["https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/ba94d818-ef45-445f-baad-39a4341b3997.jpg"],
+  "PS5 Slim 1TB Disc Edition":    ["https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/d90eb67e-6dad-4069-b6c9-f6c8f520c4ea.jpg"],
+  "PS5 Slim 1TB Digital Edition": ["https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/d90eb67e-6dad-4069-b6c9-f6c8f520c4ea.jpg"],
+};
+
 export const CATEGORY_PHOTOS: Record<string, string> = {
   "iPhone 17/AIR/PRO/MAX":      "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/b8ee9456-ba97-4dc8-af93-5ee436332c5e.jpg",
   "iPhone 16/e/+/PRO/MAX":      "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/2e6a9047-65e8-4c05-839d-bdab5bbdbcd3.jpg",

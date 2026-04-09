@@ -1,6 +1,6 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
-import { CatalogItem, SEND_LEAD_URL, PRICE_MARKUP } from "@/pages/catalog.types";
+import { CatalogItem, SEND_LEAD_URL, PRICE_MARKUP, MODEL_PHOTOS, MODEL_PHOTOS_EXTRA, CATEGORY_PHOTOS } from "@/pages/catalog.types";
 
 interface Props {
   item: CatalogItem;
@@ -11,9 +11,14 @@ const CatalogOrderModal = ({ item, onClose }: Props) => {
   const [form, setForm] = useState({ name: "", phone: "" });
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [photoIdx, setPhotoIdx] = useState(0);
 
   const title = [item.brand, item.model, item.storage, item.color].filter(Boolean).join(" ");
   const displayPrice = item.price ? (item.price + PRICE_MARKUP).toLocaleString("ru-RU") + " ₽" : "Цену уточняйте";
+
+  const mainPhoto = item.photo_url || MODEL_PHOTOS[item.model] || CATEGORY_PHOTOS[item.category] || null;
+  const extraPhotos = MODEL_PHOTOS_EXTRA[item.model] || [];
+  const allPhotos = mainPhoto ? [mainPhoto, ...extraPhotos] : extraPhotos;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,6 +61,43 @@ const CatalogOrderModal = ({ item, onClose }: Props) => {
         </div>
 
         <div className="px-6 pb-8">
+
+          {/* Галерея фото */}
+          {allPhotos.length > 0 && (
+            <div className="mb-5">
+              <div className="relative bg-[#f5f5f7] rounded-2xl aspect-square flex items-center justify-center overflow-hidden">
+                <img
+                  key={allPhotos[photoIdx]}
+                  src={allPhotos[photoIdx]}
+                  alt={title}
+                  className="w-4/5 h-4/5 object-contain transition-opacity duration-200"
+                />
+                {allPhotos.length > 1 && (
+                  <>
+                    <button onClick={() => setPhotoIdx(i => (i - 1 + allPhotos.length) % allPhotos.length)}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 rounded-full flex items-center justify-center shadow">
+                      <Icon name="ChevronLeft" size={16} className="text-[#1d1d1f]" />
+                    </button>
+                    <button onClick={() => setPhotoIdx(i => (i + 1) % allPhotos.length)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 rounded-full flex items-center justify-center shadow">
+                      <Icon name="ChevronRight" size={16} className="text-[#1d1d1f]" />
+                    </button>
+                  </>
+                )}
+              </div>
+              {allPhotos.length > 1 && (
+                <div className="flex gap-2 mt-2 justify-center">
+                  {allPhotos.map((url, i) => (
+                    <button key={i} onClick={() => setPhotoIdx(i)}
+                      className={`w-12 h-12 rounded-xl overflow-hidden border-2 transition-all ${i === photoIdx ? "border-[#1d1d1f]" : "border-transparent opacity-40"}`}>
+                      <img src={url} alt="" className="w-full h-full object-contain bg-[#f5f5f7]" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Product info */}
           <div className="bg-[#f5f5f7] rounded-2xl p-4 mb-5">
             <div className="text-sm font-medium text-[#1d1d1f] leading-snug">{title}</div>
