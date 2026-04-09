@@ -462,6 +462,7 @@ def handler(event: dict, context) -> dict:
 
         chat_id_str = str(msg.get('chat', {}).get('id', ''))
         chat_username = (msg.get('chat', {}).get('username') or '').lower()
+        chat_title = msg.get('chat', {}).get('title', '')
         text = msg.get('text') or msg.get('caption') or ''
         has_photo = bool(msg.get('photo'))
 
@@ -470,12 +471,24 @@ def handler(event: dict, context) -> dict:
         is_price_msg = bool(price_line_re.search(text))
         from_price_source = (not PRICE_SOURCE_CHAT_ID) or (chat_id_str == PRICE_SOURCE_CHAT_ID)
 
-        # Фото — только из канала @appledysonphoto
-        from_photo_source = (chat_username == PHOTO_SOURCE_USERNAME)
+        # Фото — только из канала @appledysonphoto (или пересланное из него)
+        fwd_chat = msg.get('forward_from_chat') or {}
+        fwd_username = (fwd_chat.get('username') or '').lower()
+        from_photo_source = (chat_username == PHOTO_SOURCE_USERNAME) or (fwd_username == PHOTO_SOURCE_USERNAME)
 
         conn = psycopg2.connect(os.environ['DATABASE_URL'])
         cur = conn.cursor()
-        stats = {'photos_saved': 0, 'chat_id': chat_id_str}
+        stats = {
+            'photos_saved': 0,
+            'chat_id': chat_id_str,
+            'chat_username': chat_username,
+            'chat_title': chat_title,
+            'is_price_msg': is_price_msg,
+            'from_price_source': from_price_source,
+            'has_photo': has_photo,
+            'from_photo_source': from_photo_source,
+            'price_source_expected': PRICE_SOURCE_CHAT_ID,
+        }
 
         if is_price_msg and from_price_source:
             price_stats = process_price_message(cur, text)
