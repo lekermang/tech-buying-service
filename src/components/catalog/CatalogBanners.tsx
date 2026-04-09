@@ -10,7 +10,7 @@ interface Cat {
 }
 
 const CATS: Cat[] = [
-  { title: "iPhone 17",         subtitle: "Pro · Air · Max",       cat: "iPhone 17/AIR/PRO/MAX",      accent: "#6366f1", badge: "Новинки" },
+  { title: "iPhone 17",         subtitle: "Pro · Air · Max",       cat: "iPhone 17/AIR/PRO/MAX",      accent: "#f97316", badge: "Новинки" },
   { title: "iPhone 16",         subtitle: "Pro · Plus · e",        cat: "iPhone 16/e/+/PRO/MAX",      accent: "#f59e0b", badge: "Хит" },
   { title: "iPhone 15",         subtitle: "Pro · Plus",            cat: "iPhone 15/+/PRO/MAX",        accent: "#10b981" },
   { title: "iPhone 11–14",      subtitle: "11 · 12 · 13 · 14",     cat: "iPhone 11/12/13/14",         accent: "#64748b", badge: "Доступно" },
@@ -42,30 +42,47 @@ export default function CatalogBanners({ onCategory, activeCategory }: Props) {
 
       {/* ── Шапка ── */}
       <div className="px-3 sm:px-5 py-5 sm:py-6">
-        {/* Hero баннер iPhone 17 */}
-        <div className="relative w-full rounded-2xl overflow-hidden mb-0" style={{ height: 160 }}>
+        {/* Hero баннер iPhone 17 — Orange */}
+        <button
+          onClick={() => onCategory(hero.cat)}
+          className="relative w-full rounded-2xl overflow-hidden mb-0 cursor-pointer block"
+          style={{ height: 180 }}
+        >
+          {/* Оранжевый градиентный фон */}
+          <div className="absolute inset-0" style={{
+            background: "linear-gradient(135deg, #7c2d12 0%, #c2410c 30%, #f97316 60%, #fdba74 100%)"
+          }} />
+          {/* Декоративные круги */}
+          <div className="absolute -right-8 -top-8 w-48 h-48 rounded-full opacity-20" style={{ background: "#fff3" }} />
+          <div className="absolute right-16 bottom-0 w-32 h-32 rounded-full opacity-10" style={{ background: "#fff5" }} />
+          {/* Фото категории поверх если есть */}
           {heroPhoto && (
             <img src={heroPhoto} alt={hero.title}
-              className="absolute inset-0 w-full h-full object-cover" />
+              className="absolute right-0 top-0 h-full w-1/2 object-cover opacity-30 mix-blend-luminosity" />
           )}
-          <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-transparent" />
-          <div className="absolute inset-0 p-4 sm:p-5 flex flex-col justify-center">
-            <span className="inline-flex items-center gap-1.5 bg-indigo-500 text-white text-[11px] font-bold px-2.5 py-1 rounded-full w-fit mb-2">
+          <div className="absolute inset-0 p-5 sm:p-6 flex flex-col justify-center">
+            <span className="inline-flex items-center gap-1.5 text-white text-[11px] font-bold px-2.5 py-1 rounded-full w-fit mb-3"
+              style={{ background: "rgba(0,0,0,0.3)" }}>
               <Icon name="Sparkles" size={11} />
-              {hero.badge}
+              {hero.badge} 2025
             </span>
-            <div className="text-white font-bold text-2xl sm:text-3xl leading-tight">{hero.title}</div>
-            <div className="text-white/55 text-sm mt-1">{hero.subtitle}</div>
+            <div className="text-white font-black text-3xl sm:text-4xl leading-none tracking-tight">iPhone 17</div>
+            <div className="text-white/80 text-base font-semibold mt-1">Pro Max · Pro · Air · Plus</div>
+            <div className="flex items-center gap-2 mt-3">
+              <span className="text-white/60 text-xs">Cosmic Orange • Desert Titanium • Blue</span>
+            </div>
           </div>
           {activeCategory === hero.cat && (
-            <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-indigo-500 flex items-center justify-center">
+            <div className="absolute top-3 right-3 w-6 h-6 rounded-full flex items-center justify-center"
+              style={{ background: "rgba(0,0,0,0.4)" }}>
               <Icon name="Check" size={12} className="text-white" />
             </div>
           )}
-        </div>
+        </button>
 
         <div className="mt-3 flex items-center gap-2 flex-wrap">
-          <span className="inline-flex items-center gap-1 bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-[10px] font-bold px-2 py-0.5 rounded-full">
+          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
+            style={{ background: "rgba(249,115,22,0.2)", border: "1px solid rgba(249,115,22,0.4)", color: "#fb923c" }}>
             <Icon name="Sparkles" size={9} />
             Официальная гарантия
           </span>

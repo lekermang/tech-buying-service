@@ -1,4 +1,4 @@
-import { memo, useState, useRef } from "react";
+import { memo, useState, useRef, useEffect, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 import { CatalogItem, REGION_FLAG, MODEL_PHOTOS, MODEL_PHOTOS_EXTRA, CATEGORY_PHOTOS, PRICE_MARKUP, getColorHex } from "@/pages/catalog.types";
 
@@ -19,15 +19,32 @@ const CatalogProductCard = memo(function CatalogProductCard({ item, onBuy, onAdd
   const colorHex = getColorHex(item.color);
   const [photoIdx, setPhotoIdx] = useState(0);
   const [imgLoaded, setImgLoaded] = useState(false);
+
   const touchStartX = useRef<number | null>(null);
+  const autoRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopAuto = useCallback(() => {
+    if (autoRef.current) { clearInterval(autoRef.current); autoRef.current = null; }
+  }, []);
+
+  useEffect(() => {
+    if (allPhotos.length < 2) return;
+    autoRef.current = setInterval(() => {
+      setPhotoIdx(i => (i + 1) % allPhotos.length);
+      setImgLoaded(false);
+    }, 3000);
+    return stopAuto;
+  }, [allPhotos.length, stopAuto]);
 
   const goNext = (e: React.MouseEvent) => {
     e.stopPropagation();
+    stopAuto();
     setPhotoIdx(i => (i + 1) % allPhotos.length);
     setImgLoaded(false);
   };
   const goPrev = (e: React.MouseEvent) => {
     e.stopPropagation();
+    stopAuto();
     setPhotoIdx(i => (i - 1 + allPhotos.length) % allPhotos.length);
     setImgLoaded(false);
   };
@@ -50,6 +67,14 @@ const CatalogProductCard = memo(function CatalogProductCard({ item, onBuy, onAdd
     <div
       className="bg-[#111] rounded-2xl overflow-hidden group cursor-pointer flex flex-col hover:bg-[#161616] transition-all duration-200"
       onClick={() => onBuy(item)}
+      onMouseEnter={stopAuto}
+      onMouseLeave={() => {
+        if (allPhotos.length < 2) return;
+        autoRef.current = setInterval(() => {
+          setPhotoIdx(i => (i + 1) % allPhotos.length);
+          setImgLoaded(false);
+        }, 3000);
+      }}
     >
       {/* Image */}
       <div
