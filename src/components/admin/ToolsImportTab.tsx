@@ -50,37 +50,32 @@ const ToolsImportTab = ({ token }: ToolsImportTabProps) => {
     }
   };
 
-  const pollJob = async (jobId: number) => {
-    try {
-      const res = await fetch(`${SYNC_URL}?token=${token}&job_id=${jobId}`);
+  const runChunks = async () => {
+    let offset = 0;
+    let totalSaved = 0;
+    let hasMore = true;
+    while (hasMore) {
+      const res = await fetch(`${SYNC_URL}?token=${token}&action=sync_chunk&offset=${offset}`);
       const data = await res.json();
-      if (data.status === "running") {
-        setTimeout(() => pollJob(jobId), 5000);
-      } else if (data.status === "done") {
-        setResult({ ok: true, imported: data.imported });
-        loadStats();
+      if (!data.ok) {
+        setResult({ ok: false, error: data.error || "Ошибка при синхронизации" });
         setSyncing(false);
-      } else {
-        setResult({ ok: false, error: data.error || "Неизвестная ошибка" });
-        setSyncing(false);
+        return;
       }
-    } catch {
-      setTimeout(() => pollJob(jobId), 5000);
+      totalSaved += data.saved || 0;
+      hasMore = data.has_more || false;
+      offset = data.next_offset || (offset + (data.saved || 0));
     }
+    setResult({ ok: true, imported: totalSaved });
+    loadStats();
+    setSyncing(false);
   };
 
   const handleSync = async () => {
     setSyncing(true);
     setResult(null);
     try {
-      const res = await fetch(`${SYNC_URL}?token=${token}&action=start`);
-      const data = await res.json();
-      if (data.ok && data.job_id) {
-        setTimeout(() => pollJob(data.job_id), 5000);
-      } else {
-        setResult({ ok: false, error: data.error || "Не удалось запустить" });
-        setSyncing(false);
-      }
+      await runChunks();
     } catch (err) {
       setResult({ ok: false, error: String(err) });
       setSyncing(false);
