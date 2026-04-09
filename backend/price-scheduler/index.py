@@ -135,7 +135,7 @@ def format_category_message(cat, cat_items, date_str, markup=5500):
     wa_number = CONTACT_PHONE.replace('+', '').replace(' ', '').replace('-', '')
     order_button = {'inline_keyboard': [[
         {'text': '💬 WhatsApp', 'url': f'https://wa.me/{wa_number}'},
-        {'text': '✍️ Написать менеджеру', 'url': 'https://t.me/KalygaSkypka24'},
+        {'text': '✍️ Написать менеджеру', 'url': 'https://t.me/skypka24'},
     ]]}
     return text, order_button
 
