@@ -84,6 +84,137 @@
     }
     </script>
 
+    <!-- Schema.org FAQPage — для Поиска с Алисой -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Как продать iPhone в Скупка24?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Привезите iPhone в один из наших офисов (ул. Кирова 7/47 или ул. Кирова 11), либо оставьте заявку на сайте. Оценка занимает 15 минут, деньги выплачиваем сразу в день обращения. Работаем 24/7."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Сколько стоит грамм золота при сдаче в Скупка24?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Цена приёма золота формируется на основе биржевого курса и обновляется ежедневно. Актуальную цену смотрите на сайте skypka24.com — там отображается текущая стоимость за грамм золота 999 пробы."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Как быстро происходит оценка техники?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Оценка любой техники занимает не более 15 минут. После оценки сразу выплачиваем деньги наличными или на карту."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Какую технику принимает Скупка24?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Принимаем iPhone (все модели), MacBook, ноутбуки, iPad, Apple Watch, AirPods, смартфоны Samsung и других брендов, планшеты, игровые консоли PlayStation и Xbox, а также золото и ювелирные украшения."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Где находится Скупка24?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "У нас два офиса: ул. Кирова, 7/47 и ул. Кирова, 11. Оба работают круглосуточно, без выходных. Телефон: 8 800 600-68-33 (бесплатно по России)."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Можно ли сдать технику в кредите или с блокировкой?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Принимаем технику с iCloud, но она должна быть разблокирована. Технику, находящуюся в кредите или под залогом, не принимаем. Уточните детали по телефону +7 (992) 999-03-33."
+          }
+        }
+      ]
+    }
+    </script>
+
+    <!-- Schema.org Service — услуги скупки -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Service",
+      "serviceType": "Скупка техники и золота",
+      "provider": {
+        "@type": "LocalBusiness",
+        "name": "Скупка24",
+        "url": "https://skypka24.com",
+        "telephone": "+7-992-999-03-33"
+      },
+      "areaServed": {
+        "@type": "Country",
+        "name": "Россия"
+      },
+      "hasOfferCatalog": {
+        "@type": "OfferCatalog",
+        "name": "Услуги скупки",
+        "itemListElement": [
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Service",
+              "name": "Скупка iPhone",
+              "description": "Выкупаем все модели iPhone: iPhone 11, 12, 13, 14, 15, 16, 17. Оценка 15 минут, деньги сразу."
+            }
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Service",
+              "name": "Скупка MacBook и ноутбуков",
+              "description": "Выкупаем MacBook Air, MacBook Pro, ноутбуки Lenovo, Asus, HP, Dell. Честная оценка по рыночным ценам."
+            }
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Service",
+              "name": "Скупка золота и ювелирных украшений",
+              "description": "Покупаем золото 375, 500, 585, 750, 999 пробы. Цена по биржевому курсу. Оценка бесплатно."
+            }
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Service",
+              "name": "Скупка iPad и планшетов",
+              "description": "Выкупаем iPad всех поколений, а также планшеты Samsung и других брендов."
+            }
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Service",
+              "name": "Скупка Apple Watch",
+              "description": "Принимаем Apple Watch Series 3-10 и Ultra. Быстрая оценка и выплата в день обращения."
+            }
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": {
+              "@type": "Service",
+              "name": "Скупка игровых консолей",
+              "description": "Выкупаем PlayStation 4, PlayStation 5, Xbox One, Xbox Series X/S, Nintendo Switch."
+            }
+          }
+        ]
+      }
+    }
+    </script>
+
     <!-- PWA -->
     <link rel="manifest" href="/manifest.json">
     <meta name="mobile-web-app-capable" content="yes">
