@@ -8,7 +8,7 @@ const HERO_SLIDES = [
     subtitle: "Titanium. Brilliant.",
     desc: "Camera Control · ProMotion · USB‑C",
     bg: "linear-gradient(135deg, #1a0a00 0%, #3d1a00 40%, #7c3500 70%, #c55800 100%)",
-    photo: CATEGORY_PHOTOS["iPhone 17/AIR/PRO/MAX"] || "",
+    photo: "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/1c312591-3452-4c86-8e7c-c63cbb0552ba.jpg",
     badge: "NEW",
     color: "#f97316",
   },
@@ -18,7 +18,7 @@ const HERO_SLIDES = [
     subtitle: "Built for the bold.",
     desc: "Galaxy AI · S Pen · 200MP",
     bg: "linear-gradient(135deg, #000818 0%, #001a3d 50%, #003080 100%)",
-    photo: "https://3bqdrb5nxj.a.trbcdn.net/shop/media/goods/196x302/ebadf9cf-4655-47d1-8e60-58103e2934eb.jpg",
+    photo: "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/35464332-fa33-4ef5-aaba-efeb2c713db9.jpg",
     badge: "AI",
     color: "#3b82f6",
   },
@@ -28,7 +28,7 @@ const HERO_SLIDES = [
     subtitle: "Impossibly thin. Incredibly capable.",
     desc: "M4 chip · 18h battery · 13\" & 15\"",
     bg: "linear-gradient(135deg, #0a0015 0%, #200040 50%, #4a0080 100%)",
-    photo: CATEGORY_PHOTOS["MacBook"] || "",
+    photo: "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/5cc93a48-591b-49b5-9399-b069dcdbb216.jpg",
     badge: "",
     color: "#a855f7",
   },
@@ -80,11 +80,11 @@ export default function CatalogBanners({ onCategory, activeCategory }: Props) {
 
       {/* ── HERO SLIDER ── */}
       <div
-        className="relative overflow-hidden cursor-pointer"
-        style={{ minHeight: 220 }}
+        className="relative overflow-hidden cursor-pointer w-full"
+        style={{ height: "min(56vw, 420px)", minHeight: 260 }}
         onClick={() => onCategory(s.cat)}
       >
-        {/* Background */}
+        {/* Background full bleed */}
         <div
           className="absolute inset-0 transition-all duration-700"
           style={{ background: s.bg }}
@@ -95,45 +95,46 @@ export default function CatalogBanners({ onCategory, activeCategory }: Props) {
           style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E\")" }}
         />
 
-        {/* Product photo */}
+        {/* Product photo — во всю правую половину */}
         {s.photo && (
-          <div className={`absolute right-0 top-0 bottom-0 w-1/2 transition-opacity duration-300 ${animating ? "opacity-0" : "opacity-100"}`}>
+          <div className={`absolute inset-0 transition-opacity duration-300 ${animating ? "opacity-0" : "opacity-100"}`}>
             <img
               src={s.photo}
               alt={s.title}
-              className="absolute right-4 top-1/2 -translate-y-1/2 h-[85%] w-auto object-contain drop-shadow-2xl"
-              style={{ filter: "drop-shadow(0 0 40px rgba(255,255,255,0.08))" }}
+              className="absolute right-0 top-0 h-full w-1/2 object-cover object-center"
+              style={{ filter: "drop-shadow(-30px 0 60px rgba(0,0,0,0.8))" }}
             />
-            <div className="absolute inset-0" style={{ background: "linear-gradient(to right, rgba(0,0,0,0.7) 0%, transparent 60%)" }} />
+            {/* градиент поверх фото слева */}
+            <div className="absolute inset-0" style={{ background: "linear-gradient(to right, rgba(0,0,0,0.92) 35%, rgba(0,0,0,0.4) 65%, transparent 100%)" }} />
           </div>
         )}
 
         {/* Content */}
-        <div className={`relative z-10 px-6 py-8 sm:py-10 max-w-sm transition-opacity duration-300 ${animating ? "opacity-0" : "opacity-100"}`}>
+        <div className={`relative z-10 h-full flex flex-col justify-center px-6 sm:px-10 max-w-lg transition-opacity duration-300 ${animating ? "opacity-0" : "opacity-100"}`}>
           {s.badge && (
-            <span className="inline-block text-[10px] font-black tracking-[0.25em] uppercase px-2.5 py-1 rounded-full mb-3"
+            <span className="inline-block text-[10px] font-black tracking-[0.25em] uppercase px-2.5 py-1 rounded-full mb-3 w-fit"
               style={{ background: `${s.color}25`, color: s.color, border: `1px solid ${s.color}40` }}>
               {s.badge}
             </span>
           )}
-          <h1 className="text-white font-black text-3xl sm:text-4xl leading-none tracking-tight mb-1">{s.title}</h1>
+          <h1 className="text-white font-black text-4xl sm:text-5xl leading-none tracking-tight mb-2">{s.title}</h1>
           <p className="font-light tracking-widest text-sm mb-3" style={{ color: `${s.color}cc` }}>{s.subtitle}</p>
-          <p className="text-white/40 text-xs">{s.desc}</p>
+          <p className="text-white/40 text-xs mb-6">{s.desc}</p>
 
-          <div className="mt-5 inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-2 text-white text-xs font-semibold">
+          <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-5 py-2.5 text-white text-sm font-semibold w-fit hover:bg-white/20 transition-colors">
             Смотреть цены →
           </div>
         </div>
 
         {/* Dots */}
-        <div className="absolute bottom-4 left-6 flex gap-1.5">
+        <div className="absolute bottom-5 left-6 sm:left-10 flex gap-1.5 z-10">
           {HERO_SLIDES.map((_, i) => (
             <button
               key={i}
               onClick={e => { e.stopPropagation(); setSlide(i); }}
               className="rounded-full transition-all duration-300"
               style={{
-                width: i === slide ? 20 : 6,
+                width: i === slide ? 24 : 6,
                 height: 6,
                 background: i === slide ? s.color : "rgba(255,255,255,0.25)",
               }}
