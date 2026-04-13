@@ -1,5 +1,6 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
+import { ymGoal, Goals } from "@/lib/ym";
 
 const SEND_JOB_URL = "https://functions.poehali.dev/52666ff7-db52-4b6a-a90e-d60aeed699de";
 
@@ -35,6 +36,7 @@ export default function JobsSection() {
       const data = await res.json();
       if (data.ok) {
         setSent(true);
+        ymGoal(Goals.FORM_SUCCESS, { source: "jobs" });
       } else {
         setError("Ошибка отправки. Попробуйте позвонить.");
       }

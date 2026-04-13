@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import { CatalogItem, SEND_LEAD_URL, MODEL_PHOTOS, MODEL_PHOTOS_EXTRA, MODEL_COLOR_PHOTOS, CATEGORY_PHOTOS } from "@/pages/catalog.types";
+import { ymGoal, Goals } from "@/lib/ym";
 
 interface Props {
   item: CatalogItem;
@@ -39,6 +40,7 @@ const CatalogOrderModal = ({ item, onClose, markup = 3500 }: Props) => {
         }),
       });
       setSent(true);
+      ymGoal(Goals.CATALOG_ORDER, { source: "catalog", category: item.category });
     } finally {
       setLoading(false);
     }

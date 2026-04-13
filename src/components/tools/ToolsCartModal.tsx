@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import { CartItem, fmt } from "./types";
+import { ymGoal, Goals } from "@/lib/ym";
 
 const SEND_API = "https://functions.poehali.dev/52666ff7-db52-4b6a-a90e-d60aeed699de";
 
@@ -31,6 +32,7 @@ export default function ToolsCartModal({ cart, onClose, onRemove, onQty }: Props
         body: JSON.stringify({ name, phone, category: "Инструменты", desc: `${lines}\n\nИтого: ${fmt(total)}` }),
       });
       setSent(true);
+      ymGoal(Goals.FORM_SUCCESS, { source: "tools_cart" });
     } catch { setErr("Ошибка отправки"); } finally { setSending(false); }
   };
 

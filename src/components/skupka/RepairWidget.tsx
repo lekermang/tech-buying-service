@@ -1,5 +1,6 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
+import { ymGoal, Goals } from "@/lib/ym";
 
 const REPAIR_ORDER_URL = "https://functions.poehali.dev/8d0ee3bd-41eb-44fe-9d30-aab6ddc2042d";
 const REPAIR_STATUS_URL = "https://functions.poehali.dev/1fb5db63-4cb6-41be-af0f-80d6f9ce8fdf";
@@ -49,7 +50,10 @@ export default function RepairWidget() {
         }),
       });
       const data = await res.json();
-      if (data.order_id) setOrderId(data.order_id);
+      if (data.order_id) {
+        setOrderId(data.order_id);
+        ymGoal(Goals.FORM_SUCCESS, { source: "repair_widget" });
+      }
     } catch (_e) { /* ignore */ }
     setSending(false);
   };

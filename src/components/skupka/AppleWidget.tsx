@@ -1,5 +1,6 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
+import { ymGoal, Goals } from "@/lib/ym";
 
 const AVITO_PRICE_URL = "https://functions.poehali.dev/5c99f770-dbe8-42ad-b8df-adea87477627";
 const SEND_LEAD_URL = "https://functions.poehali.dev/52666ff7-db52-4b6a-a90e-d60aeed699de";
@@ -73,6 +74,7 @@ const useAppleWidget = () => {
         }),
       });
       setSent(true);
+      ymGoal(Goals.FORM_SUCCESS, { source: "apple_widget" });
     } finally {
       setSending(false);
     }
