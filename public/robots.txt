@@ -22,6 +22,15 @@ Disallow: /tools
 Disallow: /dzchat
 Crawl-delay: 1
 
+# Поиск с Алисой — запрещаем только служебные разделы
+User-agent: YandexAdditionalBot
+Allow: /
+Disallow: /admin
+Disallow: /cabinet
+Disallow: /staff
+Disallow: /tools
+Disallow: /dzchat
+
 # Google
 User-agent: Googlebot
 Allow: /
