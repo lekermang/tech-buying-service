@@ -184,8 +184,8 @@ export const CATEGORY_PHOTOS: Record<string, string> = {
   // Яндекс — проверено (со страницы Яндекс станций)
   "Яндекс / JBL / Marshall":    LAB + "beb/p01r5ohj50a11u09677suml7h9cuvdi8.webp",
   // Остальные — пока без фото, лучше цветной градиент чем неправильное фото
-  "AirPods":                    "",
-  "Apple iPad":                 "",
+  "AirPods":                    "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/52692f65-09b8-42db-b15c-c3a42cb901b3.jpg",
+  "Apple iPad":                 "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/7c8a7c80-bce2-4dd9-a8d9-7e21cc523139.jpg",
   "Honor / PIXEL":              "",
   "POCO M-X-F":                 "",
   "Xiaomi/Redmi/Pad":           "",
@@ -194,9 +194,94 @@ export const CATEGORY_PHOTOS: Record<string, string> = {
   "SKY":                        "",
 };
 
-// Фото по модели + цвету — заполняется только после РУЧНОЙ проверки каждого URL
-// Пока пусто — лучше одно правильное фото чем неправильное по цвету
-export const MODEL_COLOR_PHOTOS: Record<string, string> = {};
+const CDN = "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/";
+
+// Фото по модели + цвету (сгенерированы AI, строго по цвету)
+export const MODEL_COLOR_PHOTOS: Record<string, string> = {
+  // iPhone 17 Pro Max
+  "iPhone 17 Pro Max::natural titanium":   CDN + "1f9762ed-f76c-4460-823f-56fffef437ba.jpg",
+  "iPhone 17 Pro Max::black titanium":     CDN + "5c3fb7c4-72ae-4a8d-8bef-79b34ce97fd7.jpg",
+  "iPhone 17 Pro Max::white titanium":     CDN + "158f4e3f-53e9-44cb-8330-c3f9fe6f55b1.jpg",
+  "iPhone 17 Pro Max::desert titanium":    CDN + "b8122bc2-ef4d-4eac-9387-55505a1d07b7.jpg",
+  "iPhone 17 Pro Max::natural":            CDN + "1f9762ed-f76c-4460-823f-56fffef437ba.jpg",
+  "iPhone 17 Pro Max::black":              CDN + "5c3fb7c4-72ae-4a8d-8bef-79b34ce97fd7.jpg",
+  "iPhone 17 Pro Max::white":              CDN + "158f4e3f-53e9-44cb-8330-c3f9fe6f55b1.jpg",
+  "iPhone 17 Pro Max::desert":             CDN + "b8122bc2-ef4d-4eac-9387-55505a1d07b7.jpg",
+  // iPhone 17 Pro
+  "iPhone 17 Pro::natural titanium":       CDN + "1f9762ed-f76c-4460-823f-56fffef437ba.jpg",
+  "iPhone 17 Pro::black titanium":         CDN + "5c3fb7c4-72ae-4a8d-8bef-79b34ce97fd7.jpg",
+  "iPhone 17 Pro::white titanium":         CDN + "158f4e3f-53e9-44cb-8330-c3f9fe6f55b1.jpg",
+  "iPhone 17 Pro::desert titanium":        CDN + "b8122bc2-ef4d-4eac-9387-55505a1d07b7.jpg",
+  // iPhone 16 Pro Max
+  "iPhone 16 Pro Max::desert titanium":    CDN + "2c599457-8ae2-4c16-b5fc-80683e390d82.jpg",
+  "iPhone 16 Pro Max::black titanium":     CDN + "843dfdbf-93f1-4cf4-9c7e-4c600f239410.jpg",
+  "iPhone 16 Pro Max::desert":             CDN + "2c599457-8ae2-4c16-b5fc-80683e390d82.jpg",
+  "iPhone 16 Pro Max::black":              CDN + "843dfdbf-93f1-4cf4-9c7e-4c600f239410.jpg",
+  // iPhone 16 Pro
+  "iPhone 16 Pro::white titanium":         CDN + "0e432e39-7b12-4765-9e27-18b6e82b33d0.jpg",
+  "iPhone 16 Pro::black titanium":         CDN + "843dfdbf-93f1-4cf4-9c7e-4c600f239410.jpg",
+  "iPhone 16 Pro::desert titanium":        CDN + "2c599457-8ae2-4c16-b5fc-80683e390d82.jpg",
+  // iPhone 16
+  "iPhone 16::ultramarine":                CDN + "e0b9b9b3-9005-4055-a889-3fbed49f7f23.jpg",
+  "iPhone 16::blue":                       CDN + "e0b9b9b3-9005-4055-a889-3fbed49f7f23.jpg",
+  "iPhone 16::pink":                       CDN + "f6abe891-ef01-4006-a1c3-cb2c86a8e8b5.jpg",
+  "iPhone 16::teal":                       CDN + "74e8355f-fd4c-4224-b0cc-ff6964c11eec.jpg",
+  "iPhone 16::black":                      CDN + "5c3fb7c4-72ae-4a8d-8bef-79b34ce97fd7.jpg",
+  // iPhone 16 Plus — те же цвета
+  "iPhone 16 Plus::ultramarine":           CDN + "e0b9b9b3-9005-4055-a889-3fbed49f7f23.jpg",
+  "iPhone 16 Plus::pink":                  CDN + "f6abe891-ef01-4006-a1c3-cb2c86a8e8b5.jpg",
+  "iPhone 16 Plus::teal":                  CDN + "74e8355f-fd4c-4224-b0cc-ff6964c11eec.jpg",
+  // iPhone 15 Pro
+  "iPhone 15 Pro::natural titanium":       CDN + "a3cce28e-e548-4464-afc7-964ae59f636a.jpg",
+  "iPhone 15 Pro::blue titanium":          CDN + "e04dbcf8-eeee-4f3d-815d-740c4479c56b.jpg",
+  "iPhone 15 Pro::natural":                CDN + "a3cce28e-e548-4464-afc7-964ae59f636a.jpg",
+  "iPhone 15 Pro::blue":                   CDN + "e04dbcf8-eeee-4f3d-815d-740c4479c56b.jpg",
+  // iPhone 15 Pro Max
+  "iPhone 15 Pro Max::natural titanium":   CDN + "a3cce28e-e548-4464-afc7-964ae59f636a.jpg",
+  "iPhone 15 Pro Max::blue titanium":      CDN + "e04dbcf8-eeee-4f3d-815d-740c4479c56b.jpg",
+  // iPhone 15
+  "iPhone 15::black":                      CDN + "31fef314-f9c9-4ba2-be86-30f847c077df.jpg",
+  "iPhone 15::yellow":                     CDN + "639e2418-ed2a-4db5-8b32-460d6fd54454.jpg",
+  // iPhone 15 Plus — те же цвета
+  "iPhone 15 Plus::black":                 CDN + "31fef314-f9c9-4ba2-be86-30f847c077df.jpg",
+  "iPhone 15 Plus::yellow":                CDN + "639e2418-ed2a-4db5-8b32-460d6fd54454.jpg",
+  // iPhone 14 Pro Max
+  "iPhone 14 Pro Max::deep purple":        CDN + "ec640efc-34ec-4e0e-a164-6f0f3ddc006c.jpg",
+  "iPhone 14 Pro Max::purple":             CDN + "ec640efc-34ec-4e0e-a164-6f0f3ddc006c.jpg",
+  // Samsung Galaxy S25 Ultra
+  "Galaxy S25 Ultra::titanium black":      CDN + "7defae11-2097-4874-838f-fa97ff851e43.jpg",
+  "Galaxy S25 Ultra::black":               CDN + "7defae11-2097-4874-838f-fa97ff851e43.jpg",
+  "Galaxy S25 Ultra::titanium silverblue": CDN + "588f10d4-2413-409f-b21c-9080196025d5.jpg",
+  "Galaxy S25 Ultra::silver":              CDN + "588f10d4-2413-409f-b21c-9080196025d5.jpg",
+  "Galaxy S25 Ultra::titanium blue":       CDN + "588f10d4-2413-409f-b21c-9080196025d5.jpg",
+  // Samsung Galaxy S25
+  "Galaxy S25::navy":                      CDN + "dd18a5c5-b230-4940-ab72-05494db58d19.jpg",
+  "Galaxy S25::blue":                      CDN + "dd18a5c5-b230-4940-ab72-05494db58d19.jpg",
+  "Galaxy S25::icy blue":                  CDN + "4c94c4b8-e6de-4a21-97e0-4233919fe7e5.jpg",
+  // MacBook Air
+  "MacBook Air M4 13 (2025)::midnight":    CDN + "5a481fe7-4c63-497b-affd-333a782d9ccd.jpg",
+  "MacBook Air M4 15 (2025)::midnight":    CDN + "5a481fe7-4c63-497b-affd-333a782d9ccd.jpg",
+  "MacBook Air M4 13 (2025)::starlight":   CDN + "bb055955-d50d-431a-9ea1-6e5edbc023d4.jpg",
+  "MacBook Air M4 15 (2025)::starlight":   CDN + "bb055955-d50d-431a-9ea1-6e5edbc023d4.jpg",
+  // MacBook Pro
+  "MacBook Pro 14 M4 (2024)::space black": CDN + "2c1271d7-61c3-44c3-a21c-4da86b3c0061.jpg",
+  "MacBook Pro 14 M5 (2025)::space black": CDN + "2c1271d7-61c3-44c3-a21c-4da86b3c0061.jpg",
+  // AirPods Pro
+  "AirPods Pro 2 Type-C::white":           CDN + "52692f65-09b8-42db-b15c-c3a42cb901b3.jpg",
+  "AirPods Pro 3::white":                  CDN + "52692f65-09b8-42db-b15c-c3a42cb901b3.jpg",
+  // Apple Watch
+  "Watch S11 42mm::black":                 CDN + "f5153aab-a804-4cd3-a0b9-4498431a8ff2.jpg",
+  "Watch S11 46mm::black":                 CDN + "f5153aab-a804-4cd3-a0b9-4498431a8ff2.jpg",
+  "Watch Ultra 2 49mm::natural titanium":  CDN + "c5f504a6-119c-41a4-89f3-2c6745b954ae.jpg",
+  "Watch Ultra 3 49mm::natural titanium":  CDN + "c5f504a6-119c-41a4-89f3-2c6745b954ae.jpg",
+  // iPad
+  "iPad Pro 11 M4::space black":           CDN + "7c8a7c80-bce2-4dd9-a8d9-7e21cc523139.jpg",
+  "iPad Pro 13 M4::space black":           CDN + "7c8a7c80-bce2-4dd9-a8d9-7e21cc523139.jpg",
+  // Dyson
+  "V15 SV47 Detect Absolute::nickel/copper": CDN + "bb8a642c-7c98-435a-a8c0-e56c7bd5389a.jpg",
+  // Samsung A
+  "Galaxy A55::navy":                      CDN + "5e811a34-754d-436d-be42-f7fb1fd204c4.jpg",
+};
 
 const COLOR_MAP: Record<string, string> = {
   black: "#1a1a1a", white: "#f5f5f5", silver: "#c0c0c0", gold: "#ffd700",
