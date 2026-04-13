@@ -30,6 +30,7 @@ const PROBES = [
 const Header = ({ scrollTo }: HeaderProps) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [goldPrice, setGoldPrice] = useState<{ buy: number; date: string } | null>(null);
+  const [goldHistory, setGoldHistory] = useState<{ date: string; price: number }[]>([]);
   const [sellOpen, setSellOpen] = useState(false);
   const [clientType, setClientType] = useState<'retail' | 'wholesale'>('retail');
   const [probe, setProbe] = useState(585);
@@ -42,7 +43,10 @@ const Header = ({ scrollTo }: HeaderProps) => {
     const load = () => {
       fetch(GOLD_PRICE_URL)
         .then(r => r.json())
-        .then(d => setGoldPrice({ buy: d.buy, date: d.date }))
+        .then(d => {
+          setGoldPrice({ buy: d.buy, date: d.date });
+          if (Array.isArray(d.history) && d.history.length > 0) setGoldHistory(d.history);
+        })
         .catch(() => {});
     };
     load();
@@ -107,7 +111,38 @@ const Header = ({ scrollTo }: HeaderProps) => {
         </div>
 
         {goldPrice && (
-          <div className="hidden md:flex items-center gap-2 font-roboto text-sm">
+          <div className="hidden md:flex items-center gap-3 font-roboto text-sm">
+            {/* Мини-график 7 дней */}
+            {goldHistory.length >= 2 && (() => {
+              const W = 80, H = 28, pad = 3;
+              const prices = goldHistory.map(h => h.price);
+              const min = Math.min(...prices);
+              const max = Math.max(...prices);
+              const range = max - min || 1;
+              const pts = prices.map((p, i) => {
+                const x = pad + (i / (prices.length - 1)) * (W - pad * 2);
+                const y = H - pad - ((p - min) / range) * (H - pad * 2);
+                return `${x.toFixed(1)},${y.toFixed(1)}`;
+              }).join(' ');
+              const last = prices[prices.length - 1];
+              const first = prices[0];
+              const up = last >= first;
+              const color = up ? '#16a34a' : '#dc2626';
+              const lastX = pad + (W - pad * 2);
+              const lastY = H - pad - ((last - min) / range) * (H - pad * 2);
+              return (
+                <div className="flex items-center gap-1.5 bg-black/10 px-2 py-1 rounded" title="Изменение цены за 7 дней">
+                  <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="overflow-visible">
+                    <polyline points={pts} fill="none" stroke={color} strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" />
+                    <circle cx={lastX} cy={lastY} r="2.5" fill={color} />
+                  </svg>
+                  <span className="text-[11px] font-bold" style={{ color }}>
+                    {up ? '▲' : '▼'} {Math.abs(((last - first) / first) * 100).toFixed(1)}%
+                  </span>
+                  <span className="text-[10px] text-black/40">7д</span>
+                </div>
+              );
+            })()}
             <div className="w-px h-5 bg-black/20" />
             <span className="bg-black/10 px-2.5 py-1 text-black font-semibold">
               Физлица: {priceRetail999?.toLocaleString('ru-RU')} ₽/г
