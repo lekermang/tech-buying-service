@@ -1,0 +1,17 @@
+UPDATE t_p31606708_tech_buying_service.catalog SET price = 45500, availability = 'in_stock', updated_at = now() WHERE model = 'iPhone 16e' AND color = 'Black' AND storage = '128GB' AND region = 'EU';
+UPDATE t_p31606708_tech_buying_service.catalog SET price = 44500, availability = 'in_stock', updated_at = now() WHERE model = 'iPhone 16e' AND color = 'White' AND storage = '128GB' AND region = 'EU';
+UPDATE t_p31606708_tech_buying_service.catalog SET price = 54500, availability = 'on_order', updated_at = now() WHERE model = 'iPhone 16e' AND color = 'Black' AND storage = '256GB' AND region = 'EU';
+UPDATE t_p31606708_tech_buying_service.catalog SET price = 51200, availability = 'on_order', updated_at = now() WHERE model = 'iPhone 16e' AND color = 'White' AND storage = '256GB' AND region = 'EU';
+UPDATE t_p31606708_tech_buying_service.catalog SET price = 53500, availability = 'on_order', updated_at = now() WHERE model = 'iPhone 16' AND color = 'Black' AND storage = '128GB' AND region = 'US';
+UPDATE t_p31606708_tech_buying_service.catalog SET price = 54600, availability = 'in_stock', updated_at = now() WHERE model = 'iPhone 16' AND color = 'Black' AND storage = '128GB' AND region = 'EU';
+UPDATE t_p31606708_tech_buying_service.catalog SET price = 54200, availability = 'in_stock', updated_at = now() WHERE model = 'iPhone 16' AND color = 'Ultramarine' AND storage = '128GB' AND region = 'EU';
+UPDATE t_p31606708_tech_buying_service.catalog SET price = 57100, availability = 'in_stock', updated_at = now() WHERE model = 'iPhone 16' AND color = 'Pink' AND storage = '128GB' AND region = 'EU';
+UPDATE t_p31606708_tech_buying_service.catalog SET price = 53100, availability = 'in_stock', updated_at = now() WHERE model = 'iPhone 16' AND color = 'Teal' AND storage = '128GB' AND region = 'EU';
+UPDATE t_p31606708_tech_buying_service.catalog SET price = 54500, availability = 'in_stock', updated_at = now() WHERE model = 'iPhone 16' AND color = 'White' AND storage = '128GB' AND region = 'EU';
+UPDATE t_p31606708_tech_buying_service.catalog SET price = 67100, availability = 'in_stock', updated_at = now() WHERE model = 'iPhone 16' AND color = 'Ultramarine' AND storage = '256GB' AND region = 'EU';
+UPDATE t_p31606708_tech_buying_service.catalog SET price = 58600, availability = 'in_stock', updated_at = now() WHERE model = 'iPhone 16' AND color = 'Pink' AND storage = '256GB' AND region = 'EU';
+UPDATE t_p31606708_tech_buying_service.catalog SET price = NULL, availability = 'in_stock', updated_at = now() WHERE model = 'iPhone 16' AND color = 'Teal' AND storage = '256GB' AND region = 'EU';
+UPDATE t_p31606708_tech_buying_service.catalog SET price = 60400, availability = 'in_stock', updated_at = now() WHERE model = 'iPhone 16' AND color = 'White' AND storage = '256GB' AND region = 'EU';
+UPDATE t_p31606708_tech_buying_service.catalog SET price = 62200, availability = 'in_stock', updated_at = now() WHERE model = 'iPhone 16' AND color = 'Black' AND storage = '256GB' AND region = 'EU';
+UPDATE t_p31606708_tech_buying_service.catalog SET price = 75100, availability = 'on_order', updated_at = now() WHERE model = 'iPhone 16' AND color = 'Teal' AND storage = '512GB' AND region = 'EU';
+UPDATE t_p31606708_tech_buying_service.catalog SET price = 83700, availability = 'on_order', updated_at = now() WHERE model = 'iPhone 16' AND color = 'White' AND storage = '512GB' AND region = 'EU'

@@ -1,0 +1,15 @@
+UPDATE t_p31606708_tech_buying_service.catalog SET price = 103900, availability = 'on_order', updated_at = now() WHERE model = 'iPhone 16 Pro Max' AND color = 'Black' AND storage = '512GB' AND region = 'US';
+UPDATE t_p31606708_tech_buying_service.catalog SET price = 123300, availability = 'on_order', updated_at = now() WHERE model = 'iPhone 16 Pro Max' AND color = 'Black' AND storage = '1TB' AND region = 'US';
+UPDATE t_p31606708_tech_buying_service.catalog SET price = 123300, availability = 'on_order', updated_at = now() WHERE model = 'iPhone 16 Pro Max' AND color = 'White' AND storage = '1TB' AND region = 'US';
+UPDATE t_p31606708_tech_buying_service.catalog SET price = 101500, availability = 'on_order', updated_at = now() WHERE model = 'iPhone 16 Pro Max' AND color = 'Black' AND storage = '256GB' AND region = 'EU';
+UPDATE t_p31606708_tech_buying_service.catalog SET price = 89600, availability = 'in_stock', updated_at = now() WHERE model = 'iPhone 16 Pro Max' AND color = 'Desert' AND storage = '256GB' AND region = 'EU';
+UPDATE t_p31606708_tech_buying_service.catalog SET price = 98100, availability = 'on_order', updated_at = now() WHERE model = 'iPhone 16 Pro Max' AND color = 'Natural' AND storage = '256GB' AND region = 'EU';
+UPDATE t_p31606708_tech_buying_service.catalog SET price = 98900, availability = 'on_order', updated_at = now() WHERE model = 'iPhone 16 Pro Max' AND color = 'White' AND storage = '256GB' AND region = 'EU';
+UPDATE t_p31606708_tech_buying_service.catalog SET price = 111600, availability = 'on_order', updated_at = now() WHERE model = 'iPhone 16 Pro Max' AND color = 'Black' AND storage = '512GB' AND region = 'EU';
+UPDATE t_p31606708_tech_buying_service.catalog SET price = 109100, availability = 'on_order', updated_at = now() WHERE model = 'iPhone 16 Pro Max' AND color = 'Desert' AND storage = '512GB' AND region = 'EU';
+UPDATE t_p31606708_tech_buying_service.catalog SET price = 109600, availability = 'on_order', updated_at = now() WHERE model = 'iPhone 16 Pro Max' AND color = 'Natural' AND storage = '512GB' AND region = 'EU';
+UPDATE t_p31606708_tech_buying_service.catalog SET price = 109100, availability = 'on_order', updated_at = now() WHERE model = 'iPhone 16 Pro Max' AND color = 'White' AND storage = '512GB' AND region = 'EU';
+UPDATE t_p31606708_tech_buying_service.catalog SET price = 131500, availability = 'on_order', updated_at = now() WHERE model = 'iPhone 16 Pro Max' AND color = 'Black' AND storage = '1TB' AND region = 'EU';
+UPDATE t_p31606708_tech_buying_service.catalog SET price = 127400, availability = 'on_order', updated_at = now() WHERE model = 'iPhone 16 Pro Max' AND color = 'Natural' AND storage = '1TB' AND region = 'EU';
+UPDATE t_p31606708_tech_buying_service.catalog SET price = 132000, availability = 'on_order', updated_at = now() WHERE model = 'iPhone 16 Pro Max' AND color = 'White' AND storage = '1TB' AND region = 'EU';
+UPDATE t_p31606708_tech_buying_service.catalog SET price = 127900, availability = 'on_order', updated_at = now() WHERE model = 'iPhone 16 Pro Max' AND color = 'Desert' AND storage = '1TB' AND region = 'EU'
