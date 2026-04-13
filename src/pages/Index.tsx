@@ -8,6 +8,7 @@ import Icon from "@/components/ui/icon";
 import { ymGoal, Goals } from "@/lib/ym";
 import ExitPopup from "@/components/skupka/ExitPopup";
 import CookieBanner from "@/components/skupka/CookieBanner";
+import JobsSection from "@/components/skupka/JobsSection";
 
 const scrollTo = (href: string) => {
   const el = document.querySelector(href);
@@ -93,6 +94,7 @@ const Index = () => {
       <Header scrollTo={scrollTo} />
       <HeroSection scrollTo={scrollTo} externalModalOpen={evalOpen} onExternalModalClose={() => setEvalOpen(false)} />
       <InfoSections />
+      <JobsSection />
       <ContactsFooter scrollTo={scrollTo} />
       <Consultant />
       <ExitPopup onOpenEval={() => setEvalOpen(true)} />
