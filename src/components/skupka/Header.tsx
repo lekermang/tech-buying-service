@@ -44,7 +44,9 @@ const Header = ({ scrollTo }: HeaderProps) => {
       fetch(GOLD_PRICE_URL)
         .then(r => r.json())
         .then(d => {
-          setGoldPrice({ buy: d.buy, date: d.date });
+          if (d && typeof d.buy === 'number') {
+            setGoldPrice({ buy: d.buy, date: d.date || '' });
+          }
           if (Array.isArray(d.history) && d.history.length > 0) setGoldHistory(d.history);
         })
         .catch(() => {});
@@ -101,7 +103,7 @@ const Header = ({ scrollTo }: HeaderProps) => {
       <div className="bg-[#FFD700] px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 sm:gap-3">
           <span className="text-black text-sm sm:text-base font-oswald font-bold uppercase tracking-wider">🥇 Золото 999:</span>
-          {goldPrice ? (
+          {goldPrice?.buy ? (
             <span className="text-black font-roboto font-bold text-base sm:text-xl">
               {goldPrice.buy.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽/г
             </span>
@@ -110,7 +112,7 @@ const Header = ({ scrollTo }: HeaderProps) => {
           )}
         </div>
 
-        {goldPrice && (
+        {goldPrice?.buy && (
           <div className="hidden md:flex items-center gap-3 font-roboto text-sm">
             {/* Мини-график 7 дней */}
             {goldHistory.length >= 2 && (() => {
@@ -334,7 +336,7 @@ const Header = ({ scrollTo }: HeaderProps) => {
                   />
                 </div>
 
-                {goldPrice && (
+                {goldPrice?.buy && (
                   <div className="mt-3 bg-[#0D0D0D] border border-[#FFD700]/30 p-3">
                     <div className="flex items-center justify-between mb-2">
                       <span className="font-roboto text-white/50 text-xs">Цена за грамм ({probe} проба)</span>
