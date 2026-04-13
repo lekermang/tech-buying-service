@@ -12,6 +12,7 @@ const NAV_LINKS = [
   { label: "Гарантии", href: "#guarantees" },
   { label: "Филиалы", href: "#branches" },
   { label: "Контакты", href: "#contacts" },
+  { label: "Вакансии", href: "#jobs" },
 ];
 
 interface HeaderProps {
