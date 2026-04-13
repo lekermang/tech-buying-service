@@ -1,19 +1,12 @@
 import json
 import os
 import urllib.request
-from datetime import datetime, timezone, timedelta
-
-import psycopg2
 
 SCHEMA = 't_p31606708_tech_buying_service'
 HEADERS = {
     'Access-Control-Allow-Origin': '*',
     'Content-Type': 'application/json',
 }
-
-
-def get_conn():
-    return psycopg2.connect(os.environ['DATABASE_URL'])
 
 
 def handler(event: dict, context) -> dict:
@@ -58,16 +51,17 @@ def handler(event: dict, context) -> dict:
     gold_per_gram_usd = xau_usd / 31.1035
     gold_per_gram_rub = round(gold_per_gram_usd * usd_rub, 2)
 
-    # 4. Сохраняем в историю (не чаще раза в час — по дате-часу)
+    # 4. История из БД
     history = []
     try:
-        conn = get_conn()
+        import psycopg2
+        conn = psycopg2.connect(os.environ['DATABASE_URL'])
         cur = conn.cursor()
 
-        # Проверяем, есть ли запись за последний час
+        # Сохраняем не чаще раза в час
         cur.execute(
             f"SELECT id FROM {SCHEMA}.gold_price_history "
-            f"WHERE recorded_at > NOW() - INTERVAL '1 hour' ORDER BY recorded_at DESC LIMIT 1"
+            f"WHERE recorded_at > NOW() - INTERVAL '1 hour' LIMIT 1"
         )
         if not cur.fetchone():
             cur.execute(
@@ -76,7 +70,7 @@ def handler(event: dict, context) -> dict:
             )
             conn.commit()
 
-        # История за 7 дней — одна точка в день (последняя за день)
+        # История за 7 дней — одна точка в день
         cur.execute(
             f"""
             SELECT
@@ -91,7 +85,6 @@ def handler(event: dict, context) -> dict:
         )
         rows = cur.fetchall()
         history = [{'date': str(r[0]), 'price': float(r[1])} for r in rows]
-
         cur.close()
         conn.close()
     except Exception:
