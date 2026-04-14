@@ -1,0 +1,1 @@
+UPDATE t_p31606708_tech_buying_service.settings SET value = '5', updated_at = NOW() WHERE key = 'gold_bulk_discount'
