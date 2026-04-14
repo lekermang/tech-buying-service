@@ -33,8 +33,13 @@ const Header = ({ scrollTo }: HeaderProps) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [goldPrice, setGoldPrice] = useState<{ buy: number; date: string } | null>(null);
   const [goldHistory, setGoldHistory] = useState<{ date: string; price: number }[]>([]);
+  const [goldSettings, setGoldSettings] = useState({
+    retail_discount: 15, retail_deduction: 0,
+    wholesale_discount: 10, wholesale_deduction: 0,
+    bulk_discount: 15, bulk_deduction: 50,
+  });
   const [sellOpen, setSellOpen] = useState(false);
-  const [clientType, setClientType] = useState<'retail' | 'wholesale'>('retail');
+  const [clientType, setClientType] = useState<'retail' | 'wholesale' | 'bulk'>('retail');
   const [probe, setProbe] = useState(585);
   const [weight, setWeight] = useState("");
   const [form, setForm] = useState({ name: "", phone: "" });
@@ -50,6 +55,9 @@ const Header = ({ scrollTo }: HeaderProps) => {
             setGoldPrice({ buy: d.buy, date: d.date || '' });
           }
           if (Array.isArray(d.history) && d.history.length > 0) setGoldHistory(d.history);
+          if (d.settings) {
+            setGoldSettings(prev => ({ ...prev, ...d.settings }));
+          }
         })
         .catch(() => {});
     };
@@ -64,17 +72,29 @@ const Header = ({ scrollTo }: HeaderProps) => {
   };
 
   const selectedProbe = PROBES.find(p => p.value === probe) || PROBES[2];
-  const discount = clientType === 'retail' ? 0.85 : 0.90;
+
+  const getDiscountAndDeduction = () => {
+    if (clientType === 'bulk') return { discount: goldSettings.bulk_discount / 100, deduction: goldSettings.bulk_deduction };
+    if (clientType === 'wholesale') return { discount: goldSettings.wholesale_discount / 100, deduction: goldSettings.wholesale_deduction };
+    return { discount: goldSettings.retail_discount / 100, deduction: goldSettings.retail_deduction };
+  };
+  const { discount, deduction } = getDiscountAndDeduction();
 
   const calcPrice = (coeff: number) =>
-    goldPrice ? Math.round(goldPrice.buy * coeff * discount) : null;
+    goldPrice ? Math.round(goldPrice.buy * coeff * (1 - discount) - deduction) : null;
 
   const activePrice = calcPrice(selectedProbe.coeff);
   const weightNum = parseFloat(weight.replace(',', '.')) || 0;
   const totalPrice = activePrice && weightNum > 0 ? Math.round(activePrice * weightNum) : null;
 
-  const priceRetail999 = goldPrice ? Math.round(goldPrice.buy * 0.999 * 0.85) : null;
-  const priceWholesale999 = goldPrice ? Math.round(goldPrice.buy * 0.999 * 0.90) : null;
+  const priceRetail999 = goldPrice
+    ? Math.round(goldPrice.buy * 0.999 * (1 - goldSettings.retail_discount / 100) - goldSettings.retail_deduction)
+    : null;
+  const priceWholesale999 = goldPrice
+    ? Math.round(goldPrice.buy * 0.999 * (1 - goldSettings.wholesale_discount / 100) - goldSettings.wholesale_deduction)
+    : null;
+
+  const clientLabel = clientType === 'retail' ? 'Физлицо' : clientType === 'wholesale' ? 'Оптовый (от 30 г)' : 'Крупный опт (от 300 г)';
 
   const handleSell = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,8 +108,8 @@ const Header = ({ scrollTo }: HeaderProps) => {
           name: form.name,
           phone: form.phone,
           category: "Золото",
-          desc: `Проба: ${probe}, вес: ${weight || '?'} г, цена: ${activePrice} ₽/г, итого: ${totalPrice ? totalPrice.toLocaleString('ru-RU') : '?'} ₽. Тип: ${clientType === 'retail' ? 'Физлицо' : 'Оптовый'}`,
-          client_type: clientType === 'retail' ? 'Физлицо' : 'Оптовый (от 30 г)',
+          desc: `Проба: ${probe}, вес: ${weight || '?'} г, цена: ${activePrice} ₽/г, итого: ${totalPrice ? totalPrice.toLocaleString('ru-RU') : '?'} ₽. Тип: ${clientLabel}`,
+          client_type: clientLabel,
           gold_price: `${activePrice} ₽/г (проба ${probe}, вес ${weight || '?'} г = ${totalPrice ? totalPrice.toLocaleString('ru-RU') : '?'} ₽)`,
         }),
       });
@@ -300,7 +320,7 @@ const Header = ({ scrollTo }: HeaderProps) => {
 
             <div className="p-5">
               {/* Client type selector */}
-              <div className="grid grid-cols-2 gap-2 mb-4">
+              <div className="grid grid-cols-3 gap-2 mb-4">
                 <button onClick={() => setClientType('retail')}
                   className={`p-3 border-2 text-left transition-colors ${clientType === 'retail' ? 'border-[#FFD700] bg-[#FFD700]/10' : 'border-[#333] hover:border-[#FFD700]/40'}`}>
                   <div className="font-oswald font-bold text-sm uppercase mb-0.5">Физлицо</div>
@@ -311,12 +331,17 @@ const Header = ({ scrollTo }: HeaderProps) => {
                   <div className="font-oswald font-bold text-sm uppercase mb-0.5">Оптовый</div>
                   <div className="font-roboto text-white/40 text-xs">от 30 грамм</div>
                 </button>
+                <button onClick={() => setClientType('bulk')}
+                  className={`p-3 border-2 text-left transition-colors ${clientType === 'bulk' ? 'border-[#FFD700] bg-[#FFD700]/10' : 'border-[#333] hover:border-[#FFD700]/40'}`}>
+                  <div className="font-oswald font-bold text-sm uppercase mb-0.5">Крупный опт</div>
+                  <div className="font-roboto text-white/40 text-xs">от 300 грамм</div>
+                </button>
               </div>
 
               {/* Probe selector */}
               <div className="mb-5">
                 <label className="font-roboto text-white/50 text-xs uppercase tracking-wider block mb-2">Проба изделия</label>
-                <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+                <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
                   {PROBES.map(p => (
                     <button key={p.value} onClick={() => setProbe(p.value)}
                       className={`py-2 border-2 font-oswald font-bold text-sm transition-colors ${probe === p.value ? 'border-[#FFD700] bg-[#FFD700]/10 text-[#FFD700]' : 'border-[#333] text-white/60 hover:border-[#FFD700]/40'}`}>

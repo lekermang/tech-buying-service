@@ -51,8 +51,16 @@ def handler(event: dict, context) -> dict:
     gold_per_gram_usd = xau_usd / 31.1035
     gold_per_gram_rub = round(gold_per_gram_usd * usd_rub, 2)
 
-    # 4. История из БД
+    # 4. История и настройки из БД
     history = []
+    gold_settings = {
+        'retail_discount': 15,
+        'retail_deduction': 0,
+        'wholesale_discount': 10,
+        'wholesale_deduction': 0,
+        'bulk_discount': 15,
+        'bulk_deduction': 50,
+    }
     try:
         import psycopg2
         conn = psycopg2.connect(os.environ['DATABASE_URL'])
@@ -85,6 +93,15 @@ def handler(event: dict, context) -> dict:
         )
         rows = cur.fetchall()
         history = [{'date': str(r[0]), 'price': float(r[1])} for r in rows]
+
+        # Настройки скидок
+        cur.execute(
+            f"SELECT key, value FROM {SCHEMA}.settings WHERE key LIKE 'gold_%'"
+        )
+        for key, value in cur.fetchall():
+            short = key.replace('gold_', '')
+            gold_settings[short] = float(value)
+
         cur.close()
         conn.close()
     except Exception:
@@ -102,5 +119,6 @@ def handler(event: dict, context) -> dict:
             'metal': 'Золото (Au)',
             'date': cbr_date,
             'history': history,
+            'settings': gold_settings,
         })
     }
