@@ -64,7 +64,7 @@ const SplashScreen = ({ onDone }: { onDone: () => void }) => {
   );
 };
 
-const Index = () => {
+const Index = ({ goldOpen = false }: { goldOpen?: boolean }) => {
   const [splashDone, setSplashDone] = useState(false);
   const [evalOpen, setEvalOpen] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -91,7 +91,7 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-white pb-[72px] md:pb-0">
       {!splashDone && <SplashScreen onDone={() => setSplashDone(true)} />}
-      <Header scrollTo={scrollTo} />
+      <Header scrollTo={scrollTo} goldOpen={goldOpen} />
       <HeroSection scrollTo={scrollTo} externalModalOpen={evalOpen} onExternalModalClose={() => setEvalOpen(false)} />
       <InfoSections />
       <JobsSection />

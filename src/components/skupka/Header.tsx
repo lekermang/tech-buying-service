@@ -17,6 +17,7 @@ const NAV_LINKS = [
 
 interface HeaderProps {
   scrollTo: (href: string) => void;
+  goldOpen?: boolean;
 }
 
 const PROBES = [
@@ -29,7 +30,7 @@ const PROBES = [
   { label: "999", value: 999, coeff: 0.999 },
 ];
 
-const Header = ({ scrollTo }: HeaderProps) => {
+const Header = ({ scrollTo, goldOpen = false }: HeaderProps) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [goldPrice, setGoldPrice] = useState<{ buy: number; date: string } | null>(null);
   const [goldHistory, setGoldHistory] = useState<{ date: string; price: number }[]>([]);
@@ -47,9 +48,8 @@ const Header = ({ scrollTo }: HeaderProps) => {
   const [sent, setSent] = useState(false);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('gold') === '1') setSellOpen(true);
-  }, []);
+    if (goldOpen) setSellOpen(true);
+  }, [goldOpen]);
 
   useEffect(() => {
     const load = () => {
