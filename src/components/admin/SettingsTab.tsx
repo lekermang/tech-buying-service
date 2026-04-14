@@ -70,7 +70,7 @@ export default function SettingsTab({ token }: { token: string }) {
       const res = await fetch(ADMIN_URL, {
         method: "POST",
         headers: { ...adminHeaders(token), "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "settings_set", key, value: edited[key] }),
+        body: JSON.stringify({ action: "settings_set", key, value: edited[key] ?? "0" }),
       });
       if (!res.ok) throw new Error();
       setSaved(key);

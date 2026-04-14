@@ -100,7 +100,10 @@ def handler(event: dict, context) -> dict:
         )
         for key, value in cur.fetchall():
             short = key.replace('gold_', '')
-            gold_settings[short] = float(value)
+            try:
+                gold_settings[short] = float(value) if value not in (None, '') else gold_settings.get(short, 0)
+            except (ValueError, TypeError):
+                pass
 
         cur.close()
         conn.close()
