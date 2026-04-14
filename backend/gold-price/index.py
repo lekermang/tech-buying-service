@@ -15,13 +15,26 @@ def handler(event: dict, context) -> dict:
     if event.get('httpMethod') == 'OPTIONS':
         return {'statusCode': 200, 'headers': {**HEADERS, 'Access-Control-Allow-Methods': 'GET, OPTIONS'}, 'body': ''}
 
-    # 1. Курс USD/RUB от ЦБ
-    cbr_url = 'https://www.cbr-xml-daily.ru/daily_json.js'
-    req = urllib.request.Request(cbr_url, headers={'User-Agent': 'Mozilla/5.0'})
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        cbr = json.loads(resp.read().decode('utf-8'))
-    usd_rub = cbr['Valute']['USD']['Value']
-    cbr_date = cbr['Date'][:10]
+    # 1. Курс USD/RUB — биржевой (ММВБ через fxratesapi), фолбэк ЦБ
+    usd_rub = None
+    cbr_date = None
+    try:
+        fx_url = 'https://api.fxratesapi.com/latest?base=USD&currencies=RUB&resolution=1m&amount=1&places=4&format=json'
+        req_fx = urllib.request.Request(fx_url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req_fx, timeout=8) as resp_fx:
+            fx_data = json.loads(resp_fx.read().decode('utf-8'))
+        usd_rub = fx_data['rates']['RUB']
+        cbr_date = fx_data.get('date', '')[:10]
+    except Exception:
+        pass
+
+    if not usd_rub:
+        cbr_url = 'https://www.cbr-xml-daily.ru/daily_json.js'
+        req = urllib.request.Request(cbr_url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            cbr = json.loads(resp.read().decode('utf-8'))
+        usd_rub = cbr['Valute']['USD']['Value']
+        cbr_date = cbr['Date'][:10]
 
     # 2. Цена XAU/USD — fxratesapi
     xau_usd = None
