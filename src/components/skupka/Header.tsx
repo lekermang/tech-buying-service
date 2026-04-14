@@ -47,6 +47,11 @@ const Header = ({ scrollTo }: HeaderProps) => {
   const [sent, setSent] = useState(false);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('gold') === '1') setSellOpen(true);
+  }, []);
+
+  useEffect(() => {
     const load = () => {
       fetch(GOLD_PRICE_URL)
         .then(r => r.json())
