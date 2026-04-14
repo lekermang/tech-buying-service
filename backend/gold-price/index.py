@@ -53,62 +53,61 @@ def handler(event: dict, context) -> dict:
 
     # 4. История и настройки из БД
     history = []
+    db_error = None
     gold_settings = {
         'retail_discount': 15,
         'retail_deduction': 0,
         'wholesale_discount': 10,
         'wholesale_deduction': 0,
-        'bulk_discount': 15,
+        'bulk_discount': 5,
         'bulk_deduction': 50,
     }
-    try:
-        import psycopg2
-        conn = psycopg2.connect(os.environ['DATABASE_URL'])
-        cur = conn.cursor()
+    import psycopg2
+    conn = psycopg2.connect(os.environ['DATABASE_URL'])
+    cur = conn.cursor()
 
-        # Сохраняем не чаще раза в час
+    # Сохраняем не чаще раза в час
+    cur.execute(
+        f"SELECT id FROM {SCHEMA}.gold_price_history "
+        f"WHERE recorded_at > NOW() - INTERVAL '1 hour' LIMIT 1"
+    )
+    if not cur.fetchone():
         cur.execute(
-            f"SELECT id FROM {SCHEMA}.gold_price_history "
-            f"WHERE recorded_at > NOW() - INTERVAL '1 hour' LIMIT 1"
+            f"INSERT INTO {SCHEMA}.gold_price_history (price_rub, xau_usd, usd_rub) VALUES (%s, %s, %s)",
+            (gold_per_gram_rub, round(xau_usd, 2), round(usd_rub, 4))
         )
-        if not cur.fetchone():
-            cur.execute(
-                f"INSERT INTO {SCHEMA}.gold_price_history (price_rub, xau_usd, usd_rub) VALUES (%s, %s, %s)",
-                (gold_per_gram_rub, round(xau_usd, 2), round(usd_rub, 4))
-            )
-            conn.commit()
+        conn.commit()
 
-        # История за 7 дней — одна точка в день
-        cur.execute(
-            f"""
-            SELECT
-                DATE(recorded_at AT TIME ZONE 'Europe/Moscow') AS day,
-                AVG(price_rub)::NUMERIC(12,2) AS avg_price
-            FROM {SCHEMA}.gold_price_history
-            WHERE recorded_at > NOW() - INTERVAL '8 days'
-            GROUP BY day
-            ORDER BY day ASC
-            LIMIT 8
-            """
-        )
-        rows = cur.fetchall()
-        history = [{'date': str(r[0]), 'price': float(r[1])} for r in rows]
+    # История за 7 дней — одна точка в день
+    cur.execute(
+        f"""
+        SELECT
+            DATE(recorded_at + INTERVAL '3 hours') AS day,
+            AVG(price_rub)::NUMERIC(12,2) AS avg_price
+        FROM {SCHEMA}.gold_price_history
+        WHERE recorded_at > NOW() - INTERVAL '8 days'
+        GROUP BY day
+        ORDER BY day ASC
+        LIMIT 8
+        """
+    )
+    rows = cur.fetchall()
+    history = [{'date': str(r[0]), 'price': float(r[1])} for r in rows]
 
-        # Настройки скидок
-        cur.execute(
-            f"SELECT key, value FROM {SCHEMA}.settings WHERE key LIKE 'gold_%'"
-        )
-        for key, value in cur.fetchall():
-            short = key.replace('gold_', '')
+    # Настройки скидок
+    cur.execute(
+        f"SELECT key, value FROM {SCHEMA}.settings WHERE key LIKE 'gold_%'"
+    )
+    for key, value in cur.fetchall():
+        short = key.replace('gold_', '')
+        if value not in (None, ''):
             try:
-                gold_settings[short] = float(value) if value not in (None, '') else gold_settings.get(short, 0)
+                gold_settings[short] = float(value)
             except (ValueError, TypeError):
                 pass
 
-        cur.close()
-        conn.close()
-    except Exception:
-        pass
+    cur.close()
+    conn.close()
 
     return {
         'statusCode': 200,

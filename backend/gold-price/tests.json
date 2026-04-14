@@ -11,7 +11,7 @@
       "method": "GET",
       "path": "/",
       "expectedStatus": 200,
-      "expectedBody": {"metal": "string", "unit": "string"},
+      "expectedBody": {"metal": "string", "unit": "string", "settings": {"bulk_discount": 5}},
       "bodyMatcher": "partial"
     }
   ]
