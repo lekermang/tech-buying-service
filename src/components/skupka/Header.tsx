@@ -26,6 +26,7 @@ const PROBES = [
   { label: "585", value: 585, coeff: 0.585 },
   { label: "750", value: 750, coeff: 0.750 },
   { label: "850", value: 850, coeff: 0.850 },
+  { label: "900", value: 900, coeff: 0.900 },
   { label: "916", value: 916, coeff: 0.916 },
   { label: "999", value: 999, coeff: 0.999 },
 ];
