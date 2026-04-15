@@ -347,7 +347,7 @@ const Header = ({ scrollTo, goldOpen = false }: HeaderProps) => {
               {/* Probe selector */}
               <div className="mb-5">
                 <label className="font-roboto text-white/50 text-xs uppercase tracking-wider block mb-2">Проба изделия</label>
-                <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
+                <div className="grid grid-cols-4 gap-1.5">
                   {PROBES.map(p => (
                     <button key={p.value} onClick={() => setProbe(p.value)}
                       className={`py-2 border-2 font-oswald font-bold text-sm transition-colors ${probe === p.value ? 'border-[#FFD700] bg-[#FFD700]/10 text-[#FFD700]' : 'border-[#333] text-white/60 hover:border-[#FFD700]/40'}`}>
