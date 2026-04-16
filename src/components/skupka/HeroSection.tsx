@@ -111,8 +111,9 @@ const EvaluateModal = ({ onClose }: { onClose: () => void }) => {
         }).catch(() => {});
       }
     } catch (err) {
-      console.error("send-lead error:", err);
-      setError("Не удалось отправить заявку. Позвоните нам по телефону.");
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("send-lead error:", msg);
+      setError(`Ошибка: ${msg}`);
     } finally {
       setLoading(false);
     }
