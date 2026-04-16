@@ -1,10 +1,11 @@
 """
-Автоматическая отправка прайса в Telegram-группу + ping sitemap в Яндекс.Вебмастер + автопостинг новостей. v9
+Автоматическая отправка прайса в Telegram-группу + ping sitemap в Яндекс.Вебмастер + автопостинг новостей. v10
 - ?action=send_now — немедленная отправка прайса (для теста)
 - ?action=ping_sitemap — отправить sitemap прямо сейчас (для теста)
 - ?action=post_news_now — немедленно опубликовать новость (для теста)
+- ?action=send_master_report — немедленно отправить отчёт мастеру (для теста)
 - ?action=schedule_check — проверка расписания (вызывается каждые 5 мин)
-Расписание: 10:00 МСК — прайс + ping sitemap; каждый час — новость в новостную группу
+Расписание: 10:00 МСК — прайс + ping sitemap; 20:00 МСК — отчёт мастера; каждый час — новость
 """
 
 import json
@@ -25,6 +26,7 @@ CONTACT_PHONE = '+7 992 990-33-33'
 GROUP_CHAT_ID = os.environ.get('PRICE_GROUP_CHAT_ID', '')
 MSK = timezone(timedelta(hours=3))
 SEND_HOUR = 10
+MASTER_REPORT_HOUR = 20
 
 SITE_URL = 'https://skypka24.com'
 SITEMAP_URL = 'https://skypka24.com/sitemap.xml'
@@ -599,6 +601,128 @@ def send_tg_photo_caption(chat_id: str, photo_bytes: bytes, caption: str):
         return json.loads(resp.read())
 
 
+def get_repair_today_stats():
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(f"""
+        SELECT
+            COUNT(*) FILTER (WHERE status = 'done') as done,
+            COUNT(*) FILTER (WHERE status = 'new') as new_count,
+            COUNT(*) FILTER (WHERE status = 'in_progress') as in_progress,
+            COUNT(*) FILTER (WHERE status = 'waiting_parts') as waiting_parts,
+            COUNT(*) FILTER (WHERE status = 'ready') as ready,
+            COALESCE(SUM(repair_amount) FILTER (WHERE status = 'done'), 0) as revenue,
+            COALESCE(SUM(purchase_amount) FILTER (WHERE status = 'done'), 0) as costs,
+            COALESCE(SUM(master_income) FILTER (WHERE status = 'done'), 0) as master_income_sum,
+            COUNT(*) as total
+        FROM {SCHEMA}.repair_orders
+        WHERE DATE(created_at AT TIME ZONE 'Europe/Moscow') = (NOW() AT TIME ZONE 'Europe/Moscow')::date
+    """)
+    row = cur.fetchone()
+    cur.close(); conn.close()
+    if not row:
+        return None
+    revenue = int(row[5])
+    costs = int(row[6])
+    profit = revenue - costs
+    master_income = int(row[7]) if row[7] else max(0, round(profit * 0.5))
+    return {
+        'done': row[0], 'new': row[1], 'in_progress': row[2],
+        'waiting_parts': row[3], 'ready': row[4],
+        'revenue': revenue, 'costs': costs, 'profit': profit,
+        'master_income': master_income, 'total': row[8],
+    }
+
+
+def master_report_already_sent():
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(f"""
+        SELECT 1 FROM {SCHEMA}.repair_daily_master_income
+        WHERE report_date = (NOW() AT TIME ZONE 'Europe/Moscow')::date LIMIT 1
+    """)
+    row = cur.fetchone()
+    cur.close(); conn.close()
+    return row is not None
+
+
+def mark_master_report_sent(stats: dict):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(f"""
+        INSERT INTO {SCHEMA}.repair_daily_master_income
+            (report_date, total_revenue, total_costs, profit, master_income, orders_done)
+        VALUES (
+            (NOW() AT TIME ZONE 'Europe/Moscow')::date,
+            {stats['revenue']}, {stats['costs']}, {stats['profit']},
+            {stats['master_income']}, {stats['done']}
+        )
+        ON CONFLICT (report_date) DO UPDATE SET
+            total_revenue = EXCLUDED.total_revenue,
+            total_costs = EXCLUDED.total_costs,
+            profit = EXCLUDED.profit,
+            master_income = EXCLUDED.master_income,
+            orders_done = EXCLUDED.orders_done,
+            sent_at = NOW()
+    """)
+    conn.commit()
+    cur.close(); conn.close()
+
+
+def get_repair_recipients():
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(f"""
+        SELECT telegram_chat_id FROM {SCHEMA}.notification_recipients
+        WHERE is_active = true AND notify_repair = true
+    """)
+    rows = cur.fetchall()
+    cur.close(); conn.close()
+    return [r[0] for r in rows if r[0]]
+
+
+def format_master_report(stats: dict) -> str:
+    now_msk = datetime.now(MSK)
+    date_str = now_msk.strftime('%d.%m.%Y')
+    lines = [
+        f'🔧 <b>Отчёт по ремонту за {date_str}</b>',
+        '',
+        f'📦 Всего заявок: <b>{stats["total"]}</b>',
+        f'✅ Выдано: <b>{stats["done"]}</b>  •  🆕 Новых: {stats["new"]}',
+        f'🔨 В работе: {stats["in_progress"]}  •  ⏳ Ждём запчасть: {stats["waiting_parts"]}  •  🟡 Готово: {stats["ready"]}',
+        '',
+        '─────────────────────',
+        f'💰 Выручка: <b>{stats["revenue"]:,} ₽</b>'.replace(',', '\u00a0'),
+        f'🛒 Закупка запчастей: <b>{stats["costs"]:,} ₽</b>'.replace(',', '\u00a0'),
+        f'📈 Прибыль: <b>{stats["profit"]:,} ₽</b>'.replace(',', '\u00a0'),
+        '─────────────────────',
+        f'🏆 Доход мастера (50%): <b>{stats["master_income"]:,} ₽</b>'.replace(',', '\u00a0'),
+    ]
+    return '\n'.join(lines)
+
+
+def do_send_master_report(force: bool = False):
+    if not force and master_report_already_sent():
+        return {'sent': False, 'reason': 'already_sent'}
+    stats = get_repair_today_stats()
+    if not stats:
+        return {'sent': False, 'reason': 'no_data'}
+    recipients = get_repair_recipients()
+    if not recipients:
+        return {'sent': False, 'reason': 'no_recipients'}
+    text = format_master_report(stats)
+    sent_to = []
+    errors = []
+    for chat_id in recipients:
+        try:
+            send_tg_message(chat_id, text)
+            sent_to.append(chat_id)
+        except Exception as e:
+            errors.append({'chat_id': chat_id, 'error': str(e)})
+    mark_master_report_sent(stats)
+    return {'sent': True, 'sent_to': len(sent_to), 'errors': errors, 'stats': stats}
+
+
 def do_post_news():
     news_chat_id = os.environ.get('NEWS_GROUP_CHAT_ID', '')
     if not news_chat_id:
@@ -669,6 +793,10 @@ def handler(event: dict, context) -> dict:
         result = do_post_news()
         return ok(result)
 
+    if action == 'send_master_report':
+        result = do_send_master_report(force=True)
+        return ok(result)
+
     if action == 'list_hosts':
         token = os.environ.get('YANDEX_WEBMASTER_TOKEN', '').strip()
         if not token:
@@ -703,6 +831,10 @@ def handler(event: dict, context) -> dict:
         # Автопостинг новостей — каждый час, только с 9:00 до 22:00 МСК
         if 9 <= now_msk.hour < 22 and not check_news_already_posted_this_hour():
             threading.Thread(target=do_post_news, daemon=False).start()
+
+        # Ежедневный отчёт мастера в 20:00 МСК
+        if now_msk.hour == MASTER_REPORT_HOUR and not master_report_already_sent():
+            threading.Thread(target=do_send_master_report, daemon=False).start()
 
         if now_msk.hour != SEND_HOUR:
             return ok({'skipped': True, 'reason': 'not_time_' + str(now_msk.hour) + 'h'})
