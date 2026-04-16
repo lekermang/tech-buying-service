@@ -319,13 +319,20 @@ def handler(event: dict, context) -> dict:
             conn.commit(); cur.close(); conn.close()
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True}, ensure_ascii=False)}
 
-        # Обновить статус / поля
+        # Обновить статус / поля заявки
         order_id = int(body.get('id', 0))
         new_status = body.get('status', '')
         admin_note = body.get('admin_note')
         purchase_amount = body.get('purchase_amount')
         repair_amount = body.get('repair_amount')
         parts_name = body.get('parts_name')
+        # Базовые поля заявки
+        upd_name = body.get('name')
+        upd_phone = body.get('phone')
+        upd_model = body.get('model')
+        upd_repair_type = body.get('repair_type')
+        upd_price = body.get('price')
+        upd_comment = body.get('comment')
 
         if new_status and new_status not in VALID_STATUSES:
             cur.close(); conn.close()
@@ -369,6 +376,28 @@ def handler(event: dict, context) -> dict:
             sets.append(f"parts_name = '{parts_escaped}'")
         if master_income_val != 'NULL':
             sets.append(f"master_income = {master_income_val}")
+        # Базовые поля заявки
+        if upd_name is not None:
+            sets.append(f"name = '{str(upd_name).replace(chr(39), chr(39)*2)}'")
+        if upd_phone is not None:
+            sets.append(f"phone = '{str(upd_phone).replace(chr(39), chr(39)*2)}'")
+        if upd_model is not None:
+            if upd_model:
+                sets.append(f"model = '{str(upd_model).replace(chr(39), chr(39)*2)}'")
+            else:
+                sets.append("model = NULL")
+        if upd_repair_type is not None:
+            if upd_repair_type:
+                sets.append(f"repair_type = '{str(upd_repair_type).replace(chr(39), chr(39)*2)}'")
+            else:
+                sets.append("repair_type = NULL")
+        if upd_price is not None:
+            sets.append(f"price = {int(upd_price)}" if upd_price else "price = NULL")
+        if upd_comment is not None:
+            if upd_comment:
+                sets.append(f"comment = '{str(upd_comment).replace(chr(39), chr(39)*2)}'")
+            else:
+                sets.append("comment = NULL")
 
         if not sets:
             cur.close(); conn.close()
