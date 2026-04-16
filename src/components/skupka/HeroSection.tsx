@@ -92,14 +92,24 @@ const EvaluateModal = ({ onClose }: { onClose: () => void }) => {
     setLoading(true);
     setError(null);
     try {
+      // Сначала отправляем заявку без фото — быстро и надёжно
       const res = await fetch(SEND_LEAD_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...formData, photos: photos.map(p => p.base64).filter(Boolean) }),
+        body: JSON.stringify({ ...formData, photos: [] }),
       });
       if (!res.ok) throw new Error("bad_status");
       ymGoal(Goals.FORM_SUCCESS, { category: formData.category });
       setSubmitted(true);
+      // Потом тихо досылаем фото если есть (не блокируем UX)
+      const readyPhotos = photos.map(p => p.base64).filter(Boolean);
+      if (readyPhotos.length > 0) {
+        fetch(SEND_LEAD_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...formData, desc: `[фото к заявке] ${formData.desc}`, photos: readyPhotos }),
+        }).catch(() => {});
+      }
     } catch (err) {
       console.error("send-lead error:", err);
       setError("Не удалось отправить заявку. Позвоните нам по телефону.");
