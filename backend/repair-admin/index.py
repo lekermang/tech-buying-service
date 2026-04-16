@@ -104,7 +104,7 @@ def handler(event: dict, context) -> dict:
             # Динамика по дням
             cur.execute(f"""
                 SELECT
-                    DATE(created_at AT TIME ZONE 'Europe/Moscow') as day,
+                    DATE(created_at + INTERVAL '3 hours') as day,
                     COUNT(*) as total,
                     COUNT(*) FILTER (WHERE status = 'done') as done,
                     COALESCE(SUM(repair_amount) FILTER (WHERE status = 'done'), 0) as revenue,
@@ -144,7 +144,7 @@ def handler(event: dict, context) -> dict:
         if action == 'daily_stats':
             cur.execute(f"""
                 SELECT
-                    DATE(created_at AT TIME ZONE 'Europe/Moscow') as day,
+                    DATE(created_at + INTERVAL '3 hours') as day,
                     COUNT(*) as total,
                     COUNT(*) FILTER (WHERE status = 'done') as done,
                     COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled,
