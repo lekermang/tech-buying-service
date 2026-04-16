@@ -20,18 +20,31 @@ const SEND_LEAD_URL = "https://functions.poehali.dev/52666ff7-db52-4b6a-a90e-d60
 
 const compressImage = (file: File, maxW = 1200, quality = 0.75): Promise<string> =>
   new Promise(resolve => {
+    // Fallback: читаем через FileReader если canvas не сработал
+    const fallback = () => {
+      const reader = new FileReader();
+      reader.onload = ev => resolve((ev.target?.result as string).split(",")[1]);
+      reader.onerror = () => resolve("");
+      reader.readAsDataURL(file);
+    };
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = () => {
       URL.revokeObjectURL(url);
-      const scale = Math.min(1, maxW / Math.max(img.width, img.height));
-      const w = Math.round(img.width * scale);
-      const h = Math.round(img.height * scale);
-      const canvas = document.createElement("canvas");
-      canvas.width = w; canvas.height = h;
-      canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
-      resolve(canvas.toDataURL("image/jpeg", quality).split(",")[1]);
+      try {
+        const scale = Math.min(1, maxW / Math.max(img.width, img.height, 1));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
+        const b64 = canvas.toDataURL("image/jpeg", quality).split(",")[1];
+        resolve(b64 || "");
+      } catch {
+        fallback();
+      }
     };
+    img.onerror = () => { URL.revokeObjectURL(url); fallback(); };
     img.src = url;
   });
 
@@ -54,16 +67,17 @@ const EvaluateModal = ({ onClose }: { onClose: () => void }) => {
     return () => { document.body.style.overflow = ""; };
   }, []);
 
-  const handlePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
+    e.target.value = "";
     const remaining = 5 - photos.length;
     const toAdd = files.slice(0, remaining);
-    for (const file of toAdd) {
+    toAdd.forEach(file => {
       const preview = URL.createObjectURL(file);
-      const base64 = await compressImage(file);
-      setPhotos(prev => prev.length < 5 ? [...prev, { preview, base64 }] : prev);
-    }
-    e.target.value = "";
+      compressImage(file).then(base64 => {
+        setPhotos(prev => prev.length < 5 ? [...prev, { preview, base64 }] : prev);
+      });
+    });
   };
 
   const removePhoto = (idx: number) => {
@@ -72,6 +86,8 @@ const EvaluateModal = ({ onClose }: { onClose: () => void }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.name.trim()) { setError("Введите ваше имя"); return; }
+    if (!formData.phone.trim()) { setError("Введите телефон"); return; }
     ymGoal(Goals.FORM_SUBMIT, { category: formData.category });
     setLoading(true);
     setError(null);
@@ -79,13 +95,13 @@ const EvaluateModal = ({ onClose }: { onClose: () => void }) => {
       const res = await fetch(SEND_LEAD_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...formData, photos: photos.map(p => p.base64) }),
-        signal: AbortSignal.timeout(60000),
+        body: JSON.stringify({ ...formData, photos: photos.map(p => p.base64).filter(Boolean) }),
       });
       if (!res.ok) throw new Error("bad_status");
       ymGoal(Goals.FORM_SUCCESS, { category: formData.category });
       setSubmitted(true);
-    } catch {
+    } catch (err) {
+      console.error("send-lead error:", err);
       setError("Не удалось отправить заявку. Позвоните нам по телефону.");
     } finally {
       setLoading(false);
@@ -123,7 +139,7 @@ const EvaluateModal = ({ onClose }: { onClose: () => void }) => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="font-roboto text-white/50 text-xs uppercase tracking-wider block mb-1">Ваше имя</label>
-                  <input type="text" required
+                  <input type="text"
                     value={formData.name}
                     onChange={e => setFormData(p => ({ ...p, name: e.target.value }))}
                     placeholder="Иван"
@@ -131,7 +147,7 @@ const EvaluateModal = ({ onClose }: { onClose: () => void }) => {
                 </div>
                 <div>
                   <label className="font-roboto text-white/50 text-xs uppercase tracking-wider block mb-1">Телефон</label>
-                  <input type="tel" required
+                  <input type="tel"
                     value={formData.phone}
                     onChange={e => setFormData(p => ({ ...p, phone: e.target.value }))}
                     placeholder="+7 (___) ___-__-__"
