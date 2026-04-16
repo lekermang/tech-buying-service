@@ -78,14 +78,16 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
   };
 
   const completeRepair = async (id: number) => {
-    if (!completeForm.purchase_amount || !completeForm.repair_amount) return;
+    if (!completeForm.purchase_amount || !completeForm.repair_amount || !completeForm.parts_name) return;
     setCompleteSaving(true);
     await fetch(REPAIR_URL, {
       method: "POST", headers,
       body: JSON.stringify({
-        action: "complete", id,
+        id,
+        status: "ready",
         purchase_amount: parseInt(completeForm.purchase_amount),
         repair_amount: parseInt(completeForm.repair_amount),
+        parts_name: completeForm.parts_name,
       }),
     });
     setCompleteSaving(false);

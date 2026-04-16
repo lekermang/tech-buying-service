@@ -14,15 +14,16 @@ export type Order = {
   repair_type: string | null; price: number | null; status: string;
   admin_note: string | null; created_at: string; comment: string | null;
   purchase_amount: number | null; repair_amount: number | null; completed_at: string | null;
+  master_income: number | null; parts_name: string | null;
 };
 
 export type DayStat = {
   day: string; total: number; done: number; cancelled: number;
-  revenue: number; costs: number; profit: number;
+  revenue: number; costs: number; profit: number; master_income: number;
 };
 
 export const EMPTY_FORM = { name: "", phone: "", model: "", repair_type: "", price: "", comment: "" };
-export const EMPTY_COMPLETE = { purchase_amount: "", repair_amount: "" };
+export const EMPTY_COMPLETE = { purchase_amount: "", repair_amount: "", parts_name: "" };
 
 export const statusInfo = (key: string) => STATUSES.find(s => s.key === key) || STATUSES[0];
 

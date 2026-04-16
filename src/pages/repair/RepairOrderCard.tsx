@@ -2,7 +2,7 @@ import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import { Order, STATUSES, statusInfo, fmt, printReceipt, INP, LBL } from "./types";
 
-type CompleteForm = { purchase_amount: string; repair_amount: string };
+type CompleteForm = { purchase_amount: string; repair_amount: string; parts_name: string };
 
 type EditForm = {
   name: string; phone: string; model: string;
@@ -105,28 +105,42 @@ export default function RepairOrderCard({
           </div>
 
           {/* Суммы (если заполнены) */}
-          {(o.purchase_amount || o.repair_amount) && (
-            <div className="flex gap-3 mb-1.5 bg-black/30 px-2 py-1.5 mt-1">
-              {o.purchase_amount && (
+          {(o.purchase_amount || o.repair_amount || o.parts_name) && (
+            <div className="mb-1.5 bg-black/30 px-2 py-2 mt-1 space-y-1">
+              {o.parts_name && (
                 <div className="flex items-center gap-1">
-                  <span className="font-roboto text-[10px] text-white/30">Закупка:</span>
-                  <span className="font-oswald font-bold text-orange-400 text-xs">{o.purchase_amount.toLocaleString("ru-RU")} ₽</span>
+                  <span className="font-roboto text-[10px] text-white/30">🛒 Запчасть:</span>
+                  <span className="font-roboto text-xs text-orange-300">{o.parts_name}</span>
                 </div>
               )}
-              {o.repair_amount && (
-                <div className="flex items-center gap-1">
-                  <span className="font-roboto text-[10px] text-white/30">Выручка:</span>
-                  <span className="font-oswald font-bold text-green-400 text-xs">{o.repair_amount.toLocaleString("ru-RU")} ₽</span>
-                </div>
-              )}
-              {o.purchase_amount && o.repair_amount && (
-                <div className="flex items-center gap-1 ml-auto">
-                  <span className="font-roboto text-[10px] text-white/30">Прибыль:</span>
-                  <span className={`font-oswald font-bold text-xs ${o.repair_amount - o.purchase_amount >= 0 ? "text-[#FFD700]" : "text-red-400"}`}>
-                    {(o.repair_amount - o.purchase_amount).toLocaleString("ru-RU")} ₽
-                  </span>
-                </div>
-              )}
+              <div className="flex gap-3 flex-wrap">
+                {o.purchase_amount != null && (
+                  <div className="flex items-center gap-1">
+                    <span className="font-roboto text-[10px] text-white/30">Закупка:</span>
+                    <span className="font-oswald font-bold text-orange-400 text-xs">{o.purchase_amount.toLocaleString("ru-RU")} ₽</span>
+                  </div>
+                )}
+                {o.repair_amount != null && (
+                  <div className="flex items-center gap-1">
+                    <span className="font-roboto text-[10px] text-white/30">Выручка:</span>
+                    <span className="font-oswald font-bold text-green-400 text-xs">{o.repair_amount.toLocaleString("ru-RU")} ₽</span>
+                  </div>
+                )}
+                {o.purchase_amount != null && o.repair_amount != null && (
+                  <div className="flex items-center gap-1">
+                    <span className="font-roboto text-[10px] text-white/30">Прибыль:</span>
+                    <span className={`font-oswald font-bold text-xs ${o.repair_amount - o.purchase_amount >= 0 ? "text-[#FFD700]" : "text-red-400"}`}>
+                      {(o.repair_amount - o.purchase_amount).toLocaleString("ru-RU")} ₽
+                    </span>
+                  </div>
+                )}
+                {o.master_income != null && (
+                  <div className="flex items-center gap-1 ml-auto">
+                    <span className="font-roboto text-[10px] text-white/30">Мастеру:</span>
+                    <span className="font-oswald font-bold text-green-300 text-xs">{o.master_income.toLocaleString("ru-RU")} ₽</span>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -214,36 +228,45 @@ export default function RepairOrderCard({
       {/* Форма завершения ремонта (→ статус ready) */}
       {isCompleting && (
         <div className="border-t border-[#FFD700]/20 pt-3 mt-2">
-          <div className="font-roboto text-[10px] text-[#FFD700]/70 mb-2 uppercase tracking-wide">Перевести в «Готово» — укажите суммы</div>
+          <div className="font-roboto text-[10px] text-[#FFD700]/70 mb-2 uppercase tracking-wide">Перевести в «Готово» — заполните все поля</div>
+          <div className="mb-2">
+            <label className={LBL + " text-orange-400/80"}>🛒 Купленная запчасть *</label>
+            <input value={completeForm.parts_name}
+              onChange={e => onCompleteFormChange({ ...completeForm, parts_name: e.target.value })}
+              placeholder="Дисплей iPhone 14, аккумулятор Samsung..." className={INP} />
+          </div>
           <div className="grid grid-cols-2 gap-2 mb-1">
             <div>
-              <label className={LBL}>Закупочная цена (₽) *</label>
+              <label className={LBL + " text-orange-400/80"}>💸 Сумма закупки (₽) *</label>
               <input type="number" value={completeForm.purchase_amount}
                 onChange={e => onCompleteFormChange({ ...completeForm, purchase_amount: e.target.value })}
                 placeholder="500" className={INP} />
             </div>
             <div>
-              <label className={LBL}>Итоговая цена (₽) *</label>
+              <label className={LBL + " text-green-400/80"}>💰 Выдано за ремонт (₽) *</label>
               <input type="number" value={completeForm.repair_amount}
                 onChange={e => onCompleteFormChange({ ...completeForm, repair_amount: e.target.value })}
                 placeholder="1500" className={INP} />
             </div>
           </div>
           {completeForm.purchase_amount && completeForm.repair_amount && (
-            <div className="text-[10px] font-roboto text-white/40 mb-2 px-1">
-              Прибыль: <span className={`font-bold ${parseInt(completeForm.repair_amount) - parseInt(completeForm.purchase_amount) >= 0 ? "text-[#FFD700]" : "text-red-400"}`}>
+            <div className="bg-green-500/10 border border-green-500/20 px-2 py-1.5 mb-2 flex gap-4 text-xs font-roboto">
+              <span className="text-white/40">Прибыль: <span className={`font-bold ${parseInt(completeForm.repair_amount) - parseInt(completeForm.purchase_amount) >= 0 ? "text-[#FFD700]" : "text-red-400"}`}>
                 {(parseInt(completeForm.repair_amount) - parseInt(completeForm.purchase_amount)).toLocaleString("ru-RU")} ₽
-              </span>
+              </span></span>
+              <span className="text-white/40">Доход мастера: <span className="text-green-400 font-bold">
+                {Math.max(0, Math.round((parseInt(completeForm.repair_amount) - parseInt(completeForm.purchase_amount)) * 0.5)).toLocaleString("ru-RU")} ₽
+              </span></span>
             </div>
           )}
-          {(!completeForm.purchase_amount || !completeForm.repair_amount) && (
+          {(!completeForm.purchase_amount || !completeForm.repair_amount || !completeForm.parts_name) && (
             <div className="text-[10px] font-roboto text-red-400/70 mb-2 px-1 flex items-center gap-1">
-              <Icon name="AlertCircle" size={11} /> Заполните обе суммы чтобы сохранить
+              <Icon name="AlertCircle" size={11} /> Заполните все три поля
             </div>
           )}
           <div className="flex gap-2">
             <button onClick={() => onCompleteRepair(o.id)}
-              disabled={completeSaving || !completeForm.purchase_amount || !completeForm.repair_amount}
+              disabled={completeSaving || !completeForm.purchase_amount || !completeForm.repair_amount || !completeForm.parts_name}
               className="bg-[#FFD700] text-black font-oswald font-bold px-4 py-2 uppercase text-xs hover:bg-yellow-400 transition-colors disabled:opacity-40 flex items-center gap-1.5">
               <Icon name="CheckCircle" size={13} />
               {completeSaving ? "Сохраняю..." : "Готово — сохранить"}
