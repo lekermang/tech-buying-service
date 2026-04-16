@@ -7,9 +7,21 @@ import psycopg2
 HEADERS = {'Access-Control-Allow-Origin': '*'}
 SCHEMA = 't_p31606708_tech_buying_service'
 
-def send_tg(token: str, chat_id: str, caption: str, photos_b64: list):
+
+def send_tg_text(token: str, chat_id: str, text: str):
+    try:
+        requests.post(
+            f'https://api.telegram.org/bot{token}/sendMessage',
+            json={'chat_id': chat_id, 'text': text, 'parse_mode': 'Markdown'},
+            timeout=10
+        )
+    except Exception:
+        pass
+
+
+def send_tg_photos(token: str, chat_id: str, caption: str, photos_b64: list):
     tg_url = f'https://api.telegram.org/bot{token}'
-    if photos_b64:
+    try:
         if len(photos_b64) == 1:
             photo_bytes = base64.b64decode(photos_b64[0])
             requests.post(
@@ -33,18 +45,36 @@ def send_tg(token: str, chat_id: str, caption: str, photos_b64: list):
                 f'{tg_url}/sendMediaGroup',
                 data={'chat_id': chat_id, 'media': json.dumps(media)},
                 files=files_dict,
-                timeout=60
+                timeout=45
             )
-    else:
-        requests.post(
-            f'{tg_url}/sendMessage',
-            json={'chat_id': chat_id, 'text': caption, 'parse_mode': 'Markdown'},
-            timeout=10
+    except Exception:
+        pass
+
+
+def get_all_recipients(main_chat_id: str) -> list:
+    recipients = [main_chat_id]
+    try:
+        conn = psycopg2.connect(os.environ['DATABASE_URL'])
+        cur = conn.cursor()
+        cur.execute(
+            f"SELECT telegram_chat_id FROM {SCHEMA}.notification_recipients WHERE is_active = true"
         )
+        rows = cur.fetchall()
+        cur.close(); conn.close()
+        for row in rows:
+            cid = row[0]
+            if cid and cid not in recipients:
+                recipients.append(cid)
+    except Exception:
+        pass
+    pluxan = os.environ.get('PLUXAN4IK_CHAT_ID', '')
+    if pluxan and pluxan not in recipients:
+        recipients.append(pluxan)
+    return recipients
 
 
 def handler(event: dict, context) -> dict:
-    """Отправка заявки (быстрой оценки) с сайта Скупки24 в Telegram — всем получателям"""
+    """Отправка быстрой оценки с сайта Скупки24 в Telegram — всем получателям"""
 
     if event.get('httpMethod') == 'OPTIONS':
         return {
@@ -66,7 +96,6 @@ def handler(event: dict, context) -> dict:
 
     token = os.environ['TELEGRAM_BOT_TOKEN']
     main_chat_id = os.environ['TELEGRAM_CHAT_ID']
-
     client_type = body.get('client_type', '').strip()
     gold_price = body.get('gold_price', '')
 
@@ -81,32 +110,17 @@ def handler(event: dict, context) -> dict:
     )
 
     photos_b64 = body.get('photos') or ([photo_b64] if photo_b64 else [])
+    recipients = get_all_recipients(main_chat_id)
 
-    # Отправляем в основной чат
-    send_tg(token, main_chat_id, caption, photos_b64)
-
-    # Получаем всех активных получателей из БД и шлём им
-    try:
-        conn = psycopg2.connect(os.environ['DATABASE_URL'])
-        cur = conn.cursor()
-        cur.execute(
-            f"SELECT telegram_chat_id FROM {SCHEMA}.notification_recipients WHERE is_active = true"
-        )
-        rows = cur.fetchall()
-        cur.close(); conn.close()
-        for row in rows:
-            recipient_chat_id = row[0]
-            if recipient_chat_id and recipient_chat_id != main_chat_id:
-                send_tg(token, recipient_chat_id, caption, photos_b64)
-    except Exception:
-        pass
-
-    # Дополнительно шлём @PluXan4ik если задан chat_id
-    pluxan_chat_id = os.environ.get('PLUXAN4IK_CHAT_ID', '')
-    if pluxan_chat_id and pluxan_chat_id != main_chat_id:
-        try:
-            send_tg(token, pluxan_chat_id, caption, photos_b64)
-        except Exception:
-            pass
+    if photos_b64:
+        # Фото отправляем только в основной чат (чтобы не таймаутить)
+        send_tg_photos(token, main_chat_id, caption, photos_b64)
+        # Остальным — текстовое уведомление
+        for cid in recipients[1:]:
+            send_tg_text(token, cid, caption)
+    else:
+        # Без фото — текст всем
+        for cid in recipients:
+            send_tg_text(token, cid, caption)
 
     return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True})}

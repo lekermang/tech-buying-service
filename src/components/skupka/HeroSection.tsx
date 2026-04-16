@@ -18,6 +18,23 @@ const CATEGORIES = [
 
 const SEND_LEAD_URL = "https://functions.poehali.dev/52666ff7-db52-4b6a-a90e-d60aeed699de";
 
+const compressImage = (file: File, maxW = 1200, quality = 0.75): Promise<string> =>
+  new Promise(resolve => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, maxW / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/jpeg", quality).split(",")[1]);
+    };
+    img.src = url;
+  });
+
 interface HeroSectionProps {
   scrollTo: (href: string) => void;
   externalModalOpen?: boolean;
@@ -37,18 +54,15 @@ const EvaluateModal = ({ onClose }: { onClose: () => void }) => {
     return () => { document.body.style.overflow = ""; };
   }, []);
 
-  const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     const remaining = 5 - photos.length;
     const toAdd = files.slice(0, remaining);
-    toAdd.forEach(file => {
-      const reader = new FileReader();
-      reader.onload = ev => {
-        const result = ev.target?.result as string;
-        setPhotos(prev => prev.length < 5 ? [...prev, { preview: result, base64: result.split(',')[1] }] : prev);
-      };
-      reader.readAsDataURL(file);
-    });
+    for (const file of toAdd) {
+      const preview = URL.createObjectURL(file);
+      const base64 = await compressImage(file);
+      setPhotos(prev => prev.length < 5 ? [...prev, { preview, base64 }] : prev);
+    }
     e.target.value = "";
   };
 
@@ -66,8 +80,9 @@ const EvaluateModal = ({ onClose }: { onClose: () => void }) => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...formData, photos: photos.map(p => p.base64) }),
+        signal: AbortSignal.timeout(60000),
       });
-      if (!res.ok) throw new Error("Ошибка отправки");
+      if (!res.ok) throw new Error("bad_status");
       ymGoal(Goals.FORM_SUCCESS, { category: formData.category });
       setSubmitted(true);
     } catch {
@@ -78,10 +93,10 @@ const EvaluateModal = ({ onClose }: { onClose: () => void }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-[fadeIn_0.2s_ease]">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 animate-[fadeIn_0.2s_ease]">
       <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-[#141414] border border-[#FFD700]/30 shadow-2xl max-h-[90vh] overflow-y-auto animate-[slideDown_0.25s_ease]">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+      <div className="relative w-full sm:max-w-lg bg-[#141414] border-t sm:border border-[#FFD700]/30 shadow-2xl max-h-[95dvh] sm:max-h-[90vh] overflow-y-auto animate-[slideDown_0.25s_ease] rounded-t-2xl sm:rounded-none">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 sticky top-0 bg-[#141414] z-10">
           <div className="flex items-center gap-3">
             <div className="w-1 h-7 bg-[#FFD700]" />
             <h2 className="font-oswald text-xl font-bold uppercase">Быстрая оценка</h2>
@@ -105,14 +120,14 @@ const EvaluateModal = ({ onClose }: { onClose: () => void }) => {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="font-roboto text-white/50 text-xs uppercase tracking-wider block mb-1">Ваше имя</label>
                   <input type="text" required
                     value={formData.name}
                     onChange={e => setFormData(p => ({ ...p, name: e.target.value }))}
                     placeholder="Иван"
-                    className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-2.5 font-roboto text-sm focus:outline-none focus:border-[#FFD700] transition-colors" />
+                    className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-3 font-roboto text-base focus:outline-none focus:border-[#FFD700] transition-colors" />
                 </div>
                 <div>
                   <label className="font-roboto text-white/50 text-xs uppercase tracking-wider block mb-1">Телефон</label>
@@ -120,7 +135,7 @@ const EvaluateModal = ({ onClose }: { onClose: () => void }) => {
                     value={formData.phone}
                     onChange={e => setFormData(p => ({ ...p, phone: e.target.value }))}
                     placeholder="+7 (___) ___-__-__"
-                    className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-2.5 font-roboto text-sm focus:outline-none focus:border-[#FFD700] transition-colors" />
+                    className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-3 font-roboto text-base focus:outline-none focus:border-[#FFD700] transition-colors" />
                 </div>
               </div>
 
@@ -128,7 +143,7 @@ const EvaluateModal = ({ onClose }: { onClose: () => void }) => {
                 <label className="font-roboto text-white/50 text-xs uppercase tracking-wider block mb-1">Категория</label>
                 <select value={formData.category}
                   onChange={e => setFormData(p => ({ ...p, category: e.target.value }))}
-                  className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-2.5 font-roboto text-sm focus:outline-none focus:border-[#FFD700] transition-colors appearance-none cursor-pointer">
+                  className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-3 font-roboto text-base focus:outline-none focus:border-[#FFD700] transition-colors appearance-none cursor-pointer">
                   <option value="">Выберите категорию</option>
                   {CATEGORIES.map(c => <option key={c.title} value={c.title}>{c.title}</option>)}
                 </select>
@@ -140,27 +155,27 @@ const EvaluateModal = ({ onClose }: { onClose: () => void }) => {
                   onChange={e => setFormData(p => ({ ...p, desc: e.target.value }))}
                   placeholder="Модель, состояние, комплектация..."
                   rows={3}
-                  className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-2.5 font-roboto text-sm focus:outline-none focus:border-[#FFD700] transition-colors resize-none" />
+                  className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-3 font-roboto text-base focus:outline-none focus:border-[#FFD700] transition-colors resize-none" />
               </div>
 
               <div>
-                <label className="font-roboto text-white/50 text-xs uppercase tracking-wider block mb-1">
+                <label className="font-roboto text-white/50 text-xs uppercase tracking-wider block mb-2">
                   Фото товара <span className="text-[#FFD700]">{photos.length}/5</span>
                 </label>
-                <div className="grid grid-cols-4 sm:grid-cols-5 gap-2 mb-1">
+                <div className="grid grid-cols-5 gap-2 mb-1">
                   {photos.map((p, idx) => (
-                    <div key={idx} className="relative group aspect-square">
+                    <div key={idx} className="relative aspect-square">
                       <img src={p.preview} alt={`фото ${idx + 1}`} className="w-full h-full object-cover border border-[#333]" />
                       <button type="button" onClick={() => removePhoto(idx)}
-                        className="absolute top-0.5 right-0.5 w-5 h-5 bg-black/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Icon name="X" size={10} />
+                        className="absolute top-0.5 right-0.5 w-6 h-6 bg-black/80 text-white flex items-center justify-center rounded-full border border-white/20">
+                        <Icon name="X" size={11} />
                       </button>
                     </div>
                   ))}
                   {photos.length < 5 && (
                     <div onClick={() => fileRef.current?.click()}
-                      className="aspect-square border-2 border-dashed border-[#333] hover:border-[#FFD700] transition-colors cursor-pointer flex flex-col items-center justify-center gap-1">
-                      <Icon name="Plus" size={16} className="text-[#FFD700]" />
+                      className="aspect-square border-2 border-dashed border-[#444] hover:border-[#FFD700] active:border-[#FFD700] transition-colors cursor-pointer flex flex-col items-center justify-center gap-1 touch-manipulation">
+                      <Icon name="Plus" size={18} className="text-[#FFD700]" />
                       <span className="font-roboto text-white/40 text-[9px]">фото</span>
                     </div>
                   )}
