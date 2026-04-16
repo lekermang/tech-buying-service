@@ -1,8 +1,66 @@
 import json
 import os
 import psycopg2
+import requests
 
 HEADERS = {'Access-Control-Allow-Origin': '*'}
+
+
+STATUS_LABELS = {
+    'new': '🆕 Новая',
+    'in_progress': '🔧 В работе',
+    'waiting_parts': '⏳ Ожидание запчастей',
+    'ready': '✅ Готово к выдаче',
+    'done': '✔️ Выдано',
+    'cancelled': '❌ Отменено',
+}
+
+
+def send_tg_all(token: str, main_chat_id: str, conn, message: str):
+    """Отправить уведомление в основной чат и всем активным получателям из БД"""
+    tg_url = f'https://api.telegram.org/bot{token}'
+    recipients = [main_chat_id]
+    try:
+        cur2 = conn.cursor()
+        cur2.execute(
+            f"SELECT telegram_chat_id FROM {SCHEMA}.notification_recipients WHERE is_active = true AND notify_repair = true"
+        )
+        rows = cur2.fetchall()
+        cur2.close()
+        for row in rows:
+            cid = row[0]
+            if cid and cid not in recipients:
+                recipients.append(cid)
+    except Exception:
+        pass
+    pluxan = os.environ.get('PLUXAN4IK_CHAT_ID', '')
+    if pluxan and pluxan not in recipients:
+        recipients.append(pluxan)
+    for cid in recipients:
+        try:
+            requests.post(
+                f'{tg_url}/sendMessage',
+                json={'chat_id': cid, 'text': message, 'parse_mode': 'Markdown'},
+                timeout=10
+            )
+        except Exception:
+            pass
+
+
+def send_sms(phone: str, message: str):
+    """Отправить SMS через sms.ru"""
+    api_id = os.environ.get('SMSRU_API_ID', '')
+    if not api_id:
+        return
+    clean_phone = ''.join(c for c in phone if c.isdigit() or c == '+')
+    try:
+        requests.get(
+            'https://sms.ru/sms/send',
+            params={'api_id': api_id, 'to': clean_phone, 'msg': message, 'json': 1, 'from': 'Skypka24'},
+            timeout=10
+        )
+    except Exception:
+        pass
 SCHEMA = 't_p31606708_tech_buying_service'
 ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN', 'Mark2015N')
 ADMIN_TOKEN_ALT = 'Mark2015N'
@@ -404,13 +462,44 @@ def handler(event: dict, context) -> dict:
             return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'Нет данных для обновления'}, ensure_ascii=False)}
 
         set_clause = ', '.join(sets)
-        cur.execute(f"UPDATE {SCHEMA}.repair_orders SET {set_clause} WHERE id = {order_id} RETURNING id")
+        cur.execute(f"UPDATE {SCHEMA}.repair_orders SET {set_clause} WHERE id = {order_id} RETURNING id, name, phone, model, repair_type, repair_amount")
         row = cur.fetchone()
-        conn.commit(); cur.close(); conn.close()
+        conn.commit()
 
         if not row:
+            cur.close(); conn.close()
             return {'statusCode': 404, 'headers': HEADERS, 'body': json.dumps({'error': 'Заявка не найдена'}, ensure_ascii=False)}
 
+        # Отправляем Telegram уведомление при смене статуса
+        if new_status:
+            client_name = row[1] or ''
+            client_phone = row[2] or ''
+            device_model = row[3] or ''
+            repair_t = row[4] or ''
+            r_amount = row[5]
+            status_label = STATUS_LABELS.get(new_status, new_status)
+            tg_msg = (
+                f"🔔 *Ремонт #{order_id} — Статус изменён*\n\n"
+                f"📱 *Устройство:* {device_model or '—'}\n"
+                f"🔧 *Тип ремонта:* {repair_t or '—'}\n"
+                f"👤 *Клиент:* {client_name}\n"
+                f"📞 *Телефон:* {client_phone}\n"
+                f"📌 *Статус:* {status_label}"
+                + (f"\n💰 *Стоимость ремонта:* {r_amount} ₽" if r_amount else "")
+            )
+            token = os.environ['TELEGRAM_BOT_TOKEN']
+            main_chat_id = os.environ['TELEGRAM_CHAT_ID']
+            send_tg_all(token, main_chat_id, conn, tg_msg)
+
+            # SMS клиенту когда телефон готов
+            if new_status == 'ready' and client_phone:
+                sms_text = (
+                    f"Скупка24: Ваш телефон {device_model or ''} готов к выдаче! "
+                    f"Стоимость ремонта: {r_amount} руб. Ждём вас!"
+                ).strip()
+                send_sms(client_phone, sms_text)
+
+        cur.close(); conn.close()
         return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'master_income': int(master_income_val) if master_income_val != 'NULL' else None}, ensure_ascii=False)}
 
     cur.close(); conn.close()
