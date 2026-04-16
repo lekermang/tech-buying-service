@@ -288,6 +288,25 @@ def handler(event: dict, context) -> dict:
         body = json.loads(raw_body) if isinstance(raw_body, str) else (raw_body or {})
         action = body.get('action', 'update_status')
 
+        # Тест SMS
+        if action == 'sms_test':
+            phone = (body.get('phone') or '').strip()
+            message = (body.get('message') or 'Тестовое SMS от Скупка24 — всё работает!').strip()
+            if not phone:
+                cur.close(); conn.close()
+                return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'Укажите phone'}, ensure_ascii=False)}
+            api_id = os.environ.get('SMSRU_API_ID', '')
+            if not api_id:
+                cur.close(); conn.close()
+                return {'statusCode': 500, 'headers': HEADERS, 'body': json.dumps({'error': 'SMSRU_API_ID не задан'}, ensure_ascii=False)}
+            resp = requests.get(
+                'https://sms.ru/sms/send',
+                params={'api_id': api_id, 'to': phone, 'msg': message, 'json': 1},
+                timeout=15
+            )
+            cur.close(); conn.close()
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'smsru_response': resp.json()}, ensure_ascii=False)}
+
         # Сохранить настройку
         if action == 'settings_set':
             key = (body.get('key') or '').strip()
