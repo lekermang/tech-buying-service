@@ -98,6 +98,7 @@ def handler(event: dict, context) -> dict:
     main_chat_id = os.environ['TELEGRAM_CHAT_ID']
     client_type = body.get('client_type', '').strip()
     gold_price = body.get('gold_price', '')
+    client_price = str(body.get('client_price', '') or '').strip()
 
     caption = (
         f"📦 *Новая заявка — Скупка24*\n\n"
@@ -105,6 +106,7 @@ def handler(event: dict, context) -> dict:
         f"📞 *Телефон:* {phone}\n"
         f"🏷 *Категория:* {category or '—'}\n"
         f"📝 *Описание:* {desc or '—'}"
+        + (f"\n💵 *Цена клиента:* {client_price} ₽" if client_price and client_price != '0' else "")
         + (f"\n👥 *Тип клиента:* {client_type}" if client_type else "")
         + (f"\n🥇 *Курс золота:* {gold_price} ₽/г" if gold_price else "")
     )

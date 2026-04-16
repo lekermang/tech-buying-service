@@ -55,7 +55,7 @@ interface HeroSectionProps {
 }
 
 const EvaluateModal = ({ onClose }: { onClose: () => void }) => {
-  const [formData, setFormData] = useState({ name: "", phone: "", category: "", desc: "" });
+  const [formData, setFormData] = useState({ name: "", phone: "", category: "", desc: "", client_price: "" });
   const [photos, setPhotos] = useState<{ preview: string; base64: string }[]>([]);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -96,7 +96,7 @@ const EvaluateModal = ({ onClose }: { onClose: () => void }) => {
       const res = await fetch(SEND_LEAD_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...formData, photos: [] }),
+        body: JSON.stringify({ ...formData, photos: [], client_price: formData.client_price }),
       });
       if (!res.ok) throw new Error("bad_status");
       ymGoal(Goals.FORM_SUCCESS, { category: formData.category });
@@ -183,6 +183,18 @@ const EvaluateModal = ({ onClose }: { onClose: () => void }) => {
                   placeholder="Модель, состояние, комплектация..."
                   rows={3}
                   className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-3 font-roboto text-base focus:outline-none focus:border-[#FFD700] transition-colors resize-none" />
+              </div>
+
+              <div>
+                <label className="font-roboto text-white/50 text-xs uppercase tracking-wider block mb-1">Ваша цена <span className="text-white/30 normal-case">(необязательно)</span></label>
+                <div className="relative">
+                  <input type="number" min="0"
+                    value={formData.client_price}
+                    onChange={e => setFormData(p => ({ ...p, client_price: e.target.value }))}
+                    placeholder="0"
+                    className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-3 pr-8 font-roboto text-base focus:outline-none focus:border-[#FFD700] transition-colors" />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 font-roboto text-sm">₽</span>
+                </div>
               </div>
 
               <div>
