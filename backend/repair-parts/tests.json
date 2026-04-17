@@ -1,10 +1,11 @@
 {
   "tests": [
     {
-      "name": "Get parts catalog returns 200 with repair_cost",
+      "name": "Поиск запчастей по модели",
       "method": "GET",
-      "path": "/?type=battery",
+      "path": "/?model=iphone+13",
       "expectedStatus": 200,
+      "expectedBody": {"parts": []},
       "bodyMatcher": "partial"
     }
   ]
