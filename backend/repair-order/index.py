@@ -1,14 +1,47 @@
 import json
 import os
+import smtplib
 import requests
 import psycopg2
+from email.mime.text import MIMEText
 
 HEADERS = {'Access-Control-Allow-Origin': '*'}
 SCHEMA = 't_p31606708_tech_buying_service'
 
 
+def send_sms(phone: str, text: str):
+    api_id = os.environ.get('SMSRU_API_ID', '')
+    if not api_id:
+        return
+    try:
+        requests.get(
+            'https://sms.ru/sms/send',
+            params={'api_id': api_id, 'to': phone, 'msg': text, 'json': 1},
+            timeout=10,
+        )
+    except Exception:
+        pass
+
+
+def send_email(to: str, subject: str, body: str):
+    login = os.environ.get('YANDEX_SMTP_LOGIN', '')
+    password = os.environ.get('YANDEX_SMTP_PASSWORD', '')
+    if not login or not password:
+        return
+    try:
+        msg = MIMEText(body, 'plain', 'utf-8')
+        msg['Subject'] = subject
+        msg['From'] = login
+        msg['To'] = to
+        with smtplib.SMTP_SSL('smtp.yandex.ru', 465) as server:
+            server.login(login, password)
+            server.sendmail(login, [to], msg.as_string())
+    except Exception:
+        pass
+
+
 def handler(event: dict, context) -> dict:
-    """Создание заявки на ремонт: сохраняет в БД, отправляет в Telegram, возвращает ID заявки"""
+    """Создание заявки на ремонт: сохраняет в БД, отправляет в Telegram, SMS и email, возвращает ID заявки"""
 
     if event.get('httpMethod') == 'OPTIONS':
         return {
@@ -45,7 +78,7 @@ def handler(event: dict, context) -> dict:
     token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
     price_str = f'{int(price):,} ₽'.replace(',', ' ') if price else 'не определена'
 
-    text = (
+    tg_text = (
         f"🔧 *Заявка #{order_id} на ремонт — Скупка24*\n\n"
         f"👤 *Имя:* {name}\n"
         f"📞 *Телефон:* {phone}\n"
@@ -54,6 +87,16 @@ def handler(event: dict, context) -> dict:
         f"💰 *Стоимость:* {price_str}"
         + (f"\n📝 *Комментарий:* {comment}" if comment else "")
         + f"\n\n🔑 ID заявки: `{order_id}`"
+    )
+
+    plain_text = (
+        f"Заявка #{order_id} на ремонт — Скупка24\n\n"
+        f"Имя: {name}\n"
+        f"Телефон: {phone}\n"
+        f"Модель: {model or '—'}\n"
+        f"Тип ремонта: {repair_type or '—'}\n"
+        f"Стоимость: {price_str}"
+        + (f"\nКомментарий: {comment}" if comment else "")
     )
 
     if token:
@@ -72,10 +115,13 @@ def handler(event: dict, context) -> dict:
             try:
                 requests.post(
                     f'https://api.telegram.org/bot{token}/sendMessage',
-                    json={'chat_id': cid, 'text': text, 'parse_mode': 'Markdown'},
+                    json={'chat_id': cid, 'text': tg_text, 'parse_mode': 'Markdown'},
                     timeout=10,
                 )
             except Exception:
                 pass
+
+    send_sms('+79929990333', f'Заявка #{order_id} на ремонт. {name}, {phone}. {repair_type or model or ""}. Скупка24')
+    send_email('lekermanya@yandex.ru', f'Заявка #{order_id} на ремонт — Скупка24', plain_text)
 
     return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'order_id': order_id})}
