@@ -278,12 +278,12 @@ export default function RepairWidget() {
                     {/* Результаты поиска по типам */}
                     {!partsLoading && parts.length > 0 && (
                       <div className="mt-2 border border-white/10 bg-black/40">
-                        <div className="px-2 py-1.5 border-b border-white/5 font-roboto text-[9px] text-white/30 uppercase tracking-wide flex items-center gap-1">
-                          <Icon name="Wrench" size={9} /> Выберите тип ремонта — цена рассчитается автоматически
+                        <div className="px-3 py-2 border-b border-white/5 font-roboto text-[9px] text-white/30 uppercase tracking-wide flex items-center gap-1">
+                          <Icon name="Wrench" size={9} /> Выберите тип ремонта
                         </div>
                         {Object.entries(groupedParts).map(([ptype, items]) => (
                           <div key={ptype} className="border-b border-white/5 last:border-0">
-                            <div className="px-2 py-1 font-roboto text-[9px] text-white/40 uppercase tracking-wide bg-white/5">
+                            <div className="px-3 py-1.5 font-roboto text-[9px] text-white/40 uppercase tracking-wide bg-white/5">
                               {PART_TYPE_LABEL[ptype] || ptype}
                             </div>
                             {items.map((part) => {
@@ -291,28 +291,40 @@ export default function RepairWidget() {
                               return (
                                 <button
                                   key={part.id}
+                                  type="button"
                                   onClick={() => setSelectedPart(isSelected ? null : part)}
-                                  className={`w-full text-left px-2 py-1.5 flex items-center justify-between transition-colors ${
-                                    isSelected ? "bg-[#FFD700]/10 border-l-2 border-[#FFD700]" : "hover:bg-white/5 border-l-2 border-transparent"
+                                  className={`w-full text-left px-3 py-2.5 block transition-colors border-l-2 active:bg-[#FFD700]/20 ${
+                                    isSelected
+                                      ? "bg-[#FFD700]/10 border-[#FFD700]"
+                                      : "border-transparent hover:bg-white/5"
                                   }`}
                                 >
-                                  <div className="flex-1 min-w-0">
-                                    <span className={`font-oswald font-bold text-[10px] mr-1.5 ${QUALITY_COLOR[part.quality] || "text-white/50"}`}>
-                                      {part.quality}
-                                    </span>
-                                    <span className="font-roboto text-[10px] text-white/70 truncate">{part.name}</span>
-                                    {part.stock <= 3 && part.stock > 0 && (
-                                      <span className="ml-1 text-orange-400 font-roboto text-[9px]">мало</span>
-                                    )}
-                                  </div>
-                                  <div className="shrink-0 ml-2 text-right">
-                                    <div className="font-oswald font-bold text-xs text-[#FFD700]">
-                                      {part.total.toLocaleString("ru-RU")} ₽
+                                  <div className="flex items-start justify-between gap-2 w-full">
+                                    <div className="flex-1">
+                                      <span className={`font-oswald font-bold text-[11px] mr-1.5 ${QUALITY_COLOR[part.quality] || "text-white/50"}`}>
+                                        {part.quality}
+                                      </span>
+                                      <span className="font-roboto text-[11px] text-white/80 leading-snug break-words">
+                                        {part.name}
+                                      </span>
+                                      {part.stock <= 3 && part.stock > 0 && (
+                                        <span className="ml-1 text-orange-400 font-roboto text-[9px]">мало</span>
+                                      )}
                                     </div>
-                                    <div className="font-roboto text-[9px] text-white/30">
-                                      зап. {part.price.toLocaleString("ru-RU")} + работа {part.labor_cost.toLocaleString("ru-RU")}
+                                    <div className="shrink-0 text-right ml-3">
+                                      <div className="font-oswald font-bold text-sm text-[#FFD700] whitespace-nowrap">
+                                        {part.total.toLocaleString("ru-RU")} ₽
+                                      </div>
+                                      <div className="font-roboto text-[9px] text-white/30 whitespace-nowrap">
+                                        зап. {part.price.toLocaleString("ru-RU")} + раб. {part.labor_cost.toLocaleString("ru-RU")}
+                                      </div>
                                     </div>
                                   </div>
+                                  {isSelected && (
+                                    <div className="mt-1 text-[#FFD700] font-roboto text-[9px] flex items-center gap-1">
+                                      <Icon name="Check" size={9} /> Выбрано
+                                    </div>
+                                  )}
                                 </button>
                               );
                             })}
