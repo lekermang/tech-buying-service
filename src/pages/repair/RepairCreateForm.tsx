@@ -1,5 +1,6 @@
 import Icon from "@/components/ui/icon";
 import { EMPTY_FORM, INP, LBL } from "./types";
+import { formatPhone } from "@/lib/phoneFormat";
 
 type Form = typeof EMPTY_FORM;
 
@@ -23,8 +24,8 @@ export default function RepairCreateForm({ form, creating, onChange, onCreate, o
         </div>
         <div>
           <label className={LBL}>Телефон *</label>
-          <input value={form.phone} onChange={e => onChange({ ...form, phone: e.target.value })}
-            placeholder="+7 999 123-45-67" className={INP} />
+          <input value={form.phone} onChange={e => onChange({ ...form, phone: formatPhone(e.target.value) })}
+            placeholder="+7 (___) ___-__-__" className={INP} />
         </div>
       </div>
       <div className="grid grid-cols-2 gap-2 mb-2">

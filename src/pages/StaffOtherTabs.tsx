@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 import { SALES_URL, AUTH_CLIENT_URL, EMPLOYEE_AUTH_URL, type Sale, type Analytics } from "./staff.types";
 import { REPAIR_URL } from "./repair/types";
+import { formatPhone } from "@/lib/phoneFormat";
 
 // ─── Таб Продажи ─────────────────────────────────────────────────────────────
 export function SalesTab({ token }: { token: string }) {
@@ -71,7 +72,7 @@ export function ClientsTab({ token: _token }: { token: string }) {
     <div className="p-4">
       <div className="font-oswald font-bold uppercase text-sm text-white mb-3">Поиск клиента</div>
       <div className="flex gap-2 mb-3">
-        <input value={phone} onChange={e => setPhone(e.target.value)} onKeyDown={e => e.key === "Enter" && search()}
+        <input value={phone} onChange={e => setPhone(formatPhone(e.target.value))} onKeyDown={e => e.key === "Enter" && search()}
           placeholder="+7 (___) ___-__-__"
           className="flex-1 bg-[#0D0D0D] border border-[#333] text-white px-3 py-2 font-roboto text-sm focus:outline-none focus:border-[#FFD700]" />
         <button onClick={search} className="bg-[#FFD700] text-black font-oswald font-bold px-4 py-2 uppercase text-xs hover:bg-yellow-400">Найти</button>
@@ -91,10 +92,10 @@ export function ClientsTab({ token: _token }: { token: string }) {
           <div className="text-[#FFD700] font-roboto text-sm flex items-center gap-2"><Icon name="CheckCircle" size={14} /> Клиент добавлен!</div>
         ) : (
           <div className="space-y-2">
-            {[{ key: "full_name", label: "ФИО", placeholder: "Иванов Иван Иванович" }, { key: "phone", label: "Телефон *", placeholder: "+7..." }, { key: "email", label: "Email", placeholder: "mail@example.com" }].map(f => (
+            {[{ key: "full_name", label: "ФИО", placeholder: "Иванов Иван Иванович" }, { key: "phone", label: "Телефон *", placeholder: "+7 (___) ___-__-__" }, { key: "email", label: "Email", placeholder: "mail@example.com" }].map(f => (
               <div key={f.key}>
                 <label className="font-roboto text-white/30 text-[10px] block mb-1">{f.label}</label>
-                <input value={(addForm as Record<string,string>)[f.key]} onChange={e => setAddForm(p => ({ ...p, [f.key]: e.target.value }))} placeholder={f.placeholder}
+                <input value={(addForm as Record<string,string>)[f.key]} onChange={e => setAddForm(p => ({ ...p, [f.key]: f.key === "phone" ? formatPhone(e.target.value) : e.target.value }))} placeholder={f.placeholder}
                   className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-2 font-roboto text-sm focus:outline-none focus:border-[#FFD700]" />
               </div>
             ))}

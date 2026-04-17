@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import { ymGoal, Goals } from "@/lib/ym";
+import { formatPhone } from "@/lib/phoneFormat";
 
 const AVITO_PRICE_URL = "https://functions.poehali.dev/5c99f770-dbe8-42ad-b8df-adea87477627";
 const SEND_LEAD_URL = "https://functions.poehali.dev/52666ff7-db52-4b6a-a90e-d60aeed699de";
@@ -135,7 +136,7 @@ const AppleWidget = ({ compact }: AppleWidgetProps) => {
               </div>
             )}
             <div className="flex gap-1.5">
-              <input type="tel" value={w.phone} onChange={e => w.setPhone(e.target.value)}
+              <input type="tel" value={w.phone} onChange={e => w.setPhone(formatPhone(e.target.value))}
                 placeholder="+7 (___) ___-__-__"
                 className="flex-1 bg-[#0D0D0D] border border-[#333] text-white px-3 py-2 font-roboto text-xs focus:outline-none focus:border-[#FFD700] transition-colors" />
               <button onClick={w.handleSell} disabled={w.sending || !w.phone}
@@ -204,7 +205,7 @@ const AppleWidget = ({ compact }: AppleWidgetProps) => {
               </div>
             )}
             <div className="flex gap-2 flex-wrap">
-              <input type="tel" value={w.phone} onChange={e => w.setPhone(e.target.value)} placeholder="+7 (___) ___-__-__"
+              <input type="tel" value={w.phone} onChange={e => w.setPhone(formatPhone(e.target.value))} placeholder="+7 (___) ___-__-__"
                 className="flex-1 min-w-[160px] bg-[#1A1A1A] border border-[#444] text-white px-4 py-3 font-roboto text-sm focus:outline-none focus:border-[#FFD700] transition-colors" />
               <button onClick={w.handleSell} disabled={w.sending || !w.phone}
                 className="bg-[#FFD700] text-black font-oswald font-bold px-6 py-3 uppercase text-sm hover:bg-yellow-400 transition-colors disabled:opacity-50 flex items-center gap-2 shrink-0">

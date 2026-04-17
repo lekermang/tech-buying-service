@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import { Order, STATUSES, statusInfo, fmt, printReceipt, INP, LBL } from "./types";
+import { formatPhone } from "@/lib/phoneFormat";
 
 type CompleteForm = { purchase_amount: string; repair_amount: string; parts_name: string };
 
@@ -165,8 +166,8 @@ export default function RepairOrderCard({
             </div>
             <div>
               <label className={LBL}>Телефон</label>
-              <input value={editFields.phone} onChange={e => setEditFields(p => ({ ...p, phone: e.target.value }))}
-                className={INP} placeholder="+7 999 000-00-00" />
+              <input value={editFields.phone} onChange={e => setEditFields(p => ({ ...p, phone: formatPhone(e.target.value) }))}
+                className={INP} placeholder="+7 (___) ___-__-__" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2 mb-2">

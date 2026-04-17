@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import Icon from "@/components/ui/icon";
 import { ymGoal, Goals } from "@/lib/ym";
+import { formatPhone } from "@/lib/phoneFormat";
 
 const REPAIR_ORDER_URL = "https://functions.poehali.dev/8d0ee3bd-41eb-44fe-9d30-aab6ddc2042d";
 const REPAIR_STATUS_URL = "https://functions.poehali.dev/1fb5db63-4cb6-41be-af0f-80d6f9ce8fdf";
@@ -33,10 +34,9 @@ const QUALITY_COLOR: Record<string, string> = {
 
 // Дополнительные работы которые можно добавить к основному ремонту
 const EXTRA_WORKS = [
-  { id: "glass_replace", label: "Замена стекла", price: 500 },
-  { id: "diagnostics",   label: "Диагностика",   price: 300 },
-  { id: "cleaning",      label: "Чистка корпуса", price: 200 },
-  { id: "waterproof",    label: "Восстановление влагозащиты", price: 400 },
+  { id: "waterproof",  label: "Восстановление влагозащиты", price: 700 },
+  { id: "speaker",     label: "Чистка динамиков",           price: 200 },
+  { id: "oxidation",   label: "Убрать окисления",           price: 500 },
 ];
 
 type Part = {
@@ -268,8 +268,8 @@ export default function RepairWidget() {
                     onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
                     placeholder="Ваше имя *" className={INP} />
                   <input type="tel" value={form.phone}
-                    onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
-                    placeholder="Телефон *" className={INP} />
+                    onChange={e => setForm(p => ({ ...p, phone: formatPhone(e.target.value) }))}
+                    placeholder="+7 (___) ___-__-__" className={INP} />
 
                   {/* Модель + поиск */}
                   <div>

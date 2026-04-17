@@ -8,13 +8,9 @@ HEADERS = {'Access-Control-Allow-Origin': '*'}
 SCHEMA = 't_p31606708_tech_buying_service'
 API_URL = 'https://b2b.moysklad.ru/desktop-api/public/wIIpnHFmddpo/products.json'
 
-LABOR_COSTS = {
-    'display':      2000,
-    'battery':      1000,
-    'glass':         700,
-    'accessory':     500,
-    'camera_glass': 1000,
-    'flex_board':   1200,
+DEFAULT_LABOR = {
+    'display': 2000, 'battery': 1000, 'glass': 700,
+    'accessory': 500, 'camera_glass': 1000, 'flex_board': 1200,
 }
 
 PART_TYPE_RULES = [
@@ -62,6 +58,25 @@ def extract_model_keywords(name: str) -> str:
     return ' | '.join(dict.fromkeys(models))
 
 
+def get_labor_prices(cur) -> dict:
+    """Загружает актуальные цены работ из БД."""
+    try:
+        cur.execute(f"SELECT part_type, price FROM {SCHEMA}.repair_labor_prices")
+        return {r[0]: int(r[1]) for r in cur.fetchall()}
+    except Exception:
+        return DEFAULT_LABOR.copy()
+
+
+def get_parts_markup(cur) -> int:
+    """Загружает наценку на запчасти из settings."""
+    try:
+        cur.execute(f"SELECT value FROM {SCHEMA}.settings WHERE key = 'parts_markup'")
+        row = cur.fetchone()
+        return int(row[0]) if row else 0
+    except Exception:
+        return 0
+
+
 def sync_catalog(conn) -> int:
     all_products = []
     offset = 0
@@ -80,6 +95,7 @@ def sync_catalog(conn) -> int:
         offset += limit
 
     cur = conn.cursor()
+    labor = get_labor_prices(cur)
     for p in all_products:
         pid      = p.get('id', '')
         name     = p.get('name', '')
@@ -87,7 +103,7 @@ def sync_catalog(conn) -> int:
         part_type      = detect_part_type(category, name)
         quality        = detect_quality(name)
         model_keywords = extract_model_keywords(name)
-        labor_cost     = LABOR_COSTS.get(part_type, 500)
+        labor_cost     = labor.get(part_type, DEFAULT_LABOR.get(part_type, 500))
 
         cur.execute(f"""
             INSERT INTO {SCHEMA}.repair_parts
@@ -114,8 +130,13 @@ def search_parts(conn, model: str) -> list:
         return []
     conditions = ' AND '.join([f"LOWER(model_keywords) LIKE '%%{w}%%'" for w in words])
     cur = conn.cursor()
+
+    # Актуальные цены работ и наценка из БД
+    labor = get_labor_prices(cur)
+    markup = get_parts_markup(cur)
+
     cur.execute(f"""
-        SELECT id, name, category, price, stock, quality, part_type, labor_cost
+        SELECT id, name, category, price, stock, quality, part_type
         FROM {SCHEMA}.repair_parts
         WHERE available = true AND ({conditions})
         ORDER BY part_type, quality DESC, price ASC
@@ -125,25 +146,31 @@ def search_parts(conn, model: str) -> list:
     cur.close()
     parts = []
     for r in rows:
-        pid, name, category, price, stock, quality, part_type, labor_cost = r
+        pid, name, category, price, stock, quality, part_type = r
+        raw_price = float(price or 0)
+        marked_price = raw_price + markup          # цена запчасти с наценкой
+        labor_cost = labor.get(part_type, DEFAULT_LABOR.get(part_type, 500))
+        total = marked_price + labor_cost
         parts.append({
             'id': pid,
             'name': name,
             'category': category,
-            'price': float(price or 0),
+            'price': marked_price,          # с наценкой — клиент видит это
+            'raw_price': raw_price,         # закупочная
+            'markup': markup,
             'stock': float(stock or 0),
             'quality': quality,
             'part_type': part_type,
-            'labor_cost': labor_cost or 0,
-            'total': float(price or 0) + (labor_cost or 0),
+            'labor_cost': labor_cost,
+            'total': total,
         })
     return parts
 
 
 def handler(event: dict, context) -> dict:
     """
-    GET ?model=iphone+13  — поиск запчастей по модели с ценой работ.
-    POST (без тела)        — синхронизация каталога из МойСклад (запускать из админки).
+    GET ?model=iphone+13  — поиск запчастей (цены работ и наценка из БД).
+    POST                   — синхронизация каталога из МойСклад.
     """
 
     if event.get('httpMethod') == 'OPTIONS':

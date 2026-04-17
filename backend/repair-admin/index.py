@@ -235,13 +235,17 @@ def handler(event: dict, context) -> dict:
             settings = [{'key': r[0], 'value': r[1], 'description': r[2], 'updated_at': r[3].isoformat() if r[3] else None} for r in rows]
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'settings': settings}, ensure_ascii=False)}
 
-        # Цены работ по категориям
+        # Цены работ + наценка на детали
         if action == 'labor_prices_get':
             cur.execute(f"SELECT part_type, label, price FROM {SCHEMA}.repair_labor_prices ORDER BY part_type")
             rows = cur.fetchall()
+            cur.execute(f"SELECT value FROM {SCHEMA}.settings WHERE key='parts_markup'")
+            mrow = cur.fetchone()
+            markup = int(mrow[0]) if mrow else 0
             cur.close(); conn.close()
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps(
-                {'prices': [{'part_type': r[0], 'label': r[1], 'price': r[2]} for r in rows]},
+                {'prices': [{'part_type': r[0], 'label': r[1], 'price': r[2]} for r in rows],
+                 'parts_markup': markup},
                 ensure_ascii=False
             )}
 
@@ -298,7 +302,7 @@ def handler(event: dict, context) -> dict:
         body = json.loads(raw_body) if isinstance(raw_body, str) else (raw_body or {})
         action = body.get('action', 'update_status')
 
-        # Сохранение цен работ по категориям
+        # Сохранение цен работ + наценки на детали
         if action == 'labor_prices_set':
             prices = body.get('prices', [])
             for item in prices:
@@ -310,6 +314,14 @@ def handler(event: dict, context) -> dict:
                         SET price = {price_val}, updated_at = NOW()
                         WHERE part_type = '{pt}'
                     """)
+            # Наценка на детали
+            if 'parts_markup' in body:
+                markup_val = int(body.get('parts_markup', 0))
+                cur.execute(f"""
+                    INSERT INTO {SCHEMA}.settings (key, value, description)
+                    VALUES ('parts_markup', '{markup_val}', 'Наценка на запчасти для ремонта (руб)')
+                    ON CONFLICT (key) DO UPDATE SET value = '{markup_val}', updated_at = NOW()
+                """)
             conn.commit()
             cur.close(); conn.close()
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True}, ensure_ascii=False)}

@@ -23,6 +23,7 @@ export default function LaborPricesTab({
 }) {
   const [prices, setPrices] = useState<LaborPrice[]>([]);
   const [edited, setEdited] = useState<Record<string, string>>({});
+  const [markup, setMarkup] = useState("0");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -40,6 +41,7 @@ export default function LaborPricesTab({
       const init: Record<string, string> = {};
       list.forEach(p => { init[p.part_type] = String(p.price); });
       setEdited(init);
+      setMarkup(String(data.parts_markup ?? 0));
     } catch {
       setError("Не удалось загрузить цены");
     }
@@ -60,7 +62,11 @@ export default function LaborPricesTab({
       const res = await fetch(ADMIN_URL, {
         method: "POST",
         headers,
-        body: JSON.stringify({ action: "labor_prices_set", prices: payload }),
+        body: JSON.stringify({
+          action: "labor_prices_set",
+          prices: payload,
+          parts_markup: parseInt(markup) || 0,
+        }),
       });
       const data = await res.json();
       if (data.ok) { setSaved(true); setTimeout(() => setSaved(false), 3000); }
@@ -81,9 +87,28 @@ export default function LaborPricesTab({
 
   return (
     <div className="p-4 max-w-sm">
+      {/* Наценка на детали */}
+      <div className="font-oswald font-bold text-white text-base uppercase mb-1">Наценка на детали</div>
+      <div className="font-roboto text-white/30 text-[10px] mb-2">
+        Прибавляется к закупочной цене запчасти. Клиент видит: закупка + наценка + работа.
+      </div>
+      <div className="flex items-center gap-2 border border-[#333] px-3 py-2.5 bg-black/20 mb-5">
+        <div className="flex-1 font-roboto text-white/80 text-xs">Наценка на запчасть</div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <input
+            type="number" min={0} step={100}
+            value={markup}
+            onChange={e => setMarkup(e.target.value)}
+            className={`${inp} w-24`}
+          />
+          <span className="font-roboto text-white/40 text-xs">₽</span>
+        </div>
+      </div>
+
+      {/* Цены работ */}
       <div className="font-oswald font-bold text-white text-base uppercase mb-1">Цены работ</div>
-      <div className="font-roboto text-white/30 text-[10px] mb-4">
-        Стоимость работы по каждой категории запчастей. Цена в калькуляторе = цена запчасти + цена работы.
+      <div className="font-roboto text-white/30 text-[10px] mb-3">
+        Стоимость работы по каждой категории.
       </div>
 
       <div className="flex flex-col gap-2">
@@ -95,9 +120,7 @@ export default function LaborPricesTab({
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
               <input
-                type="number"
-                min={0}
-                step={100}
+                type="number" min={0} step={100}
                 value={edited[p.part_type] ?? ""}
                 onChange={e => setEdited(prev => ({ ...prev, [p.part_type]: e.target.value }))}
                 className={`${inp} w-24`}
@@ -120,7 +143,7 @@ export default function LaborPricesTab({
           ? <><Icon name="Loader" size={14} className="animate-spin" /> Сохраняем...</>
           : saved
           ? <><Icon name="Check" size={14} /> Сохранено</>
-          : "Сохранить цены"}
+          : "Сохранить"}
       </button>
     </div>
   );

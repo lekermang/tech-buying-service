@@ -1,5 +1,20 @@
 import Icon from "@/components/ui/icon";
 import { Order, STATUSES, INP, LBL, fmt, printReceipt } from "./types";
+import { formatPhone } from "@/lib/phoneFormat";
+
+const STATUS_MSG: Record<string, string> = {
+  in_progress:   "Ваш телефон принят в ремонт и сейчас в работе. Скоро сообщим результат 🔧",
+  waiting_parts: "Для вашего телефона заказаны запчасти. Ожидаем поставку, после этого сразу начнём ремонт ⏳",
+  ready:         "Ваш телефон готов! Можете забирать в любое время. Ждём вас 🎉",
+  done:          "Спасибо за обращение! Ваш телефон выдан. Если возникнут вопросы — всегда рады помочь 👍",
+  cancelled:     "По вашей заявке на ремонт — к сожалению, отменено. Обратитесь к нам для уточнения деталей.",
+};
+
+function waLink(phone: string, orderId: number, msg: string, amount?: number | null): string {
+  const clean = phone.replace(/\D/g, "");
+  const full = `Скупка24, ремонт #${orderId}:\n${msg}${amount ? `\nСтоимость: ${Number(amount).toLocaleString("ru-RU")} ₽` : ""}`;
+  return `https://wa.me/${clean}?text=${encodeURIComponent(full)}`;
+}
 
 type EditForm = {
   name: string; phone: string; model: string; repair_type: string;
@@ -114,7 +129,7 @@ export default function StaffRepairOrderCard({
             </div>
             <div>
               <label className={LBL}>Телефон</label>
-              <input value={ef.phone} onChange={e => onEditFormChange(o.id, { ...ef, phone: e.target.value })} className={INP} placeholder="+7..." />
+              <input value={ef.phone} onChange={e => onEditFormChange(o.id, { ...ef, phone: formatPhone(e.target.value) })} className={INP} placeholder="+7 (___) ___-__-__" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -136,6 +151,26 @@ export default function StaffRepairOrderCard({
           </div>
 
           {saveError && <div className="text-red-400 font-roboto text-[10px]">{saveError}</div>}
+
+          {/* WhatsApp статус клиенту */}
+          {o.phone && o.phone.replace(/\D/g,"").length >= 10 && (
+            <div>
+              <div className="font-roboto text-white/30 text-[9px] uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                <Icon name="MessageCircle" size={10} className="text-green-400" /> Статус клиенту (WhatsApp MAX)
+              </div>
+              <div className="flex gap-1.5 flex-wrap">
+                {Object.entries(STATUS_MSG).map(([key, msg]) => {
+                  const s = STATUSES.find(x => x.key === key);
+                  return (
+                    <a key={key} href={waLink(o.phone, o.id, msg, o.repair_amount)} target="_blank" rel="noopener noreferrer"
+                      className="font-roboto text-[9px] px-2 py-1 border border-green-500/20 text-green-400/70 hover:bg-green-500/10 hover:text-green-400 transition-colors flex items-center gap-1">
+                      <Icon name="Send" size={9} />{s?.label || key}
+                    </a>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Кнопки статусов */}
           <div className="flex gap-1.5 flex-wrap">
