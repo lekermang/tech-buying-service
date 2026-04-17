@@ -31,6 +31,14 @@ const QUALITY_COLOR: Record<string, string> = {
   A: "text-white/50",
 };
 
+// Дополнительные работы которые можно добавить к основному ремонту
+const EXTRA_WORKS = [
+  { id: "glass_replace", label: "Замена стекла", price: 500 },
+  { id: "diagnostics",   label: "Диагностика",   price: 300 },
+  { id: "cleaning",      label: "Чистка корпуса", price: 200 },
+  { id: "waterproof",    label: "Восстановление влагозащиты", price: 400 },
+];
+
 type Part = {
   id: string; name: string; category: string;
   price: number; stock: number; quality: string;
@@ -55,6 +63,8 @@ export default function RepairWidget() {
   const [parts, setParts] = useState<Part[]>([]);
   const [partsLoading, setPartsLoading] = useState(false);
   const [selectedPart, setSelectedPart] = useState<Part | null>(null);
+  const [showPartsList, setShowPartsList] = useState(false);
+  const [extraWorks, setExtraWorks] = useState<string[]>([]);
 
   const [statusId, setStatusId] = useState("");
   const [statusResult, setStatusResult] = useState<OrderStatus | null>(null);
@@ -67,6 +77,8 @@ export default function RepairWidget() {
     const model = form.model.trim();
     setSelectedPart(null);
     setParts([]);
+    setShowPartsList(false);
+    setExtraWorks([]);
     if (model.length < 3) return;
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -75,22 +87,39 @@ export default function RepairWidget() {
       try {
         const res = await fetch(`${REPAIR_PARTS_URL}?model=${encodeURIComponent(model)}`);
         const data = await res.json();
-        setParts(data.parts || []);
+        const fetched = data.parts || [];
+        setParts(fetched);
+        if (fetched.length > 0) setShowPartsList(true);
       } catch { /* ignore */ }
       setPartsLoading(false);
     }, 600);
   }, [form.model]);
 
   const groupedParts = parts.reduce<Record<string, Part[]>>((acc, p) => {
-    const key = p.part_type;
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(p);
+    if (!acc[p.part_type]) acc[p.part_type] = [];
+    acc[p.part_type].push(p);
     return acc;
   }, {});
+
+  const extraTotal = EXTRA_WORKS
+    .filter(w => extraWorks.includes(w.id))
+    .reduce((s, w) => s + w.price, 0);
+
+  const grandTotal = (selectedPart?.total ?? 0) + extraTotal;
+
+  const toggleExtra = (id: string) =>
+    setExtraWorks(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+
+  const handleSelectPart = (part: Part) => {
+    setSelectedPart(part);
+    setShowPartsList(false); // прячем список
+    setExtraWorks([]);
+  };
 
   const handleSubmit = async () => {
     if (!form.name || !form.phone || !form.model || !form.fault) return;
     setSending(true);
+    const extraLabels = EXTRA_WORKS.filter(w => extraWorks.includes(w.id)).map(w => w.label);
     try {
       const res = await fetch(REPAIR_ORDER_URL, {
         method: "POST",
@@ -100,9 +129,9 @@ export default function RepairWidget() {
           phone: form.phone,
           model: form.model,
           repair_type: selectedPart
-            ? `${PART_TYPE_LABEL[selectedPart.part_type] || selectedPart.part_type} (${selectedPart.quality})`
+            ? `${PART_TYPE_LABEL[selectedPart.part_type] || selectedPart.part_type}${extraLabels.length ? " + " + extraLabels.join(", ") : ""}`
             : form.fault,
-          price: selectedPart ? selectedPart.total : undefined,
+          price: selectedPart ? grandTotal : undefined,
           comment: form.fault,
         }),
       });
@@ -136,13 +165,15 @@ export default function RepairWidget() {
     setOrderId(null);
     setParts([]);
     setSelectedPart(null);
+    setShowPartsList(false);
+    setExtraWorks([]);
   };
 
   const canSubmit = form.name && form.phone && form.model && form.fault;
 
   return (
     <div className="border border-white/10 bg-black/30 px-4 py-5 w-full">
-      <button className="flex items-center justify-between w-full" onClick={() => setOpen((v) => !v)}>
+      <button className="flex items-center justify-between w-full" onClick={() => setOpen(v => !v)}>
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-[#FFD700] flex items-center justify-center shrink-0">
             <Icon name="Wrench" size={20} className="text-black" />
@@ -157,37 +188,28 @@ export default function RepairWidget() {
 
       {open && (
         <div className="mt-3">
+          {/* Табы */}
           <div className="flex gap-1 mb-3">
-            {[{ key: "form", label: "Заявка" }, { key: "status", label: "Статус заявки" }].map((t) => (
-              <button
-                key={t.key}
-                onClick={() => setTab(t.key as "form" | "status")}
+            {[{ key: "form", label: "Заявка" }, { key: "status", label: "Статус заявки" }].map(t => (
+              <button key={t.key} onClick={() => setTab(t.key as "form" | "status")}
                 className={`font-roboto text-[10px] px-2.5 py-1 border transition-colors ${
                   tab === t.key ? "border-[#FFD700] text-[#FFD700]" : "border-white/10 text-white/40 hover:text-white"
-                }`}
-              >
+                }`}>
                 {t.label}
               </button>
             ))}
           </div>
 
+          {/* Статус заявки */}
           {tab === "status" && (
             <div>
               <div className="font-roboto text-white/40 text-[10px] mb-1.5 uppercase tracking-wide">Введите номер заявки</div>
               <div className="flex gap-1.5 mb-2">
-                <input
-                  type="text"
-                  value={statusId}
-                  onChange={(e) => setStatusId(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && checkStatus()}
-                  placeholder="Например: 42"
-                  className={INP}
-                />
-                <button
-                  onClick={checkStatus}
-                  disabled={statusLoading}
-                  className="bg-[#FFD700] text-black font-oswald font-bold px-3 py-2 uppercase text-xs hover:bg-yellow-400 transition-colors disabled:opacity-50 shrink-0"
-                >
+                <input type="text" value={statusId} onChange={e => setStatusId(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && checkStatus()}
+                  placeholder="Например: 42" className={INP} />
+                <button onClick={checkStatus} disabled={statusLoading}
+                  className="bg-[#FFD700] text-black font-oswald font-bold px-3 py-2 uppercase text-xs hover:bg-yellow-400 transition-colors disabled:opacity-50 shrink-0">
                   {statusLoading ? "..." : "Проверить"}
                 </button>
               </div>
@@ -218,6 +240,7 @@ export default function RepairWidget() {
             </div>
           )}
 
+          {/* Форма заявки */}
           {tab === "form" && (
             <>
               {orderId ? (
@@ -233,73 +256,50 @@ export default function RepairWidget() {
                     <button onClick={reset} className="text-white/40 hover:text-white font-roboto text-[10px] transition-colors">
                       Новая заявка
                     </button>
-                    <button
-                      onClick={() => { setStatusId(String(orderId)); setTab("status"); checkStatus(); }}
-                      className="text-[#FFD700] hover:underline font-roboto text-[10px]"
-                    >
+                    <button onClick={() => { setStatusId(String(orderId)); setTab("status"); checkStatus(); }}
+                      className="text-[#FFD700] hover:underline font-roboto text-[10px]">
                       Проверить статус →
                     </button>
                   </div>
                 </div>
               ) : (
                 <div className="flex flex-col gap-1.5">
-                  <input
-                    type="text"
-                    value={form.name}
-                    onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-                    placeholder="Ваше имя *"
-                    className={INP}
-                  />
-                  <input
-                    type="tel"
-                    value={form.phone}
-                    onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
-                    placeholder="Телефон *"
-                    className={INP}
-                  />
+                  <input type="text" value={form.name}
+                    onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
+                    placeholder="Ваше имя *" className={INP} />
+                  <input type="tel" value={form.phone}
+                    onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
+                    placeholder="Телефон *" className={INP} />
 
-                  {/* Модель + поиск запчастей */}
+                  {/* Модель + поиск */}
                   <div>
-                    <input
-                      type="text"
-                      value={form.model}
-                      onChange={(e) => setForm((p) => ({ ...p, model: e.target.value }))}
-                      placeholder="Модель телефона * (напр: iPhone 13)"
-                      className={INP}
-                    />
+                    <input type="text" value={form.model}
+                      onChange={e => setForm(p => ({ ...p, model: e.target.value }))}
+                      placeholder="Модель телефона * (напр: iPhone 13)" className={INP} />
 
-                    {/* Индикатор поиска */}
                     {partsLoading && (
-                      <div className="text-white/30 font-roboto text-[10px] mt-1 flex items-center gap-1">
+                      <div className="text-white/30 font-roboto text-[10px] mt-1.5 flex items-center gap-1">
                         <Icon name="Loader" size={10} className="animate-spin" /> Ищу запчасти...
                       </div>
                     )}
 
-                    {/* Результаты поиска по типам */}
-                    {!partsLoading && parts.length > 0 && (
-                      <div className="mt-2 border border-white/10 bg-black/40">
+                    {/* Выпадающий список — показываем только пока не выбрано */}
+                    {!partsLoading && showPartsList && parts.length > 0 && (
+                      <div className="mt-2 border border-white/10 bg-[#0a0a0a]">
                         <div className="px-3 py-2 border-b border-white/5 font-roboto text-[9px] text-white/30 uppercase tracking-wide flex items-center gap-1">
                           <Icon name="Wrench" size={9} /> Выберите тип ремонта
                         </div>
-                        {Object.entries(groupedParts).map(([ptype, items]) => (
-                          <div key={ptype} className="border-b border-white/5 last:border-0">
-                            <div className="px-3 py-1.5 font-roboto text-[9px] text-white/40 uppercase tracking-wide bg-white/5">
-                              {PART_TYPE_LABEL[ptype] || ptype}
-                            </div>
-                            {items.map((part) => {
-                              const isSelected = selectedPart?.id === part.id;
-                              return (
-                                <button
-                                  key={part.id}
-                                  type="button"
-                                  onClick={() => setSelectedPart(isSelected ? null : part)}
-                                  className={`w-full text-left px-3 py-2.5 block transition-colors border-l-2 active:bg-[#FFD700]/20 ${
-                                    isSelected
-                                      ? "bg-[#FFD700]/10 border-[#FFD700]"
-                                      : "border-transparent hover:bg-white/5"
-                                  }`}
-                                >
-                                  <div className="flex items-start justify-between gap-2 w-full">
+                        <div className="max-h-64 overflow-y-auto">
+                          {Object.entries(groupedParts).map(([ptype, items]) => (
+                            <div key={ptype} className="border-b border-white/5 last:border-0">
+                              <div className="px-3 py-1 font-roboto text-[9px] text-white/40 uppercase tracking-wide bg-white/5 sticky top-0">
+                                {PART_TYPE_LABEL[ptype] || ptype}
+                              </div>
+                              {items.map(part => (
+                                <button key={part.id} type="button"
+                                  onClick={() => handleSelectPart(part)}
+                                  className="w-full text-left px-3 py-2.5 block transition-colors border-l-2 border-transparent hover:bg-white/5 active:bg-[#FFD700]/10 hover:border-white/20">
+                                  <div className="flex items-start justify-between gap-2">
                                     <div className="flex-1">
                                       <span className={`font-oswald font-bold text-[11px] mr-1.5 ${QUALITY_COLOR[part.quality] || "text-white/50"}`}>
                                         {part.quality}
@@ -320,53 +320,111 @@ export default function RepairWidget() {
                                       </div>
                                     </div>
                                   </div>
-                                  {isSelected && (
-                                    <div className="mt-1 text-[#FFD700] font-roboto text-[9px] flex items-center gap-1">
-                                      <Icon name="Check" size={9} /> Выбрано
-                                    </div>
-                                  )}
                                 </button>
-                              );
-                            })}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Выбранная запчасть — итог */}
-                    {selectedPart && (
-                      <div className="mt-1.5 bg-[#FFD700]/10 border border-[#FFD700]/30 px-2.5 py-2 flex items-center justify-between">
-                        <div>
-                          <div className="font-roboto text-[10px] text-white/60">Итоговая стоимость</div>
-                          <div className="font-roboto text-[9px] text-white/40">{selectedPart.name}</div>
-                        </div>
-                        <div className="font-oswald font-bold text-base text-[#FFD700]">
-                          {selectedPart.total.toLocaleString("ru-RU")} ₽
+                              ))}
+                            </div>
+                          ))}
                         </div>
                       </div>
                     )}
 
-                    {!partsLoading && form.model.trim().length >= 3 && parts.length === 0 && (
+                    {!partsLoading && form.model.trim().length >= 3 && parts.length === 0 && !showPartsList && (
                       <div className="text-white/30 font-roboto text-[10px] mt-1">
                         Запчасти не найдены — опишите проблему ниже
                       </div>
                     )}
+
+                    {/* Выбранная запчасть — компактная карточка */}
+                    {selectedPart && (
+                      <div className="mt-2 border border-[#FFD700]/40 bg-[#FFD700]/5">
+                        {/* Шапка выбранного */}
+                        <div className="px-3 py-2.5 flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                              <Icon name="CheckCircle" size={11} className="text-[#FFD700] shrink-0" />
+                              <span className="font-roboto text-[10px] text-[#FFD700] font-medium">
+                                {PART_TYPE_LABEL[selectedPart.part_type] || selectedPart.part_type}
+                              </span>
+                              <span className={`font-oswald font-bold text-[10px] ${QUALITY_COLOR[selectedPart.quality] || "text-white/50"}`}>
+                                {selectedPart.quality}
+                              </span>
+                            </div>
+                            <div className="font-roboto text-[10px] text-white/60 leading-snug break-words">
+                              {selectedPart.name}
+                            </div>
+                            <div className="font-roboto text-[9px] text-white/30 mt-0.5">
+                              зап. {selectedPart.price.toLocaleString("ru-RU")} + раб. {selectedPart.labor_cost.toLocaleString("ru-RU")} ₽
+                            </div>
+                          </div>
+                          <div className="shrink-0 text-right">
+                            <div className="font-oswald font-bold text-base text-[#FFD700]">
+                              {selectedPart.total.toLocaleString("ru-RU")} ₽
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Доп. работы */}
+                        <div className="border-t border-[#FFD700]/10 px-3 py-2">
+                          <div className="font-roboto text-[9px] text-white/30 uppercase tracking-wide mb-1.5">
+                            Добавить к ремонту:
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {EXTRA_WORKS.map(w => {
+                              const active = extraWorks.includes(w.id);
+                              return (
+                                <button key={w.id} type="button" onClick={() => toggleExtra(w.id)}
+                                  className={`flex items-center gap-1 px-2 py-1 border font-roboto text-[10px] transition-colors ${
+                                    active
+                                      ? "border-[#FFD700] bg-[#FFD700]/15 text-[#FFD700]"
+                                      : "border-white/15 text-white/40 hover:border-white/30 hover:text-white/70"
+                                  }`}>
+                                  {active && <Icon name="Check" size={9} />}
+                                  {w.label}
+                                  <span className={`ml-0.5 ${active ? "text-[#FFD700]/70" : "text-white/25"}`}>
+                                    +{w.price} ₽
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Итог с допами */}
+                        <div className="border-t border-[#FFD700]/10 px-3 py-2 flex items-center justify-between">
+                          <div>
+                            <div className="font-roboto text-[10px] text-white/50">Итого за ремонт</div>
+                            {extraTotal > 0 && (
+                              <div className="font-roboto text-[9px] text-white/30">
+                                {selectedPart.total.toLocaleString("ru-RU")} + {extraTotal.toLocaleString("ru-RU")} ₽ доп.
+                              </div>
+                            )}
+                          </div>
+                          <div className="font-oswald font-bold text-xl text-[#FFD700]">
+                            {grandTotal.toLocaleString("ru-RU")} ₽
+                          </div>
+                        </div>
+
+                        {/* Кнопка изменить */}
+                        <div className="border-t border-white/5 px-3 py-1.5">
+                          <button type="button" onClick={() => { setShowPartsList(true); setSelectedPart(null); setExtraWorks([]); }}
+                            className="font-roboto text-[9px] text-white/30 hover:text-white/60 flex items-center gap-1 transition-colors">
+                            <Icon name="ChevronDown" size={10} /> Изменить выбор
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
-                  <input
-                    type="text"
-                    value={form.fault}
-                    onChange={(e) => setForm((p) => ({ ...p, fault: e.target.value }))}
+                  <input type="text" value={form.fault}
+                    onChange={e => setForm(p => ({ ...p, fault: e.target.value }))}
                     placeholder="Опишите проблему * (не включается, разбит экран...)"
-                    className={INP}
-                  />
+                    className={INP} />
 
-                  <button
-                    onClick={handleSubmit}
-                    disabled={!canSubmit || sending}
-                    className="w-full bg-[#FFD700] text-black font-oswald font-bold py-2.5 uppercase text-sm hover:bg-yellow-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed mt-1"
-                  >
-                    {sending ? "Отправляем..." : "Отправить заявку"}
+                  <button onClick={handleSubmit} disabled={!canSubmit || sending}
+                    className="w-full bg-[#FFD700] text-black font-oswald font-bold py-2.5 uppercase text-sm hover:bg-yellow-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed mt-1">
+                    {sending ? "Отправляем..." : selectedPart
+                      ? `Отправить заявку · ${grandTotal.toLocaleString("ru-RU")} ₽`
+                      : "Отправить заявку"}
                   </button>
                   <div className="font-roboto text-white/20 text-[9px] text-center">
                     Перезвоним в течение 15 минут

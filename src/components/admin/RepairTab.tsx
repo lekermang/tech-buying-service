@@ -5,15 +5,16 @@ import {
   ADMIN_URL, STATUSES, Order, Analytics, EditForm,
   EMPTY_FORM, EMPTY_READY,
 } from "./repair/repairTypes";
-
-const REPAIR_PARTS_URL = "https://functions.poehali.dev/68da5b17-ae5f-4568-8e27-0d945b995d82";
 import RepairAnalytics from "./repair/RepairAnalytics";
 import RepairOrderCard from "./repair/RepairOrderCard";
 import RepairReadyModal from "./repair/RepairReadyModal";
+import LaborPricesTab from "./repair/LaborPricesTab";
 
 export { STATUSES } from "./repair/repairTypes";
 
-type View = "orders" | "analytics";
+const REPAIR_PARTS_URL = "https://functions.poehali.dev/68da5b17-ae5f-4568-8e27-0d945b995d82";
+
+type View = "orders" | "analytics" | "labor_prices";
 type Period = "day" | "week" | "month";
 
 export default function RepairTab({ token }: { token: string }) {
@@ -200,6 +201,10 @@ export default function RepairTab({ token }: { token: string }) {
             className={`px-4 py-1.5 font-roboto text-xs transition-colors flex items-center gap-1.5 ${view === "analytics" ? "bg-[#FFD700] text-black font-bold" : "text-white/50 hover:text-white"}`}>
             <Icon name="BarChart2" size={13} />Аналитика
           </button>
+          <button onClick={() => setView("labor_prices")}
+            className={`px-4 py-1.5 font-roboto text-xs transition-colors flex items-center gap-1.5 ${view === "labor_prices" ? "bg-[#FFD700] text-black font-bold" : "text-white/50 hover:text-white"}`}>
+            <Icon name="Tag" size={13} />Цены работ
+          </button>
         </div>
 
         {view === "orders" && (
@@ -352,6 +357,13 @@ export default function RepairTab({ token }: { token: string }) {
             })}
           </div>
         </>
+      )}
+
+      {/* Цены работ */}
+      {view === "labor_prices" && (
+        <div className="flex-1 overflow-y-auto">
+          <LaborPricesTab token={token} authHeader="X-Admin-Token" />
+        </div>
       )}
 
       {/* Модалка перевода в Готово */}

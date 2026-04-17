@@ -4,8 +4,9 @@ import { REPAIR_URL, STATUSES, Order, DayStat, EMPTY_FORM, INP, LBL, printReceip
 import StaffRepairAnalytics from "./repair/StaffRepairAnalytics";
 import StaffRepairOrderCard from "./repair/StaffRepairOrderCard";
 import StaffRepairReadyModal from "./repair/StaffRepairReadyModal";
+import LaborPricesTab from "@/components/admin/repair/LaborPricesTab";
 
-type View = "list" | "analytics";
+type View = "list" | "analytics" | "labor_prices";
 type Period = "day" | "week" | "month";
 
 type RepairAnalytics = {
@@ -221,6 +222,12 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
             className={`px-4 py-1.5 font-roboto text-xs transition-colors flex items-center gap-1.5 ${view === "analytics" ? "bg-[#FFD700] text-black font-bold" : "text-white/50 hover:text-white"}`}>
             <Icon name="BarChart2" size={13} /> Аналитика
           </button>
+          {isOwner && (
+            <button onClick={() => setView("labor_prices")}
+              className={`px-4 py-1.5 font-roboto text-xs transition-colors flex items-center gap-1.5 ${view === "labor_prices" ? "bg-[#FFD700] text-black font-bold" : "text-white/50 hover:text-white"}`}>
+              <Icon name="Tag" size={13} /> Цены работ
+            </button>
+          )}
         </div>
 
         {view === "list" && (
@@ -344,6 +351,13 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
             })}
           </div>
         </>
+      )}
+
+      {/* ── Цены работ (только owner) ── */}
+      {view === "labor_prices" && isOwner && (
+        <div className="flex-1 overflow-y-auto">
+          <LaborPricesTab token={token} authHeader="X-Employee-Token" />
+        </div>
       )}
 
       {/* ── Модалка «Готово» ── */}

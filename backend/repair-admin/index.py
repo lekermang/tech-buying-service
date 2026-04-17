@@ -235,6 +235,16 @@ def handler(event: dict, context) -> dict:
             settings = [{'key': r[0], 'value': r[1], 'description': r[2], 'updated_at': r[3].isoformat() if r[3] else None} for r in rows]
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'settings': settings}, ensure_ascii=False)}
 
+        # Цены работ по категориям
+        if action == 'labor_prices_get':
+            cur.execute(f"SELECT part_type, label, price FROM {SCHEMA}.repair_labor_prices ORDER BY part_type")
+            rows = cur.fetchall()
+            cur.close(); conn.close()
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps(
+                {'prices': [{'part_type': r[0], 'label': r[1], 'price': r[2]} for r in rows]},
+                ensure_ascii=False
+            )}
+
         # Список получателей уведомлений
         if action == 'recipients':
             cur.execute(
@@ -287,6 +297,22 @@ def handler(event: dict, context) -> dict:
         raw_body = event.get('body') or '{}'
         body = json.loads(raw_body) if isinstance(raw_body, str) else (raw_body or {})
         action = body.get('action', 'update_status')
+
+        # Сохранение цен работ по категориям
+        if action == 'labor_prices_set':
+            prices = body.get('prices', [])
+            for item in prices:
+                pt = str(item.get('part_type', '')).strip()
+                price_val = int(item.get('price', 0))
+                if pt:
+                    cur.execute(f"""
+                        UPDATE {SCHEMA}.repair_labor_prices
+                        SET price = {price_val}, updated_at = NOW()
+                        WHERE part_type = '{pt}'
+                    """)
+            conn.commit()
+            cur.close(); conn.close()
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True}, ensure_ascii=False)}
 
         # Тест SMS
         if action == 'sms_test':
