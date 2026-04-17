@@ -5,6 +5,8 @@ import {
   ADMIN_URL, STATUSES, Order, Analytics, EditForm,
   EMPTY_FORM, EMPTY_READY,
 } from "./repair/repairTypes";
+
+const REPAIR_PARTS_URL = "https://functions.poehali.dev/68da5b17-ae5f-4568-8e27-0d945b995d82";
 import RepairAnalytics from "./repair/RepairAnalytics";
 import RepairOrderCard from "./repair/RepairOrderCard";
 import RepairReadyModal from "./repair/RepairReadyModal";
@@ -38,6 +40,25 @@ export default function RepairTab({ token }: { token: string }) {
   const [readyForm, setReadyForm] = useState<EditForm>(EMPTY_READY);
   const [readyError, setReadyError] = useState<string | null>(null);
   const [readySaving, setReadySaving] = useState(false);
+
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<string | null>(null);
+
+  const syncParts = async () => {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await fetch(REPAIR_PARTS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...adminHeaders(token) },
+      });
+      const data = await res.json();
+      setSyncResult(data.synced != null ? `Загружено ${data.synced} запчастей` : "Ошибка синхронизации");
+    } catch {
+      setSyncResult("Ошибка соединения");
+    }
+    setSyncing(false);
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -197,6 +218,20 @@ export default function RepairTab({ token }: { token: string }) {
               <Icon name={showForm ? "X" : "Plus"} size={13} />
               {showForm ? "Отмена" : "Новая заявка"}
             </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={syncParts}
+                disabled={syncing}
+                title="Синхронизировать каталог запчастей из МойСклад"
+                className="flex items-center gap-1.5 border border-[#333] text-white/60 hover:text-white hover:border-white/40 px-3 py-1.5 font-roboto text-xs transition-colors disabled:opacity-40"
+              >
+                <Icon name={syncing ? "Loader" : "RefreshCw"} size={13} className={syncing ? "animate-spin" : ""} />
+                {syncing ? "Синхронизация..." : "Запчасти"}
+              </button>
+              {syncResult && (
+                <span className="font-roboto text-[10px] text-green-400">{syncResult}</span>
+              )}
+            </div>
           </>
         )}
       </div>

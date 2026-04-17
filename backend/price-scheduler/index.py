@@ -61,6 +61,110 @@ NEWS_TOPICS = [
 ]
 
 
+REPAIR_PARTS_API = 'https://b2b.moysklad.ru/desktop-api/public/wIIpnHFmddpo/products.json'
+REPAIR_PART_TYPE_RULES = [
+    ('battery',      ['аккумулятор', 'акб']),
+    ('camera_glass', ['стекл', 'камер']),
+    ('glass',        ['стекло', 'тачскрин', 'переклейк']),
+    ('flex_board',   ['шлейф', 'плат']),
+    ('display',      ['дисплей', 'экран', 'lcd', 'oled', 'amoled']),
+    ('accessory',    ['аксессуар', 'динамик', 'звонок', 'вибро', 'корпус', 'рамка', 'крышка', 'прочее']),
+]
+REPAIR_QUALITY_RULES = [
+    ('ORIG', ['orig', 'оригинал', 'original']),
+    ('AAA',  ['aaa', 'ааа']),
+    ('AA',   ['aa', 'аа', 'премиум', 'premium']),
+    ('A',    ['копия', 'copy']),
+]
+REPAIR_LABOR_COSTS = {
+    'display': 2000, 'battery': 1000, 'glass': 700,
+    'accessory': 500, 'camera_glass': 1000, 'flex_board': 1200,
+}
+
+
+def _rp_detect_type(category, name):
+    text = (category + ' ' + name).lower()
+    for ptype, kws in REPAIR_PART_TYPE_RULES:
+        for kw in kws:
+            if kw in text:
+                return ptype
+    return 'accessory'
+
+
+def _rp_detect_quality(name):
+    text = name.lower()
+    for q, kws in REPAIR_QUALITY_RULES:
+        for kw in kws:
+            if kw in text:
+                return q
+    return 'A'
+
+
+def _rp_keywords(name):
+    import re as _re
+    brackets = _re.findall(r'\(([^)]+)\)', name)
+    models = []
+    for b in brackets:
+        parts = _re.split(r'[/,;]+', b)
+        models.extend([p.strip().lower() for p in parts if p.strip()])
+    models.append(name.lower())
+    return ' | '.join(dict.fromkeys(models))
+
+
+def sync_repair_parts():
+    """Загружает все запчасти из МойСклад и обновляет repair_parts в БД."""
+    import urllib.request as _req
+    all_products = []
+    offset = 0
+    limit = 100
+    while True:
+        url = (REPAIR_PARTS_API +
+               f'?category=&category_id=&limit={limit}&offset={offset}&search=')
+        try:
+            with _req.urlopen(url, timeout=30) as r:
+                data = json.loads(r.read())
+        except Exception:
+            break
+        products = data.get('products', [])
+        if not products:
+            break
+        all_products.extend(products)
+        if len(products) < limit:
+            break
+        offset += limit
+
+    if not all_products:
+        return
+
+    conn = get_conn()
+    cur = conn.cursor()
+    for p in all_products:
+        pid = p.get('id', '')
+        name = p.get('name', '')
+        category = p.get('category', '')
+        ptype = _rp_detect_type(category, name)
+        quality = _rp_detect_quality(name)
+        keywords = _rp_keywords(name)
+        labor = REPAIR_LABOR_COSTS.get(ptype, 500)
+        cur.execute(f"""
+            INSERT INTO {SCHEMA}.repair_parts
+                (id, code, name, category, category_id, price, stock, available,
+                 quality, part_type, model_keywords, labor_cost, updated_at)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,NOW())
+            ON CONFLICT (id) DO UPDATE SET
+                name=EXCLUDED.name, category=EXCLUDED.category,
+                price=EXCLUDED.price, stock=EXCLUDED.stock,
+                available=EXCLUDED.available, quality=EXCLUDED.quality,
+                part_type=EXCLUDED.part_type, model_keywords=EXCLUDED.model_keywords,
+                labor_cost=EXCLUDED.labor_cost, updated_at=NOW()
+        """, (pid, p.get('code', ''), name, category, p.get('categoryId', ''),
+              p.get('price') or 0, p.get('stock') or 0, p.get('available', True),
+              quality, ptype, keywords, labor))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
 def get_conn():
     return psycopg2.connect(os.environ['DATABASE_URL'])
 
@@ -827,6 +931,9 @@ def handler(event: dict, context) -> dict:
             job_id = create_sync_job()
             t = threading.Thread(target=sync_tools_feed, args=(job_id,), daemon=False)
             t.start()
+
+        # Синхронизация каталога запчастей МойСклад каждый час
+        threading.Thread(target=sync_repair_parts, daemon=False).start()
 
         # Автопостинг новостей — каждый час, только с 9:00 до 22:00 МСК
         if 9 <= now_msk.hour < 22 and not check_news_already_posted_this_hour():
