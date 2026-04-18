@@ -39,6 +39,11 @@ def check_auth(event):
     token = hdrs.get('X-Admin-Token') or hdrs.get('X-Employee-Token')
     if not token:
         return False
+    # Проверка по ADMIN_TOKEN из секретов
+    admin_token = os.environ.get('ADMIN_TOKEN', '')
+    if admin_token and token == admin_token:
+        return True
+    # Проверка по токену сотрудника из БД
     conn = get_conn()
     cur = conn.cursor()
     cur.execute(
