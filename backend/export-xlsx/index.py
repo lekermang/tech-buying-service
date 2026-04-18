@@ -15,14 +15,13 @@ HEADERS = {
 }
 
 YM_HEADERS = ['Название', 'Идентификатор', 'Описание', 'Короткое описание',
-              'Категория', 'Фото', 'Цена', 'В наличии',
-              'Количество', 'Ссылка']
+              'Категория', 'Фото', 'Цена', 'В наличии', 'Ссылка']
 
 S3_KEY_CATALOG     = 'exports/catalog_export.xlsx'
 S3_KEY_GOODS       = 'exports/goods_export.xlsx'
 S3_KEY_TOOLS_FINAL = 'exports/tools_export.xlsx'
 
-COL_WIDTHS = [40, 15, 50, 30, 25, 50, 14, 12, 14, 50]
+COL_WIDTHS = [40, 15, 50, 30, 25, 50, 14, 12, 50]
 
 
 def get_conn():
@@ -115,7 +114,7 @@ def build_catalog(conn, model_photos=None, category_photos=None):
         in_stock = 'Да' if availability == 'in_stock' else 'Нет'
         photo = photo_url or model_photos.get(model) or category_photos.get(category) or ''
         rows.append([name, clean_id(item_id), desc, short, category,
-                     photo, price or '', in_stock, '1 шт.', photo])
+                     photo, price or '', in_stock, photo])
     cur.close()
     return make_wb('Каталог электроники', '1565C8', rows)
 
@@ -138,7 +137,7 @@ def build_goods(conn, model_photos=None, category_photos=None):
         desc = description or short
         photo = photo_url or model_photos.get(model) or category_photos.get(category) or ''
         rows.append([name, clean_id(item_id), desc, short, category,
-                     photo, sell_price or '', 'Да', '1 шт.', photo])
+                     photo, sell_price or '', 'Да', photo])
     cur.close()
     return make_wb('Товары на складе', '27AE60', rows)
 
@@ -160,7 +159,7 @@ def build_tools(conn):
         price = float(my_price) if my_price and float(my_price) > 0 else (float(base_price) if base_price else '')
         short = ' '.join(x for x in [brand, name] if x)
         rows.append([name, clean_id(article), short, short, category or '',
-                     image_url or '', price, 'Да', '1 шт.', image_url or ''])
+                     image_url or '', price, 'Да', image_url or ''])
     cur.close()
     return make_wb('Инструменты', 'E67E22', rows)
 
