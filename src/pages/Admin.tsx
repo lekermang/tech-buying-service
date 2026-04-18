@@ -65,27 +65,36 @@ export default function Admin() {
   };
 
   const generateXlsx = async () => {
+    const tok = localStorage.getItem("admin_token") || token;
+    console.log("generateXlsx token:", tok);
     setGenerating(true);
     setXlsxUrl(null);
     try {
       setXlsxStep("Каталог электроники..."); setXlsxProgress(10);
-      await post(token, 'catalog');
+      const r1 = await post(tok, 'catalog');
+      console.log("catalog result:", r1);
 
       setXlsxStep("Товары на складе..."); setXlsxProgress(35);
-      await post(token, 'goods');
+      const r2 = await post(tok, 'goods');
+      console.log("goods result:", r2);
 
       setXlsxStep("Инструменты (18 000 позиций)..."); setXlsxProgress(55);
-      await post(token, 'tools');
+      const r3 = await post(tok, 'tools');
+      console.log("tools result:", r3);
 
       setXlsxStep("Сборка файла..."); setXlsxProgress(90);
-      const result = await post(token, 'merge');
+      const result = await post(tok, 'merge');
+      console.log("merge result:", result);
 
       setXlsxProgress(100);
       setXlsxStep("Готово!");
       if (result.url) setXlsxUrl(result.url);
+    } catch (e) {
+      console.error("generateXlsx error:", e);
+      setXlsxStep("Ошибка!");
     } finally {
       setGenerating(false);
-      setTimeout(() => { setXlsxProgress(0); setXlsxStep(""); }, 2000);
+      setTimeout(() => { setXlsxProgress(0); setXlsxStep(""); }, 3000);
     }
   };
 
