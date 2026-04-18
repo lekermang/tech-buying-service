@@ -50,16 +50,27 @@ export default function Admin() {
   const checkXlsx = async (tok: string) => {
     try {
       const res = await fetch(EXPORT_URL, { headers: adminHeaders(tok) });
-      const data = await res.json();
-      if (data.status === 'ready') { setXlsxUrl(data.url); setXlsxDate(data.last_modified || null); }
+      if (!res.ok) return;
+      const text = await res.text();
+      const data = JSON.parse(text);
+      if (data.status === 'ready' && data.url) {
+        setXlsxUrl(data.url);
+        setXlsxDate(data.last_modified || null);
+      }
     } catch (_e) { /* ignore */ }
   };
 
   const generateXlsx = async () => {
     setGenerating(true);
     try {
-      const res = await fetch(EXPORT_URL, { method: 'POST', headers: adminHeaders(token) });
-      const data = await res.json();
+      const res = await fetch(EXPORT_URL, {
+        method: 'POST',
+        headers: { ...adminHeaders(token), 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      if (!res.ok) return;
+      const text = await res.text();
+      const data = JSON.parse(text);
       if (data.url) { setXlsxUrl(data.url); setXlsxDate(null); }
     } finally {
       setGenerating(false);

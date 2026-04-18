@@ -175,6 +175,7 @@ def get_cdn_url():
 
 def handler(event: dict, context) -> dict:
     """Экспорт товаров в XLSX (Яндекс Маркет): генерация и сохранение в S3, получение ссылки"""
+    print(f"METHOD: {event.get('httpMethod')} HEADERS: {event.get('headers', {})}")
     if event.get('httpMethod') == 'OPTIONS':
         return {'statusCode': 200, 'headers': HEADERS, 'body': ''}
 
@@ -184,10 +185,11 @@ def handler(event: dict, context) -> dict:
     method = event.get('httpMethod', 'GET')
 
     if method == 'POST':
-        # Генерация и загрузка в S3
+        print("Starting XLSX generation...")
         conn = get_conn()
         xlsx_data = build_xlsx(conn)
         conn.close()
+        print(f"XLSX built, size: {len(xlsx_data)} bytes")
 
         s3 = get_s3()
         s3.put_object(
