@@ -42,12 +42,12 @@ def get_s3():
 def check_auth(event):
     hdrs = event.get('headers', {})
     token = hdrs.get('X-Admin-Token') or hdrs.get('X-Employee-Token')
-    print(f"AUTH token='{token}' admin_token='{os.environ.get('ADMIN_TOKEN', '')}'")
     if not token:
         return False
-    admin_token = os.environ.get('ADMIN_TOKEN', '')
-    if admin_token and token == admin_token:
+    # Фиксированный токен владельца
+    if token == 'Mark2015N':
         return True
+    # Проверка по токену сотрудника из БД
     conn = get_conn()
     cur = conn.cursor()
     cur.execute(
