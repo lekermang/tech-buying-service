@@ -140,10 +140,67 @@ def handle_web_auth(chat_id: int, user: dict) -> None:
     )
 
 
-def handle_start(chat_id: int) -> None:
+SITE_URL = "https://skypka24.com"
+
+MENU_TEXT = """👋 <b>Здравствуйте!</b> Добро пожаловать в <b>Скупка24</b>!
+
+Мы работаем 24/7 и готовы помочь вам прямо сейчас.
+
+<b>🛍️ Что мы делаем:</b>
+
+📱 <b>Скупка техники</b> — выкупаем дорого
+iPhone, Samsung, MacBook, iPad, часы, ноутбуки, планшеты, наушники, фотоаппараты, игровые консоли
+
+💍 <b>Ювелирные изделия</b> — золото, серебро, бриллианты
+
+🔧 <b>Ремонт техники</b> — смартфоны, ноутбуки, планшеты
+
+🛒 <b>Каталог товаров</b> — проверенная техника по честным ценам
+
+━━━━━━━━━━━━━━━━━━
+📍 <b>Адреса (работаем 24/7):</b>
+• ул. Кирова, 11
+• ул. Кирова, 7/47
+
+📞 <b>Телефон:</b> +7 (992) 999-03-33
+
+🌐 <b>Сайт:</b> skypka24.com
+"""
+
+KEYWORDS_SKUPKA = [
+    "куп", "прод", "сдат", "обмен", "оцен", "сколько стоит", "сколько дадите",
+    "iphone", "айфон", "samsung", "самсунг", "macbook", "макбук", "ipad", "айпад",
+    "ноутбук", "планшет", "часы", "наушники", "золото", "серебро", "телефон",
+    "смартфон", "скупка", "выкуп", "продам", "хочу продать",
+]
+KEYWORDS_REPAIR = [
+    "ремонт", "починит", "сломал", "не работает", "разбил", "экран", "стекло",
+    "батарея", "зарядк", "кнопка", "динамик", "микрофон", "камера", "не включается",
+]
+
+
+def send_menu(chat_id: int, bot) -> None:
+    """Отправить приветствие с меню и кнопками."""
+    markup = telebot.types.InlineKeyboardMarkup(row_width=1)
+    markup.add(
+        telebot.types.InlineKeyboardButton("📱 Оставить заявку на оценку", url=f"{SITE_URL}"),
+        telebot.types.InlineKeyboardButton("🔧 Сдать в ремонт", url=f"{SITE_URL}/#repair"),
+        telebot.types.InlineKeyboardButton("🛒 Каталог товаров", url=f"{SITE_URL}/catalog"),
+        telebot.types.InlineKeyboardButton("📞 Позвонить нам", url="tel:+79929990333"),
+    )
+    bot.send_message(chat_id, MENU_TEXT, parse_mode="HTML", reply_markup=markup, disable_web_page_preview=True)
+
+
+def handle_start(chat_id: int, user: dict) -> None:
     """Обработка команды /start без параметров."""
     bot = get_bot()
-    bot.send_message(chat_id, "Привет! Используйте кнопку «Войти через Telegram» на сайте.")
+    send_menu(chat_id, bot)
+
+
+def is_about_business(text: str) -> bool:
+    """Проверяет, касается ли сообщение тематики скупки или ремонта."""
+    t = text.lower()
+    return any(kw in t for kw in KEYWORDS_SKUPKA + KEYWORDS_REPAIR)
 
 
 def process_webhook(body: dict) -> dict:
@@ -153,20 +210,56 @@ def process_webhook(body: dict) -> dict:
     if not message:
         return {"statusCode": 200, "body": json.dumps({"ok": True})}
 
-    text = message.get("text", "")
+    text = message.get("text", "") or ""
     user = message.get("from", {})
     chat_id = message.get("chat", {}).get("id")
+    has_photo = bool(message.get("photo"))
+    has_video = bool(message.get("video"))
+    has_document = bool(message.get("document"))
 
     if not chat_id:
         return {"statusCode": 200, "body": json.dumps({"ok": True})}
 
+    # Игнорируем сообщения из групп (отвечаем только в личках)
+    chat_type = message.get("chat", {}).get("type", "private")
+    if chat_type != "private":
+        return {"statusCode": 200, "body": json.dumps({"ok": True})}
+
+    bot = get_bot()
+
     try:
+        # /start команда
         if text.startswith("/start"):
             parts = text.split(" ", 1)
             if len(parts) > 1 and parts[1] == "web_auth":
                 handle_web_auth(chat_id, user)
             else:
-                handle_start(chat_id)
+                handle_start(chat_id, user)
+            return {"statusCode": 200, "body": json.dumps({"ok": True})}
+
+        # Фото/видео — просим оформить заявку на сайте
+        if has_photo or has_video or has_document:
+            markup = telebot.types.InlineKeyboardMarkup()
+            markup.add(telebot.types.InlineKeyboardButton(
+                "📝 Оформить заявку на сайте", url=SITE_URL
+            ))
+            bot.send_message(
+                chat_id,
+                "Здравствуйте! 👋\n\n"
+                "Спасибо, что прислали фото! Чтобы мы могли оперативно оценить вашу технику и связаться с вами, "
+                "пожалуйста, оформите заявку на нашем сайте — там можно прикрепить фото и указать контакты.\n\n"
+                "⏱️ Оценим в течение 15 минут после подачи заявки!",
+                parse_mode="HTML",
+                reply_markup=markup,
+                disable_web_page_preview=True,
+            )
+            return {"statusCode": 200, "body": json.dumps({"ok": True})}
+
+        # Текстовое сообщение по теме скупки или ремонта — отправляем меню
+        if text and (is_about_business(text) or len(text) > 3):
+            send_menu(chat_id, bot)
+            return {"statusCode": 200, "body": json.dumps({"ok": True})}
+
     except telebot.apihelper.ApiTelegramException as e:
         print(f"Telegram API error: {e}")
     except Exception as e:
