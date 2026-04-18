@@ -45,35 +45,47 @@ export default function Admin() {
   const [collapsed, setCollapsed] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [xlsxUrl, setXlsxUrl] = useState<string | null>(null);
-  const [xlsxDate, setXlsxDate] = useState<string | null>(null);
+  const [xlsxProgress, setXlsxProgress] = useState(0);
+  const [xlsxStep, setXlsxStep] = useState("");
+
+  const post = (tok: string, action: string) =>
+    fetch(EXPORT_URL, {
+      method: 'POST',
+      headers: { ...adminHeaders(tok), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action }),
+    }).then(r => r.json());
 
   const checkXlsx = async (tok: string) => {
     try {
       const res = await fetch(EXPORT_URL, { headers: adminHeaders(tok) });
       if (!res.ok) return;
-      const text = await res.text();
-      const data = JSON.parse(text);
-      if (data.status === 'ready' && data.url) {
-        setXlsxUrl(data.url);
-        setXlsxDate(data.last_modified || null);
-      }
+      const data = await res.json();
+      if (data.status === 'ready' && data.url) setXlsxUrl(data.url);
     } catch (_e) { /* ignore */ }
   };
 
   const generateXlsx = async () => {
     setGenerating(true);
+    setXlsxUrl(null);
     try {
-      const res = await fetch(EXPORT_URL, {
-        method: 'POST',
-        headers: { ...adminHeaders(token), 'Content-Type': 'application/json' },
-        body: '{}',
-      });
-      if (!res.ok) return;
-      const text = await res.text();
-      const data = JSON.parse(text);
-      if (data.url) { setXlsxUrl(data.url); setXlsxDate(null); }
+      setXlsxStep("Каталог электроники..."); setXlsxProgress(10);
+      await post(token, 'catalog');
+
+      setXlsxStep("Товары на складе..."); setXlsxProgress(35);
+      await post(token, 'goods');
+
+      setXlsxStep("Инструменты (18 000 позиций)..."); setXlsxProgress(55);
+      await post(token, 'tools');
+
+      setXlsxStep("Сборка файла..."); setXlsxProgress(90);
+      const result = await post(token, 'merge');
+
+      setXlsxProgress(100);
+      setXlsxStep("Готово!");
+      if (result.url) setXlsxUrl(result.url);
     } finally {
       setGenerating(false);
+      setTimeout(() => { setXlsxProgress(0); setXlsxStep(""); }, 2000);
     }
   };
 
@@ -199,7 +211,18 @@ export default function Admin() {
         <div className="border-b border-[#222] px-5 py-3 flex items-center gap-3">
           <Icon name={active?.icon || "Circle"} size={16} className="text-[#FFD700]" />
           <span className="font-bold uppercase tracking-wide text-sm">{active?.label}</span>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-3">
+            {generating && (
+              <div className="flex items-center gap-2 min-w-[220px]">
+                <div className="flex-1 bg-white/10 rounded-full h-1.5 overflow-hidden">
+                  <div
+                    className="h-full bg-yellow-400 transition-all duration-500"
+                    style={{ width: `${xlsxProgress}%` }}
+                  />
+                </div>
+                <span className="text-[10px] text-yellow-400 whitespace-nowrap">{xlsxProgress}% {xlsxStep}</span>
+              </div>
+            )}
             <button
               onClick={generateXlsx}
               disabled={generating}
@@ -209,11 +232,10 @@ export default function Admin() {
               <Icon name={generating ? "Loader" : "RefreshCw"} size={13} className={generating ? "animate-spin" : ""} />
               {generating ? "Генерирую..." : "Обновить XLSX"}
             </button>
-            {xlsxUrl && (
+            {xlsxUrl && !generating && (
               <a
                 href={xlsxUrl}
                 download="yandex_market_export.xlsx"
-                title={xlsxDate ? `Сформирован: ${xlsxDate}` : "Скачать XLSX"}
                 className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 border border-green-500/30 text-green-400 hover:bg-green-500/10 transition-colors"
               >
                 <Icon name="FileDown" size={13} />
