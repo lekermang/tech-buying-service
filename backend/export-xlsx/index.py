@@ -14,6 +14,10 @@ HEADERS = {
     'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Token, X-Employee-Token',
 }
 
+YM_HEADERS = ['Название', 'Идентификатор', 'Описание', 'Короткое описание',
+              'Категория', 'Фото', 'Цена товара', 'В наличии',
+              'Количество', 'Единицы измерения', 'Ссылка']
+
 
 def get_conn():
     return psycopg2.connect(os.environ['DATABASE_URL'])
@@ -34,14 +38,15 @@ def check_auth(event):
     return row is not None
 
 
-def style_header(ws, col_count, fill_color):
+def style_header(ws, fill_color):
     fill = PatternFill(start_color=fill_color, end_color=fill_color, fill_type='solid')
     font = Font(bold=True, color='FFFFFF', size=10)
-    for col in range(1, col_count + 1):
+    for col in range(1, len(YM_HEADERS) + 1):
         cell = ws.cell(row=1, column=col)
         cell.fill = fill
         cell.font = font
         cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    ws.row_dimensions[1].height = 30
 
 
 def auto_width(ws):
@@ -53,98 +58,135 @@ def auto_width(ws):
                 max_len = max(max_len, len(str(cell.value or '')))
             except Exception:
                 pass
-        ws.column_dimensions[col_letter].width = min(max(max_len + 2, 8), 45)
+        ws.column_dimensions[col_letter].width = min(max(max_len + 2, 10), 50)
 
 
 def sheet_catalog(wb, conn):
     ws = wb.create_sheet('Каталог электроники')
-    headers = ['ID', 'Категория', 'Бренд', 'Модель', 'Цвет', 'Память', 'RAM',
-               'Регион', 'SIM', 'Наличие', 'Цена (₽)', 'Описание']
-    ws.append(headers)
-    style_header(ws, len(headers), '1565C8')
+    ws.append(YM_HEADERS)
+    style_header(ws, '1565C8')
 
     cur = conn.cursor()
     cur.execute(f"""
-        SELECT id, category, brand, model, color, storage, ram, region,
-               sim_type, availability, price, description
+        SELECT id, category, brand, model, color, storage, ram,
+               region, sim_type, availability, price, description, photo_url
         FROM {SCHEMA}.catalog
         WHERE is_active = true
         ORDER BY category, brand, model
     """)
-    avail_map = {'in_stock': 'В наличии', 'on_order': 'Под заказ'}
     for r in cur.fetchall():
+        item_id, category, brand, model, color, storage, ram, region, sim_type, availability, price, description, photo_url = r
+
+        parts = [x for x in [brand, model, storage, color, region] if x]
+        name = ' '.join(parts)
+
+        short_parts = [x for x in [brand, model, storage] if x]
+        short_desc = ' '.join(short_parts)
+
+        full_desc = description or short_desc
+
+        in_stock = 'Да' if availability == 'in_stock' else 'Нет'
+        qty = 1 if availability == 'in_stock' else 0
+
         ws.append([
-            r[0], r[1], r[2], r[3],
-            r[4] or '', r[5] or '', r[6] or '', r[7] or '',
-            r[8] or '', avail_map.get(r[9], r[9] or ''),
-            r[10] or '', r[11] or ''
+            name,
+            str(item_id),
+            full_desc,
+            short_desc,
+            category,
+            photo_url or '',
+            price or '',
+            in_stock,
+            qty,
+            'шт',
+            photo_url or '',
         ])
     cur.close()
     auto_width(ws)
     ws.freeze_panes = 'A2'
-    ws.row_dimensions[1].height = 30
 
 
 def sheet_goods(wb, conn):
     ws = wb.create_sheet('Товары на складе')
-    headers = ['ID', 'Название', 'Категория', 'Бренд', 'Модель', 'Состояние',
-               'Цвет', 'Память', 'IMEI', 'Цена продажи (₽)', 'Цена закупки (₽)',
-               'Статус', 'Описание', 'Дата добавления']
-    ws.append(headers)
-    style_header(ws, len(headers), '27AE60')
+    ws.append(YM_HEADERS)
+    style_header(ws, '27AE60')
 
     cur = conn.cursor()
     cur.execute(f"""
-        SELECT id, title, category, brand, model, condition, color, storage,
-               imei, sell_price, purchase_price, status, description, added_at
+        SELECT id, title, category, brand, model, condition, color,
+               storage, sell_price, status, description, photo_url
         FROM {SCHEMA}.goods
+        WHERE status = 'available'
         ORDER BY added_at DESC
     """)
-    status_map = {'available': 'В наличии', 'sold': 'Продано', 'reserved': 'Резерв'}
     for r in cur.fetchall():
+        item_id, title, category, brand, model, condition, color, storage, sell_price, status, description, photo_url = r
+
+        name = title or ' '.join(x for x in [brand, model, storage, color] if x)
+        short_desc = ' '.join(x for x in [brand, model, storage, condition] if x)
+        full_desc = description or short_desc
+
+        in_stock = 'Да' if status == 'available' else 'Нет'
+
         ws.append([
-            r[0], r[1], r[2], r[3] or '', r[4] or '',
-            r[5] or '', r[6] or '', r[7] or '', r[8] or '',
-            r[9] or '', r[10] or '',
-            status_map.get(r[11], r[11] or ''),
-            r[12] or '',
-            str(r[13])[:10] if r[13] else ''
+            name,
+            str(item_id),
+            full_desc,
+            short_desc,
+            category,
+            photo_url or '',
+            sell_price or '',
+            in_stock,
+            1,
+            'шт',
+            photo_url or '',
         ])
     cur.close()
     auto_width(ws)
     ws.freeze_panes = 'A2'
-    ws.row_dimensions[1].height = 30
 
 
 def sheet_tools(wb, conn):
     ws = wb.create_sheet('Инструменты')
-    headers = ['Артикул', 'Название', 'Бренд', 'Категория',
-               'Базовая цена (₽)', 'Моя цена (₽)', 'Наличие']
-    ws.append(headers)
-    style_header(ws, len(headers), 'E67E22')
+    ws.append(YM_HEADERS)
+    style_header(ws, 'E67E22')
 
     cur = conn.cursor()
     cur.execute(f"""
         SELECT article, name, brand, category,
-               base_price, my_price, amount
+               my_price, base_price, amount, image_url
         FROM {SCHEMA}.tools_products
         ORDER BY category, name
     """)
     for r in cur.fetchall():
+        article, name, brand, category, my_price, base_price, amount, image_url = r
+
+        price = float(my_price) if my_price and float(my_price) > 0 else (float(base_price) if base_price else '')
+        in_stock = 'Да' if amount and 'наличи' in amount.lower() else 'Нет'
+        qty = 1 if in_stock == 'Да' else 0
+
+        short_desc = ' '.join(x for x in [brand, name] if x)
+
         ws.append([
-            r[0], r[1], r[2] or '', r[3] or '',
-            float(r[4]) if r[4] else 0,
-            float(r[5]) if r[5] else 0,
-            r[6] or ''
+            name,
+            article,
+            short_desc,
+            short_desc,
+            category or '',
+            image_url or '',
+            price,
+            in_stock,
+            qty,
+            'шт',
+            image_url or '',
         ])
     cur.close()
     auto_width(ws)
     ws.freeze_panes = 'A2'
-    ws.row_dimensions[1].height = 30
 
 
 def handler(event: dict, context) -> dict:
-    """Экспорт товаров в XLSX: каталог электроники, товары на складе, инструменты"""
+    """Экспорт товаров в XLSX формате Яндекс Маркета: каталог электроники, товары на складе, инструменты"""
     if event.get('httpMethod') == 'OPTIONS':
         return {'statusCode': 200, 'headers': HEADERS, 'body': ''}
 
@@ -171,7 +213,7 @@ def handler(event: dict, context) -> dict:
         'headers': {
             **HEADERS,
             'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'Content-Disposition': 'attachment; filename="skypka24_export.xlsx"',
+            'Content-Disposition': 'attachment; filename="yandex_market_export.xlsx"',
         },
         'body': xlsx_b64,
         'isBase64Encoded': True,
