@@ -1,6 +1,6 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
-import { Order, STATUSES, INP, LBL, fmt, printReceipt } from "./types";
+import { Order, STATUSES, INP, LBL, fmt, printReceipt, printAct } from "./types";
 import { formatPhone } from "@/lib/phoneFormat";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -245,7 +245,14 @@ export default function StaffRepairOrderCard({
                     className="ml-auto font-roboto text-[10px] px-3 py-1.5 bg-[#FFD700] text-black font-bold hover:bg-yellow-400 transition-colors disabled:opacity-40 flex items-center gap-1">
                     <Icon name="Save" size={11} />{saving ? "Сохраняю..." : "Сохранить"}
                   </button>
+                  <button onClick={() => printAct(o)}
+                    title="Акт приёмки"
+                    className="font-roboto text-[10px] px-2.5 py-1.5 border border-[#FFD700]/20 text-[#FFD700]/50 hover:text-[#FFD700] hover:border-[#FFD700]/40 transition-colors flex items-center gap-1">
+                    <Icon name="FileText" size={11} />
+                    <span>Акт</span>
+                  </button>
                   <button onClick={() => { printReceipt(o); }}
+                    title="Чек / квитанция"
                     className="font-roboto text-[10px] px-2.5 py-1.5 border border-white/10 text-white/40 hover:text-white transition-colors flex items-center gap-1">
                     <Icon name="Printer" size={11} />
                   </button>

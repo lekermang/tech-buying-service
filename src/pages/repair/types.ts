@@ -41,6 +41,82 @@ export const fmtDay = (day: string) => {
 export const INP = "w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-2 font-roboto text-xs focus:outline-none focus:border-[#FFD700] transition-colors placeholder:text-white/20";
 export const LBL = "font-roboto text-white/40 text-[10px] block mb-1";
 
+export const printAct = (o: Order) => {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("ru-RU");
+  const timeStr = now.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  const win = window.open("", "_blank", "width=800,height=900");
+  if (!win) return;
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Акт приёмки #${o.id}</title><style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;font-size:12px;color:#000;background:#fff}
+    .page{width:100%;max-width:700px;margin:0 auto;padding:20px}
+    h1{font-size:17px;font-weight:bold;text-align:center;margin-bottom:2px;text-transform:uppercase;letter-spacing:1px}
+    .subtitle{font-size:10px;text-align:center;color:#555;margin-bottom:16px}
+    .section-title{font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid #000;padding-bottom:4px;margin:14px 0 8px}
+    .row{display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px;border-bottom:1px dotted #ccc;padding-bottom:3px}
+    .row .label{color:#444;flex-shrink:0;margin-right:8px}
+    .row .val{font-weight:600;text-align:right}
+    .risks{margin:0;padding:0;list-style:none}
+    .risks li{font-size:11px;margin-bottom:8px;padding-left:18px;position:relative;line-height:1.5}
+    .risks li:before{content:attr(data-n)".";position:absolute;left:0;font-weight:bold}
+    .sign-block{display:flex;justify-content:space-between;margin-top:24px;gap:30px}
+    .sign-item{flex:1;text-align:center}
+    .sign-line{border-bottom:1px solid #000;margin-bottom:4px;height:30px}
+    .sign-label{font-size:10px;color:#555}
+    .warn-box{border:2px solid #000;padding:10px 14px;margin:14px 0;background:#fffbe6}
+    .warn-title{font-size:12px;font-weight:bold;text-align:center;margin-bottom:8px}
+    .footer{font-size:9px;color:#777;text-align:center;margin-top:16px;border-top:1px solid #ccc;padding-top:8px}
+    @media print{button{display:none!important}body{margin:0}}
+  </style></head><body>
+  <div style="text-align:center;padding:10px 10px 0"><button onclick="window.print()" style="padding:8px 24px;font-size:13px;cursor:pointer;background:#FFD700;border:none;font-weight:bold">🖨 Печатать</button></div>
+  <div class="page">
+    <h1>Акт приёмки на ремонт</h1>
+    <div class="subtitle">Скупка24 · ИП Мамедов Адиль Мирза Оглы · г. Калуга, ул. Кирова, 21а</div>
+
+    <div class="section-title">Данные заявки</div>
+    <div class="row"><span class="label">№ заявки:</span><span class="val">#${o.id}</span></div>
+    <div class="row"><span class="label">Дата приёмки:</span><span class="val">${dateStr} ${timeStr}</span></div>
+    <div class="row"><span class="label">Клиент:</span><span class="val">${o.name}</span></div>
+    <div class="row"><span class="label">Телефон:</span><span class="val">${o.phone}</span></div>
+    ${o.model ? `<div class="row"><span class="label">Устройство:</span><span class="val">${o.model}</span></div>` : ""}
+    ${o.repair_type ? `<div class="row"><span class="label">Вид работ:</span><span class="val">${o.repair_type}</span></div>` : ""}
+    ${o.price ? `<div class="row"><span class="label">Предв. стоимость:</span><span class="val">${o.price.toLocaleString("ru-RU")} ₽</span></div>` : ""}
+    ${o.comment ? `<div class="row"><span class="label">Описание проблемы:</span><span class="val" style="max-width:300px">${o.comment}</span></div>` : ""}
+
+    <div class="section-title">Условия ремонта — клиент ознакомлен и согласен</div>
+    <div class="warn-box">
+      <div class="warn-title">⚠️ Внимание! Ознакомьтесь перед подписью</div>
+      <ul class="risks">
+        <li data-n="1">После контакта с водой аппарат может полностью выйти из строя при любом виде ремонта (чистка, прогрев, пайка). Мастерская не обязана его восстанавливать.</li>
+        <li data-n="2">Компонентная пайка сопряжена с риском безвозвратного повреждения платы. Если телефон перестал включаться в процессе ремонта — работа оплачивается в полном объёме.</li>
+        <li data-n="3">При снятии дисплея возможно его повреждение (полосы, артефакты, отказ включения). Замена дисплея производится за счёт клиента.</li>
+        <li data-n="4">Все пользовательские данные (фото, контакты и др.) могут быть безвозвратно утеряны. Мастерская не занимается восстановлением данных. Клиент самостоятельно создал резервную копию либо согласен на потерю.</li>
+        <li data-n="5">Гарантия на результат ремонта не предоставляется. В худшем случае устройство будет возвращено в нерабочем состоянии; клиент оплачивает диагностику и уже выполненные работы.</li>
+      </ul>
+    </div>
+
+    <div class="sign-block">
+      <div class="sign-item">
+        <div class="sign-line"></div>
+        <div class="sign-label">Мастер (подпись / ФИО)</div>
+      </div>
+      <div class="sign-item">
+        <div class="sign-line"></div>
+        <div class="sign-label">Клиент (подпись / ФИО)</div>
+      </div>
+    </div>
+
+    <div class="footer">
+      ИНН: 402810962699 · ОГРНИП: 307402814200032 · Р/с: 40802810422270001866 · КАЛУЖСКОЕ ОТДЕЛЕНИЕ N8608 ПАО СБЕРБАНК
+    </div>
+  </div>
+  </body></html>`);
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 400);
+};
+
 export const printReceipt = (o: Order) => {
   const now = new Date();
   const dateStr = now.toLocaleDateString("ru-RU");
