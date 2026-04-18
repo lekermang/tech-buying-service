@@ -14,14 +14,13 @@ HEADERS = {
     'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Token, X-Employee-Token',
 }
 
-YM_HEADERS = ['Название', 'Идентификатор', 'Описание', 'Короткое описание',
-              'Категория', 'Фото', 'Цена', 'Количество', 'В наличии', 'Ссылка']
+YM_HEADERS = ['Название', 'Цена', 'Описание', 'Категория', 'URL', 'Фото']
 
 S3_KEY_CATALOG     = 'exports/catalog_export.xlsx'
 S3_KEY_GOODS       = 'exports/goods_export.xlsx'
 S3_KEY_TOOLS_FINAL = 'exports/tools_export.xlsx'
 
-COL_WIDTHS = [40, 15, 50, 30, 25, 50, 14, 10, 12, 50]
+COL_WIDTHS = [50, 14, 80, 30, 60, 60]
 
 
 def get_conn():
@@ -113,10 +112,8 @@ def build_catalog(conn, model_photos=None, category_photos=None):
         desc = description or short
         if not price:
             continue
-        in_stock = 'Да' if availability == 'in_stock' else 'Нет'
         photo = photo_url or model_photos.get(model) or category_photos.get(category) or ''
-        rows.append([name, clean_id(item_id), desc, short, category,
-                     photo, price, '1 шт.', in_stock, photo])
+        rows.append([name, price, desc, category, photo, photo])
     cur.close()
     return make_wb('Каталог электроники', '1565C8', rows)
 
@@ -140,8 +137,7 @@ def build_goods(conn, model_photos=None, category_photos=None):
         if not sell_price:
             continue
         photo = photo_url or model_photos.get(model) or category_photos.get(category) or ''
-        rows.append([name, clean_id(item_id), desc, short, category,
-                     photo, sell_price, '1 шт.', 'Да', photo])
+        rows.append([name, sell_price, desc, category, photo, photo])
     cur.close()
     return make_wb('Товары на складе', '27AE60', rows)
 
@@ -164,8 +160,7 @@ def build_tools(conn):
         short = ' '.join(x for x in [brand, name] if x)
         if not price:
             continue
-        rows.append([name, clean_id(article), short, short, category or '',
-                     image_url or '', price, '1 шт.', 'Да', image_url or ''])
+        rows.append([name, price, short, category or '', image_url or '', image_url or ''])
     cur.close()
     return make_wb('Инструменты', 'E67E22', rows)
 
