@@ -2,18 +2,26 @@ import Icon from "@/components/ui/icon";
 import { Order, STATUSES, INP, LBL, fmt, printReceipt } from "./types";
 import { formatPhone } from "@/lib/phoneFormat";
 
-const STATUS_MSG: Record<string, string> = {
-  in_progress:   "Ваш телефон принят в ремонт и сейчас в работе. Скоро сообщим результат 🔧",
-  waiting_parts: "Для вашего телефона заказаны запчасти. Ожидаем поставку, после этого сразу начнём ремонт ⏳",
-  ready:         "Ваш телефон готов! Можете забирать в любое время. Ждём вас 🎉",
-  done:          "Спасибо за обращение! Ваш телефон выдан. Если возникнут вопросы — всегда рады помочь 👍",
-  cancelled:     "По вашей заявке на ремонт — к сожалению, отменено. Обратитесь к нам для уточнения деталей.",
+const STATUS_LABEL: Record<string, string> = {
+  in_progress:   "В работе",
+  waiting_parts: "Ждём запчасть",
+  ready:         "Готово ✓",
+  done:          "Выдано",
+  cancelled:     "Отменено",
 };
 
-function waLink(phone: string, orderId: number, msg: string, amount?: number | null): string {
+const STATUS_MSG: Record<string, string> = {
+  in_progress:   "В работе 🔧 Ваш телефон принят и сейчас в ремонте. Сообщим, как только будет готово.",
+  waiting_parts: "Ждём запчасть ⏳ Запчасть заказана, ожидаем поставку. Сразу приступим к ремонту.",
+  ready:         "Готово ✓ 🎉 Ваш телефон готов! Можно забирать в любое время.",
+  done:          "Выдано 👍 Спасибо за обращение! Рады видеть вас снова.",
+  cancelled:     "Отменено ❌ К сожалению, ремонт отменён. Свяжитесь с нами для уточнения деталей.",
+};
+
+function maxLink(phone: string, orderId: number, msg: string, amount?: number | null): string {
   const clean = phone.replace(/\D/g, "");
   const full = `Скупка24, ремонт #${orderId}:\n${msg}${amount ? `\nСтоимость: ${Number(amount).toLocaleString("ru-RU")} ₽` : ""}`;
-  return `https://wa.me/${clean}?text=${encodeURIComponent(full)}`;
+  return `https://web.max.ru/#/chat?phone=${clean}&text=${encodeURIComponent(full)}`;
 }
 
 type EditForm = {
@@ -59,6 +67,14 @@ export default function StaffRepairOrderCard({
             <span className="font-roboto text-sm text-white font-medium truncate">{o.name}</span>
             <a href={`tel:${o.phone}`} onClick={e => e.stopPropagation()}
               className="font-roboto text-xs text-[#FFD700] hover:underline shrink-0">{o.phone}</a>
+            {o.phone && o.phone.replace(/\D/g,"").length >= 10 && (
+              <a href={`https://web.max.ru/#/chat?phone=${o.phone.replace(/\D/g,"")}`} target="_blank" rel="noopener noreferrer"
+                onClick={e => e.stopPropagation()}
+                title="Написать в MAX"
+                className="text-blue-400 hover:text-blue-300 transition-colors font-roboto text-[10px] font-bold flex items-center border border-blue-500/30 px-1.5 py-0.5">
+                MAX
+              </a>
+            )}
           </div>
           <div className="flex items-center gap-1.5 shrink-0 ml-2">
             <span className="font-roboto text-[9px] text-white/25 hidden sm:inline">{fmt(o.created_at)}</span>
@@ -152,22 +168,19 @@ export default function StaffRepairOrderCard({
 
           {saveError && <div className="text-red-400 font-roboto text-[10px]">{saveError}</div>}
 
-          {/* WhatsApp статус клиенту */}
+          {/* MAX — статус клиенту */}
           {o.phone && o.phone.replace(/\D/g,"").length >= 10 && (
             <div>
               <div className="font-roboto text-white/30 text-[9px] uppercase tracking-wide mb-1.5 flex items-center gap-1">
-                <Icon name="MessageCircle" size={10} className="text-green-400" /> Статус клиенту (WhatsApp MAX)
+                <span className="text-blue-400 font-bold text-[9px]">MAX</span> Отправить статус клиенту
               </div>
               <div className="flex gap-1.5 flex-wrap">
-                {Object.entries(STATUS_MSG).map(([key, msg]) => {
-                  const s = STATUSES.find(x => x.key === key);
-                  return (
-                    <a key={key} href={waLink(o.phone, o.id, msg, o.repair_amount)} target="_blank" rel="noopener noreferrer"
-                      className="font-roboto text-[9px] px-2 py-1 border border-green-500/20 text-green-400/70 hover:bg-green-500/10 hover:text-green-400 transition-colors flex items-center gap-1">
-                      <Icon name="Send" size={9} />{s?.label || key}
-                    </a>
-                  );
-                })}
+                {Object.entries(STATUS_MSG).map(([key, msg]) => (
+                  <a key={key} href={maxLink(o.phone, o.id, msg, o.repair_amount)} target="_blank" rel="noopener noreferrer"
+                    className="font-roboto text-[9px] px-2.5 py-1.5 border border-blue-500/20 text-blue-400/70 hover:bg-blue-500/10 hover:text-blue-400 transition-colors flex items-center gap-1">
+                    <Icon name="Send" size={9} />{STATUS_LABEL[key] || key}
+                  </a>
+                ))}
               </div>
             </div>
           )}
