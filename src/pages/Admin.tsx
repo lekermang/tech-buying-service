@@ -45,8 +45,9 @@ export default function Admin() {
   const [checking, setChecking] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [generating, setGenerating] = useState(false);
-  const [xlsxUrl, setXlsxUrl] = useState<string | null>(null);
-  const [xlsxToolsUrl, setXlsxToolsUrl] = useState<string | null>(null);
+  const [catalogUrl, setCatalogUrl] = useState<string | null>(null);
+  const [goodsUrl, setGoodsUrl] = useState<string | null>(null);
+  const [toolsUrl, setToolsUrl] = useState<string | null>(null);
   const [xlsxProgress, setXlsxProgress] = useState(0);
   const [xlsxStep, setXlsxStep] = useState("");
 
@@ -62,33 +63,31 @@ export default function Admin() {
       const res = await fetch(EXPORT_URL, { headers: adminHeaders(tok) });
       if (!res.ok) return;
       const data = await res.json();
-      if (data.url) setXlsxUrl(data.url);
-      if (data.tools_url) setXlsxToolsUrl(data.tools_url);
+      if (data.catalog_url) setCatalogUrl(data.catalog_url);
+      if (data.goods_url) setGoodsUrl(data.goods_url);
+      if (data.tools_url) setToolsUrl(data.tools_url);
     } catch (_e) { /* ignore */ }
   };
 
   const generateXlsx = async () => {
     const tok = localStorage.getItem("admin_token") || token;
     setGenerating(true);
-    setXlsxUrl(null);
-    setXlsxToolsUrl(null);
+    setCatalogUrl(null); setGoodsUrl(null); setToolsUrl(null);
     try {
-      setXlsxStep("Каталог электроники..."); setXlsxProgress(10);
-      await post(tok, 'catalog', { model_photos: MODEL_PHOTOS, category_photos: CATEGORY_PHOTOS });
+      setXlsxStep("Каталог электроники..."); setXlsxProgress(15);
+      const r1 = await post(tok, 'catalog', { model_photos: MODEL_PHOTOS, category_photos: CATEGORY_PHOTOS });
+      if (r1.catalog_url) setCatalogUrl(r1.catalog_url);
 
-      setXlsxStep("Товары на складе..."); setXlsxProgress(35);
-      await post(tok, 'goods', { model_photos: MODEL_PHOTOS, category_photos: CATEGORY_PHOTOS });
+      setXlsxStep("Товары на складе..."); setXlsxProgress(40);
+      const r2 = await post(tok, 'goods', { model_photos: MODEL_PHOTOS, category_photos: CATEGORY_PHOTOS });
+      if (r2.goods_url) setGoodsUrl(r2.goods_url);
 
-      setXlsxStep("Инструменты (18 000 позиций)..."); setXlsxProgress(55);
+      setXlsxStep("Инструменты (~9 000 позиций)..."); setXlsxProgress(65);
       const r3 = await post(tok, 'tools');
-      if (r3.tools_url) setXlsxToolsUrl(r3.tools_url);
-
-      setXlsxStep("Сборка файла..."); setXlsxProgress(90);
-      const result = await post(tok, 'merge');
+      if (r3.tools_url) setToolsUrl(r3.tools_url);
 
       setXlsxProgress(100);
       setXlsxStep("Готово!");
-      if (result.url) setXlsxUrl(result.url);
     } catch (e) {
       console.error("generateXlsx error:", e);
       setXlsxStep("Ошибка!");
@@ -241,21 +240,28 @@ export default function Admin() {
               <Icon name={generating ? "Loader" : "RefreshCw"} size={13} className={generating ? "animate-spin" : ""} />
               {generating ? "Генерирую..." : "Обновить XLSX"}
             </button>
-            {xlsxUrl && !generating && (
-              <a href={xlsxUrl} download="yandex_market_export.xlsx"
-                className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 border border-green-500/30 text-green-400 hover:bg-green-500/10 transition-colors">
+            {catalogUrl && !generating && (
+              <a href={catalogUrl} download="catalog_export.xlsx"
+                className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 border border-blue-500/30 text-blue-400 hover:bg-blue-500/10 transition-colors">
                 <Icon name="FileDown" size={13} />
-                Каталог + Товары
+                Каталог
               </a>
             )}
-            {xlsxToolsUrl && !generating && (
-              <a href={xlsxToolsUrl} download="tools_export.xlsx"
+            {goodsUrl && !generating && (
+              <a href={goodsUrl} download="goods_export.xlsx"
+                className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 border border-green-500/30 text-green-400 hover:bg-green-500/10 transition-colors">
+                <Icon name="FileDown" size={13} />
+                Товары
+              </a>
+            )}
+            {toolsUrl && !generating && (
+              <a href={toolsUrl} download="tools_export.xlsx"
                 className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 border border-orange-500/30 text-orange-400 hover:bg-orange-500/10 transition-colors">
                 <Icon name="FileDown" size={13} />
                 Инструменты
               </a>
             )}
-            {!xlsxUrl && !xlsxToolsUrl && !generating && (
+            {!catalogUrl && !goodsUrl && !toolsUrl && !generating && (
               <span className="text-[11px] text-white/30">Файл не сформирован</span>
             )}
           </div>

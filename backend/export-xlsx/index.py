@@ -16,15 +16,13 @@ HEADERS = {
 
 YM_HEADERS = ['Название', 'Идентификатор', 'Описание', 'Короткое описание',
               'Категория', 'Фото', 'Цена', 'В наличии',
-              'Количество', 'Единицы измерения', 'Ссылка']
+              'Количество', 'Ссылка']
 
-S3_KEY_CATALOG = 'exports/part_catalog.xlsx'
-S3_KEY_GOODS   = 'exports/part_goods.xlsx'
-S3_KEY_TOOLS   = 'exports/part_tools.xlsx'
-S3_KEY_FINAL   = 'exports/yandex_market_export.xlsx'
+S3_KEY_CATALOG     = 'exports/catalog_export.xlsx'
+S3_KEY_GOODS       = 'exports/goods_export.xlsx'
 S3_KEY_TOOLS_FINAL = 'exports/tools_export.xlsx'
 
-COL_WIDTHS = [40, 15, 50, 30, 25, 50, 14, 12, 10, 8, 50]
+COL_WIDTHS = [40, 15, 50, 30, 25, 50, 14, 12, 14, 50]
 
 
 def get_conn():
@@ -117,7 +115,7 @@ def build_catalog(conn, model_photos=None, category_photos=None):
         in_stock = 'Да' if availability == 'in_stock' else 'Нет'
         photo = photo_url or model_photos.get(model) or category_photos.get(category) or ''
         rows.append([name, clean_id(item_id), desc, short, category,
-                     photo, price or '', in_stock, 1, 'шт', photo])
+                     photo, price or '', in_stock, '1 шт.', photo])
     cur.close()
     return make_wb('Каталог электроники', '1565C8', rows)
 
@@ -140,7 +138,7 @@ def build_goods(conn, model_photos=None, category_photos=None):
         desc = description or short
         photo = photo_url or model_photos.get(model) or category_photos.get(category) or ''
         rows.append([name, clean_id(item_id), desc, short, category,
-                     photo, sell_price or '', 'Да', 1, 'шт', photo])
+                     photo, sell_price or '', 'Да', '1 шт.', photo])
     cur.close()
     return make_wb('Товары на складе', '27AE60', rows)
 
@@ -162,41 +160,14 @@ def build_tools(conn):
         price = float(my_price) if my_price and float(my_price) > 0 else (float(base_price) if base_price else '')
         short = ' '.join(x for x in [brand, name] if x)
         rows.append([name, clean_id(article), short, short, category or '',
-                     image_url or '', price, 'Да', 1, 'шт', image_url or ''])
+                     image_url or '', price, 'Да', '1 шт.', image_url or ''])
     cur.close()
     return make_wb('Инструменты', 'E67E22', rows)
 
 
-def merge_parts(s3):
-    wb_final = openpyxl.Workbook()
-    wb_final.remove(wb_final.active)
-    for key, fill, name in [
-        (S3_KEY_CATALOG, '1565C8', 'Каталог электроники'),
-        (S3_KEY_GOODS,   '27AE60', 'Товары на складе'),
-        (S3_KEY_TOOLS,   'E67E22', 'Инструменты'),
-    ]:
-        obj = s3.get_object(Bucket='files', Key=key)
-        part_wb = openpyxl.load_workbook(io.BytesIO(obj['Body'].read()))
-        part_ws = part_wb.active
-        ws = wb_final.create_sheet(name)
-        for row in part_ws.iter_rows(values_only=True):
-            ws.append(list(row))
-        style_header(ws, fill)
-        ws.freeze_panes = 'A2'
-    buf = io.BytesIO()
-    wb_final.save(buf)
-    buf.seek(0)
-    return buf.read()
-
-
-def get_cdn_url():
+def cdn(key):
     key_id = os.environ['AWS_ACCESS_KEY_ID']
-    return f"https://cdn.poehali.dev/projects/{key_id}/bucket/{S3_KEY_FINAL}"
-
-
-def get_cdn_tools_url():
-    key_id = os.environ['AWS_ACCESS_KEY_ID']
-    return f"https://cdn.poehali.dev/projects/{key_id}/bucket/{S3_KEY_TOOLS_FINAL}"
+    return f"https://cdn.poehali.dev/projects/{key_id}/bucket/{key}"
 
 
 def s3_exists(s3, key):
@@ -207,8 +178,16 @@ def s3_exists(s3, key):
         return False
 
 
+def put_xlsx(s3, key, data, filename):
+    s3.put_object(
+        Bucket='files', Key=key, Body=data,
+        ContentType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ContentDisposition=f'attachment; filename="{filename}"',
+    )
+
+
 def handler(event: dict, context) -> dict:
-    """Экспорт XLSX Яндекс Маркет: пошаговая генерация каталога, товаров, инструментов"""
+    """Экспорт XLSX Яндекс Бизнес: 3 отдельных файла — каталог, товары, инструменты"""
     if event.get('httpMethod') == 'OPTIONS':
         return {'statusCode': 200, 'headers': HEADERS, 'body': ''}
 
@@ -224,58 +203,42 @@ def handler(event: dict, context) -> dict:
             body = {}
 
     action = body.get('action') if method == 'POST' else 'status'
-
     s3 = get_s3()
 
-    # GET — статус
+    # GET — статус всех трёх файлов
     if action == 'status':
-        exists = s3_exists(s3, S3_KEY_FINAL)
-        tools_exists = s3_exists(s3, S3_KEY_TOOLS_FINAL)
         return ok({
-            'status': 'ready' if exists else 'not_generated',
-            'url': get_cdn_url() if exists else None,
-            'tools_url': get_cdn_tools_url() if tools_exists else None,
+            'catalog_url': cdn(S3_KEY_CATALOG) if s3_exists(s3, S3_KEY_CATALOG) else None,
+            'goods_url':   cdn(S3_KEY_GOODS)   if s3_exists(s3, S3_KEY_GOODS)   else None,
+            'tools_url':   cdn(S3_KEY_TOOLS_FINAL) if s3_exists(s3, S3_KEY_TOOLS_FINAL) else None,
         })
 
-    # POST action=catalog
+    # POST action=catalog → catalog_export.xlsx
     if action == 'catalog':
         model_photos = body.get('model_photos', {})
         category_photos = body.get('category_photos', {})
         conn = get_conn()
         data = build_catalog(conn, model_photos, category_photos)
         conn.close()
-        s3.put_object(Bucket='files', Key=S3_KEY_CATALOG, Body=data,
-                      ContentType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        return ok({'status': 'catalog_done'})
+        put_xlsx(s3, S3_KEY_CATALOG, data, 'catalog_export.xlsx')
+        return ok({'status': 'catalog_done', 'catalog_url': cdn(S3_KEY_CATALOG)})
 
-    # POST action=goods
+    # POST action=goods → goods_export.xlsx
     if action == 'goods':
         model_photos = body.get('model_photos', {})
         category_photos = body.get('category_photos', {})
         conn = get_conn()
         data = build_goods(conn, model_photos, category_photos)
         conn.close()
-        s3.put_object(Bucket='files', Key=S3_KEY_GOODS, Body=data,
-                      ContentType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        return ok({'status': 'goods_done'})
+        put_xlsx(s3, S3_KEY_GOODS, data, 'goods_export.xlsx')
+        return ok({'status': 'goods_done', 'goods_url': cdn(S3_KEY_GOODS)})
 
-    # POST action=tools — часть для merge + отдельный файл инструментов
+    # POST action=tools → tools_export.xlsx
     if action == 'tools':
         conn = get_conn()
         data = build_tools(conn)
         conn.close()
-        ct = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        s3.put_object(Bucket='files', Key=S3_KEY_TOOLS, Body=data, ContentType=ct)
-        s3.put_object(Bucket='files', Key=S3_KEY_TOOLS_FINAL, Body=data, ContentType=ct,
-                      ContentDisposition='attachment; filename="tools_export.xlsx"')
-        return ok({'status': 'tools_done', 'tools_url': get_cdn_tools_url()})
-
-    # POST action=merge — объединить каталог + товары (без инструментов — отдельный файл)
-    if action == 'merge':
-        final_data = merge_parts(s3)
-        s3.put_object(Bucket='files', Key=S3_KEY_FINAL, Body=final_data,
-                      ContentType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                      ContentDisposition='attachment; filename="yandex_market_export.xlsx"')
-        return ok({'status': 'ready', 'url': get_cdn_url(), 'tools_url': get_cdn_tools_url()})
+        put_xlsx(s3, S3_KEY_TOOLS_FINAL, data, 'tools_export.xlsx')
+        return ok({'status': 'tools_done', 'tools_url': cdn(S3_KEY_TOOLS_FINAL)})
 
     return err(400, 'Unknown action')
