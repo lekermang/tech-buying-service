@@ -16,7 +16,7 @@ HEADERS = {
 
 YM_HEADERS = ['Название', 'Идентификатор', 'Описание', 'Короткое описание',
               'Категория', 'Фото', 'Цена', 'В наличии',
-              'Количество', 'Ссылка']
+              'Количество', 'Единицы измерения', 'Ссылка']
 
 S3_KEY_CATALOG = 'exports/part_catalog.xlsx'
 S3_KEY_GOODS   = 'exports/part_goods.xlsx'
@@ -24,7 +24,7 @@ S3_KEY_TOOLS   = 'exports/part_tools.xlsx'
 S3_KEY_FINAL   = 'exports/yandex_market_export.xlsx'
 S3_KEY_TOOLS_FINAL = 'exports/tools_export.xlsx'
 
-COL_WIDTHS = [40, 15, 50, 30, 25, 50, 14, 12, 12, 50]
+COL_WIDTHS = [40, 15, 50, 30, 25, 50, 14, 12, 10, 8, 50]
 
 
 def get_conn():
@@ -94,6 +94,10 @@ def make_wb(sheet_name, fill_color, rows):
     return buf.read()
 
 
+def clean_id(val):
+    return str(val).strip().lstrip('\ufeff').lstrip('\u200b').strip()
+
+
 def build_catalog(conn, model_photos=None, category_photos=None):
     model_photos = model_photos or {}
     category_photos = category_photos or {}
@@ -112,8 +116,8 @@ def build_catalog(conn, model_photos=None, category_photos=None):
         desc = description or short
         in_stock = 'Да' if availability == 'in_stock' else 'Нет'
         photo = photo_url or model_photos.get(model) or category_photos.get(category) or ''
-        rows.append([name, str(item_id), desc, short, category,
-                     photo, price or '', in_stock, '1 шт', photo])
+        rows.append([name, clean_id(item_id), desc, short, category,
+                     photo, price or '', in_stock, 1, 'шт', photo])
     cur.close()
     return make_wb('Каталог электроники', '1565C8', rows)
 
@@ -135,27 +139,30 @@ def build_goods(conn, model_photos=None, category_photos=None):
         short = ' '.join(x for x in [brand, model, storage, condition] if x)
         desc = description or short
         photo = photo_url or model_photos.get(model) or category_photos.get(category) or ''
-        rows.append([name, str(item_id), desc, short, category,
-                     photo, sell_price or '', 'Да', '1 шт', photo])
+        rows.append([name, clean_id(item_id), desc, short, category,
+                     photo, sell_price or '', 'Да', 1, 'шт', photo])
     cur.close()
     return make_wb('Товары на складе', '27AE60', rows)
 
 
 def build_tools(conn):
     cur = conn.cursor()
+    # Только товары "В наличии" — лимит Яндекс Бизнес 10 000
     cur.execute(f"""
         SELECT article, name, brand, category,
                my_price, base_price, amount, image_url
-        FROM {SCHEMA}.tools_products ORDER BY category, name
+        FROM {SCHEMA}.tools_products
+        WHERE amount ILIKE '%наличи%'
+        ORDER BY category, name
+        LIMIT 9900
     """)
     rows = []
     for r in cur.fetchall():
         article, name, brand, category, my_price, base_price, amount, image_url = r
         price = float(my_price) if my_price and float(my_price) > 0 else (float(base_price) if base_price else '')
-        in_stock = 'Да' if amount and 'наличи' in amount.lower() else 'Нет'
         short = ' '.join(x for x in [brand, name] if x)
-        rows.append([name, article, short, short, category or '',
-                     image_url or '', price, in_stock, '1 шт', image_url or ''])
+        rows.append([name, clean_id(article), short, short, category or '',
+                     image_url or '', price, 'Да', 1, 'шт', image_url or ''])
     cur.close()
     return make_wb('Инструменты', 'E67E22', rows)
 
