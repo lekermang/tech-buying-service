@@ -50,7 +50,12 @@ export default function Admin() {
     try {
       const res = await fetch(EXPORT_URL, { headers: adminHeaders(token) });
       const text = await res.text();
-      const binary = atob(text);
+      let base64 = text;
+      try {
+        const parsed = JSON.parse(text);
+        if (parsed.body) base64 = parsed.body;
+      } catch (_e) { /* raw base64 */ }
+      const binary = atob(base64);
       const bytes = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
       const blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
