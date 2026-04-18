@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import Icon from "@/components/ui/icon";
-import { REPAIR_URL, STATUSES, Order, DayStat, EMPTY_FORM, INP, LBL, printReceipt } from "./repair/types";
+import { REPAIR_URL, STATUSES, Order, DayStat, EMPTY_FORM, INP, LBL, printReceipt, printAct } from "./repair/types";
 import StaffRepairAnalytics from "./repair/StaffRepairAnalytics";
 import StaffRepairOrderCard from "./repair/StaffRepairOrderCard";
 import StaffRepairReadyModal from "./repair/StaffRepairReadyModal";
@@ -96,12 +96,25 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
   const createOrder = async () => {
     if (!form.name || !form.phone) return;
     setCreating(true);
-    await fetch(REPAIR_URL, {
+    const res = await fetch(REPAIR_URL, {
       method: "POST", headers,
       body: JSON.stringify({ action: "create", ...form, price: form.price ? parseInt(form.price) : null }),
     });
+    const data = await res.json();
     setCreating(false);
     setShowForm(false);
+    if (data.order_id) {
+      const newOrder: Order = {
+        id: data.order_id, name: form.name, phone: form.phone,
+        model: form.model || null, repair_type: form.repair_type || null,
+        price: form.price ? parseInt(form.price) : null,
+        comment: form.comment || null, status: "new",
+        admin_note: null, created_at: new Date().toISOString(),
+        purchase_amount: null, repair_amount: null,
+        completed_at: null, master_income: null, parts_name: null,
+      };
+      printAct(newOrder);
+    }
     setForm(EMPTY_FORM);
     loadOrders();
   };
