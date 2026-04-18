@@ -32,7 +32,7 @@
     --input: 0 0% 15%;
     --ring: 48 100% 50%;
 
-    --radius: 0.25rem;
+    --radius: 0.5rem;
 
     --yellow: #ffd700;
     --black: #0d0d0d;
@@ -62,6 +62,14 @@
     font-family: "Oswald", sans-serif;
     text-transform: uppercase;
     letter-spacing: 0.02em;
+  }
+
+  button:not([class*="rounded"]):not([class*="rounded-none"]) {
+    border-radius: 0.5rem;
+  }
+
+  a[class*="bg-"]:not([class*="rounded"]) {
+    border-radius: 0.5rem;
   }
 }
 

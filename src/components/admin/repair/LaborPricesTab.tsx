@@ -4,12 +4,19 @@ import Icon from "@/components/ui/icon";
 const ADMIN_URL = "https://functions.poehali.dev/a105aede-d55d-4b99-9d3e-5e977887aa04";
 
 const LABELS: Record<string, string> = {
-  display:      "Дисплей",
-  battery:      "Аккумулятор",
-  glass:        "Стекло / тачскрин",
-  camera_glass: "Стекло камеры",
-  flex_board:   "Шлейф / плата",
-  accessory:    "Задняя крышка",
+  display:        "Дисплей",
+  battery:        "Аккумулятор",
+  glass:          "Стекло / тачскрин",
+  camera_glass:   "Стекло камеры",
+  flex_board:     "Шлейф / плата",
+  accessory:      "Аксессуары",
+  rear_glass:     "Заднее стекло iPhone",
+  battery_iphone: "Аккумулятор iPhone",
+  battery_other:  "Аккумулятор (другое)",
+  speaker_ear:    "Динамик слуховой",
+  speaker_loud:   "Динамик громкий (звонок)",
+  vibro:          "Вибромотор",
+  back_cover:     "Задняя крышка / Рамка / Корпус",
 };
 
 type LaborPrice = { part_type: string; label: string; price: number };

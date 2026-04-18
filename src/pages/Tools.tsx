@@ -419,6 +419,17 @@ export default function ToolsPage() {
         </div>
       </div>
 
+      {/* Подвал с гарантией */}
+      <footer className="border-t border-gray-800 mt-2 py-6">
+        <div className="max-w-screen-xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-gray-600">
+          <div className="flex items-center gap-2">
+            <Icon name="ShieldCheck" size={16} className="text-orange-400 shrink-0" />
+            <span className="text-gray-400 font-medium">Гарантия <span className="text-orange-400 font-bold">3 года</span> на весь ручной инструмент</span>
+          </div>
+          <span className="text-gray-700">© Скупка24 — профессиональные инструменты и расходные материалы</span>
+        </div>
+      </footer>
+
       {cartOpen && <ToolsCartModal cart={cart} onClose={() => setCartOpen(false)} onRemove={removeFromCart} onQty={changeQty} />}
     </div>
   );

@@ -9,17 +9,23 @@ SCHEMA = 't_p31606708_tech_buying_service'
 API_URL = 'https://b2b.moysklad.ru/desktop-api/public/wIIpnHFmddpo/products.json'
 
 DEFAULT_LABOR = {
-    'display': 2000, 'battery': 1000, 'glass': 700,
-    'accessory': 500, 'camera_glass': 1000, 'flex_board': 1200,
+    'display': 1800, 'battery': 1000, 'battery_iphone': 1200, 'battery_other': 800,
+    'glass': 700, 'accessory': 500, 'camera_glass': 800, 'flex_board': 1000,
+    'rear_glass': 1200, 'speaker_ear': 700, 'speaker_loud': 700, 'vibro': 600, 'back_cover': 900,
 }
 
 PART_TYPE_RULES = [
-    ('battery',      ['аккумулятор', 'акб']),
-    ('camera_glass', ['стекл', 'камер']),
-    ('glass',        ['стекло', 'тачскрин', 'переклейк']),
-    ('flex_board',   ['шлейф', 'плат']),
-    ('display',      ['дисплей', 'экран', 'lcd', 'oled', 'amoled']),
-    ('accessory',    ['аксессуар', 'динамик', 'звонок', 'вибро', 'корпус', 'рамка', 'крышка', 'прочее']),
+    ('rear_glass',     ['заднее стекло', 'back glass']),
+    ('camera_glass',   ['стекл', 'камер']),
+    ('glass',          ['стекло', 'тачскрин', 'переклейк']),
+    ('flex_board',     ['шлейф', 'плат']),
+    ('display',        ['дисплей', 'экран', 'lcd', 'oled', 'amoled']),
+    ('speaker_ear',    ['слуховой', 'earpiece', 'наушник']),
+    ('speaker_loud',   ['динамик', 'звонок', 'speaker']),
+    ('vibro',          ['вибро', 'vibrat']),
+    ('back_cover',     ['корпус', 'рамка', 'крышка', 'back cover']),
+    ('battery_iphone', ['аккумулятор', 'акб', 'батар']),
+    ('accessory',      ['аксессуар', 'прочее']),
 ]
 
 QUALITY_RULES = [
