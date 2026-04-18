@@ -15,13 +15,13 @@ HEADERS = {
 }
 
 YM_HEADERS = ['Название', 'Идентификатор', 'Описание', 'Короткое описание',
-              'Категория', 'Фото', 'Цена', 'В наличии', 'Ссылка']
+              'Категория', 'Фото', 'Цена', 'Количество', 'В наличии', 'Ссылка']
 
 S3_KEY_CATALOG     = 'exports/catalog_export.xlsx'
 S3_KEY_GOODS       = 'exports/goods_export.xlsx'
 S3_KEY_TOOLS_FINAL = 'exports/tools_export.xlsx'
 
-COL_WIDTHS = [40, 15, 50, 30, 25, 50, 14, 12, 50]
+COL_WIDTHS = [40, 15, 50, 30, 25, 50, 14, 10, 12, 50]
 
 
 def get_conn():
@@ -111,10 +111,12 @@ def build_catalog(conn, model_photos=None, category_photos=None):
         name = ' '.join(x for x in [brand, model, storage, color] if x)
         short = ' '.join(x for x in [brand, model, storage] if x)
         desc = description or short
+        if not price:
+            continue
         in_stock = 'Да' if availability == 'in_stock' else 'Нет'
         photo = photo_url or model_photos.get(model) or category_photos.get(category) or ''
         rows.append([name, clean_id(item_id), desc, short, category,
-                     photo, price or '', in_stock, photo])
+                     photo, price, '1 шт.', in_stock, photo])
     cur.close()
     return make_wb('Каталог электроники', '1565C8', rows)
 
@@ -135,9 +137,11 @@ def build_goods(conn, model_photos=None, category_photos=None):
         name = title or ' '.join(x for x in [brand, model, storage, color] if x)
         short = ' '.join(x for x in [brand, model, storage, condition] if x)
         desc = description or short
+        if not sell_price:
+            continue
         photo = photo_url or model_photos.get(model) or category_photos.get(category) or ''
         rows.append([name, clean_id(item_id), desc, short, category,
-                     photo, sell_price or '', 'Да', photo])
+                     photo, sell_price, '1 шт.', 'Да', photo])
     cur.close()
     return make_wb('Товары на складе', '27AE60', rows)
 
@@ -158,8 +162,10 @@ def build_tools(conn):
         article, name, brand, category, my_price, base_price, amount, image_url = r
         price = float(my_price) if my_price and float(my_price) > 0 else (float(base_price) if base_price else '')
         short = ' '.join(x for x in [brand, name] if x)
+        if not price:
+            continue
         rows.append([name, clean_id(article), short, short, category or '',
-                     image_url or '', price, 'Да', image_url or ''])
+                     image_url or '', price, '1 шт.', 'Да', image_url or ''])
     cur.close()
     return make_wb('Инструменты', 'E67E22', rows)
 
