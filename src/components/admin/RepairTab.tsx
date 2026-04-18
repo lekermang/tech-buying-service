@@ -5,6 +5,7 @@ import {
   ADMIN_URL, STATUSES, Order, Analytics, EditForm,
   EMPTY_FORM, EMPTY_READY,
 } from "./repair/repairTypes";
+import { printAct } from "@/pages/repair/types";
 import RepairAnalytics from "./repair/RepairAnalytics";
 import RepairOrderCard from "./repair/RepairOrderCard";
 import RepairReadyModal from "./repair/RepairReadyModal";
@@ -148,13 +149,26 @@ export default function RepairTab({ token }: { token: string }) {
   const createOrder = async () => {
     if (!form.name || !form.phone) return;
     setCreating(true);
-    await fetch(ADMIN_URL, {
+    const res = await fetch(ADMIN_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...adminHeaders(token) },
       body: JSON.stringify({ action: "create", ...form, price: form.price ? parseInt(form.price) : null }),
     });
+    const data = await res.json();
     setCreating(false);
     setShowForm(false);
+    if (data.id) {
+      const newOrder: Order = {
+        id: data.id, name: form.name, phone: form.phone,
+        model: form.model || null, repair_type: form.repair_type || null,
+        price: form.price ? parseInt(form.price) : null,
+        comment: form.comment || null, status: "new",
+        admin_note: null, created_at: new Date().toISOString(),
+        purchase_amount: null, repair_amount: null,
+        completed_at: null, master_income: null, parts_name: null,
+      };
+      printAct(newOrder);
+    }
     setForm(EMPTY_FORM);
     load();
   };
