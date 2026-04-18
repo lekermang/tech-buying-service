@@ -11,15 +11,7 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled:     "Отменено",
 };
 
-const AD_FOOTER = "\n\n📲 Присоединяйтесь к нам: https://t.me/ProService40";
-
-const STATUS_MSG: Record<string, string> = {
-  in_progress:   "В работе 🔧 Ваш телефон принят и сейчас в ремонте. Сообщим, как только будет готово.",
-  waiting_parts: "Ждём запчасть ⏳ Запчасть заказана, ожидаем поставку. Сразу приступим к ремонту.",
-  ready:         "Готово ✓ 🎉 Ваш телефон готов! Можно забирать в любое время.",
-  done:          "Выдано 👍 Спасибо за обращение! Рады видеть вас снова.",
-  cancelled:     "Отменено ❌ К сожалению, ремонт отменён. Свяжитесь с нами для уточнения деталей.",
-};
+const REPAIR_ORDER_URL = "https://functions.poehali.dev/8d0ee3bd-41eb-44fe-9d30-aab6ddc2042d";
 
 type EditForm = {
   name: string; phone: string; model: string; repair_type: string;
@@ -34,6 +26,8 @@ type Props = {
   saving: boolean;
   saveError: string | null;
   isOwner: boolean;
+  token: string;
+  authHeader: "X-Admin-Token" | "X-Employee-Token";
   onToggle: () => void;
   onEditFormChange: (id: number, ef: EditForm) => void;
   onChangeStatus: (id: number, status: string, extra?: Record<string, unknown>) => void;
@@ -46,17 +40,27 @@ type Props = {
 const statusInfo = (key: string) => STATUSES.find(s => s.key === key) || STATUSES[0];
 
 export default function StaffRepairOrderCard({
-  o, isExpanded, ef, saving, saveError, isOwner,
+  o, isExpanded, ef, saving, saveError, isOwner, token, authHeader,
   onToggle, onEditFormChange, onChangeStatus, onOpenReadyModal, onIssueOrder, onSaveCard, onDelete,
 }: Props) {
   const st = statusInfo(o.status);
   const [sentKey, setSentKey] = useState<string | null>(null);
+  const [notifyError, setNotifyError] = useState<string | null>(null);
 
-  const handleSend = (key: string, msg: string) => {
-    const amount = o.repair_amount ? `\nСтоимость: ${Number(o.repair_amount).toLocaleString("ru-RU")} ₽` : "";
-    const fullMsg = `Скупка24, ремонт #${o.id}:\n${msg}${amount}${AD_FOOTER}`;
-    window.open(`https://t.me/Skypkaklgbot?text=${encodeURIComponent(fullMsg)}`, "_blank");
-    setSentKey(key);
+  const handleSend = async (statusKey: string) => {
+    setSentKey(statusKey);
+    setNotifyError(null);
+    try {
+      const res = await fetch(REPAIR_ORDER_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", [authHeader]: token },
+        body: JSON.stringify({ action: "notify", order_id: o.id, status_key: statusKey }),
+      });
+      const data = await res.json();
+      if (!data.ok) setNotifyError(data.error || "Ошибка отправки");
+    } catch {
+      setNotifyError("Ошибка соединения");
+    }
     setTimeout(() => setSentKey(null), 3000);
   };
 
@@ -176,31 +180,31 @@ export default function StaffRepairOrderCard({
 
           {/* Telegram — статус клиенту через @Skypkaklgbot */}
           <div className="border border-[#229ED9]/15 bg-[#229ED9]/5 p-2.5">
-            <div className="flex items-center justify-between mb-2">
-              <div className="font-roboto text-white/30 text-[9px] uppercase tracking-wide flex items-center gap-1">
-                <Icon name="Send" size={9} className="text-[#229ED9]" /> Статус клиенту — Telegram
-              </div>
-              <a href="https://t.me/Skypkaklgbot" target="_blank" rel="noopener noreferrer"
-                className="font-roboto text-[9px] text-[#229ED9] hover:text-[#1a8cc2] border border-[#229ED9]/30 px-1.5 py-0.5 transition-colors">
-                @Skypkaklgbot →
-              </a>
+            <div className="font-roboto text-white/30 text-[9px] uppercase tracking-wide mb-2 flex items-center gap-1">
+              <Icon name="Send" size={9} className="text-[#229ED9]" /> Статус клиенту — бот @Skypkaklgbot
             </div>
             <div className="flex gap-1.5 flex-wrap">
-              {Object.entries(STATUS_MSG).map(([key, msg]) => (
-                <button key={key} type="button" onClick={() => handleSend(key, msg)}
+              {Object.entries(STATUS_LABEL).map(([key, label]) => (
+                <button key={key} type="button" onClick={() => handleSend(key)}
+                  disabled={sentKey === key}
                   className={`font-roboto text-[9px] px-2.5 py-1.5 border transition-colors flex items-center gap-1 ${
                     sentKey === key
                       ? "border-green-500/40 text-green-400 bg-green-500/10"
                       : "border-[#229ED9]/20 text-[#229ED9]/70 hover:bg-[#229ED9]/10 hover:text-[#229ED9]"
                   }`}>
                   <Icon name={sentKey === key ? "Check" : "Send"} size={9} />
-                  {STATUS_LABEL[key] || key}
+                  {label}
                 </button>
               ))}
             </div>
-            {sentKey && (
+            {sentKey && !notifyError && (
               <div className="mt-1.5 font-roboto text-[9px] text-green-400/70 flex items-center gap-1">
-                <Icon name="CheckCircle" size={9} /> Telegram открыт — нажмите «Отправить» боту
+                <Icon name="CheckCircle" size={9} /> Сообщение отправлено клиенту в Telegram
+              </div>
+            )}
+            {notifyError && (
+              <div className="mt-1.5 font-roboto text-[9px] text-orange-400 flex items-center gap-1">
+                <Icon name="AlertCircle" size={9} /> {notifyError}
               </div>
             )}
           </div>

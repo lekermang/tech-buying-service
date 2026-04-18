@@ -331,6 +331,8 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
                   saving={saving}
                   saveError={saveError}
                   isOwner={isOwner}
+                  token={token}
+                  authHeader="X-Employee-Token"
                   onToggle={() => {
                     const opening = expandedId !== o.id;
                     setExpandedId(opening ? o.id : null);

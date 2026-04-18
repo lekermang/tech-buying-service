@@ -337,6 +337,8 @@ export default function RepairTab({ token }: { token: string }) {
                   ef={ef}
                   saving={saving}
                   saveError={saveError}
+                  token={token}
+                  authHeader="X-Admin-Token"
                   onToggle={() => {
                     setExpandedId(isExpanded ? null : o.id);
                     setSaveError(null);
