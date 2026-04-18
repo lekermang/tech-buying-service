@@ -511,11 +511,31 @@ def handler(event: dict, context) -> dict:
             model_val = f"'{model}'" if model else 'NULL'
             repair_type_val = f"'{repair_type}'" if repair_type else 'NULL'
             comment_val = f"'{comment}'" if comment else 'NULL'
+            price_str = f"{int(price):,} ₽".replace(',', ' ') if price else 'не определена'
+            suffix = ''.join(c for c in phone if c.isdigit())[-10:]
+            cur.execute(f"SELECT chat_id FROM {SCHEMA}.tg_phone_map WHERE RIGHT(REGEXP_REPLACE(phone, '[^0-9]', '', 'g'), 10) = '{suffix}' LIMIT 1")
+            prow = cur.fetchone()
+            client_chat_id = prow[0] if prow else None
             cur.execute(
-                f"INSERT INTO {SCHEMA}.repair_orders (name, phone, model, repair_type, price, comment) VALUES ('{name}', '{phone}', {model_val}, {repair_type_val}, {price_val}, {comment_val}) RETURNING id"
+                f"INSERT INTO {SCHEMA}.repair_orders (name, phone, model, repair_type, price, comment, client_tg_chat_id) VALUES ('{name}', '{phone}', {model_val}, {repair_type_val}, {price_val}, {comment_val}, {'NULL' if not client_chat_id else client_chat_id}) RETURNING id"
             )
             new_id = cur.fetchone()[0]
-            conn.commit(); cur.close(); conn.close()
+            conn.commit()
+            tg_token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+            main_chat = os.environ.get('TELEGRAM_CHAT_ID', '')
+            tg_msg = (
+                f"🔧 *Заявка #{new_id} на ремонт — Скупка24*\n\n"
+                f"👤 *Имя:* {name}\n📞 *Телефон:* {phone}\n"
+                f"📱 *Модель:* {model or '—'}\n🛠 *Тип ремонта:* {repair_type or '—'}\n"
+                f"💰 *Стоимость:* {price_str}"
+                + (f"\n📝 *Комментарий:* {comment}" if comment else "")
+                + f"\n\n🔑 ID заявки: `{new_id}`"
+                + ("\n✅ Клиент в TG" if client_chat_id else "")
+            )
+            if tg_token and main_chat:
+                send_tg_all(tg_token, main_chat, conn, tg_msg)
+            send_sms('+79929990333', f'Заявка #{new_id} на ремонт. {name}, {phone}. {repair_type or model or ""}. Скупка24')
+            cur.close(); conn.close()
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'id': new_id}, ensure_ascii=False)}
 
         # Удалить заявку

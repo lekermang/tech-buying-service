@@ -336,6 +336,17 @@ def handler(event: dict, context) -> dict:
             send_tg(token, cid, tg_text)
             send_tg(token, cid, act_text)
 
+    if token and client_chat_id:
+        client_msg = (
+            f"✅ *Заявка #{order_id} принята!*\n\n"
+            f"Здравствуйте, {name}!\n"
+            f"📱 *Устройство:* {model or '—'}\n"
+            f"🛠 *Работы:* {repair_type or '—'}\n"
+            f"💰 *Стоимость:* {price_str}\n\n"
+            f"Скоро перезвоним. Статус — командой /status{AD_FOOTER}"
+        )
+        send_tg(token, client_chat_id, client_msg)
+
     send_sms('+79929990333', f'Заявка #{order_id} на ремонт. {name}, {phone}. {repair_type or model or ""}. Скупка24')
     send_email('lekermanya@yandex.ru', f'Заявка #{order_id} на ремонт — Скупка24',
         f"Заявка #{order_id}\nИмя: {name}\nТелефон: {phone}\nМодель: {model}\nТип: {repair_type}\nСтоимость: {price_str}")
