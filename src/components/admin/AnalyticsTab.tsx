@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Icon from "@/components/ui/icon";
+import func2url from "@/../../backend/func2url.json";
 import {
   YM_ID,
   MOCK_STATS, MOCK_GOALS, MOCK_SOURCES, MOCK_DEVICES, MOCK_GEO, MOCK_PAGES,
@@ -9,6 +10,9 @@ import {
 } from "./analytics.shared";
 import { OverviewSection, GoalsSection, SourcesSection, BehaviorSection } from "./AnalyticsSections";
 import { GeoSection, WebvisorSection, HeatmapSection, SeoSection } from "./AnalyticsIframeSections";
+
+const XLSX_URL = (func2url as Record<string, string>)["export-xlsx"];
+const ADMIN_TOKEN = localStorage.getItem("adminToken") || "";
 
 // ── Секции навигации ──────────────────────────────────────────────
 type Section = "overview" | "goals" | "sources" | "behavior" | "geo" | "webvisor" | "heatmap" | "seo";
@@ -27,13 +31,48 @@ const SECTIONS: { key: Section; label: string; icon: string }[] = [
 // ── Компонент ─────────────────────────────────────────────────────
 const AnalyticsTab = () => {
   const [section, setSection] = useState<Section>("overview");
-  const [stats] = useState<YmStat[]>(MOCK_STATS);
+  const [stats, setStats] = useState<YmStat[]>(MOCK_STATS);
   const [goals] = useState<YmGoalStat[]>(MOCK_GOALS);
-  const [sources] = useState<YmSource[]>(MOCK_SOURCES);
-  const [devices] = useState<YmDevice[]>(MOCK_DEVICES);
-  const [geo] = useState<YmGeo[]>(MOCK_GEO);
-  const [pages] = useState<YmPage[]>(MOCK_PAGES);
+  const [sources, setSources] = useState<YmSource[]>(MOCK_SOURCES);
+  const [devices, setDevices] = useState<YmDevice[]>(MOCK_DEVICES);
+  const [geo, setGeo] = useState<YmGeo[]>(MOCK_GEO);
+  const [pages, setPages] = useState<YmPage[]>(MOCK_PAGES);
   const [period, setPeriod] = useState<7 | 14 | 30>(14);
+  const [loading, setLoading] = useState(false);
+  const [isReal, setIsReal] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchStats = useCallback(async (days: 7 | 14 | 30) => {
+    if (!XLSX_URL) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${XLSX_URL}?action=ym&days=${days}`, {
+        headers: { "X-Admin-Token": ADMIN_TOKEN },
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        if (d.error === "YM_TOKEN not configured") {
+          setError("Токен Яндекс Метрики не настроен. Показаны тестовые данные.");
+        } else {
+          setError("Ошибка загрузки. Показаны тестовые данные.");
+        }
+        return;
+      }
+      const data = await res.json();
+      if (data.stats?.length) { setStats(data.stats); setIsReal(true); }
+      if (data.sources?.length) setSources(data.sources);
+      if (data.devices?.length) setDevices(data.devices);
+      if (data.geo?.length) setGeo(data.geo);
+      if (data.pages?.length) setPages(data.pages);
+    } catch {
+      setError("Нет соединения. Показаны тестовые данные.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchStats(period); }, [period, fetchStats]);
 
   // Суммы за период
   const slice = stats.slice(-period);
@@ -97,7 +136,24 @@ const AnalyticsTab = () => {
             </button>
           ))}
         </nav>
-        <div className="p-3 border-t border-[#222]">
+        <div className="p-3 border-t border-[#222] flex flex-col gap-2">
+          {/* Статус данных */}
+          <div className="flex items-center gap-1.5">
+            {loading ? (
+              <span className="text-[10px] text-white/30 animate-pulse">Загрузка...</span>
+            ) : isReal ? (
+              <>
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
+                <span className="text-[10px] text-green-400">Реальные данные</span>
+              </>
+            ) : (
+              <>
+                <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 shrink-0" />
+                <span className="text-[10px] text-yellow-400">Тестовые данные</span>
+              </>
+            )}
+          </div>
+          {error && <p className="text-[9px] text-red-400/70 leading-tight">{error}</p>}
           <a href={`https://metrika.yandex.ru/dashboard?id=${YM_ID}`} target="_blank" rel="noopener noreferrer"
             className="flex items-center gap-1.5 text-[10px] text-white/30 hover:text-[#FFD700] transition-colors">
             <Icon name="ExternalLink" size={10} /> Открыть Метрику
@@ -106,7 +162,15 @@ const AnalyticsTab = () => {
       </div>
 
       {/* Контент */}
-      <div className="flex-1 overflow-y-auto min-w-0">
+      <div className="flex-1 overflow-y-auto min-w-0 relative">
+        {loading && (
+          <div className="absolute inset-0 bg-black/30 z-10 flex items-center justify-center">
+            <div className="flex items-center gap-2 text-white/50 text-sm">
+              <Icon name="Loader" size={16} className="animate-spin" />
+              Загрузка статистики...
+            </div>
+          </div>
+        )}
         {renderContent()}
       </div>
     </div>

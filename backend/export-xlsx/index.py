@@ -4,6 +4,9 @@ import io
 import boto3
 import psycopg2
 import openpyxl
+import urllib.request
+import urllib.parse
+from datetime import datetime, timedelta
 from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
 
@@ -202,7 +205,8 @@ def handler(event: dict, context) -> dict:
         except Exception:
             body = {}
 
-    action = body.get('action') if method == 'POST' else 'status'
+    qp = event.get('queryStringParameters') or {}
+    action = body.get('action') if method == 'POST' else qp.get('action', 'status')
     s3 = get_s3()
 
     # GET — статус всех трёх файлов
@@ -240,5 +244,52 @@ def handler(event: dict, context) -> dict:
         conn.close()
         put_xlsx(s3, S3_KEY_TOOLS_FINAL, data, 'tools_export.xlsx')
         return ok({'status': 'tools_done', 'tools_url': cdn(S3_KEY_TOOLS_FINAL)})
+
+    # GET ?action=ym&days=14 → статистика Яндекс Метрики
+    if action == 'ym':
+        ym_token = os.environ.get('YM_TOKEN', '')
+        if not ym_token:
+            return err(503, 'YM_TOKEN not configured')
+        days = int(qp.get('days', 14))
+        date_to = datetime.today().strftime('%Y-%m-%d')
+        date_from = (datetime.today() - timedelta(days=days - 1)).strftime('%Y-%m-%d')
+        YM_ID = 108421419
+        YM_API = 'https://api-metrika.yandex.net/stat/v1/data'
+
+        def ym_get(params):
+            qs = urllib.parse.urlencode(params)
+            req = urllib.request.Request(f"{YM_API}?{qs}", headers={'Authorization': f'OAuth {ym_token}'})
+            with urllib.request.urlopen(req, timeout=15) as r:
+                return json.loads(r.read())
+
+        daily = ym_get({'ids': YM_ID, 'metrics': 'ym:s:visits,ym:s:pageviews,ym:s:users,ym:s:bounceRate,ym:s:avgVisitDurationSeconds',
+                        'dimensions': 'ym:s:date', 'date1': date_from, 'date2': date_to, 'sort': 'ym:s:date', 'limit': 100})
+        stats = [{'date': r['dimensions'][0]['name'], 'visits': int(r['metrics'][0]), 'pageviews': int(r['metrics'][1]),
+                  'users': int(r['metrics'][2]), 'bounceRate': round(r['metrics'][3], 1), 'avgDuration': int(r['metrics'][4])}
+                 for r in daily.get('data', [])]
+
+        src = ym_get({'ids': YM_ID, 'metrics': 'ym:s:visits', 'dimensions': 'ym:s:trafficSourceName',
+                      'date1': date_from, 'date2': date_to, 'sort': '-ym:s:visits', 'limit': 10})
+        tv = sum(r['metrics'][0] for r in src.get('data', [])) or 1
+        sources = [{'source': r['dimensions'][0]['name'], 'visits': int(r['metrics'][0]), 'pct': round(int(r['metrics'][0]) / tv * 100)} for r in src.get('data', [])]
+
+        dev = ym_get({'ids': YM_ID, 'metrics': 'ym:s:visits', 'dimensions': 'ym:s:deviceCategory',
+                      'date1': date_from, 'date2': date_to, 'sort': '-ym:s:visits', 'limit': 5})
+        td = sum(r['metrics'][0] for r in dev.get('data', [])) or 1
+        DN = {'desktop': 'Компьютер', 'mobile': 'Смартфон', 'tablet': 'Планшет'}
+        devices = [{'device': DN.get(r['dimensions'][0]['name'], r['dimensions'][0]['name']), 'visits': int(r['metrics'][0]),
+                    'pct': round(int(r['metrics'][0]) / td * 100)} for r in dev.get('data', [])]
+
+        geo_r = ym_get({'ids': YM_ID, 'metrics': 'ym:s:visits', 'dimensions': 'ym:s:regionCity',
+                        'date1': date_from, 'date2': date_to, 'sort': '-ym:s:visits', 'limit': 10})
+        tg2 = sum(r['metrics'][0] for r in geo_r.get('data', [])) or 1
+        geo = [{'city': r['dimensions'][0].get('name') or 'Неизвестно', 'visits': int(r['metrics'][0]),
+                'pct': round(int(r['metrics'][0]) / tg2 * 100)} for r in geo_r.get('data', [])]
+
+        pg = ym_get({'ids': YM_ID, 'metrics': 'ym:pv:pageviews,ym:pv:avgTimeOnPage', 'dimensions': 'ym:pv:URLPathFull',
+                     'date1': date_from, 'date2': date_to, 'sort': '-ym:pv:pageviews', 'limit': 10})
+        pages = [{'url': r['dimensions'][0]['name'], 'views': int(r['metrics'][0]), 'avgTime': int(r['metrics'][1])} for r in pg.get('data', [])]
+
+        return ok({'stats': stats, 'sources': sources, 'devices': devices, 'geo': geo, 'pages': pages})
 
     return err(400, 'Unknown action')
