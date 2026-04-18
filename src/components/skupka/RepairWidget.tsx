@@ -54,6 +54,7 @@ export default function RepairWidget() {
   const [form, setForm] = useState({ name: "", phone: "", model: "", fault: "" });
   const [sending, setSending] = useState(false);
   const [orderId, setOrderId] = useState<number | null>(null);
+  const [agreed, setAgreed] = useState(false);
 
   const [parts, setParts] = useState<Part[]>([]);
   const [partsLoading, setPartsLoading] = useState(false);
@@ -170,9 +171,10 @@ export default function RepairWidget() {
     setExtraWorks([]);
     setExtraWorksList([]);
     setClientInfo(null);
+    setAgreed(false);
   };
 
-  const canSubmit = form.name && form.phone && form.model && form.fault;
+  const canSubmit = form.name && form.phone && form.model && form.fault && agreed;
 
   return (
     <div className="border border-white/10 bg-black/30 px-4 py-5 w-full">
@@ -433,6 +435,36 @@ export default function RepairWidget() {
                     onChange={e => setForm(p => ({ ...p, fault: e.target.value }))}
                     placeholder="Опишите проблему * (не включается, разбит экран...)"
                     className={INP} />
+
+                  {/* Условия приёмки */}
+                  <div className="border border-white/10 bg-black/40 p-3 mt-1">
+                    <div className="font-roboto text-[9px] text-white/30 uppercase tracking-widest mb-2 flex items-center gap-1">
+                      <Icon name="AlertTriangle" size={9} className="text-[#FFD700]/50" />
+                      Условия ремонта
+                    </div>
+                    <ul className="space-y-1 mb-2.5">
+                      {[
+                        "После воды аппарат может полностью умереть при любом ремонте. Мастерская не обязана его оживлять.",
+                        "Компонентная пайка — риск гибели платы. Если телефон умер в процессе — работа оплачивается.",
+                        "При снятии дисплея он может сломаться. Замена — за счёт клиента.",
+                        "Данные (фото, контакты) могут быть потеряны безвозвратно.",
+                        "Гарантии на результат нет. В худшем случае — оплата диагностики и сделанной работы.",
+                      ].map((t, i) => (
+                        <li key={i} className="flex gap-1.5">
+                          <span className="text-[#FFD700]/40 font-roboto text-[9px] shrink-0">{i + 1}.</span>
+                          <span className="font-roboto text-[9px] text-white/35 leading-relaxed">{t}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <label className="flex items-start gap-2 cursor-pointer" onClick={() => setAgreed(v => !v)}>
+                      <div className={`mt-0.5 w-3.5 h-3.5 shrink-0 border flex items-center justify-center transition-colors ${agreed ? "bg-[#FFD700] border-[#FFD700]" : "border-white/30"}`}>
+                        {agreed && <Icon name="Check" size={9} className="text-black" />}
+                      </div>
+                      <span className="font-roboto text-[10px] text-white/50 leading-relaxed">
+                        Ознакомлен с рисками и согласен на ремонт
+                      </span>
+                    </label>
+                  </div>
 
                   <button onClick={handleSubmit} disabled={!canSubmit || sending}
                     className="w-full bg-[#FFD700] text-black font-oswald font-bold py-2.5 uppercase text-sm hover:bg-yellow-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed mt-1">
