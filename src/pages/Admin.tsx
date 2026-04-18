@@ -43,30 +43,26 @@ export default function Admin() {
   const [error, setError] = useState("");
   const [checking, setChecking] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-  const [exporting, setExporting] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [xlsxUrl, setXlsxUrl] = useState<string | null>(null);
+  const [xlsxDate, setXlsxDate] = useState<string | null>(null);
 
-  const downloadXlsx = async () => {
-    setExporting(true);
+  const checkXlsx = async (tok: string) => {
     try {
-      const res = await fetch(EXPORT_URL, { headers: adminHeaders(token) });
-      const text = await res.text();
-      let base64 = text;
-      try {
-        const parsed = JSON.parse(text);
-        if (parsed.body) base64 = parsed.body;
-      } catch (_e) { /* raw base64 */ }
-      const binary = atob(base64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      const blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "yandex_market_export.xlsx";
-      a.click();
-      URL.revokeObjectURL(url);
+      const res = await fetch(EXPORT_URL, { headers: adminHeaders(tok) });
+      const data = await res.json();
+      if (data.status === 'ready') { setXlsxUrl(data.url); setXlsxDate(data.last_modified || null); }
+    } catch (_e) { /* ignore */ }
+  };
+
+  const generateXlsx = async () => {
+    setGenerating(true);
+    try {
+      const res = await fetch(EXPORT_URL, { method: 'POST', headers: adminHeaders(token) });
+      const data = await res.json();
+      if (data.url) { setXlsxUrl(data.url); setXlsxDate(null); }
     } finally {
-      setExporting(false);
+      setGenerating(false);
     }
   };
 
@@ -92,7 +88,7 @@ export default function Admin() {
     setToken(""); setAuthed(false); setTokenInput("");
   };
 
-  useEffect(() => { if (token) checkAuth(token); }, []);
+  useEffect(() => { if (token) { checkAuth(token); checkXlsx(token); } }, []);
 
   if (!authed) {
     return (
@@ -192,16 +188,30 @@ export default function Admin() {
         <div className="border-b border-[#222] px-5 py-3 flex items-center gap-3">
           <Icon name={active?.icon || "Circle"} size={16} className="text-[#FFD700]" />
           <span className="font-bold uppercase tracking-wide text-sm">{active?.label}</span>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
             <button
-              onClick={downloadXlsx}
-              disabled={exporting}
-              title="Скачать каталог электроники, товары склада и инструменты в Excel"
-              className="flex items-center gap-1.5 font-roboto text-[11px] px-3 py-1.5 border border-green-500/30 text-green-400 hover:bg-green-500/10 transition-colors disabled:opacity-40"
+              onClick={generateXlsx}
+              disabled={generating}
+              title="Сгенерировать новый файл XLSX из актуальных данных"
+              className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 border border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10 transition-colors disabled:opacity-40"
             >
-              <Icon name={exporting ? "Loader" : "FileDown"} size={13} className={exporting ? "animate-spin" : ""} />
-              {exporting ? "Формирую..." : "Скачать XLSX"}
+              <Icon name={generating ? "Loader" : "RefreshCw"} size={13} className={generating ? "animate-spin" : ""} />
+              {generating ? "Генерирую..." : "Обновить XLSX"}
             </button>
+            {xlsxUrl && (
+              <a
+                href={xlsxUrl}
+                download="yandex_market_export.xlsx"
+                title={xlsxDate ? `Сформирован: ${xlsxDate}` : "Скачать XLSX"}
+                className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 border border-green-500/30 text-green-400 hover:bg-green-500/10 transition-colors"
+              >
+                <Icon name="FileDown" size={13} />
+                Скачать XLSX
+              </a>
+            )}
+            {!xlsxUrl && !generating && (
+              <span className="text-[11px] text-white/30">Файл не сформирован</span>
+            )}
           </div>
         </div>
 
