@@ -210,34 +210,60 @@ export default function StaffRepairOrderCard({
           </div>
 
           {/* Кнопки статусов */}
-          <div className="flex gap-1.5 flex-wrap">
-            {STATUSES.filter(s => s.key !== o.status).map(s => (
-              <button key={s.key}
-                onClick={() => {
-                  if (s.key === "ready") { onOpenReadyModal(o); }
-                  else if (s.key === "done") { onIssueOrder(o); }
-                  else { onChangeStatus(o.id, s.key, { admin_note: ef.admin_note }); }
-                }}
-                disabled={saving}
-                className={`font-roboto text-[10px] px-2.5 py-1.5 border transition-colors flex items-center gap-1 ${s.color} border-current/20 hover:opacity-80 disabled:opacity-40`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />{s.label}
-              </button>
-            ))}
-            <button onClick={() => onSaveCard(o)} disabled={saving}
-              className="ml-auto font-roboto text-[10px] px-3 py-1.5 bg-[#FFD700] text-black font-bold hover:bg-yellow-400 transition-colors disabled:opacity-40 flex items-center gap-1">
-              <Icon name="Save" size={11} />{saving ? "Сохраняю..." : "Сохранить"}
-            </button>
-            <button onClick={() => { printReceipt(o); }}
-              className="font-roboto text-[10px] px-2.5 py-1.5 border border-white/10 text-white/40 hover:text-white transition-colors flex items-center gap-1">
-              <Icon name="Printer" size={11} />
-            </button>
-            {isOwner && (
-              <button onClick={() => onDelete(o.id)}
-                className="font-roboto text-[10px] px-2.5 py-1.5 border border-red-500/20 text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-1">
-                <Icon name="Trash2" size={11} />
-              </button>
-            )}
-          </div>
+          {(() => {
+            const hasAmount = !!ef.repair_amount && ef.repair_amount !== "0";
+            const hasPurchase = !!ef.purchase_amount && ef.purchase_amount !== "0";
+            const financeBlocked = !hasAmount || !hasPurchase;
+            return (
+              <div className="space-y-1.5">
+                <div className="flex gap-1.5 flex-wrap">
+                  {STATUSES.filter(s => s.key !== o.status).map(s => {
+                    const needsFinance = s.key === "ready" || s.key === "done";
+                    const blocked = needsFinance && financeBlocked;
+                    return (
+                      <button key={s.key}
+                        onClick={() => {
+                          if (s.key === "ready") onOpenReadyModal(o);
+                          else if (s.key === "done") onIssueOrder(o);
+                          else onChangeStatus(o.id, s.key, { admin_note: ef.admin_note });
+                        }}
+                        disabled={saving || blocked}
+                        title={blocked ? "Введите закупку и сумму выдачи" : undefined}
+                        className={`font-roboto text-[10px] px-2.5 py-1.5 border transition-colors flex items-center gap-1 ${
+                          blocked
+                            ? "border-white/10 text-white/15 cursor-not-allowed"
+                            : saving
+                            ? "opacity-50 cursor-not-allowed border-white/10 text-white/30"
+                            : `${s.color} border-current/20 hover:opacity-80`
+                        }`}>
+                        {blocked ? <Icon name="Lock" size={9} /> : <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />}
+                        {s.label}
+                      </button>
+                    );
+                  })}
+                  <button onClick={() => onSaveCard(o)} disabled={saving}
+                    className="ml-auto font-roboto text-[10px] px-3 py-1.5 bg-[#FFD700] text-black font-bold hover:bg-yellow-400 transition-colors disabled:opacity-40 flex items-center gap-1">
+                    <Icon name="Save" size={11} />{saving ? "Сохраняю..." : "Сохранить"}
+                  </button>
+                  <button onClick={() => { printReceipt(o); }}
+                    className="font-roboto text-[10px] px-2.5 py-1.5 border border-white/10 text-white/40 hover:text-white transition-colors flex items-center gap-1">
+                    <Icon name="Printer" size={11} />
+                  </button>
+                  {isOwner && (
+                    <button onClick={() => onDelete(o.id)}
+                      className="font-roboto text-[10px] px-2.5 py-1.5 border border-red-500/20 text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-1">
+                      <Icon name="Trash2" size={11} />
+                    </button>
+                  )}
+                </div>
+                {financeBlocked && (
+                  <div className="font-roboto text-[9px] text-white/25 flex items-center gap-1">
+                    <Icon name="Lock" size={9} /> «Готово» и «Выдано» — введите закупку и сумму выдачи
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>
