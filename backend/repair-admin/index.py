@@ -639,13 +639,16 @@ def handler(event: dict, context) -> dict:
             main_chat_id = os.environ['TELEGRAM_CHAT_ID']
             send_tg_all(token, main_chat_id, conn, tg_msg)
 
-            # SMS клиенту когда телефон готов
-            if new_status == 'ready' and client_phone:
-                sms_text = (
-                    f"Скупка24: Ваш телефон {device_model or ''} готов к выдаче! "
-                    f"Стоимость ремонта: {r_amount} руб. Ждём вас!"
-                ).strip()
-                send_sms(client_phone, sms_text)
+            # SMS клиенту при смене статуса
+            sms_templates = {
+                'in_progress': f"Скупка24: Ремонт {device_model or 'вашего устройства'} начался. Сообщим, как только будет готово.",
+                'waiting_parts': f"Скупка24: Заказали запчасть для {device_model or 'вашего устройства'}. Как только придёт — сразу приступим.",
+                'ready': f"Скупка24: {device_model or 'Ваше устройство'} готово к выдаче! Стоимость: {r_amount} руб. Ждём вас!",
+                'done': f"Скупка24: Спасибо за обращение! Ваш {device_model or 'телефон'} выдан. Будем рады снова.",
+                'cancelled': f"Скупка24: Ремонт {device_model or 'устройства'} отменён. Позвоните нам для уточнения деталей.",
+            }
+            if client_phone and new_status in sms_templates:
+                send_sms(client_phone, sms_templates[new_status])
 
         cur.close(); conn.close()
         return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'master_income': int(master_income_val) if master_income_val != 'NULL' else None}, ensure_ascii=False)}
