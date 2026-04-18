@@ -32,12 +32,7 @@ const QUALITY_COLOR: Record<string, string> = {
   A: "text-white/50",
 };
 
-// Дополнительные работы которые можно добавить к основному ремонту
-const EXTRA_WORKS = [
-  { id: "waterproof",  label: "Восстановление влагозащиты", price: 700 },
-  { id: "speaker",     label: "Чистка динамиков",           price: 200 },
-  { id: "oxidation",   label: "Убрать окисления",           price: 500 },
-];
+type ExtraWork = { id: number; label: string; price: number };
 
 type Part = {
   id: string; name: string; category: string;
@@ -65,6 +60,8 @@ export default function RepairWidget() {
   const [selectedPart, setSelectedPart] = useState<Part | null>(null);
   const [showPartsList, setShowPartsList] = useState(false);
   const [extraWorks, setExtraWorks] = useState<string[]>([]);
+  const [extraWorksList, setExtraWorksList] = useState<ExtraWork[]>([]);
+  const [clientInfo, setClientInfo] = useState<{ found: boolean; full_name?: string; discount_pct: number } | null>(null);
 
   const [statusId, setStatusId] = useState("");
   const [statusResult, setStatusResult] = useState<OrderStatus | null>(null);
@@ -85,15 +82,17 @@ export default function RepairWidget() {
     debounceRef.current = setTimeout(async () => {
       setPartsLoading(true);
       try {
-        const res = await fetch(`${REPAIR_PARTS_URL}?model=${encodeURIComponent(model)}`);
+        const res = await fetch(`${REPAIR_PARTS_URL}?model=${encodeURIComponent(model)}&phone=${encodeURIComponent(form.phone)}`);
         const data = await res.json();
         const fetched = data.parts || [];
         setParts(fetched);
         if (fetched.length > 0) setShowPartsList(true);
+        setExtraWorksList(data.extra_works || []);
+        setClientInfo(data.client || null);
       } catch { /* ignore */ }
       setPartsLoading(false);
     }, 600);
-  }, [form.model]);
+  }, [form.model, form.phone]);
 
   const groupedParts = parts.reduce<Record<string, Part[]>>((acc, p) => {
     if (!acc[p.part_type]) acc[p.part_type] = [];
@@ -101,14 +100,16 @@ export default function RepairWidget() {
     return acc;
   }, {});
 
-  const extraTotal = EXTRA_WORKS
-    .filter(w => extraWorks.includes(w.id))
+  const extraTotal = extraWorksList
+    .filter(w => extraWorks.includes(String(w.id)))
     .reduce((s, w) => s + w.price, 0);
 
-  const grandTotal = (selectedPart?.total ?? 0) + extraTotal;
+  const discountPct = clientInfo?.found ? (clientInfo.discount_pct || 0) : 0;
+  const grandTotal = Math.round(((selectedPart?.total ?? 0) + extraTotal) * (1 - discountPct / 100));
 
   const toggleExtra = (id: string) =>
     setExtraWorks(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+
 
   const handleSelectPart = (part: Part) => {
     setSelectedPart(part);
@@ -119,7 +120,7 @@ export default function RepairWidget() {
   const handleSubmit = async () => {
     if (!form.name || !form.phone || !form.model || !form.fault) return;
     setSending(true);
-    const extraLabels = EXTRA_WORKS.filter(w => extraWorks.includes(w.id)).map(w => w.label);
+    const extraLabels = extraWorksList.filter(w => extraWorks.includes(String(w.id))).map(w => w.label);
     try {
       const res = await fetch(REPAIR_ORDER_URL, {
         method: "POST",
@@ -167,6 +168,8 @@ export default function RepairWidget() {
     setSelectedPart(null);
     setShowPartsList(false);
     setExtraWorks([]);
+    setExtraWorksList([]);
+    setClientInfo(null);
   };
 
   const canSubmit = form.name && form.phone && form.model && form.fault;
@@ -369,10 +372,10 @@ export default function RepairWidget() {
                             Добавить к ремонту:
                           </div>
                           <div className="flex flex-wrap gap-1.5">
-                            {EXTRA_WORKS.map(w => {
-                              const active = extraWorks.includes(w.id);
+                            {extraWorksList.map(w => {
+                              const active = extraWorks.includes(String(w.id));
                               return (
-                                <button key={w.id} type="button" onClick={() => toggleExtra(w.id)}
+                                <button key={w.id} type="button" onClick={() => toggleExtra(String(w.id))}
                                   className={`flex items-center gap-1 px-2 py-1 border font-roboto text-[10px] transition-colors ${
                                     active
                                       ? "border-[#FFD700] bg-[#FFD700]/15 text-[#FFD700]"
@@ -388,6 +391,17 @@ export default function RepairWidget() {
                             })}
                           </div>
                         </div>
+
+                        {/* Скидка для постоянного клиента */}
+                        {clientInfo?.found && clientInfo.discount_pct > 0 && (
+                          <div className="border-t border-[#FFD700]/10 px-3 py-2 bg-green-500/5 flex items-center justify-between">
+                            <div>
+                              <div className="font-roboto text-[10px] text-green-400">Скидка для постоянного клиента</div>
+                              <div className="font-roboto text-[9px] text-white/40">{clientInfo.full_name}</div>
+                            </div>
+                            <div className="font-oswald font-bold text-sm text-green-400">-{clientInfo.discount_pct}%</div>
+                          </div>
+                        )}
 
                         {/* Итог с допами */}
                         <div className="border-t border-[#FFD700]/10 px-3 py-2 flex items-center justify-between">
@@ -426,8 +440,16 @@ export default function RepairWidget() {
                       ? `Отправить заявку · ${grandTotal.toLocaleString("ru-RU")} ₽`
                       : "Отправить заявку"}
                   </button>
-                  <div className="font-roboto text-white/20 text-[9px] text-center">
-                    Перезвоним в течение 15 минут
+                  <div className="flex items-center justify-between">
+                    <div className="font-roboto text-white/20 text-[9px]">
+                      Перезвоним в течение 15 минут
+                    </div>
+                    {!clientInfo?.found && (
+                      <a href="/repair-discount" target="_blank"
+                        className="font-roboto text-[9px] text-[#FFD700]/50 hover:text-[#FFD700] transition-colors flex items-center gap-0.5">
+                        <Icon name="Tag" size={9} /> Получить скидку -3%
+                      </a>
+                    )}
                   </div>
                 </div>
               )}

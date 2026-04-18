@@ -115,6 +115,38 @@ def handler(event: dict, context) -> dict:
             'body': '',
         }
 
+    # Публичные actions (без токена)
+    raw_body_pub = event.get('body') or '{}'
+    body_pub = json.loads(raw_body_pub) if isinstance(raw_body_pub, str) else (raw_body_pub or {})
+    if event.get('httpMethod') == 'POST' and body_pub.get('action') == 'client_register':
+        conn = psycopg2.connect(os.environ['DATABASE_URL'])
+        cur = conn.cursor()
+        full_name = str(body_pub.get('full_name', '')).strip().replace("'", "''")
+        phone = ''.join(c for c in str(body_pub.get('phone', '')) if c.isdigit())
+        birth_date = str(body_pub.get('birth_date', '')).strip()
+        ref_phone = ''.join(c for c in str(body_pub.get('referrer_phone', '')) if c.isdigit())
+        if not full_name or len(phone) < 10:
+            cur.close(); conn.close()
+            return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'ФИО и телефон обязательны'}, ensure_ascii=False)}
+        referrer_id = 'NULL'
+        if ref_phone and len(ref_phone) >= 10:
+            ref_suffix = ref_phone[-10:]
+            cur.execute(f"SELECT id FROM {SCHEMA}.repair_clients WHERE RIGHT(REGEXP_REPLACE(phone, '[^0-9]', '', 'g'), 10)='{ref_suffix}'")
+            ref_row = cur.fetchone()
+            if ref_row:
+                referrer_id = str(ref_row[0])
+                cur.execute(f"UPDATE {SCHEMA}.repair_clients SET discount_pct=GREATEST(discount_pct, 5) WHERE id={ref_row[0]}")
+        bd_val = f"'{birth_date}'" if birth_date else 'NULL'
+        cur.execute(f"""
+            INSERT INTO {SCHEMA}.repair_clients (full_name, phone, birth_date, referrer_id, discount_pct)
+            VALUES ('{full_name}', '+{phone}', {bd_val}, {referrer_id}, 3)
+            ON CONFLICT (phone) DO UPDATE SET full_name=EXCLUDED.full_name, birth_date=EXCLUDED.birth_date
+            RETURNING id, discount_pct
+        """)
+        row = cur.fetchone()
+        conn.commit(); cur.close(); conn.close()
+        return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'client_id': row[0], 'discount_pct': row[1]}, ensure_ascii=False)}
+
     if not auth(event):
         return {'statusCode': 401, 'headers': HEADERS, 'body': json.dumps({'error': 'Unauthorized'}, ensure_ascii=False)}
 
@@ -235,17 +267,20 @@ def handler(event: dict, context) -> dict:
             settings = [{'key': r[0], 'value': r[1], 'description': r[2], 'updated_at': r[3].isoformat() if r[3] else None} for r in rows]
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'settings': settings}, ensure_ascii=False)}
 
-        # Цены работ + наценка на детали
+        # Цены работ + наценка на детали + доп. работы
         if action == 'labor_prices_get':
             cur.execute(f"SELECT part_type, label, price FROM {SCHEMA}.repair_labor_prices ORDER BY part_type")
             rows = cur.fetchall()
             cur.execute(f"SELECT value FROM {SCHEMA}.settings WHERE key='parts_markup'")
             mrow = cur.fetchone()
             markup = int(mrow[0]) if mrow else 0
+            cur.execute(f"SELECT id, label, price, is_active, sort_order FROM {SCHEMA}.repair_extra_works ORDER BY sort_order, id")
+            erows = cur.fetchall()
+            extra = [{'id': r[0], 'label': r[1], 'price': r[2], 'is_active': r[3], 'sort_order': r[4]} for r in erows]
             cur.close(); conn.close()
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps(
                 {'prices': [{'part_type': r[0], 'label': r[1], 'price': r[2]} for r in rows],
-                 'parts_markup': markup},
+                 'parts_markup': markup, 'extra_works': extra},
                 ensure_ascii=False
             )}
 
@@ -302,29 +337,83 @@ def handler(event: dict, context) -> dict:
         body = json.loads(raw_body) if isinstance(raw_body, str) else (raw_body or {})
         action = body.get('action', 'update_status')
 
-        # Сохранение цен работ + наценки на детали
+        # Сохранение цен работ + наценки + доп. работ
         if action == 'labor_prices_set':
             prices = body.get('prices', [])
             for item in prices:
                 pt = str(item.get('part_type', '')).strip()
                 price_val = int(item.get('price', 0))
                 if pt:
-                    cur.execute(f"""
-                        UPDATE {SCHEMA}.repair_labor_prices
-                        SET price = {price_val}, updated_at = NOW()
-                        WHERE part_type = '{pt}'
-                    """)
-            # Наценка на детали
+                    cur.execute(f"UPDATE {SCHEMA}.repair_labor_prices SET price={price_val}, updated_at=NOW() WHERE part_type='{pt}'")
             if 'parts_markup' in body:
                 markup_val = int(body.get('parts_markup', 0))
                 cur.execute(f"""
                     INSERT INTO {SCHEMA}.settings (key, value, description)
                     VALUES ('parts_markup', '{markup_val}', 'Наценка на запчасти для ремонта (руб)')
-                    ON CONFLICT (key) DO UPDATE SET value = '{markup_val}', updated_at = NOW()
+                    ON CONFLICT (key) DO UPDATE SET value='{markup_val}', updated_at=NOW()
                 """)
+            # Сохраняем доп. работы
+            extra = body.get('extra_works', [])
+            for ew in extra:
+                eid = ew.get('id')
+                elabel = str(ew.get('label', '')).replace("'", "''").strip()
+                eprice = int(ew.get('price', 0))
+                eactive = bool(ew.get('is_active', True))
+                esort = int(ew.get('sort_order', 0))
+                if eid:
+                    cur.execute(f"""
+                        UPDATE {SCHEMA}.repair_extra_works
+                        SET label='{elabel}', price={eprice}, is_active={eactive}, sort_order={esort}
+                        WHERE id={eid}
+                    """)
+                elif elabel:
+                    cur.execute(f"""
+                        INSERT INTO {SCHEMA}.repair_extra_works (label, price, is_active, sort_order)
+                        VALUES ('{elabel}', {eprice}, {eactive}, {esort})
+                    """)
             conn.commit()
             cur.close(); conn.close()
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True}, ensure_ascii=False)}
+
+        # Удаление доп. работы
+        if action == 'extra_work_delete':
+            eid = int(body.get('id', 0))
+            if eid:
+                cur.execute(f"DELETE FROM {SCHEMA}.repair_extra_works WHERE id={eid}")
+                conn.commit()
+            cur.close(); conn.close()
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True}, ensure_ascii=False)}
+
+        # Регистрация клиента (публичный action — без токена)
+        if action == 'client_register':
+            full_name = str(body.get('full_name', '')).strip().replace("'", "''")
+            phone = ''.join(c for c in str(body.get('phone', '')) if c.isdigit())
+            birth_date = str(body.get('birth_date', '')).strip()
+            ref_phone = ''.join(c for c in str(body.get('referrer_phone', '')) if c.isdigit())
+            if not full_name or len(phone) < 10:
+                cur.close(); conn.close()
+                return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'ФИО и телефон обязательны'}, ensure_ascii=False)}
+            # Ищем реферера
+            referrer_id = 'NULL'
+            if ref_phone and len(ref_phone) >= 10:
+                ref_suffix = ref_phone[-10:]
+                cur.execute(f"SELECT id FROM {SCHEMA}.repair_clients WHERE RIGHT(REGEXP_REPLACE(phone, '[^0-9]', '', 'g'), 10)='{ref_suffix}'")
+                ref_row = cur.fetchone()
+                if ref_row:
+                    referrer_id = str(ref_row[0])
+                    # Обновляем скидку реферера до 5%
+                    cur.execute(f"UPDATE {SCHEMA}.repair_clients SET discount_pct=GREATEST(discount_pct, 5) WHERE id={ref_row[0]}")
+            bd_val = f"'{birth_date}'" if birth_date else 'NULL'
+            cur.execute(f"""
+                INSERT INTO {SCHEMA}.repair_clients (full_name, phone, birth_date, referrer_id, discount_pct)
+                VALUES ('{full_name}', '+{phone}', {bd_val}, {referrer_id}, 3)
+                ON CONFLICT (phone) DO UPDATE SET full_name=EXCLUDED.full_name, birth_date=EXCLUDED.birth_date
+                RETURNING id, discount_pct
+            """)
+            row = cur.fetchone()
+            conn.commit()
+            cur.close(); conn.close()
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'client_id': row[0], 'discount_pct': row[1]}, ensure_ascii=False)}
 
         # Тест SMS
         if action == 'sms_test':

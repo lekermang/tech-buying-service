@@ -13,6 +13,7 @@ const LABELS: Record<string, string> = {
 };
 
 type LaborPrice = { part_type: string; label: string; price: number };
+type ExtraWork = { id?: number; label: string; price: number; is_active: boolean; sort_order: number };
 
 export default function LaborPricesTab({
   token,
@@ -24,6 +25,8 @@ export default function LaborPricesTab({
   const [prices, setPrices] = useState<LaborPrice[]>([]);
   const [edited, setEdited] = useState<Record<string, string>>({});
   const [markup, setMarkup] = useState("0");
+  const [extras, setExtras] = useState<ExtraWork[]>([]);
+  const [editedExtras, setEditedExtras] = useState<ExtraWork[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -42,6 +45,9 @@ export default function LaborPricesTab({
       list.forEach(p => { init[p.part_type] = String(p.price); });
       setEdited(init);
       setMarkup(String(data.parts_markup ?? 0));
+      const extList: ExtraWork[] = data.extra_works || [];
+      setExtras(extList);
+      setEditedExtras(extList.map(e => ({...e})));
     } catch {
       setError("Не удалось загрузить цены");
     }
@@ -66,6 +72,7 @@ export default function LaborPricesTab({
           action: "labor_prices_set",
           prices: payload,
           parts_markup: parseInt(markup) || 0,
+          extra_works: editedExtras,
         }),
       });
       const data = await res.json();
@@ -130,6 +137,40 @@ export default function LaborPricesTab({
           </div>
         ))}
       </div>
+
+      {/* Доп. работы */}
+      <div className="font-oswald font-bold text-white text-base uppercase mb-1 mt-5">Доп. работы</div>
+      <div className="font-roboto text-white/30 text-[10px] mb-3">
+        Клиент может добавить их к основному ремонту.
+      </div>
+      <div className="flex flex-col gap-2">
+        {editedExtras.map((ew, i) => (
+          <div key={i} className="flex items-center gap-2 border border-[#222] px-3 py-2 bg-black/20">
+            <input
+              value={ew.label}
+              onChange={e => setEditedExtras(prev => prev.map((x, j) => j === i ? {...x, label: e.target.value} : x))}
+              className="flex-1 bg-transparent text-white font-roboto text-xs focus:outline-none border-b border-[#333] focus:border-[#FFD700] py-0.5"
+              placeholder="Название работы"
+            />
+            <input
+              type="number" min={0} step={100}
+              value={ew.price}
+              onChange={e => setEditedExtras(prev => prev.map((x, j) => j === i ? {...x, price: parseInt(e.target.value)||0} : x))}
+              className="w-20 bg-[#0D0D0D] border border-[#333] text-white px-2 py-1 font-roboto text-xs focus:outline-none focus:border-[#FFD700] text-right"
+            />
+            <span className="text-white/30 text-xs">₽</span>
+            <button type="button" onClick={() => setEditedExtras(prev => prev.filter((_, j) => j !== i))}
+              className="text-red-400/50 hover:text-red-400 transition-colors">
+              <Icon name="X" size={12} />
+            </button>
+          </div>
+        ))}
+      </div>
+      <button type="button"
+        onClick={() => setEditedExtras(prev => [...prev, {label: '', price: 0, is_active: true, sort_order: prev.length}])}
+        className="mt-2 flex items-center gap-1 font-roboto text-[10px] text-white/30 hover:text-white transition-colors">
+        <Icon name="Plus" size={11} /> Добавить работу
+      </button>
 
       {error && (
         <div className="mt-3 text-red-400 font-roboto text-[10px] flex items-center gap-1">

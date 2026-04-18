@@ -15,6 +15,7 @@ const Catalog = lazy(() => import("./pages/Catalog"));
 const Tools = lazy(() => import("./pages/Tools"));
 const ToolsSync = lazy(() => import("./pages/ToolsSync"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const RepairDiscount = lazy(() => import("./pages/RepairDiscount"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -44,6 +45,7 @@ const App = () => (
             <Route path="/tools-sync" element={<ToolsSync />} />
             <Route path="/staff" element={<Staff />} />
             <Route path="/dzchat" element={<DzChat />} />
+            <Route path="/repair-discount" element={<RepairDiscount />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

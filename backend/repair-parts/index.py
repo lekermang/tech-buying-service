@@ -77,6 +77,15 @@ def get_parts_markup(cur) -> int:
         return 0
 
 
+def get_extra_works(cur) -> list:
+    """Загружает список активных доп. работ из БД."""
+    try:
+        cur.execute(f"SELECT id, label, price FROM {SCHEMA}.repair_extra_works WHERE is_active=true ORDER BY sort_order, id")
+        return [{'id': r[0], 'label': r[1], 'price': int(r[2])} for r in cur.fetchall()]
+    except Exception:
+        return []
+
+
 def sync_catalog(conn) -> int:
     all_products = []
     offset = 0
@@ -124,16 +133,36 @@ def sync_catalog(conn) -> int:
     return len(all_products)
 
 
-def search_parts(conn, model: str) -> list:
+def get_client_discount(cur, phone: str) -> dict:
+    """Проверяет клиента по телефону и возвращает скидку."""
+    if not phone:
+        return {'found': False, 'discount_pct': 0}
+    clean = ''.join(c for c in phone if c.isdigit())
+    if len(clean) < 10:
+        return {'found': False, 'discount_pct': 0}
+    # Нормализуем: берём последние 10 цифр для поиска
+    suffix = clean[-10:]
+    cur.execute(f"""
+        SELECT id, full_name, discount_pct FROM {SCHEMA}.repair_clients
+        WHERE RIGHT(REGEXP_REPLACE(phone, '[^0-9]', '', 'g'), 10) = '{suffix}'
+    """)
+    row = cur.fetchone()
+    if row:
+        return {'found': True, 'client_id': row[0], 'full_name': row[1], 'discount_pct': row[2]}
+    return {'found': False, 'discount_pct': 0}
+
+
+def search_parts(conn, model: str, phone: str = '') -> tuple:
     words = [w for w in model.lower().split() if len(w) >= 2]
     if not words:
-        return []
+        return [], [], {}
     conditions = ' AND '.join([f"LOWER(model_keywords) LIKE '%%{w}%%'" for w in words])
     cur = conn.cursor()
 
-    # Актуальные цены работ и наценка из БД
     labor = get_labor_prices(cur)
     markup = get_parts_markup(cur)
+    extra = get_extra_works(cur)
+    client_info = get_client_discount(cur, phone)
 
     cur.execute(f"""
         SELECT id, name, category, price, stock, quality, part_type
@@ -148,15 +177,15 @@ def search_parts(conn, model: str) -> list:
     for r in rows:
         pid, name, category, price, stock, quality, part_type = r
         raw_price = float(price or 0)
-        marked_price = raw_price + markup          # цена запчасти с наценкой
+        marked_price = raw_price + markup
         labor_cost = labor.get(part_type, DEFAULT_LABOR.get(part_type, 500))
         total = marked_price + labor_cost
         parts.append({
             'id': pid,
             'name': name,
             'category': category,
-            'price': marked_price,          # с наценкой — клиент видит это
-            'raw_price': raw_price,         # закупочная
+            'price': marked_price,
+            'raw_price': raw_price,
             'markup': markup,
             'stock': float(stock or 0),
             'quality': quality,
@@ -164,7 +193,7 @@ def search_parts(conn, model: str) -> list:
             'labor_cost': labor_cost,
             'total': total,
         })
-    return parts
+    return parts, extra, client_info
 
 
 def handler(event: dict, context) -> dict:
@@ -188,14 +217,19 @@ def handler(event: dict, context) -> dict:
 
     params = event.get('queryStringParameters') or {}
     model = (params.get('model') or '').strip()
+    phone = (params.get('phone') or '').strip()
 
     if not model or len(model) < 2:
         conn.close()
         return {'statusCode': 400, 'headers': HEADERS,
                 'body': json.dumps({'error': 'model обязателен'}, ensure_ascii=False)}
 
-    parts = search_parts(conn, model)
+    parts, extra_works, client_info = search_parts(conn, model, phone)
     conn.close()
 
     return {'statusCode': 200, 'headers': HEADERS,
-            'body': json.dumps({'parts': parts}, ensure_ascii=False)}
+            'body': json.dumps({
+                'parts': parts,
+                'extra_works': extra_works,
+                'client': client_info,
+            }, ensure_ascii=False)}
