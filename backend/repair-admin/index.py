@@ -1,3 +1,4 @@
+import io
 import json
 import os
 import psycopg2
@@ -45,6 +46,92 @@ def send_tg_all(token: str, main_chat_id: str, conn, message: str):
             )
         except Exception:
             pass
+
+
+def build_act_docx(order_id, name, phone, model, repair_type, price_str, comment) -> bytes:
+    from docx import Document
+    from docx.shared import Pt, Cm
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+    import datetime
+
+    doc = Document()
+    for section in doc.sections:
+        section.top_margin = Cm(2); section.bottom_margin = Cm(2)
+        section.left_margin = Cm(3); section.right_margin = Cm(1.5)
+
+    def add_para(text='', bold=False, size=12, align=WD_ALIGN_PARAGRAPH.LEFT):
+        p = doc.add_paragraph(); p.alignment = align
+        run = p.add_run(text); run.bold = bold
+        run.font.size = Pt(size); run.font.name = 'Times New Roman'
+        return p
+
+    def add_field(label, value):
+        p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        r1 = p.add_run(label); r1.bold = True; r1.font.size = Pt(12); r1.font.name = 'Times New Roman'
+        r2 = p.add_run(value); r2.font.size = Pt(12); r2.font.name = 'Times New Roman'
+
+    now = datetime.datetime.now().strftime('%d.%m.%Y %H:%M')
+    add_para('АКТ ПРИЁМКИ НА РЕМОНТ ТЕХНИЧЕСКОГО ОБОРУДОВАНИЯ', bold=True, size=14, align=WD_ALIGN_PARAGRAPH.CENTER)
+    add_para(f'№ {order_id}', size=13, align=WD_ALIGN_PARAGRAPH.CENTER)
+    add_para(f'г. Калуга, {now}', size=12, align=WD_ALIGN_PARAGRAPH.CENTER)
+    doc.add_paragraph()
+    add_field('Исполнитель: ', 'ИП Мамедов Адиль Мирза Оглы, ИНН 402810962699, г. Калуга, ул. Кирова, 21а')
+    add_field('Заказчик: ', name); add_field('Телефон: ', phone)
+    if model: add_field('Устройство: ', model)
+    if repair_type: add_field('Вид работ: ', repair_type)
+    add_field('Предварительная стоимость: ', price_str)
+    if comment: add_field('Описание: ', comment)
+    doc.add_paragraph()
+    add_para('УСЛОВИЯ РЕМОНТА — КЛИЕНТ ОЗНАКОМЛЕН И СОГЛАСЕН:', bold=True, size=13)
+    doc.add_paragraph()
+    risks = [
+        'После контакта с водой аппарат может полностью выйти из строя при любом виде ремонта. Мастерская не обязана восстанавливать устройство.',
+        'Компонентная пайка — риск безвозвратного повреждения платы. Если телефон перестал включаться в процессе — работа оплачивается.',
+        'При снятии дисплея возможно повреждение (полосы, артефакты). Замена за счёт клиента.',
+        'Все данные (фото, контакты) могут быть безвозвратно утеряны. Мастерская не восстанавливает данные.',
+        'Гарантия на результат не предоставляется. В худшем случае клиент оплачивает диагностику и выполненные работы.',
+    ]
+    for i, risk in enumerate(risks, 1):
+        p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        run = p.add_run(f'{i}. {risk}'); run.font.size = Pt(12); run.font.name = 'Times New Roman'
+    doc.add_paragraph()
+    add_para('Подписывая акт, клиент подтверждает ознакомление с условиями и добровольно соглашается на ремонт.', size=11)
+    doc.add_paragraph(); doc.add_paragraph()
+
+    table = doc.add_table(rows=2, cols=3)
+    for row in table.rows:
+        for cell in row.cells:
+            tc = cell._tc; tcPr = tc.get_or_add_tcPr()
+            tcBorders = OxmlElement('w:tcBorders')
+            for border in ['top', 'bottom', 'left', 'right']:
+                b = OxmlElement(f'w:{border}'); b.set(qn('w:val'), 'nil'); tcBorders.append(b)
+            tcPr.append(tcBorders)
+    for col_idx, label in [(0, 'Мастер (подпись / ФИО)'), (2, 'Клиент (подпись / ФИО)')]:
+        cell = table.cell(0, col_idx); p = cell.paragraphs[0]
+        run = p.add_run('_' * 30); run.font.size = Pt(12)
+        cell2 = table.cell(1, col_idx); p2 = cell2.paragraphs[0]; p2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run2 = p2.add_run(label); run2.font.size = Pt(10); run2.font.name = 'Times New Roman'
+
+    doc.add_paragraph()
+    p_f = doc.add_paragraph(); p_f.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r = p_f.add_run('ИНН: 402810962699  ·  ОГРНИП: 307402814200032  ·  Р/с: 40802810422270001866\nКАЛУЖСКОЕ ОТДЕЛЕНИЕ N8608 ПАО СБЕРБАНК  ·  БИК: 042908612')
+    r.font.size = Pt(9); r.font.name = 'Times New Roman'
+
+    buf = io.BytesIO(); doc.save(buf); return buf.getvalue()
+
+
+def send_tg_document(token: str, chat_id, doc_bytes: bytes, filename: str, caption: str = ''):
+    try:
+        requests.post(
+            f'https://api.telegram.org/bot{token}/sendDocument',
+            data={'chat_id': chat_id, 'caption': caption},
+            files={'document': (filename, doc_bytes, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')},
+            timeout=30,
+        )
+    except Exception:
+        pass
 
 
 def send_sms(phone: str, message: str):
@@ -534,6 +621,23 @@ def handler(event: dict, context) -> dict:
             )
             if tg_token and main_chat:
                 send_tg_all(tg_token, main_chat, conn, tg_msg)
+                docx_bytes = build_act_docx(new_id, name, phone, model, repair_type, price_str, comment)
+                filename = f'Акт_приёмки_{new_id}_{name.replace(" ", "_")}.docx'
+                recipients = [main_chat]
+                try:
+                    cur3 = conn.cursor()
+                    cur3.execute(f"SELECT telegram_chat_id FROM {SCHEMA}.notification_recipients WHERE is_active=true AND notify_repair=true")
+                    for row in cur3.fetchall():
+                        if row[0] and row[0] not in recipients:
+                            recipients.append(row[0])
+                    cur3.close()
+                except Exception:
+                    pass
+                pluxan = os.environ.get('PLUXAN4IK_CHAT_ID', '')
+                if pluxan and pluxan not in recipients:
+                    recipients.append(pluxan)
+                for cid in recipients:
+                    send_tg_document(tg_token, cid, docx_bytes, filename, caption=f'📋 Акт приёмки №{new_id}')
             send_sms('+79929990333', f'Заявка #{new_id} на ремонт. {name}, {phone}. {repair_type or model or ""}. Скупка24')
             cur.close(); conn.close()
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'id': new_id}, ensure_ascii=False)}

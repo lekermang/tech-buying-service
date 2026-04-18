@@ -1,3 +1,4 @@
+import io
 import json
 import os
 import smtplib
@@ -41,6 +42,137 @@ def send_tg(token: str, chat_id, text: str, parse_mode: str = 'Markdown'):
             f'https://api.telegram.org/bot{token}/sendMessage',
             json={'chat_id': chat_id, 'text': text, 'parse_mode': parse_mode},
             timeout=10,
+        )
+    except Exception:
+        pass
+
+
+def build_act_docx(order_id, name, phone, model, repair_type, price_str, comment) -> bytes:
+    from docx import Document
+    from docx.shared import Pt, Cm
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+    import datetime
+
+    doc = Document()
+
+    # Поля страницы
+    for section in doc.sections:
+        section.top_margin = Cm(2)
+        section.bottom_margin = Cm(2)
+        section.left_margin = Cm(3)
+        section.right_margin = Cm(1.5)
+
+    def add_para(text='', bold=False, size=12, align=WD_ALIGN_PARAGRAPH.LEFT):
+        p = doc.add_paragraph()
+        p.alignment = align
+        run = p.add_run(text)
+        run.bold = bold
+        run.font.size = Pt(size)
+        run.font.name = 'Times New Roman'
+        return p
+
+    def add_field(label, value):
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        r1 = p.add_run(label)
+        r1.bold = True
+        r1.font.size = Pt(12)
+        r1.font.name = 'Times New Roman'
+        r2 = p.add_run(value)
+        r2.font.size = Pt(12)
+        r2.font.name = 'Times New Roman'
+        return p
+
+    now = datetime.datetime.now().strftime('%d.%m.%Y %H:%M')
+
+    add_para('АКТ ПРИЁМКИ НА РЕМОНТ ТЕХНИЧЕСКОГО ОБОРУДОВАНИЯ', bold=True, size=14, align=WD_ALIGN_PARAGRAPH.CENTER)
+    add_para(f'№ {order_id}', size=13, align=WD_ALIGN_PARAGRAPH.CENTER)
+    add_para(f'г. Калуга, {now}', size=12, align=WD_ALIGN_PARAGRAPH.CENTER)
+    doc.add_paragraph()
+
+    add_field('Исполнитель: ', 'ИП Мамедов Адиль Мирза Оглы, ИНН 402810962699, г. Калуга, ул. Кирова, 21а')
+    add_field('Заказчик (клиент): ', name)
+    add_field('Телефон: ', phone)
+    if model:
+        add_field('Устройство: ', model)
+    if repair_type:
+        add_field('Вид работ: ', repair_type)
+    add_field('Предварительная стоимость: ', price_str)
+    if comment:
+        add_field('Описание неисправности: ', comment)
+
+    doc.add_paragraph()
+    add_para('УСЛОВИЯ РЕМОНТА — КЛИЕНТ ОЗНАКОМЛЕН И СОГЛАСЕН:', bold=True, size=13)
+    doc.add_paragraph()
+
+    risks = [
+        'После контакта с водой аппарат может полностью выйти из строя при любом виде ремонта (чистка, прогрев, пайка). Мастерская не несёт ответственности и не обязана восстанавливать устройство.',
+        'Компонентная пайка сопряжена с риском безвозвратного повреждения платы. Если телефон перестал включаться в процессе ремонта — работа оплачивается в полном объёме.',
+        'При снятии дисплея возможно его повреждение: появление полос, артефактов, отказ включения. Замена повреждённого дисплея производится исключительно за счёт клиента.',
+        'Все пользовательские данные (фотографии, контакты, переписка и пр.) могут быть безвозвратно утеряны. Мастерская не занимается восстановлением данных. Подписывая акт, клиент подтверждает, что создал резервную копию либо согласен на потерю данных.',
+        'Гарантия на результат ремонта не предоставляется. В худшем случае устройство будет возвращено в нерабочем состоянии; клиент обязуется оплатить стоимость диагностики и всех выполненных работ.',
+    ]
+    for i, risk in enumerate(risks, 1):
+        p = doc.add_paragraph(style='List Number')
+        p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        run = p.add_run(f'{i}. {risk}')
+        run.font.size = Pt(12)
+        run.font.name = 'Times New Roman'
+
+    doc.add_paragraph()
+    add_para('Подписывая настоящий акт, клиент подтверждает, что ознакомлен со всеми условиями и добровольно соглашается на проведение ремонта.', size=11)
+
+    doc.add_paragraph()
+    doc.add_paragraph()
+
+    # Таблица подписей
+    table = doc.add_table(rows=2, cols=3)
+    table.style = 'Table Grid'
+    for row in table.rows:
+        for cell in row.cells:
+            for border in ['top', 'bottom', 'left', 'right']:
+                tc = cell._tc
+                tcPr = tc.get_or_add_tcPr()
+                tcBorders = OxmlElement('w:tcBorders')
+                b = OxmlElement(f'w:{border}')
+                b.set(qn('w:val'), 'nil')
+                tcBorders.append(b)
+                tcPr.append(tcBorders)
+
+    # Линии подписей
+    for col_idx, label in [(0, 'Мастер (подпись / ФИО)'), (2, 'Клиент (подпись / ФИО)')]:
+        cell = table.cell(0, col_idx)
+        p = cell.paragraphs[0]
+        run = p.add_run('_' * 30)
+        run.font.size = Pt(12)
+        cell2 = table.cell(1, col_idx)
+        p2 = cell2.paragraphs[0]
+        p2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run2 = p2.add_run(label)
+        run2.font.size = Pt(10)
+        run2.font.name = 'Times New Roman'
+
+    doc.add_paragraph()
+    p_footer = doc.add_paragraph()
+    p_footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r = p_footer.add_run('ИНН: 402810962699  ·  ОГРНИП: 307402814200032  ·  Р/с: 40802810422270001866\nКАЛУЖСКОЕ ОТДЕЛЕНИЕ N8608 ПАО СБЕРБАНК  ·  БИК: 042908612  ·  К/с: 30101810100000000612')
+    r.font.size = Pt(9)
+    r.font.name = 'Times New Roman'
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+def send_tg_document(token: str, chat_id, doc_bytes: bytes, filename: str, caption: str = ''):
+    try:
+        requests.post(
+            f'https://api.telegram.org/bot{token}/sendDocument',
+            data={'chat_id': chat_id, 'caption': caption},
+            files={'document': (filename, doc_bytes, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')},
+            timeout=30,
         )
     except Exception:
         pass
@@ -332,9 +464,11 @@ def handler(event: dict, context) -> dict:
         default_chat = os.environ.get('TELEGRAM_CHAT_ID', '')
         if default_chat and default_chat not in chat_ids:
             chat_ids.insert(0, default_chat)
+        docx_bytes = build_act_docx(order_id, name, phone, model, repair_type, price_str, comment)
+        filename = f'Акт_приёмки_{order_id}_{name.replace(" ", "_")}.docx'
         for cid in chat_ids:
             send_tg(token, cid, tg_text)
-            send_tg(token, cid, act_text)
+            send_tg_document(token, cid, docx_bytes, filename, caption=f'📋 Акт приёмки №{order_id}')
 
     if token and client_chat_id:
         client_msg = (
