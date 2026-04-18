@@ -62,6 +62,20 @@ def handler(event: dict, context) -> dict:
                       'is_active': r[4], 'created_at': r[5].isoformat() if r[5] else None} for r in rows]
         return _ok({'employees': employees})
 
+    # GET /clients — список клиентов программы скидок (owner/admin)
+    if method == 'GET' and params.get('action') == 'clients':
+        emp = get_employee_by_token(emp_token)
+        if not emp or emp['role'] not in ('owner', 'admin'):
+            return _err(403, 'Нет доступа')
+        conn = get_conn(); cur = conn.cursor()
+        cur.execute(f"""SELECT id, full_name, phone, email, discount_pct, loyalty_points, registered_at
+                        FROM {SCHEMA}.clients ORDER BY registered_at DESC""")
+        rows = cur.fetchall(); cur.close(); conn.close()
+        clients = [{'id': r[0], 'full_name': r[1], 'phone': r[2], 'email': r[3],
+                    'discount_pct': r[4], 'loyalty_points': r[5],
+                    'registered_at': r[6].isoformat() if r[6] else None} for r in rows]
+        return _ok({'clients': clients, 'total': len(clients)})
+
     # POST /reset-password — сброс пароля через ADMIN_TOKEN (системный секрет)
     if method == 'POST' and body.get('action') == 'reset_password':
         admin_secret = os.environ.get('ADMIN_TOKEN', '')

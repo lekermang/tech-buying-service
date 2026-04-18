@@ -35,6 +35,21 @@ def handler(event: dict, context) -> dict:
     headers_in = {k.lower(): v for k, v in (event.get('headers') or {}).items()}
     client_token = headers_in.get('x-client-token', '').strip()
 
+    # GET /list — список всех клиентов (только для admin, X-Admin-Token)
+    if method == 'GET' and params.get('action') == 'list':
+        admin_token = headers_in.get('x-admin-token', '').strip()
+        expected = os.environ.get('ADMIN_TOKEN', '')
+        if not admin_token or admin_token != expected:
+            return _err(403, 'Нет доступа')
+        conn = get_conn(); cur = conn.cursor()
+        cur.execute(f"""SELECT id, full_name, phone, email, discount_pct, loyalty_points, registered_at
+                        FROM {SCHEMA}.clients ORDER BY registered_at DESC""")
+        rows = cur.fetchall(); cur.close(); conn.close()
+        clients = [{'id': r[0], 'full_name': r[1], 'phone': r[2], 'email': r[3],
+                    'discount_pct': r[4], 'loyalty_points': r[5],
+                    'registered_at': r[6].isoformat() if r[6] else None} for r in rows]
+        return _ok({'clients': clients, 'total': len(clients)})
+
     # GET /profile — получить профиль по токену или по номеру телефона (для сотрудников)
     if method == 'GET' and params.get('action') == 'profile':
         phone_param = params.get('phone', '').strip()
