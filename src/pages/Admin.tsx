@@ -12,12 +12,13 @@ import AnalyticsTab from "@/components/admin/AnalyticsTab";
 import NotificationsTab from "@/components/admin/NotificationsTab";
 import SettingsTab from "@/components/admin/SettingsTab";
 import ClientsAdminTab from "@/components/admin/ClientsAdminTab";
+import SmsBlastTab from "@/components/admin/SmsBlastTab";
 import { MODEL_PHOTOS, CATEGORY_PHOTOS } from "@/pages/catalog.types";
 
 const ADMIN_URL = "https://functions.poehali.dev/a105aede-d55d-4b99-9d3e-5e977887aa04";
 const EXPORT_URL = "https://functions.poehali.dev/13db4dbd-0d2b-47d4-8e09-c6f82483ffde";
 
-type Tab = "repair" | "prices" | "sky" | "catalog" | "items" | "api-catalog" | "tools-import" | "analytics" | "notifications" | "settings" | "clients";
+type Tab = "repair" | "prices" | "sky" | "catalog" | "items" | "api-catalog" | "tools-import" | "analytics" | "notifications" | "settings" | "clients" | "sms-blast";
 
 const MENU: { key: Tab; label: string; icon: string; group: string }[] = [
   { key: "analytics",     label: "Аналитика",      icon: "BarChart2",   group: "Статистика" },
@@ -29,6 +30,7 @@ const MENU: { key: Tab; label: string; icon: string; group: string }[] = [
   { key: "api-catalog",   label: "Выгрузка API",   icon: "PackageOpen", group: "Каталог" },
   { key: "catalog",       label: "Синхронизация",  icon: "Bot",         group: "Инструменты" },
   { key: "tools-import",  label: "Импорт CSV",     icon: "FileUp",      group: "Инструменты" },
+  { key: "sms-blast",     label: "Рассылка SMS",   icon: "MessageSquare", group: "Система" },
   { key: "clients",       label: "Клиенты",        icon: "Users",       group: "Система" },
   { key: "settings",      label: "Настройки",      icon: "Settings",    group: "Система" },
 ];
@@ -279,6 +281,7 @@ export default function Admin() {
           {tab === "catalog"       && <CatalogTab token={token} />}
           {tab === "api-catalog"   && <ApiCatalogContent token={token} />}
           {tab === "tools-import"  && <ToolsImportTab token={token} />}
+          {tab === "sms-blast"     && <SmsBlastTab token={token} />}
           {tab === "clients"       && <ClientsAdminTab token={token} />}
           {tab === "settings"      && <SettingsTab token={token} />}
         </div>

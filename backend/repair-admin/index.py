@@ -777,5 +777,73 @@ def handler(event: dict, context) -> dict:
         cur.close(); conn.close()
         return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'master_income': int(master_income_val) if master_income_val != 'NULL' else None}, ensure_ascii=False)}
 
-    cur.close(); conn.close()
+    # ── SMS РАССЫЛКА ──────────────────────────────────────────────────────────
+
+    # GET ?action=sms_contacts&group=... — список контактов для предпросмотра
+    if method == 'GET' and params.get('action') == 'sms_contacts':
+        if not auth(event):
+            return {'statusCode': 403, 'headers': HEADERS, 'body': json.dumps({'error': 'Нет доступа'}, ensure_ascii=False)}
+        group = params.get('group', 'all')  # all | registered | repair
+        conn = psycopg2.connect(os.environ['DATABASE_URL'])
+        cur = conn.cursor()
+        contacts = []
+        if group in ('all', 'registered'):
+            cur.execute(f"SELECT id, full_name, phone FROM {SCHEMA}.clients ORDER BY registered_at DESC")
+            for r in cur.fetchall():
+                contacts.append({'id': f'c_{r[0]}', 'full_name': r[1], 'phone': r[2], 'source': 'registered'})
+        if group in ('all', 'repair'):
+            cur.execute(f"""SELECT DISTINCT ON (phone) id, name, phone FROM {SCHEMA}.repair_orders
+                            WHERE status NOT IN ('cancelled') ORDER BY phone, created_at DESC""")
+            seen = {c['phone'] for c in contacts}
+            for r in cur.fetchall():
+                if r[2] not in seen:
+                    contacts.append({'id': f'r_{r[0]}', 'full_name': r[1], 'phone': r[2], 'source': 'repair'})
+                    seen.add(r[2])
+        cur.close(); conn.close()
+        return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'contacts': contacts, 'total': len(contacts)}, ensure_ascii=False)}
+
+    # POST action=sms_blast — массовая рассылка SMS
+    if method == 'POST' and body.get('action') == 'sms_blast':
+        if not auth(event):
+            return {'statusCode': 403, 'headers': HEADERS, 'body': json.dumps({'error': 'Нет доступа'}, ensure_ascii=False)}
+        message = (body.get('message') or '').strip()
+        group = body.get('group', 'all')  # all | registered | repair
+        if not message:
+            return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'Текст сообщения обязателен'}, ensure_ascii=False)}
+        if len(message) > 480:
+            return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'Сообщение слишком длинное (макс 480 символов)'}, ensure_ascii=False)}
+        api_id = os.environ.get('SMSRU_API_ID', '')
+        if not api_id:
+            return {'statusCode': 500, 'headers': HEADERS, 'body': json.dumps({'error': 'SMS сервис не настроен'}, ensure_ascii=False)}
+        conn = psycopg2.connect(os.environ['DATABASE_URL'])
+        cur = conn.cursor()
+        phones = set()
+        if group in ('all', 'registered'):
+            cur.execute(f"SELECT phone FROM {SCHEMA}.clients")
+            for r in cur.fetchall():
+                clean = ''.join(c for c in r[0] if c.isdigit() or c == '+')
+                if clean:
+                    phones.add(clean)
+        if group in ('all', 'repair'):
+            cur.execute(f"SELECT DISTINCT phone FROM {SCHEMA}.repair_orders WHERE status NOT IN ('cancelled')")
+            for r in cur.fetchall():
+                clean = ''.join(c for c in r[0] if c.isdigit() or c == '+')
+                if clean:
+                    phones.add(clean)
+        cur.close(); conn.close()
+        sent = 0; failed = 0
+        for phone_num in phones:
+            try:
+                resp = requests.get('https://sms.ru/sms/send',
+                    params={'api_id': api_id, 'to': phone_num, 'msg': message, 'json': 1, 'from': 'Skypka24'},
+                    timeout=10)
+                data_r = resp.json() if resp.status_code == 200 else {}
+                if data_r.get('status') == 'OK':
+                    sent += 1
+                else:
+                    failed += 1
+            except Exception:
+                failed += 1
+        return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'sent': sent, 'failed': failed, 'total': len(phones)}, ensure_ascii=False)}
+
     return {'statusCode': 405, 'headers': HEADERS, 'body': json.dumps({'error': 'Method not allowed'}, ensure_ascii=False)}
