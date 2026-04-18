@@ -10,6 +10,8 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled:     "Отменено",
 };
 
+const AD_FOOTER = "\n\n📲 Присоединяйтесь к нам: https://t.me/ProService40";
+
 const STATUS_MSG: Record<string, string> = {
   in_progress:   "В работе 🔧 Ваш телефон принят и сейчас в ремонте. Сообщим, как только будет готово.",
   waiting_parts: "Ждём запчасть ⏳ Запчасть заказана, ожидаем поставку. Сразу приступим к ремонту.",
@@ -18,12 +20,9 @@ const STATUS_MSG: Record<string, string> = {
   cancelled:     "Отменено ❌ К сожалению, ремонт отменён. Свяжитесь с нами для уточнения деталей.",
 };
 
-function copyToClipboard(text: string) {
-  navigator.clipboard?.writeText(text).catch(() => {
-    const ta = document.createElement("textarea");
-    ta.value = text; document.body.appendChild(ta); ta.select();
-    document.execCommand("copy"); document.body.removeChild(ta);
-  });
+function buildTgLink(phone: string, text: string): string {
+  // Открывает бота @Skypkaklgbot с готовым текстом
+  return `https://t.me/Skypkaklgbot?text=${encodeURIComponent(text)}`;
 }
 
 type Props = {
@@ -45,14 +44,14 @@ export default function RepairOrderCard({
   onToggle, onEditFormChange, onUpdateStatus, onOpenReadyModal, onSaveEdit, onDelete,
 }: Props) {
   const st = statusInfo(o.status);
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [sentKey, setSentKey] = useState<string | null>(null);
 
-  const handleCopy = (key: string, msg: string) => {
+  const handleSend = (key: string, msg: string) => {
     const amount = o.repair_amount ? `\nСтоимость ремонта: ${Number(o.repair_amount).toLocaleString("ru-RU")} ₽` : "";
-    const fullMsg = `Скупка24, ремонт #${o.id}:\n${msg}${amount}`;
-    copyToClipboard(fullMsg);
-    setCopiedKey(key);
-    setTimeout(() => setCopiedKey(null), 2500);
+    const fullMsg = `Скупка24, ремонт #${o.id}:\n${msg}${amount}${AD_FOOTER}`;
+    window.open(buildTgLink(o.phone, fullMsg), "_blank");
+    setSentKey(key);
+    setTimeout(() => setSentKey(null), 3000);
   };
 
   return (
@@ -67,12 +66,12 @@ export default function RepairOrderCard({
             </span>
             <span className="font-oswald font-bold text-white text-sm">{o.name}</span>
             <a href={`tel:${o.phone}`} onClick={e => e.stopPropagation()} className="text-[#FFD700] hover:text-yellow-400 text-xs font-roboto">{o.phone}</a>
-            {o.phone && o.phone.replace(/\D/g,"").length >= 10 && (
-              <a href={`https://web.max.ru/#/chat?phone=${o.phone.replace(/\D/g,"")}`} target="_blank" rel="noopener noreferrer"
+            {o.phone && (
+              <a href={`https://t.me/Skypkaklgbot`} target="_blank" rel="noopener noreferrer"
                 onClick={e => e.stopPropagation()}
-                title="Написать в MAX"
-                className="text-blue-400 hover:text-blue-300 transition-colors font-roboto text-[10px] font-bold flex items-center gap-0.5 border border-blue-500/30 px-1.5 py-0.5">
-                MAX
+                title="Открыть бота Telegram"
+                className="text-[#229ED9] hover:text-[#1a8cc2] transition-colors flex items-center gap-0.5">
+                <Icon name="Send" size={13} />
               </a>
             )}
           </div>
@@ -137,41 +136,36 @@ export default function RepairOrderCard({
 
           {saveError && <div className="text-red-400 font-roboto text-xs">{saveError}</div>}
 
-          {/* MAX — статус клиенту */}
-          {o.phone && o.phone.replace(/\D/g,"").length >= 10 && (
-            <div className="border border-blue-500/15 bg-blue-500/5 p-2.5">
-              <div className="flex items-center justify-between mb-2">
-                <div className="font-roboto text-white/30 text-[9px] uppercase tracking-wide flex items-center gap-1">
-                  <span className="text-blue-400 font-bold text-[9px]">MAX</span> Статус клиенту
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="font-roboto text-[10px] text-white/50">{o.phone}</span>
-                  <a href="https://web.max.ru" target="_blank" rel="noopener noreferrer"
-                    className="font-roboto text-[9px] text-blue-400 hover:text-blue-300 border border-blue-500/30 px-1.5 py-0.5 transition-colors">
-                    Открыть MAX →
-                  </a>
-                </div>
+          {/* Telegram — статус клиенту через @Skypkaklgbot */}
+          <div className="border border-[#229ED9]/15 bg-[#229ED9]/5 p-2.5">
+            <div className="flex items-center justify-between mb-2">
+              <div className="font-roboto text-white/30 text-[9px] uppercase tracking-wide flex items-center gap-1">
+                <Icon name="Send" size={9} className="text-[#229ED9]" /> Статус клиенту — Telegram
               </div>
-              <div className="flex gap-1.5 flex-wrap">
-                {Object.entries(STATUS_MSG).map(([key, msg]) => (
-                  <button key={key} type="button" onClick={() => handleCopy(key, msg)}
-                    className={`font-roboto text-[9px] px-2.5 py-1.5 border transition-colors flex items-center gap-1 ${
-                      copiedKey === key
-                        ? "border-green-500/40 text-green-400 bg-green-500/10"
-                        : "border-blue-500/20 text-blue-400/70 hover:bg-blue-500/10 hover:text-blue-400"
-                    }`}>
-                    <Icon name={copiedKey === key ? "Check" : "Copy"} size={9} />
-                    {STATUS_LABEL[key] || key}
-                  </button>
-                ))}
-              </div>
-              {copiedKey && (
-                <div className="mt-1.5 font-roboto text-[9px] text-green-400/70 flex items-center gap-1">
-                  <Icon name="CheckCircle" size={9} /> Текст скопирован — вставьте в чат MAX
-                </div>
-              )}
+              <a href="https://t.me/Skypkaklgbot" target="_blank" rel="noopener noreferrer"
+                className="font-roboto text-[9px] text-[#229ED9] hover:text-[#1a8cc2] border border-[#229ED9]/30 px-1.5 py-0.5 transition-colors">
+                @Skypkaklgbot →
+              </a>
             </div>
-          )}
+            <div className="flex gap-1.5 flex-wrap">
+              {Object.entries(STATUS_MSG).map(([key, msg]) => (
+                <button key={key} type="button" onClick={() => handleSend(key, msg)}
+                  className={`font-roboto text-[9px] px-2.5 py-1.5 border transition-colors flex items-center gap-1 ${
+                    sentKey === key
+                      ? "border-green-500/40 text-green-400 bg-green-500/10"
+                      : "border-[#229ED9]/20 text-[#229ED9]/70 hover:bg-[#229ED9]/10 hover:text-[#229ED9]"
+                  }`}>
+                  <Icon name={sentKey === key ? "Check" : "Send"} size={9} />
+                  {STATUS_LABEL[key] || key}
+                </button>
+              ))}
+            </div>
+            {sentKey && (
+              <div className="mt-1.5 font-roboto text-[9px] text-green-400/70 flex items-center gap-1">
+                <Icon name="CheckCircle" size={9} /> Telegram открыт — нажмите «Отправить» боту
+              </div>
+            )}
+          </div>
 
           {/* Кнопки управления статусом */}
           <div className="flex gap-1.5 flex-wrap">
