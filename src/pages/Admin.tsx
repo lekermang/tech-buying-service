@@ -49,11 +49,15 @@ export default function Admin() {
     setExporting(true);
     try {
       const res = await fetch(EXPORT_URL, { headers: adminHeaders(token) });
-      const blob = await res.blob();
+      const text = await res.text();
+      const binary = atob(text);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "skypka24_export.xlsx";
+      a.download = "yandex_market_export.xlsx";
       a.click();
       URL.revokeObjectURL(url);
     } finally {
