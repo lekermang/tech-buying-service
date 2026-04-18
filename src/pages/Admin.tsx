@@ -11,6 +11,7 @@ import ToolsImportTab from "@/components/admin/ToolsImportTab";
 import AnalyticsTab from "@/components/admin/AnalyticsTab";
 import NotificationsTab from "@/components/admin/NotificationsTab";
 import SettingsTab from "@/components/admin/SettingsTab";
+import { MODEL_PHOTOS, CATEGORY_PHOTOS } from "@/pages/catalog.types";
 
 const ADMIN_URL = "https://functions.poehali.dev/a105aede-d55d-4b99-9d3e-5e977887aa04";
 const EXPORT_URL = "https://functions.poehali.dev/13db4dbd-0d2b-47d4-8e09-c6f82483ffde";
@@ -45,14 +46,15 @@ export default function Admin() {
   const [collapsed, setCollapsed] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [xlsxUrl, setXlsxUrl] = useState<string | null>(null);
+  const [xlsxToolsUrl, setXlsxToolsUrl] = useState<string | null>(null);
   const [xlsxProgress, setXlsxProgress] = useState(0);
   const [xlsxStep, setXlsxStep] = useState("");
 
-  const post = (tok: string, action: string) =>
+  const post = (tok: string, action: string, extra?: object) =>
     fetch(EXPORT_URL, {
       method: 'POST',
       headers: { ...adminHeaders(tok), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action }),
+      body: JSON.stringify({ action, ...extra }),
     }).then(r => r.json());
 
   const checkXlsx = async (tok: string) => {
@@ -60,31 +62,29 @@ export default function Admin() {
       const res = await fetch(EXPORT_URL, { headers: adminHeaders(tok) });
       if (!res.ok) return;
       const data = await res.json();
-      if (data.status === 'ready' && data.url) setXlsxUrl(data.url);
+      if (data.url) setXlsxUrl(data.url);
+      if (data.tools_url) setXlsxToolsUrl(data.tools_url);
     } catch (_e) { /* ignore */ }
   };
 
   const generateXlsx = async () => {
     const tok = localStorage.getItem("admin_token") || token;
-    console.log("generateXlsx token:", tok);
     setGenerating(true);
     setXlsxUrl(null);
+    setXlsxToolsUrl(null);
     try {
       setXlsxStep("Каталог электроники..."); setXlsxProgress(10);
-      const r1 = await post(tok, 'catalog');
-      console.log("catalog result:", r1);
+      await post(tok, 'catalog', { model_photos: MODEL_PHOTOS, category_photos: CATEGORY_PHOTOS });
 
       setXlsxStep("Товары на складе..."); setXlsxProgress(35);
-      const r2 = await post(tok, 'goods');
-      console.log("goods result:", r2);
+      await post(tok, 'goods', { model_photos: MODEL_PHOTOS, category_photos: CATEGORY_PHOTOS });
 
       setXlsxStep("Инструменты (18 000 позиций)..."); setXlsxProgress(55);
       const r3 = await post(tok, 'tools');
-      console.log("tools result:", r3);
+      if (r3.tools_url) setXlsxToolsUrl(r3.tools_url);
 
       setXlsxStep("Сборка файла..."); setXlsxProgress(90);
       const result = await post(tok, 'merge');
-      console.log("merge result:", result);
 
       setXlsxProgress(100);
       setXlsxStep("Готово!");
@@ -242,16 +242,20 @@ export default function Admin() {
               {generating ? "Генерирую..." : "Обновить XLSX"}
             </button>
             {xlsxUrl && !generating && (
-              <a
-                href={xlsxUrl}
-                download="yandex_market_export.xlsx"
-                className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 border border-green-500/30 text-green-400 hover:bg-green-500/10 transition-colors"
-              >
+              <a href={xlsxUrl} download="yandex_market_export.xlsx"
+                className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 border border-green-500/30 text-green-400 hover:bg-green-500/10 transition-colors">
                 <Icon name="FileDown" size={13} />
-                Скачать XLSX
+                Каталог + Товары
               </a>
             )}
-            {!xlsxUrl && !generating && (
+            {xlsxToolsUrl && !generating && (
+              <a href={xlsxToolsUrl} download="tools_export.xlsx"
+                className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 border border-orange-500/30 text-orange-400 hover:bg-orange-500/10 transition-colors">
+                <Icon name="FileDown" size={13} />
+                Инструменты
+              </a>
+            )}
+            {!xlsxUrl && !xlsxToolsUrl && !generating && (
               <span className="text-[11px] text-white/30">Файл не сформирован</span>
             )}
           </div>

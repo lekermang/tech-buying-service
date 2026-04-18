@@ -22,6 +22,7 @@ S3_KEY_CATALOG = 'exports/part_catalog.xlsx'
 S3_KEY_GOODS   = 'exports/part_goods.xlsx'
 S3_KEY_TOOLS   = 'exports/part_tools.xlsx'
 S3_KEY_FINAL   = 'exports/yandex_market_export.xlsx'
+S3_KEY_TOOLS_FINAL = 'exports/tools_export.xlsx'
 
 COL_WIDTHS = [40, 15, 50, 30, 25, 50, 14, 12, 12, 50]
 
@@ -93,7 +94,9 @@ def make_wb(sheet_name, fill_color, rows):
     return buf.read()
 
 
-def build_catalog(conn):
+def build_catalog(conn, model_photos=None, category_photos=None):
+    model_photos = model_photos or {}
+    category_photos = category_photos or {}
     cur = conn.cursor()
     cur.execute(f"""
         SELECT id, category, brand, model, color, storage,
@@ -108,13 +111,16 @@ def build_catalog(conn):
         short = ' '.join(x for x in [brand, model, storage] if x)
         desc = description or short
         in_stock = 'Да' if availability == 'in_stock' else 'Нет'
+        photo = photo_url or model_photos.get(model) or category_photos.get(category) or ''
         rows.append([name, str(item_id), desc, short, category,
-                     photo_url or '', price or '', in_stock, '1 шт', photo_url or ''])
+                     photo, price or '', in_stock, '1 шт', photo])
     cur.close()
     return make_wb('Каталог электроники', '1565C8', rows)
 
 
-def build_goods(conn):
+def build_goods(conn, model_photos=None, category_photos=None):
+    model_photos = model_photos or {}
+    category_photos = category_photos or {}
     cur = conn.cursor()
     cur.execute(f"""
         SELECT id, title, category, brand, model, condition,
@@ -128,8 +134,9 @@ def build_goods(conn):
         name = title or ' '.join(x for x in [brand, model, storage, color] if x)
         short = ' '.join(x for x in [brand, model, storage, condition] if x)
         desc = description or short
+        photo = photo_url or model_photos.get(model) or category_photos.get(category) or ''
         rows.append([name, str(item_id), desc, short, category,
-                     photo_url or '', sell_price or '', 'Да', '1 шт', photo_url or ''])
+                     photo, sell_price or '', 'Да', '1 шт', photo])
     cur.close()
     return make_wb('Товары на складе', '27AE60', rows)
 
@@ -180,6 +187,11 @@ def get_cdn_url():
     return f"https://cdn.poehali.dev/projects/{key_id}/bucket/{S3_KEY_FINAL}"
 
 
+def get_cdn_tools_url():
+    key_id = os.environ['AWS_ACCESS_KEY_ID']
+    return f"https://cdn.poehali.dev/projects/{key_id}/bucket/{S3_KEY_TOOLS_FINAL}"
+
+
 def s3_exists(s3, key):
     try:
         s3.head_object(Bucket='files', Key=key)
@@ -211,21 +223,19 @@ def handler(event: dict, context) -> dict:
     # GET — статус
     if action == 'status':
         exists = s3_exists(s3, S3_KEY_FINAL)
-        parts = {
-            'catalog': s3_exists(s3, S3_KEY_CATALOG),
-            'goods':   s3_exists(s3, S3_KEY_GOODS),
-            'tools':   s3_exists(s3, S3_KEY_TOOLS),
-        }
+        tools_exists = s3_exists(s3, S3_KEY_TOOLS_FINAL)
         return ok({
             'status': 'ready' if exists else 'not_generated',
             'url': get_cdn_url() if exists else None,
-            'parts': parts,
+            'tools_url': get_cdn_tools_url() if tools_exists else None,
         })
 
     # POST action=catalog
     if action == 'catalog':
+        model_photos = body.get('model_photos', {})
+        category_photos = body.get('category_photos', {})
         conn = get_conn()
-        data = build_catalog(conn)
+        data = build_catalog(conn, model_photos, category_photos)
         conn.close()
         s3.put_object(Bucket='files', Key=S3_KEY_CATALOG, Body=data,
                       ContentType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
@@ -233,28 +243,32 @@ def handler(event: dict, context) -> dict:
 
     # POST action=goods
     if action == 'goods':
+        model_photos = body.get('model_photos', {})
+        category_photos = body.get('category_photos', {})
         conn = get_conn()
-        data = build_goods(conn)
+        data = build_goods(conn, model_photos, category_photos)
         conn.close()
         s3.put_object(Bucket='files', Key=S3_KEY_GOODS, Body=data,
                       ContentType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         return ok({'status': 'goods_done'})
 
-    # POST action=tools
+    # POST action=tools — часть для merge + отдельный файл инструментов
     if action == 'tools':
         conn = get_conn()
         data = build_tools(conn)
         conn.close()
-        s3.put_object(Bucket='files', Key=S3_KEY_TOOLS, Body=data,
-                      ContentType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        return ok({'status': 'tools_done'})
+        ct = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        s3.put_object(Bucket='files', Key=S3_KEY_TOOLS, Body=data, ContentType=ct)
+        s3.put_object(Bucket='files', Key=S3_KEY_TOOLS_FINAL, Body=data, ContentType=ct,
+                      ContentDisposition='attachment; filename="tools_export.xlsx"')
+        return ok({'status': 'tools_done', 'tools_url': get_cdn_tools_url()})
 
-    # POST action=merge — объединить все части
+    # POST action=merge — объединить каталог + товары (без инструментов — отдельный файл)
     if action == 'merge':
         final_data = merge_parts(s3)
         s3.put_object(Bucket='files', Key=S3_KEY_FINAL, Body=final_data,
                       ContentType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                       ContentDisposition='attachment; filename="yandex_market_export.xlsx"')
-        return ok({'status': 'ready', 'url': get_cdn_url()})
+        return ok({'status': 'ready', 'url': get_cdn_url(), 'tools_url': get_cdn_tools_url()})
 
     return err(400, 'Unknown action')
