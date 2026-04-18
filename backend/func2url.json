@@ -1,7 +1,7 @@
 {
+  "export-xlsx": "https://functions.poehali.dev/13db4dbd-0d2b-47d4-8e09-c6f82483ffde",
   "dzchat-api": "https://functions.poehali.dev/608c7976-816a-4e3e-b374-5dd617b045bf",
   "tools-sync": "https://functions.poehali.dev/8e9219e9-9dcf-4726-a272-69c6ce976b80",
-  "tools-import": "https://functions.poehali.dev/465711ab-0bef-49fe-b8c4-18c7f3064970",
   "tools-catalog": "https://functions.poehali.dev/434ea4ea-de14-4074-a738-e5db6e4f9697",
   "resold-parser": "https://functions.poehali.dev/a10aef75-50fc-411c-85bb-692d44fb31e7",
   "price-scheduler": "https://functions.poehali.dev/b09271ea-c662-4225-973f-4dd4c6a0e32c",

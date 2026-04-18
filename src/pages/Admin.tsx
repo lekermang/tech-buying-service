@@ -13,6 +13,7 @@ import NotificationsTab from "@/components/admin/NotificationsTab";
 import SettingsTab from "@/components/admin/SettingsTab";
 
 const ADMIN_URL = "https://functions.poehali.dev/a105aede-d55d-4b99-9d3e-5e977887aa04";
+const EXPORT_URL = "https://functions.poehali.dev/13db4dbd-0d2b-47d4-8e09-c6f82483ffde";
 
 type Tab = "repair" | "prices" | "sky" | "catalog" | "items" | "api-catalog" | "tools-import" | "analytics" | "notifications" | "settings";
 
@@ -42,6 +43,23 @@ export default function Admin() {
   const [error, setError] = useState("");
   const [checking, setChecking] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  const downloadXlsx = async () => {
+    setExporting(true);
+    try {
+      const res = await fetch(EXPORT_URL, { headers: adminHeaders(token) });
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "skypka24_export.xlsx";
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const checkAuth = async (tok: string) => {
     setChecking(true);
@@ -165,6 +183,17 @@ export default function Admin() {
         <div className="border-b border-[#222] px-5 py-3 flex items-center gap-3">
           <Icon name={active?.icon || "Circle"} size={16} className="text-[#FFD700]" />
           <span className="font-bold uppercase tracking-wide text-sm">{active?.label}</span>
+          <div className="ml-auto">
+            <button
+              onClick={downloadXlsx}
+              disabled={exporting}
+              title="Скачать каталог электроники, товары склада и инструменты в Excel"
+              className="flex items-center gap-1.5 font-roboto text-[11px] px-3 py-1.5 border border-green-500/30 text-green-400 hover:bg-green-500/10 transition-colors disabled:opacity-40"
+            >
+              <Icon name={exporting ? "Loader" : "FileDown"} size={13} className={exporting ? "animate-spin" : ""} />
+              {exporting ? "Формирую..." : "Скачать XLSX"}
+            </button>
+          </div>
         </div>
 
         <div className={`flex-1 ${tab === "analytics" ? "overflow-hidden flex flex-col" : "overflow-auto"}`}>
