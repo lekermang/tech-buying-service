@@ -46,6 +46,7 @@ export default function StaffRepairOrderCard({
   const st = statusInfo(o.status);
   const [sentKey, setSentKey] = useState<string | null>(null);
   const [notifyError, setNotifyError] = useState<string | null>(null);
+  const [noPurchase, setNoPurchase] = useState(false);
 
   const handleSend = async (statusKey: string) => {
     setSentKey(statusKey);
@@ -119,9 +120,19 @@ export default function StaffRepairOrderCard({
             </div>
             <div>
               <label className={LBL + " text-orange-400/80"}>💸 Закупка (₽)</label>
-              <input type="number" value={ef.purchase_amount}
+              <input type="number" value={noPurchase ? "0" : ef.purchase_amount}
                 onChange={e => onEditFormChange(o.id, { ...ef, purchase_amount: e.target.value })}
-                placeholder="500" className={INP} />
+                placeholder="500" disabled={noPurchase} className={INP + (noPurchase ? " opacity-40" : "")} />
+              <label className="flex items-center gap-1.5 mt-1 cursor-pointer" onClick={() => {
+                const next = !noPurchase;
+                setNoPurchase(next);
+                if (next) onEditFormChange(o.id, { ...ef, purchase_amount: "0" });
+              }}>
+                <div className={`w-3 h-3 border flex items-center justify-center transition-colors ${noPurchase ? "bg-[#FFD700] border-[#FFD700]" : "border-white/30"}`}>
+                  {noPurchase && <Icon name="Check" size={8} className="text-black" />}
+                </div>
+                <span className="font-roboto text-[9px] text-white/40">Без закупки (0 ₽)</span>
+              </label>
             </div>
             <div>
               <label className={LBL + " text-green-400/80"}>💰 Выдано за ремонт (₽)</label>
@@ -211,8 +222,8 @@ export default function StaffRepairOrderCard({
 
           {/* Кнопки статусов */}
           {(() => {
-            const hasAmount = !!ef.repair_amount && ef.repair_amount !== "0";
-            const hasPurchase = !!ef.purchase_amount && ef.purchase_amount !== "0";
+            const hasAmount = ef.repair_amount !== "" && ef.repair_amount !== null && ef.repair_amount !== undefined;
+            const hasPurchase = noPurchase || (ef.purchase_amount !== "" && ef.purchase_amount !== null && ef.purchase_amount !== undefined);
             const financeBlocked = !hasAmount || !hasPurchase;
             return (
               <div className="space-y-1.5">
@@ -228,7 +239,7 @@ export default function StaffRepairOrderCard({
                           else onChangeStatus(o.id, s.key, { admin_note: ef.admin_note });
                         }}
                         disabled={saving || blocked}
-                        title={blocked ? "Введите закупку и сумму выдачи" : undefined}
+                        title={blocked ? "Введите сумму выдачи (и закупку или поставьте галочку «Без закупки»)" : undefined}
                         className={`font-roboto text-[10px] px-2.5 py-1.5 border transition-colors flex items-center gap-1 ${
                           blocked
                             ? "border-white/10 text-white/15 cursor-not-allowed"
