@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import Icon from "@/components/ui/icon";
 import { ymGoal, Goals } from "@/lib/ym";
 
@@ -113,6 +114,7 @@ const ContactsFooter = ({ scrollTo }: ContactsFooterProps) => {
             {["Политика конфиденциальности", "Договор оферты"].map(l => (
               <a key={l} href="#" className="font-roboto text-white/30 text-xs hover:text-white/60 transition-colors hidden sm:block">{l}</a>
             ))}
+            <Link to="/requisites" className="font-roboto text-white/30 text-xs hover:text-[#FFD700] transition-colors hidden sm:block">Реквизиты</Link>
           </div>
         </div>
       </footer>
