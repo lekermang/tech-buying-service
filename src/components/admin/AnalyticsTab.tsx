@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback } from "react";
 import Icon from "@/components/ui/icon";
-import func2url from "@/../../backend/func2url.json";
 import {
   YM_ID,
   MOCK_STATS, MOCK_GOALS, MOCK_SOURCES, MOCK_DEVICES, MOCK_GEO, MOCK_PAGES,
@@ -11,7 +10,7 @@ import {
 import { OverviewSection, GoalsSection, SourcesSection, BehaviorSection } from "./AnalyticsSections";
 import { GeoSection, WebvisorSection, HeatmapSection, SeoSection } from "./AnalyticsIframeSections";
 
-const XLSX_URL = (func2url as Record<string, string>)["export-xlsx"];
+const XLSX_URL = "https://functions.poehali.dev/13db4dbd-0d2b-47d4-8e09-c6f82483ffde";
 const ADMIN_TOKEN = localStorage.getItem("adminToken") || "";
 
 // ── Секции навигации ──────────────────────────────────────────────
