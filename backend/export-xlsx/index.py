@@ -15,15 +15,15 @@ HEADERS = {
 }
 
 YM_HEADERS = ['Название', 'Идентификатор', 'Описание', 'Короткое описание',
-              'Категория', 'Фото', 'Цена товара', 'В наличии',
-              'Количество', 'Единицы измерения', 'Ссылка']
+              'Категория', 'Фото', 'Цена', 'В наличии',
+              'Количество', 'Ссылка']
 
 S3_KEY_CATALOG = 'exports/part_catalog.xlsx'
 S3_KEY_GOODS   = 'exports/part_goods.xlsx'
 S3_KEY_TOOLS   = 'exports/part_tools.xlsx'
 S3_KEY_FINAL   = 'exports/yandex_market_export.xlsx'
 
-COL_WIDTHS = [40, 15, 50, 30, 25, 50, 14, 12, 12, 18, 50]
+COL_WIDTHS = [40, 15, 50, 30, 25, 50, 14, 12, 12, 50]
 
 
 def get_conn():
@@ -109,7 +109,7 @@ def build_catalog(conn):
         desc = description or short
         in_stock = 'Да' if availability == 'in_stock' else 'Нет'
         rows.append([name, str(item_id), desc, short, category,
-                     photo_url or '', price or '', in_stock, 1 if in_stock == 'Да' else 0, 'шт', photo_url or ''])
+                     photo_url or '', price or '', in_stock, '1 шт', photo_url or ''])
     cur.close()
     return make_wb('Каталог электроники', '1565C8', rows)
 
@@ -129,7 +129,7 @@ def build_goods(conn):
         short = ' '.join(x for x in [brand, model, storage, condition] if x)
         desc = description or short
         rows.append([name, str(item_id), desc, short, category,
-                     photo_url or '', sell_price or '', 'Да', 1, 'шт', photo_url or ''])
+                     photo_url or '', sell_price or '', 'Да', '1 шт', photo_url or ''])
     cur.close()
     return make_wb('Товары на складе', '27AE60', rows)
 
@@ -148,7 +148,7 @@ def build_tools(conn):
         in_stock = 'Да' if amount and 'наличи' in amount.lower() else 'Нет'
         short = ' '.join(x for x in [brand, name] if x)
         rows.append([name, article, short, short, category or '',
-                     image_url or '', price, in_stock, 1 if in_stock == 'Да' else 0, 'шт', image_url or ''])
+                     image_url or '', price, in_stock, '1 шт', image_url or ''])
     cur.close()
     return make_wb('Инструменты', 'E67E22', rows)
 
