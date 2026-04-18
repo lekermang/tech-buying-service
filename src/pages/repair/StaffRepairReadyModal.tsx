@@ -27,17 +27,24 @@ export default function StaffRepairReadyModal({ order, form, error, saving, onFo
 
         <div className="space-y-3">
           <div>
-            <label className={LBL + " text-orange-400/80"}>🛒 Купленная запчасть *</label>
+            <label className={LBL + " text-orange-400/80"}>🛒 Купленная запчасть</label>
             <input value={form.parts_name}
               onChange={e => onFormChange({ ...form, parts_name: e.target.value })}
               placeholder="Дисплей iPhone 14, аккумулятор..." className={INP} />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className={LBL + " text-orange-400/80"}>💸 Закупка (₽) *</label>
+              <label className={LBL + " text-orange-400/80"}>💸 Закупка (₽)</label>
               <input type="number" value={form.purchase_amount}
                 onChange={e => onFormChange({ ...form, purchase_amount: e.target.value })}
-                placeholder="500" className={INP} />
+                placeholder="0" className={INP} />
+              <label className="flex items-center gap-1.5 mt-1 cursor-pointer"
+                onClick={() => onFormChange({ ...form, purchase_amount: "0", parts_name: form.parts_name || "Нет" })}>
+                <div className={`w-3 h-3 border flex items-center justify-center transition-colors ${form.purchase_amount === "0" ? "bg-[#FFD700] border-[#FFD700]" : "border-white/30"}`}>
+                  {form.purchase_amount === "0" && <span className="text-black text-[8px] font-bold">✓</span>}
+                </div>
+                <span className="font-roboto text-[9px] text-white/40">Без закупки (0 ₽)</span>
+              </label>
             </div>
             <div>
               <label className={LBL + " text-green-400/80"}>💰 Выдано за ремонт (₽) *</label>

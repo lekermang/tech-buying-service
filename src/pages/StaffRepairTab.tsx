@@ -192,9 +192,8 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
   // ─── Подтвердить «Готово» ────────────────────────────────────────────────────
   const submitReady = async () => {
     if (!readyModal) return;
-    if (!readyForm.parts_name.trim()) { setReadyError("Укажите купленную запчасть"); return; }
-    if (!readyForm.purchase_amount) { setReadyError("Укажите сумму закупки"); return; }
     if (!readyForm.repair_amount) { setReadyError("Укажите выданную сумму за ремонт"); return; }
+    if (readyForm.purchase_amount === "" || readyForm.purchase_amount == null) { setReadyError("Укажите сумму закупки (можно 0)"); return; }
     setReadySaving(true);
     const ok = await changeStatus(readyModal.id, "ready", {
       purchase_amount: parseInt(readyForm.purchase_amount),
