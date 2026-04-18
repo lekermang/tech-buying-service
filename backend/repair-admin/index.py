@@ -337,7 +337,7 @@ def handler(event: dict, context) -> dict:
         body = json.loads(raw_body) if isinstance(raw_body, str) else (raw_body or {})
         action = body.get('action', 'update_status')
 
-        # Сохранение цен работ + наценки + доп. работ
+        # Сохранение цен работ + наценки + доп. работ + мгновенный пересчёт repair_parts
         if action == 'labor_prices_set':
             prices = body.get('prices', [])
             for item in prices:
@@ -345,6 +345,8 @@ def handler(event: dict, context) -> dict:
                 price_val = int(item.get('price', 0))
                 if pt:
                     cur.execute(f"UPDATE {SCHEMA}.repair_labor_prices SET price={price_val}, updated_at=NOW() WHERE part_type='{pt}'")
+                    # Мгновенно обновляем labor_cost во всех запчастях этого типа
+                    cur.execute(f"UPDATE {SCHEMA}.repair_parts SET labor_cost={price_val} WHERE part_type='{pt}'")
             if 'parts_markup' in body:
                 markup_val = int(body.get('parts_markup', 0))
                 cur.execute(f"""

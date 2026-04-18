@@ -64,11 +64,11 @@
     letter-spacing: 0.02em;
   }
 
-  button:not([class*="rounded"]):not([class*="rounded-none"]) {
+  button {
     border-radius: 0.5rem;
   }
 
-  a[class*="bg-"]:not([class*="rounded"]) {
+  a[class*="bg-"] {
     border-radius: 0.5rem;
   }
 }

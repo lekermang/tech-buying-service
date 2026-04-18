@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 
 const ADMIN_URL = "https://functions.poehali.dev/a105aede-d55d-4b99-9d3e-5e977887aa04";
+const PARTS_URL = "https://functions.poehali.dev/68da5b17-ae5f-4568-8e27-0d945b995d82";
 
 const LABELS: Record<string, string> = {
   display:        "Дисплей",
@@ -37,6 +38,8 @@ export default function LaborPricesTab({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ ok: boolean; synced?: number } | null>(null);
   const [error, setError] = useState("");
 
   const headers = { "Content-Type": "application/json", [authHeader]: token };
@@ -62,6 +65,19 @@ export default function LaborPricesTab({
   };
 
   useEffect(() => { load(); }, []);
+
+  const syncCatalog = async () => {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await fetch(PARTS_URL, { method: "POST", headers });
+      const data = await res.json();
+      setSyncResult({ ok: !!data.ok, synced: data.synced });
+    } catch {
+      setSyncResult({ ok: false });
+    }
+    setSyncing(false);
+  };
 
   const save = async () => {
     setSaving(true);
@@ -190,9 +206,29 @@ export default function LaborPricesTab({
         {saving
           ? <><Icon name="Loader" size={14} className="animate-spin" /> Сохраняем...</>
           : saved
-          ? <><Icon name="Check" size={14} /> Сохранено</>
+          ? <><Icon name="Check" size={14} /> Цены сохранены и пересчитаны</>
           : "Сохранить"}
       </button>
+
+      {/* Кнопка синхронизации каталога запчастей */}
+      <div className="mt-4 border-t border-[#222] pt-4">
+        <div className="font-roboto text-white/30 text-[10px] uppercase tracking-wide mb-2 flex items-center gap-1">
+          <Icon name="Database" size={10} /> Каталог запчастей (МойСклад)
+        </div>
+        <button onClick={syncCatalog} disabled={syncing}
+          className="w-full border border-[#333] text-white/60 font-roboto text-xs py-2.5 hover:border-[#FFD700]/40 hover:text-white transition-colors disabled:opacity-40 flex items-center justify-center gap-2">
+          <Icon name={syncing ? "Loader" : "RefreshCw"} size={13} className={syncing ? "animate-spin" : ""} />
+          {syncing ? "Обновляем..." : "Обновить БД из МойСклад"}
+        </button>
+        {syncResult && (
+          <div className={`mt-2 font-roboto text-[10px] flex items-center gap-1.5 ${syncResult.ok ? "text-green-400" : "text-red-400"}`}>
+            <Icon name={syncResult.ok ? "CheckCircle" : "AlertCircle"} size={11} />
+            {syncResult.ok
+              ? `Готово — обновлено ${syncResult.synced?.toLocaleString("ru-RU")} позиций`
+              : "Ошибка синхронизации"}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

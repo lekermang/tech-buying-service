@@ -366,7 +366,10 @@ const HeroSection = ({ scrollTo, externalModalOpen, onExternalModalClose }: Hero
                 <div className="w-10 h-10 bg-[#FFD700]/20 border border-[#FFD700]/40 flex items-center justify-center shrink-0">
                   <Icon name="Wrench" size={20} className="text-[#FFD700]" />
                 </div>
-                <span className="font-oswald font-bold text-base uppercase text-white tracking-wide leading-tight">Каталог инструментов и расходных материалов</span>
+                <div>
+                  <span className="font-oswald font-bold text-base uppercase text-white tracking-wide leading-tight block">Каталог инструментов и расходных материалов</span>
+                  <span className="bg-[#FFD700]/20 text-[#FFD700] font-roboto text-[11px] px-1.5 py-0.5 border border-[#FFD700]/30 mt-1 inline-block">Гарантия 3 года</span>
+                </div>
               </div>
               <Icon name="ChevronRight" size={20} className="text-white/40 group-hover:text-[#FFD700] transition-colors shrink-0" />
             </a>
