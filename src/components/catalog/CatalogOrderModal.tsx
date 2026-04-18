@@ -140,33 +140,46 @@ const CatalogOrderModal = ({ item, onClose, markup = 3500 }: Props) => {
               <h4 className="text-lg font-semibold text-[#1d1d1f] mb-1">Заявка принята!</h4>
               <p className="text-sm text-[#1d1d1f]/40 mb-4">Перезвоним в течение 15 минут</p>
 
-              {/* QR + реквизиты Сбербанк */}
-              <div className="bg-[#f5f5f7] rounded-2xl p-4 mb-4">
-                <div className="text-xs font-semibold text-[#1d1d1f]/40 uppercase tracking-wide mb-3">Оплата через СБП · Сбербанк</div>
-                <div className="flex items-center gap-4">
-                  {/* QR */}
-                  <div className="shrink-0 w-24 h-24 bg-white rounded-xl overflow-hidden flex items-center justify-center p-1.5 border border-black/8">
-                    <img
-                      src="https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/c4300d94-dd25-455c-82c9-2da4f7f45c86.jpg"
-                      alt="QR Сбербанк"
-                      className="w-full h-full object-contain"
-                    />
+              {/* Оплата после отправки */}
+              <div className="bg-[#f5f5f7] rounded-2xl p-4 mb-4 text-left">
+                <div className="text-xs font-semibold text-[#1d1d1f]/40 uppercase tracking-wide mb-3">Способы оплаты</div>
+
+                {/* СБП */}
+                <div className="mb-3 pb-3 border-b border-black/6">
+                  <div className="flex items-center gap-2 mb-2">
+                    <img src="https://cdn.nspk.ru/upload/logos/sbp_color.svg" alt="СБП" className="h-5" onError={e => { (e.target as HTMLImageElement).style.display='none' }} />
+                    <span className="text-xs font-semibold text-[#1d1d1f]">Система быстрых платежей</span>
                   </div>
-                  <div className="flex-1 text-left">
-                    <div className="text-xs text-[#1d1d1f]/40 mb-1">Номер телефона</div>
-                    <div className="text-lg font-bold text-[#1d1d1f] tracking-tight">8 992 999-03-33</div>
-                    <div className="text-[11px] text-[#1d1d1f]/35 mt-0.5">Сбербанк · Получатель подтвердится</div>
-                    <button
-                      onClick={() => navigator.clipboard.writeText("89929990333")}
-                      className="mt-2 inline-flex items-center gap-1 text-[#21A038] text-xs font-medium">
-                      <Icon name="Copy" size={11} />
-                      Скопировать номер
-                    </button>
+                  <div className="flex items-center gap-3">
+                    <div className="shrink-0 w-20 h-20 bg-white rounded-xl overflow-hidden flex items-center justify-center p-1 border border-black/8">
+                      <img src="https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/c4300d94-dd25-455c-82c9-2da4f7f45c86.jpg" alt="QR СБП" className="w-full h-full object-contain" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-xs text-[#1d1d1f]/40 mb-0.5">Номер телефона</div>
+                      <div className="text-base font-bold text-[#1d1d1f]">8 992 999-03-33</div>
+                      <div className="text-[11px] text-[#1d1d1f]/35 mt-0.5">Сбербанк · Получатель подтвердится</div>
+                      <button onClick={() => navigator.clipboard.writeText("89929990333")}
+                        className="mt-1.5 inline-flex items-center gap-1 text-[#21A038] text-xs font-medium">
+                        <Icon name="Copy" size={11} />Скопировать
+                      </button>
+                    </div>
                   </div>
                 </div>
+
+                {/* Т-Pay */}
+                <div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-sm font-black text-[#FFDD2D] bg-[#333] rounded px-1.5 py-0.5 leading-none">T</span>
+                    <span className="text-xs font-semibold text-[#1d1d1f]">Т-Pay (Т-Банк)</span>
+                  </div>
+                  <div className="text-[11px] text-[#1d1d1f]/40 leading-relaxed">
+                    Выберите Т-Pay при оплате и подтвердите платёж в приложении Т-Банка.
+                  </div>
+                </div>
+
                 {item.price && (
                   <div className="mt-3 pt-3 border-t border-black/6 flex items-center justify-between">
-                    <span className="text-xs text-[#1d1d1f]/40">Сумма к переводу:</span>
+                    <span className="text-xs text-[#1d1d1f]/40">Сумма к оплате:</span>
                     <span className="text-base font-bold text-[#1d1d1f]">{(item.price + markup).toLocaleString("ru-RU")} ₽</span>
                   </div>
                 )}
@@ -205,27 +218,38 @@ const CatalogOrderModal = ({ item, onClose, markup = 3500 }: Props) => {
                 {loading ? "Отправляем..." : "Отправить заявку"}
               </button>
 
-              {/* QR перед отправкой */}
-              <div className="bg-[#f5f5f7] rounded-2xl p-4">
-                <div className="text-xs font-semibold text-[#1d1d1f]/40 uppercase tracking-wide mb-3">Оплата · Сбербанк СБП</div>
-                <div className="flex items-center gap-3">
-                  <div className="shrink-0 w-20 h-20 bg-white rounded-xl overflow-hidden flex items-center justify-center p-1 border border-black/8">
-                    <img
-                      src="https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/c4300d94-dd25-455c-82c9-2da4f7f45c86.jpg"
-                      alt="QR"
-                      className="w-full h-full object-contain"
-                    />
+              {/* Оплата перед отправкой */}
+              <div className="bg-[#f5f5f7] rounded-2xl p-4 text-left">
+                <div className="text-xs font-semibold text-[#1d1d1f]/40 uppercase tracking-wide mb-3">Способы оплаты</div>
+
+                {/* СБП */}
+                <div className="mb-3 pb-3 border-b border-black/6">
+                  <div className="flex items-center gap-2 mb-2">
+                    <img src="https://cdn.nspk.ru/upload/logos/sbp_color.svg" alt="СБП" className="h-5" onError={e => { (e.target as HTMLImageElement).style.display='none' }} />
+                    <span className="text-xs font-semibold text-[#1d1d1f]">Система быстрых платежей</span>
                   </div>
-                  <div className="flex-1 text-left">
-                    <div className="text-sm font-bold text-[#1d1d1f]">8 992 999-03-33</div>
-                    <div className="text-[11px] text-[#1d1d1f]/35 mt-0.5">Сбербанк</div>
-                    <button type="button"
-                      onClick={() => navigator.clipboard.writeText("89929990333")}
-                      className="mt-1.5 inline-flex items-center gap-1 text-[#21A038] text-xs font-medium">
-                      <Icon name="Copy" size={11} />
-                      Скопировать
-                    </button>
+                  <div className="flex items-center gap-3">
+                    <div className="shrink-0 w-20 h-20 bg-white rounded-xl overflow-hidden flex items-center justify-center p-1 border border-black/8">
+                      <img src="https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/c4300d94-dd25-455c-82c9-2da4f7f45c86.jpg" alt="QR СБП" className="w-full h-full object-contain" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-sm font-bold text-[#1d1d1f]">8 992 999-03-33</div>
+                      <div className="text-[11px] text-[#1d1d1f]/35 mt-0.5">Сбербанк</div>
+                      <button type="button" onClick={() => navigator.clipboard.writeText("89929990333")}
+                        className="mt-1.5 inline-flex items-center gap-1 text-[#21A038] text-xs font-medium">
+                        <Icon name="Copy" size={11} />Скопировать
+                      </button>
+                    </div>
                   </div>
+                </div>
+
+                {/* Т-Pay */}
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-black text-[#FFDD2D] bg-[#333] rounded px-1.5 py-0.5 leading-none">T</span>
+                    <span className="text-xs font-semibold text-[#1d1d1f]">Т-Pay (Т-Банк)</span>
+                  </div>
+                  <div className="text-[11px] text-[#1d1d1f]/40">Выберите Т-Pay и подтвердите в приложении Т-Банка.</div>
                 </div>
               </div>
 
