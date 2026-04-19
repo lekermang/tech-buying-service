@@ -39,6 +39,7 @@ export default function LaborPricesTab({
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<{ done: number; total: number } | null>(null);
   const [syncResult, setSyncResult] = useState<{ ok: boolean; synced?: number; error?: string } | null>(null);
   const [error, setError] = useState("");
 
@@ -69,14 +70,34 @@ export default function LaborPricesTab({
   const syncCatalog = async () => {
     setSyncing(true);
     setSyncResult(null);
+    setSyncProgress(null);
+    let totalSynced = 0;
+    let offset = 0;
     try {
-      const res = await fetch(PARTS_URL, { method: "POST", headers });
-      const data = await res.json();
-      setSyncResult({ ok: !!data.ok, synced: data.synced, error: data.error });
+      while (true) {
+        const res = await fetch(PARTS_URL, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ offset }),
+        });
+        const data = await res.json();
+        if (!data.ok) {
+          setSyncResult({ ok: false, error: data.error });
+          setSyncing(false);
+          setSyncProgress(null);
+          return;
+        }
+        totalSynced += data.saved;
+        setSyncProgress({ done: offset + data.saved, total: data.total || (offset + data.saved) });
+        if (!data.has_more) break;
+        offset = data.next_offset;
+      }
+      setSyncResult({ ok: true, synced: totalSynced });
     } catch (e) {
       setSyncResult({ ok: false, error: String(e) });
     }
     setSyncing(false);
+    setSyncProgress(null);
   };
 
   const save = async () => {
@@ -218,8 +239,25 @@ export default function LaborPricesTab({
         <button onClick={syncCatalog} disabled={syncing}
           className="w-full border border-[#333] text-white/60 font-roboto text-xs py-2.5 hover:border-[#FFD700]/40 hover:text-white transition-colors disabled:opacity-40 flex items-center justify-center gap-2">
           <Icon name={syncing ? "Loader" : "RefreshCw"} size={13} className={syncing ? "animate-spin" : ""} />
-          {syncing ? "Обновляем..." : "Обновить БД из МойСклад"}
+          {syncing
+            ? syncProgress
+              ? `Загружено ${syncProgress.done.toLocaleString("ru-RU")} из ${syncProgress.total.toLocaleString("ru-RU")}...`
+              : "Подключаемся..."
+            : "Обновить БД из МойСклад"}
         </button>
+        {syncing && syncProgress && (
+          <div className="mt-2">
+            <div className="w-full bg-[#222] h-1.5 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-[#FFD700] transition-all duration-300"
+                style={{ width: `${Math.round((syncProgress.done / syncProgress.total) * 100)}%` }}
+              />
+            </div>
+            <div className="text-right font-roboto text-[9px] text-white/30 mt-0.5">
+              {Math.round((syncProgress.done / syncProgress.total) * 100)}%
+            </div>
+          </div>
+        )}
         {syncResult && (
           <div className={`mt-2 font-roboto text-[10px] flex items-center gap-1.5 ${syncResult.ok ? "text-green-400" : "text-red-400"}`}>
             <Icon name={syncResult.ok ? "CheckCircle" : "AlertCircle"} size={11} />

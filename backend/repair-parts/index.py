@@ -96,34 +96,27 @@ def get_extra_works(cur) -> list:
         return []
 
 
-def sync_catalog(conn) -> int:
-    all_products = []
-    offset = 0
-    limit = 100
-    while True:
-        resp = requests.get(API_URL, params={
-            'category': '', 'category_id': '', 'limit': limit, 'offset': offset, 'search': ''
-        }, timeout=30)
-        data = resp.json()
-        products = data.get('products', [])
-        if not products:
-            break
-        all_products.extend(products)
-        if len(products) < limit:
-            break
-        offset += limit
+PAGE_SIZE = 100
+
+def sync_page(conn, offset: int) -> dict:
+    """Синхронизирует одну страницу товаров из МойСклад."""
+    resp = requests.get(API_URL, params={
+        'category': '', 'category_id': '', 'limit': PAGE_SIZE, 'offset': offset, 'search': ''
+    }, timeout=30)
+    data = resp.json()
+    products = data.get('products', [])
+    total = data.get('total', 0)
 
     cur = conn.cursor()
     labor = get_labor_prices(cur)
-    for p in all_products:
-        pid      = p.get('id', '')
-        name     = p.get('name', '')
-        category = p.get('category', '')
-        part_type      = detect_part_type(category, name)
-        quality        = detect_quality(name)
+    for p in products:
+        pid           = p.get('id', '')
+        name          = p.get('name', '')
+        category      = p.get('category', '')
+        part_type     = detect_part_type(category, name)
+        quality       = detect_quality(name)
         model_keywords = extract_model_keywords(name)
-        labor_cost     = labor.get(part_type, DEFAULT_LABOR.get(part_type, 500))
-
+        labor_cost    = labor.get(part_type, DEFAULT_LABOR.get(part_type, 500))
         cur.execute(f"""
             INSERT INTO {SCHEMA}.repair_parts
                 (id, code, name, category, category_id, price, stock, available,
@@ -140,7 +133,16 @@ def sync_catalog(conn) -> int:
               quality, part_type, model_keywords, labor_cost))
     conn.commit()
     cur.close()
-    return len(all_products)
+
+    saved = len(products)
+    has_more = (offset + saved) < total and saved == PAGE_SIZE
+    return {
+        'saved': saved,
+        'total': total,
+        'offset': offset,
+        'next_offset': offset + saved if has_more else None,
+        'has_more': has_more,
+    }
 
 
 def get_client_discount(cur, phone: str) -> dict:
@@ -219,10 +221,12 @@ def handler(event: dict, context) -> dict:
 
     if event.get('httpMethod') == 'POST':
         try:
-            synced = sync_catalog(conn)
+            body = json.loads(event.get('body') or '{}')
+            offset = int(body.get('offset', 0))
+            result = sync_page(conn, offset)
             conn.close()
             return {'statusCode': 200, 'headers': HEADERS,
-                    'body': json.dumps({'ok': True, 'synced': synced})}
+                    'body': json.dumps({'ok': True, **result})}
         except Exception as e:
             conn.close()
             print(f"[SYNC ERROR] {type(e).__name__}: {e}")
