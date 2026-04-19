@@ -1,3 +1,7 @@
+import { useState } from "react";
+
+const REPAIR_URL = "https://functions.poehali.dev/a105aede-d55d-4b99-9d3e-5e977887aa04";
+
 const items = [
   {
     num: "01",
@@ -67,6 +71,31 @@ const items = [
 ];
 
 const Act = () => {
+  const [form, setForm] = useState({ name: "", phone: "", model: "", comment: "" });
+  const [agreed, setAgreed] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [err, setErr] = useState("");
+
+  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleSubmit = async () => {
+    if (!form.name || !form.phone || !agreed) return;
+    setSending(true);
+    setErr("");
+    try {
+      const res = await fetch(REPAIR_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "create", ...form }),
+      });
+      const data = await res.json();
+      if (data.ok) { setSent(true); setForm({ name: "", phone: "", model: "", comment: "" }); setAgreed(false); }
+      else setErr("Ошибка при отправке. Попробуйте ещё раз.");
+    } catch { setErr("Нет связи. Попробуйте ещё раз."); }
+    setSending(false);
+  };
+
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-white">
       {/* Шапка */}
@@ -117,8 +146,91 @@ const Act = () => {
           ))}
         </div>
 
+        {/* ФОРМА ЗАПИСИ */}
+        <div className="mt-10 border border-[#FFD700]/20 bg-[#111]">
+          <div className="flex items-center gap-3 px-5 py-3 border-b border-[#222]">
+            <div className="w-1 h-5 bg-[#FFD700]" />
+            <span className="font-oswald text-white text-base font-bold uppercase tracking-wide">Записаться в ремонт</span>
+          </div>
+          <div className="p-5">
+            {sent ? (
+              <div className="text-center py-6">
+                <div className="font-oswald text-[#FFD700] text-xl font-bold uppercase mb-2">Заявка принята!</div>
+                <p className="font-roboto text-white/50 text-sm">Мы свяжемся с вами в ближайшее время.</p>
+                <button onClick={() => setSent(false)} className="mt-4 font-roboto text-[#FFD700]/60 text-xs hover:text-[#FFD700] transition-colors underline">
+                  Отправить ещё одну
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                  <div>
+                    <label className="font-roboto text-white/40 text-[10px] block mb-1">Ваше имя *</label>
+                    <input
+                      value={form.name} onChange={e => set("name", e.target.value)}
+                      placeholder="Иван Иванов"
+                      className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-2 font-roboto text-xs focus:outline-none focus:border-[#FFD700] transition-colors placeholder:text-white/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-roboto text-white/40 text-[10px] block mb-1">Телефон *</label>
+                    <input
+                      value={form.phone} onChange={e => set("phone", e.target.value)}
+                      placeholder="+7 (999) 000-00-00"
+                      className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-2 font-roboto text-xs focus:outline-none focus:border-[#FFD700] transition-colors placeholder:text-white/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-roboto text-white/40 text-[10px] block mb-1">Модель устройства</label>
+                    <input
+                      value={form.model} onChange={e => set("model", e.target.value)}
+                      placeholder="iPhone 14, Samsung A54..."
+                      className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-2 font-roboto text-xs focus:outline-none focus:border-[#FFD700] transition-colors placeholder:text-white/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-roboto text-white/40 text-[10px] block mb-1">Что сломалось</label>
+                    <input
+                      value={form.comment} onChange={e => set("comment", e.target.value)}
+                      placeholder="Замена дисплея, зарядка..."
+                      className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-2 font-roboto text-xs focus:outline-none focus:border-[#FFD700] transition-colors placeholder:text-white/20"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-start justify-between gap-3 mb-4">
+                  <label className="flex items-start gap-2 cursor-pointer group flex-1">
+                    <div
+                      onClick={() => setAgreed(v => !v)}
+                      className={`mt-0.5 w-4 h-4 shrink-0 border flex items-center justify-center transition-colors ${agreed ? "bg-[#FFD700] border-[#FFD700]" : "border-white/30 group-hover:border-[#FFD700]/60"}`}
+                    >
+                      {agreed && <span className="text-black text-[9px] font-bold">✓</span>}
+                    </div>
+                    <span className="font-roboto text-white/50 text-[11px] leading-relaxed">
+                      Ознакомлен с условиями ремонта и согласен
+                    </span>
+                  </label>
+                  <a href="/act" className="font-roboto text-[#FFD700]/70 text-[10px] hover:text-[#FFD700] transition-colors shrink-0 underline underline-offset-2 mt-0.5">
+                    Условия
+                  </a>
+                </div>
+
+                {err && <p className="font-roboto text-red-400 text-xs mb-3">{err}</p>}
+
+                <button
+                  onClick={handleSubmit}
+                  disabled={sending || !form.name || !form.phone || !agreed}
+                  className="bg-[#FFD700] text-black font-oswald font-bold px-6 py-2.5 uppercase text-sm hover:bg-yellow-400 transition-colors disabled:opacity-40 tracking-wide"
+                >
+                  {sending ? "Отправляю..." : "Записаться в ремонт"}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
         {/* Футер */}
-        <div className="mt-12 pt-6 border-t border-[#222]">
+        <div className="mt-10 pt-6 border-t border-[#222]">
           <div className="flex items-start gap-3 mb-4">
             <div className="w-1 h-4 bg-[#FFD700]/50 mt-0.5 flex-shrink-0" />
             <p className="font-roboto text-white/30 text-xs leading-relaxed">

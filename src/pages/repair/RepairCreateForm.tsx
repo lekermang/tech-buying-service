@@ -78,17 +78,26 @@ export default function RepairCreateForm({ form, creating, onChange, onCreate, o
             </li>
           ))}
         </ol>
-        <label className="flex items-start gap-2 cursor-pointer group">
-          <div
-            onClick={() => setAgreed(v => !v)}
-            className={`mt-0.5 w-4 h-4 shrink-0 border flex items-center justify-center transition-colors ${agreed ? "bg-[#FFD700] border-[#FFD700]" : "border-white/30 group-hover:border-[#FFD700]/60"}`}
+        <div className="flex items-start justify-between gap-3">
+          <label className="flex items-start gap-2 cursor-pointer group flex-1">
+            <div
+              onClick={() => setAgreed(v => !v)}
+              className={`mt-0.5 w-4 h-4 shrink-0 border flex items-center justify-center transition-colors ${agreed ? "bg-[#FFD700] border-[#FFD700]" : "border-white/30 group-hover:border-[#FFD700]/60"}`}
+            >
+              {agreed && <Icon name="Check" size={10} className="text-black" />}
+            </div>
+            <span className="font-roboto text-white/60 text-[11px] leading-relaxed">
+              Клиент ознакомлен с условиями, рисками и согласен на проведение ремонта
+            </span>
+          </label>
+          <a
+            href="/act"
+            target="_blank"
+            className="font-roboto text-[#FFD700]/70 text-[10px] hover:text-[#FFD700] transition-colors shrink-0 underline underline-offset-2 mt-0.5"
           >
-            {agreed && <Icon name="Check" size={10} className="text-black" />}
-          </div>
-          <span className="font-roboto text-white/60 text-[11px] leading-relaxed">
-            Клиент ознакомлен с условиями, рисками и согласен на проведение ремонта
-          </span>
-        </label>
+            Условия
+          </a>
+        </div>
       </div>
 
       <div className="flex gap-2 mt-3">
