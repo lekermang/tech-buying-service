@@ -560,6 +560,60 @@ def handler(event: dict, context) -> dict:
             cur.close(); conn.close()
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'smsru_response': resp.json()}, ensure_ascii=False)}
 
+        # SMS рассылка
+        if action == 'sms_blast':
+            message = (body.get('message') or '').strip()
+            group = body.get('group', 'all')
+            if not message:
+                cur.close(); conn.close()
+                return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'Текст сообщения обязателен'}, ensure_ascii=False)}
+            if len(message) > 480:
+                cur.close(); conn.close()
+                return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'Сообщение слишком длинное (макс 480 символов)'}, ensure_ascii=False)}
+            api_id = os.environ.get('SMSRU_API_ID', '')
+            if not api_id:
+                cur.close(); conn.close()
+                return {'statusCode': 500, 'headers': HEADERS, 'body': json.dumps({'error': 'SMS сервис не настроен'}, ensure_ascii=False)}
+
+            def fmt_p(raw: str) -> str:
+                digits = ''.join(c for c in (raw or '') if c.isdigit())
+                if len(digits) == 11 and digits.startswith('8'):
+                    digits = '7' + digits[1:]
+                if len(digits) == 10:
+                    digits = '7' + digits
+                return ('+' + digits) if len(digits) == 11 else ''
+
+            phones = set()
+            if group in ('all', 'registered'):
+                cur.execute(f"SELECT phone FROM {SCHEMA}.clients")
+                for r in cur.fetchall():
+                    p = fmt_p(r[0] or '')
+                    if p: phones.add(p)
+            if group in ('all', 'repair'):
+                cur.execute(
+                    "SELECT DISTINCT phone FROM " + SCHEMA + ".repair_orders"
+                    " WHERE status NOT IN ('cancelled') AND phone IS NOT NULL AND LENGTH(phone) >= 11"
+                )
+                for r in cur.fetchall():
+                    p = fmt_p((r[0] or '').strip())
+                    if p: phones.add(p)
+            cur.close(); conn.close()
+            sent = 0; failed = 0
+            for phone_num in phones:
+                try:
+                    resp = requests.get('https://sms.ru/sms/send',
+                        params={'api_id': api_id, 'to': phone_num, 'msg': message, 'json': 1, 'from': 'Skypka24'},
+                        timeout=10)
+                    data_r = resp.json() if resp.status_code == 200 else {}
+                    if data_r.get('status') == 'OK':
+                        sent += 1
+                    else:
+                        failed += 1
+                except Exception:
+                    failed += 1
+            print(f"[sms_blast] sent={sent} failed={failed} total={len(phones)}", flush=True)
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'sent': sent, 'failed': failed, 'total': len(phones)}, ensure_ascii=False)}
+
         # Сохранить настройку
         if action == 'settings_set':
             key = (body.get('key') or '').strip()
@@ -814,104 +868,5 @@ def handler(event: dict, context) -> dict:
 
         cur.close(); conn.close()
         return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'master_income': int(master_income_val) if master_income_val != 'NULL' else None}, ensure_ascii=False)}
-
-    # ── SMS РАССЫЛКА ──────────────────────────────────────────────────────────
-
-    # GET ?action=sms_contacts&group=... — список контактов для предпросмотра
-    if method == 'GET' and params.get('action') == 'sms_contacts':
-        hdrs_debug = {k.lower(): v for k, v in (event.get('headers') or {}).items()}
-        print(f"[sms_contacts] headers keys: {list(hdrs_debug.keys())}", flush=True)
-        print(f"[sms_contacts] x-admin-token present: {'x-admin-token' in hdrs_debug}", flush=True)
-        if not auth(event):
-            return {'statusCode': 403, 'headers': HEADERS, 'body': json.dumps({'error': 'Нет доступа', 'debug_headers': list(hdrs_debug.keys())}, ensure_ascii=False)}
-        group = params.get('group', 'all')  # all | registered | repair
-
-        def fmt_phone(raw: str) -> str:
-            digits = ''.join(c for c in (raw or '') if c.isdigit())
-            if len(digits) == 11 and digits.startswith('8'):
-                digits = '7' + digits[1:]
-            if len(digits) == 10:
-                digits = '7' + digits
-            return ('+' + digits) if len(digits) == 11 else ''
-
-        conn = psycopg2.connect(os.environ['DATABASE_URL'])
-        cur = conn.cursor()
-        contacts = []
-        seen_phones = set()
-        if group in ('all', 'registered'):
-            cur.execute(f"SELECT id, full_name, phone FROM {SCHEMA}.clients ORDER BY registered_at DESC")
-            for r in cur.fetchall():
-                p = fmt_phone(r[2] or '')
-                if p and p not in seen_phones:
-                    contacts.append({'id': f'c_{r[0]}', 'full_name': r[1] or '', 'phone': p, 'source': 'registered'})
-                    seen_phones.add(p)
-        if group in ('all', 'repair'):
-            cur.execute(
-                "SELECT id, name, phone FROM " + SCHEMA + ".repair_orders"
-                " WHERE status NOT IN ('cancelled')"
-                " AND phone IS NOT NULL AND phone != '' AND LENGTH(phone) >= 11"
-                " ORDER BY id DESC"
-            )
-            for r in cur.fetchall():
-                raw_p = (r[2] or '').strip()
-                p = fmt_phone(raw_p)
-                if p and p not in seen_phones:
-                    contacts.append({'id': f'r_{r[0]}', 'full_name': r[1] or '', 'phone': p, 'source': 'repair'})
-                    seen_phones.add(p)
-        cur.close(); conn.close()
-        print(f"[sms_contacts] group={group} total={len(contacts)}", flush=True)
-        return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'contacts': contacts, 'total': len(contacts)}, ensure_ascii=False)}
-
-    # POST action=sms_blast — массовая рассылка SMS
-    if method == 'POST' and body.get('action') == 'sms_blast':
-        if not auth(event):
-            return {'statusCode': 403, 'headers': HEADERS, 'body': json.dumps({'error': 'Нет доступа'}, ensure_ascii=False)}
-        message = (body.get('message') or '').strip()
-        group = body.get('group', 'all')  # all | registered | repair
-        if not message:
-            return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'Текст сообщения обязателен'}, ensure_ascii=False)}
-        if len(message) > 480:
-            return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'Сообщение слишком длинное (макс 480 символов)'}, ensure_ascii=False)}
-        api_id = os.environ.get('SMSRU_API_ID', '')
-        if not api_id:
-            return {'statusCode': 500, 'headers': HEADERS, 'body': json.dumps({'error': 'SMS сервис не настроен'}, ensure_ascii=False)}
-        def normalize_phone(raw: str) -> str:
-            digits = ''.join(c for c in raw if c.isdigit())
-            if len(digits) == 11 and digits.startswith('8'):
-                digits = '7' + digits[1:]
-            if len(digits) == 10:
-                digits = '7' + digits
-            return digits if len(digits) == 11 else ''
-
-        conn = psycopg2.connect(os.environ['DATABASE_URL'])
-        cur = conn.cursor()
-        phones = set()
-        if group in ('all', 'registered'):
-            cur.execute(f"SELECT phone FROM {SCHEMA}.clients")
-            for r in cur.fetchall():
-                n = normalize_phone(r[0] or '')
-                if n:
-                    phones.add(n)
-        if group in ('all', 'repair'):
-            cur.execute(f"SELECT DISTINCT phone FROM {SCHEMA}.repair_orders WHERE status NOT IN ('cancelled') AND phone != ''")
-            for r in cur.fetchall():
-                n = normalize_phone(r[0] or '')
-                if n:
-                    phones.add(n)
-        cur.close(); conn.close()
-        sent = 0; failed = 0
-        for phone_num in phones:
-            try:
-                resp = requests.get('https://sms.ru/sms/send',
-                    params={'api_id': api_id, 'to': phone_num, 'msg': message, 'json': 1, 'from': 'Skypka24'},
-                    timeout=10)
-                data_r = resp.json() if resp.status_code == 200 else {}
-                if data_r.get('status') == 'OK':
-                    sent += 1
-                else:
-                    failed += 1
-            except Exception:
-                failed += 1
-        return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'sent': sent, 'failed': failed, 'total': len(phones)}, ensure_ascii=False)}
 
     return {'statusCode': 405, 'headers': HEADERS, 'body': json.dumps({'error': 'Method not allowed'}, ensure_ascii=False)}
