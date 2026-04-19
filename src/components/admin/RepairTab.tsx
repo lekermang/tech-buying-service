@@ -57,7 +57,7 @@ export default function RepairTab({ token }: { token: string }) {
         headers: { "Content-Type": "application/json", ...adminHeaders(token) },
       });
       const data = await res.json();
-      setSyncResult(data.synced != null ? `Загружено ${data.synced} запчастей` : "Ошибка синхронизации");
+      setSyncResult(data.synced != null ? `Загружено ${data.synced} запчастей` : `Ошибка: ${data.error || "нет ответа от МойСклад"}`);
     } catch {
       setSyncResult("Ошибка соединения");
     }

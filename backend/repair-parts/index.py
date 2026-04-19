@@ -216,10 +216,16 @@ def handler(event: dict, context) -> dict:
     conn = psycopg2.connect(os.environ['DATABASE_URL'])
 
     if event.get('httpMethod') == 'POST':
-        synced = sync_catalog(conn)
-        conn.close()
-        return {'statusCode': 200, 'headers': HEADERS,
-                'body': json.dumps({'ok': True, 'synced': synced})}
+        try:
+            synced = sync_catalog(conn)
+            conn.close()
+            return {'statusCode': 200, 'headers': HEADERS,
+                    'body': json.dumps({'ok': True, 'synced': synced})}
+        except Exception as e:
+            conn.close()
+            print(f"[SYNC ERROR] {type(e).__name__}: {e}")
+            return {'statusCode': 500, 'headers': HEADERS,
+                    'body': json.dumps({'ok': False, 'error': str(e)})}
 
     params = event.get('queryStringParameters') or {}
     model = (params.get('model') or '').strip()
