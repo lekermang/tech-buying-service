@@ -48,6 +48,22 @@ export default function StaffRepairOrderCard({
   const [notifyError, setNotifyError] = useState<string | null>(null);
   const [smsSentKey, setSmsSentKey] = useState<string | null>(null);
   const [smsError, setSmsError] = useState<string | null>(null);
+  const [actSending, setActSending] = useState(false);
+  const [actSent, setActSent] = useState(false);
+
+  const handleSendAct = async () => {
+    setActSending(true);
+    try {
+      const res = await fetch("https://functions.poehali.dev/a105aede-d55d-4b99-9d3e-5e977887aa04", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", [authHeader]: token },
+        body: JSON.stringify({ action: "send_act", id: o.id }),
+      });
+      const data = await res.json();
+      if (data.ok) { setActSent(true); setTimeout(() => setActSent(false), 3000); }
+    } catch (_e) { /* ignore */ }
+    setActSending(false);
+  };
 
   const handleSend = async (statusKey: string) => {
     setSentKey(statusKey);
@@ -298,9 +314,14 @@ export default function StaffRepairOrderCard({
 
           {/* Печать + удаление */}
           <div className="flex gap-2">
+            <button onClick={handleSendAct} disabled={actSending}
+              className={`flex-1 font-roboto text-xs py-2.5 border transition-colors flex items-center justify-center gap-1.5 min-h-[44px] ${actSent ? "border-green-500/40 text-green-400 bg-green-500/10" : "border-[#229ED9]/30 text-[#229ED9]/70 active:bg-[#229ED9]/10"}`}>
+              <Icon name={actSent ? "Check" : actSending ? "Loader2" : "Send"} size={14} className={actSending ? "animate-spin" : ""} />
+              {actSent ? "Отправлен!" : "Акт в TG"}
+            </button>
             <button onClick={() => printAct(o)}
               className="flex-1 font-roboto text-xs py-2.5 border border-[#FFD700]/20 text-[#FFD700]/60 active:bg-[#FFD700]/10 transition-colors flex items-center justify-center gap-1.5 min-h-[44px]">
-              <Icon name="FileText" size={14} /> Акт
+              <Icon name="FileText" size={14} /> Акт .docx
             </button>
             <button onClick={() => printReceipt(o)}
               className="flex-1 font-roboto text-xs py-2.5 border border-white/10 text-white/40 active:bg-white/5 transition-colors flex items-center justify-center gap-1.5 min-h-[44px]">

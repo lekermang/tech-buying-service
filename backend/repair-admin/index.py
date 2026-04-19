@@ -883,6 +883,40 @@ def handler(event: dict, context) -> dict:
             cur.close(); conn.close()
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'id': new_id}, ensure_ascii=False)}
 
+        # Отправить акт в Telegram
+        if action == 'send_act':
+            order_id = int(body.get('id', 0))
+            cur.execute(f"SELECT name, phone, model, repair_type, price, comment FROM {SCHEMA}.repair_orders WHERE id = {order_id}")
+            row = cur.fetchone()
+            if not row:
+                cur.close(); conn.close()
+                return {'statusCode': 404, 'headers': HEADERS, 'body': json.dumps({'error': 'Заявка не найдена'}, ensure_ascii=False)}
+            name, phone, model, repair_type, price, comment = row
+            price_str = f"{int(price):,} ₽".replace(',', ' ') if price else 'не определена'
+            docx_bytes = build_act_docx(order_id, name or '', phone or '', model or '', repair_type or '', price_str, comment or '')
+            filename = f'Акт_приёмки_{order_id}_{(name or "клиент").replace(" ", "_")}.docx'
+            tg_token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+            main_chat = os.environ.get('TELEGRAM_CHAT_ID', '')
+            recipients = [main_chat] if main_chat else []
+            try:
+                cur2 = conn.cursor()
+                cur2.execute(f"SELECT telegram_chat_id FROM {SCHEMA}.notification_recipients WHERE is_active=true AND notify_repair=true")
+                for r2 in cur2.fetchall():
+                    if r2[0] and r2[0] not in recipients:
+                        recipients.append(r2[0])
+                cur2.close()
+            except Exception:
+                pass
+            pluxan = os.environ.get('PLUXAN4IK_CHAT_ID', '')
+            if pluxan and pluxan not in recipients:
+                recipients.append(pluxan)
+            sent = 0
+            for cid in recipients:
+                send_tg_document(tg_token, cid, docx_bytes, filename, caption=f'📋 Акт приёмки №{order_id} — {name}')
+                sent += 1
+            cur.close(); conn.close()
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'sent_to': sent}, ensure_ascii=False)}
+
         # Удалить заявку
         if action == 'delete':
             order_id = int(body.get('id', 0))

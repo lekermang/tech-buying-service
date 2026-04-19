@@ -35,6 +35,22 @@ export default function RepairOrderCard({
   const st = statusInfo(o.status);
   const [sentKey, setSentKey] = useState<string | null>(null);
   const [notifyError, setNotifyError] = useState<string | null>(null);
+  const [actSending, setActSending] = useState(false);
+  const [actSent, setActSent] = useState(false);
+
+  const handleSendAct = async () => {
+    setActSending(true);
+    try {
+      const res = await fetch("https://functions.poehali.dev/a105aede-d55d-4b99-9d3e-5e977887aa04", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", [authHeader]: token },
+        body: JSON.stringify({ action: "send_act", id: o.id }),
+      });
+      const data = await res.json();
+      if (data.ok) { setActSent(true); setTimeout(() => setActSent(false), 3000); }
+    } catch (_e) { /* ignore */ }
+    setActSending(false);
+  };
 
   const handleSend = async (statusKey: string) => {
     setSentKey(statusKey);
@@ -207,6 +223,12 @@ export default function RepairOrderCard({
                   <button onClick={() => onSaveEdit(o)} disabled={saving}
                     className="ml-auto font-roboto text-[10px] px-3 py-1.5 bg-[#FFD700] text-black font-bold hover:bg-yellow-400 transition-colors disabled:opacity-40 flex items-center gap-1">
                     <Icon name="Save" size={11} />{saving ? "Сохраняю..." : "Сохранить"}
+                  </button>
+                  <button onClick={handleSendAct} disabled={actSending}
+                    title="Отправить акт приёмки в Telegram"
+                    className={`font-roboto text-[10px] px-2.5 py-1.5 border transition-colors flex items-center gap-1 ${actSent ? "border-green-500/40 text-green-400 bg-green-500/10" : "border-[#229ED9]/25 text-[#229ED9]/60 hover:bg-[#229ED9]/10"}`}>
+                    <Icon name={actSent ? "Check" : actSending ? "Loader2" : "Send"} size={11} className={actSending ? "animate-spin" : ""} />
+                    {actSent ? "Отправлен" : "Акт в TG"}
                   </button>
                   <button onClick={() => onDelete(o.id)} className="font-roboto text-[10px] px-2.5 py-1.5 border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-1">
                     <Icon name="Trash2" size={11} />
