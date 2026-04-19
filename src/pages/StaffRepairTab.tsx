@@ -226,69 +226,71 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
 
   return (
     <div className="flex flex-col">
-      {/* ── Переключатель вид ── */}
-      <div className="px-4 py-2.5 border-b border-[#222] flex items-center gap-3 flex-wrap">
-        <div className="flex rounded overflow-hidden border border-[#333]">
+      {/* ── Переключатель вид + кнопка новой заявки ── */}
+      <div className="px-3 pt-3 pb-2 border-b border-[#222] flex items-center gap-2">
+        <div className="flex flex-1 overflow-hidden border border-[#333]">
           <button onClick={() => setView("list")}
-            className={`px-4 py-1.5 font-roboto text-xs transition-colors flex items-center gap-1.5 ${view === "list" ? "bg-[#FFD700] text-black font-bold" : "text-white/50 hover:text-white"}`}>
+            className={`flex-1 py-2 font-roboto text-xs transition-colors flex items-center justify-center gap-1.5 ${view === "list" ? "bg-[#FFD700] text-black font-bold" : "text-white/50"}`}>
             <Icon name="ClipboardList" size={13} /> Заявки
           </button>
           <button onClick={() => setView("analytics")}
-            className={`px-4 py-1.5 font-roboto text-xs transition-colors flex items-center gap-1.5 ${view === "analytics" ? "bg-[#FFD700] text-black font-bold" : "text-white/50 hover:text-white"}`}>
+            className={`flex-1 py-2 font-roboto text-xs transition-colors flex items-center justify-center gap-1.5 ${view === "analytics" ? "bg-[#FFD700] text-black font-bold" : "text-white/50"}`}>
             <Icon name="BarChart2" size={13} /> Аналитика
           </button>
           {isOwner && (
             <button onClick={() => setView("labor_prices")}
-              className={`px-4 py-1.5 font-roboto text-xs transition-colors flex items-center gap-1.5 ${view === "labor_prices" ? "bg-[#FFD700] text-black font-bold" : "text-white/50 hover:text-white"}`}>
-              <Icon name="Tag" size={13} /> Цены работ
+              className={`flex-1 py-2 font-roboto text-xs transition-colors flex items-center justify-center gap-1.5 ${view === "labor_prices" ? "bg-[#FFD700] text-black font-bold" : "text-white/50"}`}>
+              <Icon name="Tag" size={13} /> Цены
             </button>
           )}
         </div>
-
         {view === "list" && (
-          <>
+          <button onClick={() => { setShowForm(v => !v); setForm(EMPTY_FORM); }}
+            className={`flex items-center gap-1 font-oswald font-bold px-3 py-2 text-xs uppercase transition-colors shrink-0 ${showForm ? "bg-[#333] text-white/60" : "bg-[#FFD700] text-black"}`}>
+            <Icon name={showForm ? "X" : "Plus"} size={14} />
+            {showForm ? "Отмена" : "Заявка"}
+          </button>
+        )}
+      </div>
+
+      {/* ── Поиск + период ── */}
+      {view === "list" && (
+        <div className="px-3 py-2 border-b border-[#222] space-y-2">
+          <div className="flex items-center gap-2">
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Поиск: имя, телефон, модель..."
-              className="flex-1 min-w-[120px] bg-[#0D0D0D] border border-[#333] text-white px-3 py-1.5 font-roboto text-xs focus:outline-none focus:border-[#FFD700] placeholder:text-white/20"
+              className="flex-1 bg-[#0D0D0D] border border-[#333] text-white px-3 py-2 font-roboto text-sm focus:outline-none focus:border-[#FFD700] placeholder:text-white/20"
             />
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <button onClick={() => { setDateFrom(""); setDateTo(""); }}
-                className={`px-2 py-1 font-roboto text-[10px] border transition-colors ${
-                  !dateFrom && !dateTo ? "border-[#FFD700] text-[#FFD700] bg-[#FFD700]/10" : "border-[#333] text-white/40 hover:border-white/30 hover:text-white/70"
-                }`}>Все</button>
-              {[
-                { label: "Сегодня", get: () => { const t = new Date().toISOString().slice(0,10); return [t, t]; } },
-                { label: "Неделя",  get: () => { const t = new Date(); const f = new Date(t); f.setDate(t.getDate()-6); return [f.toISOString().slice(0,10), t.toISOString().slice(0,10)]; } },
-                { label: "Месяц",   get: () => { const t = new Date(); const f = new Date(t); f.setDate(t.getDate()-29); return [f.toISOString().slice(0,10), t.toISOString().slice(0,10)]; } },
-              ].map(q => (
-                <button key={q.label} onClick={() => { const [f,to] = q.get(); setDateFrom(f); setDateTo(to); }}
-                  className={`px-2 py-1 font-roboto text-[10px] border transition-colors ${
-                    (() => { const [f,to] = q.get(); return dateFrom===f && dateTo===to; })()
-                      ? "border-[#FFD700] text-[#FFD700] bg-[#FFD700]/10"
-                      : "border-[#333] text-white/40 hover:border-white/30 hover:text-white/70"
-                  }`}>{q.label}</button>
-              ))}
-              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-                title="Дата сдачи от"
-                className="bg-[#0D0D0D] border border-[#333] text-white/70 px-2 py-1.5 font-roboto text-xs focus:outline-none focus:border-[#FFD700] w-32" />
-              <span className="text-white/20 text-xs">—</span>
-              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-                title="Дата сдачи до"
-                className="bg-[#0D0D0D] border border-[#333] text-white/70 px-2 py-1.5 font-roboto text-xs focus:outline-none focus:border-[#FFD700] w-32" />
-            </div>
-            <button onClick={loadOrders} disabled={loading} className="text-white/40 hover:text-white p-1.5 transition-colors">
-              <Icon name={loading ? "Loader" : "RefreshCw"} size={13} className={loading ? "animate-spin" : ""} />
+            <button onClick={loadOrders} disabled={loading} className="text-white/40 active:text-white p-2 transition-colors shrink-0">
+              <Icon name={loading ? "Loader" : "RefreshCw"} size={16} className={loading ? "animate-spin" : ""} />
             </button>
-            <button onClick={() => { setShowForm(v => !v); setForm(EMPTY_FORM); }}
-              className="flex items-center gap-1.5 bg-[#FFD700] text-black font-oswald font-bold px-3 py-1.5 text-xs uppercase hover:bg-yellow-400 transition-colors shrink-0">
-              <Icon name={showForm ? "X" : "Plus"} size={12} />
-              {showForm ? "Отмена" : "Заявка"}
-            </button>
-          </>
-        )}
-      </div>
+          </div>
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+            {[
+              { label: "Все",     get: (): [string,string] => ["", ""] },
+              { label: "Сегодня", get: (): [string,string] => { const t = new Date().toISOString().slice(0,10); return [t, t]; } },
+              { label: "Неделя",  get: (): [string,string] => { const t = new Date(); const f = new Date(t); f.setDate(t.getDate()-6); return [f.toISOString().slice(0,10), t.toISOString().slice(0,10)]; } },
+              { label: "Месяц",   get: (): [string,string] => { const t = new Date(); const f = new Date(t); f.setDate(t.getDate()-29); return [f.toISOString().slice(0,10), t.toISOString().slice(0,10)]; } },
+            ].map(q => {
+              const [qf, qt] = q.get();
+              const isActive = qf === dateFrom && qt === dateTo;
+              return (
+                <button key={q.label} onClick={() => { setDateFrom(qf); setDateTo(qt); }}
+                  className={`px-3 py-1.5 font-roboto text-xs border shrink-0 transition-colors ${isActive ? "border-[#FFD700] text-[#FFD700] bg-[#FFD700]/10" : "border-[#333] text-white/40"}`}>
+                  {q.label}
+                </button>
+              );
+            })}
+            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+              className="bg-[#0D0D0D] border border-[#333] text-white/60 px-2 py-1.5 font-roboto text-xs focus:outline-none focus:border-[#FFD700] shrink-0 w-[120px]" />
+            <span className="text-white/20 text-xs shrink-0">—</span>
+            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+              className="bg-[#0D0D0D] border border-[#333] text-white/60 px-2 py-1.5 font-roboto text-xs focus:outline-none focus:border-[#FFD700] shrink-0 w-[120px]" />
+          </div>
+        </div>
+      )}
 
       {/* ── АНАЛИТИКА ── */}
       {view === "analytics" && (
@@ -323,38 +325,37 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
 
           {/* Форма новой заявки */}
           {showForm && (
-            <div className="mx-4 mt-3 mb-1 bg-[#1A1A1A] border border-[#FFD700]/30 p-4">
-              <div className="font-roboto text-white/40 text-[10px] uppercase tracking-widest mb-3">Новая заявка на ремонт</div>
-              <div className="grid grid-cols-2 gap-2 mb-2">
-                <div><label className={LBL}>Имя клиента *</label>
-                  <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="Иван Иванов" className={INP} /></div>
-                <div><label className={LBL}>Телефон *</label>
-                  <input value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} placeholder="+7 999 123-45-67" className={INP} /></div>
+            <div className="mx-3 mt-3 mb-1 bg-[#1A1A1A] border border-[#FFD700]/30 p-4 space-y-3">
+              <div className="font-roboto text-white/40 text-[10px] uppercase tracking-widest">Новая заявка на ремонт</div>
+              <div>
+                <label className={LBL}>Имя клиента *</label>
+                <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="Иван Иванов" className={INP} />
               </div>
-              <div className="grid grid-cols-2 gap-2 mb-2">
-                <div><label className={LBL}>Модель устройства</label>
-                  <input value={form.model} onChange={e => setForm(p => ({ ...p, model: e.target.value }))} placeholder="iPhone 14..." className={INP} /></div>
+              <div>
+                <label className={LBL}>Телефон *</label>
+                <input type="tel" value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} placeholder="+7 999 123-45-67" className={INP} />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div><label className={LBL}>Модель</label>
+                  <input value={form.model} onChange={e => setForm(p => ({ ...p, model: e.target.value }))} placeholder="iPhone 14" className={INP} /></div>
                 <div><label className={LBL}>Тип ремонта</label>
-                  <input value={form.repair_type} onChange={e => setForm(p => ({ ...p, repair_type: e.target.value }))} placeholder="Замена дисплея..." className={INP} /></div>
+                  <input value={form.repair_type} onChange={e => setForm(p => ({ ...p, repair_type: e.target.value }))} placeholder="Дисплей..." className={INP} /></div>
               </div>
-              <div className="grid grid-cols-2 gap-2 mb-2">
+              <div className="grid grid-cols-2 gap-2">
                 <div><label className={LBL}>Стоимость (₽)</label>
-                  <input type="number" value={form.price} onChange={e => setForm(p => ({ ...p, price: e.target.value }))} placeholder="1500" className={INP} /></div>
+                  <input type="number" inputMode="numeric" value={form.price} onChange={e => setForm(p => ({ ...p, price: e.target.value }))} placeholder="1500" className={INP} /></div>
                 <div><label className={LBL}>Комментарий</label>
-                  <input value={form.comment} onChange={e => setForm(p => ({ ...p, comment: e.target.value }))} placeholder="Описание поломки..." className={INP} /></div>
+                  <input value={form.comment} onChange={e => setForm(p => ({ ...p, comment: e.target.value }))} placeholder="Описание..." className={INP} /></div>
               </div>
-              <div className="flex gap-2 mt-2">
-                <button onClick={createOrder} disabled={creating || !form.name || !form.phone}
-                  className="bg-[#FFD700] text-black font-oswald font-bold px-4 py-2 uppercase text-xs hover:bg-yellow-400 disabled:opacity-50 flex items-center gap-1.5 transition-colors">
-                  <Icon name="Check" size={13} />{creating ? "Создаю..." : "Создать заявку"}
-                </button>
-                <button onClick={() => { setShowForm(false); setForm(EMPTY_FORM); }} className="text-white/30 font-roboto text-xs hover:text-white px-2 transition-colors">Отмена</button>
-              </div>
+              <button onClick={createOrder} disabled={creating || !form.name || !form.phone}
+                className="w-full bg-[#FFD700] text-black font-oswald font-bold py-3 uppercase text-sm disabled:opacity-50 flex items-center justify-center gap-2 transition-colors">
+                <Icon name="Check" size={15} />{creating ? "Создаю..." : "Создать заявку"}
+              </button>
             </div>
           )}
 
           {/* Карточки */}
-          <div className="px-4 py-3 space-y-2">
+          <div className="px-3 py-3 space-y-2">
             {loading && <div className="text-center py-10 text-white/30 font-roboto text-sm">Загружаю...</div>}
             {!loading && orders.length === 0 && (
               <div className="text-center py-10 text-white/30 font-roboto text-sm">Заявок нет</div>

@@ -467,4 +467,22 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
+  /* Safe area для iPhone с чёлкой */
+  .safe-top {
+    padding-top: max(0px, env(safe-area-inset-top));
+  }
+  .safe-bottom {
+    padding-bottom: max(0px, env(safe-area-inset-bottom));
+  }
+  .safe-area-inset {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Убираем highlight при тапе на мобиле */
+  button,
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
 }
