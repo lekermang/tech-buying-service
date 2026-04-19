@@ -1,6 +1,6 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
-import { Order, STATUSES, INP, LBL, fmt, printReceipt, printAct } from "./types";
+import { Order, STATUSES, INP, LBL, fmt, printReceipt, printAct, printActHTML } from "./types";
 import { formatPhone } from "@/lib/phoneFormat";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -319,9 +319,13 @@ export default function StaffRepairOrderCard({
               <Icon name={actSent ? "Check" : actSending ? "Loader2" : "Send"} size={14} className={actSending ? "animate-spin" : ""} />
               {actSent ? "Отправлен!" : "Акт в TG"}
             </button>
+            <button onClick={() => printActHTML(o)}
+              className="flex-1 font-roboto text-xs py-2.5 border border-[#FFD700]/40 text-[#FFD700] active:bg-[#FFD700]/10 transition-colors flex items-center justify-center gap-1.5 min-h-[44px]">
+              <Icon name="FileText" size={14} /> Акт
+            </button>
             <button onClick={() => printAct(o)}
               className="flex-1 font-roboto text-xs py-2.5 border border-[#FFD700]/20 text-[#FFD700]/60 active:bg-[#FFD700]/10 transition-colors flex items-center justify-center gap-1.5 min-h-[44px]">
-              <Icon name="FileText" size={14} /> Акт .docx
+              <Icon name="Download" size={14} /> .docx
             </button>
             <button onClick={() => printReceipt(o)}
               className="flex-1 font-roboto text-xs py-2.5 border border-white/10 text-white/40 active:bg-white/5 transition-colors flex items-center justify-center gap-1.5 min-h-[44px]">
