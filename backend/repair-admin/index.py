@@ -548,6 +548,25 @@ def handler(event: dict, context) -> dict:
             cur.close(); conn.close()
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'client_id': row[0], 'discount_pct': row[1]}, ensure_ascii=False)}
 
+        # Баланс sms.ru + цена за SMS
+        if action == 'sms_balance':
+            api_id = os.environ.get('SMSRU_API_ID', '')
+            if not api_id:
+                cur.close(); conn.close()
+                return {'statusCode': 500, 'headers': HEADERS, 'body': json.dumps({'error': 'SMSRU_API_ID не задан'}, ensure_ascii=False)}
+            balance_resp = requests.get('https://sms.ru/my/balance', params={'api_id': api_id, 'json': 1}, timeout=10)
+            balance_data = balance_resp.json() if balance_resp.status_code == 200 else {}
+            cost_resp = requests.get('https://sms.ru/sms/cost', params={'api_id': api_id, 'to': '79999999999', 'msg': 'test', 'json': 1, 'from': 'IPMamedov'}, timeout=10)
+            cost_data = cost_resp.json() if cost_resp.status_code == 200 else {}
+            sms_cost = None
+            if cost_data.get('status') == 'OK':
+                for phone_info in cost_data.get('sms', {}).values():
+                    if isinstance(phone_info, dict):
+                        sms_cost = phone_info.get('cost')
+                        break
+            cur.close(); conn.close()
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'balance': balance_data.get('balance'), 'sms_cost': sms_cost}, ensure_ascii=False)}
+
         # Тест SMS
         if action == 'sms_test':
             phone = (body.get('phone') or '').strip()

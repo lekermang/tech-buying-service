@@ -29,6 +29,29 @@ export default function SmsBlastTab({ token }: { token: string }) {
   const [confirmed, setConfirmed] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number } | null>(null);
+  const [balance, setBalance] = useState<number | null>(null);
+  const [smsCost, setSmsCost] = useState<number | null>(null);
+  const [loadingBalance, setLoadingBalance] = useState(false);
+
+  const loadBalance = async () => {
+    setLoadingBalance(true);
+    try {
+      const res = await fetch(ADMIN_URL, {
+        method: "POST",
+        headers: { ...adminHeaders(token), "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "sms_balance" }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setBalance(data.balance !== null && data.balance !== undefined ? parseFloat(data.balance) : null);
+        setSmsCost(data.sms_cost !== null && data.sms_cost !== undefined ? parseFloat(data.sms_cost) : null);
+      }
+    } catch (_e) { /* ignore */ }
+    setLoadingBalance(false);
+  };
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { loadBalance(); }, []);
 
   const importWH = async () => {
     setImporting(true);
@@ -256,6 +279,33 @@ export default function SmsBlastTab({ token }: { token: string }) {
           </div>
         </div>
       )}
+
+      {/* Стоимость и баланс */}
+      <div className="mb-4 bg-[#111] border border-[#222] p-3 flex flex-wrap items-center gap-x-6 gap-y-2">
+        <div className="flex items-center gap-2">
+          <span className="text-white/40 text-[10px] uppercase tracking-wider">Цена за 1 SMS</span>
+          <span className="text-white text-sm font-bold">
+            {loadingBalance ? "..." : smsCost !== null ? `${smsCost.toFixed(2)} ₽` : "—"}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-white/40 text-[10px] uppercase tracking-wider">Итого за рассылку</span>
+          <span className="text-[#FFD700] text-sm font-bold">
+            {smsCost !== null && contacts.length > 0
+              ? `≈ ${(smsCost * contacts.length).toFixed(2)} ₽`
+              : "—"}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 ml-auto">
+          <span className="text-white/40 text-[10px] uppercase tracking-wider">Баланс sms.ru</span>
+          <span className={`text-sm font-bold ${balance !== null && balance < 50 ? "text-red-400" : "text-green-400"}`}>
+            {loadingBalance ? "..." : balance !== null ? `${balance.toFixed(2)} ₽` : "—"}
+          </span>
+          <button onClick={loadBalance} disabled={loadingBalance} className="text-white/30 hover:text-white transition-colors ml-1">
+            <Icon name="RefreshCw" size={11} className={loadingBalance ? "animate-spin" : ""} />
+          </button>
+        </div>
+      </div>
 
       <button
         onClick={handleSend}
