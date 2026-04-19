@@ -143,7 +143,7 @@ def send_sms(phone: str, message: str):
     try:
         requests.get(
             'https://sms.ru/sms/send',
-            params={'api_id': api_id, 'to': clean_phone, 'msg': message, 'json': 1, 'from': 'Skypka24'},
+            params={'api_id': api_id, 'to': clean_phone, 'msg': message, 'json': 1, 'from': 'IPMamedov'},
             timeout=10
         )
     except Exception:
@@ -620,7 +620,7 @@ def handler(event: dict, context) -> dict:
                 chunk = all_phones[i:i + chunk_size]
                 try:
                     resp = requests.get('https://sms.ru/sms/send',
-                        params={'api_id': api_id, 'to': ','.join(chunk), 'msg': message, 'json': 1, 'from': 'Skypka24'},
+                        params={'api_id': api_id, 'to': ','.join(chunk), 'msg': message, 'json': 1, 'from': 'IPMamedov'},
                         timeout=20)
                     data_r = resp.json() if resp.status_code == 200 else {}
                     print(f"[sms_blast] chunk resp status={data_r.get('status')} status_code={resp.status_code} body={str(data_r)[:300]}", flush=True)

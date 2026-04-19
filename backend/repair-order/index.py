@@ -361,7 +361,7 @@ def handler(event: dict, context) -> dict:
         if not api_id:
             return {'statusCode': 500, 'headers': HEADERS, 'body': json.dumps({'error': 'SMSRU_API_ID не задан'}, ensure_ascii=False)}
         resp = requests.get('https://sms.ru/sms/send',
-            params={'api_id': api_id, 'to': phone, 'msg': sms_text, 'json': 1, 'from': 'Skypka24'}, timeout=10)
+            params={'api_id': api_id, 'to': phone, 'msg': sms_text, 'json': 1, 'from': 'IPMamedov'}, timeout=10)
         d = resp.json() if resp.status_code == 200 else {}
         if d.get('status') == 'OK':
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'sent_to': name, 'phone': phone}, ensure_ascii=False)}
