@@ -251,152 +251,93 @@ export const printActHTML = (o: Order) => {
   const now = new Date(o.created_at);
   const dateStr = now.toLocaleDateString("ru-RU", { day: "2-digit", month: "long", year: "numeric" });
   const timeStr = now.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
-
-  // Номер заявки в формате штрихкода: дополняем нулями до 12 символов (EAN-13 стиль)
   const barNum = String(o.id).padStart(12, "0");
+  const orderNum = String(o.id).padStart(6, "0");
 
-  // Иконки устройств — SVG-схемы (телефон, ноутбук, планшет)
-  const phoneViewsSVG = `
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 200" style="width:100%;max-width:480px">
-  <!-- Телефон спереди -->
-  <g transform="translate(10,10)">
-    <rect x="20" y="0" width="80" height="150" rx="10" ry="10" fill="none" stroke="#000" stroke-width="2"/>
-    <rect x="30" y="12" width="60" height="115" fill="none" stroke="#000" stroke-width="1"/>
-    <ellipse cx="60" cy="8" rx="8" ry="2.5" fill="none" stroke="#000" stroke-width="1"/>
-    <circle cx="60" cy="143" r="5" fill="none" stroke="#000" stroke-width="1"/>
-    <text x="60" y="180" text-anchor="middle" font-size="9" fill="#000">Спереди</text>
-  </g>
-  <!-- Телефон сзади -->
-  <g transform="translate(120,10)">
-    <rect x="20" y="0" width="80" height="150" rx="10" ry="10" fill="none" stroke="#000" stroke-width="2"/>
-    <circle cx="45" cy="20" r="10" fill="none" stroke="#000" stroke-width="1.5"/>
-    <circle cx="45" cy="20" r="6" fill="none" stroke="#000" stroke-width="1"/>
-    <text x="60" y="180" text-anchor="middle" font-size="9" fill="#000">Сзади</text>
-  </g>
-  <!-- Телефон слева -->
-  <g transform="translate(230,10)">
-    <rect x="38" y="0" width="24" height="150" rx="5" ry="5" fill="none" stroke="#000" stroke-width="2"/>
-    <rect x="28" y="35" width="8" height="25" rx="2" fill="none" stroke="#000" stroke-width="1.5"/>
-    <rect x="28" y="65" width="8" height="25" rx="2" fill="none" stroke="#000" stroke-width="1.5"/>
-    <rect x="64" y="45" width="8" height="35" rx="2" fill="none" stroke="#000" stroke-width="1.5"/>
-    <text x="50" y="180" text-anchor="middle" font-size="9" fill="#000">Слева</text>
-  </g>
-  <!-- Телефон снизу -->
-  <g transform="translate(310,50)">
-    <rect x="10" y="30" width="130" height="30" rx="8" ry="8" fill="none" stroke="#000" stroke-width="2"/>
-    <rect x="55" y="38" width="40" height="14" rx="3" fill="none" stroke="#000" stroke-width="1"/>
-    <rect x="20" y="35" width="5" height="20" rx="2" fill="none" stroke="#000" stroke-width="1"/>
-    <rect x="30" y="35" width="5" height="20" rx="2" fill="none" stroke="#000" stroke-width="1"/>
-    <text x="75" y="80" text-anchor="middle" font-size="9" fill="#000">Снизу</text>
-  </g>
-</svg>`;
-
-  const laptopViewsSVG = `
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 200" style="width:100%;max-width:480px">
-  <!-- Ноутбук спереди открытый -->
-  <g transform="translate(5,5)">
-    <rect x="5" y="5" width="130" height="90" rx="4" fill="none" stroke="#000" stroke-width="2"/>
-    <rect x="10" y="10" width="120" height="80" fill="none" stroke="#000" stroke-width="1"/>
-    <rect x="0" y="96" width="140" height="12" rx="2" fill="none" stroke="#000" stroke-width="2"/>
-    <rect x="50" y="99" width="40" height="6" rx="2" fill="none" stroke="#000" stroke-width="1"/>
-    <text x="70" y="125" text-anchor="middle" font-size="9" fill="#000">Спереди</text>
-  </g>
-  <!-- Ноутбук сзади закрытый -->
-  <g transform="translate(170,5)">
-    <rect x="5" y="5" width="130" height="12" rx="4" fill="none" stroke="#000" stroke-width="2"/>
-    <rect x="0" y="20" width="140" height="85" rx="4" fill="none" stroke="#000" stroke-width="2"/>
-    <text x="70" y="125" text-anchor="middle" font-size="9" fill="#000">Сзади</text>
-  </g>
-  <!-- Ноутбук сбоку -->
-  <g transform="translate(335,40)">
-    <rect x="60" y="5" width="12" height="65" rx="2" fill="none" stroke="#000" stroke-width="2"/>
-    <rect x="30" y="70" width="80" height="12" rx="2" fill="none" stroke="#000" stroke-width="2"/>
-    <line x1="60" y1="70" x2="72" y2="70" stroke="#000" stroke-width="1"/>
-    <text x="66" y="100" text-anchor="middle" font-size="9" fill="#000">Сбоку</text>
-  </g>
-</svg>`;
-
-  const checkItems = [
-    ["Кнопка питания", ""], ["Кнопки громкости", ""], ["Тачскрин", ""],
-    ["Дисплей (пиксели/пятна)", ""], ["Основная камера", ""], ["Фронтальная камера", ""],
-    ["Динамик разговорный", ""], ["Динамик основной", ""], ["Микрофон", ""],
-    ["Wi-Fi", ""], ["Bluetooth", ""], ["Face ID / Touch ID", ""],
-    ["Разъём зарядки", ""], ["Аккумулятор", ""], ["SIM-карта", ""],
-  ];
-
-  const win = window.open("", "_blank", "width=900,height=1100");
+  const win = window.open("", "_blank", "width=960,height=1200");
   if (!win) return;
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
-  <title>Акт приёма №${o.id}</title>
-  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:Arial,sans-serif;font-size:11px;color:#000;background:#fff;padding:12mm 10mm}
-    .top-label{font-size:9px;text-align:right;margin-bottom:4px;color:#555}
-    .header{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;border:1.5px solid #000;padding:8px 12px;margin-bottom:8px}
-    .header-left{display:flex;flex-direction:column;gap:4px;min-width:160px}
-    .barcode-block{display:flex;flex-direction:column;align-items:center}
-    .barcode-block svg{height:48px}
-    .barcode-num{font-size:10px;letter-spacing:1px;margin-top:1px}
-    .warn-box{border:1.5px solid #000;padding:4px 8px;font-size:9px;font-weight:bold;max-width:170px;margin-top:4px;line-height:1.4}
-    .header-center{text-align:center;flex:1}
-    .act-title{font-size:16px;font-weight:bold;margin-bottom:2px}
-    .act-sub{font-size:10px;color:#333;margin-bottom:6px}
-    .act-num{font-size:13px;font-weight:bold}
-    .act-date{font-size:10px;margin-top:2px}
-    .header-right{text-align:right;font-size:9px;line-height:1.7;min-width:200px}
-    .header-right b{font-size:10px}
-    .section{display:flex;gap:12px;margin-bottom:8px}
-    .section-block{flex:1;border:1.5px solid #000}
-    .section-block .head{background:#eee;padding:4px 8px;font-weight:bold;font-size:10px;border-bottom:1px solid #000}
-    .section-block .body{padding:6px 8px}
-    .field{margin-bottom:4px}
-    .field .lbl{color:#555;font-size:9px}
-    .field .val{font-weight:bold;font-size:11px}
-    .field-line{display:flex;gap:6px;align-items:baseline}
-    .damages-block{border:1.5px solid #000;margin-bottom:8px}
-    .damages-block .head{background:#eee;padding:4px 8px;font-weight:bold;font-size:10px;border-bottom:1px solid #000}
-    .damages-inner{display:flex;gap:0}
-    .devices-col{flex:1.2;padding:8px;border-right:1px solid #ccc;display:flex;flex-direction:column;gap:4px;align-items:center}
-    .devices-label{font-size:8px;color:#555;margin-bottom:2px}
-    .check-col{flex:1;padding:8px}
-    .check-table{width:100%;border-collapse:collapse;font-size:9px}
-    .check-table th{background:#f0f0f0;border:1px solid #aaa;padding:3px 5px;text-align:left}
-    .check-table td{border:1px solid #aaa;padding:3px 5px}
-    .check-table td:last-child{width:90px;color:#555}
-    .conditions{border:1.5px solid #000;margin-bottom:8px}
-    .conditions .head{background:#eee;padding:4px 8px;font-weight:bold;font-size:10px;border-bottom:1px solid #000}
-    .conditions ol{padding:6px 8px 6px 22px;font-size:9px;line-height:1.7}
-    .signs{display:flex;gap:0;border:1.5px solid #000}
-    .sign-cell{flex:1;padding:8px 12px;text-align:center}
-    .sign-cell:first-child{border-right:1px solid #000}
-    .sign-line-block{margin-top:24px;border-top:1px solid #000;padding-top:3px;font-size:9px;color:#555}
-    .print-btn{text-align:center;padding:10px;margin-bottom:8px}
-    @media print{.print-btn{display:none}.body{padding:0}html,body{padding:0;margin:0}}
-  </style>
-  </head><body>
-  <div class="print-btn">
-    <button onclick="window.print()" style="padding:8px 24px;font-size:14px;cursor:pointer;background:#FFD700;border:2px solid #000;font-weight:bold">🖨 Распечатать акт</button>
-  </div>
 
-  <div class="top-label">Экз. Клиента</div>
+  const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Акт приёма №${o.id}</title>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js">` + `</script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;font-size:10.5px;color:#000;background:#fff}
+.page{width:210mm;min-height:297mm;margin:0 auto;padding:8mm 10mm}
+.print-btn{text-align:center;padding:10px;background:#f5f5f5;border-bottom:1px solid #ccc}
+@media print{.print-btn{display:none}body{margin:0}.page{padding:8mm 10mm;width:100%}}
+
+/* ШАПКА */
+.hdr{display:flex;align-items:stretch;border:1.5px solid #000;margin-bottom:6px}
+.hdr-left{padding:6px 10px;display:flex;flex-direction:column;gap:6px;border-right:1px solid #000;min-width:155px;justify-content:center}
+.bc svg{display:block}
+.bc-num{font-size:9px;letter-spacing:0.5px;text-align:center;margin-top:1px}
+.warn{border:1.5px solid #000;padding:3px 6px;font-size:8.5px;font-weight:bold;line-height:1.4;text-align:center}
+.hdr-mid{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px;text-align:center;border-right:1px solid #000}
+.hdr-mid .t1{font-size:15px;font-weight:bold}
+.hdr-mid .t2{font-size:10px;color:#444;margin:1px 0 6px}
+.hdr-mid .t3{font-size:12px;font-weight:bold}
+.hdr-mid .t4{font-size:9.5px;color:#333;margin-top:2px}
+.hdr-right{padding:6px 10px;font-size:9px;line-height:1.75;text-align:right;min-width:185px;display:flex;flex-direction:column;justify-content:center}
+.hdr-right b{font-size:10px}
+
+/* СЕКЦИИ */
+.sec3{display:flex;gap:0;margin-bottom:6px;border:1.5px solid #000}
+.sec-col{flex:1;border-right:1px solid #ccc}
+.sec-col:last-child{border-right:none}
+.sec-col .sh{background:#eee;padding:3px 7px;font-weight:bold;font-size:9.5px;border-bottom:1px solid #ccc}
+.sec-col .sb{padding:5px 7px}
+.f{margin-bottom:3px}
+.f .l{font-size:8.5px;color:#555}
+.f .v{font-weight:bold;font-size:10.5px;word-break:break-word}
+
+/* ПОВРЕЖДЕНИЯ */
+.dmg{border:1.5px solid #000;margin-bottom:6px}
+.dmg .dh{background:#eee;padding:3px 7px;font-weight:bold;font-size:9.5px;border-bottom:1px solid #ccc}
+.dmg-inner{display:flex}
+.dmg-left{flex:1.15;padding:6px 8px;border-right:1px solid #ccc;display:flex;flex-direction:column;align-items:center;gap:8px}
+.dmg-hint{font-size:8px;color:#555;text-align:center}
+.dmg-right{flex:1;padding:6px 8px}
+.ctbl{width:100%;border-collapse:collapse;font-size:9px}
+.ctbl th{background:#f0f0f0;border:1px solid #bbb;padding:3px 5px;text-align:left}
+.ctbl td{border:1px solid #bbb;padding:3px 5px}
+.ctbl td:last-child{width:100px;color:#555;font-size:8.5px}
+
+/* УСЛОВИЯ */
+.cond{border:1.5px solid #000;margin-bottom:6px}
+.cond .ch{background:#eee;padding:3px 7px;font-weight:bold;font-size:9.5px;border-bottom:1px solid #ccc}
+.cond ol{padding:5px 8px 5px 24px;font-size:8.5px;line-height:1.65}
+.cond li{margin-bottom:3px}
+
+/* ПОДПИСИ */
+.signs{display:flex;border:1.5px solid #000}
+.sign-col{flex:1;padding:7px 12px;text-align:center}
+.sign-col:first-child{border-right:1px solid #000}
+.sign-col b{font-size:10px}
+.sign-col .stxt{font-size:8.5px;color:#444;margin:3px 0 16px}
+.sign-line{border-top:1px solid #000;padding-top:2px;font-size:8px;color:#666;display:flex;justify-content:space-around}
+</style>
+</head><body>
+<div class="print-btn">
+  <button onclick="window.print()" style="padding:8px 28px;font-size:14px;cursor:pointer;background:#FFD700;border:2px solid #000;font-weight:bold">🖨 Распечатать акт</button>
+</div>
+<div class="page">
+
+  <div style="font-size:8.5px;text-align:right;margin-bottom:3px;color:#555">Экз. Клиента</div>
 
   <!-- ШАПКА -->
-  <div class="header">
-    <div class="header-left">
-      <div class="barcode-block">
-        <svg id="barcode"></svg>
-        <div class="barcode-num">${barNum}</div>
-      </div>
-      <div class="warn-box">ВНИМАНИЕ! Оплата производится только в сервисном центре при получении заказа.</div>
+  <div class="hdr">
+    <div class="hdr-left">
+      <div class="bc"><svg id="barcode"></svg><div class="bc-num">${barNum}</div></div>
+      <div class="warn">ВНИМАНИЕ! Оплата производится только в сервисном центре при получении заказа.</div>
     </div>
-    <div class="header-center">
-      <div class="act-title">Акт приёма — передачи</div>
-      <div class="act-sub">устройства в ремонт</div>
-      <div class="act-num">№ ${String(o.id).padStart(6, "0")}</div>
-      <div class="act-date">от ${dateStr}, ${timeStr}</div>
+    <div class="hdr-mid">
+      <div class="t1">Акт приёма — передачи</div>
+      <div class="t2">устройства в ремонт</div>
+      <div class="t3">№ ${orderNum}</div>
+      <div class="t4">от ${dateStr}, ${timeStr}</div>
     </div>
-    <div class="header-right">
+    <div class="hdr-right">
       <b>Исполнитель:</b><br>
       ИП Мамедов Адиль Мирза Оглы<br>
       ИНН: 402810962699<br>
@@ -408,47 +349,137 @@ export const printActHTML = (o: Order) => {
   </div>
 
   <!-- КЛИЕНТ / УСТРОЙСТВО / РЕМОНТ -->
-  <div class="section">
-    <div class="section-block">
-      <div class="head">Клиент:</div>
-      <div class="body">
-        <div class="field"><div class="lbl">ФИО Клиента:</div><div class="val">${o.name}</div></div>
-        <div class="field"><div class="lbl">Телефон Клиента:</div><div class="val">${o.phone}</div></div>
+  <div class="sec3">
+    <div class="sec-col">
+      <div class="sh">Клиент:</div>
+      <div class="sb">
+        <div class="f"><div class="l">ФИО Клиента:</div><div class="v">${o.name}</div></div>
+        <div class="f"><div class="l">Телефон Клиента:</div><div class="v">${o.phone}</div></div>
       </div>
     </div>
-    <div class="section-block">
-      <div class="head">Устройство:</div>
-      <div class="body">
-        <div class="field"><div class="lbl">Устройство:</div><div class="val">${o.model || "—"}</div></div>
-        <div class="field"><div class="lbl">Описание неисправности:</div><div class="val">${o.comment || "—"}</div></div>
-        <div class="field"><div class="lbl">Внешний вид:</div><div class="val">Царапины, потёртости, возможны скрытые дефекты</div></div>
+    <div class="sec-col">
+      <div class="sh">Устройство:</div>
+      <div class="sb">
+        <div class="f"><div class="l">Устройство:</div><div class="v">${o.model || "—"}</div></div>
+        <div class="f"><div class="l">Описание неисправности:</div><div class="v">${o.comment || "—"}</div></div>
+        <div class="f"><div class="l">Внешний вид при приёме:</div><div class="v">Царапины, потёртости, возможны скрытые дефекты</div></div>
       </div>
     </div>
-    <div class="section-block">
-      <div class="head">Ремонт:</div>
-      <div class="body">
-        <div class="field"><div class="lbl">Вид работ:</div><div class="val">${o.repair_type || "—"}</div></div>
-        <div class="field"><div class="lbl">Ориентировочная стоимость:</div><div class="val">${o.price ? o.price.toLocaleString("ru-RU") + " ₽" : "По диагностике"}</div></div>
-        <div class="field"><div class="lbl">Аванс:</div><div class="val">—</div></div>
-        <div class="field"><div class="lbl">Ориентировочный срок:</div><div class="val">По договорённости</div></div>
+    <div class="sec-col">
+      <div class="sh">Ремонт:</div>
+      <div class="sb">
+        <div class="f"><div class="l">Вид работ:</div><div class="v">${o.repair_type || "—"}</div></div>
+        <div class="f"><div class="l">Ориентировочная стоимость:</div><div class="v">${o.price ? o.price.toLocaleString("ru-RU") + " ₽" : "По результатам диагностики"}</div></div>
+        <div class="f"><div class="l">Аванс:</div><div class="v">0</div></div>
+        <div class="f"><div class="l">Ориентировочный срок ремонта:</div><div class="v">По договорённости</div></div>
+        <div class="f"><div class="l">Заявленные неисправности:</div><div class="v">${o.comment || "—"}</div></div>
       </div>
     </div>
   </div>
 
-  <!-- НАРУЖНЫЕ ПОВРЕЖДЕНИЯ + ПРОВЕРКА ФУНКЦИЙ -->
-  <div class="damages-block">
-    <div class="head">Наружные повреждения &amp; Проверка функций</div>
-    <div class="damages-inner">
-      <div class="devices-col">
-        <div class="devices-label">Отметить на схеме: * – скол, / – вмятина, v – царапина</div>
-        ${phoneViewsSVG}
-        ${laptopViewsSVG}
+  <!-- ПОВРЕЖДЕНИЯ + ПРОВЕРКА ФУНКЦИЙ -->
+  <div class="dmg">
+    <div class="dh">Наружные повреждения &nbsp;&nbsp; Проверка функций</div>
+    <div class="dmg-inner">
+      <div class="dmg-left">
+        <div class="dmg-hint">Отметить на схеме: * – скол, / – вмятина, v – царапина</div>
+
+        <!-- ТЕЛЕФОН -->
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 460 175" style="width:100%;max-width:460px">
+          <text x="230" y="12" text-anchor="middle" font-size="9" font-weight="bold" fill="#333">Смартфон</text>
+          <!-- спереди -->
+          <g transform="translate(8,18)">
+            <rect x="18" y="0" width="64" height="118" rx="9" fill="none" stroke="#000" stroke-width="1.8"/>
+            <rect x="24" y="10" width="52" height="96" fill="none" stroke="#000" stroke-width="1"/>
+            <ellipse cx="50" cy="6" rx="7" ry="2" fill="none" stroke="#000" stroke-width="1"/>
+            <circle cx="50" cy="112" r="4" fill="none" stroke="#000" stroke-width="1"/>
+            <text x="50" y="135" text-anchor="middle" font-size="8" fill="#555">Спереди</text>
+          </g>
+          <!-- сзади -->
+          <g transform="translate(100,18)">
+            <rect x="18" y="0" width="64" height="118" rx="9" fill="none" stroke="#000" stroke-width="1.8"/>
+            <rect x="28" y="8" width="20" height="20" rx="4" fill="none" stroke="#000" stroke-width="1.2"/>
+            <circle cx="38" cy="18" r="6" fill="none" stroke="#000" stroke-width="1"/>
+            <circle cx="52" cy="12" r="3" fill="none" stroke="#000" stroke-width="1"/>
+            <text x="50" y="135" text-anchor="middle" font-size="8" fill="#555">Сзади</text>
+          </g>
+          <!-- слева -->
+          <g transform="translate(192,28)">
+            <rect x="30" y="0" width="18" height="118" rx="5" fill="none" stroke="#000" stroke-width="1.8"/>
+            <rect x="20" y="25" width="8" height="20" rx="2" fill="none" stroke="#000" stroke-width="1.2"/>
+            <rect x="20" y="50" width="8" height="20" rx="2" fill="none" stroke="#000" stroke-width="1.2"/>
+            <rect x="50" y="35" width="8" height="28" rx="2" fill="none" stroke="#000" stroke-width="1.2"/>
+            <text x="39" y="135" text-anchor="middle" font-size="8" fill="#555">Слева</text>
+          </g>
+          <!-- снизу -->
+          <g transform="translate(255,60)">
+            <rect x="8" y="18" width="106" height="22" rx="7" fill="none" stroke="#000" stroke-width="1.8"/>
+            <rect x="44" y="23" width="34" height="12" rx="3" fill="none" stroke="#000" stroke-width="1"/>
+            <rect x="14" y="22" width="4" height="14" rx="2" fill="none" stroke="#000" stroke-width="1"/>
+            <rect x="22" y="22" width="4" height="14" rx="2" fill="none" stroke="#000" stroke-width="1"/>
+            <rect x="92" y="22" width="4" height="14" rx="2" fill="none" stroke="#000" stroke-width="1"/>
+            <text x="61" y="58" text-anchor="middle" font-size="8" fill="#555">Снизу</text>
+          </g>
+        </svg>
+
+        <!-- НОУТБУК -->
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 460 160" style="width:100%;max-width:460px">
+          <text x="230" y="12" text-anchor="middle" font-size="9" font-weight="bold" fill="#333">Ноутбук</text>
+          <!-- спереди открытый -->
+          <g transform="translate(5,18)">
+            <rect x="4" y="2" width="140" height="90" rx="4" fill="none" stroke="#000" stroke-width="1.8"/>
+            <rect x="9" y="7" width="130" height="80" fill="none" stroke="#000" stroke-width="1"/>
+            <circle cx="74" cy="5" r="2" fill="none" stroke="#000" stroke-width="1"/>
+            <rect x="0" y="93" width="148" height="10" rx="2" fill="none" stroke="#000" stroke-width="1.8"/>
+            <rect x="48" y="95" width="52" height="6" rx="2" fill="none" stroke="#000" stroke-width="1"/>
+            <text x="74" y="118" text-anchor="middle" font-size="8" fill="#555">Спереди</text>
+          </g>
+          <!-- сзади закрытый -->
+          <g transform="translate(167,18)">
+            <rect x="4" y="2" width="140" height="10" rx="4" fill="none" stroke="#000" stroke-width="1.8"/>
+            <rect x="0" y="14" width="148" height="79" rx="4" fill="none" stroke="#000" stroke-width="1.8"/>
+            <text x="74" y="110" text-anchor="middle" font-size="8" fill="#555">Сзади</text>
+          </g>
+          <!-- сбоку -->
+          <g transform="translate(330,28)">
+            <rect x="50" y="2" width="10" height="68" rx="2" fill="none" stroke="#000" stroke-width="1.8"/>
+            <rect x="26" y="71" width="88" height="10" rx="2" fill="none" stroke="#000" stroke-width="1.8"/>
+            <rect x="34" y="73" width="10" height="7" rx="1" fill="none" stroke="#000" stroke-width="1"/>
+            <rect x="96" y="73" width="10" height="7" rx="1" fill="none" stroke="#000" stroke-width="1"/>
+            <text x="70" y="100" text-anchor="middle" font-size="8" fill="#555">Сбоку</text>
+          </g>
+        </svg>
       </div>
-      <div class="check-col">
-        <table class="check-table">
+
+      <div class="dmg-right">
+        <table class="ctbl">
           <thead><tr><th>Функция</th><th>До ремонта</th></tr></thead>
           <tbody>
-            ${checkItems.map(([name]) => `<tr><td>${name}</td><td>Проверка невозможна</td></tr>`).join("")}
+            <tr><td>Кнопка Home</td><td>Проверка невозможна</td></tr>
+            <tr><td>Кнопка Вкл./Выкл.</td><td>Проверка невозможна</td></tr>
+            <tr><td>Изменение геометрии</td><td>Не деформирован</td></tr>
+            <tr><td>Деформация корпуса</td><td>Не деформирован</td></tr>
+            <tr><td>Компас и гироскоп</td><td>Проверка невозможна</td></tr>
+            <tr><td>Кнопки громкости (меню)</td><td>Проверка невозможна</td></tr>
+            <tr><td>Поиск сети</td><td>Проверка невозможна</td></tr>
+            <tr><td>Нижний микрофон (диктофон)</td><td>Проверка невозможна</td></tr>
+            <tr><td>Полифонический динамик</td><td>Проверка невозможна</td></tr>
+            <tr><td>Wi-Fi/Bluetooth (наличие адреса)</td><td>Проверка невозможна</td></tr>
+            <tr><td>Фонарик</td><td>Проверка невозможна</td></tr>
+            <tr><td>Датчик приближения</td><td>Проверка невозможна</td></tr>
+            <tr><td>Кнопки громкости (вызов)</td><td>Проверка невозможна</td></tr>
+            <tr><td>Камера основная (фокус/пятна)</td><td>Проверка невозможна</td></tr>
+            <tr><td>Чтение SIM-карты</td><td>Проверка невозможна</td></tr>
+            <tr><td>Датчик освещённости</td><td>Проверка невозможна</td></tr>
+            <tr><td>Дисплей (touch/steel/рамка/полосы/пиксели/3D touch)</td><td>Проверка невозможна</td></tr>
+            <tr><td>Сканер радужки глаз</td><td>Проверка невозможна</td></tr>
+            <tr><td>Touch ID / Face ID</td><td>Проверка невозможна</td></tr>
+            <tr><td>Беспроводная зарядка</td><td>Проверка невозможна</td></tr>
+            <tr><td>Слуховой динамик</td><td>Проверка невозможна</td></tr>
+            <tr><td>Разъём зарядки</td><td>Проверка невозможна</td></tr>
+            <tr><td>Переключатель вибро</td><td>Проверка невозможна</td></tr>
+            <tr><td>Камера фронтальная (фокус/пятна)</td><td>Проверка невозможна</td></tr>
+            <tr><td>Аудиоразъём (L/R)</td><td>Проверка невозможна</td></tr>
           </tbody>
         </table>
       </div>
@@ -456,53 +487,56 @@ export const printActHTML = (o: Order) => {
   </div>
 
   <!-- УСЛОВИЯ -->
-  <div class="conditions">
-    <div class="head">Условия ремонта — клиент ознакомлен и согласен</div>
+  <div class="cond">
+    <div class="ch">Правила и условия проведения ремонтных работ</div>
     <ol>
-      <li>Правила и условия проведения ремонтных работ изложены на сайте <a href="https://skypka24.com/act" target="_blank">skypka24.com/act</a></li>
+      <li>Правила и условия проведения ремонтных работ изложены на сайте <b>skypka24.com/act</b></li>
       <li>Устройство Клиента принимается без разборки и проверки внутренних неисправностей.</li>
-      <li>Клиент согласен с тем, что гарантия от производителя после произведенного ремонта не возможна.</li>
-      <li>Клиент принимает на себя риск, связанный с возможным проявлением при ремонте скрытых дефектов, имеющихся в устройстве на момент приемки от клиента, которые невозможно проверить и зафиксировать в данном документе (наличие следов коррозии, попадания влаги, посторонних предметов, следов механических повреждений и прочих непредусмотренных производителем в устройство и его компоненты).</li>
+      <li>Клиент согласен с тем, что гарантия от производителя после произведённого ремонта не возможна.</li>
+      <li>Клиент принимает на себя риск, связанный с возможным проявлением при ремонте скрытых дефектов, имеющихся в устройстве на момент приёмки от клиента, которые невозможно проверить и зафиксировать в данном документе (наличие следов коррозии, попадания влаги, посторонних предметов, следов механических повреждений и прочих непредусмотренных производителем в устройство и его компоненты).</li>
       <li>Ремонт и обслуживание осуществляется в соответствии с требованиями нормативных документов, в том числе ГОСТ Р МЭК 60065-2002, ГОСТ Р МЭК 60950-2002, ГОСТ Р 50936-2013, ГОСТ Р 57137-2016, ГОСТ Р 50938-2013 и согласно Федеральному закону «О защите прав потребителей».</li>
       <li>Установленные узлы и расходные материалы возврату не подлежат согласно Перечню сложных технических товаров, не подлежащих обмену или возврату.</li>
-      <li>Исполнитель не несет ответственности за сохранность гарантийных пломб сторонних сервисных центров и производителя устройства.</li>
-      <li>Исполнитель не несет ответственности за возможную потерю информации на внутренних носителях устройства, связанную с заменой узлов и компонентов.</li>
+      <li>Исполнитель не несёт ответственности за сохранность гарантийных пломб сторонних сервисных центров и производителя устройства.</li>
+      <li>Исполнитель не несёт ответственности за возможную потерю информации на внутренних носителях устройства, связанную с заменой узлов и компонентов.</li>
       <li>Факт возврата устройства из ремонта фиксируется в форме ВО-13, которую исполнитель заполняет в двух экземплярах при возврате устройства клиенту.</li>
       <li>Клиент согласен с тем, что при ремонте устройства могут быть заменены компоненты, узлы, модули, влияющие на идентификацию IMEI номера устройства.</li>
-      <li><b>Ремонт Устройств после попадания влаги.</b> В том случае, если Устройство Клиента подвергалось взаимодействию с водной средой, то в Устройстве возможны окисления мест соединения. Клиент согласен, что при обнаружении следов взаимодействия с водной средой есть риск выхода из строя многофункциональных шлейфов, а также других узлов Устройства (вибромотор, полифонический и слуховой динамики, кнопка Home с функцией Touch ID, основная камера, системы антенн и др.), за который Исполнитель ответственности не несет. Клиент уведомлен о вероятности самопроизвольного выхода из строя материнской платы (частично или полностью), потери или полной утраты функциональности Устройства, за который исполнитель ответственности не несет. Клиент предупрежден, что указанные неисправности могут проявиться как во время проведения ремонта, так и в течение трех месяцев после выдачи Устройства Клиенту.</li>
-      <li><b>Ремонт Устройств, полностью или частично восстановленных с использованием неоригинальных комплектующих.</b> С Клиентом согласовано, что при проведении сложного ремонта в случае обнаружения на Устройстве установленных ранее неоригинальных комплектующих с нарушением заводских допусков в работоспособности и установке последних есть риск частичного или полного выхода из строя функциональных узлов (дисплейный модуль, системы антенн), за который Исполнитель ответственности не несет. Клиент согласен, что если Устройство ранее подвергалось некачественному ремонту в другом сервисном центре, то возможен риск выхода из строя материнской платы Устройства по одной из следующих причин: трещины в текстолите, отсутствие необходимых для работы микроэлементов на поверхности платы, нарушение системы пайки (BGA) микросхем на поверхности платы, за который Исполнитель ответственности не несет, равно как и за полный выход Устройства из строя без возможности его восстановления.</li>
-      <li>Клиент согласен с тем, что Исполнитель не несет ответственности за возможную неработоспособность Устройства или его отдельных компонентов из-за невозможности проверки всех функций Устройства.</li>
+      <li><b>Ремонт Устройств после попадания влаги.</b> В том случае, если Устройство Клиента подвергалось взаимодействию с водной средой, то в Устройстве возможны окисления мест соединения. Клиент согласен, что при обнаружении следов взаимодействия с водной средой есть риск выхода из строя многофункциональных шлейфов, а также других узлов Устройства (вибромотор, полифонический и слуховой динамики, кнопка Home с функцией Touch ID, основная камера, системы антенн и др.), за который Исполнитель ответственности не несёт. Клиент уведомлен о вероятности самопроизвольного выхода из строя материнской платы (частично или полностью), потери или полной утраты функциональности Устройства. Клиент предупреждён, что указанные неисправности могут проявиться как во время проведения ремонта, так и в течение трёх месяцев после выдачи Устройства Клиенту.</li>
+      <li><b>Ремонт Устройств, полностью или частично восстановленных с использованием неоригинальных комплектующих.</b> С Клиентом согласовано, что при проведении сложного ремонта в случае обнаружения на Устройстве установленных ранее неоригинальных комплектующих с нарушением заводских допусков в работоспособности и установке последних есть риск частичного или полного выхода из строя функциональных узлов (дисплейный модуль, системы антенн), за который Исполнитель ответственности не несёт. Клиент согласен, что если Устройство ранее подвергалось некачественному ремонту в другом сервисном центре, то возможен риск выхода из строя материнской платы Устройства по одной из следующих причин: трещины в текстолите, отсутствие необходимых микроэлементов на поверхности платы, нарушение системы пайки (BGA) микросхем на поверхности платы, за который Исполнитель ответственности не несёт, равно как и за полный выход Устройства из строя без возможности его восстановления.</li>
+      <li>Клиент согласен с тем, что Исполнитель не несёт ответственности за возможную неработоспособность Устройства или его отдельных компонентов из-за невозможности проверки всех функций Устройства.</li>
     </ol>
   </div>
 
   <!-- ПОДПИСИ -->
   <div class="signs">
-    <div class="sign-cell">
-      <b>Исполнитель</b>
-      <div class="sign-line-block">Устройство в указанном состоянии принял:</div>
-      <div style="margin-top:4px;font-size:9px">_________________________ / _________________________</div>
-      <div style="font-size:9px;color:#555;margin-top:2px">(подпись) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (расшифровка)</div>
-    </div>
-    <div class="sign-cell">
+    <div class="sign-col">
       <b>Клиент</b>
-      <div class="sign-line-block">С условиями ознакомлен и согласен, устройство в ремонт передал:</div>
-      <div style="margin-top:4px;font-size:9px">_________________________ / _________________________</div>
-      <div style="font-size:9px;color:#555;margin-top:2px">(подпись) &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (расшифровка)</div>
+      <div class="stxt">С условиями ознакомлен и согласен, устройство в ремонт передал:</div>
+      <div class="sign-line"><span>_________________________</span><span>_________________________</span></div>
+      <div style="display:flex;justify-content:space-around;font-size:8px;color:#777;margin-top:2px"><span>(подпись)</span><span>(расшифровка)</span></div>
+    </div>
+    <div class="sign-col">
+      <b>Исполнитель</b>
+      <div class="stxt">Устройство в указанном состоянии принял, работоспособность подтвердил:</div>
+      <div class="sign-line"><span>_________________________</span><span>_________________________</span></div>
+      <div style="display:flex;justify-content:space-around;font-size:8px;color:#777;margin-top:2px"><span>(подпись)</span><span>(расшифровка)</span></div>
     </div>
   </div>
 
-  <script>
-    window.addEventListener('load', function() {
-      JsBarcode("#barcode", "${barNum}", {
-        format: "CODE128",
-        width: 1.8,
-        height: 50,
-        displayValue: false,
-        margin: 0,
-      });
+</div>
+<script>
+  window.addEventListener('load', function() {
+    JsBarcode("#barcode", "${barNum}", {
+      format: "CODE128",
+      width: 1.6,
+      height: 44,
+      displayValue: false,
+      margin: 0,
     });
-  </script>
-  </body></html>`);
+  });
+` + `</script>
+</body></html>`;
+
+  win.document.write(html);
   win.document.close();
 };
 
