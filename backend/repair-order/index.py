@@ -92,7 +92,7 @@ def build_act_docx(order_id, name, phone, model, repair_type, price_str, comment
     add_para(f'г. Калуга, {now}', size=12, align=WD_ALIGN_PARAGRAPH.CENTER)
     doc.add_paragraph()
 
-    add_field('Исполнитель: ', 'ИП Мамедов Адиль Мирза Оглы, ИНН 402810962699, г. Калуга, ул. Кирова, 21а')
+    add_field('Исполнитель: ', 'ИП Мамедов Адиль Мирза Оглы, ИНН 402810962699, г. Калуга, ул. Кирова, 7/47 и ул. Кирова, 11')
     add_field('Заказчик (клиент): ', name)
     add_field('Телефон: ', phone)
     if model:

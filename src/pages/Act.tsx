@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 const REPAIR_URL = "https://functions.poehali.dev/a105aede-d55d-4b99-9d3e-5e977887aa04";
+const SEND_LEAD_URL = "https://functions.poehali.dev/52666ff7-db52-4b6a-a90e-d60aeed699de";
 
 const items = [
   {
@@ -84,12 +85,24 @@ const Act = () => {
     setSending(true);
     setErr("");
     try {
-      const res = await fetch(REPAIR_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "create", ...form }),
-      });
-      const data = await res.json();
+      const [repairRes] = await Promise.all([
+        fetch(REPAIR_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "create", ...form }),
+        }),
+        fetch(SEND_LEAD_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: form.name,
+            phone: form.phone,
+            category: "Ремонт",
+            desc: [form.model, form.comment].filter(Boolean).join(" — ") || "—",
+          }),
+        }),
+      ]);
+      const data = await repairRes.json();
       if (data.ok) { setSent(true); setForm({ name: "", phone: "", model: "", comment: "" }); setAgreed(false); }
       else setErr("Ошибка при отправке. Попробуйте ещё раз.");
     } catch { setErr("Нет связи. Попробуйте ещё раз."); }
@@ -102,7 +115,7 @@ const Act = () => {
       <div className="border-b border-[#FFD700]/20 bg-[#0D0D0D]/95 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-5 py-3 flex items-center justify-between">
           <span className="font-oswald text-[#FFD700] text-lg font-bold uppercase tracking-wide">Скупка24</span>
-          <span className="font-roboto text-white/40 text-xs">г. Калуга, ул. Кирова, 21а</span>
+          <span className="font-roboto text-white/40 text-xs">г. Калуга, ул. Кирова, 7/47 и ул. Кирова, 11</span>
         </div>
       </div>
 
@@ -234,7 +247,7 @@ const Act = () => {
           <div className="flex items-start gap-3 mb-4">
             <div className="w-1 h-4 bg-[#FFD700]/50 mt-0.5 flex-shrink-0" />
             <p className="font-roboto text-white/30 text-xs leading-relaxed">
-              ИП Мамедов Адиль Мирза Оглы · г. Калуга, ул. Кирова, 21а · Тел.: +7 (992) 990-33-33<br />
+              ИП Мамедов Адиль Мирза Оглы · г. Калуга, ул. Кирова, 7/47 и ул. Кирова, 11 · Тел.: +7 (992) 990-33-33<br />
               ИНН: 402810962699 · ОГРНИП: 307402814200032<br />
               Р/с: 40802810422270001866 · КАЛУЖСКОЕ ОТДЕЛЕНИЕ N8608 ПАО СБЕРБАНК · БИК: 042908612
             </p>

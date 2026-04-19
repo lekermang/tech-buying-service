@@ -125,7 +125,7 @@ def build_act_docx(order_id, name, phone, model, repair_type, price_str, comment
     cl.paragraphs[0].clear(); cl.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.LEFT
     r = cl.paragraphs[0].add_run('ИП МАМЕДОВ АДИЛЬ МИРЗА ОГЛЫ')
     r.bold = True; r.font.size = Pt(12); r.font.name = F
-    for line in ['г. Калуга, ул. Кирова, 21а', 'ИНН: 402810962699  |  ОГРНИП: 307402814200032',
+    for line in ['г. Калуга, ул. Кирова, 7/47 и ул. Кирова, 11', 'ИНН: 402810962699  |  ОГРНИП: 307402814200032',
                  'Тел.: +7 (992) 990-33-33  |  skypka24.com']:
         p2 = cl.add_paragraph(line); p2.runs[0].font.size = Pt(9); p2.runs[0].font.name = F
 

@@ -209,7 +209,7 @@ export const printAct = async (o: Order) => {
               verticalAlign: VerticalAlign.CENTER,
               children: [
                 new Paragraph({ spacing: { before: 60, after: 20 }, children: [b("ИП МАМЕДОВ АДИЛЬ МИРЗА ОГЛЫ", 22)] }),
-                new Paragraph({ spacing: { before: 0, after: 20 }, children: [n("г. Калуга, ул. Кирова, 21а", 17)] }),
+                new Paragraph({ spacing: { before: 0, after: 20 }, children: [n("г. Калуга, ул. Кирова, 7/47 и ул. Кирова, 11", 17)] }),
                 new Paragraph({ spacing: { before: 0, after: 20 }, children: [n("ИНН: 402810962699  |  ОГРНИП: 307402814200032", 16)] }),
                 new Paragraph({ spacing: { before: 0, after: 60 }, children: [n("Тел.: +7 (992) 990-33-33  |  skypka24.com", 16)] }),
               ],
@@ -358,7 +358,7 @@ body{font-family:Arial,sans-serif;font-size:10px;color:#000;background:#fff}
     ИП Мамедов Адиль Мирза Оглы<br>
     ИНН: 402810962699<br>
     ОГРНИП: 307402814200032<br>
-    г. Калуга, ул. Кирова, 21а<br>
+    г. Калуга, ул. Кирова, 7/47 и ул. Кирова, 11<br>
     Тел.: +7 (992) 990-33-33<br>
     skypka24.com
   </div>
