@@ -785,21 +785,35 @@ def handler(event: dict, context) -> dict:
         if not auth(event):
             return {'statusCode': 403, 'headers': HEADERS, 'body': json.dumps({'error': 'Нет доступа'}, ensure_ascii=False)}
         group = params.get('group', 'all')  # all | registered | repair
+
+        def fmt_phone(raw: str) -> str:
+            digits = ''.join(c for c in (raw or '') if c.isdigit())
+            if len(digits) == 11 and digits.startswith('8'):
+                digits = '7' + digits[1:]
+            if len(digits) == 10:
+                digits = '7' + digits
+            return ('+' + digits) if len(digits) == 11 else ''
+
         conn = psycopg2.connect(os.environ['DATABASE_URL'])
         cur = conn.cursor()
         contacts = []
+        seen_phones = set()
         if group in ('all', 'registered'):
             cur.execute(f"SELECT id, full_name, phone FROM {SCHEMA}.clients ORDER BY registered_at DESC")
             for r in cur.fetchall():
-                contacts.append({'id': f'c_{r[0]}', 'full_name': r[1], 'phone': r[2], 'source': 'registered'})
+                p = fmt_phone(r[2] or '')
+                if p and p not in seen_phones:
+                    contacts.append({'id': f'c_{r[0]}', 'full_name': r[1] or '', 'phone': p, 'source': 'registered'})
+                    seen_phones.add(p)
         if group in ('all', 'repair'):
             cur.execute(f"""SELECT DISTINCT ON (phone) id, name, phone FROM {SCHEMA}.repair_orders
-                            WHERE status NOT IN ('cancelled') ORDER BY phone, created_at DESC""")
-            seen = {c['phone'] for c in contacts}
+                            WHERE status NOT IN ('cancelled') AND phone != '' AND phone IS NOT NULL
+                            ORDER BY phone, created_at DESC""")
             for r in cur.fetchall():
-                if r[2] not in seen:
-                    contacts.append({'id': f'r_{r[0]}', 'full_name': r[1], 'phone': r[2], 'source': 'repair'})
-                    seen.add(r[2])
+                p = fmt_phone(r[2] or '')
+                if p and p not in seen_phones:
+                    contacts.append({'id': f'r_{r[0]}', 'full_name': r[1] or '', 'phone': p, 'source': 'repair'})
+                    seen_phones.add(p)
         cur.close(); conn.close()
         return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'contacts': contacts, 'total': len(contacts)}, ensure_ascii=False)}
 
