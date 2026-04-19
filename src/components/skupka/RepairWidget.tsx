@@ -449,14 +449,23 @@ export default function RepairWidget() {
                     placeholder="Опишите проблему * (не включается, разбит экран...)"
                     className={INP} />
 
-                  <label className="flex items-start gap-2 cursor-pointer mt-1" onClick={() => setAgreed(v => !v)}>
-                    <div className={`mt-0.5 w-3.5 h-3.5 shrink-0 border flex items-center justify-center transition-colors ${agreed ? "bg-[#FFD700] border-[#FFD700]" : "border-white/30"}`}>
-                      {agreed && <Icon name="Check" size={9} className="text-black" />}
-                    </div>
-                    <span className="font-roboto text-[10px] text-white/50 leading-relaxed">
-                      Ознакомлен с условиями ремонта и согласен
-                    </span>
-                  </label>
+                  <div className="flex items-center justify-between gap-2 mt-1">
+                    <label className="flex items-start gap-2 cursor-pointer flex-1" onClick={() => setAgreed(v => !v)}>
+                      <div className={`mt-0.5 w-3.5 h-3.5 shrink-0 border flex items-center justify-center transition-colors ${agreed ? "bg-[#FFD700] border-[#FFD700]" : "border-white/30"}`}>
+                        {agreed && <Icon name="Check" size={9} className="text-black" />}
+                      </div>
+                      <span className="font-roboto text-[10px] text-white/50 leading-relaxed">
+                        Ознакомлен с условиями ремонта и согласен
+                      </span>
+                    </label>
+                    <a
+                      href="/act"
+                      target="_blank"
+                      className="font-roboto text-[10px] text-[#FFD700]/60 hover:text-[#FFD700] transition-colors underline underline-offset-2 shrink-0"
+                    >
+                      Условия
+                    </a>
+                  </div>
 
                   <button onClick={handleSubmit} disabled={!canSubmit || sending}
                     className="w-full bg-[#FFD700] text-black font-oswald font-bold py-2.5 uppercase text-sm hover:bg-yellow-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed mt-1">
