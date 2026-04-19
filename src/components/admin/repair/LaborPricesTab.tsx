@@ -39,7 +39,7 @@ export default function LaborPricesTab({
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [syncResult, setSyncResult] = useState<{ ok: boolean; synced?: number } | null>(null);
+  const [syncResult, setSyncResult] = useState<{ ok: boolean; synced?: number; error?: string } | null>(null);
   const [error, setError] = useState("");
 
   const headers = { "Content-Type": "application/json", [authHeader]: token };
@@ -72,9 +72,9 @@ export default function LaborPricesTab({
     try {
       const res = await fetch(PARTS_URL, { method: "POST", headers });
       const data = await res.json();
-      setSyncResult({ ok: !!data.ok, synced: data.synced });
-    } catch {
-      setSyncResult({ ok: false });
+      setSyncResult({ ok: !!data.ok, synced: data.synced, error: data.error });
+    } catch (e) {
+      setSyncResult({ ok: false, error: String(e) });
     }
     setSyncing(false);
   };
@@ -225,7 +225,7 @@ export default function LaborPricesTab({
             <Icon name={syncResult.ok ? "CheckCircle" : "AlertCircle"} size={11} />
             {syncResult.ok
               ? `Готово — обновлено ${syncResult.synced?.toLocaleString("ru-RU")} позиций`
-              : "Ошибка синхронизации"}
+              : `Ошибка: ${syncResult.error || "нет ответа"}`}
           </div>
         )}
       </div>
