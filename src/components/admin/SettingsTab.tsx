@@ -89,7 +89,7 @@ export default function SettingsTab({ token }: { token: string }) {
     return Math.round(goldBuy * 0.585 * (1 - disc) - ded);
   };
 
-  const otherSettings = settings.filter(s => !s.key.startsWith("gold_"));
+  const otherSettings = settings.filter(s => !s.key.startsWith("gold_") && !s.key.startsWith("sms_tpl_"));
 
   const SaveBtn = ({ keyName }: { keyName: string }) => (
     <button
@@ -191,6 +191,51 @@ export default function SettingsTab({ token }: { token: string }) {
           Изменения отображаются на сайте в течение 30 секунд после сохранения
         </div>
       </div>
+
+      {/* SMS шаблоны */}
+      {(() => {
+        const SMS_LABELS: Record<string, string> = {
+          sms_tpl_in_progress: 'Взят в ремонт',
+          sms_tpl_waiting_parts: 'Ожидание запчасти',
+          sms_tpl_ready: 'Готов к выдаче',
+          sms_tpl_done: 'Выдан клиенту',
+          sms_tpl_cancelled: 'Отменён',
+        };
+        const smsSettings = settings.filter(s => s.key.startsWith('sms_tpl_'));
+        if (!smsSettings.length) return null;
+        return (
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-1 h-5 bg-[#FFD700]" />
+              <div className="text-white/60 text-xs uppercase tracking-widest">SMS-шаблоны ремонта</div>
+            </div>
+            <div className="text-white/30 text-xs mb-4">
+              Переменные: <span className="text-white/50 font-mono">{'{device}'}</span> — модель устройства, <span className="text-white/50 font-mono">{'{amount}'}</span> — стоимость ремонта
+            </div>
+            <div className="flex flex-col gap-3">
+              {smsSettings.map((s) => (
+                <div key={s.key} className="bg-[#1A1A1A] border border-[#333] p-4">
+                  <div className="text-white text-sm font-medium mb-2">{SMS_LABELS[s.key] || s.key}</div>
+                  <div className="flex gap-2 items-start">
+                    <textarea
+                      rows={2}
+                      value={edited[s.key] ?? s.value}
+                      onChange={(e) => setEdited(prev => ({ ...prev, [s.key]: e.target.value }))}
+                      className="flex-1 bg-[#0D0D0D] border border-[#444] text-white px-3 py-2 text-sm focus:outline-none focus:border-[#FFD700] transition-colors resize-none"
+                    />
+                    <SaveBtn keyName={s.key} />
+                  </div>
+                  {s.updated_at && (
+                    <div className="text-white/20 text-xs mt-1">
+                      Обновлено: {new Date(s.updated_at).toLocaleString('ru-RU')}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Прочие параметры */}
       {otherSettings.length > 0 && (

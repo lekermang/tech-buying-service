@@ -856,15 +856,21 @@ def handler(event: dict, context) -> dict:
 
             # SMS клиенту при смене статуса
             dev = device_model or 'устройство'
-            sms_templates = {
-                'in_progress': f"Скупка24: {dev} в ремонте. Готово — сообщим. Skypka24.com",
-                'waiting_parts': f"Скупка24: {dev} — ждём запчасть. Готово — сообщим. Skypka24.com",
-                'ready': f"Скупка24: {dev} готов! Стоимость: {r_amount} руб. Ждём вас. Skypka24.com",
-                'done': f"Скупка24: {dev} выдан. Спасибо за обращение! Skypka24.com",
-                'cancelled': f"Скупка24: {dev} — ремонт отменён. Позвоните нам. Skypka24.com",
+            default_templates = {
+                'in_progress': 'Скупка24: {device} в ремонте. Готово — сообщим. Skypka24.com',
+                'waiting_parts': 'Скупка24: {device} — ждём запчасть. Готово — сообщим. Skypka24.com',
+                'ready': 'Скупка24: {device} готов! Стоимость: {amount} руб. Ждём вас. Skypka24.com',
+                'done': 'Скупка24: {device} выдан. Спасибо за обращение! Skypka24.com',
+                'cancelled': 'Скупка24: {device} — ремонт отменён. Позвоните нам. Skypka24.com',
             }
-            if client_phone and new_status in sms_templates:
-                send_sms(client_phone, sms_templates[new_status])
+            if client_phone and new_status in default_templates:
+                cur2 = conn.cursor()
+                cur2.execute(f"SELECT value FROM {SCHEMA}.settings WHERE key = 'sms_tpl_{new_status}'")
+                row2 = cur2.fetchone()
+                cur2.close()
+                tpl = (row2[0] if row2 and row2[0] else default_templates[new_status])
+                sms_text = tpl.replace('{device}', dev).replace('{amount}', str(r_amount or ''))
+                send_sms(client_phone, sms_text)
 
         cur.close(); conn.close()
         return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'master_income': int(master_income_val) if master_income_val != 'NULL' else None}, ensure_ascii=False)}
