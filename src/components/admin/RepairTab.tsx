@@ -232,7 +232,19 @@ export default function RepairTab({ token }: { token: string }) {
               placeholder="Поиск по имени, телефону, модели..."
               className="flex-1 min-w-[150px] bg-[#0D0D0D] border border-[#333] text-white px-3 py-1.5 font-roboto text-xs focus:outline-none focus:border-[#FFD700] placeholder:text-white/20"
             />
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {[
+                { label: "Сегодня", get: () => { const t = new Date().toISOString().slice(0,10); return [t, t]; } },
+                { label: "Неделя",  get: () => { const t = new Date(); const f = new Date(t); f.setDate(t.getDate()-6); return [f.toISOString().slice(0,10), t.toISOString().slice(0,10)]; } },
+                { label: "Месяц",   get: () => { const t = new Date(); const f = new Date(t); f.setDate(t.getDate()-29); return [f.toISOString().slice(0,10), t.toISOString().slice(0,10)]; } },
+              ].map(q => (
+                <button key={q.label} onClick={() => { const [f,to] = q.get(); setDateFrom(f); setDateTo(to); }}
+                  className={`px-2 py-1 font-roboto text-[10px] border transition-colors ${
+                    (() => { const [f,to] = q.get(); return dateFrom===f && dateTo===to; })()
+                      ? "border-[#FFD700] text-[#FFD700] bg-[#FFD700]/10"
+                      : "border-[#333] text-white/40 hover:border-white/30 hover:text-white/70"
+                  }`}>{q.label}</button>
+              ))}
               <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
                 title="Дата сдачи от"
                 className="bg-[#0D0D0D] border border-[#333] text-white/70 px-2 py-1.5 font-roboto text-xs focus:outline-none focus:border-[#FFD700] w-32" />
