@@ -47,6 +47,14 @@ type OrderStatus = {
 
 const INP = "w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-2 font-roboto text-xs focus:outline-none focus:border-[#FFD700] transition-colors";
 
+const STATIC_EXTRAS = [
+  { id: "wl1", label: "Восстановление влагозащиты", price: 700 },
+  { id: "wl2", label: "Чистка динамиков", price: 200 },
+  { id: "wl3", label: "Убрать окисления", price: 500 },
+  { id: "wl4", label: "Установка защитного стекла", price: 1000 },
+  { id: "wl5", label: "Восстановление модема iPhone", price: 5000 },
+];
+
 export default function RepairWidget() {
   const [tab, setTab] = useState<"form" | "status">("form");
   const [open, setOpen] = useState(false);
@@ -122,6 +130,9 @@ export default function RepairWidget() {
     if (!form.name || !form.phone || !form.model || !form.fault) return;
     setSending(true);
     const extraLabels = extraWorksList.filter(w => extraWorks.includes(String(w.id))).map(w => w.label);
+    const staticExtraLabels = STATIC_EXTRAS.filter(w => extraWorks.includes(w.id)).map(w => w.label);
+    const staticExtraTotal = STATIC_EXTRAS.filter(w => extraWorks.includes(w.id)).reduce((s, w) => s + w.price, 0);
+    const allExtras = [...extraLabels, ...staticExtraLabels];
     try {
       const res = await fetch(REPAIR_ORDER_URL, {
         method: "POST",
@@ -131,9 +142,9 @@ export default function RepairWidget() {
           phone: form.phone,
           model: form.model,
           repair_type: selectedPart
-            ? `${PART_TYPE_LABEL[selectedPart.part_type] || selectedPart.part_type}${extraLabels.length ? " + " + extraLabels.join(", ") : ""}`
-            : form.fault,
-          price: selectedPart ? grandTotal : undefined,
+            ? `${PART_TYPE_LABEL[selectedPart.part_type] || selectedPart.part_type}${allExtras.length ? " + " + allExtras.join(", ") : ""}`
+            : [form.fault, ...staticExtraLabels].filter(Boolean).join(" + "),
+          price: selectedPart ? grandTotal : (staticExtraTotal > 0 ? staticExtraTotal : undefined),
           comment: form.fault,
         }),
       });
@@ -347,8 +358,35 @@ export default function RepairWidget() {
                     )}
 
                     {!partsLoading && form.model.trim().length >= 3 && parts.length === 0 && !showPartsList && (
-                      <div className="text-white/30 font-roboto text-[10px] mt-1">
-                        Запчасти не найдены — опишите проблему ниже
+                      <div>
+                        <div className="text-white/30 font-roboto text-[10px] mt-1 mb-2">
+                          Запчасти не найдены — опишите проблему ниже
+                        </div>
+                        {/* Доп. услуги даже без подобранной запчасти */}
+                        <div className="border border-white/10 bg-[#0a0a0a] px-3 py-2.5">
+                          <div className="font-roboto text-[9px] text-white/30 uppercase tracking-wide mb-1.5">
+                            Добавить к ремонту:
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {STATIC_EXTRAS.map(w => {
+                              const active = extraWorks.includes(w.id);
+                              return (
+                                <button key={w.id} type="button" onClick={() => toggleExtra(w.id)}
+                                  className={`flex items-center gap-1 px-2 py-1 border font-roboto text-[10px] transition-colors ${
+                                    active
+                                      ? "border-[#FFD700] bg-[#FFD700]/15 text-[#FFD700]"
+                                      : "border-white/15 text-white/40 hover:border-white/30 hover:text-white/70"
+                                  }`}>
+                                  {active && <Icon name="Check" size={9} />}
+                                  {w.label}
+                                  <span className={`ml-0.5 ${active ? "text-[#FFD700]/70" : "text-white/25"}`}>
+                                    +{w.price.toLocaleString("ru-RU")} ₽
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
                       </div>
                     )}
 
