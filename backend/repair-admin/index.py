@@ -610,21 +610,30 @@ def handler(event: dict, context) -> dict:
                     p = fmt_p(r[0] or '')
                     if p: phones.add(p)
             cur.close(); conn.close()
+            all_phones = list(phones)
             sent = 0; failed = 0
-            for phone_num in phones:
+            # sms.ru поддерживает до 100 номеров в одном запросе через запятую
+            chunk_size = 100
+            for i in range(0, len(all_phones), chunk_size):
+                chunk = all_phones[i:i + chunk_size]
                 try:
                     resp = requests.get('https://sms.ru/sms/send',
-                        params={'api_id': api_id, 'to': phone_num, 'msg': message, 'json': 1, 'from': 'Skypka24'},
-                        timeout=10)
+                        params={'api_id': api_id, 'to': ','.join(chunk), 'msg': message, 'json': 1, 'from': 'Skypka24'},
+                        timeout=20)
                     data_r = resp.json() if resp.status_code == 200 else {}
                     if data_r.get('status') == 'OK':
-                        sent += 1
+                        sms_items = data_r.get('sms', {})
+                        for num, info in sms_items.items():
+                            if isinstance(info, dict) and info.get('status') == 'OK':
+                                sent += 1
+                            else:
+                                failed += 1
                     else:
-                        failed += 1
+                        failed += len(chunk)
                 except Exception:
-                    failed += 1
-            print(f"[sms_blast] sent={sent} failed={failed} total={len(phones)}", flush=True)
-            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'sent': sent, 'failed': failed, 'total': len(phones)}, ensure_ascii=False)}
+                    failed += len(chunk)
+            print(f"[sms_blast] sent={sent} failed={failed} total={len(all_phones)}", flush=True)
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'sent': sent, 'failed': failed, 'total': len(all_phones)}, ensure_ascii=False)}
 
         # Импорт WH-контактов из WhatsApp чата (Яндекс Диск)
         if action == 'import_wh_contacts':
