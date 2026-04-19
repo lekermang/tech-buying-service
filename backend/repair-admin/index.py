@@ -50,42 +50,111 @@ def send_tg_all(token: str, main_chat_id: str, conn, message: str):
 
 def build_act_docx(order_id, name, phone, model, repair_type, price_str, comment) -> bytes:
     from docx import Document
-    from docx.shared import Pt, Cm
+    from docx.shared import Pt, Cm, RGBColor
     from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.enum.table import WD_TABLE_ALIGNMENT, WD_ALIGN_VERTICAL
     from docx.oxml.ns import qn
     from docx.oxml import OxmlElement
     import datetime
 
-    doc = Document()
-    for section in doc.sections:
-        section.top_margin = Cm(2); section.bottom_margin = Cm(2)
-        section.left_margin = Cm(3); section.right_margin = Cm(1.5)
+    F = 'Arial'
+    now = datetime.datetime.now().strftime('%d.%m.%Y %H:%M')
 
-    def add_para(text='', bold=False, size=12, align=WD_ALIGN_PARAGRAPH.LEFT):
-        p = doc.add_paragraph(); p.alignment = align
+    def set_cell_bg(cell, hex_color):
+        tc = cell._tc; tcPr = tc.get_or_add_tcPr()
+        shd = OxmlElement('w:shd')
+        shd.set(qn('w:val'), 'clear'); shd.set(qn('w:color'), 'auto')
+        shd.set(qn('w:fill'), hex_color); tcPr.append(shd)
+
+    def set_cell_borders(cell, color='000000', sz=4):
+        tc = cell._tc; tcPr = tc.get_or_add_tcPr()
+        tcBorders = OxmlElement('w:tcBorders')
+        for side in ['top', 'bottom', 'left', 'right']:
+            b = OxmlElement(f'w:{side}')
+            b.set(qn('w:val'), 'single'); b.set(qn('w:sz'), str(sz))
+            b.set(qn('w:space'), '0'); b.set(qn('w:color'), color)
+            tcBorders.append(b)
+        tcPr.append(tcBorders)
+
+    def cell_para(cell, text, bold=False, size=10, align=WD_ALIGN_PARAGRAPH.LEFT, color=None):
+        p = cell.paragraphs[0] if cell.paragraphs else cell.add_paragraph()
+        p.alignment = align; p.clear()
         run = p.add_run(text); run.bold = bold
-        run.font.size = Pt(size); run.font.name = 'Times New Roman'
+        run.font.size = Pt(size); run.font.name = F
+        if color: run.font.color.rgb = RGBColor.from_string(color)
         return p
 
-    def add_field(label, value):
-        p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.LEFT
-        r1 = p.add_run(label); r1.bold = True; r1.font.size = Pt(12); r1.font.name = 'Times New Roman'
-        r2 = p.add_run(value); r2.font.size = Pt(12); r2.font.name = 'Times New Roman'
+    doc = Document()
+    for section in doc.sections:
+        section.top_margin = Cm(1.5); section.bottom_margin = Cm(1.5)
+        section.left_margin = Cm(1.5); section.right_margin = Cm(1.5)
+    for style in doc.styles:
+        if hasattr(style, 'font'):
+            style.font.name = F
 
-    now = datetime.datetime.now().strftime('%d.%m.%Y %H:%M')
-    add_para('АКТ ПРИЁМКИ НА РЕМОНТ ТЕХНИЧЕСКОГО ОБОРУДОВАНИЯ', bold=True, size=14, align=WD_ALIGN_PARAGRAPH.CENTER)
-    add_para(f'№ {order_id}', size=13, align=WD_ALIGN_PARAGRAPH.CENTER)
-    add_para(f'г. Калуга, {now}', size=12, align=WD_ALIGN_PARAGRAPH.CENTER)
+    # ── ШАПКА ──────────────────────────────────────────────────────────────────
+    hdr = doc.add_table(rows=1, cols=2)
+    hdr.alignment = WD_TABLE_ALIGNMENT.CENTER
+    hdr.columns[0].width = Cm(11); hdr.columns[1].width = Cm(7)
+
+    cl = hdr.cell(0, 0); set_cell_bg(cl, 'F5F5F5'); set_cell_borders(cl, '000000', 6)
+    cl.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+    cl.paragraphs[0].clear(); cl.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.LEFT
+    r = cl.paragraphs[0].add_run('ИП МАМЕДОВ АДИЛЬ МИРЗА ОГЛЫ')
+    r.bold = True; r.font.size = Pt(12); r.font.name = F
+    for line in ['г. Калуга, ул. Кирова, 21а', 'ИНН: 402810962699  |  ОГРНИП: 307402814200032',
+                 'Тел.: +7 (992) 990-33-33  |  skypka24.com']:
+        p2 = cl.add_paragraph(line); p2.runs[0].font.size = Pt(9); p2.runs[0].font.name = F
+
+    cr = hdr.cell(0, 1); set_cell_bg(cr, 'FFFFFF'); set_cell_borders(cr, '000000', 6)
+    cr.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+    cell_para(cr, 'АКТ ПРИЁМА В РЕМОНТ', bold=True, size=14, align=WD_ALIGN_PARAGRAPH.CENTER)
+    cr.add_paragraph(f'№ {order_id}').runs[0].bold = True
+    cr.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+    cr.paragraphs[-1].runs[0].font.size = Pt(12); cr.paragraphs[-1].runs[0].font.name = F
+
     doc.add_paragraph()
-    add_field('Исполнитель: ', 'ИП Мамедов Адиль Мирза Оглы, ИНН 402810962699, г. Калуга, ул. Кирова, 21а')
-    add_field('Заказчик: ', name); add_field('Телефон: ', phone)
-    if model: add_field('Устройство: ', model)
-    if repair_type: add_field('Вид работ: ', repair_type)
-    add_field('Предварительная стоимость: ', price_str)
-    if comment: add_field('Описание: ', comment)
+
+    # ── ДАННЫЕ ЗАЯВКИ ──────────────────────────────────────────────────────────
+    info_rows = [
+        ('№ заявки', str(order_id)),
+        ('Дата / Время', now),
+        ('Клиент', name or '—'),
+        ('Телефон', phone or '—'),
+        ('Устройство', model or '—'),
+        ('Вид работ', repair_type or '—'),
+        ('Описание неисправности', comment or '—'),
+        ('Предв. стоимость', price_str),
+    ]
+    tbl = doc.add_table(rows=len(info_rows), cols=2)
+    tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
+    for i, (lbl_txt, val_txt) in enumerate(info_rows):
+        bg = 'F5F5F5' if i % 2 == 0 else 'FFFFFF'
+        cl = tbl.cell(i, 0); set_cell_bg(cl, bg); set_cell_borders(cl)
+        cell_para(cl, lbl_txt, bold=True, size=10)
+        cr = tbl.cell(i, 1); set_cell_bg(cr, bg); set_cell_borders(cr)
+        cell_para(cr, val_txt, size=10)
+
     doc.add_paragraph()
-    add_para('УСЛОВИЯ РЕМОНТА — КЛИЕНТ ОЗНАКОМЛЕН И СОГЛАСЕН:', bold=True, size=13)
+
+    # ── ВНЕШНИЙ ВИД ────────────────────────────────────────────────────────────
+    cond = doc.add_table(rows=3, cols=4)
+    cond.alignment = WD_TABLE_ALIGNMENT.CENTER
+    merged = cond.cell(0, 0).merge(cond.cell(0, 3))
+    set_cell_bg(merged, 'EEEEEE'); set_cell_borders(merged, '000000', 6)
+    cell_para(merged, 'ВНЕШНИЙ ВИД УСТРОЙСТВА ПРИ ПРИЁМЕ', bold=True, size=10, align=WD_ALIGN_PARAGRAPH.CENTER)
+    for j, lbl_txt in enumerate(['Царапины', 'Трещины', 'Сколы', 'Другое']):
+        c = cond.cell(1, j); set_cell_bg(c, 'FFFFFF'); set_cell_borders(c)
+        cell_para(c, lbl_txt, bold=True, size=9, align=WD_ALIGN_PARAGRAPH.CENTER)
+        c.add_paragraph('☐  Есть     ☐  Нет').alignment = WD_ALIGN_PARAGRAPH.CENTER
+        c.paragraphs[-1].runs[0].font.size = Pt(9)
+    note = cond.cell(2, 0).merge(cond.cell(2, 3))
+    set_cell_bg(note, 'FFFFFF'); set_cell_borders(note)
+    cell_para(note, 'Примечания: ' + '_' * 90, size=9)
+
     doc.add_paragraph()
+
+    # ── УСЛОВИЯ РЕМОНТА ────────────────────────────────────────────────────────
     risks = [
         'После воды аппарат может полностью умереть при любом ремонте. Мастерская не обязана его оживлять.',
         'Компонентная пайка — риск гибели платы. Если телефон умер в процессе — работа оплачивается.',
@@ -93,31 +162,37 @@ def build_act_docx(order_id, name, phone, model, repair_type, price_str, comment
         'Данные (фото, контакты) могут быть потеряны безвозвратно.',
         'Гарантии на результат нет. В худшем случае — оплата диагностики и сделанной работы.',
     ]
+    rtbl = doc.add_table(rows=len(risks) + 1, cols=2)
+    rtbl.alignment = WD_TABLE_ALIGNMENT.CENTER
+    hrow = rtbl.cell(0, 0).merge(rtbl.cell(0, 1))
+    set_cell_bg(hrow, 'EEEEEE'); set_cell_borders(hrow, '000000', 6)
+    cell_para(hrow, 'УСЛОВИЯ РЕМОНТА — КЛИЕНТ ОЗНАКОМЛЕН И СОГЛАСЕН', bold=True, size=10, align=WD_ALIGN_PARAGRAPH.CENTER)
     for i, risk in enumerate(risks, 1):
-        p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        run = p.add_run(f'{i}. {risk}'); run.font.size = Pt(12); run.font.name = 'Times New Roman'
-    doc.add_paragraph()
-    add_para('Подписывая акт, клиент подтверждает ознакомление с условиями и добровольно соглашается на ремонт.', size=11)
-    doc.add_paragraph(); doc.add_paragraph()
-
-    table = doc.add_table(rows=2, cols=3)
-    for row in table.rows:
-        for cell in row.cells:
-            tc = cell._tc; tcPr = tc.get_or_add_tcPr()
-            tcBorders = OxmlElement('w:tcBorders')
-            for border in ['top', 'bottom', 'left', 'right']:
-                b = OxmlElement(f'w:{border}'); b.set(qn('w:val'), 'nil'); tcBorders.append(b)
-            tcPr.append(tcBorders)
-    for col_idx, label in [(0, 'Мастер (подпись / ФИО)'), (2, 'Клиент (подпись / ФИО)')]:
-        cell = table.cell(0, col_idx); p = cell.paragraphs[0]
-        run = p.add_run('_' * 30); run.font.size = Pt(12)
-        cell2 = table.cell(1, col_idx); p2 = cell2.paragraphs[0]; p2.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run2 = p2.add_run(label); run2.font.size = Pt(10); run2.font.name = 'Times New Roman'
+        cn = rtbl.cell(i, 0); set_cell_bg(cn, 'F5F5F5'); set_cell_borders(cn)
+        cell_para(cn, str(i), bold=True, size=10, align=WD_ALIGN_PARAGRAPH.CENTER)
+        cv = rtbl.cell(i, 1); set_cell_bg(cv, 'FFFFFF'); set_cell_borders(cv)
+        cell_para(cv, risk, size=9)
 
     doc.add_paragraph()
-    p_f = doc.add_paragraph(); p_f.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    r = p_f.add_run('ИНН: 402810962699  ·  ОГРНИП: 307402814200032  ·  Р/с: 40802810422270001866\nКАЛУЖСКОЕ ОТДЕЛЕНИЕ N8608 ПАО СБЕРБАНК  ·  БИК: 042908612')
-    r.font.size = Pt(9); r.font.name = 'Times New Roman'
+
+    # ── ПОДПИСИ ────────────────────────────────────────────────────────────────
+    stbl = doc.add_table(rows=2, cols=2)
+    stbl.alignment = WD_TABLE_ALIGNMENT.CENTER
+    for j, lbl_txt in enumerate(['МАСТЕР', 'КЛИЕНТ']):
+        ch = stbl.cell(0, j); set_cell_bg(ch, 'F5F5F5'); set_cell_borders(ch, '000000', 6)
+        cell_para(ch, lbl_txt, bold=True, size=10, align=WD_ALIGN_PARAGRAPH.CENTER)
+    for j in range(2):
+        cs = stbl.cell(1, j); set_cell_bg(cs, 'FFFFFF'); set_cell_borders(cs, '000000', 6)
+        cell_para(cs, 'ФИО: ' + '_' * 35, size=9)
+        p2 = cs.add_paragraph('Подпись: ' + '_' * 33)
+        p2.runs[0].font.size = Pt(9); p2.runs[0].font.name = F
+
+    doc.add_paragraph()
+
+    # ── РЕКВИЗИТЫ ──────────────────────────────────────────────────────────────
+    p_req = doc.add_paragraph('Р/с: 40802810422270001866  |  КАЛУЖСКОЕ ОТДЕЛЕНИЕ N8608 ПАО СБЕРБАНК  |  БИК: 042908612')
+    p_req.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_req.runs[0].font.size = Pt(8); p_req.runs[0].font.name = F; p_req.runs[0].font.color.rgb = RGBColor(0x88, 0x88, 0x88)
 
     buf = io.BytesIO(); doc.save(buf); return buf.getvalue()
 

@@ -42,110 +42,181 @@ export const INP = "w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-
 export const LBL = "font-roboto text-white/40 text-[10px] block mb-1";
 
 export const printAct = async (o: Order) => {
-  const { Document, Packer, Paragraph, TextRun, AlignmentType, BorderStyle, Table, TableRow, TableCell, WidthType, ShadingType } = await import("docx");
+  const { Document, Packer, Paragraph, TextRun, AlignmentType, BorderStyle, Table, TableRow, TableCell, WidthType, VerticalAlign } = await import("docx");
   const { saveAs } = await import("file-saver");
 
   const now = new Date();
   const dateStr = now.toLocaleDateString("ru-RU");
   const timeStr = now.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
 
-  const bold = (text: string, size = 22) => new TextRun({ text, bold: true, size, font: "Times New Roman" });
-  const normal = (text: string, size = 22) => new TextRun({ text, size, font: "Times New Roman" });
+  const F = "Arial";
+  const b = (t: string, sz = 18) => new TextRun({ text: t, bold: true, size: sz, font: F });
+  const n = (t: string, sz = 18) => new TextRun({ text: t, size: sz, font: F });
+  const NONE = BorderStyle.NONE;
+  const SINGLE = BorderStyle.SINGLE;
 
-  const fieldRow = (label: string, value: string) => new Paragraph({
-    spacing: { after: 80 },
+  const noBorder = { top: { style: NONE }, bottom: { style: NONE }, left: { style: NONE }, right: { style: NONE } };
+  const allBorder = (sz = 4, color = "000000") => ({
+    top: { style: SINGLE, size: sz, color }, bottom: { style: SINGLE, size: sz, color },
+    left: { style: SINGLE, size: sz, color }, right: { style: SINGLE, size: sz, color },
+  });
+
+  // Строка таблицы данных: метка | значение
+  const dataRow = (label: string, value: string, shaded = false) => new TableRow({
     children: [
-      new TextRun({ text: label, bold: true, size: 22, font: "Times New Roman" }),
-      new TextRun({ text: value, size: 22, font: "Times New Roman" }),
+      new TableCell({
+        width: { size: 35, type: WidthType.PERCENTAGE },
+        shading: shaded ? { fill: "F5F5F5" } : undefined,
+        borders: allBorder(4),
+        verticalAlign: VerticalAlign.CENTER,
+        children: [new Paragraph({ spacing: { before: 40, after: 40 }, children: [b(label, 18)] })],
+      }),
+      new TableCell({
+        width: { size: 65, type: WidthType.PERCENTAGE },
+        shading: shaded ? { fill: "F5F5F5" } : undefined,
+        borders: allBorder(4),
+        verticalAlign: VerticalAlign.CENTER,
+        children: [new Paragraph({ spacing: { before: 40, after: 40 }, children: [n(value || "—", 18)] })],
+      }),
     ],
   });
 
-  const riskItem = (n: number, text: string) => new Paragraph({
-    spacing: { before: 100, after: 100 },
-    indent: { left: 360 },
-    children: [
-      new TextRun({ text: `${n}. `, bold: true, size: 22, font: "Times New Roman" }),
-      new TextRun({ text, size: 22, font: "Times New Roman" }),
-    ],
-  });
-
-  const signTable = new Table({
+  // Таблица с данными заявки
+  const infoTable = new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
-    borders: {
-      top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE },
-      left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE },
-      insideH: { style: BorderStyle.NONE }, insideV: { style: BorderStyle.NONE },
-    },
+    borders: allBorder(6),
+    rows: [
+      dataRow("№ заявки", String(o.id), true),
+      dataRow("Дата / Время", `${dateStr}  ${timeStr}`),
+      dataRow("Клиент", o.name, true),
+      dataRow("Телефон", o.phone),
+      dataRow("Устройство", o.model || "—", true),
+      dataRow("Вид работ", o.repair_type || "—"),
+      dataRow("Описание неисправности", o.comment || "—", true),
+      dataRow("Предв. стоимость", o.price ? `${o.price.toLocaleString("ru-RU")} руб.` : "По результатам диагностики"),
+    ],
+  });
+
+  // Таблица состояния устройства при приёме
+  const conditionTable = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: allBorder(6),
     rows: [
       new TableRow({ children: [
-        new TableCell({
-          width: { size: 45, type: WidthType.PERCENTAGE },
-          borders: { bottom: { style: BorderStyle.SINGLE, size: 6, color: "000000" }, top: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
-          children: [new Paragraph({ children: [normal("  ")] })],
-        }),
-        new TableCell({ width: { size: 10, type: WidthType.PERCENTAGE }, borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } }, children: [new Paragraph({ children: [normal("")] })] }),
-        new TableCell({
-          width: { size: 45, type: WidthType.PERCENTAGE },
-          borders: { bottom: { style: BorderStyle.SINGLE, size: 6, color: "000000" }, top: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
-          children: [new Paragraph({ children: [normal("  ")] })],
-        }),
+        new TableCell({ columnSpan: 4, borders: allBorder(4), shading: { fill: "EEEEEE" },
+          children: [new Paragraph({ spacing: { before: 40, after: 40 }, alignment: AlignmentType.CENTER, children: [b("ВНЕШНИЙ ВИД УСТРОЙСТВА ПРИ ПРИЁМЕ", 18)] })] }),
       ]}),
       new TableRow({ children: [
-        new TableCell({ borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [normal("Мастер (подпись / ФИО)", 18)] })] }),
-        new TableCell({ borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } }, children: [new Paragraph({ children: [normal("")] })] }),
-        new TableCell({ borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } }, children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [normal("Клиент (подпись / ФИО)", 18)] })] }),
+        ...(["Царапины", "Трещины", "Сколы", "Другое"].map(label =>
+          new TableCell({ width: { size: 25, type: WidthType.PERCENTAGE }, borders: allBorder(4),
+            children: [
+              new Paragraph({ spacing: { before: 40, after: 60 }, alignment: AlignmentType.CENTER, children: [n(label, 16)] }),
+              new Paragraph({ spacing: { before: 0, after: 40 }, alignment: AlignmentType.CENTER, children: [n("☐  Есть     ☐  Нет", 16)] }),
+            ]})
+        )),
+      ]}),
+      new TableRow({ children: [
+        new TableCell({ columnSpan: 4, borders: allBorder(4),
+          children: [new Paragraph({ spacing: { before: 40, after: 60 }, children: [b("Примечания: ", 16), n("_".repeat(80), 16)] })] }),
       ]}),
     ],
   });
+
+  // Таблица рисков
+  const risks = [
+    "После воды аппарат может полностью умереть при любом ремонте. Мастерская не обязана его оживлять.",
+    "Компонентная пайка — риск гибели платы. Если телефон умер в процессе — работа оплачивается.",
+    "При снятии дисплея он может сломаться. Замена — за счёт клиента.",
+    "Данные (фото, контакты) могут быть потеряны безвозвратно.",
+    "Гарантии на результат нет. В худшем случае — оплата диагностики и сделанной работы.",
+  ];
+  const risksTable = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: allBorder(6),
+    rows: [
+      new TableRow({ children: [
+        new TableCell({ columnSpan: 2, borders: allBorder(4), shading: { fill: "EEEEEE" },
+          children: [new Paragraph({ spacing: { before: 40, after: 40 }, alignment: AlignmentType.CENTER, children: [b("УСЛОВИЯ РЕМОНТА — КЛИЕНТ ОЗНАКОМЛЕН И СОГЛАСЕН", 18)] })] }),
+      ]}),
+      ...risks.map((risk, i) => new TableRow({ children: [
+        new TableCell({ width: { size: 5, type: WidthType.PERCENTAGE }, borders: allBorder(4), shading: { fill: "F5F5F5" }, verticalAlign: VerticalAlign.CENTER,
+          children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [b(`${i + 1}`, 18)] })] }),
+        new TableCell({ width: { size: 95, type: WidthType.PERCENTAGE }, borders: allBorder(4),
+          children: [new Paragraph({ spacing: { before: 40, after: 40 }, children: [n(risk, 17)] })] }),
+      ]})),
+    ],
+  });
+
+  // Таблица подписей
+  const signTable = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: allBorder(6),
+    rows: [
+      new TableRow({ children: [
+        new TableCell({ width: { size: 50, type: WidthType.PERCENTAGE }, borders: allBorder(4), shading: { fill: "F5F5F5" },
+          children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 40, after: 40 }, children: [b("МАСТЕР", 18)] })] }),
+        new TableCell({ width: { size: 50, type: WidthType.PERCENTAGE }, borders: allBorder(4), shading: { fill: "F5F5F5" },
+          children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 40, after: 40 }, children: [b("КЛИЕНТ", 18)] })] }),
+      ]}),
+      new TableRow({ children: [
+        new TableCell({ borders: allBorder(4),
+          children: [
+            new Paragraph({ spacing: { before: 20, after: 20 }, children: [n("ФИО: _______________________________", 17)] }),
+            new Paragraph({ spacing: { before: 60, after: 20 }, children: [n("Подпись: ___________________________", 17)] }),
+          ] }),
+        new TableCell({ borders: allBorder(4),
+          children: [
+            new Paragraph({ spacing: { before: 20, after: 20 }, children: [n("ФИО: _______________________________", 17)] }),
+            new Paragraph({ spacing: { before: 60, after: 20 }, children: [n("Подпись: ___________________________", 17)] }),
+          ] }),
+      ]}),
+    ],
+  });
+
+  const gap = new Paragraph({ spacing: { before: 120, after: 0 }, children: [] });
 
   const doc = new Document({
     sections: [{
-      properties: {
-        page: {
-          margin: { top: 1134, bottom: 1134, left: 1701, right: 850 },
-        },
-      },
+      properties: { page: { margin: { top: 720, bottom: 720, left: 1080, right: 720 } } },
       children: [
-        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 40 }, children: [bold("АКТ ПРИЁМКИ НА РЕМОНТ ТЕХНИЧЕСКОГО ОБОРУДОВАНИЯ", 28)] }),
-        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 20 }, children: [normal(`№ ${o.id}`, 24)] }),
-        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 300 }, children: [normal(`г. Калуга, ${dateStr}   ${timeStr}`, 22)] }),
-
-        new Paragraph({ spacing: { after: 60 }, children: [bold("Исполнитель: "), normal("ИП Мамедов Адиль Мирза Оглы, ИНН 402810962699, г. Калуга, ул. Кирова, 21а")] }),
-        fieldRow("Заказчик (клиент): ", o.name),
-        fieldRow("Телефон: ", o.phone),
-        ...(o.model ? [fieldRow("Устройство: ", o.model)] : []),
-        ...(o.repair_type ? [fieldRow("Вид работ: ", o.repair_type)] : []),
-        ...(o.price ? [fieldRow("Предварительная стоимость: ", `${o.price.toLocaleString("ru-RU")} руб.`)] : []),
-        ...(o.comment ? [fieldRow("Описание неисправности: ", o.comment)] : []),
-
-        new Paragraph({ spacing: { before: 300, after: 160 }, children: [bold("УСЛОВИЯ РЕМОНТА — КЛИЕНТ ОЗНАКОМЛЕН И СОГЛАСЕН:", 24)] }),
-
-        new Paragraph({
-          spacing: { after: 160 },
-          border: { top: { style: BorderStyle.SINGLE, size: 6 }, bottom: { style: BorderStyle.SINGLE, size: 6 }, left: { style: BorderStyle.SINGLE, size: 6 }, right: { style: BorderStyle.SINGLE, size: 6 } },
-          shading: { type: ShadingType.CLEAR, fill: "FFF9E6" },
-          children: [bold("! ВНИМАТЕЛЬНО ПРОЧИТАЙТЕ ПЕРЕД ПОДПИСЬЮ", 22)],
-          alignment: AlignmentType.CENTER,
+        // Шапка
+        new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          borders: allBorder(8, "000000"),
+          rows: [new TableRow({ children: [
+            new TableCell({ width: { size: 60, type: WidthType.PERCENTAGE }, borders: { ...noBorder, right: { style: SINGLE, size: 8, color: "000000" } },
+              children: [
+                new Paragraph({ spacing: { before: 60, after: 20 }, children: [b("ИП МАМЕДОВ АДИЛЬ МИРЗА ОГЛЫ", 22)] }),
+                new Paragraph({ spacing: { before: 0, after: 20 }, children: [n("г. Калуга, ул. Кирова, 21а", 17)] }),
+                new Paragraph({ spacing: { before: 0, after: 20 }, children: [n("ИНН: 402810962699  |  ОГРНИП: 307402814200032", 16)] }),
+                new Paragraph({ spacing: { before: 0, after: 60 }, children: [n("Тел.: +7 (992) 990-33-33  |  skypka24.com", 16)] }),
+              ] }),
+            new TableCell({ width: { size: 40, type: WidthType.PERCENTAGE }, borders: noBorder, verticalAlign: VerticalAlign.CENTER,
+              children: [
+                new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 40, after: 10 }, children: [b("АКТ ПРИЁМА В РЕМОНТ", 24)] }),
+                new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 40 }, children: [b(`№ ${o.id}`, 22)] }),
+              ] }),
+          ]})],
         }),
 
-        riskItem(1, "После воды аппарат может полностью умереть при любом ремонте. Мастерская не обязана его оживлять."),
-        riskItem(2, "Компонентная пайка — риск гибели платы. Если телефон умер в процессе — работа оплачивается."),
-        riskItem(3, "При снятии дисплея он может сломаться. Замена — за счёт клиента."),
-        riskItem(4, "Данные (фото, контакты) могут быть потеряны безвозвратно."),
-        riskItem(5, "Гарантии на результат нет. В худшем случае — оплата диагностики и сделанной работы."),
-
-        new Paragraph({ spacing: { before: 400, after: 200 }, children: [normal("Подписывая настоящий акт, клиент подтверждает, что ознакомлен со всеми условиями, рисками и добровольно соглашается на проведение ремонта.", 20)] }),
-
+        gap,
+        infoTable,
+        gap,
+        conditionTable,
+        gap,
+        risksTable,
+        gap,
         signTable,
 
-        new Paragraph({ spacing: { before: 400 }, alignment: AlignmentType.CENTER, children: [normal("ИНН: 402810962699  ·  ОГРНИП: 307402814200032  ·  Р/с: 40802810422270001866", 18)] }),
-        new Paragraph({ alignment: AlignmentType.CENTER, children: [normal("КАЛУЖСКОЕ ОТДЕЛЕНИЕ N8608 ПАО СБЕРБАНК  ·  БИК: 042908612  ·  К/с: 30101810100000000612", 18)] }),
+        // Реквизиты
+        new Paragraph({ spacing: { before: 100, after: 0 }, alignment: AlignmentType.CENTER,
+          children: [n("Р/с: 40802810422270001866  |  КАЛУЖСКОЕ ОТДЕЛЕНИЕ N8608 ПАО СБЕРБАНК  |  БИК: 042908612", 15)] }),
       ],
     }],
   });
 
   const blob = await Packer.toBlob(doc);
-  saveAs(blob, `Акт_приёмки_${o.id}_${o.name.replace(/\s+/g, "_")}.docx`);
+  saveAs(blob, `Акт_приёмки_№${o.id}_${o.name.replace(/\s+/g, "_")}.docx`);
 };
 
 export const printReceipt = (o: Order) => {
