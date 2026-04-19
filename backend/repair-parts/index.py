@@ -4,7 +4,11 @@ import re
 import requests
 import psycopg2
 
-HEADERS = {'Access-Control-Allow-Origin': '*'}
+HEADERS = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Token, X-Employee-Token, Authorization',
+}
 SCHEMA = 't_p31606708_tech_buying_service'
 API_URL = 'https://b2b.moysklad.ru/desktop-api/public/wIIpnHFmddpo/products.json'
 
@@ -209,9 +213,7 @@ def handler(event: dict, context) -> dict:
     """
 
     if event.get('httpMethod') == 'OPTIONS':
-        return {'statusCode': 200, 'headers': {**HEADERS,
-            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type'}, 'body': ''}
+        return {'statusCode': 200, 'headers': HEADERS, 'body': ''}
 
     conn = psycopg2.connect(os.environ['DATABASE_URL'])
 
