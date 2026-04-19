@@ -254,6 +254,10 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
               className="flex-1 min-w-[120px] bg-[#0D0D0D] border border-[#333] text-white px-3 py-1.5 font-roboto text-xs focus:outline-none focus:border-[#FFD700] placeholder:text-white/20"
             />
             <div className="flex items-center gap-1.5 flex-wrap">
+              <button onClick={() => { setDateFrom(""); setDateTo(""); }}
+                className={`px-2 py-1 font-roboto text-[10px] border transition-colors ${
+                  !dateFrom && !dateTo ? "border-[#FFD700] text-[#FFD700] bg-[#FFD700]/10" : "border-[#333] text-white/40 hover:border-white/30 hover:text-white/70"
+                }`}>Все</button>
               {[
                 { label: "Сегодня", get: () => { const t = new Date().toISOString().slice(0,10); return [t, t]; } },
                 { label: "Неделя",  get: () => { const t = new Date(); const f = new Date(t); f.setDate(t.getDate()-6); return [f.toISOString().slice(0,10), t.toISOString().slice(0,10)]; } },
@@ -273,11 +277,6 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
               <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
                 title="Дата сдачи до"
                 className="bg-[#0D0D0D] border border-[#333] text-white/70 px-2 py-1.5 font-roboto text-xs focus:outline-none focus:border-[#FFD700] w-32" />
-              {(dateFrom || dateTo) && (
-                <button onClick={() => { setDateFrom(""); setDateTo(""); }} className="text-white/30 hover:text-red-400 transition-colors" title="Сбросить">
-                  <Icon name="X" size={12} />
-                </button>
-              )}
             </div>
             <button onClick={loadOrders} disabled={loading} className="text-white/40 hover:text-white p-1.5 transition-colors">
               <Icon name={loading ? "Loader" : "RefreshCw"} size={13} className={loading ? "animate-spin" : ""} />
