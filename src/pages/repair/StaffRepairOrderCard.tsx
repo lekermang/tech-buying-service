@@ -47,6 +47,9 @@ export default function StaffRepairOrderCard({
   const [sentKey, setSentKey] = useState<string | null>(null);
   const [notifyError, setNotifyError] = useState<string | null>(null);
 
+  const [smsSentKey, setSmsSentKey] = useState<string | null>(null);
+  const [smsError, setSmsError] = useState<string | null>(null);
+
   const handleSend = async (statusKey: string) => {
     setSentKey(statusKey);
     setNotifyError(null);
@@ -62,6 +65,23 @@ export default function StaffRepairOrderCard({
       setNotifyError("Ошибка соединения");
     }
     setTimeout(() => setSentKey(null), 3000);
+  };
+
+  const handleSendSms = async (statusKey: string) => {
+    setSmsSentKey(statusKey);
+    setSmsError(null);
+    try {
+      const res = await fetch(REPAIR_ORDER_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", [authHeader]: token },
+        body: JSON.stringify({ action: "notify_sms", order_id: o.id, status_key: statusKey }),
+      });
+      const data = await res.json();
+      if (!data.ok) setSmsError(data.error || "Ошибка SMS");
+    } catch {
+      setSmsError("Ошибка соединения");
+    }
+    setTimeout(() => setSmsSentKey(null), 3000);
   };
 
   return (
@@ -213,6 +233,37 @@ export default function StaffRepairOrderCard({
             {notifyError && (
               <div className="mt-1.5 font-roboto text-[9px] text-orange-400 flex items-center gap-1">
                 <Icon name="AlertCircle" size={9} /> {notifyError}
+              </div>
+            )}
+          </div>
+
+          {/* SMS — статус клиенту */}
+          <div className="border border-green-500/15 bg-green-500/5 p-2.5">
+            <div className="font-roboto text-white/30 text-[9px] uppercase tracking-wide mb-2 flex items-center gap-1">
+              <Icon name="MessageSquare" size={9} className="text-green-400" /> SMS клиенту на {o.phone || "—"}
+            </div>
+            <div className="flex gap-1.5 flex-wrap">
+              {Object.entries(STATUS_LABEL).map(([key, label]) => (
+                <button key={key} type="button" onClick={() => handleSendSms(key)}
+                  disabled={smsSentKey === key}
+                  className={`font-roboto text-[9px] px-2.5 py-1.5 border transition-colors flex items-center gap-1 ${
+                    smsSentKey === key
+                      ? "border-green-500/40 text-green-400 bg-green-500/10"
+                      : "border-green-500/20 text-green-400/70 hover:bg-green-500/10 hover:text-green-400"
+                  }`}>
+                  <Icon name={smsSentKey === key ? "Check" : "MessageSquare"} size={9} />
+                  {label}
+                </button>
+              ))}
+            </div>
+            {smsSentKey && !smsError && (
+              <div className="mt-1.5 font-roboto text-[9px] text-green-400/70 flex items-center gap-1">
+                <Icon name="CheckCircle" size={9} /> SMS отправлено на {o.phone}
+              </div>
+            )}
+            {smsError && (
+              <div className="mt-1.5 font-roboto text-[9px] text-orange-400 flex items-center gap-1">
+                <Icon name="AlertCircle" size={9} /> {smsError}
               </div>
             )}
           </div>

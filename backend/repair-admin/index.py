@@ -806,11 +806,13 @@ def handler(event: dict, context) -> dict:
                     contacts.append({'id': f'c_{r[0]}', 'full_name': r[1] or '', 'phone': p, 'source': 'registered'})
                     seen_phones.add(p)
         if group in ('all', 'repair'):
-            cur.execute(f"""SELECT DISTINCT ON (phone) id, name, phone FROM {SCHEMA}.repair_orders
-                            WHERE status NOT IN ('cancelled') AND phone != '' AND phone IS NOT NULL
-                            ORDER BY phone, created_at DESC""")
+            cur.execute(f"""SELECT id, name, phone FROM {SCHEMA}.repair_orders
+                            WHERE status NOT IN ('cancelled')
+                              AND phone IS NOT NULL AND phone != ''
+                              AND phone ~ '^\\+7[0-9]{{10}}$'
+                            ORDER BY id DESC""")
             for r in cur.fetchall():
-                p = fmt_phone(r[2] or '')
+                p = r[2].strip()
                 if p and p not in seen_phones:
                     contacts.append({'id': f'r_{r[0]}', 'full_name': r[1] or '', 'phone': p, 'source': 'repair'})
                     seen_phones.add(p)

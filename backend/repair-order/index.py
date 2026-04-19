@@ -328,6 +328,46 @@ def handler(event: dict, context) -> dict:
             f"📲 https://t.me/ProService40", parse_mode='')
         return {'statusCode': 200, 'headers': HEADERS, 'body': '{"ok":true}'}
 
+    # ── SMS клиенту о статусе ────────────────────────────────────────────────
+    if action == 'notify_sms':
+        if not auth_staff(event):
+            return {'statusCode': 401, 'headers': HEADERS,
+                    'body': json.dumps({'error': 'Unauthorized'}, ensure_ascii=False)}
+        order_id = int(body.get('order_id', 0))
+        status_key = str(body.get('status_key', '')).strip()
+        if not order_id or status_key not in STATUS_MSG:
+            return {'statusCode': 400, 'headers': HEADERS,
+                    'body': json.dumps({'error': 'order_id и status_key обязательны'}, ensure_ascii=False)}
+        conn = psycopg2.connect(os.environ['DATABASE_URL'])
+        cur = conn.cursor()
+        cur.execute(f"SELECT id, name, phone, repair_type, repair_amount FROM {SCHEMA}.repair_orders WHERE id = {order_id}")
+        row = cur.fetchone()
+        cur.close(); conn.close()
+        if not row:
+            return {'statusCode': 404, 'headers': HEADERS, 'body': json.dumps({'error': 'Заявка не найдена'}, ensure_ascii=False)}
+        _, name, phone, repair_type, repair_amount = row
+        if not phone or not phone.startswith('+7'):
+            return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': f'Телефон клиента не указан или не в формате +7: {phone}'}, ensure_ascii=False)}
+        dev = repair_type or 'устройство'
+        sms_templates = {
+            'in_progress':   f"Скупка24: {dev} в ремонте. Готово — сообщим. Skypka24.com",
+            'waiting_parts': f"Скупка24: {dev} — ждём запчасть. Готово — сообщим. Skypka24.com",
+            'ready':         f"Скупка24: {dev} готов! Стоимость: {int(repair_amount) if repair_amount else '?'} руб. Ждём вас. Skypka24.com",
+            'done':          f"Скупка24: {dev} выдан. Спасибо за обращение! Skypka24.com",
+            'cancelled':     f"Скупка24: {dev} — ремонт отменён. Позвоните нам. Skypka24.com",
+        }
+        sms_text = sms_templates.get(status_key, '')
+        api_id = os.environ.get('SMSRU_API_ID', '')
+        if not api_id:
+            return {'statusCode': 500, 'headers': HEADERS, 'body': json.dumps({'error': 'SMSRU_API_ID не задан'}, ensure_ascii=False)}
+        resp = requests.get('https://sms.ru/sms/send',
+            params={'api_id': api_id, 'to': phone, 'msg': sms_text, 'json': 1, 'from': 'Skypka24'}, timeout=10)
+        d = resp.json() if resp.status_code == 200 else {}
+        if d.get('status') == 'OK':
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'sent_to': name, 'phone': phone}, ensure_ascii=False)}
+        else:
+            return {'statusCode': 500, 'headers': HEADERS, 'body': json.dumps({'error': d.get('status_text', 'Ошибка SMS')}, ensure_ascii=False)}
+
     # ── Уведомить клиента о статусе ──────────────────────────────────────────
     if action == 'notify':
         if not auth_staff(event):
