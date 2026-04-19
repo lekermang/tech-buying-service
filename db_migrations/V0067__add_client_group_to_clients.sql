@@ -1,0 +1,1 @@
+ALTER TABLE t_p31606708_tech_buying_service.clients ADD COLUMN IF NOT EXISTS client_group text NULL;

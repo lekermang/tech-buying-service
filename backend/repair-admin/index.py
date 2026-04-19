@@ -399,7 +399,7 @@ def handler(event: dict, context) -> dict:
             contacts = []
             seen_phones = set()
             if group in ('all', 'registered'):
-                cur.execute(f"SELECT id, full_name, phone FROM {SCHEMA}.clients ORDER BY registered_at DESC")
+                cur.execute(f"SELECT id, full_name, phone FROM {SCHEMA}.clients WHERE (client_group IS NULL OR client_group != 'wh') ORDER BY registered_at DESC")
                 for r in cur.fetchall():
                     p = fmt_phone(r[2] or '')
                     if p and p not in seen_phones:
@@ -416,6 +416,13 @@ def handler(event: dict, context) -> dict:
                     p = fmt_phone((r[2] or '').strip())
                     if p and p not in seen_phones:
                         contacts.append({'id': f'r_{r[0]}', 'full_name': r[1] or '', 'phone': p, 'source': 'repair'})
+                        seen_phones.add(p)
+            if group in ('all', 'wh'):
+                cur.execute(f"SELECT id, full_name, phone FROM {SCHEMA}.clients WHERE client_group = 'wh' ORDER BY full_name")
+                for r in cur.fetchall():
+                    p = fmt_phone(r[2] or '')
+                    if p and p not in seen_phones:
+                        contacts.append({'id': f'c_{r[0]}', 'full_name': r[1] or '', 'phone': p, 'source': 'wh'})
                         seen_phones.add(p)
             cur.close(); conn.close()
             print(f"[sms_contacts] group={group} total={len(contacts)}", flush=True)
@@ -585,7 +592,7 @@ def handler(event: dict, context) -> dict:
 
             phones = set()
             if group in ('all', 'registered'):
-                cur.execute(f"SELECT phone FROM {SCHEMA}.clients")
+                cur.execute(f"SELECT phone FROM {SCHEMA}.clients WHERE (client_group IS NULL OR client_group != 'wh')")
                 for r in cur.fetchall():
                     p = fmt_p(r[0] or '')
                     if p: phones.add(p)
@@ -596,6 +603,11 @@ def handler(event: dict, context) -> dict:
                 )
                 for r in cur.fetchall():
                     p = fmt_p((r[0] or '').strip())
+                    if p: phones.add(p)
+            if group in ('all', 'wh'):
+                cur.execute(f"SELECT phone FROM {SCHEMA}.clients WHERE client_group = 'wh'")
+                for r in cur.fetchall():
+                    p = fmt_p(r[0] or '')
                     if p: phones.add(p)
             cur.close(); conn.close()
             sent = 0; failed = 0
@@ -613,6 +625,61 @@ def handler(event: dict, context) -> dict:
                     failed += 1
             print(f"[sms_blast] sent={sent} failed={failed} total={len(phones)}", flush=True)
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'sent': sent, 'failed': failed, 'total': len(phones)}, ensure_ascii=False)}
+
+        # Импорт WH-контактов из WhatsApp чата (Яндекс Диск)
+        if action == 'import_wh_contacts':
+            import re
+            yd_url = (body.get('url') or '').strip()
+            if not yd_url:
+                cur.close(); conn.close()
+                return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'url required'}, ensure_ascii=False)}
+            # Получить прямую ссылку через API Яндекс Диска
+            api_resp = requests.get(
+                'https://cloud-api.yandex.net/v1/disk/public/resources/download',
+                params={'public_key': yd_url}, timeout=15
+            )
+            if api_resp.status_code != 200:
+                cur.close(); conn.close()
+                return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'Не удалось получить ссылку с Яндекс Диска'}, ensure_ascii=False)}
+            download_href = api_resp.json().get('href', '')
+            if not download_href:
+                cur.close(); conn.close()
+                return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'Нет ссылки для скачивания'}, ensure_ascii=False)}
+            file_resp = requests.get(download_href, timeout=30)
+            text = file_resp.content.decode('utf-8', errors='ignore')
+            # Извлечь все уникальные российские мобильные номера
+            raw_numbers = re.findall(r'\b(?:\+?7|8)(9\d{9})\b', text)
+            unique_phones = list(dict.fromkeys(['7' + n for n in raw_numbers]))
+            if not unique_phones:
+                cur.close(); conn.close()
+                return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'imported': 0, 'skipped': 0}, ensure_ascii=False)}
+            # Получить уже существующие WH-номера
+            cur.execute(f"SELECT phone FROM {SCHEMA}.clients WHERE client_group = 'wh'")
+            existing = set(r[0] for r in cur.fetchall())
+            # Получить максимальный номер WH
+            cur.execute(f"SELECT full_name FROM {SCHEMA}.clients WHERE client_group = 'wh' ORDER BY id DESC LIMIT 1")
+            last_row = cur.fetchone()
+            last_num = 0
+            if last_row:
+                m = re.search(r'(\d+)$', last_row[0] or '')
+                if m:
+                    last_num = int(m.group(1))
+            imported = 0; skipped = 0
+            for phone in unique_phones:
+                normalized = phone
+                if normalized in existing:
+                    skipped += 1
+                    continue
+                last_num += 1
+                name = f'WH{last_num}'
+                cur.execute(
+                    f"INSERT INTO {SCHEMA}.clients (full_name, phone, client_group) VALUES ('{name}', '{normalized}', 'wh') ON CONFLICT DO NOTHING"
+                )
+                existing.add(normalized)
+                imported += 1
+            conn.commit(); cur.close(); conn.close()
+            print(f"[import_wh_contacts] imported={imported} skipped={skipped}", flush=True)
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'imported': imported, 'skipped': skipped}, ensure_ascii=False)}
 
         # Сохранить настройку
         if action == 'settings_set':

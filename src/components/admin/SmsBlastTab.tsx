@@ -4,16 +4,19 @@ import { adminHeaders } from "@/lib/adminFetch";
 
 const ADMIN_URL = "https://functions.poehali.dev/a105aede-d55d-4b99-9d3e-5e977887aa04";
 
-type Group = "all" | "registered" | "repair";
-type Contact = { id: string; full_name: string; phone: string; source: "registered" | "repair" };
+type Group = "all" | "registered" | "repair" | "wh";
+type Contact = { id: string; full_name: string; phone: string; source: "registered" | "repair" | "wh" };
 
 const GROUPS: { key: Group; label: string; desc: string; icon: string; color: string }[] = [
-  { key: "all",        label: "Все клиенты",       desc: "Зарегистрированные + клиенты ремонта",  icon: "Users",      color: "text-[#FFD700]" },
-  { key: "registered", label: "Программа скидок",  desc: "Зарегистрировались через личный кабинет", icon: "Star",      color: "text-blue-400" },
-  { key: "repair",     label: "Клиенты ремонта",   desc: "Сдавали технику в ремонт",               icon: "Wrench",    color: "text-green-400" },
+  { key: "all",        label: "Все клиенты",       desc: "Зарегистрированные + клиенты ремонта + WH",  icon: "Users",        color: "text-[#FFD700]" },
+  { key: "registered", label: "Программа скидок",  desc: "Зарегистрировались через личный кабинет",    icon: "Star",         color: "text-blue-400" },
+  { key: "repair",     label: "Клиенты ремонта",   desc: "Сдавали технику в ремонт",                   icon: "Wrench",       color: "text-green-400" },
+  { key: "wh",         label: "WH контакты",        desc: "Импортированные из WhatsApp",                icon: "MessageCircle", color: "text-purple-400" },
 ];
 
 const MAX_SMS = 480;
+
+const WH_YANDEX_URL = "https://disk.yandex.ru/d/5EfAAkfp_gdjkA";
 
 export default function SmsBlastTab({ token }: { token: string }) {
   const [group, setGroup] = useState<Group>("all");
@@ -24,6 +27,31 @@ export default function SmsBlastTab({ token }: { token: string }) {
   const [result, setResult] = useState<{ sent: number; failed: number; total: number } | null>(null);
   const [error, setError] = useState("");
   const [confirmed, setConfirmed] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{ imported: number; skipped: number } | null>(null);
+
+  const importWH = async () => {
+    setImporting(true);
+    setImportResult(null);
+    setError("");
+    try {
+      const res = await fetch(ADMIN_URL, {
+        method: "POST",
+        headers: { ...adminHeaders(token), "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "import_wh_contacts", url: WH_YANDEX_URL }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setImportResult({ imported: data.imported, skipped: data.skipped });
+        loadContacts("wh");
+      } else {
+        setError(data.error || "Ошибка импорта");
+      }
+    } catch (e) {
+      setError(`Ошибка: ${e}`);
+    }
+    setImporting(false);
+  };
 
   const loadContacts = async (g: Group) => {
     setLoadingContacts(true);
@@ -101,6 +129,31 @@ export default function SmsBlastTab({ token }: { token: string }) {
         </div>
       </div>
 
+      {/* Импорт WH контактов */}
+      {group === "wh" && (
+        <div className="mb-4 bg-purple-500/5 border border-purple-500/20 p-3 flex items-center justify-between gap-3">
+          <div>
+            <div className="text-purple-300 text-xs font-bold">WH контакты (WhatsApp)</div>
+            <div className="text-white/30 text-[10px] mt-0.5">Загрузить номера из чата Яндекс Диска. Уже добавленные — пропускаются.</div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {importResult && (
+              <span className="text-green-400 text-xs">+{importResult.imported} добавлено</span>
+            )}
+            <button
+              onClick={importWH}
+              disabled={importing}
+              className="bg-purple-600 hover:bg-purple-500 disabled:opacity-60 text-white text-xs font-bold px-3 py-2 flex items-center gap-1.5 transition-colors"
+            >
+              {importing
+                ? <Icon name="Loader2" size={13} className="animate-spin" />
+                : <Icon name="Download" size={13} />}
+              {importing ? "Импорт..." : "Импортировать"}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Список контактов */}
       <div className="mb-5">
         <div className="flex items-center justify-between mb-2">
@@ -122,9 +175,11 @@ export default function SmsBlastTab({ token }: { token: string }) {
               {contacts.map(c => (
                 <div key={c.id} className="flex items-center gap-3 px-3 py-1.5">
                   <span className={`text-[9px] font-bold px-1.5 py-0.5 uppercase shrink-0 ${
-                    c.source === "registered" ? "bg-blue-500/15 text-blue-400" : "bg-green-500/15 text-green-400"
+                    c.source === "registered" ? "bg-blue-500/15 text-blue-400"
+                    : c.source === "wh" ? "bg-purple-500/15 text-purple-400"
+                    : "bg-green-500/15 text-green-400"
                   }`}>
-                    {c.source === "registered" ? "скидки" : "ремонт"}
+                    {c.source === "registered" ? "скидки" : c.source === "wh" ? "WH" : "ремонт"}
                   </span>
                   <span className="text-white/70 text-xs truncate flex-1">{c.full_name}</span>
                   <span className="text-white/40 text-xs font-mono shrink-0">{c.phone}</span>
