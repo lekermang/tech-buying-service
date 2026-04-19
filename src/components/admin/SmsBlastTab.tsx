@@ -206,7 +206,7 @@ export default function SmsBlastTab({ token }: { token: string }) {
           className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-2.5 text-sm focus:outline-none focus:border-[#FFD700] resize-none font-roboto leading-relaxed"
         />
         <div className="mt-1.5 text-white/25 text-[10px]">
-          Отправитель будет указан как «Skypka24». Убедитесь, что имя зарегистрировано в sms.ru.
+          Отправитель будет указан как «IPMamedov». Убедитесь, что имя зарегистрировано в sms.ru.
         </div>
       </div>
 
