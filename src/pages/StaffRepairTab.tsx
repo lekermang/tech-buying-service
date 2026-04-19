@@ -32,6 +32,8 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
   const [loading, setLoading] = useState(false);
   const [filterStatus, setFilterStatus] = useState("all");
   const [search, setSearch] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   // Карточки
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -63,16 +65,17 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
   // ─── Загрузка заявок ─────────────────────────────────────────────────────────
   const loadOrders = useCallback(async () => {
     setLoading(true);
-    let url = REPAIR_URL;
     const ps: string[] = [];
     if (filterStatus !== "all") ps.push("status=" + filterStatus);
     if (search.trim()) ps.push("search=" + encodeURIComponent(search.trim()));
-    if (ps.length) url += "?" + ps.join("&");
+    if (dateFrom) ps.push("date_from=" + dateFrom);
+    if (dateTo) ps.push("date_to=" + dateTo);
+    const url = REPAIR_URL + (ps.length ? "?" + ps.join("&") : "");
     const res = await fetch(url, { headers: { "X-Employee-Token": token } });
     const data = await res.json();
     setOrders(data.orders || []);
     setLoading(false);
-  }, [token, filterStatus, search]);
+  }, [token, filterStatus, search, dateFrom, dateTo]);
 
   // ─── Загрузка аналитики ───────────────────────────────────────────────────────
   const loadAnalytics = useCallback(async (p: Period) => {
@@ -111,7 +114,7 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
         comment: form.comment || null, status: "new",
         admin_note: null, created_at: new Date().toISOString(),
         purchase_amount: null, repair_amount: null,
-        completed_at: null, master_income: null, parts_name: null,
+        completed_at: null, master_income: null, parts_name: null, picked_up_at: null,
       };
       printAct(newOrder);
     }
@@ -248,8 +251,22 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Поиск: имя, телефон, модель..."
-              className="flex-1 min-w-[160px] bg-[#0D0D0D] border border-[#333] text-white px-3 py-1.5 font-roboto text-xs focus:outline-none focus:border-[#FFD700] placeholder:text-white/20"
+              className="flex-1 min-w-[120px] bg-[#0D0D0D] border border-[#333] text-white px-3 py-1.5 font-roboto text-xs focus:outline-none focus:border-[#FFD700] placeholder:text-white/20"
             />
+            <div className="flex items-center gap-1.5">
+              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                title="Дата сдачи от"
+                className="bg-[#0D0D0D] border border-[#333] text-white/70 px-2 py-1.5 font-roboto text-xs focus:outline-none focus:border-[#FFD700] w-32" />
+              <span className="text-white/20 text-xs">—</span>
+              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                title="Дата сдачи до"
+                className="bg-[#0D0D0D] border border-[#333] text-white/70 px-2 py-1.5 font-roboto text-xs focus:outline-none focus:border-[#FFD700] w-32" />
+              {(dateFrom || dateTo) && (
+                <button onClick={() => { setDateFrom(""); setDateTo(""); }} className="text-white/30 hover:text-red-400 transition-colors" title="Сбросить">
+                  <Icon name="X" size={12} />
+                </button>
+              )}
+            </div>
             <button onClick={loadOrders} disabled={loading} className="text-white/40 hover:text-white p-1.5 transition-colors">
               <Icon name={loading ? "Loader" : "RefreshCw"} size={13} className={loading ? "animate-spin" : ""} />
             </button>

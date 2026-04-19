@@ -14,7 +14,7 @@ export type Order = {
   repair_type: string | null; price: number | null; status: string;
   admin_note: string | null; created_at: string; comment: string | null;
   purchase_amount: number | null; repair_amount: number | null; completed_at: string | null;
-  master_income: number | null; parts_name: string | null;
+  master_income: number | null; parts_name: string | null; picked_up_at: string | null;
 };
 
 export type DayStat = {

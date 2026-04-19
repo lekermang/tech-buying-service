@@ -117,9 +117,18 @@ export default function StaffRepairOrderCard({
           {o.model && <span className="text-white/40">📱 {o.model}</span>}
           {o.repair_type && <span className="text-white/40">🔧 {o.repair_type}</span>}
           {o.price && <span className="text-[#FFD700]/70 font-bold">{o.price.toLocaleString("ru-RU")} ₽</span>}
-          {o.repair_amount != null && <span className="text-green-400">▸ выдано {o.repair_amount.toLocaleString("ru-RU")} ₽</span>}
-          {o.master_income != null && <span className="text-green-300">мастеру {o.master_income.toLocaleString("ru-RU")} ₽</span>}
         </div>
+        <div className="flex gap-4 mt-0.5 flex-wrap text-[9px] font-roboto text-white/20">
+          <span>📥 Сдан: {fmt(o.created_at)}</span>
+          {o.picked_up_at && <span className="text-green-400/50">📤 Забрал: {fmt(o.picked_up_at)}</span>}
+          {o.completed_at && !o.picked_up_at && <span className="text-yellow-400/40">✅ Готово: {fmt(o.completed_at)}</span>}
+        </div>
+        {(o.repair_amount != null || o.master_income != null) && (
+          <div className="flex gap-2 mt-0.5 flex-wrap text-[10px] font-roboto">
+            {o.repair_amount != null && <span className="text-green-400">▸ выдано {o.repair_amount.toLocaleString("ru-RU")} ₽</span>}
+            {o.master_income != null && <span className="text-green-300">мастеру {o.master_income.toLocaleString("ru-RU")} ₽</span>}
+          </div>
+        )}
       </div>
 
       {/* Раскрытая часть */}

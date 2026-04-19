@@ -168,7 +168,7 @@ export default function RepairTab({ token }: { token: string }) {
         comment: form.comment || null, status: "new",
         admin_note: null, created_at: new Date().toISOString(),
         purchase_amount: null, repair_amount: null,
-        completed_at: null, master_income: null, parts_name: null,
+        completed_at: null, master_income: null, parts_name: null, picked_up_at: null,
       };
       printAct(newOrder);
     }
