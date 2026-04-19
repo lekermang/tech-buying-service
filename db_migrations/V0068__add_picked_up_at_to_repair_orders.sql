@@ -1,0 +1,1 @@
+ALTER TABLE t_p31606708_tech_buying_service.repair_orders ADD COLUMN IF NOT EXISTS picked_up_at TIMESTAMP WITH TIME ZONE NULL;

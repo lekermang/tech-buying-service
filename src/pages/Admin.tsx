@@ -286,7 +286,7 @@ export default function Admin() {
           {tab === "sms-blast"     && <SmsBlastTab token={token} />}
           {tab === "clients"       && <ClientsAdminTab token={token} />}
           {tab === "settings"      && <SettingsTab token={token} />}
-          {tab === "theme"         && <ThemeTab />}
+          {tab === "theme"         && <ThemeTab token={token} />}
         </div>
       </div>
     </div>

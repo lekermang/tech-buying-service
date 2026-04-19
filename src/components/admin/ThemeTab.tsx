@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { THEMES, getSavedThemeId, saveAndApplyTheme, applyTheme, SiteTheme } from "@/lib/theme";
 import Icon from "@/components/ui/icon";
+import { adminHeaders } from "@/lib/adminFetch";
 
+const ADMIN_URL = "https://functions.poehali.dev/a105aede-d55d-4b99-9d3e-5e977887aa04";
 const CUSTOM_KEY = "site_theme_custom";
 
 function loadCustom(): SiteTheme | null {
@@ -22,13 +24,23 @@ function darken(hex: string, amount = 0.15): string {
   return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
 }
 
-export default function ThemeTab() {
+export default function ThemeTab({ token }: { token: string }) {
   const [activeId, setActiveId] = useState<string>(getSavedThemeId());
 
   const savedCustom = loadCustom();
   const [customBg, setCustomBg] = useState(savedCustom?.bg ?? "#0d0d0d");
   const [customAccent, setCustomAccent] = useState(savedCustom?.accent ?? "#ffd700");
   const [customSaved, setCustomSaved] = useState(false);
+
+  const [globalEnabled, setGlobalEnabled] = useState(false);
+  const [globalSaving, setGlobalSaving] = useState(false);
+  const [globalStatus, setGlobalStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`${ADMIN_URL}?action=theme_get`).then(r => r.json()).then(d => {
+      setGlobalEnabled(d.theme !== null && d.theme !== undefined);
+    }).catch(() => { /* ignore */ });
+  }, []);
 
   const handleSelect = (id: string) => {
     setActiveId(id);
@@ -59,6 +71,35 @@ export default function ThemeTab() {
     applyTheme(theme);
     setCustomSaved(true);
     setTimeout(() => setCustomSaved(false), 2000);
+  };
+
+  const getActiveThemeObj = (): SiteTheme | null => {
+    if (activeId === "custom") return loadCustom();
+    return THEMES.find(t => t.id === activeId) || null;
+  };
+
+  const handleGlobalSave = async (enable: boolean) => {
+    setGlobalSaving(true);
+    setGlobalStatus(null);
+    const themeObj = enable ? getActiveThemeObj() : null;
+    try {
+      const res = await fetch(ADMIN_URL, {
+        method: "POST",
+        headers: { ...adminHeaders(token), "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "theme_set", theme: themeObj, enabled: enable }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setGlobalEnabled(enable);
+        setGlobalStatus(enable ? "Тема применена для всех посетителей!" : "Глобальная тема отключена.");
+      } else {
+        setGlobalStatus("Ошибка: " + (data.error || "неизвестная"));
+      }
+    } catch (_e) {
+      setGlobalStatus("Ошибка соединения");
+    }
+    setGlobalSaving(false);
+    setTimeout(() => setGlobalStatus(null), 3000);
   };
 
   return (
@@ -187,8 +228,47 @@ export default function ThemeTab() {
         </button>
       </div>
 
+      {/* Глобальная тема для всех посетителей */}
+      <div className="mt-2 border border-[#2a2a2a] bg-[#111] p-4 mb-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Icon name="Globe" size={15} className="text-blue-400" />
+          <span className="text-white font-bold text-sm uppercase tracking-wide">Для всех посетителей</span>
+          <span className={`ml-auto text-[10px] font-bold px-2 py-0.5 rounded ${globalEnabled ? "bg-green-500/20 text-green-400" : "bg-white/5 text-white/30"}`}>
+            {globalEnabled ? "Включено" : "Выключено"}
+          </span>
+        </div>
+        <div className="text-white/40 text-xs mb-4 leading-relaxed">
+          Выберите тему выше, затем нажмите кнопку — все посетители увидят сайт с этой темой. Можно отключить в любой момент — вернётся классический чёрный.
+        </div>
+        <div className="flex gap-3 flex-wrap">
+          <button
+            onClick={() => handleGlobalSave(true)}
+            disabled={globalSaving}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-bold text-xs px-4 py-2 uppercase tracking-wide transition-colors"
+          >
+            <Icon name={globalSaving ? "Loader2" : "Globe"} size={13} className={globalSaving ? "animate-spin" : ""} />
+            Применить для всех
+          </button>
+          {globalEnabled && (
+            <button
+              onClick={() => handleGlobalSave(false)}
+              disabled={globalSaving}
+              className="flex items-center gap-2 border border-red-500/30 text-red-400 hover:bg-red-500/10 disabled:opacity-50 font-bold text-xs px-4 py-2 uppercase tracking-wide transition-colors"
+            >
+              <Icon name="X" size={13} />
+              Отключить
+            </button>
+          )}
+        </div>
+        {globalStatus && (
+          <div className={`mt-2 text-xs font-bold ${globalStatus.startsWith("Ошибка") ? "text-red-400" : "text-green-400"}`}>
+            {globalStatus}
+          </div>
+        )}
+      </div>
+
       <div className="bg-[#111] border border-[#222] p-3 text-white/30 text-[11px] leading-relaxed">
-        Тема сохраняется в браузере на этом устройстве.
+        Локальная тема сохраняется только в этом браузере и не влияет на других посетителей.
       </div>
     </div>
   );

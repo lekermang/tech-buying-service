@@ -805,6 +805,105 @@ def format_master_report(stats: dict) -> str:
     return '\n'.join(lines)
 
 
+def get_open_repairs():
+    """Незакрытые ремонты (не выдано, не отменено)"""
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(f"""
+        SELECT id, name, phone, model, repair_type, status, created_at
+        FROM {SCHEMA}.repair_orders
+        WHERE status NOT IN ('done', 'cancelled')
+        ORDER BY created_at ASC
+    """)
+    rows = cur.fetchall()
+    cur.close(); conn.close()
+    STATUS_LABELS_RU = {
+        'new': 'Принята',
+        'in_progress': 'В работе',
+        'waiting_parts': 'Ждём запчасть',
+        'ready': 'Готово к выдаче',
+    }
+    result = []
+    for r in rows:
+        result.append({
+            'id': r[0], 'name': r[1], 'phone': r[2],
+            'model': r[3], 'repair_type': r[4],
+            'status': STATUS_LABELS_RU.get(r[5], r[5]),
+            'created_at': r[6],
+        })
+    return result
+
+
+def format_morning_reminder(orders: list) -> str:
+    now_msk = datetime.now(MSK)
+    date_str = now_msk.strftime('%d.%m.%Y')
+    lines = [
+        f'☀️ <b>Доброе утро! Незакрытые ремонты на {date_str}</b>',
+        f'📋 Всего в работе: <b>{len(orders)}</b>',
+        '',
+    ]
+    for o in orders:
+        days_open = (datetime.now(MSK) - o['created_at'].replace(tzinfo=MSK if o['created_at'].tzinfo is None else o['created_at'].tzinfo)).days if o['created_at'] else 0
+        device = o['model'] or o['repair_type'] or 'устройство'
+        lines.append(
+            f"🔧 <b>#{o['id']}</b> {o['name']} — {device}\n"
+            f"   📌 {o['status']}  •  ⏱ {days_open} дн."
+        )
+    lines += ['', '⚡️ Займись незакрытыми заявками!']
+    return '\n'.join(lines)
+
+
+MORNING_REMINDER_HOUR = 10
+
+
+def morning_reminder_already_sent():
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(f"""
+        SELECT 1 FROM {SCHEMA}.settings
+        WHERE key = 'morning_reminder_date'
+        AND value = (NOW() AT TIME ZONE 'Europe/Moscow')::date::text
+    """)
+    row = cur.fetchone()
+    cur.close(); conn.close()
+    return row is not None
+
+
+def mark_morning_reminder_sent():
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(f"""
+        INSERT INTO {SCHEMA}.settings (key, value, description)
+        VALUES ('morning_reminder_date', (NOW() AT TIME ZONE 'Europe/Moscow')::date::text, 'Дата последнего утреннего напоминания')
+        ON CONFLICT (key) DO UPDATE SET value = (NOW() AT TIME ZONE 'Europe/Moscow')::date::text, updated_at = NOW()
+    """)
+    conn.commit()
+    cur.close(); conn.close()
+
+
+def do_send_morning_reminder():
+    orders = get_open_repairs()
+    if not orders:
+        return {'sent': False, 'reason': 'no_open_repairs'}
+    recipients = get_repair_recipients()
+    pluxan = os.environ.get('PLUXAN4IK_CHAT_ID', '')
+    all_recipients = list(recipients)
+    if pluxan and pluxan not in all_recipients:
+        all_recipients.append(pluxan)
+    if not all_recipients:
+        return {'sent': False, 'reason': 'no_recipients'}
+    text = format_morning_reminder(orders)
+    sent_to = []
+    for chat_id in all_recipients:
+        try:
+            send_tg_message(chat_id, text)
+            sent_to.append(chat_id)
+        except Exception:
+            pass
+    mark_morning_reminder_sent()
+    return {'sent': True, 'sent_to': len(sent_to), 'open_count': len(orders)}
+
+
 def do_send_master_report(force: bool = False):
     if not force and master_report_already_sent():
         return {'sent': False, 'reason': 'already_sent'}
@@ -901,6 +1000,10 @@ def handler(event: dict, context) -> dict:
         result = do_send_master_report(force=True)
         return ok(result)
 
+    if action == 'send_morning_reminder':
+        result = do_send_morning_reminder()
+        return ok(result)
+
     if action == 'list_hosts':
         token = os.environ.get('YANDEX_WEBMASTER_TOKEN', '').strip()
         if not token:
@@ -942,6 +1045,10 @@ def handler(event: dict, context) -> dict:
         # Ежедневный отчёт мастера в 20:00 МСК
         if now_msk.hour == MASTER_REPORT_HOUR and not master_report_already_sent():
             threading.Thread(target=do_send_master_report, daemon=False).start()
+
+        # Утреннее напоминание о незакрытых ремонтах в 10:00 МСК
+        if now_msk.hour == MORNING_REMINDER_HOUR and not morning_reminder_already_sent():
+            threading.Thread(target=do_send_morning_reminder, daemon=False).start()
 
         if now_msk.hour != SEND_HOUR:
             return ok({'skipped': True, 'reason': 'not_time_' + str(now_msk.hour) + 'h'})

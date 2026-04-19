@@ -15,6 +15,7 @@ export type Order = {
   admin_note: string | null; created_at: string; comment: string | null;
   purchase_amount: number | null; repair_amount: number | null;
   completed_at: string | null; master_income: number | null; parts_name: string | null;
+  picked_up_at: string | null;
 };
 
 export type Analytics = {

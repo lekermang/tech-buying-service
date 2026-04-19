@@ -234,6 +234,23 @@ def handler(event: dict, context) -> dict:
         conn.commit(); cur.close(); conn.close()
         return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'client_id': row[0], 'discount_pct': row[1]}, ensure_ascii=False)}
 
+    # Публичный GET: theme_get — без авторизации
+    if event.get('httpMethod') == 'GET':
+        pub_params = event.get('queryStringParameters') or {}
+        if pub_params.get('action') == 'theme_get':
+            conn_pub = psycopg2.connect(os.environ['DATABASE_URL'])
+            cur_pub = conn_pub.cursor()
+            cur_pub.execute(f"SELECT value FROM {SCHEMA}.settings WHERE key = 'site_theme'")
+            row_pub = cur_pub.fetchone()
+            cur_pub.close(); conn_pub.close()
+            theme_data = None
+            if row_pub and row_pub[0]:
+                try:
+                    theme_data = json.loads(row_pub[0])
+                except Exception:
+                    theme_data = None
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'theme': theme_data}, ensure_ascii=False)}
+
     if not auth(event):
         return {'statusCode': 401, 'headers': HEADERS, 'body': json.dumps({'error': 'Unauthorized'}, ensure_ascii=False)}
 
@@ -346,6 +363,20 @@ def handler(event: dict, context) -> dict:
             ]
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'stats': stats}, ensure_ascii=False)}
 
+        # Получить тему сайта (публичный — без токена не дойдёт, но action доступен)
+        if action == 'theme_get':
+            cur.execute(f"SELECT value FROM {SCHEMA}.settings WHERE key = 'site_theme'")
+            row = cur.fetchone()
+            cur.close(); conn.close()
+            if row and row[0]:
+                import json as _json
+                try:
+                    theme_data = _json.loads(row[0])
+                except Exception:
+                    theme_data = None
+                return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'theme': theme_data}, ensure_ascii=False)}
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'theme': None}, ensure_ascii=False)}
+
         # Настройки системы
         if action == 'settings_get':
             cur.execute(f"SELECT key, value, description, updated_at FROM {SCHEMA}.settings ORDER BY key")
@@ -431,22 +462,24 @@ def handler(event: dict, context) -> dict:
         # Список заявок
         status_filter = params.get('status', '')
         search = params.get('search', '')
-        if status_filter and search:
-            cur.execute(
-                f"SELECT id, name, phone, model, repair_type, price, status, admin_note, created_at, comment, purchase_amount, repair_amount, completed_at, master_income, parts_name FROM {SCHEMA}.repair_orders WHERE status = '{status_filter}' AND (name ILIKE '%{search}%' OR phone ILIKE '%{search}%' OR model ILIKE '%{search}%') ORDER BY created_at DESC LIMIT 200"
-            )
-        elif status_filter:
-            cur.execute(
-                f"SELECT id, name, phone, model, repair_type, price, status, admin_note, created_at, comment, purchase_amount, repair_amount, completed_at, master_income, parts_name FROM {SCHEMA}.repair_orders WHERE status = '{status_filter}' ORDER BY created_at DESC LIMIT 200"
-            )
-        elif search:
-            cur.execute(
-                f"SELECT id, name, phone, model, repair_type, price, status, admin_note, created_at, comment, purchase_amount, repair_amount, completed_at, master_income, parts_name FROM {SCHEMA}.repair_orders WHERE name ILIKE '%{search}%' OR phone ILIKE '%{search}%' OR model ILIKE '%{search}%' ORDER BY created_at DESC LIMIT 200"
-            )
-        else:
-            cur.execute(
-                f"SELECT id, name, phone, model, repair_type, price, status, admin_note, created_at, comment, purchase_amount, repair_amount, completed_at, master_income, parts_name FROM {SCHEMA}.repair_orders ORDER BY created_at DESC LIMIT 200"
-            )
+        date_from = params.get('date_from', '')
+        date_to = params.get('date_to', '')
+
+        conditions = []
+        if status_filter:
+            conditions.append(f"status = '{status_filter}'")
+        if search:
+            s = search.replace("'", "''")
+            conditions.append(f"(name ILIKE '%{s}%' OR phone ILIKE '%{s}%' OR model ILIKE '%{s}%')")
+        if date_from:
+            conditions.append(f"DATE(created_at AT TIME ZONE 'Europe/Moscow') >= '{date_from}'")
+        if date_to:
+            conditions.append(f"DATE(created_at AT TIME ZONE 'Europe/Moscow') <= '{date_to}'")
+
+        where = ('WHERE ' + ' AND '.join(conditions)) if conditions else ''
+        cur.execute(
+            f"SELECT id, name, phone, model, repair_type, price, status, admin_note, created_at, comment, purchase_amount, repair_amount, completed_at, master_income, parts_name, picked_up_at FROM {SCHEMA}.repair_orders {where} ORDER BY created_at DESC LIMIT 500"
+        )
         rows = cur.fetchall()
         cur.close(); conn.close()
 
@@ -458,6 +491,7 @@ def handler(event: dict, context) -> dict:
                 'comment': r[9], 'purchase_amount': r[10], 'repair_amount': r[11],
                 'completed_at': r[12].isoformat() if r[12] else None,
                 'master_income': r[13], 'parts_name': r[14],
+                'picked_up_at': r[15].isoformat() if r[15] else None,
             }
             for r in rows
         ]
@@ -467,6 +501,20 @@ def handler(event: dict, context) -> dict:
         raw_body = event.get('body') or '{}'
         body = json.loads(raw_body) if isinstance(raw_body, str) else (raw_body or {})
         action = body.get('action', 'update_status')
+
+        # Сохранить тему сайта
+        if action == 'theme_set':
+            import json as _json
+            theme_obj = body.get('theme')  # None = отключить глобальную тему
+            enabled = body.get('enabled', True)
+            if not enabled or theme_obj is None:
+                cur.execute(f"INSERT INTO {SCHEMA}.settings (key, value, description) VALUES ('site_theme', NULL, 'Глобальная тема сайта для всех посетителей') ON CONFLICT (key) DO UPDATE SET value = NULL, updated_at = NOW()")
+            else:
+                theme_json = _json.dumps(theme_obj, ensure_ascii=False)
+                cur.execute(f"INSERT INTO {SCHEMA}.settings (key, value, description) VALUES ('site_theme', '{theme_json.replace(chr(39), chr(39)*2)}', 'Глобальная тема сайта для всех посетителей') ON CONFLICT (key) DO UPDATE SET value = '{theme_json.replace(chr(39), chr(39)*2)}', updated_at = NOW()")
+            conn.commit()
+            cur.close(); conn.close()
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True}, ensure_ascii=False)}
 
         # Сохранение цен работ + наценки + доп. работ + мгновенный пересчёт repair_parts
         if action == 'labor_prices_set':
@@ -831,7 +879,7 @@ def handler(event: dict, context) -> dict:
                     recipients.append(pluxan)
                 for cid in recipients:
                     send_tg_document(tg_token, cid, docx_bytes, filename, caption=f'📋 Акт приёмки №{new_id}')
-            send_sms('+79929990333', f'Заявка #{new_id} на ремонт. {name}, {phone}. {repair_type or model or ""}. Скупка24')
+            # SMS при создании НЕ отправляем — только Telegram
             cur.close(); conn.close()
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'id': new_id}, ensure_ascii=False)}
 
@@ -956,23 +1004,22 @@ def handler(event: dict, context) -> dict:
             main_chat_id = os.environ['TELEGRAM_CHAT_ID']
             send_tg_all(token, main_chat_id, conn, tg_msg)
 
-            # SMS клиенту при смене статуса
-            dev = device_model or 'устройство'
-            default_templates = {
-                'in_progress': 'Скупка24: {device} в ремонте. Готово — сообщим. Skypka24.com',
-                'waiting_parts': 'Скупка24: {device} — ждём запчасть. Готово — сообщим. Skypka24.com',
-                'ready': 'Скупка24: {device} готов! Стоимость: {amount} руб. Ждём вас. Skypka24.com',
-                'done': 'Скупка24: {device} выдан. Спасибо за обращение! Skypka24.com',
-                'cancelled': 'Скупка24: {device} — ремонт отменён. Позвоните нам. Skypka24.com',
-            }
-            if client_phone and new_status in default_templates:
+            # SMS клиенту ТОЛЬКО при статусе "ready" (Готово к выдаче)
+            if new_status == 'ready' and client_phone:
+                dev = device_model or 'устройство'
+                default_ready_tpl = 'Скупка24: {device} готов! Стоимость: {amount} руб. Ждём вас. Skypka24.com'
                 cur2 = conn.cursor()
-                cur2.execute(f"SELECT value FROM {SCHEMA}.settings WHERE key = 'sms_tpl_{new_status}'")
+                cur2.execute(f"SELECT value FROM {SCHEMA}.settings WHERE key = 'sms_tpl_ready'")
                 row2 = cur2.fetchone()
                 cur2.close()
-                tpl = (row2[0] if row2 and row2[0] else default_templates[new_status])
+                tpl = (row2[0] if row2 and row2[0] else default_ready_tpl)
                 sms_text = tpl.replace('{device}', dev).replace('{amount}', str(r_amount or ''))
                 send_sms(client_phone, sms_text)
+
+            # При выдаче (done) — фиксируем дату получения
+            if new_status == 'done':
+                cur.execute(f"UPDATE {SCHEMA}.repair_orders SET picked_up_at = NOW() WHERE id = {order_id} AND picked_up_at IS NULL")
+                conn.commit()
 
         cur.close(); conn.close()
         return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'master_income': int(master_income_val) if master_income_val != 'NULL' else None}, ensure_ascii=False)}

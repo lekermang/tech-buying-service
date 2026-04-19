@@ -1,6 +1,6 @@
 
 import { Suspense, lazy, useEffect } from "react";
-import { getSavedThemeId, saveAndApplyTheme } from "@/lib/theme";
+import { getSavedThemeId, saveAndApplyTheme, applyTheme } from "@/lib/theme";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -30,9 +30,21 @@ const queryClient = new QueryClient({
   },
 });
 
+const ADMIN_URL = "https://functions.poehali.dev/a105aede-d55d-4b99-9d3e-5e977887aa04";
+
 const App = () => {
   useEffect(() => {
+    // Сначала применяем локальную тему мгновенно
     saveAndApplyTheme(getSavedThemeId());
+    // Затем проверяем глобальную тему с сервера
+    fetch(`${ADMIN_URL}?action=theme_get`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.theme) {
+          applyTheme(d.theme);
+        }
+      })
+      .catch(() => { /* ignore */ });
   }, []);
 
   return (

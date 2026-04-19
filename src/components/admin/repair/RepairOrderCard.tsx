@@ -87,6 +87,11 @@ export default function RepairOrderCard({
           {o.repair_amount && <span className="text-green-400 text-[10px]">Выдано: {o.repair_amount.toLocaleString("ru-RU")} ₽</span>}
           {o.master_income && <span className="text-green-300 text-[10px]">Мастер: {o.master_income.toLocaleString("ru-RU")} ₽</span>}
         </div>
+        <div className="flex gap-4 mt-1 flex-wrap text-[10px] font-roboto text-white/25">
+          <span>📥 Сдан: {fmt(o.created_at)}</span>
+          {o.picked_up_at && <span className="text-green-400/60">📤 Забрал: {fmt(o.picked_up_at)}</span>}
+          {o.completed_at && !o.picked_up_at && <span className="text-yellow-400/50">✅ Готово: {fmt(o.completed_at)}</span>}
+        </div>
       </div>
 
       {/* Раскрытая часть */}
