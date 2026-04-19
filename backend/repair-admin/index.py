@@ -764,12 +764,13 @@ def handler(event: dict, context) -> dict:
             send_tg_all(token, main_chat_id, conn, tg_msg)
 
             # SMS клиенту при смене статуса
+            dev = device_model or 'устройство'
             sms_templates = {
-                'in_progress': f"Скупка24: Ремонт {device_model or 'вашего устройства'} начался. Сообщим, как только будет готово.",
-                'waiting_parts': f"Скупка24: Заказали запчасть для {device_model or 'вашего устройства'}. Как только придёт — сразу приступим.",
-                'ready': f"Скупка24: {device_model or 'Ваше устройство'} готово к выдаче! Стоимость: {r_amount} руб. Ждём вас!",
-                'done': f"Скупка24: Спасибо за обращение! Ваш {device_model or 'телефон'} выдан. Будем рады снова.",
-                'cancelled': f"Скупка24: Ремонт {device_model or 'устройства'} отменён. Позвоните нам для уточнения деталей.",
+                'in_progress': f"Скупка24: {dev} в ремонте. Готово — сообщим. Skypka24.com",
+                'waiting_parts': f"Скупка24: {dev} — ждём запчасть. Готово — сообщим. Skypka24.com",
+                'ready': f"Скупка24: {dev} готов! Стоимость: {r_amount} руб. Ждём вас. Skypka24.com",
+                'done': f"Скупка24: {dev} выдан. Спасибо за обращение! Skypka24.com",
+                'cancelled': f"Скупка24: {dev} — ремонт отменён. Позвоните нам. Skypka24.com",
             }
             if client_phone and new_status in sms_templates:
                 send_sms(client_phone, sms_templates[new_status])
