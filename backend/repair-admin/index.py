@@ -472,9 +472,9 @@ def handler(event: dict, context) -> dict:
             s = search.replace("'", "''")
             conditions.append(f"(name ILIKE '%{s}%' OR phone ILIKE '%{s}%' OR model ILIKE '%{s}%')")
         if date_from:
-            conditions.append(f"DATE(created_at AT TIME ZONE 'Europe/Moscow') >= '{date_from}'")
+            conditions.append(f"DATE(created_at + INTERVAL '3 hours') >= '{date_from}'")
         if date_to:
-            conditions.append(f"DATE(created_at AT TIME ZONE 'Europe/Moscow') <= '{date_to}'")
+            conditions.append(f"DATE(created_at + INTERVAL '3 hours') <= '{date_to}'")
 
         where = ('WHERE ' + ' AND '.join(conditions)) if conditions else ''
         cur.execute(
