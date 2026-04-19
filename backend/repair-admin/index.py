@@ -569,6 +569,8 @@ def handler(event: dict, context) -> dict:
 
         # SMS рассылка
         if action == 'sms_blast':
+          try:
+            print(f"[sms_blast] start group={body.get('group')} msg_len={len(body.get('message',''))}", flush=True)
             message = (body.get('message') or '').strip()
             group = body.get('group', 'all')
             if not message:
@@ -635,6 +637,10 @@ def handler(event: dict, context) -> dict:
                     failed += len(chunk)
             print(f"[sms_blast] sent={sent} failed={failed} total={len(all_phones)}", flush=True)
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'sent': sent, 'failed': failed, 'total': len(all_phones)}, ensure_ascii=False)}
+          except Exception as e:
+            import traceback
+            print(f"[sms_blast] EXCEPTION: {e}\n{traceback.format_exc()}", flush=True)
+            return {'statusCode': 500, 'headers': HEADERS, 'body': json.dumps({'error': f'Внутренняя ошибка: {e}'}, ensure_ascii=False)}
 
         # Импорт WH-контактов из WhatsApp чата (Яндекс Диск)
         if action == 'import_wh_contacts':
