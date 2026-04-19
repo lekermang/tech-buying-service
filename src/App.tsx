@@ -1,5 +1,6 @@
 
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect } from "react";
+import { getSavedThemeId, saveAndApplyTheme } from "@/lib/theme";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -29,7 +30,12 @@ const queryClient = new QueryClient({
   },
 });
 
-const App = () => (
+const App = () => {
+  useEffect(() => {
+    saveAndApplyTheme(getSavedThemeId());
+  }, []);
+
+  return (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
@@ -55,6 +61,7 @@ const App = () => (
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
-);
+  );
+};
 
 export default App;
