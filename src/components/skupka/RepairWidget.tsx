@@ -185,7 +185,7 @@ export default function RepairWidget() {
           </div>
           <div>
             <span className="font-oswald font-bold text-base uppercase text-white tracking-wide block leading-tight">Ремонт телефонов</span>
-            <span className="bg-[#FFD700] text-black font-oswald font-bold text-[11px] px-1.5 py-0.5 leading-none mt-1 inline-block">99% ремонтов за 40 минут</span>
+            <span className="bg-[#FFD700] text-black font-oswald font-bold text-[11px] px-1.5 py-0.5 leading-none mt-1 inline-block">При вас за 20 минут · от 490 ₽</span>
           </div>
         </div>
         <Icon name={open ? "ChevronUp" : "ChevronDown"} size={20} className="text-white/40" />
@@ -193,6 +193,19 @@ export default function RepairWidget() {
 
       {open && (
         <div className="mt-3">
+          {/* Преимущества */}
+          <div className="flex flex-wrap gap-x-3 gap-y-1 mb-3">
+            {[
+              { icon: "ShieldCheck", text: "Бесплатная диагностика" },
+              { icon: "UserCheck", text: "Профессиональные мастера" },
+              { icon: "Star", text: 'Комплектующие "Original"' },
+            ].map(({ icon, text }) => (
+              <div key={text} className="flex items-center gap-1">
+                <Icon name={icon as Parameters<typeof Icon>[0]["name"]} size={11} className="text-[#FFD700]" />
+                <span className="font-roboto text-[10px] text-white/50">{text}</span>
+              </div>
+            ))}
+          </div>
           {/* Табы */}
           <div className="flex gap-1 mb-3">
             {[{ key: "form", label: "Заявка" }, { key: "status", label: "Статус заявки" }].map(t => (
