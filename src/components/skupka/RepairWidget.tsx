@@ -185,7 +185,7 @@ export default function RepairWidget() {
           </div>
           <div>
             <span className="font-oswald font-bold text-base uppercase text-white tracking-wide block leading-tight">Ремонт телефонов</span>
-            <span className="bg-[#FFD700] text-black font-oswald font-bold text-[11px] px-1.5 py-0.5 leading-none mt-1 inline-block">При вас за 20 минут · от 490 ₽</span>
+            <span className="bg-[#FFD700] text-black font-oswald font-bold text-[11px] px-1.5 py-0.5 leading-none mt-1 inline-block">При вас за 20 минут · от 300 ₽</span>
           </div>
         </div>
         <Icon name={open ? "ChevronUp" : "ChevronDown"} size={20} className="text-white/40" />
