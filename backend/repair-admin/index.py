@@ -384,6 +384,43 @@ def handler(event: dict, context) -> dict:
             ]
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'recipients': recipients}, ensure_ascii=False)}
 
+        # SMS контакты для рассылки
+        if action == 'sms_contacts':
+            group = params.get('group', 'all')
+
+            def fmt_phone(raw: str) -> str:
+                digits = ''.join(c for c in (raw or '') if c.isdigit())
+                if len(digits) == 11 and digits.startswith('8'):
+                    digits = '7' + digits[1:]
+                if len(digits) == 10:
+                    digits = '7' + digits
+                return ('+' + digits) if len(digits) == 11 else ''
+
+            contacts = []
+            seen_phones = set()
+            if group in ('all', 'registered'):
+                cur.execute(f"SELECT id, full_name, phone FROM {SCHEMA}.clients ORDER BY registered_at DESC")
+                for r in cur.fetchall():
+                    p = fmt_phone(r[2] or '')
+                    if p and p not in seen_phones:
+                        contacts.append({'id': f'c_{r[0]}', 'full_name': r[1] or '', 'phone': p, 'source': 'registered'})
+                        seen_phones.add(p)
+            if group in ('all', 'repair'):
+                cur.execute(
+                    "SELECT id, name, phone FROM " + SCHEMA + ".repair_orders"
+                    " WHERE status NOT IN ('cancelled')"
+                    " AND phone IS NOT NULL AND phone != '' AND LENGTH(phone) >= 11"
+                    " ORDER BY id DESC"
+                )
+                for r in cur.fetchall():
+                    p = fmt_phone((r[2] or '').strip())
+                    if p and p not in seen_phones:
+                        contacts.append({'id': f'r_{r[0]}', 'full_name': r[1] or '', 'phone': p, 'source': 'repair'})
+                        seen_phones.add(p)
+            cur.close(); conn.close()
+            print(f"[sms_contacts] group={group} total={len(contacts)}", flush=True)
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'contacts': contacts, 'total': len(contacts)}, ensure_ascii=False)}
+
         # Список заявок
         status_filter = params.get('status', '')
         search = params.get('search', '')
@@ -782,8 +819,11 @@ def handler(event: dict, context) -> dict:
 
     # GET ?action=sms_contacts&group=... — список контактов для предпросмотра
     if method == 'GET' and params.get('action') == 'sms_contacts':
+        hdrs_debug = {k.lower(): v for k, v in (event.get('headers') or {}).items()}
+        print(f"[sms_contacts] headers keys: {list(hdrs_debug.keys())}", flush=True)
+        print(f"[sms_contacts] x-admin-token present: {'x-admin-token' in hdrs_debug}", flush=True)
         if not auth(event):
-            return {'statusCode': 403, 'headers': HEADERS, 'body': json.dumps({'error': 'Нет доступа'}, ensure_ascii=False)}
+            return {'statusCode': 403, 'headers': HEADERS, 'body': json.dumps({'error': 'Нет доступа', 'debug_headers': list(hdrs_debug.keys())}, ensure_ascii=False)}
         group = params.get('group', 'all')  # all | registered | repair
 
         def fmt_phone(raw: str) -> str:
@@ -806,17 +846,20 @@ def handler(event: dict, context) -> dict:
                     contacts.append({'id': f'c_{r[0]}', 'full_name': r[1] or '', 'phone': p, 'source': 'registered'})
                     seen_phones.add(p)
         if group in ('all', 'repair'):
-            cur.execute(f"""SELECT id, name, phone FROM {SCHEMA}.repair_orders
-                            WHERE status NOT IN ('cancelled')
-                              AND phone IS NOT NULL AND phone != ''
-                              AND phone ~ '^\\+7[0-9]{{10}}$'
-                            ORDER BY id DESC""")
+            cur.execute(
+                "SELECT id, name, phone FROM " + SCHEMA + ".repair_orders"
+                " WHERE status NOT IN ('cancelled')"
+                " AND phone IS NOT NULL AND phone != '' AND LENGTH(phone) >= 11"
+                " ORDER BY id DESC"
+            )
             for r in cur.fetchall():
-                p = r[2].strip()
+                raw_p = (r[2] or '').strip()
+                p = fmt_phone(raw_p)
                 if p and p not in seen_phones:
                     contacts.append({'id': f'r_{r[0]}', 'full_name': r[1] or '', 'phone': p, 'source': 'repair'})
                     seen_phones.add(p)
         cur.close(); conn.close()
+        print(f"[sms_contacts] group={group} total={len(contacts)}", flush=True)
         return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'contacts': contacts, 'total': len(contacts)}, ensure_ascii=False)}
 
     # POST action=sms_blast — массовая рассылка SMS

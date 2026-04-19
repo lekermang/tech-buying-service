@@ -30,9 +30,17 @@ export default function SmsBlastTab({ token }: { token: string }) {
     setContacts([]);
     setResult(null);
     setConfirmed(false);
-    const res = await fetch(`${ADMIN_URL}?action=sms_contacts&group=${g}`, { headers: adminHeaders(token) });
-    const data = await res.json();
-    setContacts(data.contacts || []);
+    setError("");
+    try {
+      const res = await fetch(`${ADMIN_URL}?action=sms_contacts&group=${g}`, { headers: adminHeaders(token) });
+      const data = await res.json();
+      if (data.error) {
+        setError(`Ошибка загрузки: ${data.error} (статус ${res.status})`);
+      }
+      setContacts(data.contacts || []);
+    } catch (e) {
+      setError(`Сетевая ошибка: ${e}`);
+    }
     setLoadingContacts(false);
   };
 
