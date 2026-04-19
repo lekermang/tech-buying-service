@@ -816,21 +816,29 @@ def handler(event: dict, context) -> dict:
         api_id = os.environ.get('SMSRU_API_ID', '')
         if not api_id:
             return {'statusCode': 500, 'headers': HEADERS, 'body': json.dumps({'error': 'SMS сервис не настроен'}, ensure_ascii=False)}
+        def normalize_phone(raw: str) -> str:
+            digits = ''.join(c for c in raw if c.isdigit())
+            if len(digits) == 11 and digits.startswith('8'):
+                digits = '7' + digits[1:]
+            if len(digits) == 10:
+                digits = '7' + digits
+            return digits if len(digits) == 11 else ''
+
         conn = psycopg2.connect(os.environ['DATABASE_URL'])
         cur = conn.cursor()
         phones = set()
         if group in ('all', 'registered'):
             cur.execute(f"SELECT phone FROM {SCHEMA}.clients")
             for r in cur.fetchall():
-                clean = ''.join(c for c in r[0] if c.isdigit() or c == '+')
-                if clean:
-                    phones.add(clean)
+                n = normalize_phone(r[0] or '')
+                if n:
+                    phones.add(n)
         if group in ('all', 'repair'):
-            cur.execute(f"SELECT DISTINCT phone FROM {SCHEMA}.repair_orders WHERE status NOT IN ('cancelled')")
+            cur.execute(f"SELECT DISTINCT phone FROM {SCHEMA}.repair_orders WHERE status NOT IN ('cancelled') AND phone != ''")
             for r in cur.fetchall():
-                clean = ''.join(c for c in r[0] if c.isdigit() or c == '+')
-                if clean:
-                    phones.add(clean)
+                n = normalize_phone(r[0] or '')
+                if n:
+                    phones.add(n)
         cur.close(); conn.close()
         sent = 0; failed = 0
         for phone_num in phones:
