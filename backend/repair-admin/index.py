@@ -621,6 +621,7 @@ def handler(event: dict, context) -> dict:
                         params={'api_id': api_id, 'to': ','.join(chunk), 'msg': message, 'json': 1, 'from': 'Skypka24'},
                         timeout=20)
                     data_r = resp.json() if resp.status_code == 200 else {}
+                    print(f"[sms_blast] chunk resp status={data_r.get('status')} status_code={resp.status_code} body={str(data_r)[:300]}", flush=True)
                     if data_r.get('status') == 'OK':
                         sms_items = data_r.get('sms', {})
                         for num, info in sms_items.items():
