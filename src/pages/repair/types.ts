@@ -254,7 +254,7 @@ export const printActHTML = (o: Order) => {
   const barNum = String(o.id).padStart(12, "0");
   const orderNum = String(o.id).padStart(6, "0");
 
-  const win = window.open("", "_blank", "width=960,height=1200");
+  const win = window.open("", "_blank", "width=980,height=1300");
   if (!win) return;
 
   const html = `<!DOCTYPE html>
@@ -262,60 +262,75 @@ export const printActHTML = (o: Order) => {
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js">` + `</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Arial,sans-serif;font-size:10.5px;color:#000;background:#fff}
-.page{width:210mm;min-height:297mm;margin:0 auto;padding:8mm 10mm}
+body{font-family:Arial,sans-serif;font-size:10px;color:#000;background:#fff}
+.page{width:210mm;margin:0 auto;padding:7mm 9mm}
 .print-btn{text-align:center;padding:10px;background:#f5f5f5;border-bottom:1px solid #ccc}
-@media print{.print-btn{display:none}body{margin:0}.page{padding:8mm 10mm;width:100%}}
+@media print{.print-btn{display:none}body{margin:0}.page{padding:7mm 9mm;width:100%}}
 
 /* ШАПКА */
-.hdr{display:flex;align-items:stretch;border:1.5px solid #000;margin-bottom:6px}
-.hdr-left{padding:6px 10px;display:flex;flex-direction:column;gap:6px;border-right:1px solid #000;min-width:155px;justify-content:center}
-.bc svg{display:block}
-.bc-num{font-size:9px;letter-spacing:0.5px;text-align:center;margin-top:1px}
-.warn{border:1.5px solid #000;padding:3px 6px;font-size:8.5px;font-weight:bold;line-height:1.4;text-align:center}
-.hdr-mid{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px;text-align:center;border-right:1px solid #000}
-.hdr-mid .t1{font-size:15px;font-weight:bold}
-.hdr-mid .t2{font-size:10px;color:#444;margin:1px 0 6px}
+.hdr{display:flex;align-items:stretch;margin-bottom:5px;border:1px solid #000}
+.hdr-bc{padding:5px 8px;border-right:1px solid #000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-width:150px}
+.hdr-bc svg{display:block}
+.bc-num{font-size:8.5px;letter-spacing:1px;text-align:center}
+.warn{border:1.5px solid #000;padding:3px 5px;font-size:8px;font-weight:bold;line-height:1.4;text-align:center;max-width:145px}
+.hdr-mid{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 10px;border-right:1px solid #000;text-align:center}
+.hdr-mid .t1{font-size:14px;font-weight:bold;letter-spacing:0.3px}
+.hdr-mid .t2{font-size:9px;color:#555;margin:1px 0 5px}
 .hdr-mid .t3{font-size:12px;font-weight:bold}
-.hdr-mid .t4{font-size:9.5px;color:#333;margin-top:2px}
-.hdr-right{padding:6px 10px;font-size:9px;line-height:1.75;text-align:right;min-width:185px;display:flex;flex-direction:column;justify-content:center}
-.hdr-right b{font-size:10px}
+.hdr-mid .t4{font-size:9px;color:#333;margin-top:2px}
+.hdr-right{padding:5px 8px;font-size:8.5px;line-height:1.7;text-align:left;min-width:175px;display:flex;flex-direction:column;justify-content:center}
+.hdr-right b{font-size:9.5px;display:block;margin-bottom:1px}
 
-/* СЕКЦИИ */
-.sec3{display:flex;gap:0;margin-bottom:6px;border:1.5px solid #000}
-.sec-col{flex:1;border-right:1px solid #ccc}
-.sec-col:last-child{border-right:none}
-.sec-col .sh{background:#eee;padding:3px 7px;font-weight:bold;font-size:9.5px;border-bottom:1px solid #ccc}
-.sec-col .sb{padding:5px 7px}
-.f{margin-bottom:3px}
-.f .l{font-size:8.5px;color:#555}
-.f .v{font-weight:bold;font-size:10.5px;word-break:break-word}
+/* 3 секции: Клиент / Устройство / Ремонт */
+.sec3{display:flex;border:1px solid #000;margin-bottom:5px}
+.sc{flex:1;border-right:1px solid #ccc}
+.sc:last-child{border-right:none}
+.sc-h{background:#efefef;padding:2px 6px;font-weight:bold;font-size:9px;border-bottom:1px solid #ccc;text-underline-offset:2px;text-decoration:underline}
+.sc-b{padding:4px 6px}
+.f{margin-bottom:2px}
+.fl{font-size:8px;color:#555}
+.fv{font-weight:bold;font-size:10px;word-break:break-word}
+.fvn{font-size:10px;word-break:break-word}
 
-/* ПОВРЕЖДЕНИЯ */
-.dmg{border:1.5px solid #000;margin-bottom:6px}
-.dmg .dh{background:#eee;padding:3px 7px;font-weight:bold;font-size:9.5px;border-bottom:1px solid #ccc}
-.dmg-inner{display:flex}
-.dmg-left{flex:1.15;padding:6px 8px;border-right:1px solid #ccc;display:flex;flex-direction:column;align-items:center;gap:8px}
-.dmg-hint{font-size:8px;color:#555;text-align:center}
-.dmg-right{flex:1;padding:6px 8px}
-.ctbl{width:100%;border-collapse:collapse;font-size:9px}
-.ctbl th{background:#f0f0f0;border:1px solid #bbb;padding:3px 5px;text-align:left}
-.ctbl td{border:1px solid #bbb;padding:3px 5px}
-.ctbl td:last-child{width:100px;color:#555;font-size:8.5px}
+/* Заметки приёмщика */
+.notes{margin-bottom:5px;border-bottom:1px solid #000;padding-bottom:3px}
+.notes-lbl{font-size:8.5px;font-weight:bold;margin-bottom:12px}
 
-/* УСЛОВИЯ */
-.cond{border:1.5px solid #000;margin-bottom:6px}
-.cond .ch{background:#eee;padding:3px 7px;font-weight:bold;font-size:9.5px;border-bottom:1px solid #ccc}
-.cond ol{padding:5px 8px 5px 24px;font-size:8.5px;line-height:1.65}
-.cond li{margin-bottom:3px}
+/* Блок повреждений + таблица функций */
+.dmg-wrap{display:flex;border:1px solid #000;margin-bottom:5px}
+.dmg-left{flex:1.2;border-right:1px solid #ccc;padding:5px 6px;display:flex;flex-direction:column;gap:6px}
+.dmg-title{font-size:9px;font-weight:bold;margin-bottom:1px}
+.dmg-hint{font-size:7.5px;color:#555;margin-bottom:3px}
+.dmg-right{flex:1;padding:4px 5px}
+.ctbl{width:100%;border-collapse:collapse;font-size:8.5px}
+.ctbl th{background:#efefef;border:1px solid #bbb;padding:2px 4px;text-align:left;font-size:8.5px}
+.ctbl td{border:1px solid #bbb;padding:2px 4px}
+.ctbl td:last-child{font-size:8px;color:#555;width:95px}
 
-/* ПОДПИСИ */
-.signs{display:flex;border:1.5px solid #000}
-.sign-col{flex:1;padding:7px 12px;text-align:center}
+/* Телефон SVG */
+.phone-row{display:flex;align-items:flex-end;justify-content:space-between;gap:4px}
+
+/* Условия */
+.cond-wrap{display:flex;border:1px solid #000;margin-bottom:5px}
+.cond-left{flex:1;padding:4px 8px 4px 6px;border-right:1px solid #ccc}
+.cond-right{width:130px;padding:5px 7px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;text-align:center}
+.cond-title{font-size:8.5px;font-weight:bold;background:#efefef;padding:2px 6px;border-bottom:1px solid #ccc;margin:-4px -8px 4px -6px}
+.cond-ol{padding-left:16px;font-size:7.8px;line-height:1.6;margin:0}
+.cond-ol li{margin-bottom:1px}
+.cond-agree{font-size:8px;font-weight:bold;line-height:1.4;border:1px solid #000;padding:4px;text-align:center}
+.cond-link{font-size:9px;font-weight:bold;color:#000;word-break:break-all}
+
+/* Подписи */
+.signs{display:flex;border:1px solid #000}
+.sign-col{flex:1;padding:6px 10px}
 .sign-col:first-child{border-right:1px solid #000}
-.sign-col b{font-size:10px}
-.sign-col .stxt{font-size:8.5px;color:#444;margin:3px 0 16px}
-.sign-line{border-top:1px solid #000;padding-top:2px;font-size:8px;color:#666;display:flex;justify-content:space-around}
+.sign-title{font-size:8.5px;margin-bottom:2px}
+.sign-who{font-size:9px;margin-bottom:12px}
+.sign-line-row{display:flex;gap:16px;margin-bottom:2px}
+.sign-blank{flex:1;border-bottom:1px solid #000;margin-bottom:1px;height:14px}
+.sign-hint{display:flex;gap:16px;font-size:7.5px;color:#777}
+.sign-hint span{flex:1;text-align:center}
+.date-line{font-size:8px;margin-bottom:2px}
 </style>
 </head><body>
 <div class="print-btn">
@@ -323,173 +338,200 @@ body{font-family:Arial,sans-serif;font-size:10.5px;color:#000;background:#fff}
 </div>
 <div class="page">
 
-  <div style="font-size:8.5px;text-align:right;margin-bottom:3px;color:#555">Экз. Клиента</div>
+<div style="font-size:8px;text-align:right;margin-bottom:2px;color:#555">Экз. Клиента</div>
 
-  <!-- ШАПКА -->
-  <div class="hdr">
-    <div class="hdr-left">
-      <div class="bc"><svg id="barcode"></svg><div class="bc-num">${barNum}</div></div>
-      <div class="warn">ВНИМАНИЕ! Оплата производится только в сервисном центре при получении заказа.</div>
-    </div>
-    <div class="hdr-mid">
-      <div class="t1">Акт приёма — передачи</div>
-      <div class="t2">устройства в ремонт</div>
-      <div class="t3">№ ${orderNum}</div>
-      <div class="t4">от ${dateStr}, ${timeStr}</div>
-    </div>
-    <div class="hdr-right">
-      <b>Исполнитель:</b><br>
-      ИП Мамедов Адиль Мирза Оглы<br>
-      ИНН: 402810962699<br>
-      ОГРНИП: 307402814200032<br>
-      г. Калуга, ул. Кирова, 21а<br>
-      Тел.: +7 (992) 990-33-33<br>
-      skypka24.com
+<!-- ШАПКА -->
+<div class="hdr">
+  <div class="hdr-bc">
+    <svg id="barcode"></svg>
+    <div class="bc-num">${barNum}</div>
+    <div class="warn">ВНИМАНИЕ! Оплата производится только в сервисном центре при получении заказа.</div>
+  </div>
+  <div class="hdr-mid">
+    <div class="t1">Акт приёма — передачи</div>
+    <div class="t2">устройства в ремонт</div>
+    <div class="t3">№ ${orderNum}</div>
+    <div class="t4">от ${dateStr}</div>
+  </div>
+  <div class="hdr-right">
+    <b>Исполнитель:</b>
+    ИП Мамедов Адиль Мирза Оглы<br>
+    ИНН: 402810962699<br>
+    ОГРНИП: 307402814200032<br>
+    г. Калуга, ул. Кирова, 21а<br>
+    Тел.: +7 (992) 990-33-33<br>
+    skypka24.com
+  </div>
+</div>
+
+<!-- КЛИЕНТ / УСТРОЙСТВО / РЕМОНТ -->
+<div class="sec3">
+  <div class="sc">
+    <div class="sc-h">Клиент:</div>
+    <div class="sc-b">
+      <div class="f"><div class="fl">ФИО Клиента:</div><div class="fv">${o.name}</div></div>
+      <div style="height:8px"></div>
+      <div class="f"><div class="fl">Телефон Клиента:</div><div class="fv">${o.phone}</div></div>
     </div>
   </div>
-
-  <!-- КЛИЕНТ / УСТРОЙСТВО / РЕМОНТ -->
-  <div class="sec3">
-    <div class="sec-col">
-      <div class="sh">Клиент:</div>
-      <div class="sb">
-        <div class="f"><div class="l">ФИО Клиента:</div><div class="v">${o.name}</div></div>
-        <div class="f"><div class="l">Телефон Клиента:</div><div class="v">${o.phone}</div></div>
-      </div>
-    </div>
-    <div class="sec-col">
-      <div class="sh">Устройство:</div>
-      <div class="sb">
-        <div class="f"><div class="l">Устройство:</div><div class="v">${o.model || "—"}</div></div>
-        <div class="f"><div class="l">Описание неисправности:</div><div class="v">${o.comment || "—"}</div></div>
-        <div class="f"><div class="l">Внешний вид при приёме:</div><div class="v">Царапины, потёртости, возможны скрытые дефекты</div></div>
-      </div>
-    </div>
-    <div class="sec-col">
-      <div class="sh">Ремонт:</div>
-      <div class="sb">
-        <div class="f"><div class="l">Вид работ:</div><div class="v">${o.repair_type || "—"}</div></div>
-        <div class="f"><div class="l">Ориентировочная стоимость:</div><div class="v">${o.price ? o.price.toLocaleString("ru-RU") + " ₽" : "По результатам диагностики"}</div></div>
-        <div class="f"><div class="l">Аванс:</div><div class="v">0</div></div>
-        <div class="f"><div class="l">Ориентировочный срок ремонта:</div><div class="v">По договорённости</div></div>
-        <div class="f"><div class="l">Заявленные неисправности:</div><div class="v">${o.comment || "—"}</div></div>
-      </div>
+  <div class="sc">
+    <div class="sc-h">Устройство:</div>
+    <div class="sc-b">
+      <div class="f"><div class="fl">Устройство:</div><div class="fv">${o.model || "—"}</div></div>
+      <div class="f"><div class="fl">Цвет:</div><div class="fvn">—</div></div>
+      <div class="f"><div class="fl">Пароль от устройства:</div><div class="fvn">&nbsp;</div></div>
+      <div class="f"><div class="fl">Сер. №:</div><div class="fvn">—</div></div>
+      <div class="f"><div class="fl">Внешний вид:</div><div class="fvn">Царапины, потёртости, возможны скрытые дефекты</div></div>
+      <div class="f"><div class="fl">IMEI:</div><div class="fvn">&nbsp;</div></div>
     </div>
   </div>
+  <div class="sc">
+    <div class="sc-h">Ремонт:</div>
+    <div class="sc-b">
+      <div class="f"><div class="fl">Ориентировочная стоимость:</div><div class="fvn">${o.price ? o.price.toLocaleString("ru-RU") + " ₽" : "0"}</div></div>
+      <div class="f"><div class="fl">Аванс:</div><div class="fvn">0</div></div>
+      <div style="height:6px"></div>
+      <div class="f"><div class="fl">Ориентировочный срок ремонта:</div><div class="fvn">По договорённости</div></div>
+      <div class="f"><div class="fl">Заявленные неисправности:</div><div class="fvn">${o.comment || o.repair_type || "—"}</div></div>
+    </div>
+  </div>
+</div>
 
-  <!-- ПОВРЕЖДЕНИЯ + ПРОВЕРКА ФУНКЦИЙ -->
-  <div class="dmg">
-    <div class="dh">Наружные повреждения &nbsp;&nbsp; Проверка функций</div>
-    <div class="dmg-inner">
-      <div class="dmg-left">
-        <div class="dmg-hint">Отметить на схеме: * – скол, / – вмятина, v – царапина</div>
+<!-- ЗАМЕТКИ ПРИЁМЩИКА -->
+<div class="notes">
+  <div class="notes-lbl">Заметки приёмщика:</div>
+</div>
 
-        <!-- ТЕЛЕФОН -->
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 460 175" style="width:100%;max-width:460px">
-          <text x="230" y="12" text-anchor="middle" font-size="9" font-weight="bold" fill="#333">Смартфон</text>
-          <!-- спереди -->
-          <g transform="translate(8,18)">
-            <rect x="18" y="0" width="64" height="118" rx="9" fill="none" stroke="#000" stroke-width="1.8"/>
-            <rect x="24" y="10" width="52" height="96" fill="none" stroke="#000" stroke-width="1"/>
-            <ellipse cx="50" cy="6" rx="7" ry="2" fill="none" stroke="#000" stroke-width="1"/>
-            <circle cx="50" cy="112" r="4" fill="none" stroke="#000" stroke-width="1"/>
-            <text x="50" y="135" text-anchor="middle" font-size="8" fill="#555">Спереди</text>
-          </g>
-          <!-- сзади -->
-          <g transform="translate(100,18)">
-            <rect x="18" y="0" width="64" height="118" rx="9" fill="none" stroke="#000" stroke-width="1.8"/>
-            <rect x="28" y="8" width="20" height="20" rx="4" fill="none" stroke="#000" stroke-width="1.2"/>
-            <circle cx="38" cy="18" r="6" fill="none" stroke="#000" stroke-width="1"/>
-            <circle cx="52" cy="12" r="3" fill="none" stroke="#000" stroke-width="1"/>
-            <text x="50" y="135" text-anchor="middle" font-size="8" fill="#555">Сзади</text>
-          </g>
-          <!-- слева -->
-          <g transform="translate(192,28)">
-            <rect x="30" y="0" width="18" height="118" rx="5" fill="none" stroke="#000" stroke-width="1.8"/>
-            <rect x="20" y="25" width="8" height="20" rx="2" fill="none" stroke="#000" stroke-width="1.2"/>
-            <rect x="20" y="50" width="8" height="20" rx="2" fill="none" stroke="#000" stroke-width="1.2"/>
-            <rect x="50" y="35" width="8" height="28" rx="2" fill="none" stroke="#000" stroke-width="1.2"/>
-            <text x="39" y="135" text-anchor="middle" font-size="8" fill="#555">Слева</text>
-          </g>
-          <!-- снизу -->
-          <g transform="translate(255,60)">
-            <rect x="8" y="18" width="106" height="22" rx="7" fill="none" stroke="#000" stroke-width="1.8"/>
-            <rect x="44" y="23" width="34" height="12" rx="3" fill="none" stroke="#000" stroke-width="1"/>
-            <rect x="14" y="22" width="4" height="14" rx="2" fill="none" stroke="#000" stroke-width="1"/>
-            <rect x="22" y="22" width="4" height="14" rx="2" fill="none" stroke="#000" stroke-width="1"/>
-            <rect x="92" y="22" width="4" height="14" rx="2" fill="none" stroke="#000" stroke-width="1"/>
-            <text x="61" y="58" text-anchor="middle" font-size="8" fill="#555">Снизу</text>
-          </g>
+<!-- НАРУЖНЫЕ ПОВРЕЖДЕНИЯ + ПРОВЕРКА ФУНКЦИЙ -->
+<div class="dmg-wrap">
+  <div class="dmg-left">
+    <div>
+      <div class="dmg-title">Наружные повреждения</div>
+      <div class="dmg-hint">Отметить на схеме: * – скол, / – вмятина, v – царапина</div>
+    </div>
+
+    <!-- ТЕЛЕФОН 4 ВИДА -->
+    <div class="phone-row">
+      <!-- Спереди -->
+      <div style="display:flex;flex-direction:column;align-items:center">
+        <svg viewBox="0 0 56 108" width="52" height="100" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="2" width="52" height="104" rx="7" fill="none" stroke="#000" stroke-width="1.5"/>
+          <rect x="7" y="11" width="42" height="83" fill="none" stroke="#000" stroke-width="1"/>
+          <ellipse cx="28" cy="7" rx="7" ry="2" fill="none" stroke="#000" stroke-width="1"/>
+          <circle cx="28" cy="99" r="4" fill="none" stroke="#000" stroke-width="1"/>
         </svg>
-
-        <!-- НОУТБУК -->
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 460 160" style="width:100%;max-width:460px">
-          <text x="230" y="12" text-anchor="middle" font-size="9" font-weight="bold" fill="#333">Ноутбук</text>
-          <!-- спереди открытый -->
-          <g transform="translate(5,18)">
-            <rect x="4" y="2" width="140" height="90" rx="4" fill="none" stroke="#000" stroke-width="1.8"/>
-            <rect x="9" y="7" width="130" height="80" fill="none" stroke="#000" stroke-width="1"/>
-            <circle cx="74" cy="5" r="2" fill="none" stroke="#000" stroke-width="1"/>
-            <rect x="0" y="93" width="148" height="10" rx="2" fill="none" stroke="#000" stroke-width="1.8"/>
-            <rect x="48" y="95" width="52" height="6" rx="2" fill="none" stroke="#000" stroke-width="1"/>
-            <text x="74" y="118" text-anchor="middle" font-size="8" fill="#555">Спереди</text>
-          </g>
-          <!-- сзади закрытый -->
-          <g transform="translate(167,18)">
-            <rect x="4" y="2" width="140" height="10" rx="4" fill="none" stroke="#000" stroke-width="1.8"/>
-            <rect x="0" y="14" width="148" height="79" rx="4" fill="none" stroke="#000" stroke-width="1.8"/>
-            <text x="74" y="110" text-anchor="middle" font-size="8" fill="#555">Сзади</text>
-          </g>
-          <!-- сбоку -->
-          <g transform="translate(330,28)">
-            <rect x="50" y="2" width="10" height="68" rx="2" fill="none" stroke="#000" stroke-width="1.8"/>
-            <rect x="26" y="71" width="88" height="10" rx="2" fill="none" stroke="#000" stroke-width="1.8"/>
-            <rect x="34" y="73" width="10" height="7" rx="1" fill="none" stroke="#000" stroke-width="1"/>
-            <rect x="96" y="73" width="10" height="7" rx="1" fill="none" stroke="#000" stroke-width="1"/>
-            <text x="70" y="100" text-anchor="middle" font-size="8" fill="#555">Сбоку</text>
-          </g>
-        </svg>
+        <div style="font-size:7.5px;color:#555;margin-top:1px">Спереди</div>
       </div>
+      <!-- Сзади -->
+      <div style="display:flex;flex-direction:column;align-items:center">
+        <svg viewBox="0 0 56 108" width="52" height="100" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="2" width="52" height="104" rx="7" fill="none" stroke="#000" stroke-width="1.5"/>
+          <rect x="7" y="8" width="18" height="18" rx="4" fill="none" stroke="#000" stroke-width="1.2"/>
+          <circle cx="16" cy="17" r="5" fill="none" stroke="#000" stroke-width="1"/>
+          <circle cx="28" cy="10" r="3" fill="none" stroke="#000" stroke-width="1"/>
+          <rect x="8" y="28" width="10" height="2" rx="1" fill="#ccc" stroke="none"/>
+        </svg>
+        <div style="font-size:7.5px;color:#555;margin-top:1px">Сзади</div>
+      </div>
+      <!-- Слева (торец) -->
+      <div style="display:flex;flex-direction:column;align-items:center">
+        <svg viewBox="0 0 20 108" width="20" height="100" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="2" width="16" height="104" rx="4" fill="none" stroke="#000" stroke-width="1.5"/>
+          <rect x="0" y="22" width="4" height="16" rx="2" fill="none" stroke="#000" stroke-width="1"/>
+          <rect x="0" y="42" width="4" height="16" rx="2" fill="none" stroke="#000" stroke-width="1"/>
+          <rect x="16" y="32" width="4" height="22" rx="2" fill="none" stroke="#000" stroke-width="1"/>
+        </svg>
+        <div style="font-size:7.5px;color:#555;margin-top:1px">Слева</div>
+      </div>
+      <!-- Снизу (торец) -->
+      <div style="display:flex;flex-direction:column;align-items:center">
+        <svg viewBox="0 0 108 20" width="100" height="20" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="2" width="104" height="16" rx="4" fill="none" stroke="#000" stroke-width="1.5"/>
+          <rect x="36" y="4" width="36" height="12" rx="3" fill="none" stroke="#000" stroke-width="1"/>
+          <rect x="8" y="5" width="4" height="10" rx="2" fill="none" stroke="#000" stroke-width="1"/>
+          <rect x="16" y="5" width="4" height="10" rx="2" fill="none" stroke="#000" stroke-width="1"/>
+          <rect x="92" y="5" width="4" height="10" rx="2" fill="none" stroke="#000" stroke-width="1"/>
+        </svg>
+        <div style="font-size:7.5px;color:#555;margin-top:1px">Снизу</div>
+      </div>
+    </div>
 
-      <div class="dmg-right">
-        <table class="ctbl">
-          <thead><tr><th>Функция</th><th>До ремонта</th></tr></thead>
-          <tbody>
-            <tr><td>Кнопка Home</td><td>Проверка невозможна</td></tr>
-            <tr><td>Кнопка Вкл./Выкл.</td><td>Проверка невозможна</td></tr>
-            <tr><td>Изменение геометрии</td><td>Не деформирован</td></tr>
-            <tr><td>Деформация корпуса</td><td>Не деформирован</td></tr>
-            <tr><td>Компас и гироскоп</td><td>Проверка невозможна</td></tr>
-            <tr><td>Кнопки громкости (меню)</td><td>Проверка невозможна</td></tr>
-            <tr><td>Поиск сети</td><td>Проверка невозможна</td></tr>
-            <tr><td>Нижний микрофон (диктофон)</td><td>Проверка невозможна</td></tr>
-            <tr><td>Полифонический динамик</td><td>Проверка невозможна</td></tr>
-            <tr><td>Wi-Fi/Bluetooth (наличие адреса)</td><td>Проверка невозможна</td></tr>
-            <tr><td>Фонарик</td><td>Проверка невозможна</td></tr>
-            <tr><td>Датчик приближения</td><td>Проверка невозможна</td></tr>
-            <tr><td>Кнопки громкости (вызов)</td><td>Проверка невозможна</td></tr>
-            <tr><td>Камера основная (фокус/пятна)</td><td>Проверка невозможна</td></tr>
-            <tr><td>Чтение SIM-карты</td><td>Проверка невозможна</td></tr>
-            <tr><td>Датчик освещённости</td><td>Проверка невозможна</td></tr>
-            <tr><td>Дисплей (touch/steel/рамка/полосы/пиксели/3D touch)</td><td>Проверка невозможна</td></tr>
-            <tr><td>Сканер радужки глаз</td><td>Проверка невозможна</td></tr>
-            <tr><td>Touch ID / Face ID</td><td>Проверка невозможна</td></tr>
-            <tr><td>Беспроводная зарядка</td><td>Проверка невозможна</td></tr>
-            <tr><td>Слуховой динамик</td><td>Проверка невозможна</td></tr>
-            <tr><td>Разъём зарядки</td><td>Проверка невозможна</td></tr>
-            <tr><td>Переключатель вибро</td><td>Проверка невозможна</td></tr>
-            <tr><td>Камера фронтальная (фокус/пятна)</td><td>Проверка невозможна</td></tr>
-            <tr><td>Аудиоразъём (L/R)</td><td>Проверка невозможна</td></tr>
-          </tbody>
-        </table>
+    <!-- НОУТБУК 3 ВИДА -->
+    <div>
+      <div style="font-size:8px;color:#555;margin-bottom:3px;font-weight:bold">Ноутбук / Планшет:</div>
+      <div style="display:flex;align-items:flex-end;gap:8px">
+        <!-- Спереди открытый -->
+        <div style="display:flex;flex-direction:column;align-items:center">
+          <svg viewBox="0 0 120 95" width="110" height="88" xmlns="http://www.w3.org/2000/svg">
+            <rect x="2" y="2" width="116" height="72" rx="4" fill="none" stroke="#000" stroke-width="1.5"/>
+            <rect x="7" y="7" width="106" height="62" fill="none" stroke="#000" stroke-width="1"/>
+            <circle cx="60" cy="4.5" r="2" fill="none" stroke="#000" stroke-width="1"/>
+            <rect x="0" y="75" width="120" height="10" rx="2" fill="none" stroke="#000" stroke-width="1.5"/>
+            <rect x="40" y="77" width="40" height="6" rx="2" fill="none" stroke="#000" stroke-width="1"/>
+          </svg>
+          <div style="font-size:7.5px;color:#555;margin-top:1px">Спереди</div>
+        </div>
+        <!-- Сзади закрытый -->
+        <div style="display:flex;flex-direction:column;align-items:center">
+          <svg viewBox="0 0 120 95" width="110" height="88" xmlns="http://www.w3.org/2000/svg">
+            <rect x="2" y="2" width="116" height="10" rx="3" fill="none" stroke="#000" stroke-width="1.5"/>
+            <rect x="0" y="14" width="120" height="72" rx="4" fill="none" stroke="#000" stroke-width="1.5"/>
+          </svg>
+          <div style="font-size:7.5px;color:#555;margin-top:1px">Сзади</div>
+        </div>
+        <!-- Сбоку -->
+        <div style="display:flex;flex-direction:column;align-items:center">
+          <svg viewBox="0 0 30 95" width="28" height="88" xmlns="http://www.w3.org/2000/svg">
+            <rect x="10" y="2" width="10" height="60" rx="2" fill="none" stroke="#000" stroke-width="1.5"/>
+            <rect x="2" y="64" width="26" height="10" rx="2" fill="none" stroke="#000" stroke-width="1.5"/>
+            <rect x="4" y="66" width="8" height="6" rx="1" fill="none" stroke="#000" stroke-width="1"/>
+          </svg>
+          <div style="font-size:7.5px;color:#555;margin-top:1px">Сбоку</div>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- УСЛОВИЯ -->
-  <div class="cond">
-    <div class="ch">Правила и условия проведения ремонтных работ</div>
-    <ol>
+  <!-- ТАБЛИЦА ФУНКЦИЙ -->
+  <div class="dmg-right">
+    <table class="ctbl">
+      <thead><tr><th>Проверка функций</th><th>До ремонта</th></tr></thead>
+      <tbody>
+        <tr><td>Кнопка Home</td><td>Проверка невозможна</td></tr>
+        <tr><td>Кнопка Вкл./Выкл.</td><td>Проверка невозможна</td></tr>
+        <tr><td>Изменение геометрии</td><td>Не деформирован</td></tr>
+        <tr><td>Деформация корпуса</td><td>Не деформирован</td></tr>
+        <tr><td>Компас и гироскоп</td><td>Проверка невозможна</td></tr>
+        <tr><td>Кнопки громкости (меню)</td><td>Проверка невозможна</td></tr>
+        <tr><td>Поиск сети</td><td>Проверка невозможна</td></tr>
+        <tr><td>Нижний микрофон (диктофон)</td><td>Проверка невозможна</td></tr>
+        <tr><td>Полифонический динамик</td><td>Проверка невозможна</td></tr>
+        <tr><td>Wi-Fi/Bluetooth (адрес Wi-Fi/сеть)</td><td>Проверка невозможна</td></tr>
+        <tr><td>Фонарик</td><td>Проверка невозможна</td></tr>
+        <tr><td>Датчик приближения</td><td>Проверка невозможна</td></tr>
+        <tr><td>Кнопки громкости (вызов)</td><td>Проверка невозможна</td></tr>
+        <tr><td>Камера основная (фокус/пятна/пиксели)</td><td>Проверка невозможна</td></tr>
+        <tr><td>Чтение SIM-карты</td><td>Проверка невозможна</td></tr>
+        <tr><td>Датчик освещённости</td><td>Проверка невозможна</td></tr>
+        <tr><td>Дисплей (touchscreen/стекло/рамка/полосы/пиксели/3D touch)</td><td>Проверка невозможна</td></tr>
+        <tr><td>Сканер радужки глаз</td><td>Проверка невозможна</td></tr>
+        <tr><td>Touch ID / Face ID</td><td>Проверка невозможна</td></tr>
+        <tr><td>Беспроводная зарядка</td><td>Проверка невозможна</td></tr>
+        <tr><td>Слуховой динамик</td><td>Проверка невозможна</td></tr>
+        <tr><td>Разъём зарядки</td><td>Проверка невозможна</td></tr>
+        <tr><td>Переключатель вибро</td><td>Проверка невозможна</td></tr>
+        <tr><td>Камера фронтальная (фокус/пятна/пиксели)</td><td>Проверка невозможна</td></tr>
+        <tr><td>Аудиоразъём (L/R)</td><td>Проверка невозможна</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- УСЛОВИЯ + СОГЛАСИЕ -->
+<div class="cond-wrap">
+  <div class="cond-left">
+    <div class="cond-title">Правила и условия проведения ремонтных работ</div>
+    <ol class="cond-ol">
       <li>Правила и условия проведения ремонтных работ изложены на сайте <b>skypka24.com/act</b></li>
       <li>Устройство Клиента принимается без разборки и проверки внутренних неисправностей.</li>
       <li>Клиент согласен с тем, что гарантия от производителя после произведённого ремонта не возможна.</li>
@@ -505,30 +547,39 @@ body{font-family:Arial,sans-serif;font-size:10.5px;color:#000;background:#fff}
       <li>Клиент согласен с тем, что Исполнитель не несёт ответственности за возможную неработоспособность Устройства или его отдельных компонентов из-за невозможности проверки всех функций Устройства.</li>
     </ol>
   </div>
-
-  <!-- ПОДПИСИ -->
-  <div class="signs">
-    <div class="sign-col">
-      <b>Клиент</b>
-      <div class="stxt">С условиями ознакомлен и согласен, устройство в ремонт передал:</div>
-      <div class="sign-line"><span>_________________________</span><span>_________________________</span></div>
-      <div style="display:flex;justify-content:space-around;font-size:8px;color:#777;margin-top:2px"><span>(подпись)</span><span>(расшифровка)</span></div>
-    </div>
-    <div class="sign-col">
-      <b>Исполнитель</b>
-      <div class="stxt">Устройство в указанном состоянии принял, работоспособность подтвердил:</div>
-      <div class="sign-line"><span>_________________________</span><span>_________________________</span></div>
-      <div style="display:flex;justify-content:space-around;font-size:8px;color:#777;margin-top:2px"><span>(подпись)</span><span>(расшифровка)</span></div>
-    </div>
+  <div class="cond-right">
+    <div class="cond-agree">Ознакомлен с условиями ремонта и согласен</div>
+    <div style="font-size:7.5px;color:#555;text-align:center;margin-top:2px">Полные правила на сайте:</div>
+    <div class="cond-link">skypka24.com/act</div>
+    <div style="margin-top:16px;border-top:1px solid #000;width:100%;padding-top:2px;font-size:7.5px;color:#777;text-align:center">(подпись клиента)</div>
   </div>
+</div>
+
+<!-- ПОДПИСИ -->
+<div class="signs">
+  <div class="sign-col">
+    <div class="sign-title">Клиент:</div>
+    <div class="sign-who">С условиями ознакомлен и согласен, устройство в работоспособном состоянии и рабочоспособность передал:</div>
+    <div class="date-line">___________ 20___ г.</div>
+    <div class="sign-line-row"><div class="sign-blank"></div><div class="sign-blank"></div></div>
+    <div class="sign-hint"><span>(подпись)</span><span>(Фамилия, Имя, Отчество)</span></div>
+  </div>
+  <div class="sign-col">
+    <div class="sign-title">Исполнитель:</div>
+    <div class="sign-who">Устройство в указанном состоянии принял, работоспособность подтвердил:</div>
+    <div class="date-line">___________ 20___ г.</div>
+    <div class="sign-line-row"><div class="sign-blank"></div><div class="sign-blank"></div></div>
+    <div class="sign-hint"><span>(подпись)</span><span>(Фамилия, Имя, Отчество)</span></div>
+  </div>
+</div>
 
 </div>
 <script>
   window.addEventListener('load', function() {
     JsBarcode("#barcode", "${barNum}", {
       format: "CODE128",
-      width: 1.6,
-      height: 44,
+      width: 1.5,
+      height: 42,
       displayValue: false,
       margin: 0,
     });
