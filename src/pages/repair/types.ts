@@ -42,12 +42,19 @@ export const INP = "w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-
 export const LBL = "font-roboto text-white/40 text-[10px] block mb-1";
 
 export const printAct = async (o: Order) => {
-  const { Document, Packer, Paragraph, TextRun, AlignmentType, BorderStyle, Table, TableRow, TableCell, WidthType, VerticalAlign } = await import("docx");
+  const { Document, Packer, Paragraph, TextRun, AlignmentType, BorderStyle, Table, TableRow, TableCell, WidthType, VerticalAlign, ImageRun } = await import("docx");
   const { saveAs } = await import("file-saver");
 
   const now = new Date();
   const dateStr = now.toLocaleDateString("ru-RU");
   const timeStr = now.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+
+  // Загружаем логотип
+  let logoData: ArrayBuffer | null = null;
+  try {
+    const resp = await fetch("https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/f4f18755-1806-41a9-bcbe-82823a66929b.JPG");
+    if (resp.ok) logoData = await resp.arrayBuffer();
+  } catch (_e) { /* без логотипа */ }
 
   const F = "Arial";
   const b = (t: string, sz = 18) => new TextRun({ text: t, bold: true, size: sz, font: F });
@@ -184,19 +191,40 @@ export const printAct = async (o: Order) => {
           width: { size: 100, type: WidthType.PERCENTAGE },
           borders: allBorder(8, "000000"),
           rows: [new TableRow({ children: [
-            new TableCell({ width: { size: 60, type: WidthType.PERCENTAGE }, borders: { ...noBorder, right: { style: SINGLE, size: 8, color: "000000" } },
+            // Логотип
+            ...(logoData ? [new TableCell({
+              width: { size: 18, type: WidthType.PERCENTAGE },
+              borders: { ...noBorder, right: { style: SINGLE, size: 6, color: "DDDDDD" } },
+              verticalAlign: VerticalAlign.CENTER,
+              children: [new Paragraph({
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 40, after: 40 },
+                children: [new ImageRun({ data: logoData, transformation: { width: 90, height: 90 }, type: "jpg" })],
+              })],
+            })] : []),
+            // Реквизиты
+            new TableCell({
+              width: { size: logoData ? 52 : 60, type: WidthType.PERCENTAGE },
+              borders: { ...noBorder, right: { style: SINGLE, size: 8, color: "000000" } },
+              verticalAlign: VerticalAlign.CENTER,
               children: [
                 new Paragraph({ spacing: { before: 60, after: 20 }, children: [b("ИП МАМЕДОВ АДИЛЬ МИРЗА ОГЛЫ", 22)] }),
                 new Paragraph({ spacing: { before: 0, after: 20 }, children: [n("г. Калуга, ул. Кирова, 21а", 17)] }),
                 new Paragraph({ spacing: { before: 0, after: 20 }, children: [n("ИНН: 402810962699  |  ОГРНИП: 307402814200032", 16)] }),
                 new Paragraph({ spacing: { before: 0, after: 60 }, children: [n("Тел.: +7 (992) 990-33-33  |  skypka24.com", 16)] }),
-              ] }),
-            new TableCell({ width: { size: 40, type: WidthType.PERCENTAGE }, borders: noBorder, verticalAlign: VerticalAlign.CENTER,
+              ],
+            }),
+            // Акт №
+            new TableCell({
+              width: { size: 30, type: WidthType.PERCENTAGE },
+              borders: noBorder,
+              verticalAlign: VerticalAlign.CENTER,
               children: [
                 new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 40, after: 10 }, children: [b("АКТ ПРИЁМА В РЕМОНТ", 24)] }),
                 new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 40 }, children: [b(`№ ${o.id}`, 22)] }),
-              ] }),
-          ]})],
+              ],
+            }),
+          ]})]
         }),
 
         gap,

@@ -59,6 +59,14 @@ def build_act_docx(order_id, name, phone, model, repair_type, price_str, comment
 
     F = 'Arial'
     now = datetime.datetime.now().strftime('%d.%m.%Y %H:%M')
+    LOGO_URL = 'https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/f4f18755-1806-41a9-bcbe-82823a66929b.JPG'
+    logo_bytes = None
+    try:
+        logo_resp = requests.get(LOGO_URL, timeout=10)
+        if logo_resp.status_code == 200:
+            logo_bytes = io.BytesIO(logo_resp.content)
+    except Exception:
+        pass
 
     def set_cell_bg(cell, hex_color):
         tc = cell._tc; tcPr = tc.get_or_add_tcPr()
@@ -93,11 +101,26 @@ def build_act_docx(order_id, name, phone, model, repair_type, price_str, comment
             style.font.name = F
 
     # ── ШАПКА ──────────────────────────────────────────────────────────────────
-    hdr = doc.add_table(rows=1, cols=2)
+    cols = 3 if logo_bytes else 2
+    hdr = doc.add_table(rows=1, cols=cols)
     hdr.alignment = WD_TABLE_ALIGNMENT.CENTER
-    hdr.columns[0].width = Cm(11); hdr.columns[1].width = Cm(7)
 
-    cl = hdr.cell(0, 0); set_cell_bg(cl, 'F5F5F5'); set_cell_borders(cl, '000000', 6)
+    col_idx = 0
+
+    # Логотип (если загрузился)
+    if logo_bytes:
+        from docx.shared import Inches
+        hdr.columns[0].width = Cm(3.5)
+        cl0 = hdr.cell(0, 0); set_cell_bg(cl0, 'FFFFFF'); set_cell_borders(cl0, '000000', 6)
+        cl0.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+        p_logo = cl0.paragraphs[0]; p_logo.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run_logo = p_logo.add_run()
+        run_logo.add_picture(logo_bytes, width=Cm(3.0))
+        col_idx = 1
+
+    # Реквизиты
+    hdr.columns[col_idx].width = Cm(10)
+    cl = hdr.cell(0, col_idx); set_cell_bg(cl, 'F5F5F5'); set_cell_borders(cl, '000000', 6)
     cl.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
     cl.paragraphs[0].clear(); cl.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.LEFT
     r = cl.paragraphs[0].add_run('ИП МАМЕДОВ АДИЛЬ МИРЗА ОГЛЫ')
@@ -106,9 +129,11 @@ def build_act_docx(order_id, name, phone, model, repair_type, price_str, comment
                  'Тел.: +7 (992) 990-33-33  |  skypka24.com']:
         p2 = cl.add_paragraph(line); p2.runs[0].font.size = Pt(9); p2.runs[0].font.name = F
 
-    cr = hdr.cell(0, 1); set_cell_bg(cr, 'FFFFFF'); set_cell_borders(cr, '000000', 6)
+    # Акт №
+    hdr.columns[col_idx + 1].width = Cm(5)
+    cr = hdr.cell(0, col_idx + 1); set_cell_bg(cr, 'FFFFFF'); set_cell_borders(cr, '000000', 6)
     cr.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
-    cell_para(cr, 'АКТ ПРИЁМА В РЕМОНТ', bold=True, size=14, align=WD_ALIGN_PARAGRAPH.CENTER)
+    cell_para(cr, 'АКТ ПРИЁМА В РЕМОНТ', bold=True, size=13, align=WD_ALIGN_PARAGRAPH.CENTER)
     cr.add_paragraph(f'№ {order_id}').runs[0].bold = True
     cr.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
     cr.paragraphs[-1].runs[0].font.size = Pt(12); cr.paragraphs[-1].runs[0].font.name = F
