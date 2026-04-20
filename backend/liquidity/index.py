@@ -391,17 +391,21 @@ def handler(event: dict, context) -> dict:
                 entry_date = body.get("date", date.today().isoformat())
                 shop = body.get("shop", "kirova7")
 
-                # Суммируем repair_amount у заказов со статусом ready/done за дату
+                # Моя доля = repair_amount - master_income - purchase_amount
                 cur.execute(f"""
-                    SELECT COALESCE(SUM(repair_amount), 0)
+                    SELECT COALESCE(SUM(
+                        repair_amount
+                        - COALESCE(master_income, 0)
+                        - COALESCE(purchase_amount, 0)
+                    ), 0)
                     FROM {SCHEMA}.repair_orders
                     WHERE DATE(completed_at AT TIME ZONE 'Europe/Moscow') = %s
                     AND status IN ('ready', 'done', 'picked_up')
                     AND repair_amount IS NOT NULL
                 """, (entry_date,))
-                total_repair = float(cur.fetchone()[0])
+                my_profit = float(cur.fetchone()[0])
 
-                if total_repair > 0:
+                if my_profit > 0:
                     # Удаляем старую авто-запись за эту дату, если есть
                     cur.execute(f"""
                         DELETE FROM {SCHEMA}.liquidity_entries
@@ -410,11 +414,11 @@ def handler(event: dict, context) -> dict:
                     cur.execute(f"""
                         INSERT INTO {SCHEMA}.liquidity_entries
                             (entry_date, shop, category, amount, comment, source)
-                        VALUES (%s, %s, 'repair', %s, 'Авто: выручка с ремонта', 'auto_repair')
+                        VALUES (%s, %s, 'repair', %s, 'Авто: моя доля с ремонта', 'auto_repair')
                         RETURNING id
-                    """, (entry_date, shop, total_repair))
+                    """, (entry_date, shop, my_profit))
                     conn.commit()
-                    return ok({"synced": True, "amount": total_repair})
+                    return ok({"synced": True, "amount": my_profit})
                 return ok({"synced": False, "amount": 0})
 
         return err("Неизвестный запрос")

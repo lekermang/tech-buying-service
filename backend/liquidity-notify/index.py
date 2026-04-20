@@ -78,9 +78,13 @@ def handler(event: dict, context) -> dict:
         gold_row = cur.fetchone()
         gold_stock = float(gold_row[0]) if gold_row else 0.0
 
-        # Выручка ремонт из repair_orders (ready/done за сегодня)
+        # Моя доля с ремонта = repair_amount - master_income - purchase_amount
         cur.execute(f"""
-            SELECT COALESCE(SUM(repair_amount), 0)
+            SELECT COALESCE(SUM(
+                repair_amount
+                - COALESCE(master_income, 0)
+                - COALESCE(purchase_amount, 0)
+            ), 0)
             FROM {SCHEMA}.repair_orders
             WHERE DATE(completed_at AT TIME ZONE 'Europe/Moscow') = %s
             AND status IN ('ready', 'done', 'picked_up')
