@@ -60,7 +60,7 @@ const CAT_COLOR: Record<string, string> = {
 };
 
 type View = "dashboard" | "gold" | "phones" | "rent" | "analytics" | "entries";
-type Period = "day" | "week" | "month" | "custom";
+type Period = "day" | "yesterday" | "week" | "month" | "custom";
 
 export default function LiquidityTab({ token }: { token: string }) {
   const [view, setView] = useState<View>("dashboard");
@@ -571,10 +571,11 @@ export default function LiquidityTab({ token }: { token: string }) {
             {/* Переключатель периода */}
             <div className="flex items-center gap-2 flex-wrap">
               {[
-                { k: "day",    l: "День" },
-                { k: "week",   l: "Неделя" },
-                { k: "month",  l: "Месяц" },
-                { k: "custom", l: "Период" },
+                { k: "day",       l: "Сегодня" },
+                { k: "yesterday", l: "Вчера" },
+                { k: "week",      l: "Неделя" },
+                { k: "month",     l: "Месяц" },
+                { k: "custom",    l: "Период" },
               ].map(p => (
                 <button key={p.k} onClick={() => setPeriod(p.k as Period)}
                   className={`px-3 py-1.5 font-roboto text-xs border transition-colors ${period === p.k ? "border-[#FFD700] text-[#FFD700] bg-[#FFD700]/10" : "border-[#333] text-white/40 hover:text-white"}`}>

@@ -4,7 +4,7 @@
 """
 import json
 import os
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 import psycopg2
 
 SCHEMA = os.environ.get("MAIN_DB_SCHEMA", "t_p31606708_tech_buying_service")
@@ -13,6 +13,24 @@ CORS = {
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, X-Admin-Token",
 }
+
+REPAIR_SQL = f"""
+    SELECT COALESCE(SUM(
+        repair_amount - COALESCE(master_income,0) - COALESCE(purchase_amount,0)
+    ), 0)
+    FROM {SCHEMA}.repair_orders
+    WHERE DATE(COALESCE(completed_at, status_updated_at)) BETWEEN %s AND %s
+    AND status IN ('ready','done','picked_up') AND repair_amount IS NOT NULL
+"""
+
+REPAIR_DAILY_SQL = f"""
+    SELECT DATE(COALESCE(completed_at, status_updated_at)) as day,
+        COALESCE(SUM(repair_amount - COALESCE(master_income,0) - COALESCE(purchase_amount,0)), 0) as profit
+    FROM {SCHEMA}.repair_orders
+    WHERE DATE(COALESCE(completed_at, status_updated_at)) BETWEEN %s AND %s
+    AND status IN ('ready','done','picked_up') AND repair_amount IS NOT NULL
+    GROUP BY day ORDER BY day
+"""
 
 
 def get_conn():
@@ -55,30 +73,15 @@ def handler(event: dict, context) -> dict:
     cur = conn.cursor()
 
     try:
-        # ── GET: аналитика / данные ──────────────────────────────────────────
         if method == "GET":
 
-            # Сводка за сегодня
+            # ── Сводка за сегодня ────────────────────────────────────────────
             if action == "today":
                 today = date.today().isoformat()
-                cur.execute(f"""
-                    SELECT category, SUM(amount) as total
-                    FROM {SCHEMA}.liquidity_entries
-                    WHERE entry_date = %s
-                    GROUP BY category
-                """, (today,))
-                rows = cur.fetchall()
-                by_cat = {r[0]: float(r[1]) for r in rows}
+                cur.execute(f"SELECT category, SUM(amount) FROM {SCHEMA}.liquidity_entries WHERE entry_date=%s GROUP BY category", (today,))
+                by_cat = {r[0]: float(r[1]) for r in cur.fetchall()}
 
-                # Живой ремонт из repair_orders
-                cur.execute(f"""
-                    SELECT COALESCE(SUM(
-                        repair_amount - COALESCE(master_income,0) - COALESCE(purchase_amount,0)
-                    ), 0)
-                    FROM {SCHEMA}.repair_orders
-                    WHERE DATE(COALESCE(completed_at, status_updated_at) AT TIME ZONE 'Europe/Moscow') = %s
-                    AND status IN ('ready','done','picked_up') AND repair_amount IS NOT NULL
-                """, (today,))
+                cur.execute(REPAIR_SQL, (today, today))
                 repair_live = float(cur.fetchone()[0])
                 repair_val = max(by_cat.get("repair", 0), repair_live)
 
@@ -86,9 +89,9 @@ def handler(event: dict, context) -> dict:
                 gold_row = cur.fetchone()
                 gold_stock = float(gold_row[0]) if gold_row else 0.0
 
-                total = (by_cat.get("gold_sell",0) - by_cat.get("gold_buy",0)
-                         + repair_val + by_cat.get("phone_sale",0)
-                         + by_cat.get("rent",0) + by_cat.get("other_expense",0))
+                total = (by_cat.get("gold_sell", 0) - by_cat.get("gold_buy", 0)
+                         + repair_val + by_cat.get("phone_sale", 0)
+                         + by_cat.get("rent", 0) + by_cat.get("other_expense", 0))
 
                 return ok({
                     "date": today,
@@ -103,7 +106,7 @@ def handler(event: dict, context) -> dict:
                     "gold_stock_grams": gold_stock,
                 })
 
-            # Аналитика за период
+            # ── Аналитика за период ──────────────────────────────────────────
             if action == "analytics":
                 period = params.get("period", "week")
                 date_from = params.get("date_from")
@@ -111,10 +114,12 @@ def handler(event: dict, context) -> dict:
 
                 today = date.today()
                 if date_from and date_to:
-                    d_from = date_from
-                    d_to = date_to
+                    d_from, d_to = date_from, date_to
                 elif period == "day":
                     d_from = d_to = today.isoformat()
+                elif period == "yesterday":
+                    yesterday = (today - timedelta(days=1)).isoformat()
+                    d_from = d_to = yesterday
                 elif period == "week":
                     d_from = (today - timedelta(days=6)).isoformat()
                     d_to = today.isoformat()
@@ -125,64 +130,43 @@ def handler(event: dict, context) -> dict:
                     d_from = (today - timedelta(days=6)).isoformat()
                     d_to = today.isoformat()
 
-                # Итого по категориям из liquidity_entries
+                # Из liquidity_entries
                 cur.execute(f"""
-                    SELECT category, shop, SUM(amount) as total
+                    SELECT category, shop, SUM(amount)
                     FROM {SCHEMA}.liquidity_entries
                     WHERE entry_date BETWEEN %s AND %s
                     GROUP BY category, shop
-                    ORDER BY category, shop
                 """, (d_from, d_to))
-                rows = cur.fetchall()
-
                 totals = {}
                 by_shop = {"kirova7": {}, "kirova11": {}}
-                for cat, shop, total in rows:
+                for cat, shop, total in cur.fetchall():
                     totals[cat] = totals.get(cat, 0) + float(total)
-                    by_shop[shop][cat] = float(total)
+                    if shop in by_shop:
+                        by_shop[shop][cat] = by_shop[shop].get(cat, 0) + float(total)
 
-                # Ремонт из repair_orders за период (живые данные)
-                cur.execute(f"""
-                    SELECT COALESCE(SUM(
-                        repair_amount - COALESCE(master_income,0) - COALESCE(purchase_amount,0)
-                    ), 0)
-                    FROM {SCHEMA}.repair_orders
-                    WHERE DATE(COALESCE(completed_at, status_updated_at) AT TIME ZONE 'Europe/Moscow') BETWEEN %s AND %s
-                    AND status IN ('ready','done','picked_up') AND repair_amount IS NOT NULL
-                """, (d_from, d_to))
+                # Ремонт живой
+                cur.execute(REPAIR_SQL, (d_from, d_to))
                 repair_period = float(cur.fetchone()[0])
                 if repair_period > totals.get("repair", 0):
                     totals["repair"] = repair_period
                     by_shop["kirova7"]["repair"] = repair_period
 
-                # По дням из liquidity_entries
+                # По дням из entries
                 cur.execute(f"""
-                    SELECT entry_date, category, SUM(amount) as total
+                    SELECT entry_date, category, SUM(amount)
                     FROM {SCHEMA}.liquidity_entries
                     WHERE entry_date BETWEEN %s AND %s
-                    GROUP BY entry_date, category
-                    ORDER BY entry_date
+                    GROUP BY entry_date, category ORDER BY entry_date
                 """, (d_from, d_to))
-                daily_rows = cur.fetchall()
                 daily = {}
-                for entry_date, cat, total in daily_rows:
+                for entry_date, cat, total in cur.fetchall():
                     ds = str(entry_date)
                     if ds not in daily:
                         daily[ds] = {}
                     daily[ds][cat] = float(total)
 
-                # Ремонт по дням из repair_orders
-                cur.execute(f"""
-                    SELECT
-                        DATE(COALESCE(completed_at, status_updated_at) AT TIME ZONE 'Europe/Moscow') as day,
-                        COALESCE(SUM(
-                            repair_amount - COALESCE(master_income,0) - COALESCE(purchase_amount,0)
-                        ), 0) as my_profit
-                    FROM {SCHEMA}.repair_orders
-                    WHERE DATE(COALESCE(completed_at, status_updated_at) AT TIME ZONE 'Europe/Moscow') BETWEEN %s AND %s
-                    AND status IN ('ready','done','picked_up') AND repair_amount IS NOT NULL
-                    GROUP BY day ORDER BY day
-                """, (d_from, d_to))
+                # Ремонт по дням
+                cur.execute(REPAIR_DAILY_SQL, (d_from, d_to))
                 for day, profit in cur.fetchall():
                     ds = str(day)
                     if ds not in daily:
@@ -191,113 +175,85 @@ def handler(event: dict, context) -> dict:
 
                 daily_list = [{"date": d, **v} for d, v in sorted(daily.items())]
 
+                net = sum(totals.values())
                 return ok({
-                    "period": period,
-                    "date_from": d_from,
-                    "date_to": d_to,
-                    "totals": totals,
-                    "by_shop": by_shop,
-                    "daily": daily_list,
+                    "period": period, "date_from": d_from, "date_to": d_to,
+                    "totals": totals, "by_shop": by_shop, "daily": daily_list,
                     "total_income": sum(v for v in totals.values() if v > 0),
                     "total_expense": abs(sum(v for v in totals.values() if v < 0)),
-                    "net_profit": sum(totals.values()),
+                    "net_profit": net,
                 })
 
-            # Список записей
+            # ── Список записей ───────────────────────────────────────────────
             if action == "entries":
                 d_from = params.get("date_from", (date.today() - timedelta(days=6)).isoformat())
                 d_to = params.get("date_to", date.today().isoformat())
                 shop = params.get("shop")
                 cat = params.get("category")
 
-                q = f"""
-                    SELECT id, entry_date, shop, category, amount, comment, gold_grams, gold_price_per_gram, source, created_at
-                    FROM {SCHEMA}.liquidity_entries
-                    WHERE entry_date BETWEEN %s AND %s
-                """
+                q = f"""SELECT id, entry_date, shop, category, amount, comment, gold_grams, gold_price_per_gram, source, created_at
+                    FROM {SCHEMA}.liquidity_entries WHERE entry_date BETWEEN %s AND %s"""
                 args = [d_from, d_to]
                 if shop:
                     q += " AND shop = %s"; args.append(shop)
                 if cat:
                     q += " AND category = %s"; args.append(cat)
                 q += " ORDER BY created_at DESC LIMIT 200"
-
                 cur.execute(q, args)
                 cols = ["id", "entry_date", "shop", "category", "amount", "comment", "gold_grams", "gold_price_per_gram", "source", "created_at"]
-                entries = [dict(zip(cols, r)) for r in cur.fetchall()]
-                return ok({"entries": entries})
+                return ok({"entries": [dict(zip(cols, r)) for r in cur.fetchall()]})
 
-            # Настройки аренды
+            # ── Настройки аренды ─────────────────────────────────────────────
             if action == "rent_settings":
                 cur.execute(f"SELECT shop, amount, day_of_month FROM {SCHEMA}.liquidity_rent")
-                rows = cur.fetchall()
-                rent = {r[0]: {"amount": float(r[1]), "day_of_month": r[2]} for r in rows}
+                rent = {r[0]: {"amount": float(r[1]), "day_of_month": r[2]} for r in cur.fetchall()}
                 return ok({"rent": rent})
 
-            # Остаток золота
+            # ── Остаток золота ───────────────────────────────────────────────
             if action == "gold_stock":
                 cur.execute(f"SELECT grams, updated_at FROM {SCHEMA}.liquidity_gold_stock LIMIT 1")
                 r = cur.fetchone()
                 return ok({"grams": float(r[0]) if r else 0, "updated_at": str(r[1]) if r else None})
 
-            # Данные за сегодня + аналитика за неделю (dashboard)
+            # ── Dashboard (Сегодня + неделя) ─────────────────────────────────
             if action == "dashboard" or not action:
                 today = date.today().isoformat()
                 week_from = (date.today() - timedelta(days=6)).isoformat()
 
-                cur.execute(f"""
-                    SELECT category, SUM(amount) as total
-                    FROM {SCHEMA}.liquidity_entries
-                    WHERE entry_date = %s
-                    GROUP BY category
-                """, (today,))
-                today_rows = cur.fetchall()
-                today_cats = {r[0]: float(r[1]) for r in today_rows}
+                cur.execute(f"SELECT category, SUM(amount) FROM {SCHEMA}.liquidity_entries WHERE entry_date=%s GROUP BY category", (today,))
+                today_cats = {r[0]: float(r[1]) for r in cur.fetchall()}
 
-                # Моя доля с ремонта напрямую из repair_orders за сегодня
-                cur.execute(f"""
-                    SELECT COALESCE(SUM(
-                        repair_amount
-                        - COALESCE(master_income, 0)
-                        - COALESCE(purchase_amount, 0)
-                    ), 0)
-                    FROM {SCHEMA}.repair_orders
-                    WHERE DATE(COALESCE(completed_at, status_updated_at) AT TIME ZONE 'Europe/Moscow') = %s
-                    AND status IN ('ready', 'done', 'picked_up')
-                    AND repair_amount IS NOT NULL
-                """, (today,))
+                cur.execute(REPAIR_SQL, (today, today))
                 repair_live = float(cur.fetchone()[0])
-
-                # Берём максимум: ручная запись или живые данные из заявок
                 repair_today = max(today_cats.get("repair", 0), repair_live)
 
+                # Недельный график по дням из entries
                 cur.execute(f"""
-                    SELECT entry_date, category, SUM(amount) as total
+                    SELECT entry_date, category, SUM(amount)
                     FROM {SCHEMA}.liquidity_entries
                     WHERE entry_date BETWEEN %s AND %s
-                    GROUP BY entry_date, category
-                    ORDER BY entry_date
+                    GROUP BY entry_date, category ORDER BY entry_date
                 """, (week_from, today))
-                week_rows = cur.fetchall()
                 daily = {}
-                for entry_date, cat, total in week_rows:
+                for entry_date, cat, total in cur.fetchall():
                     ds = str(entry_date)
                     if ds not in daily:
                         daily[ds] = {}
                     daily[ds][cat] = float(total)
 
-                # Добавляем живой ремонт в сегодняшний день графика
-                if repair_live > 0:
-                    if today not in daily:
-                        daily[today] = {}
-                    daily[today]["repair"] = max(daily[today].get("repair", 0), repair_live)
+                # Ремонт по дням в графике
+                cur.execute(REPAIR_DAILY_SQL, (week_from, today))
+                for day, profit in cur.fetchall():
+                    ds = str(day)
+                    if ds not in daily:
+                        daily[ds] = {}
+                    daily[ds]["repair"] = max(daily[ds].get("repair", 0), float(profit))
 
                 cur.execute(f"SELECT grams FROM {SCHEMA}.liquidity_gold_stock LIMIT 1")
                 gold_row = cur.fetchone()
 
                 cur.execute(f"SELECT shop, amount, day_of_month FROM {SCHEMA}.liquidity_rent")
-                rent_rows = cur.fetchall()
-                rent = {r[0]: {"amount": float(r[1]), "day_of_month": r[2]} for r in rent_rows}
+                rent = {r[0]: {"amount": float(r[1]), "day_of_month": r[2]} for r in cur.fetchall()}
 
                 today_total = (
                     today_cats.get("gold_sell", 0) - today_cats.get("gold_buy", 0)
@@ -323,10 +279,11 @@ def handler(event: dict, context) -> dict:
                     "rent": rent,
                 })
 
-        # ── POST: создать запись / обновить настройки ─────────────────────────
+            return err("Неизвестный action")
+
+        # ── POST ─────────────────────────────────────────────────────────────
         if method == "POST":
 
-            # Добавить запись о покупке золота
             if action == "add_gold_buy":
                 grams = float(body.get("grams", 0))
                 price_per_gram = float(body.get("price_per_gram", 0))
@@ -334,21 +291,15 @@ def handler(event: dict, context) -> dict:
                 entry_date = body.get("date", date.today().isoformat())
                 comment = body.get("comment", "")
                 total = grams * price_per_gram
-
                 cur.execute(f"""
-                    INSERT INTO {SCHEMA}.liquidity_entries
-                        (entry_date, shop, category, amount, comment, gold_grams, gold_price_per_gram, source)
-                    VALUES (%s, %s, 'gold_buy', %s, %s, %s, %s, 'manual')
-                    RETURNING id
+                    INSERT INTO {SCHEMA}.liquidity_entries (entry_date,shop,category,amount,comment,gold_grams,gold_price_per_gram,source)
+                    VALUES (%s,%s,'gold_buy',%s,%s,%s,%s,'manual') RETURNING id
                 """, (entry_date, shop, -total, comment, grams, price_per_gram))
                 new_id = cur.fetchone()[0]
-
-                # Увеличиваем остаток золота
-                cur.execute(f"UPDATE {SCHEMA}.liquidity_gold_stock SET grams = grams + %s, updated_at = now()", (grams,))
+                cur.execute(f"UPDATE {SCHEMA}.liquidity_gold_stock SET grams=grams+%s, updated_at=now()", (grams,))
                 conn.commit()
                 return ok({"id": new_id, "total": total, "grams": grams})
 
-            # Продать золото
             if action == "sell_gold":
                 grams = float(body.get("grams", 0))
                 price_per_gram = float(body.get("price_per_gram", 0))
@@ -356,144 +307,101 @@ def handler(event: dict, context) -> dict:
                 entry_date = body.get("date", date.today().isoformat())
                 comment = body.get("comment", "Инкассо / продажа золота")
                 total = grams * price_per_gram
-
-                # Проверяем остаток
                 cur.execute(f"SELECT grams FROM {SCHEMA}.liquidity_gold_stock LIMIT 1")
                 stock = cur.fetchone()
                 stock_grams = float(stock[0]) if stock else 0.0
                 if grams > stock_grams + 0.001:
-                    return err(f"Недостаточно золота на остатке: есть {stock_grams:.3f} г, продаёте {grams:.3f} г")
-
+                    return err(f"Недостаточно золота: есть {stock_grams:.3f} г, продаёте {grams:.3f} г")
                 cur.execute(f"""
-                    INSERT INTO {SCHEMA}.liquidity_entries
-                        (entry_date, shop, category, amount, comment, gold_grams, gold_price_per_gram, source)
-                    VALUES (%s, %s, 'gold_sell', %s, %s, %s, %s, 'manual')
-                    RETURNING id
+                    INSERT INTO {SCHEMA}.liquidity_entries (entry_date,shop,category,amount,comment,gold_grams,gold_price_per_gram,source)
+                    VALUES (%s,%s,'gold_sell',%s,%s,%s,%s,'manual') RETURNING id
                 """, (entry_date, shop, total, comment, grams, price_per_gram))
                 new_id = cur.fetchone()[0]
-
-                # Уменьшаем остаток золота
-                cur.execute(f"UPDATE {SCHEMA}.liquidity_gold_stock SET grams = grams - %s, updated_at = now()", (grams,))
+                cur.execute(f"UPDATE {SCHEMA}.liquidity_gold_stock SET grams=grams-%s, updated_at=now()", (grams,))
                 conn.commit()
                 return ok({"id": new_id, "total": total, "grams": grams, "gold_stock_remaining": stock_grams - grams})
 
-            # Добавить продажу телефона
             if action == "add_phone_sale":
                 amount = float(body.get("amount", 0))
                 shop = body.get("shop", "kirova7")
                 entry_date = body.get("date", date.today().isoformat())
                 comment = body.get("comment", "")
-
                 cur.execute(f"""
-                    INSERT INTO {SCHEMA}.liquidity_entries
-                        (entry_date, shop, category, amount, comment, source)
-                    VALUES (%s, %s, 'phone_sale', %s, %s, 'manual')
-                    RETURNING id
+                    INSERT INTO {SCHEMA}.liquidity_entries (entry_date,shop,category,amount,comment,source)
+                    VALUES (%s,%s,'phone_sale',%s,%s,'manual') RETURNING id
                 """, (entry_date, shop, amount, comment))
                 new_id = cur.fetchone()[0]
                 conn.commit()
                 return ok({"id": new_id})
 
-            # Добавить произвольную запись (расход/доход)
             if action == "add_entry":
                 amount = float(body.get("amount", 0))
                 shop = body.get("shop", "kirova7")
                 category = body.get("category", "other_expense")
                 entry_date = body.get("date", date.today().isoformat())
                 comment = body.get("comment", "")
-
                 cur.execute(f"""
-                    INSERT INTO {SCHEMA}.liquidity_entries
-                        (entry_date, shop, category, amount, comment, source)
-                    VALUES (%s, %s, %s, %s, %s, 'manual')
-                    RETURNING id
+                    INSERT INTO {SCHEMA}.liquidity_entries (entry_date,shop,category,amount,comment,source)
+                    VALUES (%s,%s,%s,%s,%s,'manual') RETURNING id
                 """, (entry_date, shop, category, amount, comment))
                 new_id = cur.fetchone()[0]
                 conn.commit()
                 return ok({"id": new_id})
 
-            # Обновить сумму аренды
             if action == "update_rent":
                 shop = body.get("shop")
                 amount = float(body.get("amount", 0))
                 if shop not in ("kirova7", "kirova11"):
                     return err("Неверный магазин")
-                cur.execute(f"""
-                    UPDATE {SCHEMA}.liquidity_rent SET amount = %s, updated_at = now() WHERE shop = %s
-                """, (amount, shop))
+                cur.execute(f"UPDATE {SCHEMA}.liquidity_rent SET amount=%s, updated_at=now() WHERE shop=%s", (amount, shop))
                 conn.commit()
                 return ok({"ok": True})
 
-            # Списать аренду вручную
             if action == "charge_rent":
                 shop = body.get("shop")
                 entry_date = body.get("date", date.today().isoformat())
                 if shop not in ("kirova7", "kirova11"):
                     return err("Неверный магазин")
-                cur.execute(f"SELECT amount FROM {SCHEMA}.liquidity_rent WHERE shop = %s", (shop,))
+                cur.execute(f"SELECT amount FROM {SCHEMA}.liquidity_rent WHERE shop=%s", (shop,))
                 r = cur.fetchone()
                 if not r or float(r[0]) == 0:
                     return err("Сумма аренды не задана")
                 amount = float(r[0])
                 label = "Кирова 7" if shop == "kirova7" else "Кирова 11"
                 cur.execute(f"""
-                    INSERT INTO {SCHEMA}.liquidity_entries
-                        (entry_date, shop, category, amount, comment, source)
-                    VALUES (%s, %s, 'rent', %s, %s, 'manual')
-                    RETURNING id
+                    INSERT INTO {SCHEMA}.liquidity_entries (entry_date,shop,category,amount,comment,source)
+                    VALUES (%s,%s,'rent',%s,%s,'manual') RETURNING id
                 """, (entry_date, shop, -amount, f"Аренда {label}"))
                 new_id = cur.fetchone()[0]
                 conn.commit()
                 return ok({"id": new_id, "amount": amount})
 
-            # Удалить запись
             if action == "delete_entry":
                 entry_id = body.get("id")
                 if not entry_id:
                     return err("Нет id")
-                # Если это покупка/продажа золота — корректируем остаток
-                cur.execute(f"SELECT category, gold_grams FROM {SCHEMA}.liquidity_entries WHERE id = %s", (entry_id,))
+                cur.execute(f"SELECT category, gold_grams FROM {SCHEMA}.liquidity_entries WHERE id=%s", (entry_id,))
                 row = cur.fetchone()
                 if row:
                     cat, grams = row
                     if cat == "gold_buy" and grams:
-                        cur.execute(f"UPDATE {SCHEMA}.liquidity_gold_stock SET grams = grams - %s", (float(grams),))
+                        cur.execute(f"UPDATE {SCHEMA}.liquidity_gold_stock SET grams=grams-%s", (float(grams),))
                     elif cat == "gold_sell" and grams:
-                        cur.execute(f"UPDATE {SCHEMA}.liquidity_gold_stock SET grams = grams + %s", (float(grams),))
-                cur.execute(f"DELETE FROM {SCHEMA}.liquidity_entries WHERE id = %s", (entry_id,))
+                        cur.execute(f"UPDATE {SCHEMA}.liquidity_gold_stock SET grams=grams+%s", (float(grams),))
+                cur.execute(f"DELETE FROM {SCHEMA}.liquidity_entries WHERE id=%s", (entry_id,))
                 conn.commit()
                 return ok({"ok": True})
 
-            # Синхронизировать доход с ремонта из repair_orders
             if action == "sync_repair":
                 entry_date = body.get("date", date.today().isoformat())
                 shop = body.get("shop", "kirova7")
-
-                # Моя доля = repair_amount - master_income - purchase_amount
-                cur.execute(f"""
-                    SELECT COALESCE(SUM(
-                        repair_amount
-                        - COALESCE(master_income, 0)
-                        - COALESCE(purchase_amount, 0)
-                    ), 0)
-                    FROM {SCHEMA}.repair_orders
-                    WHERE DATE(completed_at AT TIME ZONE 'Europe/Moscow') = %s
-                    AND status IN ('ready', 'done', 'picked_up')
-                    AND repair_amount IS NOT NULL
-                """, (entry_date,))
+                cur.execute(REPAIR_SQL, (entry_date, entry_date))
                 my_profit = float(cur.fetchone()[0])
-
                 if my_profit > 0:
-                    # Удаляем старую авто-запись за эту дату, если есть
+                    cur.execute(f"DELETE FROM {SCHEMA}.liquidity_entries WHERE entry_date=%s AND shop=%s AND category='repair' AND source='auto_repair'", (entry_date, shop))
                     cur.execute(f"""
-                        DELETE FROM {SCHEMA}.liquidity_entries
-                        WHERE entry_date = %s AND shop = %s AND category = 'repair' AND source = 'auto_repair'
-                    """, (entry_date, shop))
-                    cur.execute(f"""
-                        INSERT INTO {SCHEMA}.liquidity_entries
-                            (entry_date, shop, category, amount, comment, source)
-                        VALUES (%s, %s, 'repair', %s, 'Авто: моя доля с ремонта', 'auto_repair')
-                        RETURNING id
+                        INSERT INTO {SCHEMA}.liquidity_entries (entry_date,shop,category,amount,comment,source)
+                        VALUES (%s,%s,'repair',%s,'Авто: моя доля с ремонта','auto_repair') RETURNING id
                     """, (entry_date, shop, my_profit))
                     conn.commit()
                     return ok({"synced": True, "amount": my_profit})
