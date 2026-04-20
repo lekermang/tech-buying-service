@@ -47,11 +47,13 @@ def send_tg_all(token: str, main_chat_id: str, conn, message: str):
             pass
 
 
-def build_act_html(order_id, name, phone, model, repair_type, price_str, comment) -> bytes:
+def build_act_html(order_id, name, phone, model, repair_type, price_str, comment, advance=0, is_paid=False) -> bytes:
     import datetime
     now = datetime.datetime.now()
     date_str = now.strftime('%d.%m.%Y')
     order_num = str(order_id).zfill(6)
+    advance_val = int(advance) if advance else 0
+    paid_str = 'Оплачено полностью ✓' if is_paid else (f'Аванс: {advance_val:,} ₽'.replace(',', ' ') if advance_val > 0 else '0')
 
     html = f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Акт приёма №{order_id}</title>
@@ -135,6 +137,10 @@ body{{font-family:Arial,sans-serif;font-size:10px;color:#000;background:#fff}}
     Тел.: +7 (992) 990-33-33<br>
     skypka24.com
   </div>
+  <div style="padding:4px 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;border-left:1px solid #000;min-width:70px">
+    <img src="https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=https://skypka24.com/act" width="60" height="60" alt="QR" style="display:block"/>
+    <div style="font-size:6.5px;color:#555;text-align:center;margin-top:2px">skypka24.com/act</div>
+  </div>
 </div>
 
 <div class="sec3">
@@ -160,7 +166,7 @@ body{{font-family:Arial,sans-serif;font-size:10px;color:#000;background:#fff}}
     <div class="sc-h">Ремонт:</div>
     <div class="sc-b">
       <div class="f"><div class="fl">Ориентировочная стоимость:</div><div class="fvn">{price_str}</div></div>
-      <div class="f"><div class="fl">Аванс:</div><div class="fvn">0</div></div>
+      <div class="f"><div class="fl">Аванс / Оплата:</div><div class="fvn" style="{'font-weight:bold;color:#2a7a2a' if is_paid else ''}">{paid_str}</div></div>
       <div style="height:4px"></div>
       <div class="f"><div class="fl">Срок ремонта:</div><div class="fvn">По договорённости</div></div>
       <div class="f"><div class="fl">Заявленные неисправности:</div><div class="fvn">{comment or repair_type or '—'}</div></div>
@@ -696,7 +702,7 @@ def handler(event: dict, context) -> dict:
 
         where = ('WHERE ' + ' AND '.join(conditions)) if conditions else ''
         cur.execute(
-            f"SELECT id, name, phone, model, repair_type, price, status, admin_note, created_at, comment, purchase_amount, repair_amount, completed_at, master_income, parts_name, picked_up_at FROM {SCHEMA}.repair_orders {where} ORDER BY created_at DESC LIMIT 500"
+            f"SELECT id, name, phone, model, repair_type, price, status, admin_note, created_at, comment, purchase_amount, repair_amount, completed_at, master_income, parts_name, picked_up_at, advance, is_paid FROM {SCHEMA}.repair_orders {where} ORDER BY created_at DESC LIMIT 500"
         )
         rows = cur.fetchall()
         cur.close(); conn.close()
@@ -710,6 +716,7 @@ def handler(event: dict, context) -> dict:
                 'completed_at': r[12].isoformat() if r[12] else None,
                 'master_income': r[13], 'parts_name': r[14],
                 'picked_up_at': r[15].isoformat() if r[15] else None,
+                'advance': r[16], 'is_paid': r[17],
             }
             for r in rows
         ]
@@ -1104,14 +1111,14 @@ def handler(event: dict, context) -> dict:
         # Отправить акт в Telegram
         if action == 'send_act':
             order_id = int(body.get('id', 0))
-            cur.execute(f"SELECT name, phone, model, repair_type, price, comment FROM {SCHEMA}.repair_orders WHERE id = {order_id}")
+            cur.execute(f"SELECT name, phone, model, repair_type, price, comment, advance, is_paid FROM {SCHEMA}.repair_orders WHERE id = {order_id}")
             row = cur.fetchone()
             if not row:
                 cur.close(); conn.close()
                 return {'statusCode': 404, 'headers': HEADERS, 'body': json.dumps({'error': 'Заявка не найдена'}, ensure_ascii=False)}
-            name, phone, model, repair_type, price, comment = row
+            name, phone, model, repair_type, price, comment, advance, is_paid = row
             price_str = f"{int(price):,} ₽".replace(',', ' ') if price else 'не определена'
-            html_bytes = build_act_html(order_id, name or '', phone or '', model or '', repair_type or '', price_str, comment or '')
+            html_bytes = build_act_html(order_id, name or '', phone or '', model or '', repair_type or '', price_str, comment or '', advance or 0, is_paid or False)
             filename = f'Акт_приёмки_{order_id}_{(name or "клиент").replace(" ", "_")}.html'
             tg_token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
             main_chat = os.environ.get('TELEGRAM_CHAT_ID', '')
@@ -1149,6 +1156,8 @@ def handler(event: dict, context) -> dict:
         purchase_amount = body.get('purchase_amount')
         repair_amount = body.get('repair_amount')
         parts_name = body.get('parts_name')
+        upd_advance = body.get('advance')
+        upd_is_paid = body.get('is_paid')
         # Базовые поля заявки
         upd_name = body.get('name')
         upd_phone = body.get('phone')
@@ -1221,6 +1230,10 @@ def handler(event: dict, context) -> dict:
                 sets.append(f"comment = '{str(upd_comment).replace(chr(39), chr(39)*2)}'")
             else:
                 sets.append("comment = NULL")
+        if upd_advance is not None:
+            sets.append(f"advance = {int(upd_advance)}")
+        if upd_is_paid is not None:
+            sets.append(f"is_paid = {str(bool(upd_is_paid)).upper()}")
 
         if not sets:
             cur.close(); conn.close()

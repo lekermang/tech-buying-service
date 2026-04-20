@@ -46,12 +46,14 @@ def send_tg(token: str, chat_id, text: str, parse_mode: str = 'Markdown'):
         pass
 
 
-def build_act_html(order_id, name, phone, model, repair_type, price_str, comment) -> bytes:
+def build_act_html(order_id, name, phone, model, repair_type, price_str, comment, advance=0, is_paid=False) -> bytes:
     import datetime
     now = datetime.datetime.now()
     date_str = now.strftime('%d.%m.%Y')
     time_str = now.strftime('%H:%M')
     order_num = str(order_id).zfill(6)
+    advance_val = int(advance) if advance else 0
+    paid_str = 'Оплачено полностью ✓' if is_paid else (f'Аванс: {advance_val:,} ₽'.replace(',', ' ') if advance_val > 0 else '0')
 
     html = f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Акт приёма №{order_id}</title>
@@ -130,6 +132,10 @@ body{{font-family:Arial,sans-serif;font-size:10px;color:#000;background:#fff}}
     Тел.: +7 (992) 990-33-33<br>
     skypka24.com
   </div>
+  <div style="padding:4px 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;border-left:1px solid #000;min-width:70px">
+    <img src="https://api.qrserver.com/v1/create-qr-code/?size=60x60&data=https://skypka24.com/act" width="60" height="60" alt="QR" style="display:block"/>
+    <div style="font-size:6.5px;color:#555;text-align:center;margin-top:2px">skypka24.com/act</div>
+  </div>
 </div>
 
 <div class="sec3">
@@ -155,7 +161,7 @@ body{{font-family:Arial,sans-serif;font-size:10px;color:#000;background:#fff}}
     <div class="sc-h">Ремонт:</div>
     <div class="sc-b">
       <div class="f"><div class="fl">Ориентировочная стоимость:</div><div class="fvn">{price_str}</div></div>
-      <div class="f"><div class="fl">Аванс:</div><div class="fvn">0</div></div>
+      <div class="f"><div class="fl">Аванс / Оплата:</div><div class="fvn">{paid_str}</div></div>
       <div style="height:4px"></div>
       <div class="f"><div class="fl">Срок ремонта:</div><div class="fvn">По договорённости</div></div>
       <div class="f"><div class="fl">Заявленные неисправности:</div><div class="fvn">{comment or repair_type or '—'}</div></div>

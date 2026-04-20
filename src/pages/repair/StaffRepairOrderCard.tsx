@@ -17,6 +17,7 @@ type EditForm = {
   name: string; phone: string; model: string; repair_type: string;
   price: string; comment: string; admin_note: string;
   purchase_amount: string; repair_amount: string; parts_name: string;
+  advance: string; is_paid: boolean;
 };
 
 type Props = {
@@ -196,6 +197,34 @@ export default function StaffRepairOrderCard({
                 <span className="text-white/40">Мастер: <span className="text-green-400 font-bold ml-1">
                   {Math.max(0, Math.round((parseInt(ef.repair_amount) - parseInt(ef.purchase_amount)) * 0.5)).toLocaleString("ru-RU")} ₽
                 </span></span>
+              </div>
+            )}
+
+            {/* Аванс + Оплачено */}
+            <div className="grid grid-cols-2 gap-2 pt-1 border-t border-white/5">
+              <div>
+                <label className={LBL + " text-blue-400/80"}>💵 Аванс (₽)</label>
+                <input type="number" inputMode="numeric" value={ef.advance}
+                  onChange={e => onEditFormChange(o.id, { ...ef, advance: e.target.value })}
+                  placeholder="0" className={INP} />
+              </div>
+              <div className="flex flex-col justify-end pb-1">
+                <label className="flex items-center gap-2 cursor-pointer active:opacity-70"
+                  onClick={() => onEditFormChange(o.id, { ...ef, is_paid: !ef.is_paid })}>
+                  <div className={`w-4 h-4 border flex items-center justify-center transition-colors shrink-0 ${ef.is_paid ? "bg-green-500 border-green-500" : "border-white/30"}`}>
+                    {ef.is_paid && <Icon name="Check" size={10} className="text-white" />}
+                  </div>
+                  <span className="font-roboto text-xs text-white/60">Оплачено полностью</span>
+                </label>
+              </div>
+            </div>
+            {ef.is_paid && (
+              <div className="text-[10px] font-roboto text-green-400/70 px-1">✓ Клиент оплатил ремонт полностью</div>
+            )}
+            {!ef.is_paid && ef.advance && parseInt(ef.advance) > 0 && (
+              <div className="text-[10px] font-roboto text-blue-400/70 px-1">
+                Аванс: {parseInt(ef.advance).toLocaleString("ru-RU")} ₽
+                {ef.repair_amount && ` · Остаток: ${(parseInt(ef.repair_amount) - parseInt(ef.advance)).toLocaleString("ru-RU")} ₽`}
               </div>
             )}
           </div>
