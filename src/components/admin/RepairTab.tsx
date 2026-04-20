@@ -1,20 +1,20 @@
 import { useState, useEffect, useCallback } from "react";
-import Icon from "@/components/ui/icon";
 import { adminHeaders } from "@/lib/adminFetch";
 import {
-  ADMIN_URL, STATUSES, Order, Analytics, EditForm,
+  ADMIN_URL, Order, Analytics, EditForm,
   EMPTY_FORM, EMPTY_READY,
 } from "./repair/repairTypes";
 import { printAct } from "@/pages/repair/types";
 import RepairAnalytics from "./repair/RepairAnalytics";
-import RepairOrderCard from "./repair/RepairOrderCard";
 import RepairReadyModal from "./repair/RepairReadyModal";
 import LaborPricesTab from "./repair/LaborPricesTab";
+import RepairTabHeader from "./repair/RepairTabHeader";
+import RepairOrdersView from "./repair/RepairOrdersView";
+import RepairImportTab from "./repair/RepairImportTab";
 
 export { STATUSES } from "./repair/repairTypes";
 
 const REPAIR_PARTS_URL = "https://functions.poehali.dev/68da5b17-ae5f-4568-8e27-0d945b995d82";
-const IMPORT_PARTS_URL = "https://functions.poehali.dev/71d1796e-9ac1-4330-abfb-b6713d9dfaf5";
 
 type View = "orders" | "analytics" | "labor_prices" | "import_parts";
 type Period = "day" | "week" | "month";
@@ -48,61 +48,6 @@ export default function RepairTab({ token }: { token: string }) {
 
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
-
-  const [importFile, setImportFile] = useState<File | null>(null);
-  const [importPreview, setImportPreview] = useState<{parts_found: number; sample: {name: string; category: string; price: number; quality: string; part_type: string}[]} | null>(null);
-  const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<string | null>(null);
-
-  const fileToBase64 = (file: File): Promise<string> =>
-    new Promise((res, rej) => {
-      const r = new FileReader();
-      r.onload = () => res((r.result as string).split(',')[1]);
-      r.onerror = rej;
-      r.readAsDataURL(file);
-    });
-
-  const handleImportFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImportFile(file);
-    setImportPreview(null);
-    setImportResult(null);
-    try {
-      const b64 = await fileToBase64(file);
-      const res = await fetch(IMPORT_PARTS_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...adminHeaders(token) },
-        body: JSON.stringify({ action: 'preview', file: b64 }),
-      });
-      const data = await res.json();
-      setImportPreview(data);
-    } catch {
-      setImportResult('Ошибка чтения файла');
-    }
-  };
-
-  const handleImport = async () => {
-    if (!importFile) return;
-    setImporting(true);
-    setImportResult(null);
-    try {
-      const b64 = await fileToBase64(importFile);
-      const res = await fetch(IMPORT_PARTS_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...adminHeaders(token) },
-        body: JSON.stringify({ action: 'import', file: b64 }),
-      });
-      const data = await res.json();
-      if (data.error) setImportResult(`Ошибка: ${data.error}`);
-      else setImportResult(`Загружено ${data.imported} позиций, пропущено ${data.skipped}`);
-      setImportFile(null);
-      setImportPreview(null);
-    } catch {
-      setImportResult('Ошибка соединения');
-    }
-    setImporting(false);
-  };
 
   const syncParts = async () => {
     setSyncing(true);
@@ -255,93 +200,27 @@ export default function RepairTab({ token }: { token: string }) {
     if (ok) setReadyModal(null);
   };
 
-  const statusCounts: Record<string, number> = {};
-  orders.forEach(o => { statusCounts[o.status] = (statusCounts[o.status] || 0) + 1; });
-
-  const inp = "w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-2 font-roboto text-xs focus:outline-none focus:border-[#FFD700] transition-colors placeholder:text-white/20";
-  const lbl = "font-roboto text-white/40 text-[10px] block mb-1";
-
   return (
     <div className="h-full flex flex-col">
       {/* Шапка */}
-      <div className="px-4 py-3 border-b border-[#222] flex items-center gap-3 flex-wrap">
-        <div className="flex rounded overflow-hidden border border-[#333]">
-          <button onClick={() => setView("orders")}
-            className={`px-4 py-1.5 font-roboto text-xs transition-colors flex items-center gap-1.5 ${view === "orders" ? "bg-[#FFD700] text-black font-bold" : "text-white/50 hover:text-white"}`}>
-            <Icon name="ClipboardList" size={13} />Заявки
-          </button>
-          <button onClick={() => setView("analytics")}
-            className={`px-4 py-1.5 font-roboto text-xs transition-colors flex items-center gap-1.5 ${view === "analytics" ? "bg-[#FFD700] text-black font-bold" : "text-white/50 hover:text-white"}`}>
-            <Icon name="BarChart2" size={13} />Аналитика
-          </button>
-          <button onClick={() => setView("labor_prices")}
-            className={`px-4 py-1.5 font-roboto text-xs transition-colors flex items-center gap-1.5 ${view === "labor_prices" ? "bg-[#FFD700] text-black font-bold" : "text-white/50 hover:text-white"}`}>
-            <Icon name="Tag" size={13} />Цены работ
-          </button>
-          <button onClick={() => setView("import_parts")}
-            className={`px-4 py-1.5 font-roboto text-xs transition-colors flex items-center gap-1.5 ${view === "import_parts" ? "bg-[#FFD700] text-black font-bold" : "text-white/50 hover:text-white"}`}>
-            <Icon name="FileUp" size={13} />Импорт Excel
-          </button>
-        </div>
-
-        {view === "orders" && (
-          <>
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Поиск по имени, телефону, модели..."
-              className="flex-1 min-w-[150px] bg-[#0D0D0D] border border-[#333] text-white px-3 py-1.5 font-roboto text-xs focus:outline-none focus:border-[#FFD700] placeholder:text-white/20"
-            />
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <button onClick={() => { setDateFrom(""); setDateTo(""); }}
-                className={`px-2 py-1 font-roboto text-[10px] border transition-colors ${
-                  !dateFrom && !dateTo ? "border-[#FFD700] text-[#FFD700] bg-[#FFD700]/10" : "border-[#333] text-white/40 hover:border-white/30 hover:text-white/70"
-                }`}>Все</button>
-              {[
-                { label: "Сегодня", get: () => { const t = new Date().toISOString().slice(0,10); return [t, t]; } },
-                { label: "Неделя",  get: () => { const t = new Date(); const f = new Date(t); f.setDate(t.getDate()-6); return [f.toISOString().slice(0,10), t.toISOString().slice(0,10)]; } },
-                { label: "Месяц",   get: () => { const t = new Date(); const f = new Date(t); f.setDate(t.getDate()-29); return [f.toISOString().slice(0,10), t.toISOString().slice(0,10)]; } },
-              ].map(q => (
-                <button key={q.label} onClick={() => { const [f,to] = q.get(); setDateFrom(f); setDateTo(to); }}
-                  className={`px-2 py-1 font-roboto text-[10px] border transition-colors ${
-                    (() => { const [f,to] = q.get(); return dateFrom===f && dateTo===to; })()
-                      ? "border-[#FFD700] text-[#FFD700] bg-[#FFD700]/10"
-                      : "border-[#333] text-white/40 hover:border-white/30 hover:text-white/70"
-                  }`}>{q.label}</button>
-              ))}
-              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-                title="Дата сдачи от"
-                className="bg-[#0D0D0D] border border-[#333] text-white/70 px-2 py-1.5 font-roboto text-xs focus:outline-none focus:border-[#FFD700] w-32" />
-              <span className="text-white/20 text-xs">—</span>
-              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-                title="Дата сдачи до"
-                className="bg-[#0D0D0D] border border-[#333] text-white/70 px-2 py-1.5 font-roboto text-xs focus:outline-none focus:border-[#FFD700] w-32" />
-            </div>
-            <button onClick={load} disabled={loading} className="text-white/40 hover:text-white p-1.5 transition-colors">
-              <Icon name={loading ? "Loader" : "RefreshCw"} size={14} className={loading ? "animate-spin" : ""} />
-            </button>
-            <button onClick={() => { setShowForm(!showForm); setForm(EMPTY_FORM); }}
-              className="flex items-center gap-1.5 bg-[#FFD700] text-black font-oswald font-bold px-3 py-1.5 text-xs uppercase hover:bg-yellow-400 transition-colors">
-              <Icon name={showForm ? "X" : "Plus"} size={13} />
-              {showForm ? "Отмена" : "Новая заявка"}
-            </button>
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={syncParts}
-                disabled={syncing}
-                title="Синхронизировать каталог запчастей из МойСклад"
-                className="flex items-center gap-1.5 border border-[#333] text-white/60 hover:text-white hover:border-white/40 px-3 py-1.5 font-roboto text-xs transition-colors disabled:opacity-40"
-              >
-                <Icon name={syncing ? "Loader" : "RefreshCw"} size={13} className={syncing ? "animate-spin" : ""} />
-                {syncing ? "Синхронизация..." : "Запчасти"}
-              </button>
-              {syncResult && (
-                <span className="font-roboto text-[10px] text-green-400">{syncResult}</span>
-              )}
-            </div>
-          </>
-        )}
-      </div>
+      <RepairTabHeader
+        view={view}
+        setView={setView}
+        search={search}
+        setSearch={setSearch}
+        dateFrom={dateFrom}
+        setDateFrom={setDateFrom}
+        dateTo={dateTo}
+        setDateTo={setDateTo}
+        loading={loading}
+        onRefresh={load}
+        showForm={showForm}
+        setShowForm={setShowForm}
+        setForm={setForm}
+        syncing={syncing}
+        syncResult={syncResult}
+        syncParts={syncParts}
+      />
 
       {/* АНАЛИТИКА */}
       {view === "analytics" && (
@@ -356,111 +235,30 @@ export default function RepairTab({ token }: { token: string }) {
 
       {/* ЗАЯВКИ */}
       {view === "orders" && (
-        <>
-          {/* Фильтры по статусу */}
-          <div className="px-4 py-2 flex gap-1.5 flex-wrap border-b border-[#222]">
-            <button onClick={() => setFilterStatus("all")}
-              className={`font-roboto text-xs px-2.5 py-1 border transition-colors ${filterStatus === "all" ? "border-[#FFD700] text-[#FFD700]" : "border-white/10 text-white/40 hover:text-white"}`}>
-              Все ({orders.length})
-            </button>
-            {STATUSES.map(s => (
-              <button key={s.key} onClick={() => setFilterStatus(s.key)}
-                className={`font-roboto text-xs px-2.5 py-1 border transition-colors flex items-center gap-1 ${filterStatus === s.key ? "border-[#FFD700] text-[#FFD700]" : "border-white/10 text-white/40 hover:text-white"}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
-                {s.label}
-                {statusCounts[s.key] ? <span className="text-[10px] opacity-60">({statusCounts[s.key]})</span> : null}
-              </button>
-            ))}
-          </div>
-
-          {/* Форма создания */}
-          {showForm && (
-            <div className="mx-4 mt-3 mb-1 bg-[#1A1A1A] border border-[#FFD700]/30 p-4">
-              <div className="font-roboto text-white/50 text-[10px] uppercase tracking-widest mb-3">Новая заявка на ремонт</div>
-              <div className="grid grid-cols-2 gap-2 mb-2">
-                <div>
-                  <label className={lbl}>Имя клиента *</label>
-                  <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="Иван Иванов" className={inp} />
-                </div>
-                <div>
-                  <label className={lbl}>Телефон *</label>
-                  <input value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} placeholder="+7 999 123-45-67" className={inp} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2 mb-2">
-                <div>
-                  <label className={lbl}>Модель устройства</label>
-                  <input value={form.model} onChange={e => setForm(p => ({ ...p, model: e.target.value }))} placeholder="iPhone 14, Samsung A54..." className={inp} />
-                </div>
-                <div>
-                  <label className={lbl}>Тип ремонта</label>
-                  <input value={form.repair_type} onChange={e => setForm(p => ({ ...p, repair_type: e.target.value }))} placeholder="Замена дисплея, зарядка..." className={inp} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2 mb-2">
-                <div>
-                  <label className={lbl}>Стоимость (₽)</label>
-                  <input type="number" value={form.price} onChange={e => setForm(p => ({ ...p, price: e.target.value }))} placeholder="1500" className={inp} />
-                </div>
-                <div>
-                  <label className={lbl}>Комментарий</label>
-                  <input value={form.comment} onChange={e => setForm(p => ({ ...p, comment: e.target.value }))} placeholder="Разбитый экран..." className={inp} />
-                </div>
-              </div>
-              <div className="flex gap-2 mt-3">
-                <button onClick={createOrder} disabled={creating || !form.name || !form.phone}
-                  className="bg-[#FFD700] text-black font-oswald font-bold px-5 py-2 uppercase text-xs hover:bg-yellow-400 transition-colors disabled:opacity-50 flex items-center gap-1.5">
-                  <Icon name="Check" size={13} />{creating ? "Создаю..." : "Создать заявку"}
-                </button>
-                <button onClick={() => { setShowForm(false); setForm(EMPTY_FORM); }} className="text-white/30 font-roboto text-xs hover:text-white transition-colors px-2">Отмена</button>
-              </div>
-            </div>
-          )}
-
-          {/* Список заявок */}
-          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
-            {loading && <div className="text-center py-10 text-white/30 font-roboto text-sm">Загружаю...</div>}
-            {!loading && orders.length === 0 && (
-              <div className="text-center py-10 text-white/30 font-roboto text-sm">Заявок нет</div>
-            )}
-            {orders.map((o) => {
-              const isExpanded = expandedId === o.id;
-              const ef = editForm[o.id] || {
-                purchase_amount: o.purchase_amount != null ? String(o.purchase_amount) : "",
-                repair_amount: o.repair_amount != null ? String(o.repair_amount) : "",
-                parts_name: o.parts_name || "",
-                admin_note: o.admin_note || "",
-              };
-              return (
-                <RepairOrderCard
-                  key={o.id}
-                  o={o}
-                  isExpanded={isExpanded}
-                  ef={ef}
-                  saving={saving}
-                  saveError={saveError}
-                  token={token}
-                  authHeader="X-Admin-Token"
-                  onToggle={() => {
-                    setExpandedId(isExpanded ? null : o.id);
-                    setSaveError(null);
-                    if (!isExpanded) setEditForm(prev => ({ ...prev, [o.id]: {
-                      purchase_amount: o.purchase_amount != null ? String(o.purchase_amount) : "",
-                      repair_amount: o.repair_amount != null ? String(o.repair_amount) : "",
-                      parts_name: o.parts_name || "",
-                      admin_note: o.admin_note || "",
-                    }}));
-                  }}
-                  onEditFormChange={(id, newEf) => setEditForm(prev => ({ ...prev, [id]: newEf }))}
-                  onUpdateStatus={updateStatus}
-                  onOpenReadyModal={openReadyModal}
-                  onSaveEdit={saveEdit}
-                  onDelete={deleteOrder}
-                />
-              );
-            })}
-          </div>
-        </>
+        <RepairOrdersView
+          orders={orders}
+          loading={loading}
+          filterStatus={filterStatus}
+          setFilterStatus={setFilterStatus}
+          showForm={showForm}
+          setShowForm={setShowForm}
+          form={form}
+          setForm={setForm}
+          creating={creating}
+          createOrder={createOrder}
+          expandedId={expandedId}
+          setExpandedId={setExpandedId}
+          editForm={editForm}
+          setEditForm={setEditForm}
+          saving={saving}
+          saveError={saveError}
+          setSaveError={setSaveError}
+          token={token}
+          updateStatus={updateStatus}
+          openReadyModal={openReadyModal}
+          saveEdit={saveEdit}
+          deleteOrder={deleteOrder}
+        />
       )}
 
       {/* Цены работ */}
@@ -472,66 +270,7 @@ export default function RepairTab({ token }: { token: string }) {
 
       {/* Импорт Excel */}
       {view === "import_parts" && (
-        <div className="flex-1 overflow-y-auto px-4 py-5 space-y-5 max-w-xl">
-          <div>
-            <p className="font-roboto text-white/50 text-xs mb-3">
-              Загрузи прайс-лист поставщика в формате .xlsx или .xls. Система автоматически определит колонки с названием, ценой, остатком и качеством.
-            </p>
-            <label className="flex flex-col items-center justify-center border-2 border-dashed border-[#333] hover:border-[#FFD700]/50 transition-colors cursor-pointer py-8 px-4 text-center">
-              <Icon name="FileUp" size={28} className="text-white/20 mb-2" />
-              <span className="font-roboto text-white/50 text-xs">
-                {importFile ? importFile.name : 'Нажми или перетащи файл Excel (.xlsx)'}
-              </span>
-              <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportFileChange} />
-            </label>
-          </div>
-
-          {importPreview && (
-            <div className="border border-[#222] p-3 space-y-3">
-              <p className="font-roboto text-xs text-white/60">
-                Найдено строк с товаром: <span className="text-[#FFD700] font-bold">{importPreview.parts_found}</span>
-              </p>
-              {importPreview.sample.length > 0 && (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-[10px] font-roboto">
-                    <thead>
-                      <tr className="text-white/30 border-b border-[#222]">
-                        <th className="text-left py-1 pr-3">Название</th>
-                        <th className="text-left py-1 pr-3">Категория</th>
-                        <th className="text-right py-1 pr-3">Цена</th>
-                        <th className="text-left py-1">Качество</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {importPreview.sample.map((p, i) => (
-                        <tr key={i} className="border-b border-[#111] text-white/70">
-                          <td className="py-1 pr-3 max-w-[180px] truncate">{p.name}</td>
-                          <td className="py-1 pr-3 text-white/40">{p.category || '—'}</td>
-                          <td className="py-1 pr-3 text-right">{p.price} ₽</td>
-                          <td className="py-1">{p.quality}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              <button
-                onClick={handleImport}
-                disabled={importing}
-                className="flex items-center gap-2 bg-[#FFD700] text-black font-oswald font-bold px-5 py-2 text-xs uppercase hover:bg-yellow-400 transition-colors disabled:opacity-50"
-              >
-                <Icon name={importing ? "Loader" : "Upload"} size={13} className={importing ? "animate-spin" : ""} />
-                {importing ? "Загружаю..." : `Загрузить ${importPreview.parts_found} позиций`}
-              </button>
-            </div>
-          )}
-
-          {importResult && (
-            <p className={`font-roboto text-xs ${importResult.startsWith('Ошибка') ? 'text-red-400' : 'text-green-400'}`}>
-              {importResult}
-            </p>
-          )}
-        </div>
+        <RepairImportTab token={token} />
       )}
 
       {/* Модалка перевода в Готово */}
