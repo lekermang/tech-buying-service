@@ -35,6 +35,7 @@ export default function LaborPricesTab({
   const [markup, setMarkup] = useState("0");
   const [extras, setExtras] = useState<ExtraWork[]>([]);
   const [editedExtras, setEditedExtras] = useState<ExtraWork[]>([]);
+  const [deletedExtraIds, setDeletedExtraIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -59,6 +60,7 @@ export default function LaborPricesTab({
       const extList: ExtraWork[] = data.extra_works || [];
       setExtras(extList);
       setEditedExtras(extList.map(e => ({...e})));
+      setDeletedExtraIds([]);
     } catch {
       setError("Не удалось загрузить цены");
     }
@@ -100,11 +102,25 @@ export default function LaborPricesTab({
     setSyncProgress(null);
   };
 
+  const removeExtra = (i: number) => {
+    const ew = editedExtras[i];
+    if (ew.id) setDeletedExtraIds(prev => [...prev, ew.id!]);
+    setEditedExtras(prev => prev.filter((_, j) => j !== i));
+  };
+
   const save = async () => {
     setSaving(true);
     setError("");
     setSaved(false);
     try {
+      // Удаляем помеченные записи
+      await Promise.all(deletedExtraIds.map(id =>
+        fetch(ADMIN_URL, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ action: "extra_work_delete", id }),
+        })
+      ));
       const payload = prices.map(p => ({
         part_type: p.part_type,
         price: parseInt(edited[p.part_type] || "0") || 0,
@@ -120,8 +136,12 @@ export default function LaborPricesTab({
         }),
       });
       const data = await res.json();
-      if (data.ok) { setSaved(true); setTimeout(() => setSaved(false), 3000); }
-      else setError("Ошибка сохранения");
+      if (data.ok) {
+        setDeletedExtraIds([]);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
+        load();
+      } else setError("Ошибка сохранения");
     } catch {
       setError("Ошибка соединения");
     }
@@ -189,24 +209,26 @@ export default function LaborPricesTab({
       </div>
       <div className="flex flex-col gap-2">
         {editedExtras.map((ew, i) => (
-          <div key={i} className="flex items-center gap-2 border border-[#222] px-3 py-2 bg-black/20">
+          <div key={ew.id ?? `new-${i}`} className="flex items-center gap-2 border border-[#222] px-3 py-2.5 bg-black/20">
             <input
               value={ew.label}
               onChange={e => setEditedExtras(prev => prev.map((x, j) => j === i ? {...x, label: e.target.value} : x))}
-              className="flex-1 bg-transparent text-white font-roboto text-xs focus:outline-none border-b border-[#333] focus:border-[#FFD700] py-0.5"
+              className="flex-1 bg-transparent text-white font-roboto text-xs focus:outline-none border-b border-[#333] focus:border-[#FFD700] pb-0.5"
               placeholder="Название работы"
             />
-            <input
-              type="number" min={0} step={100}
-              value={ew.price}
-              onChange={e => setEditedExtras(prev => prev.map((x, j) => j === i ? {...x, price: parseInt(e.target.value)||0} : x))}
-              className="w-20 bg-[#0D0D0D] border border-[#333] text-white px-2 py-1 font-roboto text-xs focus:outline-none focus:border-[#FFD700] text-right"
-            />
-            <span className="text-white/30 text-xs">₽</span>
-            <button type="button" onClick={() => setEditedExtras(prev => prev.filter((_, j) => j !== i))}
-              className="text-red-400/50 hover:text-red-400 transition-colors">
-              <Icon name="X" size={12} />
-            </button>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <input
+                type="number" min={0} step={100}
+                value={ew.price}
+                onChange={e => setEditedExtras(prev => prev.map((x, j) => j === i ? {...x, price: parseInt(e.target.value)||0} : x))}
+                className="w-20 bg-[#0D0D0D] border border-[#333] text-white px-2 py-1 font-roboto text-xs focus:outline-none focus:border-[#FFD700] text-right"
+              />
+              <span className="text-white/40 text-xs">₽</span>
+              <button type="button" onClick={() => removeExtra(i)}
+                className="text-white/20 hover:text-red-400 transition-colors ml-1">
+                <Icon name="Trash2" size={13} />
+              </button>
+            </div>
           </div>
         ))}
       </div>
