@@ -1,7 +1,7 @@
 """
-Ежедневное уведомление в 21:00 о доходах за день.
-Вызывается по расписанию (cron) или вручную через POST.
-Отправляет сводку в Telegram владельцу.
+Запускается по расписанию в 20:50 МСК (17:50 UTC) каждый день.
+1. Синхронизирует мою долю с ремонта в liquidity_entries.
+2. Отправляет итоговую сводку за день в Telegram.
 """
 import json
 import os
@@ -52,7 +52,6 @@ def handler(event: dict, context) -> dict:
     if event.get("httpMethod") == "OPTIONS":
         return {"statusCode": 200, "headers": CORS, "body": ""}
 
-    # Проверяем авторизацию только для HTTP-вызовов (не cron)
     is_http = bool(event.get("httpMethod"))
     if is_http and not check_auth(event):
         return {"statusCode": 401, "headers": CORS, "body": json.dumps({"error": "Unauthorized"})}
@@ -63,22 +62,7 @@ def handler(event: dict, context) -> dict:
     cur = conn.cursor()
 
     try:
-        # Итоги за сегодня по категориям
-        cur.execute(f"""
-            SELECT category, SUM(amount) as total
-            FROM {SCHEMA}.liquidity_entries
-            WHERE entry_date = %s
-            GROUP BY category
-        """, (today,))
-        rows = cur.fetchall()
-        cats = {r[0]: float(r[1]) for r in rows}
-
-        # Остаток золота
-        cur.execute(f"SELECT grams FROM {SCHEMA}.liquidity_gold_stock LIMIT 1")
-        gold_row = cur.fetchone()
-        gold_stock = float(gold_row[0]) if gold_row else 0.0
-
-        # Моя доля с ремонта = repair_amount - master_income - purchase_amount
+        # ── 1. Синхронизируем мою долю с ремонта ────────────────────────────
         cur.execute(f"""
             SELECT COALESCE(SUM(
                 repair_amount
@@ -90,23 +74,48 @@ def handler(event: dict, context) -> dict:
             AND status IN ('ready', 'done', 'picked_up')
             AND repair_amount IS NOT NULL
         """, (today,))
-        repair_auto = float(cur.fetchone()[0])
+        repair_my = float(cur.fetchone()[0])
+
+        if repair_my > 0:
+            cur.execute(f"""
+                DELETE FROM {SCHEMA}.liquidity_entries
+                WHERE entry_date = %s AND category = 'repair' AND source = 'auto_repair'
+            """, (today,))
+            cur.execute(f"""
+                INSERT INTO {SCHEMA}.liquidity_entries
+                    (entry_date, shop, category, amount, comment, source)
+                VALUES (%s, 'kirova7', 'repair', %s, 'Авто: моя доля с ремонта', 'auto_repair')
+            """, (today, repair_my))
+            conn.commit()
+
+        # ── 2. Читаем итоги за день ──────────────────────────────────────────
+        cur.execute(f"""
+            SELECT category, SUM(amount) as total
+            FROM {SCHEMA}.liquidity_entries
+            WHERE entry_date = %s
+            GROUP BY category
+        """, (today,))
+        cats = {r[0]: float(r[1]) for r in cur.fetchall()}
+
+        cur.execute(f"SELECT grams FROM {SCHEMA}.liquidity_gold_stock LIMIT 1")
+        gold_row = cur.fetchone()
+        gold_stock = float(gold_row[0]) if gold_row else 0.0
 
     finally:
         cur.close()
         conn.close()
 
-    gold_sell = cats.get("gold_sell", 0)
-    gold_buy = cats.get("gold_buy", 0)
+    # ── 3. Формируем и отправляем сообщение ─────────────────────────────────
+    gold_sell   = cats.get("gold_sell", 0)
+    gold_buy    = cats.get("gold_buy", 0)
     gold_profit = gold_sell - gold_buy
-    repair_manual = cats.get("repair", 0)
-    phone_sale = cats.get("phone_sale", 0)
-    rent = cats.get("rent", 0)
-    other = cats.get("other_expense", 0)
-    total = gold_profit + max(repair_manual, repair_auto) + phone_sale + rent + other
+    repair      = cats.get("repair", 0)
+    phone_sale  = cats.get("phone_sale", 0)
+    rent        = cats.get("rent", 0)
+    other       = cats.get("other_expense", 0)
+    total       = gold_profit + repair + phone_sale + rent + other
 
     d_fmt = date.today().strftime("%d.%m.%Y")
-
     lines = [f"<b>📊 Итоги дня {d_fmt}</b>\n"]
 
     if gold_profit != 0:
@@ -117,9 +126,8 @@ def handler(event: dict, context) -> dict:
         if gold_sell:
             lines.append(f"   ↳ продано: {fmt(gold_sell)} ₽")
 
-    repair_val = repair_manual if repair_manual else repair_auto
-    if repair_val > 0:
-        lines.append(f"🔧 Ремонт: +{fmt(repair_val)} ₽")
+    if repair > 0:
+        lines.append(f"🔧 Ремонт (моя доля): +{fmt(repair)} ₽")
 
     if phone_sale > 0:
         lines.append(f"📱 Телефоны: +{fmt(phone_sale)} ₽")
@@ -135,17 +143,16 @@ def handler(event: dict, context) -> dict:
     lines.append(f"<b>💰 Итого: {sign}{fmt(total)} ₽</b>")
     lines.append(f"🥇 Золото на складе: {gold_stock:.2f} г")
 
-    if total == 0 and gold_stock == 0 and not cats:
+    if not cats and gold_stock == 0:
         lines = [f"<b>📊 Итоги дня {d_fmt}</b>\n\nЗа сегодня записей не найдено."]
 
     text = "\n".join(lines)
 
-    # Telegram chat_id владельца
     chat_id = os.environ.get("PLUXAN4IK_CHAT_ID") or os.environ.get("TELEGRAM_CHAT_ID", "")
     tg_send(chat_id, text)
 
     return {
         "statusCode": 200,
         "headers": {**CORS, "Content-Type": "application/json"},
-        "body": json.dumps({"ok": True, "date": today, "total": total, "message": text}),
+        "body": json.dumps({"ok": True, "date": today, "repair_synced": repair_my, "total": total}),
     }
