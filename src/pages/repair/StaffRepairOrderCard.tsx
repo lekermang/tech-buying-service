@@ -137,11 +137,21 @@ export default function StaffRepairOrderCard({
           {o.repair_type && <span className="text-white/40 font-roboto text-xs">🔧 {o.repair_type}</span>}
         </div>
 
-        {/* Строка 3: цены + даты */}
+        {/* Строка 3: цены + аванс + оплата */}
         <div className="flex items-center gap-3 mt-1 flex-wrap">
           {o.price && <span className="text-[#FFD700] font-roboto text-xs font-bold">{o.price.toLocaleString("ru-RU")} ₽</span>}
           {o.repair_amount != null && <span className="text-green-400 font-roboto text-xs">✓ {o.repair_amount.toLocaleString("ru-RU")} ₽</span>}
           {o.master_income != null && <span className="text-green-300/70 font-roboto text-[10px]">мастер: {o.master_income.toLocaleString("ru-RU")} ₽</span>}
+          {o.is_paid && (
+            <span className="font-roboto text-[10px] px-1.5 py-0.5 bg-green-500/20 text-green-400 border border-green-500/30">
+              💳 Оплачено
+            </span>
+          )}
+          {!o.is_paid && o.advance != null && o.advance > 0 && (
+            <span className="font-roboto text-[10px] px-1.5 py-0.5 bg-blue-500/20 text-blue-400 border border-blue-500/30">
+              💵 Аванс {o.advance.toLocaleString("ru-RU")} ₽
+            </span>
+          )}
         </div>
         <div className="flex gap-3 mt-0.5 flex-wrap">
           <span className="text-white/20 font-roboto text-[9px]">📥 {fmt(o.created_at)}</span>
