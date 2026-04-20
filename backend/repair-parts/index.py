@@ -208,10 +208,10 @@ def moba_catalog_page(session: requests.Session, section: str, page: int = 1) ->
     url = f'{MOBA_BASE}{section}'
     params = {'PAGEN_1': page} if page > 1 else {}
     try:
-        resp = session.get(url, params=params, timeout=20,
+        resp = session.get(url, params=params, timeout=20, allow_redirects=True,
                            headers={'Accept': 'text/html', 'Referer': MOBA_BASE + '/'})
+        print(f'[MOBA] catalog {section} p{page}: status={resp.status_code} url={resp.url} html_len={len(resp.text)} snippet={resp.text[:300]!r}')
         if resp.status_code != 200:
-            print(f'[MOBA] catalog {section} p{page}: status={resp.status_code}')
             return []
         return moba_parse_catalog(resp.text, section)
     except Exception as e:
