@@ -101,48 +101,145 @@ def get_extra_works(cur) -> list:
 PAGE_SIZE = 100
 
 
-# ─── MOBA.RU ────────────────────────────────────────────────────────────────
+# ─── MOBA.RU (Битрикс-парсинг через куки браузера) ──────────────────────────
+
+import re as _re
+
+# Категории каталога для полного обхода
+MOBA_CATALOG_SECTIONS = [
+    '/catalog/displei/',
+    '/catalog/akkumulyatory/',
+    '/catalog/steklo-kamer/',
+    '/catalog/shleyfy/',
+    '/catalog/dinamiki-i-mikrofony/',
+    '/catalog/vibromotory/',
+    '/catalog/zadnie-kryshki/',
+]
+
 
 def moba_session() -> requests.Session:
+    """Создаёт сессию с куками из env (скопированы из браузера)."""
     session = requests.Session()
+    cookies_str = os.environ.get('MOBA_COOKIES', '')
     session.headers.update({
-        'User-Agent': 'Mozilla/5.0 (compatible; repair-bot/1.0)',
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'ru,en;q=0.9',
+        'bx-ajax': 'true',
+        'x-requested-with': 'XMLHttpRequest',
     })
-    login = os.environ.get('MOBA_LOGIN', '')
-    password = os.environ.get('MOBA_PASSWORD', '')
-    try:
-        resp = session.post(
-            f'{MOBA_BASE}/api/v1/auth/login',
-            json={'email': login, 'password': password},
-            timeout=20
-        )
-        data = resp.json() if resp.status_code < 400 else {}
-        token = (data.get('token') or data.get('access_token') or
-                 (data.get('data') or {}).get('token', ''))
-        if token:
-            session.headers.update({'Authorization': f'Bearer {token}'})
-    except Exception as e:
-        print(f'[MOBA] login error: {e}')
+    if cookies_str:
+        for part in cookies_str.split(';'):
+            part = part.strip()
+            if '=' in part:
+                k, v = part.split('=', 1)
+                session.cookies.set(k.strip(), v.strip(), domain='kaluga.moba.ru')
     return session
 
 
+def moba_search_html(session: requests.Session, query: str) -> list:
+    """Ищет товары через /ajax/search_title.php (Битрикс-поиск)."""
+    try:
+        resp = session.post(
+            f'{MOBA_BASE}/ajax/search_title.php',
+            data={'ajax_call': 'y', 'q': query, 'l': '1', 'INPUT_ID': 'title-search-input_fixed'},
+            headers={'Content-Type': 'application/x-www-form-urlencoded', 'Referer': MOBA_BASE + '/'},
+            timeout=15
+        )
+        if resp.status_code != 200:
+            print(f'[MOBA] search {query!r}: status={resp.status_code}')
+            return []
+        html = resp.text
+        return moba_parse_search(html, query)
+    except Exception as e:
+        print(f'[MOBA] search error: {e}')
+        return []
+
+
+def moba_parse_search(html: str, query: str) -> list:
+    """Парсит HTML ответа поиска — извлекает товары."""
+    products = []
+    # Ищем блоки товаров: id, название, цену
+    ids = _re.findall(r'data-id=["\']?(\d+)["\']?', html)
+    names = _re.findall(r'<a[^>]+class=["\'][^"\']*name[^"\']*["\'][^>]*>([^<]+)<', html)
+    prices = _re.findall(r'(\d[\d\s]{2,8})\s*[₽руб]', html)
+    # Более простой подход — ищем элементы каталога
+    items = _re.findall(
+        r'data-id=["\']?(\d+)["\']?[^>]*>.*?<[^>]+class=["\'][^"\']*(?:name|title)["\'][^>]*>\s*([^<]{5,120})',
+        html, _re.DOTALL
+    )
+    if items:
+        for pid, name in items[:50]:
+            name = name.strip()
+            if len(name) < 4:
+                continue
+            products.append({'id': pid, 'name': name, 'category': query, 'price': 0, 'stock': 1})
+    return products
+
+
+def moba_catalog_page(session: requests.Session, section: str, page: int = 1) -> list:
+    """Получает страницу каталога и парсит товары."""
+    url = f'{MOBA_BASE}{section}'
+    params = {'PAGEN_1': page} if page > 1 else {}
+    try:
+        resp = session.get(url, params=params, timeout=20,
+                           headers={'Accept': 'text/html', 'Referer': MOBA_BASE + '/'})
+        if resp.status_code != 200:
+            print(f'[MOBA] catalog {section} p{page}: status={resp.status_code}')
+            return []
+        return moba_parse_catalog(resp.text, section)
+    except Exception as e:
+        print(f'[MOBA] catalog error {section}: {e}')
+        return []
+
+
+def moba_parse_catalog(html: str, section: str) -> list:
+    """Парсит страницу каталога moba.ru (1С-Битрикс aspro_next)."""
+    products = []
+    # Ищем карточки товаров: data-id + название + цена
+    # Битрикс обычно ставит data-id на .catalog-item или similar
+    blocks = _re.findall(
+        r'<div[^>]+data-id=["\'](\d+)["\'][^>]*>(.*?)</div>\s*</div>',
+        html, _re.DOTALL
+    )
+    category = section.strip('/').split('/')[-1]
+    for pid, block in blocks[:60]:
+        # Название
+        name_m = _re.search(r'<a[^>]+title=["\']([^"\']{5,150})["\']', block)
+        if not name_m:
+            name_m = _re.search(r'class=["\'][^"\']*item-title[^"\']*["\'][^>]*>\s*<a[^>]*>([^<]{5,150})', block)
+        name = name_m.group(1).strip() if name_m else ''
+        if not name:
+            continue
+        # Цена
+        price_m = _re.search(r'(\d[\d\s]{1,7})\s*(?:₽|руб)', block)
+        price = float(_re.sub(r'\s', '', price_m.group(1))) if price_m else 0
+        # Наличие
+        in_stock = 'в наличии' in block.lower() or 'item-in-stock' in block
+        products.append({
+            'id': pid,
+            'name': name,
+            'category': category,
+            'price': price,
+            'stock': 1 if in_stock else 0,
+        })
+    return products
+
+
 def moba_normalize(p: dict) -> dict:
-    name = str(p.get('name') or p.get('title') or '')
-    category = str(p.get('category') or p.get('category_name') or '')
-    price = float(p.get('price') or p.get('sell_price') or p.get('retail_price') or 0)
-    stock = float(p.get('stock') or p.get('quantity') or p.get('count') or 0)
-    pid = str(p.get('id') or p.get('uuid') or p.get('article') or '')
-    code = str(p.get('code') or p.get('article') or p.get('sku') or pid)
+    name = str(p.get('name') or '')
+    category = str(p.get('category') or '')
+    price = float(p.get('price') or 0)
+    stock = float(p.get('stock') or 0)
+    pid = str(p.get('id') or '')
     return {
         'id': f'moba_{pid}',
-        'code': code,
+        'code': pid,
         'name': name,
         'category': category,
         'price': price,
         'stock': stock,
-        'available': stock > 0,
+        'available': stock > 0 or price > 0,
         'quality': detect_quality(name),
         'part_type': detect_part_type(category, name),
         'model_keywords': extract_model_keywords(name),
@@ -179,43 +276,36 @@ def moba_save(conn, products: list, labor: dict) -> int:
 
 
 def moba_sync_page(conn, offset: int) -> dict:
-    """Синхронизирует одну страницу товаров из moba.ru."""
+    """Синхронизирует одну секцию каталога moba.ru через парсинг HTML."""
     session = moba_session()
-    endpoints = [
-        f'{MOBA_BASE}/api/v1/products',
-        f'{MOBA_BASE}/api/v1/catalog/products',
-        f'{MOBA_BASE}/api/products',
-    ]
-    raw = []
-    total = 0
-    used_url = ''
-    for url in endpoints:
-        try:
-            resp = session.get(url, params={'limit': MOBA_PAGE_SIZE, 'offset': offset}, timeout=20)
-            if resp.status_code == 200:
-                data = resp.json()
-                raw = (data.get('products') or data.get('items') or
-                       data.get('data') or (data if isinstance(data, list) else []))
-                total = int(data.get('total') or data.get('count') or len(raw))
-                used_url = url
-                break
-        except Exception as e:
-            print(f'[MOBA] fetch error {url}: {e}')
+    idx = offset // 50   # номер секции
+    page = (offset % 50) // 10 + 1  # страница внутри секции
+
+    if idx >= len(MOBA_CATALOG_SECTIONS):
+        return {'saved': 0, 'total': len(MOBA_CATALOG_SECTIONS) * 50, 'offset': offset,
+                'next_offset': None, 'has_more': False, 'api_url': ''}
+
+    section = MOBA_CATALOG_SECTIONS[idx]
+    raw = moba_catalog_page(session, section, page)
+    print(f'[MOBA] section={section} page={page} found={len(raw)}')
 
     cur = conn.cursor()
     labor = get_labor_prices(cur)
     cur.close()
-    products = [moba_normalize(p) for p in raw]
+    products = [moba_normalize(p) for p in raw if p.get('id')]
     saved = moba_save(conn, products, labor)
 
-    has_more = (offset + len(raw)) < total and len(raw) == MOBA_PAGE_SIZE
+    total_est = len(MOBA_CATALOG_SECTIONS) * 50
+    next_offset = offset + 10
+    has_more = next_offset < total_est and (len(raw) >= 10 or page == 1)
+
     return {
         'saved': saved,
-        'total': total,
+        'total': total_est,
         'offset': offset,
-        'next_offset': offset + len(raw) if has_more else None,
+        'next_offset': next_offset if has_more else None,
         'has_more': has_more,
-        'api_url': used_url,
+        'api_url': f'{MOBA_BASE}{section}?page={page}',
     }
 
 # ─────────────────────────────────────────────────────────────────────────────
