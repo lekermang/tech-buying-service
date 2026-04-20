@@ -88,7 +88,32 @@ def handler(event: dict, context) -> dict:
             """, (today, repair_my))
             conn.commit()
 
-        # ── 2. Читаем итоги за день ──────────────────────────────────────────
+        # ── 2. Автоматическое списание аренды по числам ──────────────────────
+        # kirova11 — 10-е число, kirova7 — 25-е число
+        day_of_month = date.today().day
+        rent_schedule = {'kirova11': 10, 'kirova7': 25}
+        for shop, rent_day in rent_schedule.items():
+            if day_of_month == rent_day:
+                # Проверяем, не списали ли уже сегодня
+                cur.execute(f"""
+                    SELECT COUNT(*) FROM {SCHEMA}.liquidity_entries
+                    WHERE entry_date = %s AND shop = %s AND category = 'rent' AND source = 'auto_rent'
+                """, (today, shop))
+                already = cur.fetchone()[0]
+                if not already:
+                    cur.execute(f"SELECT amount FROM {SCHEMA}.liquidity_rent WHERE shop = %s", (shop,))
+                    rent_row = cur.fetchone()
+                    if rent_row and float(rent_row[0]) > 0:
+                        rent_amount = float(rent_row[0])
+                        label = 'Кирова 7' if shop == 'kirova7' else 'Кирова 11'
+                        cur.execute(f"""
+                            INSERT INTO {SCHEMA}.liquidity_entries
+                                (entry_date, shop, category, amount, comment, source)
+                            VALUES (%s, %s, 'rent', %s, %s, 'auto_rent')
+                        """, (today, shop, -rent_amount, f'Авто: аренда {label}'))
+                        conn.commit()
+
+        # ── 4. Читаем итоги за день ──────────────────────────────────────────
         cur.execute(f"""
             SELECT category, SUM(amount) as total
             FROM {SCHEMA}.liquidity_entries

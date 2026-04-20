@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import Icon from "@/components/ui/icon";
+import { adminHeaders } from "@/lib/adminFetch";
 
 const API = "https://functions.poehali.dev/6a0376b8-d712-4ee7-aa28-96e99c89ed9d";
 
@@ -104,12 +105,12 @@ export default function LiquidityTab({ token }: { token: string }) {
   const [rentMsg, setRentMsg] = useState<string | null>(null);
   const [chargingRent, setChargingRent] = useState<string | null>(null);
 
-  const hdrs = { "Content-Type": "application/json", "X-Admin-Token": token };
+
 
   const loadDash = useCallback(async () => {
     setDashLoading(true);
     try {
-      const res = await fetch(`${API}?action=dashboard`, { headers: { "Content-Type": "application/json", "X-Admin-Token": token } });
+      const res = await fetch(`${API}?action=dashboard`, { headers: adminHeaders(token) });
       const data = await res.json();
       if (data.today) {
         setDash(data);
@@ -135,7 +136,7 @@ export default function LiquidityTab({ token }: { token: string }) {
     else if (period === "month") { const f = new Date(today); f.setDate(today.getDate() - 29); d_from = f.toISOString().slice(0, 10); }
     else { d_from = dateFrom; d_to = dateTo; }
     const url = `${API}?action=analytics&period=${period}&date_from=${d_from}&date_to=${d_to}`;
-    const res = await fetch(url, { headers: { "Content-Type": "application/json", "X-Admin-Token": token } });
+    const res = await fetch(url, { headers: adminHeaders(token) });
     const data = await res.json();
     setAnalytics(data);
     setAnalyticsLoading(false);
@@ -150,7 +151,7 @@ export default function LiquidityTab({ token }: { token: string }) {
     let url = `${API}?action=entries&date_from=${d_from}&date_to=${today}`;
     if (entryShop !== "all") url += `&shop=${entryShop}`;
     if (entryCat !== "all") url += `&category=${entryCat}`;
-    const res = await fetch(url, { headers: { "Content-Type": "application/json", "X-Admin-Token": token } });
+    const res = await fetch(url, { headers: adminHeaders(token) });
     const data = await res.json();
     setEntries(data.entries || []);
     setEntriesLoading(false);
@@ -167,7 +168,7 @@ export default function LiquidityTab({ token }: { token: string }) {
     setGoldSaving(true); setGoldMsg(null);
     const action = goldTab === "buy" ? "add_gold_buy" : "sell_gold";
     const res = await fetch(API, {
-      method: "POST", headers: hdrs,
+      method: "POST", headers: adminHeaders(token),
       body: JSON.stringify({
         action, grams: parseFloat(goldGrams),
         price_per_gram: parseFloat(goldPrice),
@@ -187,7 +188,7 @@ export default function LiquidityTab({ token }: { token: string }) {
     if (!phoneAmount) return;
     setPhoneSaving(true); setPhoneMsg(null);
     const res = await fetch(API, {
-      method: "POST", headers: hdrs,
+      method: "POST", headers: adminHeaders(token),
       body: JSON.stringify({
         action: "add_phone_sale",
         amount: parseFloat(phoneAmount),
@@ -205,7 +206,7 @@ export default function LiquidityTab({ token }: { token: string }) {
   const saveRent = async (shop: string) => {
     setRentSaving(shop); setRentMsg(null);
     const res = await fetch(API, {
-      method: "POST", headers: hdrs,
+      method: "POST", headers: adminHeaders(token),
       body: JSON.stringify({ action: "update_rent", shop, amount: parseFloat(rentEdit[shop] || "0") }),
     });
     const data = await res.json();
@@ -219,7 +220,7 @@ export default function LiquidityTab({ token }: { token: string }) {
   const chargeRent = async (shop: string) => {
     setChargingRent(shop); setRentMsg(null);
     const res = await fetch(API, {
-      method: "POST", headers: hdrs,
+      method: "POST", headers: adminHeaders(token),
       body: JSON.stringify({ action: "charge_rent", shop, date: new Date().toISOString().slice(0, 10) }),
     });
     const data = await res.json();
@@ -232,7 +233,7 @@ export default function LiquidityTab({ token }: { token: string }) {
   const deleteEntry = async (id: number) => {
     if (!confirm("Удалить запись #" + id + "?")) return;
     await fetch(API, {
-      method: "POST", headers: hdrs,
+      method: "POST", headers: adminHeaders(token),
       body: JSON.stringify({ action: "delete_entry", id }),
     });
     loadEntries(); loadDash();
