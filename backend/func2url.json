@@ -1,4 +1,6 @@
 {
+  "liquidity-notify": "https://functions.poehali.dev/aa300128-281c-4a08-b7bc-3b548d654038",
+  "liquidity": "https://functions.poehali.dev/6a0376b8-d712-4ee7-aa28-96e99c89ed9d",
   "import-parts": "https://functions.poehali.dev/71d1796e-9ac1-4330-abfb-b6713d9dfaf5",
   "export-xlsx": "https://functions.poehali.dev/13db4dbd-0d2b-47d4-8e09-c6f82483ffde",
   "dzchat-api": "https://functions.poehali.dev/608c7976-816a-4e3e-b374-5dd617b045bf",
