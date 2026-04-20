@@ -1,4 +1,5 @@
 {
+  "import-parts": "https://functions.poehali.dev/71d1796e-9ac1-4330-abfb-b6713d9dfaf5",
   "export-xlsx": "https://functions.poehali.dev/13db4dbd-0d2b-47d4-8e09-c6f82483ffde",
   "dzchat-api": "https://functions.poehali.dev/608c7976-816a-4e3e-b374-5dd617b045bf",
   "tools-sync": "https://functions.poehali.dev/8e9219e9-9dcf-4726-a272-69c6ce976b80",
@@ -17,9 +18,6 @@
   "repair-admin": "https://functions.poehali.dev/a105aede-d55d-4b99-9d3e-5e977887aa04",
   "repair-order": "https://functions.poehali.dev/8d0ee3bd-41eb-44fe-9d30-aab6ddc2042d",
   "repair-parts": "https://functions.poehali.dev/68da5b17-ae5f-4568-8e27-0d945b995d82",
-  "chatgpt-polza-chatgpt": "https://functions.poehali.dev/720613b1-3503-4345-a6eb-3d97329267ce",
-  "avito-price": "https://functions.poehali.dev/5c99f770-dbe8-42ad-b8df-adea87477627",
-  "vk-auth-vk-auth": "https://functions.poehali.dev/540ea9ff-6ef6-482b-b525-cce4503d9eca",
   "gold-price": "https://functions.poehali.dev/0e3260ee-7b92-4be2-833b-d3fcc9d2472d",
   "telegram-bot-telegram-auth": "https://functions.poehali.dev/c67f97d4-abad-42c3-97f5-e0b3d9c6a1a8",
   "telegram-bot-telegram-bot": "https://functions.poehali.dev/21a5d408-57e5-442b-803f-ffd54a62b2a8",
