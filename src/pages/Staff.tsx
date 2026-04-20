@@ -7,6 +7,23 @@ import StaffRepairTab from "./StaffRepairTab";
 
 type Tab = "goods" | "sales" | "clients" | "analytics" | "employees" | "repair";
 
+function MskClock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const msk = new Date(now.getTime() + (now.getTimezoneOffset() + 180) * 60000);
+  const time = msk.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const date = msk.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
+  return (
+    <div className="text-center leading-tight">
+      <div className="font-oswald font-bold text-[#FFD700] text-sm tracking-wider">{time}</div>
+      <div className="font-roboto text-white/30 text-[9px]">{date} МСК</div>
+    </div>
+  );
+}
+
 export default function Staff() {
   const [token, setToken] = useState(() => localStorage.getItem("employee_token") || "");
   const [loginForm, setLoginForm] = useState({ login: "", password: "" });
@@ -120,6 +137,7 @@ export default function Staff() {
             {ROLE_LABEL[empRole] || empRole}
           </span>
         </div>
+        <MskClock />
         <button onClick={logout} className="text-white/30 active:text-red-400 transition-colors p-2 -mr-2">
           <Icon name="LogOut" size={16} />
         </button>

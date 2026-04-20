@@ -27,15 +27,15 @@ REPAIR_SQL = f"""
         repair_amount - COALESCE(master_income,0) - COALESCE(purchase_amount,0)
     ), 0)
     FROM {SCHEMA}.repair_orders
-    WHERE DATE(COALESCE(completed_at, status_updated_at) + interval '3 hours') BETWEEN %s AND %s
+    WHERE DATE(created_at + interval '3 hours') BETWEEN %s AND %s
     AND status IN ('ready','done','picked_up') AND repair_amount IS NOT NULL
 """
 
 REPAIR_DAILY_SQL = f"""
-    SELECT DATE(COALESCE(completed_at, status_updated_at) + interval '3 hours') as day,
+    SELECT DATE(created_at + interval '3 hours') as day,
         COALESCE(SUM(repair_amount - COALESCE(master_income,0) - COALESCE(purchase_amount,0)), 0) as profit
     FROM {SCHEMA}.repair_orders
-    WHERE DATE(COALESCE(completed_at, status_updated_at) + interval '3 hours') BETWEEN %s AND %s
+    WHERE DATE(created_at + interval '3 hours') BETWEEN %s AND %s
     AND status IN ('ready','done','picked_up') AND repair_amount IS NOT NULL
     GROUP BY day ORDER BY day
 """
