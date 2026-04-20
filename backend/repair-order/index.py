@@ -28,12 +28,29 @@ STATUS_MSG = {
 
 def auth_staff(event: dict) -> bool:
     hdrs = {k.lower(): v for k, v in (event.get('headers') or {}).items()}
-    admin_token = os.environ.get('ADMIN_TOKEN', '')
+    token_from_request = (hdrs.get('x-admin-token') or hdrs.get('x-employee-token') or '').strip()
+    if not token_from_request:
+        return False
+    # Проверяем ADMIN_TOKEN
+    if token_from_request == os.environ.get('ADMIN_TOKEN', ''):
+        return True
+    # Проверяем EMPLOYEE_TOKENS (env, для обратной совместимости)
     emp_raw = os.environ.get('EMPLOYEE_TOKENS', '')
-    valid = set(t.strip() for t in emp_raw.split(',') if t.strip())
-    valid.add(admin_token)
-    incoming = {hdrs.get('x-admin-token'), hdrs.get('x-employee-token')}
-    return bool(incoming & valid)
+    if emp_raw and token_from_request in {t.strip() for t in emp_raw.split(',') if t.strip()}:
+        return True
+    # Проверяем токен сотрудника в БД
+    try:
+        conn = psycopg2.connect(os.environ['DATABASE_URL'])
+        cur = conn.cursor()
+        cur.execute(
+            f"SELECT id FROM {SCHEMA}.employees WHERE auth_token=%s AND token_expires_at>NOW() AND is_active=true",
+            (token_from_request,)
+        )
+        row = cur.fetchone()
+        cur.close(); conn.close()
+        return row is not None
+    except Exception:
+        return False
 
 
 def send_tg(token: str, chat_id, text: str, parse_mode: str = 'Markdown'):
