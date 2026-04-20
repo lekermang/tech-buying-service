@@ -5,8 +5,9 @@ import StaffRepairAnalytics from "./repair/StaffRepairAnalytics";
 import StaffRepairOrderCard from "./repair/StaffRepairOrderCard";
 import StaffRepairReadyModal from "./repair/StaffRepairReadyModal";
 import LaborPricesTab from "@/components/admin/repair/LaborPricesTab";
+import RepairImportTab from "@/components/admin/repair/RepairImportTab";
 
-type View = "list" | "analytics" | "labor_prices";
+type View = "list" | "analytics" | "labor_prices" | "import_parts";
 type Period = "day" | "week" | "month";
 
 type RepairAnalytics = {
@@ -251,6 +252,12 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
               <Icon name="Tag" size={13} /> Цены
             </button>
           )}
+          {isOwner && (
+            <button onClick={() => setView("import_parts")}
+              className={`flex-1 py-2 font-roboto text-xs transition-colors flex items-center justify-center gap-1.5 ${view === "import_parts" ? "bg-[#FFD700] text-black font-bold" : "text-white/50"}`}>
+              <Icon name="FileUp" size={13} /> Импорт
+            </button>
+          )}
         </div>
         {view === "list" && (
           <button onClick={() => { setShowForm(v => !v); setForm(EMPTY_FORM); }}
@@ -409,6 +416,11 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
         <div className="flex-1 overflow-y-auto">
           <LaborPricesTab token={token} authHeader="X-Employee-Token" />
         </div>
+      )}
+
+      {/* ── Импорт Excel (только owner) ── */}
+      {view === "import_parts" && isOwner && (
+        <RepairImportTab token={token} />
       )}
 
       {/* ── Модалка «Готово» ── */}
