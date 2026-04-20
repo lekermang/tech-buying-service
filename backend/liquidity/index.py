@@ -4,8 +4,16 @@
 """
 import json
 import os
-from datetime import date, timedelta
+from datetime import datetime, timedelta, timezone
 import psycopg2
+
+MSK = timezone(timedelta(hours=3))
+
+def today_msk() -> str:
+    return datetime.now(MSK).date().isoformat()
+
+def yesterday_msk() -> str:
+    return (datetime.now(MSK).date() - timedelta(days=1)).isoformat()
 
 SCHEMA = os.environ.get("MAIN_DB_SCHEMA", "t_p31606708_tech_buying_service")
 CORS = {
@@ -19,15 +27,15 @@ REPAIR_SQL = f"""
         repair_amount - COALESCE(master_income,0) - COALESCE(purchase_amount,0)
     ), 0)
     FROM {SCHEMA}.repair_orders
-    WHERE DATE(COALESCE(completed_at, status_updated_at)) BETWEEN %s AND %s
+    WHERE DATE(COALESCE(completed_at, status_updated_at) + interval '3 hours') BETWEEN %s AND %s
     AND status IN ('ready','done','picked_up') AND repair_amount IS NOT NULL
 """
 
 REPAIR_DAILY_SQL = f"""
-    SELECT DATE(COALESCE(completed_at, status_updated_at)) as day,
+    SELECT DATE(COALESCE(completed_at, status_updated_at) + interval '3 hours') as day,
         COALESCE(SUM(repair_amount - COALESCE(master_income,0) - COALESCE(purchase_amount,0)), 0) as profit
     FROM {SCHEMA}.repair_orders
-    WHERE DATE(COALESCE(completed_at, status_updated_at)) BETWEEN %s AND %s
+    WHERE DATE(COALESCE(completed_at, status_updated_at) + interval '3 hours') BETWEEN %s AND %s
     AND status IN ('ready','done','picked_up') AND repair_amount IS NOT NULL
     GROUP BY day ORDER BY day
 """
@@ -77,7 +85,7 @@ def handler(event: dict, context) -> dict:
 
             # ── Сводка за сегодня ────────────────────────────────────────────
             if action == "today":
-                today = date.today().isoformat()
+                today = today_msk()
                 cur.execute(f"SELECT category, SUM(amount) FROM {SCHEMA}.liquidity_entries WHERE entry_date=%s GROUP BY category", (today,))
                 by_cat = {r[0]: float(r[1]) for r in cur.fetchall()}
 
@@ -112,23 +120,22 @@ def handler(event: dict, context) -> dict:
                 date_from = params.get("date_from")
                 date_to = params.get("date_to")
 
-                today = date.today()
+                t = today_msk()
                 if date_from and date_to:
                     d_from, d_to = date_from, date_to
                 elif period == "day":
-                    d_from = d_to = today.isoformat()
+                    d_from = d_to = t
                 elif period == "yesterday":
-                    yesterday = (today - timedelta(days=1)).isoformat()
-                    d_from = d_to = yesterday
+                    d_from = d_to = yesterday_msk()
                 elif period == "week":
-                    d_from = (today - timedelta(days=6)).isoformat()
-                    d_to = today.isoformat()
+                    d_from = (datetime.now(MSK).date() - timedelta(days=6)).isoformat()
+                    d_to = t
                 elif period == "month":
-                    d_from = (today - timedelta(days=29)).isoformat()
-                    d_to = today.isoformat()
+                    d_from = (datetime.now(MSK).date() - timedelta(days=29)).isoformat()
+                    d_to = t
                 else:
-                    d_from = (today - timedelta(days=6)).isoformat()
-                    d_to = today.isoformat()
+                    d_from = (datetime.now(MSK).date() - timedelta(days=6)).isoformat()
+                    d_to = t
 
                 # Из liquidity_entries
                 cur.execute(f"""
@@ -186,8 +193,8 @@ def handler(event: dict, context) -> dict:
 
             # ── Список записей ───────────────────────────────────────────────
             if action == "entries":
-                d_from = params.get("date_from", (date.today() - timedelta(days=6)).isoformat())
-                d_to = params.get("date_to", date.today().isoformat())
+                d_from = params.get("date_from", (datetime.now(MSK).date() - timedelta(days=6)).isoformat())
+                d_to = params.get("date_to", today_msk())
                 shop = params.get("shop")
                 cat = params.get("category")
 
@@ -217,8 +224,8 @@ def handler(event: dict, context) -> dict:
 
             # ── Dashboard (Сегодня + неделя) ─────────────────────────────────
             if action == "dashboard" or not action:
-                today = date.today().isoformat()
-                week_from = (date.today() - timedelta(days=6)).isoformat()
+                today = today_msk()
+                week_from = (datetime.now(MSK).date() - timedelta(days=6)).isoformat()
 
                 cur.execute(f"SELECT category, SUM(amount) FROM {SCHEMA}.liquidity_entries WHERE entry_date=%s GROUP BY category", (today,))
                 today_cats = {r[0]: float(r[1]) for r in cur.fetchall()}
@@ -288,7 +295,7 @@ def handler(event: dict, context) -> dict:
                 grams = float(body.get("grams", 0))
                 price_per_gram = float(body.get("price_per_gram", 0))
                 shop = body.get("shop", "kirova7")
-                entry_date = body.get("date", date.today().isoformat())
+                entry_date = body.get("date", today_msk())
                 comment = body.get("comment", "")
                 total = grams * price_per_gram
                 cur.execute(f"""
@@ -304,7 +311,7 @@ def handler(event: dict, context) -> dict:
                 grams = float(body.get("grams", 0))
                 price_per_gram = float(body.get("price_per_gram", 0))
                 shop = body.get("shop", "kirova7")
-                entry_date = body.get("date", date.today().isoformat())
+                entry_date = body.get("date", today_msk())
                 comment = body.get("comment", "Инкассо / продажа золота")
                 total = grams * price_per_gram
                 cur.execute(f"SELECT grams FROM {SCHEMA}.liquidity_gold_stock LIMIT 1")
@@ -324,7 +331,7 @@ def handler(event: dict, context) -> dict:
             if action == "add_phone_sale":
                 amount = float(body.get("amount", 0))
                 shop = body.get("shop", "kirova7")
-                entry_date = body.get("date", date.today().isoformat())
+                entry_date = body.get("date", today_msk())
                 comment = body.get("comment", "")
                 cur.execute(f"""
                     INSERT INTO {SCHEMA}.liquidity_entries (entry_date,shop,category,amount,comment,source)
@@ -338,7 +345,7 @@ def handler(event: dict, context) -> dict:
                 amount = float(body.get("amount", 0))
                 shop = body.get("shop", "kirova7")
                 category = body.get("category", "other_expense")
-                entry_date = body.get("date", date.today().isoformat())
+                entry_date = body.get("date", today_msk())
                 comment = body.get("comment", "")
                 cur.execute(f"""
                     INSERT INTO {SCHEMA}.liquidity_entries (entry_date,shop,category,amount,comment,source)
@@ -359,7 +366,7 @@ def handler(event: dict, context) -> dict:
 
             if action == "charge_rent":
                 shop = body.get("shop")
-                entry_date = body.get("date", date.today().isoformat())
+                entry_date = body.get("date", today_msk())
                 if shop not in ("kirova7", "kirova11"):
                     return err("Неверный магазин")
                 cur.execute(f"SELECT amount FROM {SCHEMA}.liquidity_rent WHERE shop=%s", (shop,))
@@ -393,7 +400,7 @@ def handler(event: dict, context) -> dict:
                 return ok({"ok": True})
 
             if action == "sync_repair":
-                entry_date = body.get("date", date.today().isoformat())
+                entry_date = body.get("date", today_msk())
                 shop = body.get("shop", "kirova7")
                 cur.execute(REPAIR_SQL, (entry_date, entry_date))
                 my_profit = float(cur.fetchone()[0])
