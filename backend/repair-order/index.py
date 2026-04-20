@@ -7,7 +7,7 @@ from email.mime.text import MIMEText
 
 HEADERS = {'Access-Control-Allow-Origin': '*'}
 SCHEMA = 't_p31606708_tech_buying_service'
-AD_FOOTER = "\n\n📲 Присоединяйтесь к нам: https://t.me/ProService40"
+AD_FOOTER = "\n\n🌐 skypka24.com\n📲 https://t.me/ProService40"
 
 STATUS_LABEL = {
     'in_progress':   'В работе',
@@ -474,7 +474,8 @@ def handler(event: dict, context) -> dict:
             cur.close(); conn.close()
             send_tg(token, chat_id,
                 f"✅ Телефон {contact['phone_number']} привязан.\n"
-                "Теперь вы будете получать уведомления о статусе ремонта.", parse_mode='')
+                "Теперь вы будете получать уведомления о статусе ремонта.\n\n"
+                "🌐 skypka24.com", parse_mode='')
             return {'statusCode': 200, 'headers': HEADERS, 'body': '{"ok":true}'}
 
         if text.startswith('/start'):
@@ -484,7 +485,8 @@ def handler(event: dict, context) -> dict:
                 'text': (
                     f"Привет, {first_name}! 👋 Я бот Скупка24.\n\n"
                     "Здесь вы будете получать уведомления о статусе ремонта вашего телефона.\n\n"
-                    "Нажмите кнопку ниже, чтобы привязать номер 👇"
+                    "Нажмите кнопку ниже, чтобы привязать номер 👇\n\n"
+                    "🌐 skypka24.com"
                 ),
                 'reply_markup': {
                     'keyboard': [[{'text': '📱 Поделиться номером телефона', 'request_contact': True}]],
@@ -508,17 +510,17 @@ def handler(event: dict, context) -> dict:
                 price_str = f"{int(price):,} ₽".replace(',', ' ') if price else '—'
                 send_tg(token, chat_id,
                     f"📋 Заявка #{oid}\nТип: {rtype or '—'}\nСтоимость: {price_str}\n"
-                    f"Статус: {slabels.get(status, status)}", parse_mode='')
+                    f"Статус: {slabels.get(status, status)}\n\n🌐 skypka24.com", parse_mode='')
             else:
                 cur.close(); conn.close()
                 send_tg(token, chat_id,
-                    "Заявок не найдено. Сначала привяжите номер телефона командой /start", parse_mode='')
+                    "Заявок не найдено. Сначала привяжите номер телефона командой /start\n\n🌐 skypka24.com", parse_mode='')
             return {'statusCode': 200, 'headers': HEADERS, 'body': '{"ok":true}'}
 
         cur.close(); conn.close()
         send_tg(token, chat_id,
             "Команды:\n/start — привязать номер\n/status — статус ремонта\n\n"
-            f"📲 https://t.me/ProService40", parse_mode='')
+            f"🌐 skypka24.com\n📲 https://t.me/ProService40", parse_mode='')
         return {'statusCode': 200, 'headers': HEADERS, 'body': '{"ok":true}'}
 
     # ── SMS клиенту о статусе ────────────────────────────────────────────────
