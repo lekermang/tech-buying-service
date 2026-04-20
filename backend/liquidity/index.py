@@ -70,21 +70,36 @@ def handler(event: dict, context) -> dict:
                 rows = cur.fetchall()
                 by_cat = {r[0]: float(r[1]) for r in rows}
 
-                # Остаток золота
+                # Живой ремонт из repair_orders
+                cur.execute(f"""
+                    SELECT COALESCE(SUM(
+                        repair_amount - COALESCE(master_income,0) - COALESCE(purchase_amount,0)
+                    ), 0)
+                    FROM {SCHEMA}.repair_orders
+                    WHERE DATE(COALESCE(completed_at, status_updated_at) AT TIME ZONE 'Europe/Moscow') = %s
+                    AND status IN ('ready','done','picked_up') AND repair_amount IS NOT NULL
+                """, (today,))
+                repair_live = float(cur.fetchone()[0])
+                repair_val = max(by_cat.get("repair", 0), repair_live)
+
                 cur.execute(f"SELECT grams FROM {SCHEMA}.liquidity_gold_stock LIMIT 1")
                 gold_row = cur.fetchone()
                 gold_stock = float(gold_row[0]) if gold_row else 0.0
+
+                total = (by_cat.get("gold_sell",0) - by_cat.get("gold_buy",0)
+                         + repair_val + by_cat.get("phone_sale",0)
+                         + by_cat.get("rent",0) + by_cat.get("other_expense",0))
 
                 return ok({
                     "date": today,
                     "gold_profit": by_cat.get("gold_sell", 0) - by_cat.get("gold_buy", 0),
                     "gold_buy": by_cat.get("gold_buy", 0),
                     "gold_sell": by_cat.get("gold_sell", 0),
-                    "repair_profit": by_cat.get("repair", 0),
+                    "repair_profit": repair_val,
                     "phone_profit": by_cat.get("phone_sale", 0),
                     "rent_expense": abs(by_cat.get("rent", 0)),
                     "other_expense": abs(by_cat.get("other_expense", 0)),
-                    "total": sum(by_cat.values()),
+                    "total": total,
                     "gold_stock_grams": gold_stock,
                 })
 
@@ -110,7 +125,7 @@ def handler(event: dict, context) -> dict:
                     d_from = (today - timedelta(days=6)).isoformat()
                     d_to = today.isoformat()
 
-                # Итого по категориям
+                # Итого по категориям из liquidity_entries
                 cur.execute(f"""
                     SELECT category, shop, SUM(amount) as total
                     FROM {SCHEMA}.liquidity_entries
@@ -126,7 +141,21 @@ def handler(event: dict, context) -> dict:
                     totals[cat] = totals.get(cat, 0) + float(total)
                     by_shop[shop][cat] = float(total)
 
-                # По дням
+                # Ремонт из repair_orders за период (живые данные)
+                cur.execute(f"""
+                    SELECT COALESCE(SUM(
+                        repair_amount - COALESCE(master_income,0) - COALESCE(purchase_amount,0)
+                    ), 0)
+                    FROM {SCHEMA}.repair_orders
+                    WHERE DATE(COALESCE(completed_at, status_updated_at) AT TIME ZONE 'Europe/Moscow') BETWEEN %s AND %s
+                    AND status IN ('ready','done','picked_up') AND repair_amount IS NOT NULL
+                """, (d_from, d_to))
+                repair_period = float(cur.fetchone()[0])
+                if repair_period > totals.get("repair", 0):
+                    totals["repair"] = repair_period
+                    by_shop["kirova7"]["repair"] = repair_period
+
+                # По дням из liquidity_entries
                 cur.execute(f"""
                     SELECT entry_date, category, SUM(amount) as total
                     FROM {SCHEMA}.liquidity_entries
@@ -141,6 +170,24 @@ def handler(event: dict, context) -> dict:
                     if ds not in daily:
                         daily[ds] = {}
                     daily[ds][cat] = float(total)
+
+                # Ремонт по дням из repair_orders
+                cur.execute(f"""
+                    SELECT
+                        DATE(COALESCE(completed_at, status_updated_at) AT TIME ZONE 'Europe/Moscow') as day,
+                        COALESCE(SUM(
+                            repair_amount - COALESCE(master_income,0) - COALESCE(purchase_amount,0)
+                        ), 0) as my_profit
+                    FROM {SCHEMA}.repair_orders
+                    WHERE DATE(COALESCE(completed_at, status_updated_at) AT TIME ZONE 'Europe/Moscow') BETWEEN %s AND %s
+                    AND status IN ('ready','done','picked_up') AND repair_amount IS NOT NULL
+                    GROUP BY day ORDER BY day
+                """, (d_from, d_to))
+                for day, profit in cur.fetchall():
+                    ds = str(day)
+                    if ds not in daily:
+                        daily[ds] = {}
+                    daily[ds]["repair"] = max(daily[ds].get("repair", 0), float(profit))
 
                 daily_list = [{"date": d, **v} for d, v in sorted(daily.items())]
 
@@ -207,6 +254,23 @@ def handler(event: dict, context) -> dict:
                 today_rows = cur.fetchall()
                 today_cats = {r[0]: float(r[1]) for r in today_rows}
 
+                # Моя доля с ремонта напрямую из repair_orders за сегодня
+                cur.execute(f"""
+                    SELECT COALESCE(SUM(
+                        repair_amount
+                        - COALESCE(master_income, 0)
+                        - COALESCE(purchase_amount, 0)
+                    ), 0)
+                    FROM {SCHEMA}.repair_orders
+                    WHERE DATE(COALESCE(completed_at, status_updated_at) AT TIME ZONE 'Europe/Moscow') = %s
+                    AND status IN ('ready', 'done', 'picked_up')
+                    AND repair_amount IS NOT NULL
+                """, (today,))
+                repair_live = float(cur.fetchone()[0])
+
+                # Берём максимум: ручная запись или живые данные из заявок
+                repair_today = max(today_cats.get("repair", 0), repair_live)
+
                 cur.execute(f"""
                     SELECT entry_date, category, SUM(amount) as total
                     FROM {SCHEMA}.liquidity_entries
@@ -222,6 +286,12 @@ def handler(event: dict, context) -> dict:
                         daily[ds] = {}
                     daily[ds][cat] = float(total)
 
+                # Добавляем живой ремонт в сегодняшний день графика
+                if repair_live > 0:
+                    if today not in daily:
+                        daily[today] = {}
+                    daily[today]["repair"] = max(daily[today].get("repair", 0), repair_live)
+
                 cur.execute(f"SELECT grams FROM {SCHEMA}.liquidity_gold_stock LIMIT 1")
                 gold_row = cur.fetchone()
 
@@ -229,16 +299,24 @@ def handler(event: dict, context) -> dict:
                 rent_rows = cur.fetchall()
                 rent = {r[0]: {"amount": float(r[1]), "day_of_month": r[2]} for r in rent_rows}
 
+                today_total = (
+                    today_cats.get("gold_sell", 0) - today_cats.get("gold_buy", 0)
+                    + repair_today
+                    + today_cats.get("phone_sale", 0)
+                    + today_cats.get("rent", 0)
+                    + today_cats.get("other_expense", 0)
+                )
+
                 return ok({
                     "today": {
                         "date": today,
                         "gold_buy": today_cats.get("gold_buy", 0),
                         "gold_sell": today_cats.get("gold_sell", 0),
-                        "repair": today_cats.get("repair", 0),
+                        "repair": repair_today,
                         "phone_sale": today_cats.get("phone_sale", 0),
                         "rent": today_cats.get("rent", 0),
                         "other_expense": today_cats.get("other_expense", 0),
-                        "total": sum(today_cats.values()),
+                        "total": today_total,
                     },
                     "weekly_daily": [{"date": d, **v} for d, v in sorted(daily.items())],
                     "gold_stock_grams": float(gold_row[0]) if gold_row else 0.0,
