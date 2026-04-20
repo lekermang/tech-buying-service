@@ -266,6 +266,8 @@ body{font-family:Arial,sans-serif;font-size:10px;color:#000;background:#fff}
 .page{width:210mm;margin:0 auto;padding:7mm 9mm}
 .print-btn{text-align:center;padding:10px;background:#f5f5f5;border-bottom:1px solid #ccc}
 @media print{.print-btn{display:none}body{margin:0}.page{padding:7mm 9mm;width:100%}}
+.page-break{page-break-before:always;padding-top:5mm}
+.page-num{font-size:8px;color:#777;text-align:right;margin-bottom:1px}
 
 /* ШАПКА */
 .hdr{display:flex;align-items:stretch;margin-bottom:5px;border:1px solid #000}
@@ -308,7 +310,17 @@ body{font-family:Arial,sans-serif;font-size:10px;color:#000;background:#fff}
 .ctbl td:last-child{font-size:8px;color:#555;width:95px}
 
 /* Телефон SVG */
-.phone-row{display:flex;align-items:flex-end;justify-content:space-between;gap:4px}
+.phone-row{display:flex;align-items:stretch;justify-content:space-between;gap:0}
+.phone-view{display:flex;flex-direction:column;align-items:center;flex:1}
+.phone-view svg{width:100%;height:auto;display:block}
+.phone-view-wide{display:flex;flex-direction:column;align-items:center;flex:2}
+.phone-view-wide svg{width:100%;height:auto;display:block}
+/* Ноутбук SVG */
+.laptop-row{display:flex;align-items:stretch;justify-content:space-between;gap:0}
+.laptop-view{display:flex;flex-direction:column;align-items:center;flex:3}
+.laptop-view svg{width:100%;height:auto;display:block}
+.laptop-view-narrow{display:flex;flex-direction:column;align-items:center;flex:1}
+.laptop-view-narrow svg{width:100%;height:auto;display:block}
 
 /* Условия */
 .cond-wrap{display:flex;border:1px solid #000;margin-bottom:5px}
@@ -338,7 +350,10 @@ body{font-family:Arial,sans-serif;font-size:10px;color:#000;background:#fff}
 </div>
 <div class="page">
 
-<div style="font-size:8px;text-align:right;margin-bottom:2px;color:#555">Экз. Клиента</div>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
+  <span style="font-size:8px;color:#555">Экз. Клиента</span>
+  <span style="font-size:8px;color:#777">Стр. 1 из 2</span>
+</div>
 
 <!-- ШАПКА -->
 <div class="hdr">
@@ -410,121 +425,119 @@ body{font-family:Arial,sans-serif;font-size:10px;color:#000;background:#fff}
       <div class="dmg-hint">Отметить на схеме: * – скол, / – вмятина, v – царапина</div>
     </div>
 
-    <!-- ТЕЛЕФОН 4 ВИДА -->
+    <!-- ТЕЛЕФОН 4 ВИДА — на весь квадрат -->
     <div class="phone-row">
-      <!-- Спереди -->
-      <div style="display:flex;flex-direction:column;align-items:center">
-        <svg viewBox="0 0 56 108" width="52" height="100" xmlns="http://www.w3.org/2000/svg">
-          <rect x="2" y="2" width="52" height="104" rx="7" fill="none" stroke="#000" stroke-width="1.5"/>
-          <rect x="7" y="11" width="42" height="83" fill="none" stroke="#000" stroke-width="1"/>
-          <ellipse cx="28" cy="7" rx="7" ry="2" fill="none" stroke="#000" stroke-width="1"/>
-          <circle cx="28" cy="99" r="4" fill="none" stroke="#000" stroke-width="1"/>
+      <div class="phone-view">
+        <svg viewBox="0 0 60 116" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="2" width="56" height="112" rx="8" fill="none" stroke="#000" stroke-width="1.8"/>
+          <rect x="7" y="13" width="46" height="90" fill="none" stroke="#000" stroke-width="1.1"/>
+          <ellipse cx="30" cy="8" rx="8" ry="2.5" fill="none" stroke="#000" stroke-width="1"/>
+          <circle cx="30" cy="107" r="4.5" fill="none" stroke="#000" stroke-width="1"/>
         </svg>
-        <div style="font-size:7.5px;color:#555;margin-top:1px">Спереди</div>
+        <div style="font-size:7px;color:#555;text-align:center">Спереди</div>
       </div>
-      <!-- Сзади -->
-      <div style="display:flex;flex-direction:column;align-items:center">
-        <svg viewBox="0 0 56 108" width="52" height="100" xmlns="http://www.w3.org/2000/svg">
-          <rect x="2" y="2" width="52" height="104" rx="7" fill="none" stroke="#000" stroke-width="1.5"/>
-          <rect x="7" y="8" width="18" height="18" rx="4" fill="none" stroke="#000" stroke-width="1.2"/>
-          <circle cx="16" cy="17" r="5" fill="none" stroke="#000" stroke-width="1"/>
-          <circle cx="28" cy="10" r="3" fill="none" stroke="#000" stroke-width="1"/>
-          <rect x="8" y="28" width="10" height="2" rx="1" fill="#ccc" stroke="none"/>
+      <div class="phone-view">
+        <svg viewBox="0 0 60 116" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="2" width="56" height="112" rx="8" fill="none" stroke="#000" stroke-width="1.8"/>
+          <rect x="6" y="7" width="22" height="22" rx="5" fill="none" stroke="#000" stroke-width="1.3"/>
+          <circle cx="17" cy="18" r="7" fill="none" stroke="#000" stroke-width="1.1"/>
+          <circle cx="32" cy="10" r="3.5" fill="none" stroke="#000" stroke-width="1"/>
+          <rect x="7" y="32" width="12" height="2.5" rx="1.2" fill="#ccc" stroke="none"/>
         </svg>
-        <div style="font-size:7.5px;color:#555;margin-top:1px">Сзади</div>
+        <div style="font-size:7px;color:#555;text-align:center">Сзади</div>
       </div>
-      <!-- Слева (торец) -->
-      <div style="display:flex;flex-direction:column;align-items:center">
-        <svg viewBox="0 0 20 108" width="20" height="100" xmlns="http://www.w3.org/2000/svg">
-          <rect x="2" y="2" width="16" height="104" rx="4" fill="none" stroke="#000" stroke-width="1.5"/>
-          <rect x="0" y="22" width="4" height="16" rx="2" fill="none" stroke="#000" stroke-width="1"/>
-          <rect x="0" y="42" width="4" height="16" rx="2" fill="none" stroke="#000" stroke-width="1"/>
-          <rect x="16" y="32" width="4" height="22" rx="2" fill="none" stroke="#000" stroke-width="1"/>
+      <div class="phone-view" style="flex:0.38">
+        <svg viewBox="0 0 22 116" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="2" width="18" height="112" rx="5" fill="none" stroke="#000" stroke-width="1.8"/>
+          <rect x="0" y="24" width="4" height="18" rx="2" fill="none" stroke="#000" stroke-width="1"/>
+          <rect x="0" y="46" width="4" height="18" rx="2" fill="none" stroke="#000" stroke-width="1"/>
+          <rect x="18" y="34" width="4" height="24" rx="2" fill="none" stroke="#000" stroke-width="1"/>
         </svg>
-        <div style="font-size:7.5px;color:#555;margin-top:1px">Слева</div>
+        <div style="font-size:7px;color:#555;text-align:center">Слева</div>
       </div>
-      <!-- Снизу (торец) -->
-      <div style="display:flex;flex-direction:column;align-items:center">
-        <svg viewBox="0 0 108 20" width="100" height="20" xmlns="http://www.w3.org/2000/svg">
-          <rect x="2" y="2" width="104" height="16" rx="4" fill="none" stroke="#000" stroke-width="1.5"/>
-          <rect x="36" y="4" width="36" height="12" rx="3" fill="none" stroke="#000" stroke-width="1"/>
-          <rect x="8" y="5" width="4" height="10" rx="2" fill="none" stroke="#000" stroke-width="1"/>
-          <rect x="16" y="5" width="4" height="10" rx="2" fill="none" stroke="#000" stroke-width="1"/>
-          <rect x="92" y="5" width="4" height="10" rx="2" fill="none" stroke="#000" stroke-width="1"/>
+      <div class="phone-view-wide" style="flex:1.1;justify-content:flex-end">
+        <svg viewBox="0 0 116 22" xmlns="http://www.w3.org/2000/svg" style="margin-bottom:auto">
+          <rect x="2" y="2" width="112" height="18" rx="5" fill="none" stroke="#000" stroke-width="1.8"/>
+          <rect x="38" y="4" width="40" height="14" rx="3.5" fill="none" stroke="#000" stroke-width="1.1"/>
+          <rect x="8" y="5" width="5" height="12" rx="2" fill="none" stroke="#000" stroke-width="1"/>
+          <rect x="17" y="5" width="5" height="12" rx="2" fill="none" stroke="#000" stroke-width="1"/>
+          <rect x="98" y="5" width="5" height="12" rx="2" fill="none" stroke="#000" stroke-width="1"/>
         </svg>
-        <div style="font-size:7.5px;color:#555;margin-top:1px">Снизу</div>
+        <div style="font-size:7px;color:#555;text-align:center;margin-top:2px">Снизу</div>
       </div>
     </div>
 
-    <!-- НОУТБУК 3 ВИДА -->
+    <!-- НОУТБУК / ПЛАНШЕТ 3 ВИДА — на весь квадрат -->
     <div>
-      <div style="font-size:8px;color:#555;margin-bottom:3px;font-weight:bold">Ноутбук / Планшет:</div>
-      <div style="display:flex;align-items:flex-end;gap:8px">
-        <!-- Спереди открытый -->
-        <div style="display:flex;flex-direction:column;align-items:center">
-          <svg viewBox="0 0 120 95" width="110" height="88" xmlns="http://www.w3.org/2000/svg">
-            <rect x="2" y="2" width="116" height="72" rx="4" fill="none" stroke="#000" stroke-width="1.5"/>
-            <rect x="7" y="7" width="106" height="62" fill="none" stroke="#000" stroke-width="1"/>
-            <circle cx="60" cy="4.5" r="2" fill="none" stroke="#000" stroke-width="1"/>
-            <rect x="0" y="75" width="120" height="10" rx="2" fill="none" stroke="#000" stroke-width="1.5"/>
-            <rect x="40" y="77" width="40" height="6" rx="2" fill="none" stroke="#000" stroke-width="1"/>
+      <div style="font-size:8px;color:#555;margin-bottom:2px;font-weight:bold">Ноутбук / Планшет:</div>
+      <div class="laptop-row">
+        <div class="laptop-view">
+          <svg viewBox="0 0 130 102" xmlns="http://www.w3.org/2000/svg">
+            <rect x="2" y="2" width="126" height="78" rx="5" fill="none" stroke="#000" stroke-width="1.8"/>
+            <rect x="8" y="8" width="114" height="66" fill="none" stroke="#000" stroke-width="1.1"/>
+            <circle cx="65" cy="5" r="2.2" fill="none" stroke="#000" stroke-width="1"/>
+            <rect x="0" y="82" width="130" height="12" rx="3" fill="none" stroke="#000" stroke-width="1.8"/>
+            <rect x="44" y="84" width="42" height="8" rx="2.5" fill="none" stroke="#000" stroke-width="1"/>
           </svg>
-          <div style="font-size:7.5px;color:#555;margin-top:1px">Спереди</div>
+          <div style="font-size:7px;color:#555;text-align:center">Спереди</div>
         </div>
-        <!-- Сзади закрытый -->
-        <div style="display:flex;flex-direction:column;align-items:center">
-          <svg viewBox="0 0 120 95" width="110" height="88" xmlns="http://www.w3.org/2000/svg">
-            <rect x="2" y="2" width="116" height="10" rx="3" fill="none" stroke="#000" stroke-width="1.5"/>
-            <rect x="0" y="14" width="120" height="72" rx="4" fill="none" stroke="#000" stroke-width="1.5"/>
+        <div class="laptop-view">
+          <svg viewBox="0 0 130 102" xmlns="http://www.w3.org/2000/svg">
+            <rect x="2" y="2" width="126" height="12" rx="4" fill="none" stroke="#000" stroke-width="1.8"/>
+            <rect x="0" y="16" width="130" height="78" rx="5" fill="none" stroke="#000" stroke-width="1.8"/>
           </svg>
-          <div style="font-size:7.5px;color:#555;margin-top:1px">Сзади</div>
+          <div style="font-size:7px;color:#555;text-align:center">Сзади</div>
         </div>
-        <!-- Сбоку -->
-        <div style="display:flex;flex-direction:column;align-items:center">
-          <svg viewBox="0 0 30 95" width="28" height="88" xmlns="http://www.w3.org/2000/svg">
-            <rect x="10" y="2" width="10" height="60" rx="2" fill="none" stroke="#000" stroke-width="1.5"/>
-            <rect x="2" y="64" width="26" height="10" rx="2" fill="none" stroke="#000" stroke-width="1.5"/>
-            <rect x="4" y="66" width="8" height="6" rx="1" fill="none" stroke="#000" stroke-width="1"/>
+        <div class="laptop-view-narrow">
+          <svg viewBox="0 0 32 102" xmlns="http://www.w3.org/2000/svg">
+            <rect x="10" y="2" width="12" height="66" rx="3" fill="none" stroke="#000" stroke-width="1.8"/>
+            <rect x="2" y="70" width="28" height="12" rx="3" fill="none" stroke="#000" stroke-width="1.8"/>
+            <rect x="4" y="72" width="10" height="8" rx="1.5" fill="none" stroke="#000" stroke-width="1"/>
           </svg>
-          <div style="font-size:7.5px;color:#555;margin-top:1px">Сбоку</div>
+          <div style="font-size:7px;color:#555;text-align:center">Сбоку</div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ТАБЛИЦА ФУНКЦИЙ -->
+  <!-- ТАБЛИЦА ФУНКЦИЙ — пустые ячейки "До ремонта" -->
   <div class="dmg-right">
     <table class="ctbl">
       <thead><tr><th>Проверка функций</th><th>До ремонта</th></tr></thead>
       <tbody>
-        <tr><td>Кнопка Home</td><td>Проверка невозможна</td></tr>
-        <tr><td>Кнопка Вкл./Выкл.</td><td>Проверка невозможна</td></tr>
-        <tr><td>Изменение геометрии</td><td>Не деформирован</td></tr>
-        <tr><td>Деформация корпуса</td><td>Не деформирован</td></tr>
-        <tr><td>Компас и гироскоп</td><td>Проверка невозможна</td></tr>
-        <tr><td>Кнопки громкости (меню)</td><td>Проверка невозможна</td></tr>
-        <tr><td>Поиск сети</td><td>Проверка невозможна</td></tr>
-        <tr><td>Нижний микрофон (диктофон)</td><td>Проверка невозможна</td></tr>
-        <tr><td>Полифонический динамик</td><td>Проверка невозможна</td></tr>
-        <tr><td>Wi-Fi/Bluetooth (адрес Wi-Fi/сеть)</td><td>Проверка невозможна</td></tr>
-        <tr><td>Фонарик</td><td>Проверка невозможна</td></tr>
-        <tr><td>Датчик приближения</td><td>Проверка невозможна</td></tr>
-        <tr><td>Кнопки громкости (вызов)</td><td>Проверка невозможна</td></tr>
-        <tr><td>Камера основная (фокус/пятна/пиксели)</td><td>Проверка невозможна</td></tr>
-        <tr><td>Чтение SIM-карты</td><td>Проверка невозможна</td></tr>
-        <tr><td>Датчик освещённости</td><td>Проверка невозможна</td></tr>
-        <tr><td>Дисплей (touchscreen/стекло/рамка/полосы/пиксели/3D touch)</td><td>Проверка невозможна</td></tr>
-        <tr><td>Сканер радужки глаз</td><td>Проверка невозможна</td></tr>
-        <tr><td>Touch ID / Face ID</td><td>Проверка невозможна</td></tr>
-        <tr><td>Беспроводная зарядка</td><td>Проверка невозможна</td></tr>
-        <tr><td>Слуховой динамик</td><td>Проверка невозможна</td></tr>
-        <tr><td>Разъём зарядки</td><td>Проверка невозможна</td></tr>
-        <tr><td>Переключатель вибро</td><td>Проверка невозможна</td></tr>
-        <tr><td>Камера фронтальная (фокус/пятна/пиксели)</td><td>Проверка невозможна</td></tr>
-        <tr><td>Аудиоразъём (L/R)</td><td>Проверка невозможна</td></tr>
+        <tr><td>Кнопка Home</td><td>&nbsp;</td></tr>
+        <tr><td>Кнопка Вкл./Выкл.</td><td>&nbsp;</td></tr>
+        <tr><td>Изменение геометрии</td><td>&nbsp;</td></tr>
+        <tr><td>Деформация корпуса</td><td>&nbsp;</td></tr>
+        <tr><td>Компас и гироскоп</td><td>&nbsp;</td></tr>
+        <tr><td>Кнопки громкости (меню)</td><td>&nbsp;</td></tr>
+        <tr><td>Поиск сети</td><td>&nbsp;</td></tr>
+        <tr><td>Нижний микрофон (диктофон)</td><td>&nbsp;</td></tr>
+        <tr><td>Полифонический динамик</td><td>&nbsp;</td></tr>
+        <tr><td>Wi-Fi/Bluetooth (адрес Wi-Fi/сеть)</td><td>&nbsp;</td></tr>
+        <tr><td>Фонарик</td><td>&nbsp;</td></tr>
+        <tr><td>Датчик приближения</td><td>&nbsp;</td></tr>
+        <tr><td>Кнопки громкости (вызов)</td><td>&nbsp;</td></tr>
+        <tr><td>Камера основная (фокус/пятна/пиксели)</td><td>&nbsp;</td></tr>
+        <tr><td>Чтение SIM-карты</td><td>&nbsp;</td></tr>
+        <tr><td>Датчик освещённости</td><td>&nbsp;</td></tr>
+        <tr><td>Дисплей (touchscreen/стекло/рамка/полосы/пиксели/3D touch)</td><td>&nbsp;</td></tr>
+        <tr><td>Сканер радужки глаз</td><td>&nbsp;</td></tr>
+        <tr><td>Touch ID / Face ID</td><td>&nbsp;</td></tr>
+        <tr><td>Беспроводная зарядка</td><td>&nbsp;</td></tr>
+        <tr><td>Слуховой динамик</td><td>&nbsp;</td></tr>
+        <tr><td>Разъём зарядки</td><td>&nbsp;</td></tr>
+        <tr><td>Переключатель вибро</td><td>&nbsp;</td></tr>
+        <tr><td>Камера фронтальная (фокус/пятна/пиксели)</td><td>&nbsp;</td></tr>
+        <tr><td>Аудиоразъём (L/R)</td><td>&nbsp;</td></tr>
       </tbody>
     </table>
   </div>
+</div>
+
+<!-- РАЗРЫВ СТРАНИЦЫ -->
+<div class="page-break">
+<div class="page-num">Стр. 2 из 2</div>
 </div>
 
 <!-- УСЛОВИЯ + СОГЛАСИЕ -->
