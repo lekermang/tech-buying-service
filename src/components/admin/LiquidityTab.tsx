@@ -168,7 +168,7 @@ export default function LiquidityTab({ token }: { token: string }) {
     setGoldSaving(true); setGoldMsg(null);
     const action = goldTab === "buy" ? "add_gold_buy" : "sell_gold";
     const res = await fetch(API, {
-      method: "POST", headers: adminHeaders(token),
+      method: "POST", headers: { ...adminHeaders(token), "Content-Type": "application/json" },
       body: JSON.stringify({
         action, grams: parseFloat(goldGrams),
         price_per_gram: parseFloat(goldPrice),
@@ -188,7 +188,7 @@ export default function LiquidityTab({ token }: { token: string }) {
     if (!phoneAmount) return;
     setPhoneSaving(true); setPhoneMsg(null);
     const res = await fetch(API, {
-      method: "POST", headers: adminHeaders(token),
+      method: "POST", headers: { ...adminHeaders(token), "Content-Type": "application/json" },
       body: JSON.stringify({
         action: "add_phone_sale",
         amount: parseFloat(phoneAmount),
@@ -206,7 +206,7 @@ export default function LiquidityTab({ token }: { token: string }) {
   const saveRent = async (shop: string) => {
     setRentSaving(shop); setRentMsg(null);
     const res = await fetch(API, {
-      method: "POST", headers: adminHeaders(token),
+      method: "POST", headers: { ...adminHeaders(token), "Content-Type": "application/json" },
       body: JSON.stringify({ action: "update_rent", shop, amount: parseFloat(rentEdit[shop] || "0") }),
     });
     const data = await res.json();
@@ -220,7 +220,7 @@ export default function LiquidityTab({ token }: { token: string }) {
   const chargeRent = async (shop: string) => {
     setChargingRent(shop); setRentMsg(null);
     const res = await fetch(API, {
-      method: "POST", headers: adminHeaders(token),
+      method: "POST", headers: { ...adminHeaders(token), "Content-Type": "application/json" },
       body: JSON.stringify({ action: "charge_rent", shop, date: new Date().toISOString().slice(0, 10) }),
     });
     const data = await res.json();
@@ -233,7 +233,7 @@ export default function LiquidityTab({ token }: { token: string }) {
   const deleteEntry = async (id: number) => {
     if (!confirm("Удалить запись #" + id + "?")) return;
     await fetch(API, {
-      method: "POST", headers: adminHeaders(token),
+      method: "POST", headers: { ...adminHeaders(token), "Content-Type": "application/json" },
       body: JSON.stringify({ action: "delete_entry", id }),
     });
     loadEntries(); loadDash();
