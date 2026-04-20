@@ -104,6 +104,7 @@ export default function LaborPricesTab({
 
   const removeExtra = (i: number) => {
     const ew = editedExtras[i];
+    if (!window.confirm(`Удалить «${ew.label || 'без названия'}»?`)) return;
     if (ew.id) setDeletedExtraIds(prev => [...prev, ew.id!]);
     setEditedExtras(prev => prev.filter((_, j) => j !== i));
   };
