@@ -193,6 +193,25 @@ def push_to_chat_members(conn, chat_id: int, exclude_user_id: int, push_payload:
         pass
 
 
+def send_sms(phone: str, code: str) -> bool:
+    api_id = os.environ.get("SMSRU_API_ID", "")
+    if not api_id:
+        return False
+    from urllib.parse import urlencode
+    from urllib.request import urlopen
+    params = urlencode({"api_id": api_id, "to": phone, "msg": f"DzChat: ваш код {code}", "json": 1})
+    try:
+        with urlopen(f"https://sms.ru/sms/send?{params}", timeout=10) as r:
+            result = json.loads(r.read().decode())
+            return result.get("status") == "OK"
+    except Exception:
+        return False
+
+
+def gen_otp() -> str:
+    return str(random.randint(100000, 999999))
+
+
 def handler(event: dict, context) -> dict:
     """DzChat WhatsApp-like API handler."""
     if event.get("httpMethod") == "OPTIONS":
@@ -423,6 +442,66 @@ def handler(event: dict, context) -> dict:
             "caller": {"id": row[7], "name": row[8], "avatar_url": row[9]},
             "callee": {"id": row[10], "name": row[11], "avatar_url": row[12]},
         }})
+
+    # ── SMS: отправить код (регистрация / вход) ───────────────────
+    if action == "sms_send" and method == "POST":
+        phone = body.get("phone", "").strip()
+        mode = body.get("mode", "login")  # "login" или "register"
+        name = body.get("name", "").strip()
+        if not phone:
+            return resp({"error": "Укажите номер телефона"}, 400)
+        cur = conn.cursor()
+        cur.execute(f"SELECT id, name FROM {SCHEMA}.dzchat_users WHERE phone=%s", (phone,))
+        existing = cur.fetchone()
+        if mode == "register":
+            if not name:
+                return resp({"error": "Укажите ваше имя"}, 400)
+            if existing:
+                return resp({"error": "Аккаунт с этим номером уже существует. Войдите."}, 409)
+        else:
+            if not existing:
+                return resp({"error": "Аккаунт не найден. Зарегистрируйтесь."}, 404)
+        code = gen_otp()
+        ok = send_sms(phone, code)
+        if not ok:
+            return resp({"error": "Не удалось отправить SMS. Проверьте номер."}, 500)
+        if existing:
+            cur.execute(f"UPDATE {SCHEMA}.dzchat_users SET otp=%s, otp_expires_at=NOW() + INTERVAL '10 minutes' WHERE phone=%s", (code, phone))
+        else:
+            cur.execute(f"""
+                INSERT INTO {SCHEMA}.dzchat_users (phone, name, otp, otp_expires_at, is_online, last_seen_at)
+                VALUES (%s, %s, %s, NOW() + INTERVAL '10 minutes', FALSE, NOW())
+                ON CONFLICT (phone) DO UPDATE SET otp=EXCLUDED.otp, otp_expires_at=EXCLUDED.otp_expires_at
+            """, (phone, name, code))
+        conn.commit()
+        return resp({"ok": True, "sent": True})
+
+    # ── SMS: подтвердить код ───────────────────────────────────────
+    if action == "sms_verify" and method == "POST":
+        phone = body.get("phone", "").strip()
+        code = body.get("code", "").strip()
+        if not phone or not code:
+            return resp({"error": "Укажите телефон и код"}, 400)
+        cur = conn.cursor()
+        cur.execute(f"SELECT id, otp, otp_expires_at FROM {SCHEMA}.dzchat_users WHERE phone=%s", (phone,))
+        row = cur.fetchone()
+        if not row:
+            return resp({"error": "Аккаунт не найден"}, 404)
+        if not row[1] or row[1] != code:
+            return resp({"error": "Неверный код"}, 400)
+        import datetime
+        if row[2] and row[2] < datetime.datetime.now():
+            return resp({"error": "Код истёк. Запросите новый."}, 400)
+        tok = gen_token(phone)
+        cur.execute(f"""
+            UPDATE {SCHEMA}.dzchat_users
+            SET otp=NULL, otp_expires_at=NULL,
+                session_token=%s, session_expires_at=NOW() + INTERVAL '30 days',
+                is_online=TRUE, last_seen_at=NOW()
+            WHERE id=%s
+        """, (tok, row[0]))
+        conn.commit()
+        return resp({"ok": True, "token": tok, "user_id": row[0]})
 
     # ── REGISTER ──────────────────────────────────────────────────
     if action == "register" and method == "POST":
