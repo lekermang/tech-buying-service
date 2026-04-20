@@ -118,22 +118,48 @@ MOBA_CATALOG_SECTIONS = [
 
 
 def moba_session() -> requests.Session:
-    """Создаёт сессию с куками из env (скопированы из браузера)."""
+    """Создаёт сессию и авторизуется на moba.ru через Битрикс-форму."""
     session = requests.Session()
-    cookies_str = os.environ.get('MOBA_COOKIES', '')
     session.headers.update({
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'ru,en;q=0.9',
-        'bx-ajax': 'true',
-        'x-requested-with': 'XMLHttpRequest',
     })
-    if cookies_str:
-        for part in cookies_str.split(';'):
-            part = part.strip()
-            if '=' in part:
-                k, v = part.split('=', 1)
-                session.cookies.set(k.strip(), v.strip(), domain='kaluga.moba.ru')
+    login = os.environ.get('MOBA_LOGIN', '')
+    password = os.environ.get('MOBA_PASSWORD', '')
+
+    # Шаг 1: получаем начальные куки (PHPSESSID) через главную страницу
+    try:
+        session.get(f'{MOBA_BASE}/?login=yes', timeout=15, allow_redirects=True)
+    except Exception as e:
+        print(f'[MOBA] get main error: {e}')
+
+    # Шаг 2: авторизуемся через ajax/form.php (Битрикс)
+    try:
+        resp = session.post(
+            f'{MOBA_BASE}/ajax/form.php',
+            params={'type': 'auth', 'backurl': '/?login=yes', 'auth': 'Y'},
+            data={
+                'AUTH_FORM': 'Y',
+                'TYPE': 'AUTH',
+                'backurl': '/?login=yes',
+                'USER_LOGIN': login,
+                'USER_PASSWORD': password,
+                'USER_REMEMBER': 'Y',
+            },
+            headers={
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Referer': f'{MOBA_BASE}/?login=yes',
+                'x-requested-with': 'XMLHttpRequest',
+                'bx-ajax': 'true',
+            },
+            timeout=15,
+            allow_redirects=True,
+        )
+        print(f'[MOBA] auth status={resp.status_code} cookies={list(session.cookies.keys())}')
+    except Exception as e:
+        print(f'[MOBA] auth error: {e}')
+
     return session
 
 
