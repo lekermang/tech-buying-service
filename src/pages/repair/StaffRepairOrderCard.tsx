@@ -17,7 +17,7 @@ type EditForm = {
   name: string; phone: string; model: string; repair_type: string;
   price: string; comment: string; admin_note: string;
   purchase_amount: string; repair_amount: string; parts_name: string;
-  advance: string; is_paid: boolean;
+  advance: string; is_paid: boolean; payment_method: string;
 };
 
 type Props = {
@@ -142,14 +142,14 @@ export default function StaffRepairOrderCard({
           {o.price && <span className="text-[#FFD700] font-roboto text-xs font-bold">{o.price.toLocaleString("ru-RU")} ₽</span>}
           {o.repair_amount != null && <span className="text-green-400 font-roboto text-xs">✓ {o.repair_amount.toLocaleString("ru-RU")} ₽</span>}
           {o.master_income != null && <span className="text-green-300/70 font-roboto text-[10px]">мастер: {o.master_income.toLocaleString("ru-RU")} ₽</span>}
-          {o.is_paid && (
+          {o.is_paid && o.payment_method && (
             <span className="font-roboto text-[10px] px-1.5 py-0.5 bg-green-500/20 text-green-400 border border-green-500/30">
-              💳 Оплачено
+              {o.payment_method === "cash" ? "💵 Нал" : o.payment_method === "card" ? "💳 Карта" : "📲 Перевод"}
             </span>
           )}
           {!o.is_paid && o.advance != null && o.advance > 0 && (
             <span className="font-roboto text-[10px] px-1.5 py-0.5 bg-blue-500/20 text-blue-400 border border-blue-500/30">
-              💵 Аванс {o.advance.toLocaleString("ru-RU")} ₽
+              💵 {o.advance.toLocaleString("ru-RU")} ₽
             </span>
           )}
         </div>
@@ -210,33 +210,44 @@ export default function StaffRepairOrderCard({
               </div>
             )}
 
-            {/* Аванс + Оплачено */}
-            <div className="grid grid-cols-2 gap-2 pt-1 border-t border-white/5">
+            {/* Аванс + Способ оплаты */}
+            <div className="pt-1 border-t border-white/5 space-y-2">
               <div>
                 <label className={LBL + " text-blue-400/80"}>💵 Аванс (₽)</label>
                 <input type="number" inputMode="numeric" value={ef.advance}
                   onChange={e => onEditFormChange(o.id, { ...ef, advance: e.target.value })}
                   placeholder="0" className={INP} />
-              </div>
-              <div className="flex flex-col justify-end pb-1">
-                <label className="flex items-center gap-2 cursor-pointer active:opacity-70"
-                  onClick={() => onEditFormChange(o.id, { ...ef, is_paid: !ef.is_paid })}>
-                  <div className={`w-4 h-4 border flex items-center justify-center transition-colors shrink-0 ${ef.is_paid ? "bg-green-500 border-green-500" : "border-white/30"}`}>
-                    {ef.is_paid && <Icon name="Check" size={10} className="text-white" />}
+                {ef.advance && parseInt(ef.advance) > 0 && ef.repair_amount && (
+                  <div className="text-[10px] font-roboto text-blue-400/70 mt-1">
+                    Остаток: {(parseInt(ef.repair_amount) - parseInt(ef.advance)).toLocaleString("ru-RU")} ₽
                   </div>
-                  <span className="font-roboto text-xs text-white/60">Оплачено полностью</span>
-                </label>
+                )}
+              </div>
+              <div>
+                <label className={LBL}>💳 Способ оплаты</label>
+                <div className="grid grid-cols-4 gap-1 mt-1">
+                  {[
+                    { v: "",        label: "Нет" },
+                    { v: "cash",    label: "Нал" },
+                    { v: "card",    label: "Карта" },
+                    { v: "transfer",label: "Перевод" },
+                  ].map(opt => (
+                    <button key={opt.v} type="button"
+                      onClick={() => onEditFormChange(o.id, { ...ef, payment_method: opt.v, is_paid: opt.v !== "" })}
+                      className={`font-roboto text-[11px] py-2 border transition-colors ${
+                        ef.payment_method === opt.v
+                          ? "bg-[#FFD700] border-[#FFD700] text-black font-bold"
+                          : "border-white/20 text-white/50 active:bg-white/10"
+                      }`}>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                {ef.is_paid && ef.payment_method && (
+                  <div className="text-[10px] font-roboto text-green-400/70 mt-1">✓ Оплачено: {ef.payment_method === "cash" ? "наличными" : ef.payment_method === "card" ? "картой" : "переводом"}</div>
+                )}
               </div>
             </div>
-            {ef.is_paid && (
-              <div className="text-[10px] font-roboto text-green-400/70 px-1">✓ Клиент оплатил ремонт полностью</div>
-            )}
-            {!ef.is_paid && ef.advance && parseInt(ef.advance) > 0 && (
-              <div className="text-[10px] font-roboto text-blue-400/70 px-1">
-                Аванс: {parseInt(ef.advance).toLocaleString("ru-RU")} ₽
-                {ef.repair_amount && ` · Остаток: ${(parseInt(ef.repair_amount) - parseInt(ef.advance)).toLocaleString("ru-RU")} ₽`}
-              </div>
-            )}
           </div>
 
           {/* Поля заявки */}
@@ -329,26 +340,26 @@ export default function StaffRepairOrderCard({
           </div>
 
           {/* SMS */}
-          <div className="border border-green-500/20 bg-green-500/5 p-3 rounded-sm">
-            <div className="font-roboto text-white/30 text-[10px] uppercase tracking-wide mb-2 flex items-center gap-1">
-              <Icon name="MessageSquare" size={10} className="text-green-400" /> SMS на {o.phone || "—"}
+          <div className="border border-green-500/20 bg-green-500/5 px-2.5 py-2 rounded-sm">
+            <div className="font-roboto text-white/30 text-[10px] uppercase tracking-wide mb-1.5 flex items-center gap-1">
+              <Icon name="MessageSquare" size={10} className="text-green-400" /> SMS · {o.phone || "—"}
             </div>
-            <div className="grid grid-cols-2 gap-1.5">
+            <div className="flex flex-wrap gap-1">
               {Object.entries(STATUS_LABEL).map(([key, label]) => (
                 <button key={key} type="button" onClick={() => handleSendSms(key)}
                   disabled={smsSentKey === key}
-                  className={`font-roboto text-xs py-2 px-2 border transition-colors flex items-center justify-center gap-1.5 min-h-[40px] ${
+                  className={`font-roboto text-[10px] py-1.5 px-2 border transition-colors flex items-center gap-1 ${
                     smsSentKey === key
                       ? "border-green-500/40 text-green-400 bg-green-500/10"
                       : "border-green-500/20 text-green-400/70 active:bg-green-500/10"
                   }`}>
-                  <Icon name={smsSentKey === key ? "Check" : "MessageSquare"} size={10} />
+                  <Icon name={smsSentKey === key ? "Check" : "MessageSquare"} size={9} />
                   {label}
                 </button>
               ))}
             </div>
-            {smsError && <div className="mt-1.5 font-roboto text-xs text-orange-400">{smsError}</div>}
-            {smsSentKey && !smsError && <div className="mt-1.5 font-roboto text-xs text-green-400/70">✓ SMS отправлено</div>}
+            {smsError && <div className="mt-1 font-roboto text-[10px] text-orange-400">{smsError}</div>}
+            {smsSentKey && !smsError && <div className="mt-1 font-roboto text-[10px] text-green-400/70">✓ Отправлено</div>}
           </div>
 
           {/* Печать + удаление */}

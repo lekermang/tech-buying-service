@@ -126,7 +126,7 @@ export default function Staff() {
       </div>
 
       {/* Контент — растягивается, с паддингом под нижнюю панель */}
-      <div className="flex-1 overflow-y-auto pb-20">
+      <div className="flex-1 overflow-y-auto" style={{ paddingBottom: 'calc(50px + env(safe-area-inset-bottom, 16px))' }}>
         {tab === "repair"    && <StaffRepairTab token={token} isOwner={empRole === "owner"} />}
         {tab === "goods"     && <GoodsTab token={token} />}
         {tab === "sales"     && <SalesTab token={token} />}
@@ -135,20 +135,26 @@ export default function Staff() {
         {tab === "employees" && isOwnerOrAdmin && <EmployeesTab token={token} myRole={empRole} />}
       </div>
 
-      {/* Нижняя навигация — фиксированная, как у нативных приложений */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-[#111] border-t border-[#222] flex safe-bottom z-50">
-        {TABS.map(t => (
-          <button
-            key={t.k}
-            onClick={() => setTab(t.k as Tab)}
-            className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-h-[56px] transition-colors active:opacity-70 ${
-              tab === t.k ? "text-[#FFD700]" : "text-white/35"
-            }`}
-          >
-            <Icon name={t.icon} size={tab === t.k ? 22 : 20} />
-            <span className="font-roboto text-[9px] leading-none tracking-wide">{t.l}</span>
-          </button>
-        ))}
+      {/* Нижняя навигация — фиксированная, с safe area для iPhone */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-[#111]/95 backdrop-blur-sm border-t border-[#2A2A2A] z-50"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+        <div className="flex">
+          {TABS.map(t => (
+            <button
+              key={t.k}
+              onClick={() => setTab(t.k as Tab)}
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 pt-2 pb-1.5 min-h-[50px] transition-colors active:opacity-60 relative ${
+                tab === t.k ? "text-[#FFD700]" : "text-white/30"
+              }`}
+            >
+              {tab === t.k && (
+                <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-[#FFD700] rounded-b-full" />
+              )}
+              <Icon name={t.icon} size={20} />
+              <span className="font-roboto text-[8px] leading-none tracking-wide">{t.l}</span>
+            </button>
+          ))}
+        </div>
       </nav>
     </div>
   );

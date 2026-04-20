@@ -702,7 +702,7 @@ def handler(event: dict, context) -> dict:
 
         where = ('WHERE ' + ' AND '.join(conditions)) if conditions else ''
         cur.execute(
-            f"SELECT id, name, phone, model, repair_type, price, status, admin_note, created_at, comment, purchase_amount, repair_amount, completed_at, master_income, parts_name, picked_up_at, advance, is_paid FROM {SCHEMA}.repair_orders {where} ORDER BY created_at DESC LIMIT 500"
+            f"SELECT id, name, phone, model, repair_type, price, status, admin_note, created_at, comment, purchase_amount, repair_amount, completed_at, master_income, parts_name, picked_up_at, advance, is_paid, payment_method FROM {SCHEMA}.repair_orders {where} ORDER BY created_at DESC LIMIT 500"
         )
         rows = cur.fetchall()
         cur.close(); conn.close()
@@ -716,7 +716,7 @@ def handler(event: dict, context) -> dict:
                 'completed_at': r[12].isoformat() if r[12] else None,
                 'master_income': r[13], 'parts_name': r[14],
                 'picked_up_at': r[15].isoformat() if r[15] else None,
-                'advance': r[16], 'is_paid': r[17],
+                'advance': r[16], 'is_paid': r[17], 'payment_method': r[18],
             }
             for r in rows
         ]
@@ -1234,6 +1234,13 @@ def handler(event: dict, context) -> dict:
             sets.append(f"advance = {int(upd_advance)}")
         if upd_is_paid is not None:
             sets.append(f"is_paid = {str(bool(upd_is_paid)).upper()}")
+        upd_payment_method = body.get('payment_method')
+        if upd_payment_method is not None:
+            if upd_payment_method:
+                pm = str(upd_payment_method).replace("'", "''")
+                sets.append(f"payment_method = '{pm}'")
+            else:
+                sets.append("payment_method = NULL")
 
         if not sets:
             cur.close(); conn.close()

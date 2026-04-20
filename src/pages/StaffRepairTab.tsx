@@ -22,7 +22,7 @@ type EditForm = {
   name: string; phone: string; model: string; repair_type: string;
   price: string; comment: string; admin_note: string;
   purchase_amount: string; repair_amount: string; parts_name: string;
-  advance: string; is_paid: boolean;
+  advance: string; is_paid: boolean; payment_method: string;
 };
 
 export default function StaffRepairTab({ token, isOwner = false }: { token: string; isOwner?: boolean }) {
@@ -116,7 +116,7 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
         admin_note: null, created_at: new Date().toISOString(),
         purchase_amount: null, repair_amount: null,
         completed_at: null, master_income: null, parts_name: null, picked_up_at: null,
-        advance: null, is_paid: null,
+        advance: null, is_paid: null, payment_method: null,
       };
       printAct(newOrder);
     }
@@ -137,6 +137,7 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
     if (ef.parts_name) body.parts_name = ef.parts_name;
     body.advance = ef.advance ? parseInt(ef.advance) : 0;
     body.is_paid = ef.is_paid;
+    body.payment_method = ef.payment_method || null;
     // Поля заявки
     body.name = ef.name; body.phone = ef.phone;
     body.model = ef.model || null; body.repair_type = ef.repair_type || null;
@@ -228,6 +229,7 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
     parts_name: o.parts_name || "",
     advance: o.advance != null ? String(o.advance) : "",
     is_paid: o.is_paid ?? false,
+    payment_method: o.payment_method || "",
   });
 
   return (

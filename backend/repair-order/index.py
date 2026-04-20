@@ -27,12 +27,13 @@ STATUS_MSG = {
 
 
 def auth_staff(event: dict) -> bool:
-    hdrs = event.get('headers') or {}
+    hdrs = {k.lower(): v for k, v in (event.get('headers') or {}).items()}
     admin_token = os.environ.get('ADMIN_TOKEN', '')
     emp_raw = os.environ.get('EMPLOYEE_TOKENS', '')
-    valid = [t.strip() for t in emp_raw.split(',') if t.strip()]
-    valid.append(admin_token)
-    return hdrs.get('X-Admin-Token') in valid or hdrs.get('X-Employee-Token') in valid
+    valid = set(t.strip() for t in emp_raw.split(',') if t.strip())
+    valid.add(admin_token)
+    incoming = {hdrs.get('x-admin-token'), hdrs.get('x-employee-token')}
+    return bool(incoming & valid)
 
 
 def send_tg(token: str, chat_id, text: str, parse_mode: str = 'Markdown'):
