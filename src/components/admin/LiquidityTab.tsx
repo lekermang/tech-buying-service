@@ -104,21 +104,25 @@ export default function LiquidityTab({ token }: { token: string }) {
   const [rentMsg, setRentMsg] = useState<string | null>(null);
   const [chargingRent, setChargingRent] = useState<string | null>(null);
 
-  const hdrs = { "Content-Type": "application/json", "X-Admin-Token": token } as const;
+  const hdrs = { "Content-Type": "application/json", "X-Admin-Token": token };
 
   const loadDash = useCallback(async () => {
     setDashLoading(true);
-    const res = await fetch(`${API}?action=dashboard`, { headers: { "Content-Type": "application/json", "X-Admin-Token": token } });
-    const data = await res.json();
-    setDash(data);
-    if (data.rent) {
-      setRentSettings(data.rent);
-      const init: Record<string, string> = {};
-      Object.entries(data.rent as Record<string, { amount: number }>).forEach(([k, v]) => {
-        init[k] = String(v.amount);
-      });
-      setRentEdit(init);
-    }
+    try {
+      const res = await fetch(`${API}?action=dashboard`, { headers: { "Content-Type": "application/json", "X-Admin-Token": token } });
+      const data = await res.json();
+      if (data.today) {
+        setDash(data);
+        if (data.rent) {
+          setRentSettings(data.rent);
+          const init: Record<string, string> = {};
+          Object.entries(data.rent as Record<string, { amount: number }>).forEach(([k, v]) => {
+            init[k] = String(v.amount);
+          });
+          setRentEdit(init);
+        }
+      }
+    } catch { /* ignore */ }
     setDashLoading(false);
   }, [token]);
 
@@ -271,10 +275,10 @@ export default function LiquidityTab({ token }: { token: string }) {
         {view === "dashboard" && (
           <div className="p-4 space-y-4 max-w-3xl">
             {dashLoading && <div className="text-white/30 text-sm text-center py-10">Загружаю...</div>}
-            {dash && (
+            {dash?.today && (
               <>
                 <div className="font-roboto text-white/30 text-[10px] uppercase tracking-widest">
-                  За сегодня — {new Date(dash.today.date).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}
+                  За сегодня — {new Date(dash.today.date + "T00:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}
                 </div>
 
                 {/* Карточки-итоги */}
