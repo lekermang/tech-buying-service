@@ -1,4 +1,3 @@
-import io
 import json
 import os
 import psycopg2
@@ -48,186 +47,305 @@ def send_tg_all(token: str, main_chat_id: str, conn, message: str):
             pass
 
 
-def build_act_docx(order_id, name, phone, model, repair_type, price_str, comment) -> bytes:
-    from docx import Document
-    from docx.shared import Pt, Cm, RGBColor
-    from docx.enum.text import WD_ALIGN_PARAGRAPH
-    from docx.enum.table import WD_TABLE_ALIGNMENT, WD_ALIGN_VERTICAL
-    from docx.oxml.ns import qn
-    from docx.oxml import OxmlElement
+def build_act_html(order_id, name, phone, model, repair_type, price_str, comment) -> bytes:
     import datetime
+    now = datetime.datetime.now()
+    date_str = now.strftime('%d.%m.%Y')
+    order_num = str(order_id).zfill(6)
 
-    F = 'Arial'
-    now = datetime.datetime.now().strftime('%d.%m.%Y %H:%M')
-    LOGO_URL = 'https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/f4f18755-1806-41a9-bcbe-82823a66929b.JPG'
-    logo_bytes = None
-    try:
-        logo_resp = requests.get(LOGO_URL, timeout=10)
-        if logo_resp.status_code == 200:
-            logo_bytes = io.BytesIO(logo_resp.content)
-    except Exception:
-        pass
+    html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Акт приёма №{order_id}</title>
+<style>
+*{{box-sizing:border-box;margin:0;padding:0}}
+body{{font-family:Arial,sans-serif;font-size:10px;color:#000;background:#fff}}
+.page{{width:210mm;margin:0 auto;padding:7mm 9mm}}
+@media print{{body{{margin:0}}.page{{padding:7mm 9mm;width:100%}}}}
+.page-break{{page-break-before:always;padding-top:5mm}}
+.page-num{{font-size:8px;color:#777;text-align:right;margin-bottom:1px}}
+.hdr{{display:flex;align-items:stretch;margin-bottom:5px;border:1px solid #000}}
+.hdr-mid{{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 10px;border-right:1px solid #000;text-align:center}}
+.hdr-mid .t1{{font-size:14px;font-weight:bold}}.hdr-mid .t2{{font-size:9px;color:#555;margin:1px 0 4px}}
+.hdr-mid .t3{{font-size:12px;font-weight:bold}}.hdr-mid .t4{{font-size:9px;color:#333;margin-top:1px}}
+.hdr-right{{padding:5px 8px;font-size:8.5px;line-height:1.7;min-width:175px;display:flex;flex-direction:column;justify-content:center}}
+.hdr-right b{{font-size:9.5px;display:block;margin-bottom:1px}}
+.sec3{{display:flex;border:1px solid #000;margin-bottom:5px}}
+.sc{{flex:1;border-right:1px solid #ccc}}.sc:last-child{{border-right:none}}
+.sc-h{{background:#efefef;padding:2px 6px;font-weight:bold;font-size:9px;border-bottom:1px solid #ccc}}
+.sc-b{{padding:4px 6px}}.f{{margin-bottom:2px}}.fl{{font-size:8px;color:#555}}.fv{{font-weight:bold;font-size:10px}}.fvn{{font-size:10px}}
+.notes{{margin-bottom:5px;border-bottom:1px solid #000;padding-bottom:3px}}
+.notes-lbl{{font-size:8.5px;font-weight:bold;margin-bottom:14px}}
+.dmg-wrap{{display:flex;border:1px solid #000;margin-bottom:5px}}
+.dmg-left{{flex:1.2;border-right:1px solid #ccc;padding:5px 6px;display:flex;flex-direction:column;gap:6px}}
+.dmg-title{{font-size:9px;font-weight:bold;margin-bottom:1px}}
+.dmg-hint{{font-size:7.5px;color:#555;margin-bottom:3px}}
+.dmg-right{{flex:1;padding:4px 5px}}
+.phone-row{{display:flex;align-items:stretch;justify-content:space-between;gap:0}}
+.phone-view{{display:flex;flex-direction:column;align-items:center;flex:1}}
+.phone-view svg{{width:100%;height:auto;display:block}}
+.laptop-row{{display:flex;align-items:stretch;justify-content:space-between;gap:0}}
+.laptop-view{{display:flex;flex-direction:column;align-items:center;flex:3}}
+.laptop-view svg{{width:100%;height:auto;display:block}}
+.laptop-view-narrow{{display:flex;flex-direction:column;align-items:center;flex:1}}
+.laptop-view-narrow svg{{width:100%;height:auto;display:block}}
+.ctbl{{width:100%;border-collapse:collapse;font-size:8.5px}}
+.ctbl th{{background:#efefef;border:1px solid #bbb;padding:2px 4px;text-align:left}}
+.ctbl td{{border:1px solid #bbb;padding:2px 4px}}
+.ctbl td:last-child{{width:80px;min-height:14px}}
+.cond-wrap{{display:flex;border:1px solid #000;margin-bottom:5px}}
+.cond-left{{flex:1;padding:4px 8px 4px 6px;border-right:1px solid #ccc}}
+.cond-right{{width:130px;padding:5px 7px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;text-align:center}}
+.cond-title{{font-size:8.5px;font-weight:bold;background:#efefef;padding:2px 6px;border-bottom:1px solid #ccc;margin:-4px -8px 4px -6px}}
+.cond-ol{{padding-left:16px;font-size:7.8px;line-height:1.6;margin:0}}
+.cond-ol li{{margin-bottom:1px}}
+.cond-agree{{font-size:8px;font-weight:bold;line-height:1.4;border:1px solid #000;padding:4px;text-align:center}}
+.cond-link{{font-size:9px;font-weight:bold;color:#000}}
+.signs{{display:flex;border:1px solid #000}}
+.sign-col{{flex:1;padding:6px 10px}}.sign-col:first-child{{border-right:1px solid #000}}
+.sign-title{{font-size:8.5px;margin-bottom:2px}}.sign-who{{font-size:9px;margin-bottom:10px}}
+.sign-line-row{{display:flex;gap:16px;margin-bottom:2px}}
+.sign-blank{{flex:1;border-bottom:1px solid #000;height:14px}}
+.sign-hint{{display:flex;gap:16px;font-size:7.5px;color:#777}}
+.sign-hint span{{flex:1;text-align:center}}
+.print-btn{{text-align:center;padding:10px;background:#f5f5f5;border-bottom:1px solid #ccc}}
+@media print{{.print-btn{{display:none}}}}
+</style>
+</head><body>
+<div class="print-btn">
+  <button onclick="window.print()" style="padding:8px 28px;font-size:14px;cursor:pointer;background:#FFD700;border:2px solid #000;font-weight:bold">🖨 Распечатать акт</button>
+</div>
+<div class="page">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">
+  <span style="font-size:8px;color:#555">Экз. Клиента</span>
+  <span style="font-size:8px;color:#777">Стр. 1 из 2</span>
+</div>
 
-    def set_cell_bg(cell, hex_color):
-        tc = cell._tc; tcPr = tc.get_or_add_tcPr()
-        shd = OxmlElement('w:shd')
-        shd.set(qn('w:val'), 'clear'); shd.set(qn('w:color'), 'auto')
-        shd.set(qn('w:fill'), hex_color); tcPr.append(shd)
+<div class="hdr">
+  <div class="hdr-mid">
+    <div class="t1">Акт приёма — передачи</div>
+    <div class="t2">устройства в ремонт</div>
+    <div class="t3">№ {order_num}</div>
+    <div class="t4">от {date_str}</div>
+  </div>
+  <div class="hdr-right">
+    <b>Исполнитель:</b>
+    ИП Мамедов Адиль Мирза Оглы<br>
+    ИНН: 402810962699<br>
+    ОГРНИП: 307402814200032<br>
+    г. Калуга, ул. Кирова, 7/47 и ул. Кирова, 11<br>
+    Тел.: +7 (992) 990-33-33<br>
+    skypka24.com
+  </div>
+</div>
 
-    def set_cell_borders(cell, color='000000', sz=4):
-        tc = cell._tc; tcPr = tc.get_or_add_tcPr()
-        tcBorders = OxmlElement('w:tcBorders')
-        for side in ['top', 'bottom', 'left', 'right']:
-            b = OxmlElement(f'w:{side}')
-            b.set(qn('w:val'), 'single'); b.set(qn('w:sz'), str(sz))
-            b.set(qn('w:space'), '0'); b.set(qn('w:color'), color)
-            tcBorders.append(b)
-        tcPr.append(tcBorders)
+<div class="sec3">
+  <div class="sc">
+    <div class="sc-h">Клиент:</div>
+    <div class="sc-b">
+      <div class="f"><div class="fl">ФИО Клиента:</div><div class="fv">{name}</div></div>
+      <div style="height:8px"></div>
+      <div class="f"><div class="fl">Телефон Клиента:</div><div class="fv">{phone}</div></div>
+    </div>
+  </div>
+  <div class="sc">
+    <div class="sc-h">Устройство:</div>
+    <div class="sc-b">
+      <div class="f"><div class="fl">Устройство:</div><div class="fv">{model or '—'}</div></div>
+      <div class="f"><div class="fl">Цвет:</div><div class="fvn">—</div></div>
+      <div class="f"><div class="fl">Пароль от устройства:</div><div class="fvn">&nbsp;</div></div>
+      <div class="f"><div class="fl">Сер. №:</div><div class="fvn">—</div></div>
+      <div class="f"><div class="fl">IMEI:</div><div class="fvn">&nbsp;</div></div>
+    </div>
+  </div>
+  <div class="sc">
+    <div class="sc-h">Ремонт:</div>
+    <div class="sc-b">
+      <div class="f"><div class="fl">Ориентировочная стоимость:</div><div class="fvn">{price_str}</div></div>
+      <div class="f"><div class="fl">Аванс:</div><div class="fvn">0</div></div>
+      <div style="height:4px"></div>
+      <div class="f"><div class="fl">Срок ремонта:</div><div class="fvn">По договорённости</div></div>
+      <div class="f"><div class="fl">Заявленные неисправности:</div><div class="fvn">{comment or repair_type or '—'}</div></div>
+    </div>
+  </div>
+</div>
 
-    def cell_para(cell, text, bold=False, size=10, align=WD_ALIGN_PARAGRAPH.LEFT, color=None):
-        p = cell.paragraphs[0] if cell.paragraphs else cell.add_paragraph()
-        p.alignment = align; p.clear()
-        run = p.add_run(text); run.bold = bold
-        run.font.size = Pt(size); run.font.name = F
-        if color: run.font.color.rgb = RGBColor.from_string(color)
-        return p
+<div class="notes">
+  <div class="notes-lbl">Заметки приёмщика:</div>
+</div>
 
-    doc = Document()
-    for section in doc.sections:
-        section.top_margin = Cm(1.5); section.bottom_margin = Cm(1.5)
-        section.left_margin = Cm(1.5); section.right_margin = Cm(1.5)
-    for style in doc.styles:
-        if hasattr(style, 'font'):
-            style.font.name = F
+<div class="dmg-wrap">
+  <div class="dmg-left">
+    <div>
+      <div class="dmg-title">Наружные повреждения</div>
+      <div class="dmg-hint">Отметить на схеме: * – скол, / – вмятина, v – царапина</div>
+    </div>
+    <div class="phone-row">
+      <div class="phone-view">
+        <svg viewBox="0 0 60 116" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="2" width="56" height="112" rx="8" fill="none" stroke="#000" stroke-width="1.8"/>
+          <rect x="7" y="13" width="46" height="90" fill="none" stroke="#000" stroke-width="1.1"/>
+          <ellipse cx="30" cy="8" rx="8" ry="2.5" fill="none" stroke="#000" stroke-width="1"/>
+          <circle cx="30" cy="107" r="4.5" fill="none" stroke="#000" stroke-width="1"/>
+        </svg>
+        <div style="font-size:7px;color:#555;text-align:center">Спереди</div>
+      </div>
+      <div class="phone-view">
+        <svg viewBox="0 0 60 116" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="2" width="56" height="112" rx="8" fill="none" stroke="#000" stroke-width="1.8"/>
+          <rect x="6" y="7" width="22" height="22" rx="5" fill="none" stroke="#000" stroke-width="1.3"/>
+          <circle cx="17" cy="18" r="7" fill="none" stroke="#000" stroke-width="1.1"/>
+          <circle cx="32" cy="10" r="3.5" fill="none" stroke="#000" stroke-width="1"/>
+          <rect x="7" y="32" width="12" height="2.5" rx="1.2" fill="#ccc" stroke="none"/>
+        </svg>
+        <div style="font-size:7px;color:#555;text-align:center">Сзади</div>
+      </div>
+      <div class="phone-view" style="flex:0.38">
+        <svg viewBox="0 0 22 116" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="2" width="18" height="112" rx="5" fill="none" stroke="#000" stroke-width="1.8"/>
+          <rect x="0" y="24" width="4" height="18" rx="2" fill="none" stroke="#000" stroke-width="1"/>
+          <rect x="0" y="46" width="4" height="18" rx="2" fill="none" stroke="#000" stroke-width="1"/>
+          <rect x="18" y="34" width="4" height="24" rx="2" fill="none" stroke="#000" stroke-width="1"/>
+        </svg>
+        <div style="font-size:7px;color:#555;text-align:center">Слева</div>
+      </div>
+      <div class="phone-view" style="flex:1.1;justify-content:flex-end">
+        <svg viewBox="0 0 116 22" xmlns="http://www.w3.org/2000/svg" style="margin-top:auto">
+          <rect x="2" y="2" width="112" height="18" rx="5" fill="none" stroke="#000" stroke-width="1.8"/>
+          <rect x="38" y="4" width="40" height="14" rx="3.5" fill="none" stroke="#000" stroke-width="1.1"/>
+          <rect x="8" y="5" width="5" height="12" rx="2" fill="none" stroke="#000" stroke-width="1"/>
+          <rect x="17" y="5" width="5" height="12" rx="2" fill="none" stroke="#000" stroke-width="1"/>
+          <rect x="98" y="5" width="5" height="12" rx="2" fill="none" stroke="#000" stroke-width="1"/>
+        </svg>
+        <div style="font-size:7px;color:#555;text-align:center;margin-top:2px">Снизу</div>
+      </div>
+    </div>
+    <div>
+      <div style="font-size:8px;color:#555;margin-bottom:2px;font-weight:bold">Ноутбук / Планшет:</div>
+      <div class="laptop-row">
+        <div class="laptop-view">
+          <svg viewBox="0 0 130 102" xmlns="http://www.w3.org/2000/svg">
+            <rect x="2" y="2" width="126" height="78" rx="5" fill="none" stroke="#000" stroke-width="1.8"/>
+            <rect x="8" y="8" width="114" height="66" fill="none" stroke="#000" stroke-width="1.1"/>
+            <circle cx="65" cy="5" r="2.2" fill="none" stroke="#000" stroke-width="1"/>
+            <rect x="0" y="82" width="130" height="12" rx="3" fill="none" stroke="#000" stroke-width="1.8"/>
+            <rect x="44" y="84" width="42" height="8" rx="2.5" fill="none" stroke="#000" stroke-width="1"/>
+          </svg>
+          <div style="font-size:7px;color:#555;text-align:center">Спереди</div>
+        </div>
+        <div class="laptop-view">
+          <svg viewBox="0 0 130 102" xmlns="http://www.w3.org/2000/svg">
+            <rect x="2" y="2" width="126" height="12" rx="4" fill="none" stroke="#000" stroke-width="1.8"/>
+            <rect x="0" y="16" width="130" height="78" rx="5" fill="none" stroke="#000" stroke-width="1.8"/>
+          </svg>
+          <div style="font-size:7px;color:#555;text-align:center">Сзади</div>
+        </div>
+        <div class="laptop-view-narrow">
+          <svg viewBox="0 0 32 102" xmlns="http://www.w3.org/2000/svg">
+            <rect x="10" y="2" width="12" height="66" rx="3" fill="none" stroke="#000" stroke-width="1.8"/>
+            <rect x="2" y="70" width="28" height="12" rx="3" fill="none" stroke="#000" stroke-width="1.8"/>
+            <rect x="4" y="72" width="10" height="8" rx="1.5" fill="none" stroke="#000" stroke-width="1"/>
+          </svg>
+          <div style="font-size:7px;color:#555;text-align:center">Сбоку</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="dmg-right">
+    <table class="ctbl">
+      <thead><tr><th>Проверка функций</th><th>До ремонта</th></tr></thead>
+      <tbody>
+        <tr><td>Кнопка Home</td><td>&nbsp;</td></tr>
+        <tr><td>Кнопка Вкл./Выкл.</td><td>&nbsp;</td></tr>
+        <tr><td>Изменение геометрии</td><td>&nbsp;</td></tr>
+        <tr><td>Деформация корпуса</td><td>&nbsp;</td></tr>
+        <tr><td>Компас и гироскоп</td><td>&nbsp;</td></tr>
+        <tr><td>Кнопки громкости (меню)</td><td>&nbsp;</td></tr>
+        <tr><td>Поиск сети</td><td>&nbsp;</td></tr>
+        <tr><td>Нижний микрофон (диктофон)</td><td>&nbsp;</td></tr>
+        <tr><td>Полифонический динамик</td><td>&nbsp;</td></tr>
+        <tr><td>Wi-Fi/Bluetooth</td><td>&nbsp;</td></tr>
+        <tr><td>Фонарик</td><td>&nbsp;</td></tr>
+        <tr><td>Датчик приближения</td><td>&nbsp;</td></tr>
+        <tr><td>Кнопки громкости (вызов)</td><td>&nbsp;</td></tr>
+        <tr><td>Камера основная</td><td>&nbsp;</td></tr>
+        <tr><td>Чтение SIM-карты</td><td>&nbsp;</td></tr>
+        <tr><td>Датчик освещённости</td><td>&nbsp;</td></tr>
+        <tr><td>Дисплей (touch/стекло/полосы)</td><td>&nbsp;</td></tr>
+        <tr><td>Сканер радужки глаз</td><td>&nbsp;</td></tr>
+        <tr><td>Touch ID / Face ID</td><td>&nbsp;</td></tr>
+        <tr><td>Беспроводная зарядка</td><td>&nbsp;</td></tr>
+        <tr><td>Слуховой динамик</td><td>&nbsp;</td></tr>
+        <tr><td>Разъём зарядки</td><td>&nbsp;</td></tr>
+        <tr><td>Переключатель вибро</td><td>&nbsp;</td></tr>
+        <tr><td>Камера фронтальная</td><td>&nbsp;</td></tr>
+        <tr><td>Аудиоразъём (L/R)</td><td>&nbsp;</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
 
-    # ── ШАПКА ──────────────────────────────────────────────────────────────────
-    cols = 3 if logo_bytes else 2
-    hdr = doc.add_table(rows=1, cols=cols)
-    hdr.alignment = WD_TABLE_ALIGNMENT.CENTER
+</div>
 
-    col_idx = 0
+<div class="page page-break">
+<div class="page-num">Стр. 2 из 2</div>
 
-    # Логотип (если загрузился)
-    if logo_bytes:
-        from docx.shared import Inches
-        hdr.columns[0].width = Cm(3.5)
-        cl0 = hdr.cell(0, 0); set_cell_bg(cl0, 'FFFFFF'); set_cell_borders(cl0, '000000', 6)
-        cl0.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
-        p_logo = cl0.paragraphs[0]; p_logo.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run_logo = p_logo.add_run()
-        run_logo.add_picture(logo_bytes, width=Cm(3.0))
-        col_idx = 1
+<div class="cond-wrap">
+  <div class="cond-left">
+    <div class="cond-title">Правила и условия проведения ремонтных работ</div>
+    <ol class="cond-ol">
+      <li>Правила и условия изложены на сайте <b>skypka24.com/act</b></li>
+      <li>Устройство принимается без разборки и проверки внутренних неисправностей.</li>
+      <li>Клиент согласен, что гарантия от производителя после ремонта невозможна.</li>
+      <li>Клиент принимает риск скрытых дефектов (коррозия, влага, механика), которые нельзя проверить при приёмке.</li>
+      <li>Ремонт осуществляется согласно ГОСТ Р МЭК 60065-2002, 60950-2002, 50936-2013, 57137-2016 и ФЗ «О защите прав потребителей».</li>
+      <li>Установленные узлы и материалы возврату не подлежат.</li>
+      <li>Исполнитель не несёт ответственности за гарантийные пломбы сторонних сервисов.</li>
+      <li>Исполнитель не несёт ответственности за потерю данных при замене компонентов.</li>
+      <li>Факт возврата фиксируется в форме ВО-13 в двух экземплярах.</li>
+      <li>Клиент согласен, что при ремонте могут быть заменены компоненты, влияющие на IMEI.</li>
+      <li><b>После воды:</b> риск выхода из строя шлейфов, динамиков, камер, платы — исполнитель ответственности не несёт.</li>
+      <li><b>Неоригинальные комплектующие:</b> риск выхода из строя дисплея, антенн, платы — исполнитель ответственности не несёт.</li>
+      <li>Клиент согласен, что исполнитель не несёт ответственности за неработоспособность из-за невозможности проверки всех функций.</li>
+    </ol>
+  </div>
+  <div class="cond-right">
+    <div class="cond-agree">КЛИЕНТ ОЗНАКОМЛЕН И СОГЛАСЕН С УСЛОВИЯМИ РЕМОНТА</div>
+    <div class="cond-link">skypka24.com/act</div>
+  </div>
+</div>
 
-    # Реквизиты
-    hdr.columns[col_idx].width = Cm(10)
-    cl = hdr.cell(0, col_idx); set_cell_bg(cl, 'F5F5F5'); set_cell_borders(cl, '000000', 6)
-    cl.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
-    cl.paragraphs[0].clear(); cl.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.LEFT
-    r = cl.paragraphs[0].add_run('ИП МАМЕДОВ АДИЛЬ МИРЗА ОГЛЫ')
-    r.bold = True; r.font.size = Pt(12); r.font.name = F
-    for line in ['г. Калуга, ул. Кирова, 7/47 и ул. Кирова, 11', 'ИНН: 402810962699  |  ОГРНИП: 307402814200032',
-                 'Тел.: +7 (992) 990-33-33  |  skypka24.com']:
-        p2 = cl.add_paragraph(line); p2.runs[0].font.size = Pt(9); p2.runs[0].font.name = F
+<div class="signs">
+  <div class="sign-col">
+    <div class="sign-title">Клиент:</div>
+    <div class="sign-who">С условиями ознакомлен и согласен, устройство передал:</div>
+    <div style="font-size:8px;margin-bottom:4px">___________ 20___ г.</div>
+    <div class="sign-line-row"><div class="sign-blank"></div><div class="sign-blank"></div></div>
+    <div class="sign-hint"><span>(подпись)</span><span>(Фамилия, Имя, Отчество)</span></div>
+  </div>
+  <div class="sign-col">
+    <div class="sign-title">Исполнитель:</div>
+    <div class="sign-who">Устройство в указанном состоянии принял, работоспособность подтвердил:</div>
+    <div style="font-size:8px;margin-bottom:4px">___________ 20___ г.</div>
+    <div class="sign-line-row"><div class="sign-blank"></div><div class="sign-blank"></div></div>
+    <div class="sign-hint"><span>(подпись)</span><span>(Фамилия, Имя, Отчество)</span></div>
+  </div>
+</div>
 
-    # Акт №
-    hdr.columns[col_idx + 1].width = Cm(5)
-    cr = hdr.cell(0, col_idx + 1); set_cell_bg(cr, 'FFFFFF'); set_cell_borders(cr, '000000', 6)
-    cr.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
-    cell_para(cr, 'АКТ ПРИЁМА В РЕМОНТ', bold=True, size=13, align=WD_ALIGN_PARAGRAPH.CENTER)
-    cr.add_paragraph(f'№ {order_id}').runs[0].bold = True
-    cr.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
-    cr.paragraphs[-1].runs[0].font.size = Pt(12); cr.paragraphs[-1].runs[0].font.name = F
+<div style="font-size:8px;text-align:center;color:#555;margin-top:6px">
+  ИНН: 402810962699 · ОГРНИП: 307402814200032 · Р/с: 40802810422270001866 · КАЛУЖСКОЕ ОТДЕЛЕНИЕ N8608 ПАО СБЕРБАНК · БИК: 042908612
+</div>
 
-    doc.add_paragraph()
+</div>
+</body></html>"""
 
-    # ── ДАННЫЕ ЗАЯВКИ ──────────────────────────────────────────────────────────
-    info_rows = [
-        ('№ заявки', str(order_id)),
-        ('Дата / Время', now),
-        ('Клиент', name or '—'),
-        ('Телефон', phone or '—'),
-        ('Устройство', model or '—'),
-        ('Вид работ', repair_type or '—'),
-        ('Описание неисправности', comment or '—'),
-        ('Предв. стоимость', price_str),
-    ]
-    tbl = doc.add_table(rows=len(info_rows), cols=2)
-    tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
-    for i, (lbl_txt, val_txt) in enumerate(info_rows):
-        bg = 'F5F5F5' if i % 2 == 0 else 'FFFFFF'
-        cl = tbl.cell(i, 0); set_cell_bg(cl, bg); set_cell_borders(cl)
-        cell_para(cl, lbl_txt, bold=True, size=10)
-        cr = tbl.cell(i, 1); set_cell_bg(cr, bg); set_cell_borders(cr)
-        cell_para(cr, val_txt, size=10)
-
-    doc.add_paragraph()
-
-    # ── ВНЕШНИЙ ВИД ────────────────────────────────────────────────────────────
-    cond = doc.add_table(rows=3, cols=4)
-    cond.alignment = WD_TABLE_ALIGNMENT.CENTER
-    merged = cond.cell(0, 0).merge(cond.cell(0, 3))
-    set_cell_bg(merged, 'EEEEEE'); set_cell_borders(merged, '000000', 6)
-    cell_para(merged, 'ВНЕШНИЙ ВИД УСТРОЙСТВА ПРИ ПРИЁМЕ', bold=True, size=10, align=WD_ALIGN_PARAGRAPH.CENTER)
-    for j, lbl_txt in enumerate(['Царапины', 'Трещины', 'Сколы', 'Другое']):
-        c = cond.cell(1, j); set_cell_bg(c, 'FFFFFF'); set_cell_borders(c)
-        cell_para(c, lbl_txt, bold=True, size=9, align=WD_ALIGN_PARAGRAPH.CENTER)
-        c.add_paragraph('☐  Есть     ☐  Нет').alignment = WD_ALIGN_PARAGRAPH.CENTER
-        c.paragraphs[-1].runs[0].font.size = Pt(9)
-    note = cond.cell(2, 0).merge(cond.cell(2, 3))
-    set_cell_bg(note, 'FFFFFF'); set_cell_borders(note)
-    cell_para(note, 'Примечания: ' + '_' * 90, size=9)
-
-    doc.add_paragraph()
-
-    # ── УСЛОВИЯ РЕМОНТА ────────────────────────────────────────────────────────
-    risks = [
-        'После воды аппарат может полностью умереть при любом ремонте. Мастерская не обязана его оживлять.',
-        'Компонентная пайка — риск гибели платы. Если телефон умер в процессе — работа оплачивается.',
-        'При снятии дисплея он может сломаться. Замена — за счёт клиента.',
-        'Данные (фото, контакты) могут быть потеряны безвозвратно.',
-        'Гарантии на результат нет. В худшем случае — оплата диагностики и сделанной работы.',
-    ]
-    rtbl = doc.add_table(rows=len(risks) + 1, cols=2)
-    rtbl.alignment = WD_TABLE_ALIGNMENT.CENTER
-    hrow = rtbl.cell(0, 0).merge(rtbl.cell(0, 1))
-    set_cell_bg(hrow, 'EEEEEE'); set_cell_borders(hrow, '000000', 6)
-    cell_para(hrow, 'УСЛОВИЯ РЕМОНТА — КЛИЕНТ ОЗНАКОМЛЕН И СОГЛАСЕН', bold=True, size=10, align=WD_ALIGN_PARAGRAPH.CENTER)
-    for i, risk in enumerate(risks, 1):
-        cn = rtbl.cell(i, 0); set_cell_bg(cn, 'F5F5F5'); set_cell_borders(cn)
-        cell_para(cn, str(i), bold=True, size=10, align=WD_ALIGN_PARAGRAPH.CENTER)
-        cv = rtbl.cell(i, 1); set_cell_bg(cv, 'FFFFFF'); set_cell_borders(cv)
-        cell_para(cv, risk, size=9)
-
-    doc.add_paragraph()
-
-    # ── ПОДПИСИ ────────────────────────────────────────────────────────────────
-    stbl = doc.add_table(rows=2, cols=2)
-    stbl.alignment = WD_TABLE_ALIGNMENT.CENTER
-    for j, lbl_txt in enumerate(['МАСТЕР', 'КЛИЕНТ']):
-        ch = stbl.cell(0, j); set_cell_bg(ch, 'F5F5F5'); set_cell_borders(ch, '000000', 6)
-        cell_para(ch, lbl_txt, bold=True, size=10, align=WD_ALIGN_PARAGRAPH.CENTER)
-    for j in range(2):
-        cs = stbl.cell(1, j); set_cell_bg(cs, 'FFFFFF'); set_cell_borders(cs, '000000', 6)
-        cell_para(cs, 'ФИО: ' + '_' * 35, size=9)
-        p2 = cs.add_paragraph('Подпись: ' + '_' * 33)
-        p2.runs[0].font.size = Pt(9); p2.runs[0].font.name = F
-
-    doc.add_paragraph()
-
-    # ── РЕКВИЗИТЫ ──────────────────────────────────────────────────────────────
-    p_req = doc.add_paragraph('Р/с: 40802810422270001866  |  КАЛУЖСКОЕ ОТДЕЛЕНИЕ N8608 ПАО СБЕРБАНК  |  БИК: 042908612')
-    p_req.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p_req.runs[0].font.size = Pt(8); p_req.runs[0].font.name = F; p_req.runs[0].font.color.rgb = RGBColor(0x88, 0x88, 0x88)
-
-    buf = io.BytesIO(); doc.save(buf); return buf.getvalue()
+    return html.encode('utf-8')
 
 
-def send_tg_document(token: str, chat_id, doc_bytes: bytes, filename: str, caption: str = ''):
+def send_tg_document(token: str, chat_id, doc_bytes: bytes, filename: str, caption: str = '', mime: str = 'text/html'):
     try:
         requests.post(
             f'https://api.telegram.org/bot{token}/sendDocument',
             data={'chat_id': chat_id, 'caption': caption},
-            files={'document': (filename, doc_bytes, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')},
+            files={'document': (filename, doc_bytes, mime)},
             timeout=30,
         )
     except Exception:
@@ -962,8 +1080,8 @@ def handler(event: dict, context) -> dict:
             )
             if tg_token and main_chat:
                 send_tg_all(tg_token, main_chat, conn, tg_msg)
-                docx_bytes = build_act_docx(new_id, name, phone, model, repair_type, price_str, comment)
-                filename = f'Акт_приёмки_{new_id}_{name.replace(" ", "_")}.docx'
+                html_bytes = build_act_html(new_id, name, phone, model, repair_type, price_str, comment)
+                filename = f'Акт_приёмки_{new_id}_{name.replace(" ", "_")}.html'
                 recipients = [main_chat]
                 try:
                     cur3 = conn.cursor()
@@ -978,7 +1096,7 @@ def handler(event: dict, context) -> dict:
                 if pluxan and pluxan not in recipients:
                     recipients.append(pluxan)
                 for cid in recipients:
-                    send_tg_document(tg_token, cid, docx_bytes, filename, caption=f'📋 Акт приёмки №{new_id}')
+                    send_tg_document(tg_token, cid, html_bytes, filename, caption=f'📋 Акт приёмки №{new_id} — открыть и распечатать')
             # SMS при создании НЕ отправляем — только Telegram
             cur.close(); conn.close()
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'id': new_id}, ensure_ascii=False)}
@@ -993,8 +1111,8 @@ def handler(event: dict, context) -> dict:
                 return {'statusCode': 404, 'headers': HEADERS, 'body': json.dumps({'error': 'Заявка не найдена'}, ensure_ascii=False)}
             name, phone, model, repair_type, price, comment = row
             price_str = f"{int(price):,} ₽".replace(',', ' ') if price else 'не определена'
-            docx_bytes = build_act_docx(order_id, name or '', phone or '', model or '', repair_type or '', price_str, comment or '')
-            filename = f'Акт_приёмки_{order_id}_{(name or "клиент").replace(" ", "_")}.docx'
+            html_bytes = build_act_html(order_id, name or '', phone or '', model or '', repair_type or '', price_str, comment or '')
+            filename = f'Акт_приёмки_{order_id}_{(name or "клиент").replace(" ", "_")}.html'
             tg_token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
             main_chat = os.environ.get('TELEGRAM_CHAT_ID', '')
             recipients = [main_chat] if main_chat else []
@@ -1012,7 +1130,7 @@ def handler(event: dict, context) -> dict:
                 recipients.append(pluxan)
             sent = 0
             for cid in recipients:
-                send_tg_document(tg_token, cid, docx_bytes, filename, caption=f'📋 Акт приёмки №{order_id} — {name}')
+                send_tg_document(tg_token, cid, html_bytes, filename, caption=f'📋 Акт приёмки №{order_id} — {name} — открыть и распечатать')
                 sent += 1
             cur.close(); conn.close()
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'sent_to': sent}, ensure_ascii=False)}
