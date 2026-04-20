@@ -42,6 +42,9 @@ export default function LaborPricesTab({
   const [syncing, setSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState<{ done: number; total: number } | null>(null);
   const [syncResult, setSyncResult] = useState<{ ok: boolean; synced?: number; error?: string } | null>(null);
+  const [mobaSyncing, setMobaSyncing] = useState(false);
+  const [mobaSyncProgress, setMobaSyncProgress] = useState<{ done: number; total: number } | null>(null);
+  const [mobaSyncResult, setMobaSyncResult] = useState<{ ok: boolean; synced?: number; error?: string } | null>(null);
   const [error, setError] = useState("");
 
   const headers = { "Content-Type": "application/json", [authHeader]: token };
@@ -100,6 +103,39 @@ export default function LaborPricesTab({
     }
     setSyncing(false);
     setSyncProgress(null);
+  };
+
+  const syncMoba = async () => {
+    setMobaSyncing(true);
+    setMobaSyncResult(null);
+    setMobaSyncProgress(null);
+    let totalSynced = 0;
+    let offset = 0;
+    try {
+      while (true) {
+        const res = await fetch(PARTS_URL, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ action: "moba_sync", offset }),
+        });
+        const data = await res.json();
+        if (!data.ok) {
+          setMobaSyncResult({ ok: false, error: data.error });
+          setMobaSyncing(false);
+          setMobaSyncProgress(null);
+          return;
+        }
+        totalSynced += data.saved;
+        setMobaSyncProgress({ done: offset + data.saved, total: data.total || (offset + data.saved) });
+        if (!data.has_more) break;
+        offset = data.next_offset;
+      }
+      setMobaSyncResult({ ok: true, synced: totalSynced });
+    } catch (e) {
+      setMobaSyncResult({ ok: false, error: String(e) });
+    }
+    setMobaSyncing(false);
+    setMobaSyncProgress(null);
   };
 
   const removeExtra = (i: number) => {
@@ -287,6 +323,43 @@ export default function LaborPricesTab({
             {syncResult.ok
               ? `Готово — обновлено ${syncResult.synced?.toLocaleString("ru-RU")} позиций`
               : `Ошибка: ${syncResult.error || "нет ответа"}`}
+          </div>
+        )}
+      </div>
+
+      {/* Синхронизация с Moba.ru */}
+      <div className="mt-3 border-t border-[#222] pt-4">
+        <div className="font-roboto text-white/30 text-[10px] uppercase tracking-wide mb-2 flex items-center gap-1">
+          <Icon name="Database" size={10} /> Каталог запчастей (Moba.ru)
+        </div>
+        <button onClick={syncMoba} disabled={mobaSyncing}
+          className="w-full border border-[#333] text-white/60 font-roboto text-xs py-2.5 hover:border-green-500/40 hover:text-white transition-colors disabled:opacity-40 flex items-center justify-center gap-2">
+          <Icon name={mobaSyncing ? "Loader" : "RefreshCw"} size={13} className={mobaSyncing ? "animate-spin" : ""} />
+          {mobaSyncing
+            ? mobaSyncProgress
+              ? `Загружено ${mobaSyncProgress.done.toLocaleString("ru-RU")} из ${mobaSyncProgress.total.toLocaleString("ru-RU")}...`
+              : "Подключаемся к Moba.ru..."
+            : "Обновить БД из Moba.ru"}
+        </button>
+        {mobaSyncing && mobaSyncProgress && (
+          <div className="mt-2">
+            <div className="w-full bg-[#222] h-1.5 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-green-500 transition-all duration-300"
+                style={{ width: `${Math.round((mobaSyncProgress.done / mobaSyncProgress.total) * 100)}%` }}
+              />
+            </div>
+            <div className="text-right font-roboto text-[9px] text-white/30 mt-0.5">
+              {Math.round((mobaSyncProgress.done / mobaSyncProgress.total) * 100)}%
+            </div>
+          </div>
+        )}
+        {mobaSyncResult && (
+          <div className={`mt-2 font-roboto text-[10px] flex items-center gap-1.5 ${mobaSyncResult.ok ? "text-green-400" : "text-red-400"}`}>
+            <Icon name={mobaSyncResult.ok ? "CheckCircle" : "AlertCircle"} size={11} />
+            {mobaSyncResult.ok
+              ? `Готово — обновлено ${mobaSyncResult.synced?.toLocaleString("ru-RU")} позиций`
+              : `Ошибка: ${mobaSyncResult.error || "нет ответа"}`}
           </div>
         )}
       </div>

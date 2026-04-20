@@ -11,6 +11,8 @@ HEADERS = {
 }
 SCHEMA = 't_p31606708_tech_buying_service'
 API_URL = 'https://b2b.moysklad.ru/desktop-api/public/wIIpnHFmddpo/products.json'
+MOBA_BASE = 'https://kaluga.moba.ru'
+MOBA_PAGE_SIZE = 50
 
 DEFAULT_LABOR = {
     'display': 1800, 'battery': 1000, 'battery_iphone': 1200, 'battery_other': 800,
@@ -97,6 +99,127 @@ def get_extra_works(cur) -> list:
 
 
 PAGE_SIZE = 100
+
+
+# ─── MOBA.RU ────────────────────────────────────────────────────────────────
+
+def moba_session() -> requests.Session:
+    session = requests.Session()
+    session.headers.update({
+        'User-Agent': 'Mozilla/5.0 (compatible; repair-bot/1.0)',
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+    })
+    login = os.environ.get('MOBA_LOGIN', '')
+    password = os.environ.get('MOBA_PASSWORD', '')
+    try:
+        resp = session.post(
+            f'{MOBA_BASE}/api/v1/auth/login',
+            json={'email': login, 'password': password},
+            timeout=20
+        )
+        data = resp.json() if resp.status_code < 400 else {}
+        token = (data.get('token') or data.get('access_token') or
+                 (data.get('data') or {}).get('token', ''))
+        if token:
+            session.headers.update({'Authorization': f'Bearer {token}'})
+    except Exception as e:
+        print(f'[MOBA] login error: {e}')
+    return session
+
+
+def moba_normalize(p: dict) -> dict:
+    name = str(p.get('name') or p.get('title') or '')
+    category = str(p.get('category') or p.get('category_name') or '')
+    price = float(p.get('price') or p.get('sell_price') or p.get('retail_price') or 0)
+    stock = float(p.get('stock') or p.get('quantity') or p.get('count') or 0)
+    pid = str(p.get('id') or p.get('uuid') or p.get('article') or '')
+    code = str(p.get('code') or p.get('article') or p.get('sku') or pid)
+    return {
+        'id': f'moba_{pid}',
+        'code': code,
+        'name': name,
+        'category': category,
+        'price': price,
+        'stock': stock,
+        'available': stock > 0,
+        'quality': detect_quality(name),
+        'part_type': detect_part_type(category, name),
+        'model_keywords': extract_model_keywords(name),
+    }
+
+
+def moba_save(conn, products: list, labor: dict) -> int:
+    cur = conn.cursor()
+    saved = 0
+    for p in products:
+        if not p['id'] or p['id'] == 'moba_':
+            continue
+        labor_cost = labor.get(p['part_type'], DEFAULT_LABOR.get(p['part_type'], 500))
+        cur.execute(f"""
+            INSERT INTO {SCHEMA}.repair_parts
+                (id, code, name, category, category_id, price, stock, available,
+                 quality, part_type, model_keywords, labor_cost, updated_at)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,NOW())
+            ON CONFLICT (id) DO UPDATE SET
+                name=EXCLUDED.name, category=EXCLUDED.category,
+                price=EXCLUDED.price, stock=EXCLUDED.stock,
+                available=EXCLUDED.available, quality=EXCLUDED.quality,
+                part_type=EXCLUDED.part_type, model_keywords=EXCLUDED.model_keywords,
+                labor_cost=EXCLUDED.labor_cost, updated_at=NOW()
+        """, (
+            p['id'], p['code'], p['name'], p['category'], '',
+            p['price'], p['stock'], p['available'],
+            p['quality'], p['part_type'], p['model_keywords'], labor_cost
+        ))
+        saved += 1
+    conn.commit()
+    cur.close()
+    return saved
+
+
+def moba_sync_page(conn, offset: int) -> dict:
+    """Синхронизирует одну страницу товаров из moba.ru."""
+    session = moba_session()
+    endpoints = [
+        f'{MOBA_BASE}/api/v1/products',
+        f'{MOBA_BASE}/api/v1/catalog/products',
+        f'{MOBA_BASE}/api/products',
+    ]
+    raw = []
+    total = 0
+    used_url = ''
+    for url in endpoints:
+        try:
+            resp = session.get(url, params={'limit': MOBA_PAGE_SIZE, 'offset': offset}, timeout=20)
+            if resp.status_code == 200:
+                data = resp.json()
+                raw = (data.get('products') or data.get('items') or
+                       data.get('data') or (data if isinstance(data, list) else []))
+                total = int(data.get('total') or data.get('count') or len(raw))
+                used_url = url
+                break
+        except Exception as e:
+            print(f'[MOBA] fetch error {url}: {e}')
+
+    cur = conn.cursor()
+    labor = get_labor_prices(cur)
+    cur.close()
+    products = [moba_normalize(p) for p in raw]
+    saved = moba_save(conn, products, labor)
+
+    has_more = (offset + len(raw)) < total and len(raw) == MOBA_PAGE_SIZE
+    return {
+        'saved': saved,
+        'total': total,
+        'offset': offset,
+        'next_offset': offset + len(raw) if has_more else None,
+        'has_more': has_more,
+        'api_url': used_url,
+    }
+
+# ─────────────────────────────────────────────────────────────────────────────
+
 
 def sync_page(conn, offset: int) -> dict:
     """Синхронизирует одну страницу товаров из МойСклад."""
@@ -222,6 +345,16 @@ def handler(event: dict, context) -> dict:
     if event.get('httpMethod') == 'POST':
         try:
             body = json.loads(event.get('body') or '{}')
+            action = body.get('action', 'moysklad_sync')
+
+            if action == 'moba_sync':
+                offset = int(body.get('offset', 0))
+                result = moba_sync_page(conn, offset)
+                conn.close()
+                return {'statusCode': 200, 'headers': HEADERS,
+                        'body': json.dumps({'ok': True, **result}, ensure_ascii=False)}
+
+            # default: МойСклад
             offset = int(body.get('offset', 0))
             result = sync_page(conn, offset)
             conn.close()

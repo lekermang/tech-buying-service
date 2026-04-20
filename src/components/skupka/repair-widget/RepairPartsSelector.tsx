@@ -58,6 +58,11 @@ export default function RepairPartsSelector({
                         {part.stock <= 3 && part.stock > 0 && (
                           <span className="ml-1 text-orange-400 font-roboto text-[9px]">мало</span>
                         )}
+                        {part.id.startsWith('moba_') && (
+                          <span className="ml-1.5 inline-flex items-center gap-0.5 bg-green-500/15 text-green-400 font-roboto text-[9px] px-1.5 py-0.5 rounded-sm">
+                            <Icon name="Clock" size={8} /> 1–2 часа
+                          </span>
+                        )}
                       </div>
                       <div className="shrink-0 text-right ml-3">
                         <div className="font-oswald font-bold text-sm text-[#FFD700] whitespace-nowrap">
@@ -127,8 +132,13 @@ export default function RepairPartsSelector({
               <div className="font-roboto text-[10px] text-white/60 leading-snug break-words">
                 {selectedPart.name}
               </div>
-              <div className="font-roboto text-[9px] text-white/30 mt-0.5">
-                зап. {selectedPart.price.toLocaleString("ru-RU")} + раб. {selectedPart.labor_cost.toLocaleString("ru-RU")} ₽
+              <div className="font-roboto text-[9px] text-white/30 mt-0.5 flex items-center gap-2 flex-wrap">
+                <span>зап. {selectedPart.price.toLocaleString("ru-RU")} + раб. {selectedPart.labor_cost.toLocaleString("ru-RU")} ₽</span>
+                {selectedPart.id.startsWith('moba_') && (
+                  <span className="inline-flex items-center gap-0.5 bg-green-500/15 text-green-400 font-roboto text-[9px] px-1.5 py-0.5 rounded-sm">
+                    <Icon name="Clock" size={8} /> 1–2 часа
+                  </span>
+                )}
               </div>
             </div>
             <div className="shrink-0 text-right">
