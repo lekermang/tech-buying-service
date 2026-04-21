@@ -1,0 +1,1 @@
+UPDATE t_p31606708_tech_buying_service.employees SET is_active = true;
