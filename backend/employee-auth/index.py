@@ -3,6 +3,7 @@ import os
 import secrets
 import hashlib
 from datetime import datetime, timedelta
+
 import psycopg2
 
 HEADERS = {'Access-Control-Allow-Origin': '*'}
