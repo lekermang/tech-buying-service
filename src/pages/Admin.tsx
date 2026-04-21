@@ -14,16 +14,14 @@ import SettingsTab from "@/components/admin/SettingsTab";
 import ClientsAdminTab from "@/components/admin/ClientsAdminTab";
 import SmsBlastTab from "@/components/admin/SmsBlastTab";
 import ThemeTab from "@/components/admin/ThemeTab";
-import LiquidityTab from "@/components/admin/LiquidityTab";
 import { MODEL_PHOTOS, CATEGORY_PHOTOS } from "@/pages/catalog.types";
 
 const ADMIN_URL = "https://functions.poehali.dev/a105aede-d55d-4b99-9d3e-5e977887aa04";
 const EXPORT_URL = "https://functions.poehali.dev/13db4dbd-0d2b-47d4-8e09-c6f82483ffde";
 
-type Tab = "repair" | "prices" | "sky" | "catalog" | "items" | "api-catalog" | "tools-import" | "analytics" | "notifications" | "settings" | "clients" | "sms-blast" | "theme" | "liquidity";
+type Tab = "repair" | "prices" | "sky" | "catalog" | "items" | "api-catalog" | "tools-import" | "analytics" | "notifications" | "settings" | "clients" | "sms-blast" | "theme";
 
 const MENU: { key: Tab; label: string; icon: string; group: string }[] = [
-  { key: "liquidity",     label: "Моя ликвидность", icon: "Gem",         group: "Учёт" },
   { key: "analytics",     label: "Аналитика",       icon: "BarChart2",   group: "Статистика" },
   { key: "repair",        label: "Ремонт",         icon: "Wrench",      group: "Заявки" },
   { key: "prices",        label: "Цены",           icon: "Tag",         group: "Заявки" },
@@ -289,7 +287,6 @@ export default function Admin() {
           {tab === "clients"       && <ClientsAdminTab token={token} />}
           {tab === "settings"      && <SettingsTab token={token} />}
           {tab === "theme"         && <ThemeTab token={token} />}
-          {tab === "liquidity"     && <LiquidityTab token={token} />}
         </div>
       </div>
     </div>
