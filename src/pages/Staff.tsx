@@ -48,16 +48,26 @@ export default function Staff() {
       .catch(() => {});
   }, [token]);
 
+  const [loginLoading, setLoginLoading] = useState(false);
+
   const login = async () => {
     if (!loginForm.login || !loginForm.password) { setLoginError("Введите логин и пароль"); return; }
-    const res = await fetch(EMPLOYEE_AUTH_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "login", ...loginForm }) });
-    const data = await res.json();
-    if (data.token) {
-      localStorage.setItem("employee_token", data.token);
-      localStorage.setItem("employee_name", data.full_name);
-      localStorage.setItem("employee_role", data.role);
-      setToken(data.token); setEmpName(data.full_name); setEmpRole(data.role); setAuthed(true);
-    } else setLoginError(data.error || "Неверный логин или пароль");
+    setLoginLoading(true);
+    setLoginError("");
+    try {
+      const res = await fetch(EMPLOYEE_AUTH_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "login", ...loginForm }) });
+      const data = await res.json();
+      if (data.token) {
+        localStorage.setItem("employee_token", data.token);
+        localStorage.setItem("employee_name", data.full_name);
+        localStorage.setItem("employee_role", data.role);
+        setToken(data.token); setEmpName(data.full_name); setEmpRole(data.role); setAuthed(true);
+      } else setLoginError(data.error || "Неверный логин или пароль");
+    } catch {
+      setLoginError("Ошибка соединения. Попробуй ещё раз.");
+    } finally {
+      setLoginLoading(false);
+    }
   };
 
   const logout = () => {
@@ -96,8 +106,8 @@ export default function Staff() {
             </div>
           ))}
           {loginError && <div className="text-red-400 font-roboto text-sm">{loginError}</div>}
-          <button onClick={login} className="w-full bg-[#FFD700] text-black font-oswald font-bold py-3.5 uppercase tracking-wide text-sm hover:bg-yellow-400 transition-colors">
-            Войти
+          <button onClick={login} disabled={loginLoading} className="w-full bg-[#FFD700] text-black font-oswald font-bold py-3.5 uppercase tracking-wide text-sm hover:bg-yellow-400 transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
+            {loginLoading ? <><Icon name="Loader" size={16} className="animate-spin" /> Вход...</> : "Войти"}
           </button>
         </div>
 
