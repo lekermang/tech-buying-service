@@ -6,7 +6,12 @@ from datetime import datetime, timedelta
 
 import psycopg2
 
-HEADERS = {'Access-Control-Allow-Origin': '*'}
+HEADERS = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Employee-Token, Authorization',
+    'Content-Type': 'application/json',
+}
 SCHEMA = 't_p31606708_tech_buying_service'
 
 
