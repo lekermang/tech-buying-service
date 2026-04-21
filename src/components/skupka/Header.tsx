@@ -68,7 +68,7 @@ const Header = ({ scrollTo, goldOpen = false }: HeaderProps) => {
         .catch(() => {});
     };
     load();
-    const interval = setInterval(load, 30000);
+    const interval = setInterval(load, 3600000);
     return () => clearInterval(interval);
   }, []);
 
