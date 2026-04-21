@@ -885,6 +885,30 @@ def mark_morning_reminder_sent():
     cur.close(); conn.close()
 
 
+def send_tg_message_repair(chat_id, text):
+    """Отправка через основной бот (TELEGRAM_BOT_TOKEN) — тот, что уже пишет Давиду заявки"""
+    token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+    if not token:
+        raise ValueError('TELEGRAM_BOT_TOKEN not set')
+    payload = json.dumps({
+        'chat_id': chat_id,
+        'text': text,
+        'parse_mode': 'HTML',
+        'disable_web_page_preview': True,
+    }).encode('utf-8')
+    req = urllib.request.Request(
+        f'https://api.telegram.org/bot{token}/sendMessage',
+        data=payload,
+        headers={'Content-Type': 'application/json'}
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        body = e.read().decode('utf-8', errors='replace')
+        raise ValueError(f'Telegram API {e.code}: {body}')
+
+
 def do_send_morning_reminder():
     orders = get_open_repairs()
     print(f"[reminder] open orders: {len(orders)}")
@@ -903,7 +927,7 @@ def do_send_morning_reminder():
     errors = []
     for chat_id in all_recipients:
         try:
-            send_tg_message(chat_id, text)
+            send_tg_message_repair(chat_id, text)
             sent_to.append(chat_id)
             print(f"[reminder] sent to {chat_id}")
         except Exception as e:
