@@ -885,17 +885,20 @@ def mark_morning_reminder_sent():
     cur.close(); conn.close()
 
 
-def send_tg_message_repair(chat_id, text):
+def send_tg_message_repair(chat_id, text, reply_markup=None):
     """Отправка через основной бот (TELEGRAM_BOT_TOKEN) — тот, что уже пишет Давиду заявки"""
     token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
     if not token:
         raise ValueError('TELEGRAM_BOT_TOKEN not set')
-    payload = json.dumps({
+    payload_dict = {
         'chat_id': chat_id,
         'text': text,
         'parse_mode': 'HTML',
         'disable_web_page_preview': True,
-    }).encode('utf-8')
+    }
+    if reply_markup:
+        payload_dict['reply_markup'] = reply_markup
+    payload = json.dumps(payload_dict).encode('utf-8')
     req = urllib.request.Request(
         f'https://api.telegram.org/bot{token}/sendMessage',
         data=payload,
@@ -907,6 +910,58 @@ def send_tg_message_repair(chat_id, text):
     except urllib.error.HTTPError as e:
         body = e.read().decode('utf-8', errors='replace')
         raise ValueError(f'Telegram API {e.code}: {body}')
+
+
+STATUS_EMOJI = {
+    'Принята': '🆕',
+    'В работе': '🔧',
+    'Ждём запчасть': '📦',
+    'Готово к выдаче': '✅',
+}
+
+DAYS_EMOJI = {0: '🟢', 1: '🟡', 2: '🟠'}
+
+
+def format_order_card(o: dict) -> str:
+    days_open = 0
+    if o['created_at']:
+        tz = o['created_at'].tzinfo or MSK
+        days_open = (datetime.now(MSK) - o['created_at'].replace(tzinfo=tz)).days
+    days_icon = DAYS_EMOJI.get(days_open, '🔴')
+    status_icon = STATUS_EMOJI.get(o['status'], '📌')
+    model = o['model'] or '—'
+    repair_type = o['repair_type'] or '—'
+    phone = o['phone'] or '—'
+    name = o['name'] or '—'
+    return (
+        f"{days_icon} <b>Заявка #{o['id']}</b>  •  {days_open} дн.\n"
+        f"👤 {name}\n"
+        f"📱 {model}\n"
+        f"🔩 {repair_type}\n"
+        f"📞 {phone}\n"
+        f"{status_icon} {o['status']}"
+    )
+
+
+def make_order_keyboard(o: dict) -> dict:
+    site_url = os.environ.get('SITE_URL', 'https://dz-tech.poehali.app')
+    STATUS_NEXT = {
+        'Принята': ('▶️ В работу', 'in_progress'),
+        'В работе': ('📦 Жду запчасть', 'waiting_parts'),
+        'Ждём запчасть': ('✅ Готово', 'ready'),
+        'Готово к выдаче': ('🏁 Выдать', 'done'),
+    }
+    buttons = []
+    if o['status'] in STATUS_NEXT:
+        label, _ = STATUS_NEXT[o['status']]
+        buttons.append({'text': label, 'url': f"{site_url}/staff?order={o['id']}"})
+    buttons.append({'text': '📋 Открыть', 'url': f"{site_url}/staff?order={o['id']}"})
+    rows = []
+    if len(buttons) == 2:
+        rows.append(buttons)
+    else:
+        rows.append(buttons)
+    return {'inline_keyboard': rows}
 
 
 def do_send_morning_reminder():
@@ -922,14 +977,25 @@ def do_send_morning_reminder():
         all_recipients.append(pluxan)
     if not all_recipients:
         return {'sent': False, 'reason': 'no_recipients'}
-    text = format_morning_reminder(orders)
+
+    now_msk = datetime.now(MSK)
+    date_str = now_msk.strftime('%d.%m.%Y')
+    header = (
+        f"☀️ <b>Доброе утро, Давид!</b>\n"
+        f"📋 Незакрытых ремонтов: <b>{len(orders)}</b>  •  {date_str}"
+    )
+
     sent_to = []
     errors = []
     for chat_id in all_recipients:
         try:
-            send_tg_message_repair(chat_id, text)
+            send_tg_message_repair(chat_id, header)
+            for o in orders:
+                card = format_order_card(o)
+                keyboard = make_order_keyboard(o)
+                send_tg_message_repair(chat_id, card, reply_markup=keyboard)
             sent_to.append(chat_id)
-            print(f"[reminder] sent to {chat_id}")
+            print(f"[reminder] sent to {chat_id}, {len(orders)} cards")
         except Exception as e:
             print(f"[reminder] ERROR sending to {chat_id}: {e}")
             errors.append(str(e))
