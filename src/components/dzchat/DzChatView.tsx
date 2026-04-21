@@ -105,7 +105,7 @@ const DzChatView = ({ chat, me, token, onBack, onChatUpdate, theme: themeProp }:
     setPartnerLastSeen(chat.partner?.last_seen_at ?? null);
     setLiveChatData(chat);
     loadMessages().then(() => scrollToBottom("instant"));
-    pollRef.current = setInterval(loadMessages, 1000);
+    pollRef.current = setInterval(loadMessages, 5000);
 
     // Polling онлайн-статуса и typing партнёра каждые 3 сек
     if (chat.type === "direct" && chat.partner?.id) {
@@ -126,7 +126,7 @@ const DzChatView = ({ chat, me, token, onBack, onChatUpdate, theme: themeProp }:
         } catch (e) { void e; }
       };
       pollOnline();
-      onlinePollRef.current = setInterval(pollOnline, 3000);
+      onlinePollRef.current = setInterval(pollOnline, 15000);
     }
 
     return () => {

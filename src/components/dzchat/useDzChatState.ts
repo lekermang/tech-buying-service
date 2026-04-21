@@ -5,9 +5,9 @@ import { playNotificationSound } from "@/components/dzchat/DzChatModals";
 import { loadAndApplyTheme } from "@/components/dzchat/dzchat.theme";
 
 const NOTIF_ICON = "/dzchat-icon.svg";
-const POLL_INTERVAL = 2500;   // polling чатов
-const PING_INTERVAL = 30000;  // keep-alive
-const CALL_POLL_INTERVAL = 3000;
+const POLL_INTERVAL = 10000;  // polling чатов
+const PING_INTERVAL = 120000; // keep-alive
+const CALL_POLL_INTERVAL = 10000;
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
