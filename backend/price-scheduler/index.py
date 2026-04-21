@@ -844,9 +844,13 @@ def format_morning_reminder(orders: list) -> str:
     ]
     for o in orders:
         days_open = (datetime.now(MSK) - o['created_at'].replace(tzinfo=MSK if o['created_at'].tzinfo is None else o['created_at'].tzinfo)).days if o['created_at'] else 0
-        device = o['model'] or o['repair_type'] or 'устройство'
+        model = o['model'] or '—'
+        repair_type = o['repair_type'] or '—'
+        phone = o['phone'] or '—'
         lines.append(
-            f"🔧 <b>#{o['id']}</b> {o['name']} — {device}\n"
+            f"🔧 <b>#{o['id']}</b> {o['name']}\n"
+            f"   📱 {model}  |  🔩 {repair_type}\n"
+            f"   📞 {phone}\n"
             f"   📌 {o['status']}  •  ⏱ {days_open} дн."
         )
     lines += ['', '⚡️ Займись незакрытыми заявками!']
