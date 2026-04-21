@@ -887,10 +887,12 @@ def mark_morning_reminder_sent():
 
 def do_send_morning_reminder():
     orders = get_open_repairs()
+    print(f"[reminder] open orders: {len(orders)}")
     if not orders:
         return {'sent': False, 'reason': 'no_open_repairs'}
     recipients = get_repair_recipients()
     pluxan = os.environ.get('PLUXAN4IK_CHAT_ID', '')
+    print(f"[reminder] recipients from DB: {recipients}, pluxan: {repr(pluxan)}")
     all_recipients = list(recipients)
     if pluxan and pluxan not in all_recipients:
         all_recipients.append(pluxan)
@@ -898,14 +900,17 @@ def do_send_morning_reminder():
         return {'sent': False, 'reason': 'no_recipients'}
     text = format_morning_reminder(orders)
     sent_to = []
+    errors = []
     for chat_id in all_recipients:
         try:
             send_tg_message(chat_id, text)
             sent_to.append(chat_id)
-        except Exception:
-            pass
+            print(f"[reminder] sent to {chat_id}")
+        except Exception as e:
+            print(f"[reminder] ERROR sending to {chat_id}: {e}")
+            errors.append(str(e))
     mark_morning_reminder_sent()
-    return {'sent': True, 'sent_to': len(sent_to), 'open_count': len(orders)}
+    return {'sent': True, 'sent_to': len(sent_to), 'open_count': len(orders), 'errors': errors}
 
 
 def do_send_master_report(force: bool = False):
