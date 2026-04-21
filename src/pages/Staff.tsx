@@ -5,6 +5,8 @@ import GoodsTab from "./StaffGoodsTab";
 import { SalesTab, ClientsTab, AnalyticsTab, EmployeesTab } from "./StaffOtherTabs";
 import StaffRepairTab from "./StaffRepairTab";
 
+const PRICE_SCHEDULER_URL = "https://functions.poehali.dev/b09271ea-c662-4225-973f-4dd4c6a0e32c";
+
 type Tab = "goods" | "sales" | "clients" | "analytics" | "employees" | "repair";
 
 function MskClock() {
@@ -32,6 +34,8 @@ export default function Staff() {
   const [empName, setEmpName] = useState(() => localStorage.getItem("employee_name") || "");
   const [empRole, setEmpRole] = useState(() => localStorage.getItem("employee_role") || "");
   const [tab, setTab] = useState<Tab>("repair");
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState<null | boolean>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -108,6 +112,21 @@ export default function Staff() {
 
   const isOwnerOrAdmin = empRole === "owner" || empRole === "admin";
 
+  const sendReminderNow = async () => {
+    setSending(true);
+    setSendResult(null);
+    try {
+      const res = await fetch(`${PRICE_SCHEDULER_URL}?action=send_morning_reminder_now`);
+      const data = await res.json();
+      setSendResult(data.sent === true);
+    } catch {
+      setSendResult(false);
+    } finally {
+      setSending(false);
+      setTimeout(() => setSendResult(null), 4000);
+    }
+  };
+
   const TABS = [
     { k: "repair",    l: "Ремонт",    icon: "Wrench" },
     { k: "goods",     l: "Товары",    icon: "Package" },
@@ -138,9 +157,26 @@ export default function Staff() {
           </span>
         </div>
         <MskClock />
-        <button onClick={logout} className="text-white/30 active:text-red-400 transition-colors p-2 -mr-2">
-          <Icon name="LogOut" size={16} />
-        </button>
+        <div className="flex items-center gap-1">
+          {isOwnerOrAdmin && (
+            <button
+              onClick={sendReminderNow}
+              disabled={sending}
+              title="Отправить напоминание @PluXan сейчас"
+              className={`flex items-center gap-1 px-2 py-1 text-[10px] font-roboto font-bold uppercase tracking-wide transition-all active:opacity-60 ${
+                sendResult === true ? "bg-green-500/20 text-green-400" :
+                sendResult === false ? "bg-red-500/20 text-red-400" :
+                "bg-[#FFD700]/10 text-[#FFD700] hover:bg-[#FFD700]/20"
+              } ${sending ? "opacity-50 cursor-wait" : ""}`}
+            >
+              <Icon name={sending ? "Loader" : sendResult === true ? "Check" : "Bell"} size={12} className={sending ? "animate-spin" : ""} />
+              {sending ? "..." : sendResult === true ? "Отправлено" : sendResult === false ? "Ошибка" : "Напомнить"}
+            </button>
+          )}
+          <button onClick={logout} className="text-white/30 active:text-red-400 transition-colors p-2 -mr-2">
+            <Icon name="LogOut" size={16} />
+          </button>
+        </div>
       </div>
 
       {/* Контент — растягивается, с паддингом под нижнюю панель */}

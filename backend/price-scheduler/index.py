@@ -1079,4 +1079,8 @@ def handler(event: dict, context) -> dict:
 
         return ok(result)
 
+    if action == 'send_morning_reminder_now':
+        result = do_send_morning_reminder()
+        return ok(result)
+
     return err(400, 'unknown action: ' + action)
