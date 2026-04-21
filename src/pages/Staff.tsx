@@ -63,8 +63,10 @@ export default function Staff() {
         localStorage.setItem("employee_role", data.role);
         setToken(data.token); setEmpName(data.full_name); setEmpRole(data.role); setAuthed(true);
       } else setLoginError(data.error || "Неверный логин или пароль");
-    } catch {
-      setLoginError("Ошибка соединения. Попробуй ещё раз.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[login error]', msg, err);
+      setLoginError(`Ошибка: ${msg}`);
     } finally {
       setLoginLoading(false);
     }
