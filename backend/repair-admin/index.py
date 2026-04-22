@@ -8,10 +8,12 @@ HEADERS = {'Access-Control-Allow-Origin': '*'}
 
 STATUS_LABELS = {
     'new': '🆕 Новая',
+    'accepted': '🤝 Принят мастером',
     'in_progress': '🔧 В работе',
     'waiting_parts': '⏳ Ожидание запчастей',
     'ready': '✅ Готово к выдаче',
     'done': '✔️ Выдано',
+    'warranty': '🛡 На гарантии',
     'cancelled': '❌ Отменено',
 }
 
@@ -376,7 +378,7 @@ SCHEMA = 't_p31606708_tech_buying_service'
 ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN', 'Mark2015N')
 ADMIN_TOKEN_ALT = 'Mark2015N'
 
-VALID_STATUSES = ['new', 'in_progress', 'waiting_parts', 'ready', 'done', 'cancelled']
+VALID_STATUSES = ['new', 'accepted', 'in_progress', 'waiting_parts', 'ready', 'done', 'warranty', 'cancelled']
 ALLOW_HEADERS = 'Content-Type, X-Admin-Token, X-Employee-Token'
 
 
@@ -490,46 +492,66 @@ def handler(event: dict, context) -> dict:
         # Аналитика за период (day/week/month)
         if action == 'analytics':
             period = params.get('period', 'month')
+            # Период — строго по МСК-дням (UTC+3)
+            # today_msk = текущая дата по МСК
+            # "Сегодня" = с 00:00 МСК сегодня до сейчас
+            # "Неделя" = последние 7 МСК-дней включая сегодня
+            # "Месяц" = последние 30 МСК-дней включая сегодня
             if period == 'day':
-                interval = "1 day"
+                days = 1
             elif period == 'week':
-                interval = "7 days"
+                days = 7
             else:
-                interval = "30 days"
+                days = 30
 
-            # Все показатели по дате создания заявки (как в списке заявок)
+            # Заявки выданные (done/warranty) строго в МСК-период по status_updated_at
+            # Начало периода = 00:00 МСК (days-1) дней назад
             cur.execute(f"""
+                WITH msk_now AS (
+                    SELECT (NOW() + INTERVAL '3 hours') AS msk
+                ),
+                period_start AS (
+                    SELECT DATE_TRUNC('day', msk - INTERVAL '{days - 1} days') - INTERVAL '3 hours' AS utc_start
+                    FROM msk_now
+                )
                 SELECT
-                    COUNT(*) as total,
-                    COUNT(*) FILTER (WHERE status = 'done') as done,
+                    COUNT(*) FILTER (WHERE status IN ('done','warranty')) as done,
                     COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled,
                     COUNT(*) FILTER (WHERE status = 'ready') as ready,
                     COUNT(*) FILTER (WHERE status = 'in_progress') as in_progress,
                     COUNT(*) FILTER (WHERE status = 'waiting_parts') as waiting_parts,
-                    COUNT(*) FILTER (WHERE status = 'new') as new_count,
-                    COALESCE(SUM(repair_amount) FILTER (WHERE status = 'done'), 0) as revenue,
-                    COALESCE(SUM(purchase_amount) FILTER (WHERE status = 'done'), 0) as costs,
-                    COALESCE(SUM(master_income) FILTER (WHERE status = 'done'), 0) as master_total
-                FROM {SCHEMA}.repair_orders
-                WHERE created_at >= NOW() - INTERVAL '{interval}'
+                    COUNT(*) FILTER (WHERE status IN ('new','accepted')) as new_count,
+                    COALESCE(SUM(repair_amount) FILTER (WHERE status IN ('done','warranty')), 0) as revenue,
+                    COALESCE(SUM(purchase_amount) FILTER (WHERE status IN ('done','warranty')), 0) as costs,
+                    COALESCE(SUM(master_income) FILTER (WHERE status IN ('done','warranty')), 0) as master_total,
+                    COUNT(*) as total
+                FROM {SCHEMA}.repair_orders, period_start
+                WHERE COALESCE(status_updated_at, created_at) >= utc_start
             """)
             row = cur.fetchone()
 
-            revenue = int(row[7]) if row[7] else 0
-            costs = int(row[8]) if row[8] else 0
-            master_total = int(row[9]) if row[9] else 0
+            revenue = int(row[6]) if row[6] else 0
+            costs = int(row[7]) if row[7] else 0
+            master_total = int(row[8]) if row[8] else 0
             profit = revenue - costs
 
-            # Динамика по дням — группируем по дате создания (МСК = UTC+3)
+            # Динамика по дням — группируем по МСК-дню выдачи
             cur.execute(f"""
+                WITH msk_now AS (
+                    SELECT (NOW() + INTERVAL '3 hours') AS msk
+                ),
+                period_start AS (
+                    SELECT DATE_TRUNC('day', msk - INTERVAL '{days - 1} days') - INTERVAL '3 hours' AS utc_start
+                    FROM msk_now
+                )
                 SELECT
-                    DATE(created_at + INTERVAL '3 hours') as day,
-                    COUNT(*) as total,
-                    COUNT(*) FILTER (WHERE status = 'done') as done,
-                    COALESCE(SUM(repair_amount) FILTER (WHERE status = 'done'), 0) as revenue,
-                    COALESCE(SUM(purchase_amount) FILTER (WHERE status = 'done'), 0) as costs
-                FROM {SCHEMA}.repair_orders
-                WHERE created_at >= NOW() - INTERVAL '{interval}'
+                    DATE(COALESCE(status_updated_at, created_at) + INTERVAL '3 hours') as day,
+                    COUNT(*) as done,
+                    COALESCE(SUM(repair_amount), 0) as revenue,
+                    COALESCE(SUM(purchase_amount), 0) as costs
+                FROM {SCHEMA}.repair_orders, period_start
+                WHERE status IN ('done','warranty')
+                  AND COALESCE(status_updated_at, created_at) >= utc_start
                 GROUP BY day
                 ORDER BY day ASC
             """)
@@ -537,11 +559,10 @@ def handler(event: dict, context) -> dict:
             daily = [
                 {
                     'day': str(r[0]),
-                    'total': r[1],
-                    'done': r[2],
-                    'revenue': int(r[3]),
-                    'costs': int(r[4]),
-                    'profit': int(r[3]) - int(r[4]),
+                    'done': r[1],
+                    'revenue': int(r[2]),
+                    'costs': int(r[3]),
+                    'profit': int(r[2]) - int(r[3]),
                 }
                 for r in daily_rows
             ]
@@ -552,26 +573,27 @@ def handler(event: dict, context) -> dict:
                 'headers': HEADERS,
                 'body': json.dumps({
                     'period': period,
-                    'total': row[0], 'done': row[1], 'cancelled': row[2],
-                    'ready': row[3], 'in_progress': row[4], 'waiting_parts': row[5], 'new': row[6],
+                    'total': row[9], 'done': row[0], 'cancelled': row[1],
+                    'ready': row[2], 'in_progress': row[3], 'waiting_parts': row[4], 'new': row[5],
                     'revenue': revenue, 'costs': costs, 'profit': profit, 'master_total': master_total,
                     'daily': daily,
                 }, ensure_ascii=False)
             }
 
-        # Дневная статистика (30 дней)
+        # Дневная статистика (30 дней) — по дате выдачи в МСК
         if action == 'daily_stats':
             cur.execute(f"""
                 SELECT
-                    DATE(created_at + INTERVAL '3 hours') as day,
+                    DATE(COALESCE(status_updated_at, created_at) + INTERVAL '3 hours') as day,
                     COUNT(*) as total,
-                    COUNT(*) FILTER (WHERE status = 'done') as done,
+                    COUNT(*) FILTER (WHERE status IN ('done','warranty')) as done,
                     COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled,
-                    COALESCE(SUM(repair_amount) FILTER (WHERE status = 'done'), 0) as revenue,
-                    COALESCE(SUM(purchase_amount) FILTER (WHERE status = 'done'), 0) as costs,
-                    COALESCE(SUM(master_income) FILTER (WHERE status = 'done'), 0) as master_income
+                    COALESCE(SUM(repair_amount) FILTER (WHERE status IN ('done','warranty')), 0) as revenue,
+                    COALESCE(SUM(purchase_amount) FILTER (WHERE status IN ('done','warranty')), 0) as costs,
+                    COALESCE(SUM(master_income) FILTER (WHERE status IN ('done','warranty')), 0) as master_income
                 FROM {SCHEMA}.repair_orders
-                WHERE created_at >= NOW() - INTERVAL '30 days'
+                WHERE status IN ('done','warranty')
+                  AND COALESCE(status_updated_at, created_at) >= NOW() - INTERVAL '30 days'
                 GROUP BY day
                 ORDER BY day DESC
             """)
