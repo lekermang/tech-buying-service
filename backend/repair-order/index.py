@@ -641,27 +641,63 @@ def handler(event: dict, context) -> dict:
         return {'statusCode': 400, 'headers': HEADERS,
                 'body': json.dumps({'error': 'Имя и телефон обязательны'}, ensure_ascii=False)}
 
-    conn = psycopg2.connect(os.environ['DATABASE_URL'])
-    cur = conn.cursor()
+    # ── СОХРАНЕНИЕ В БД (транзакция — атомарно) ──────────────────────────────
+    order_id = None
+    client_chat_id = None
+    conn = None
+    try:
+        conn = psycopg2.connect(os.environ['DATABASE_URL'])
+        conn.autocommit = False
+        cur = conn.cursor()
 
-    # Ищем chat_id по телефону
-    suffix = ''.join(c for c in phone if c.isdigit())[-10:]
-    cur.execute(f"""
-        SELECT chat_id FROM {SCHEMA}.tg_phone_map
-        WHERE RIGHT(REGEXP_REPLACE(phone, '[^0-9]', '', 'g'), 10) = '{suffix}' LIMIT 1
-    """)
-    prow = cur.fetchone()
-    client_chat_id = prow[0] if prow else None
+        # Ищем chat_id по телефону
+        suffix = ''.join(c for c in phone if c.isdigit())[-10:]
+        cur.execute(f"""
+            SELECT chat_id FROM {SCHEMA}.tg_phone_map
+            WHERE RIGHT(REGEXP_REPLACE(phone, '[^0-9]', '', 'g'), 10) = '{suffix}' LIMIT 1
+        """)
+        prow = cur.fetchone()
+        client_chat_id = prow[0] if prow else None
 
-    cur.execute(
-        f"INSERT INTO {SCHEMA}.repair_orders (name, phone, model, repair_type, price, comment, client_tg_chat_id) "
-        "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
-        (name, phone, model or None, repair_type or None, price, comment or None, client_chat_id)
-    )
-    order_id = cur.fetchone()[0]
-    conn.commit()
-    cur.close()
-    conn.close()
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.repair_orders (name, phone, model, repair_type, price, comment, client_tg_chat_id) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
+            (name, phone, model or None, repair_type or None, price, comment or None, client_chat_id)
+        )
+        order_id = cur.fetchone()[0]
+        conn.commit()
+        cur.close()
+    except Exception as db_err:
+        if conn:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+        print(f"[repair-order] DB ERROR name={name} phone={phone} err={db_err}")
+        # Аварийно уведомляем в Telegram о потере заявки
+        _emergency_token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+        _emergency_chat = os.environ.get('TELEGRAM_CHAT_ID', '')
+        if _emergency_token and _emergency_chat:
+            try:
+                requests.post(
+                    f'https://api.telegram.org/bot{_emergency_token}/sendMessage',
+                    json={'chat_id': _emergency_chat,
+                          'text': f'🚨 *ОШИБКА БАЗЫ ДАННЫХ* — заявка НЕ сохранена!\n\n'
+                                  f'👤 {name}\n📞 {phone}\n📱 {model or "—"}\n🛠 {repair_type or "—"}\n\n'
+                                  f'Ошибка: `{db_err}`',
+                          'parse_mode': 'Markdown'},
+                    timeout=10
+                )
+            except Exception:
+                pass
+        return {'statusCode': 500, 'headers': HEADERS,
+                'body': json.dumps({'error': 'Ошибка сохранения заявки, попробуйте ещё раз'}, ensure_ascii=False)}
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
     price_str = f'{int(price):,} ₽'.replace(',', ' ') if price else 'не определена'
     act_text = (
@@ -688,33 +724,43 @@ def handler(event: dict, context) -> dict:
         + (f"\n✅ Клиент в TG" if client_chat_id else "")
     )
 
+    # ── УВЕДОМЛЕНИЯ (не влияют на сохранение заявки) ─────────────────────────
     if token:
-        conn2 = psycopg2.connect(os.environ['DATABASE_URL'])
-        cur2 = conn2.cursor()
-        cur2.execute(
-            f"SELECT telegram_chat_id FROM {SCHEMA}.notification_recipients WHERE is_active=true AND notify_repair=true"
-        )
-        chat_ids = [r[0] for r in cur2.fetchall()]
-        cur2.close(); conn2.close()
+        try:
+            conn2 = psycopg2.connect(os.environ['DATABASE_URL'])
+            cur2 = conn2.cursor()
+            cur2.execute(
+                f"SELECT telegram_chat_id FROM {SCHEMA}.notification_recipients WHERE is_active=true AND notify_repair=true"
+            )
+            chat_ids = [r[0] for r in cur2.fetchall()]
+            cur2.close(); conn2.close()
+        except Exception:
+            chat_ids = []
         default_chat = os.environ.get('TELEGRAM_CHAT_ID', '')
         if default_chat and default_chat not in chat_ids:
             chat_ids.insert(0, default_chat)
-        html_bytes = build_act_html(order_id, name, phone, model, repair_type, price_str, comment)
-        filename = f'Акт_приёмки_{order_id}_{name.replace(" ", "_")}.html'
-        for cid in chat_ids:
-            send_tg(token, cid, tg_text)
-            send_tg_document(token, cid, html_bytes, filename, caption=f'📋 Акт приёмки №{order_id} — открыть и распечатать', mime='text/html')
+        try:
+            html_bytes = build_act_html(order_id, name, phone, model, repair_type, price_str, comment)
+            filename = f'Акт_приёмки_{order_id}_{name.replace(" ", "_")}.html'
+            for cid in chat_ids:
+                send_tg(token, cid, tg_text)
+                send_tg_document(token, cid, html_bytes, filename, caption=f'📋 Акт приёмки №{order_id} — открыть и распечатать', mime='text/html')
+        except Exception as tg_err:
+            print(f"[repair-order] TG notify error order={order_id} err={tg_err}")
 
     if token and client_chat_id:
-        client_msg = (
-            f"✅ *Заявка #{order_id} принята!*\n\n"
-            f"Здравствуйте, {name}!\n"
-            f"📱 *Устройство:* {model or '—'}\n"
-            f"🛠 *Работы:* {repair_type or '—'}\n"
-            f"💰 *Стоимость:* {price_str}\n\n"
-            f"Скоро перезвоним. Статус — командой /status{AD_FOOTER}"
-        )
-        send_tg(token, client_chat_id, client_msg)
+        try:
+            client_msg = (
+                f"✅ *Заявка #{order_id} принята!*\n\n"
+                f"Здравствуйте, {name}!\n"
+                f"📱 *Устройство:* {model or '—'}\n"
+                f"🛠 *Работы:* {repair_type or '—'}\n"
+                f"💰 *Стоимость:* {price_str}\n\n"
+                f"Скоро перезвоним. Статус — командой /status{AD_FOOTER}"
+            )
+            send_tg(token, client_chat_id, client_msg)
+        except Exception:
+            pass
 
     send_sms('+79929990333', f'Заявка #{order_id} на ремонт. {name}, {phone}. {repair_type or model or ""}. Скупка24')
     send_email('lekermanya@yandex.ru', f'Заявка #{order_id} на ремонт — Скупка24',
