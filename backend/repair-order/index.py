@@ -441,7 +441,7 @@ def handler(event: dict, context) -> dict:
         webhook_url = f"{FUNC_URL}?action=tg_webhook"
         resp = requests.post(
             f'https://api.telegram.org/bot{token}/setWebhook',
-            json={'url': webhook_url, 'allowed_updates': ['message']},
+            json={'url': webhook_url, 'allowed_updates': ['message', 'callback_query']},
             timeout=10,
         )
         return {'statusCode': 200, 'headers': HEADERS,
@@ -454,73 +454,309 @@ def handler(event: dict, context) -> dict:
 
     # ── Telegram Webhook от бота ──────────────────────────────────────────────
     if action == 'tg_webhook':
+        if not token:
+            return {'statusCode': 200, 'headers': HEADERS, 'body': '{"ok":true}'}
+
+        import re as _re
+
+        SITE = 'https://skypka24.com'
+
+        STATUS_LABELS_TG = {
+            'new':           '🔔 Заявка принята',
+            'accepted':      '✅ Принят мастером',
+            'in_progress':   '🔧 В работе',
+            'waiting_parts': '📦 Ждём запчасть',
+            'ready':         '🟡 Готово — можно забирать!',
+            'done':          '✅ Выдано',
+            'warranty':      '🛡 На гарантии',
+            'cancelled':     '❌ Отменено',
+        }
+        STATUS_DESC_TG = {
+            'new':           'Заявка зарегистрирована, ожидает приёмки мастером.',
+            'accepted':      'Мастер принял устройство и приступает к диагностике.',
+            'in_progress':   'Мастер работает над вашим устройством.',
+            'waiting_parts': 'Ожидаем поступления необходимых запчастей.',
+            'ready':         'Ремонт завершён! Приходите забирать устройство.',
+            'done':          'Устройство выдано владельцу.',
+            'warranty':      'Устройство находится на гарантийном обслуживании.',
+            'cancelled':     'Заявка отменена.',
+        }
+
+        def tg_api(method, data):
+            return requests.post(
+                f'https://api.telegram.org/bot{token}/{method}',
+                json=data, timeout=10
+            )
+
+        def main_menu_markup():
+            return {'inline_keyboard': [
+                [{'text': '📱 Продать технику',          'callback_data': 'sec_sell'}],
+                [{'text': '💍 Сдать украшения',           'callback_data': 'sec_jewelry'}],
+                [{'text': '🔧 Ремонт телефона',           'callback_data': 'sec_repair'}],
+                [{'text': '🛒 Каталог Б/У техники',       'callback_data': 'sec_catalog'}],
+                [{'text': '🔍 Узнать статус ремонта',     'callback_data': 'sec_status'}],
+                [{'text': '📍 Адреса и контакты',         'callback_data': 'sec_contacts'}],
+            ]}
+
+        def back_markup():
+            return {'inline_keyboard': [[{'text': '← Главное меню', 'callback_data': 'sec_main'}]]}
+
+        def order_markup(oid):
+            return {'inline_keyboard': [
+                [{'text': '🔄 Обновить статус', 'callback_data': f'order_{oid}'}],
+                [{'text': '← Главное меню',     'callback_data': 'sec_main'}],
+            ]}
+
+        SECTIONS = {
+            'sec_main': (
+                '👋 <b>Добро пожаловать в Скупка24!</b>\n\nРаботаем <b>24/7</b> — выкупаем дорого, ремонтируем быстро.\n\nВыберите раздел:',
+                main_menu_markup
+            ),
+            'sec_sell': (
+                '📱 <b>Продать технику</b>\n\nВыкупаем дорого и быстро:\n• iPhone, Samsung, Xiaomi\n• MacBook, ноутбуки, iPad\n• Apple Watch, AirPods\n• Игровые консоли, фотоаппараты\n\n💰 <b>Цену назовём за 15 минут</b> после заявки',
+                lambda: {'inline_keyboard': [
+                    [{'text': '📝 Оставить заявку на сайте', 'url': SITE}],
+                    [{'text': '📞 Позвонить: 8-800-707-40-40', 'url': 'tel:88007074040'}],
+                    [{'text': '← Главное меню', 'callback_data': 'sec_main'}],
+                ]}
+            ),
+            'sec_jewelry': (
+                '💍 <b>Сдать ювелирные украшения</b>\n\nПринимаем:\n• Золото 585, 750, 999 пробы\n• Серебро\n• Бриллианты и драгоценные камни\n• Лом золота\n\n⚡️ Оценка и выплата — в день обращения',
+                lambda: {'inline_keyboard': [
+                    [{'text': '📝 Оставить заявку на сайте', 'url': SITE}],
+                    [{'text': '📞 Позвонить: 8-800-707-40-40', 'url': 'tel:88007074040'}],
+                    [{'text': '← Главное меню', 'callback_data': 'sec_main'}],
+                ]}
+            ),
+            'sec_repair': (
+                '🔧 <b>Ремонт телефонов</b>\n\nПри вас за 20 минут:\n• Замена стекла и дисплея — от 300 ₽\n• Замена аккумулятора\n• Ремонт разъёма зарядки\n• Чистка после воды\n\n🛡 <b>Бесплатная диагностика</b>\n✅ Оригинальные комплектующие',
+                lambda: {'inline_keyboard': [
+                    [{'text': '📋 Оставить заявку на ремонт', 'url': f'{SITE}/#repair'}],
+                    [{'text': '🔍 Узнать статус ремонта',     'callback_data': 'sec_status'}],
+                    [{'text': '📞 Позвонить',                  'url': 'tel:88007074040'}],
+                    [{'text': '← Главное меню',               'callback_data': 'sec_main'}],
+                ]}
+            ),
+            'sec_catalog': (
+                '🛒 <b>Каталог Б/У техники</b>\n\nПроверенные устройства с гарантией <b>1 год</b>:\n• iPhone от 3 000 ₽\n• Samsung, Xiaomi\n• MacBook, ноутбуки\n• iPad, AirPods\n\nКаждое устройство проверено мастером.',
+                lambda: {'inline_keyboard': [
+                    [{'text': '🛒 Открыть каталог', 'url': f'{SITE}/catalog'}],
+                    [{'text': '← Главное меню',     'callback_data': 'sec_main'}],
+                ]}
+            ),
+            'sec_status': (
+                '🔍 <b>Статус заявки на ремонт</b>\n\nОтправьте <b>номер заявки</b> (например: <code>42</code>)\nили <b>номер телефона</b>, указанный при сдаче.',
+                back_markup
+            ),
+            'sec_contacts': (
+                '📍 <b>Адреса (работаем 24/7)</b>\n\n🏪 <b>Кирова, 11</b>\n🏪 <b>Кирова, 7/47</b>\n\n📞 8-800-707-40-40 (бесплатно)\n🌐 skypka24.com',
+                lambda: {'inline_keyboard': [
+                    [{'text': '📞 Позвонить', 'url': 'tel:88007074040'}, {'text': '🌐 Сайт', 'url': SITE}],
+                    [{'text': '← Главное меню', 'callback_data': 'sec_main'}],
+                ]}
+            ),
+        }
+
+        def get_order_info(order_id):
+            try:
+                conn2 = psycopg2.connect(os.environ['DATABASE_URL'])
+                cur2 = conn2.cursor()
+                cur2.execute(
+                    f"SELECT id, name, model, repair_type, status, admin_note FROM {SCHEMA}.repair_orders WHERE id = %s",
+                    (order_id,)
+                )
+                row2 = cur2.fetchone()
+                cur2.close(); conn2.close()
+                return row2
+            except Exception:
+                return None
+
+        def get_orders_by_phone_tg(phone_raw):
+            digits = _re.sub(r'[^0-9]', '', phone_raw)[-7:]
+            try:
+                conn2 = psycopg2.connect(os.environ['DATABASE_URL'])
+                cur2 = conn2.cursor()
+                cur2.execute(
+                    f"""SELECT id, model, status FROM {SCHEMA}.repair_orders
+                        WHERE regexp_replace(phone, '[^0-9]', '', 'g') LIKE %s
+                          AND status != 'cancelled'
+                        ORDER BY created_at DESC LIMIT 5""",
+                    ('%' + digits + '%',)
+                )
+                rows2 = cur2.fetchall()
+                cur2.close(); conn2.close()
+                return rows2
+            except Exception:
+                return []
+
+        def format_order_tg(row2):
+            oid, name, model, repair_type, status, admin_note = row2
+            sl = STATUS_LABELS_TG.get(status, status)
+            sd = STATUS_DESC_TG.get(status, '')
+            lines = [f'📋 <b>Заявка #{oid}</b>']
+            if name:   lines.append(f'👤 {name}')
+            if model:  lines.append(f'📱 {model}')
+            if repair_type: lines.append(f'🔧 {repair_type}')
+            lines.append(f'\n{sl}')
+            if sd: lines.append(f'<i>{sd}</i>')
+            if admin_note: lines.append(f'\n💬 <b>Комментарий мастера:</b>\n{admin_note}')
+            return '\n'.join(lines)
+
+        # ── Callback query (нажатие кнопки) ──
+        cb = body.get('callback_query')
+        if cb:
+            cb_id   = cb.get('id')
+            cb_data = cb.get('data', '')
+            cb_msg  = cb.get('message', {})
+            cb_chat = cb_msg.get('chat', {}).get('id')
+            cb_mid  = cb_msg.get('message_id')
+
+            def edit_msg(text, markup):
+                tg_api('editMessageText', {
+                    'chat_id': cb_chat, 'message_id': cb_mid,
+                    'text': text, 'parse_mode': 'HTML',
+                    'reply_markup': markup, 'disable_web_page_preview': True,
+                })
+                tg_api('answerCallbackQuery', {'callback_query_id': cb_id})
+
+            # Обновить статус заявки
+            if cb_data.startswith('order_'):
+                oid = int(cb_data.split('_', 1)[1])
+                row2 = get_order_info(oid)
+                if row2:
+                    edit_msg(f'🔍 <b>Статус вашей заявки:</b>\n\n{format_order_tg(row2)}', order_markup(oid))
+                else:
+                    edit_msg(f'⚠️ Заявка #{oid} не найдена.', back_markup())
+                return {'statusCode': 200, 'headers': HEADERS, 'body': '{"ok":true}'}
+
+            # Разделы меню
+            if cb_data in SECTIONS:
+                text2, kb_fn = SECTIONS[cb_data]
+                edit_msg(text2, kb_fn())
+                return {'statusCode': 200, 'headers': HEADERS, 'body': '{"ok":true}'}
+
+            tg_api('answerCallbackQuery', {'callback_query_id': cb_id})
+            return {'statusCode': 200, 'headers': HEADERS, 'body': '{"ok":true}'}
+
+        # ── Обычное сообщение ──
         message = body.get('message') or {}
         chat_id = message.get('chat', {}).get('id')
-        if not chat_id or not token:
+        if not chat_id:
+            return {'statusCode': 200, 'headers': HEADERS, 'body': '{"ok":true}'}
+
+        chat_type = message.get('chat', {}).get('type', 'private')
+        if chat_type != 'private':
             return {'statusCode': 200, 'headers': HEADERS, 'body': '{"ok":true}'}
 
         from_user = message.get('from') or {}
-        username = from_user.get('username', '')
+        username   = from_user.get('username', '')
         first_name = from_user.get('first_name', '')
         text = (message.get('text') or '').strip()
         contact = message.get('contact')
 
-        conn = psycopg2.connect(os.environ['DATABASE_URL'])
-        cur = conn.cursor()
-
+        # Поделился номером — привязываем
         if contact and contact.get('phone_number'):
+            conn = psycopg2.connect(os.environ['DATABASE_URL'])
+            cur = conn.cursor()
             save_phone_map(cur, contact['phone_number'], chat_id, username, first_name)
             conn.commit()
             cur.close(); conn.close()
-            send_tg(token, chat_id,
-                f"✅ Телефон {contact['phone_number']} привязан.\n"
-                "Теперь вы будете получать уведомления о статусе ремонта.\n\n"
-                "🌐 skypka24.com", parse_mode='')
-            return {'statusCode': 200, 'headers': HEADERS, 'body': '{"ok":true}'}
-
-        if text.startswith('/start'):
-            cur.close(); conn.close()
-            requests.post(f'https://api.telegram.org/bot{token}/sendMessage', json={
+            tg_api('sendMessage', {
                 'chat_id': chat_id,
-                'text': (
-                    f"Привет, {first_name}! 👋 Я бот Скупка24.\n\n"
-                    "Здесь вы будете получать уведомления о статусе ремонта вашего телефона.\n\n"
-                    "Нажмите кнопку ниже, чтобы привязать номер 👇\n\n"
-                    "🌐 skypka24.com"
-                ),
-                'reply_markup': {
-                    'keyboard': [[{'text': '📱 Поделиться номером телефона', 'request_contact': True}]],
-                    'resize_keyboard': True, 'one_time_keyboard': True,
-                }
-            }, timeout=10)
+                'text': f'✅ Телефон {contact["phone_number"]} привязан.\nТеперь вы будете получать уведомления о статусе ремонта.\n\n🌐 skypka24.com',
+                'reply_markup': {'remove_keyboard': True},
+            })
             return {'statusCode': 200, 'headers': HEADERS, 'body': '{"ok":true}'}
 
-        if text.startswith('/status'):
-            cur.execute(f"""
-                SELECT id, repair_type, status, price FROM {SCHEMA}.repair_orders
-                WHERE client_tg_chat_id = {chat_id} ORDER BY id DESC LIMIT 1
-            """)
-            row = cur.fetchone()
-            cur.close(); conn.close()
-            if row:
-                oid, rtype, status, price = row
-                slabels = {'new': 'Новая', 'in_progress': 'В работе 🔧',
-                    'waiting_parts': 'Ждём запчасть ⏳', 'ready': 'Готово ✓ 🎉',
-                    'done': 'Выдано 👍', 'cancelled': 'Отменено ❌'}
-                price_str = f"{int(price):,} ₽".replace(',', ' ') if price else '—'
-                send_tg(token, chat_id,
-                    f"📋 Заявка #{oid}\nТип: {rtype or '—'}\nСтоимость: {price_str}\n"
-                    f"Статус: {slabels.get(status, status)}\n\n🌐 skypka24.com", parse_mode='')
+        # /start [order_id]
+        if text.startswith('/start'):
+            param = text.split(' ', 1)[1].strip() if ' ' in text else ''
+            if param == 'web_auth':
+                # Обрабатывается отдельной функцией
+                return {'statusCode': 200, 'headers': HEADERS, 'body': '{"ok":true}'}
+            if param and param.isdigit():
+                row2 = get_order_info(int(param))
+                if row2:
+                    tg_api('sendMessage', {
+                        'chat_id': chat_id,
+                        'text': f'🔍 <b>Статус вашей заявки:</b>\n\n{format_order_tg(row2)}',
+                        'parse_mode': 'HTML',
+                        'reply_markup': order_markup(int(param)),
+                    })
+                else:
+                    tg_api('sendMessage', {
+                        'chat_id': chat_id,
+                        'text': f'⚠️ Заявка #{param} не найдена.\n\nВведите номер заявки или номер телефона.',
+                        'parse_mode': 'HTML',
+                        'reply_markup': back_markup(),
+                    })
+                return {'statusCode': 200, 'headers': HEADERS, 'body': '{"ok":true}'}
+            # Обычный /start — главное меню
+            tg_api('sendMessage', {
+                'chat_id': chat_id,
+                'text': '👋 <b>Добро пожаловать в Скупка24!</b>\n\nРаботаем <b>24/7</b> — выкупаем дорого, ремонтируем быстро.\n\nВыберите раздел:',
+                'parse_mode': 'HTML',
+                'reply_markup': main_menu_markup(),
+                'disable_web_page_preview': True,
+            })
+            return {'statusCode': 200, 'headers': HEADERS, 'body': '{"ok":true}'}
+
+        # Только цифры — статус заявки по ID
+        if _re.fullmatch(r'\d{1,6}', text):
+            row2 = get_order_info(int(text))
+            if row2:
+                tg_api('sendMessage', {
+                    'chat_id': chat_id,
+                    'text': f'🔍 <b>Статус вашей заявки:</b>\n\n{format_order_tg(row2)}',
+                    'parse_mode': 'HTML',
+                    'reply_markup': order_markup(int(text)),
+                })
             else:
-                cur.close(); conn.close()
-                send_tg(token, chat_id,
-                    "Заявок не найдено. Сначала привяжите номер телефона командой /start\n\n🌐 skypka24.com", parse_mode='')
+                tg_api('sendMessage', {
+                    'chat_id': chat_id,
+                    'text': f'⚠️ Заявка <b>#{text}</b> не найдена.\n\nПроверьте номер или введите номер телефона.',
+                    'parse_mode': 'HTML',
+                    'reply_markup': back_markup(),
+                })
             return {'statusCode': 200, 'headers': HEADERS, 'body': '{"ok":true}'}
 
-        cur.close(); conn.close()
-        send_tg(token, chat_id,
-            "Команды:\n/start — привязать номер\n/status — статус ремонта\n\n"
-            f"🌐 skypka24.com\n📲 https://t.me/ProService40", parse_mode='')
+        # Номер телефона — поиск заявок
+        digits_all = _re.sub(r'[^0-9]', '', text)
+        if len(digits_all) >= 7:
+            rows2 = get_orders_by_phone_tg(text)
+            if rows2:
+                lines = [f'📋 Найдено заявок: <b>{len(rows2)}</b>\n']
+                kb_rows = []
+                for r2 in rows2:
+                    r_id, r_model, r_status = r2
+                    sl = STATUS_LABELS_TG.get(r_status, r_status)
+                    model_part = f' — {r_model}' if r_model else ''
+                    lines.append(f'• <b>#{r_id}</b>{model_part} · {sl}')
+                    kb_rows.append([{'text': f'🔍 Заявка #{r_id}', 'callback_data': f'order_{r_id}'}])
+                kb_rows.append([{'text': '← Главное меню', 'callback_data': 'sec_main'}])
+                tg_api('sendMessage', {
+                    'chat_id': chat_id,
+                    'text': '\n'.join(lines),
+                    'parse_mode': 'HTML',
+                    'reply_markup': {'inline_keyboard': kb_rows},
+                })
+            else:
+                tg_api('sendMessage', {
+                    'chat_id': chat_id,
+                    'text': '⚠️ По этому номеру заявок не найдено.\n\nВведите <b>номер заявки</b> или напишите /start.',
+                    'parse_mode': 'HTML',
+                    'reply_markup': back_markup(),
+                })
+            return {'statusCode': 200, 'headers': HEADERS, 'body': '{"ok":true}'}
+
+        # Всё остальное — главное меню
+        tg_api('sendMessage', {
+            'chat_id': chat_id,
+            'text': '👋 <b>Добро пожаловать в Скупка24!</b>\n\nРаботаем <b>24/7</b> — выкупаем дорого, ремонтируем быстро.\n\nВыберите раздел:',
+            'parse_mode': 'HTML',
+            'reply_markup': main_menu_markup(),
+            'disable_web_page_preview': True,
+        })
         return {'statusCode': 200, 'headers': HEADERS, 'body': '{"ok":true}'}
 
     # ── SMS клиенту о статусе ────────────────────────────────────────────────
