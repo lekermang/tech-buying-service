@@ -171,8 +171,9 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
   };
 
   // ─── Выдать клиенту ──────────────────────────────────────────────────────────
-  const issueOrder = async (o: Order) => {
-    await changeStatus(o.id, "done");
+  const issueOrder = async (o: Order, issuedAt?: string) => {
+    const extra = issuedAt ? { picked_up_at: new Date(issuedAt).toISOString() } : {};
+    await changeStatus(o.id, "done", extra);
     printReceipt({ ...o, status: "done" });
   };
 

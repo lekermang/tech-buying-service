@@ -11,6 +11,14 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled:     "Отменено",
 };
 
+const STATUS_SHORT: Record<string, string> = {
+  in_progress:   "Работа",
+  waiting_parts: "Запчасть",
+  ready:         "Готово",
+  done:          "Выдано",
+  cancelled:     "Отмена",
+};
+
 const REPAIR_ORDER_URL = "https://functions.poehali.dev/8d0ee3bd-41eb-44fe-9d30-aab6ddc2042d";
 
 type EditForm = {
@@ -33,7 +41,7 @@ type Props = {
   onEditFormChange: (id: number, ef: EditForm) => void;
   onChangeStatus: (id: number, status: string, extra?: Record<string, unknown>) => void;
   onOpenReadyModal: (o: Order) => void;
-  onIssueOrder: (o: Order) => void;
+  onIssueOrder: (o: Order, issuedAt?: string) => void;
   onSaveCard: (o: Order) => void;
   onDelete: (id: number) => void;
 };
@@ -51,6 +59,14 @@ export default function StaffRepairOrderCard({
   const [smsError, setSmsError] = useState<string | null>(null);
   const [actSending, setActSending] = useState(false);
   const [actSent, setActSent] = useState(false);
+
+  // Дата выдачи (для кнопки "Выдано")
+  const nowLocal = () => {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 16);
+  };
+  const [issuedAt, setIssuedAt] = useState<string>(nowLocal);
 
   const handleSendAct = async () => {
     setActSending(true);
@@ -288,6 +304,21 @@ export default function StaffRepairOrderCard({
           {/* Смена статуса */}
           <div>
             <div className="font-roboto text-white/30 text-[10px] uppercase tracking-wider mb-2">Сменить статус</div>
+
+            {/* Поле даты выдачи — показываем если статус не "done" */}
+            {o.status !== "done" && (
+              <div className="mb-2 flex items-center gap-2 bg-[#111] border border-[#FFD700]/10 px-2.5 py-1.5">
+                <Icon name="CalendarCheck" size={12} className="text-[#FFD700]/50 shrink-0" />
+                <span className="font-roboto text-[10px] text-white/30 shrink-0">Дата выдачи:</span>
+                <input
+                  type="datetime-local"
+                  value={issuedAt}
+                  onChange={e => setIssuedAt(e.target.value)}
+                  className="flex-1 bg-transparent font-roboto text-[10px] text-white/70 outline-none min-w-0 cursor-pointer"
+                />
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-2">
               {STATUSES.filter(s => s.key !== o.status).map(s => {
                 const needsFinance = s.key === "ready" || s.key === "done";
@@ -296,7 +327,7 @@ export default function StaffRepairOrderCard({
                   <button key={s.key}
                     onClick={() => {
                       if (s.key === "ready") onOpenReadyModal(o);
-                      else if (s.key === "done") onIssueOrder(o);
+                      else if (s.key === "done") onIssueOrder(o, issuedAt);
                       else onChangeStatus(o.id, s.key, { admin_note: ef.admin_note });
                     }}
                     disabled={saving || blocked}
@@ -317,49 +348,53 @@ export default function StaffRepairOrderCard({
           </div>
 
           {/* Telegram уведомление */}
-          <div className="border border-[#229ED9]/20 bg-[#229ED9]/5 p-3 rounded-sm">
-            <div className="font-roboto text-white/30 text-[10px] uppercase tracking-wide mb-2 flex items-center gap-1">
-              <Icon name="Send" size={10} className="text-[#229ED9]" /> Telegram клиенту
+          <div className="border border-[#229ED9]/20 bg-[#229ED9]/5 px-2.5 py-2">
+            <div className="font-roboto text-white/30 text-[10px] uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
+              <Icon name="Send" size={10} className="text-[#229ED9]" />
+              <span>Telegram клиенту</span>
+              {sentKey && !notifyError && <span className="ml-auto text-green-400/80">✓ Отправлено</span>}
+              {notifyError && <span className="ml-auto text-orange-400">{notifyError}</span>}
             </div>
-            <div className="grid grid-cols-2 gap-1.5">
+            <div className="grid grid-cols-5 gap-1">
               {Object.entries(STATUS_LABEL).map(([key, label]) => (
                 <button key={key} type="button" onClick={() => handleSend(key)}
                   disabled={sentKey === key}
-                  className={`font-roboto text-xs py-2 px-2 border transition-colors flex items-center justify-center gap-1.5 min-h-[40px] ${
+                  title={label}
+                  className={`font-roboto text-[9px] py-1.5 border transition-colors flex flex-col items-center justify-center gap-0.5 min-h-[36px] ${
                     sentKey === key
                       ? "border-green-500/40 text-green-400 bg-green-500/10"
                       : "border-[#229ED9]/20 text-[#229ED9]/70 active:bg-[#229ED9]/10"
                   }`}>
-                  <Icon name={sentKey === key ? "Check" : "Send"} size={10} />
-                  {label}
+                  <Icon name={sentKey === key ? "Check" : "Send"} size={9} />
+                  <span className="leading-none text-center px-0.5">{STATUS_SHORT[key]}</span>
                 </button>
               ))}
             </div>
-            {notifyError && <div className="mt-1.5 font-roboto text-xs text-orange-400">{notifyError}</div>}
-            {sentKey && !notifyError && <div className="mt-1.5 font-roboto text-xs text-green-400/70">✓ Отправлено</div>}
           </div>
 
           {/* SMS */}
-          <div className="border border-green-500/20 bg-green-500/5 px-2.5 py-2 rounded-sm">
-            <div className="font-roboto text-white/30 text-[10px] uppercase tracking-wide mb-1.5 flex items-center gap-1">
-              <Icon name="MessageSquare" size={10} className="text-green-400" /> SMS · {o.phone || "—"}
+          <div className="border border-green-500/20 bg-green-500/5 px-2.5 py-2">
+            <div className="font-roboto text-white/30 text-[10px] uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
+              <Icon name="MessageSquare" size={10} className="text-green-400" />
+              <span>SMS · {o.phone || "—"}</span>
+              {smsSentKey && !smsError && <span className="ml-auto text-green-400/80">✓ Отправлено</span>}
+              {smsError && <span className="ml-auto text-orange-400">{smsError}</span>}
             </div>
-            <div className="flex flex-wrap gap-1">
+            <div className="grid grid-cols-5 gap-1">
               {Object.entries(STATUS_LABEL).map(([key, label]) => (
                 <button key={key} type="button" onClick={() => handleSendSms(key)}
                   disabled={smsSentKey === key}
-                  className={`font-roboto text-[10px] py-1.5 px-2 border transition-colors flex items-center gap-1 ${
+                  title={label}
+                  className={`font-roboto text-[9px] py-1.5 border transition-colors flex flex-col items-center justify-center gap-0.5 min-h-[36px] ${
                     smsSentKey === key
                       ? "border-green-500/40 text-green-400 bg-green-500/10"
                       : "border-green-500/20 text-green-400/70 active:bg-green-500/10"
                   }`}>
                   <Icon name={smsSentKey === key ? "Check" : "MessageSquare"} size={9} />
-                  {label}
+                  <span className="leading-none text-center px-0.5">{STATUS_SHORT[key]}</span>
                 </button>
               ))}
             </div>
-            {smsError && <div className="mt-1 font-roboto text-[10px] text-orange-400">{smsError}</div>}
-            {smsSentKey && !smsError && <div className="mt-1 font-roboto text-[10px] text-green-400/70">✓ Отправлено</div>}
           </div>
 
           {/* Печать + удаление */}
