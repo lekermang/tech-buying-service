@@ -1,7 +1,7 @@
 import Icon from "@/components/ui/icon";
 import { Analytics, STATUSES, money } from "./repairTypes";
 
-type Period = "day" | "week" | "month";
+type Period = "day" | "yesterday" | "week" | "month";
 
 type Props = {
   analytics: Analytics | null;
@@ -16,10 +16,10 @@ export default function RepairAnalytics({ analytics, analyticsLoading, period, o
     <div className="flex-1 overflow-y-auto p-4">
       {/* Переключатель периода */}
       <div className="flex gap-2 mb-5">
-        {(["day", "week", "month"] as Period[]).map(p => (
+        {(["day", "yesterday", "week", "month"] as Period[]).map(p => (
           <button key={p} onClick={() => onPeriodChange(p)}
-            className={`px-4 py-2 font-roboto text-xs border transition-colors ${period === p ? "border-[#FFD700] text-[#FFD700] bg-[#FFD700]/10" : "border-[#333] text-white/40 hover:text-white"}`}>
-            {p === "day" ? "Сегодня" : p === "week" ? "7 дней" : "30 дней"}
+            className={`px-3 py-2 font-roboto text-xs border transition-colors ${period === p ? "border-[#FFD700] text-[#FFD700] bg-[#FFD700]/10" : "border-[#333] text-white/40 hover:text-white"}`}>
+            {p === "day" ? "Сегодня" : p === "yesterday" ? "Вчера" : p === "week" ? "7 дней" : "30 дней"}
           </button>
         ))}
         <button onClick={onRefresh} disabled={analyticsLoading} className="ml-auto text-white/30 hover:text-white transition-colors p-1.5">

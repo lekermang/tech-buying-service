@@ -493,27 +493,29 @@ def handler(event: dict, context) -> dict:
         if action == 'analytics':
             period = params.get('period', 'month')
             # Период — строго по МСК-дням (UTC+3)
-            # today_msk = текущая дата по МСК
-            # "Сегодня" = с 00:00 МСК сегодня до сейчас
-            # "Неделя" = последние 7 МСК-дней включая сегодня
-            # "Месяц" = последние 30 МСК-дней включая сегодня
-            if period == 'day':
-                days = 1
-            elif period == 'week':
-                days = 7
+            # "Сегодня" (day)   = с 00:00 МСК сегодня
+            # "Вчера"  (yesterday) = строго вчерашний МСК-день (00:00–23:59)
+            # "7 дней" (week)   = последние 7 МСК-дней включая сегодня
+            # "Месяц"  (month)  = последние 30 МСК-дней включая сегодня
+            if period == 'yesterday':
+                # строго вчерашний день: utc_start = вчера 00:00 МСК, utc_end = сегодня 00:00 МСК
+                period_where = f"""
+                    COALESCE(status_updated_at, created_at) >= DATE_TRUNC('day', (NOW() + INTERVAL '3 hours') - INTERVAL '1 day') - INTERVAL '3 hours'
+                    AND COALESCE(status_updated_at, created_at) < DATE_TRUNC('day', (NOW() + INTERVAL '3 hours')) - INTERVAL '3 hours'
+                """
+                days = None
             else:
-                days = 30
+                if period == 'day':
+                    days = 1
+                elif period == 'week':
+                    days = 7
+                else:
+                    days = 30
+                period_where = f"""
+                    COALESCE(status_updated_at, created_at) >= DATE_TRUNC('day', (NOW() + INTERVAL '3 hours') - INTERVAL '{days - 1} days') - INTERVAL '3 hours'
+                """
 
-            # Заявки выданные (done/warranty) строго в МСК-период по status_updated_at
-            # Начало периода = 00:00 МСК (days-1) дней назад
             cur.execute(f"""
-                WITH msk_now AS (
-                    SELECT (NOW() + INTERVAL '3 hours') AS msk
-                ),
-                period_start AS (
-                    SELECT DATE_TRUNC('day', msk - INTERVAL '{days - 1} days') - INTERVAL '3 hours' AS utc_start
-                    FROM msk_now
-                )
                 SELECT
                     COUNT(*) FILTER (WHERE status IN ('done','warranty')) as done,
                     COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled,
@@ -525,8 +527,8 @@ def handler(event: dict, context) -> dict:
                     COALESCE(SUM(purchase_amount) FILTER (WHERE status IN ('done','warranty')), 0) as costs,
                     COALESCE(SUM(master_income) FILTER (WHERE status IN ('done','warranty')), 0) as master_total,
                     COUNT(*) as total
-                FROM {SCHEMA}.repair_orders, period_start
-                WHERE COALESCE(status_updated_at, created_at) >= utc_start
+                FROM {SCHEMA}.repair_orders
+                WHERE {period_where}
             """)
             row = cur.fetchone()
 
@@ -537,21 +539,14 @@ def handler(event: dict, context) -> dict:
 
             # Динамика по дням — группируем по МСК-дню выдачи
             cur.execute(f"""
-                WITH msk_now AS (
-                    SELECT (NOW() + INTERVAL '3 hours') AS msk
-                ),
-                period_start AS (
-                    SELECT DATE_TRUNC('day', msk - INTERVAL '{days - 1} days') - INTERVAL '3 hours' AS utc_start
-                    FROM msk_now
-                )
                 SELECT
                     DATE(COALESCE(status_updated_at, created_at) + INTERVAL '3 hours') as day,
                     COUNT(*) as done,
                     COALESCE(SUM(repair_amount), 0) as revenue,
                     COALESCE(SUM(purchase_amount), 0) as costs
-                FROM {SCHEMA}.repair_orders, period_start
+                FROM {SCHEMA}.repair_orders
                 WHERE status IN ('done','warranty')
-                  AND COALESCE(status_updated_at, created_at) >= utc_start
+                  AND {period_where}
                 GROUP BY day
                 ORDER BY day ASC
             """)
@@ -609,6 +604,31 @@ def handler(event: dict, context) -> dict:
                 for r in rows
             ]
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'stats': stats}, ensure_ascii=False)}
+
+        # История последних действий над заявками (50 последних записей)
+        if action == 'history':
+            limit = int(params.get('limit', '50'))
+            cur.execute(f"""
+                SELECT h.id, h.order_id, h.changed_at, h.changed_by, h.field_name, h.old_value, h.new_value,
+                       o.name as client_name, o.model as device
+                FROM {SCHEMA}.repair_order_history h
+                LEFT JOIN {SCHEMA}.repair_orders o ON o.id = h.order_id
+                ORDER BY h.changed_at DESC
+                LIMIT {limit}
+            """)
+            rows = cur.fetchall()
+            cur.close(); conn.close()
+            history = [
+                {{
+                    'id': r[0], 'order_id': r[1],
+                    'changed_at': r[2].isoformat() if r[2] else None,
+                    'changed_by': r[3], 'field_name': r[4],
+                    'old_value': r[5], 'new_value': r[6],
+                    'client_name': r[7], 'device': r[8],
+                }}
+                for r in rows
+            ]
+            return {{'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({{'history': history}}, ensure_ascii=False)}}
 
         # Получить тему сайта (публичный — без токена не дойдёт, но action доступен)
         if action == 'theme_get':
@@ -1270,6 +1290,11 @@ def handler(event: dict, context) -> dict:
             return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'Нет данных для обновления'}, ensure_ascii=False)}
 
         set_clause = ', '.join(sets)
+        # Читаем старые значения перед обновлением
+        cur.execute(f"SELECT status, repair_amount, purchase_amount, parts_name, admin_note, master_income FROM {SCHEMA}.repair_orders WHERE id = {order_id}")
+        old_row = cur.fetchone()
+        old_vals = {'status': old_row[0], 'repair_amount': old_row[1], 'purchase_amount': old_row[2], 'parts_name': old_row[3], 'admin_note': old_row[4], 'master_income': old_row[5]} if old_row else {}
+
         cur.execute(f"UPDATE {SCHEMA}.repair_orders SET {set_clause} WHERE id = {order_id} RETURNING id, name, phone, model, repair_type, repair_amount")
         row = cur.fetchone()
         conn.commit()
@@ -1277,6 +1302,27 @@ def handler(event: dict, context) -> dict:
         if not row:
             cur.close(); conn.close()
             return {'statusCode': 404, 'headers': HEADERS, 'body': json.dumps({'error': 'Заявка не найдена'}, ensure_ascii=False)}
+
+        # Записываем историю изменений
+        FIELD_LABELS = {'status': 'Статус', 'repair_amount': 'Сумма ремонта', 'purchase_amount': 'Закупка', 'parts_name': 'Запчасть', 'admin_note': 'Заметка', 'master_income': 'Доход мастера'}
+        changed_by_hdr = {k.lower(): v for k, v in (event.get('headers') or {}).items()}
+        changed_by = changed_by_hdr.get('x-employee-name', changed_by_hdr.get('x-admin-token', 'admin'))
+        history_rows = []
+        if new_status and old_vals.get('status') != new_status:
+            old_lbl = STATUS_LABELS.get(old_vals.get('status',''), old_vals.get('status',''))
+            new_lbl = STATUS_LABELS.get(new_status, new_status)
+            history_rows.append((order_id, changed_by, 'status', old_lbl, new_lbl))
+        for fld in ('repair_amount', 'purchase_amount', 'parts_name', 'admin_note'):
+            new_fld = body.get(fld)
+            if new_fld is not None and str(old_vals.get(fld) or '') != str(new_fld):
+                history_rows.append((order_id, changed_by, fld, str(old_vals.get(fld) or ''), str(new_fld)))
+        for hr in history_rows:
+            oid, cb, fn, ov, nv = hr
+            cb_e = str(cb).replace("'","''"); fn_e = fn.replace("'","''")
+            ov_e = str(ov).replace("'","''"); nv_e = str(nv).replace("'","''")
+            cur.execute(f"INSERT INTO {SCHEMA}.repair_order_history (order_id, changed_by, field_name, old_value, new_value) VALUES ({oid}, '{cb_e}', '{fn_e}', '{ov_e}', '{nv_e}')")
+        if history_rows:
+            conn.commit()
 
         # Отправляем Telegram уведомление при смене статуса
         if new_status:

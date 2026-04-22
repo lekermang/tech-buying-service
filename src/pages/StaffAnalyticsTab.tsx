@@ -16,7 +16,7 @@ export function AnalyticsTab({ token }: { token: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const repairPeriod = period === "today" ? "day" : period === "week" ? "week" : "month";
+  const repairPeriod = period === "today" ? "day" : period === "yesterday" ? "yesterday" : period === "week" ? "week" : "month";
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -43,6 +43,7 @@ export function AnalyticsTab({ token }: { token: string }) {
 
   const PERIODS = [
     { v: "today", l: "Сегодня" },
+    { v: "yesterday", l: "Вчера" },
     { v: "week", l: "7 дней" },
     { v: "month", l: "30 дней" },
   ];

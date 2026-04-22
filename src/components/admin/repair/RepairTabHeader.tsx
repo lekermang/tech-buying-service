@@ -20,11 +20,12 @@ type Props = {
   syncing: boolean;
   syncResult: string | null;
   syncParts: () => void;
+  onShowHistory: () => void;
 };
 
 export default function RepairTabHeader({
   view, setView, search, setSearch, dateFrom, setDateFrom, dateTo, setDateTo,
-  loading, onRefresh, showForm, setShowForm, setForm, syncing, syncResult, syncParts,
+  loading, onRefresh, showForm, setShowForm, setForm, syncing, syncResult, syncParts, onShowHistory,
 }: Props) {
   return (
     <div className="px-4 py-3 border-b border-[#222] flex items-center gap-3 flex-wrap">
@@ -89,6 +90,14 @@ export default function RepairTabHeader({
             {showForm ? "Отмена" : "Новая заявка"}
           </button>
           <div className="flex items-center gap-1.5">
+            <button
+              onClick={onShowHistory}
+              title="Последние действия"
+              className="flex items-center gap-1.5 border border-[#333] text-white/60 hover:text-white hover:border-white/40 px-3 py-1.5 font-roboto text-xs transition-colors"
+            >
+              <Icon name="History" size={13} />
+              Действия
+            </button>
             <button
               onClick={syncParts}
               disabled={syncing}

@@ -11,13 +11,14 @@ import LaborPricesTab from "./repair/LaborPricesTab";
 import RepairTabHeader from "./repair/RepairTabHeader";
 import RepairOrdersView from "./repair/RepairOrdersView";
 import RepairImportTab from "./repair/RepairImportTab";
+import RepairHistoryModal from "./repair/RepairHistoryModal";
 
 export { STATUSES } from "./repair/repairTypes";
 
 const REPAIR_PARTS_URL = "https://functions.poehali.dev/68da5b17-ae5f-4568-8e27-0d945b995d82";
 
 type View = "orders" | "analytics" | "labor_prices" | "import_parts";
-type Period = "day" | "week" | "month";
+type Period = "day" | "yesterday" | "week" | "month";
 
 export default function RepairTab({ token }: { token: string }) {
   const [view, setView] = useState<View>("orders");
@@ -48,6 +49,7 @@ export default function RepairTab({ token }: { token: string }) {
 
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
 
   const syncParts = async () => {
     setSyncing(true);
@@ -220,6 +222,7 @@ export default function RepairTab({ token }: { token: string }) {
         syncing={syncing}
         syncResult={syncResult}
         syncParts={syncParts}
+        onShowHistory={() => setShowHistory(true)}
       />
 
       {/* АНАЛИТИКА */}
@@ -284,6 +287,10 @@ export default function RepairTab({ token }: { token: string }) {
           onSubmit={submitReady}
           onClose={() => setReadyModal(null)}
         />
+      )}
+
+      {showHistory && (
+        <RepairHistoryModal token={token} onClose={() => setShowHistory(false)} />
       )}
     </div>
   );
