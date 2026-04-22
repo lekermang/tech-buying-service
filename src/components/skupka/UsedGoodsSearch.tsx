@@ -115,7 +115,7 @@ export default function UsedGoodsSearch() {
               onClick={() => { setTab("resold"); if (resoldItems.length === 0) fetchResold(1); }}
               className={`text-[10px] font-roboto px-2.5 py-1 transition-all ${tab === "resold" ? "bg-[#FFD700] text-black font-semibold" : "text-white/40 hover:text-white border border-white/10"}`}
             >
-              «Скупка24» Кирова 7/47, 11
+              «Скупка24» Калуга, Кирова 11
             </button>
           </div>
 

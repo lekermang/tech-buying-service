@@ -30,8 +30,7 @@ const GUARANTEES = [
 ];
 
 const BRANCHES = [
-  { city: "Филиал 1", addr: "ул. Кирова, 11", metro: "", time: "24/7", phones: ["+7 (992) 999-03-33", "8 (800) 600-68-33"] },
-  { city: "Филиал 2", addr: "ул. Кирова, 7/47", metro: "", time: "24/7", phones: ["+7 (992) 999-03-33", "8 (800) 600-68-33"] },
+  { city: "Калуга", addr: "ул. Кирова, 11", metro: "г. Калуга, центр города", time: "24/7 без выходных", phones: ["+7 (992) 999-03-33", "8 (800) 600-68-33"] },
 ];
 
 const InfoSections = () => {
@@ -126,8 +125,8 @@ const InfoSections = () => {
       <section id="branches" className="py-14 md:py-20 bg-[#111] border-t border-[#FFD700]/10">
         <div className="max-w-7xl mx-auto px-4">
           <Reveal className="mb-8 md:mb-12">
-            <p className="font-roboto text-[#FFD700] text-sm uppercase tracking-widest mb-2">Адреса</p>
-            <h2 className="font-oswald text-3xl md:text-5xl font-bold">НАШИ<br />ФИЛИАЛЫ</h2>
+            <p className="font-roboto text-[#FFD700] text-sm uppercase tracking-widest mb-2">Калуга</p>
+            <h2 className="font-oswald text-3xl md:text-5xl font-bold">НАШ<br />ОФИС В КАЛУГЕ</h2>
           </Reveal>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
@@ -174,10 +173,10 @@ const InfoSections = () => {
               <p className="font-roboto text-[#FFD700] text-sm uppercase tracking-widest mb-2">О компании</p>
               <h2 className="font-oswald text-4xl md:text-5xl font-bold mb-6">МЫ ЦЕНИМ<br />ЧЕСТНОСТЬ</h2>
               <p className="font-roboto text-white/60 leading-relaxed mb-4">
-                Скупка24 работает с 2015 года. За это время мы провели более 50 000 сделок и выплатили клиентам сотни миллионов рублей. Наш принцип прост: честная цена и уважение к каждому клиенту.
+                Скупка24 работает в Калуге с 2015 года. Наш офис — ул. Кирова, 11. За это время мы провели более 50 000 сделок и выплатили клиентам сотни миллионов рублей. Наш принцип прост: честная цена и уважение к каждому клиенту.
               </p>
               <p className="font-roboto text-white/60 leading-relaxed mb-8">
-                Все наши оценщики — сертифицированные специалисты. Мы не занижаем цены и не используем серые схемы. Только прозрачные сделки, официальный договор и выплата день в день.
+                Все наши оценщики — сертифицированные специалисты. Мы не занижаем цены и не используем серые схемы. Только прозрачные сделки, официальный договор и выплата день в день. Работаем в Калуге круглосуточно, 24/7.
               </p>
               <div className="grid grid-cols-3 gap-6">
                 {[["50 000+", "сделок"], ["₽ 500 млн", "выплачено"]].map(([num, label]) => (

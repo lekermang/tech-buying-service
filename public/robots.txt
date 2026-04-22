@@ -1,41 +1,45 @@
 User-agent: *
 Allow: /
+Allow: /catalog
+Allow: /repair-discount
 Disallow: /admin
 Disallow: /cabinet
 Disallow: /staff
 Disallow: /tools
 Disallow: /tools-sync
-Disallow: /dzchat
-
-# Разрешаем главное и каталог
-Allow: /catalog
 
 Sitemap: https://skypka24.com/sitemap.xml
 
 # Яндекс
 User-agent: Yandex
 Allow: /
+Allow: /catalog
+Allow: /repair-discount
 Disallow: /admin
 Disallow: /cabinet
 Disallow: /staff
 Disallow: /tools
-Disallow: /dzchat
+Disallow: /tools-sync
 Crawl-delay: 1
 
-# Поиск с Алисой — запрещаем только служебные разделы
+# Поиск с Алисой
 User-agent: YandexAdditionalBot
 Allow: /
+Allow: /catalog
+Allow: /repair-discount
 Disallow: /admin
 Disallow: /cabinet
 Disallow: /staff
 Disallow: /tools
-Disallow: /dzchat
+Disallow: /tools-sync
 
 # Google
 User-agent: Googlebot
 Allow: /
+Allow: /catalog
+Allow: /repair-discount
 Disallow: /admin
 Disallow: /cabinet
 Disallow: /staff
 Disallow: /tools
-Disallow: /dzchat
+Disallow: /tools-sync
