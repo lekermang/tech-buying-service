@@ -5,10 +5,12 @@ import { Order, EditForm, STATUSES, statusInfo, fmt, inp, lbl } from "./repairTy
 const DELETE_PASSWORD = "231189";
 
 const STATUS_LABEL: Record<string, string> = {
+  accepted:      "Принят мастером",
   in_progress:   "В работе",
   waiting_parts: "Ждём запчасть",
   ready:         "Готово ✓",
   done:          "Выдано",
+  warranty:      "На гарантии",
   cancelled:     "Отменено",
 };
 

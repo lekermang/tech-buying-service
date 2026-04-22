@@ -4,10 +4,12 @@ export const REPAIR_PARTS_URL = "https://functions.poehali.dev/68da5b17-ae5f-456
 
 export const STATUS_COLOR: Record<string, string> = {
   new: "text-white/60",
+  accepted: "text-purple-400",
   in_progress: "text-blue-400",
   waiting_parts: "text-orange-400",
   ready: "text-[#FFD700]",
   done: "text-green-400",
+  warranty: "text-teal-400",
   cancelled: "text-red-400",
 };
 

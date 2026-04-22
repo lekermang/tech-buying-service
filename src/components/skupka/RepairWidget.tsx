@@ -30,6 +30,9 @@ export default function RepairWidget() {
   const [statusResult, setStatusResult] = useState<OrderStatus | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
   const [statusError, setStatusError] = useState("");
+  const [phoneResults, setPhoneResults] = useState<OrderStatus[]>([]);
+  const [phoneLoading, setPhoneLoading] = useState(false);
+  const [phoneError, setPhoneError] = useState("");
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -126,6 +129,22 @@ export default function RepairWidget() {
     setStatusLoading(false);
   };
 
+  const checkStatusByPhone = async (phone: string) => {
+    if (!phone.trim()) return;
+    setPhoneLoading(true);
+    setPhoneError("");
+    setPhoneResults([]);
+    try {
+      const res = await fetch(REPAIR_STATUS_URL + "?phone=" + encodeURIComponent(phone.trim()));
+      const data = await res.json();
+      if (res.ok && data.orders) setPhoneResults(data.orders);
+      else setPhoneError(data.error || "Заявки не найдены");
+    } catch {
+      setPhoneError("Ошибка соединения");
+    }
+    setPhoneLoading(false);
+  };
+
   const reset = () => {
     setForm({ name: "", phone: "", model: "", fault: "" });
     setOrderId(null);
@@ -192,6 +211,10 @@ export default function RepairWidget() {
               statusError={statusError}
               statusResult={statusResult}
               onCheck={checkStatus}
+              onCheckByPhone={checkStatusByPhone}
+              phoneResults={phoneResults}
+              phoneLoading={phoneLoading}
+              phoneError={phoneError}
             />
           )}
 

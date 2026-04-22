@@ -1,7 +1,7 @@
 {
   "tests": [
     {
-      "name": "Missing id returns 400",
+      "name": "Missing id and phone returns 400",
       "method": "GET",
       "path": "/",
       "expectedStatus": 400,
@@ -11,6 +11,13 @@
       "name": "Non-existent id returns 404",
       "method": "GET",
       "path": "/?id=999999",
+      "expectedStatus": 404,
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Phone search not found returns 404",
+      "method": "GET",
+      "path": "/?phone=0000000000",
       "expectedStatus": 404,
       "bodyMatcher": "partial"
     }

@@ -4,18 +4,22 @@ import { Order, STATUSES, INP, LBL, fmt, printReceipt, printAct, printActHTML } 
 import { formatPhone } from "@/lib/phoneFormat";
 
 const STATUS_LABEL: Record<string, string> = {
+  accepted:      "Принят мастером",
   in_progress:   "В работе",
   waiting_parts: "Ждём запчасть",
   ready:         "Готово ✓",
   done:          "Выдано",
+  warranty:      "На гарантии",
   cancelled:     "Отменено",
 };
 
 const STATUS_SHORT: Record<string, string> = {
+  accepted:      "Принят",
   in_progress:   "Работа",
   waiting_parts: "Запчасть",
   ready:         "Готово",
   done:          "Выдано",
+  warranty:      "Гарантия",
   cancelled:     "Отмена",
 };
 
