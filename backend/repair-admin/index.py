@@ -531,10 +531,10 @@ def handler(event: dict, context) -> dict:
             # Динамика по дням — выдано считается по дате выдачи (status_updated_at)
             cur.execute(f"""
                 SELECT
-                    DATE((COALESCE(status_updated_at, created_at)) AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Moscow') as day,
-                    COUNT(*) FILTER (WHERE status = 'done') as done,
-                    COALESCE(SUM(repair_amount) FILTER (WHERE status = 'done'), 0) as revenue,
-                    COALESCE(SUM(purchase_amount) FILTER (WHERE status = 'done'), 0) as costs
+                    DATE(COALESCE(status_updated_at, created_at) + INTERVAL '3 hours') as day,
+                    COUNT(*) as done,
+                    COALESCE(SUM(repair_amount), 0) as revenue,
+                    COALESCE(SUM(purchase_amount), 0) as costs
                 FROM {SCHEMA}.repair_orders
                 WHERE status = 'done'
                   AND COALESCE(status_updated_at, created_at) >= NOW() - INTERVAL '{interval}'

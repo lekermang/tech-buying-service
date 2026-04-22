@@ -27,8 +27,10 @@ export function AnalyticsTab({ token }: { token: string }) {
         fetch(`${REPAIR_URL}?action=analytics&period=${repairPeriod}`, { headers: { "X-Employee-Token": token } }),
       ]);
       const [salesD, repairD] = await Promise.all([salesRes.json(), repairRes.json()]);
-      if (salesD && typeof salesD === "object") setData(salesD);
-      if (repairD && typeof repairD === "object") setRepairData(repairD);
+      if (salesD && typeof salesD === "object" && !salesD.error) setData(salesD);
+      if (repairD && typeof repairD === "object" && !repairD.error) {
+        setRepairData({ total: 0, done: 0, revenue: 0, costs: 0, profit: 0, master_total: 0, daily: [], ...repairD });
+      }
     } catch (e) {
       setError("Ошибка загрузки данных. Попробуйте обновить.");
       console.error("[AnalyticsTab]", e);
