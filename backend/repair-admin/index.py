@@ -502,7 +502,7 @@ def handler(event: dict, context) -> dict:
                 SELECT
                     COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '{interval}') as total,
                     COUNT(*) FILTER (WHERE status = 'done'
-                        AND COALESCE(status_updated_at, updated_at, created_at) >= NOW() - INTERVAL '{interval}') as done,
+                        AND COALESCE(status_updated_at, created_at) >= NOW() - INTERVAL '{interval}') as done,
                     COUNT(*) FILTER (WHERE status = 'cancelled'
                         AND created_at >= NOW() - INTERVAL '{interval}') as cancelled,
                     COUNT(*) FILTER (WHERE status = 'ready'
@@ -514,11 +514,11 @@ def handler(event: dict, context) -> dict:
                     COUNT(*) FILTER (WHERE status = 'new'
                         AND created_at >= NOW() - INTERVAL '{interval}') as new_count,
                     COALESCE(SUM(repair_amount) FILTER (WHERE status = 'done'
-                        AND COALESCE(status_updated_at, updated_at, created_at) >= NOW() - INTERVAL '{interval}'), 0) as revenue,
+                        AND COALESCE(status_updated_at, created_at) >= NOW() - INTERVAL '{interval}'), 0) as revenue,
                     COALESCE(SUM(purchase_amount) FILTER (WHERE status = 'done'
-                        AND COALESCE(status_updated_at, updated_at, created_at) >= NOW() - INTERVAL '{interval}'), 0) as costs,
+                        AND COALESCE(status_updated_at, created_at) >= NOW() - INTERVAL '{interval}'), 0) as costs,
                     COALESCE(SUM(master_income) FILTER (WHERE status = 'done'
-                        AND COALESCE(status_updated_at, updated_at, created_at) >= NOW() - INTERVAL '{interval}'), 0) as master_total
+                        AND COALESCE(status_updated_at, created_at) >= NOW() - INTERVAL '{interval}'), 0) as master_total
                 FROM {SCHEMA}.repair_orders
             """)
             row = cur.fetchone()
