@@ -40,20 +40,44 @@ export default function RepairForm({
 }: Props) {
   if (orderId) {
     return (
-      <div className="border-t border-[#FFD700]/20 pt-2">
-        <div className="flex items-center gap-1.5 text-[#FFD700] font-roboto text-xs mb-2">
-          <Icon name="CheckCircle" size={13} />
-          Заявка #{orderId} принята! Перезвоним через 15 мин.
+      <div className="border-t border-[#FFD700]/20 pt-3">
+        {/* Успех */}
+        <div className="flex items-center gap-2 mb-1">
+          <Icon name="CheckCircle" size={15} className="text-[#FFD700] shrink-0" />
+          <span className="text-[#FFD700] font-oswald font-bold text-sm">Заявка #{orderId} принята!</span>
         </div>
-        <div className="font-roboto text-white/40 text-[10px] mb-2">
-          Сохраните номер — по нему можно проверить статус ремонта
+        <div className="font-roboto text-white/40 text-[10px] mb-3">
+          Перезвоним через 15 минут. Сохраните номер заявки — по нему можно отслеживать ремонт.
         </div>
+
+        {/* Блок Telegram */}
+        <div className="bg-[#229ED9]/10 border border-[#229ED9]/30 px-3 py-3 mb-3">
+          <div className="flex items-center gap-2 mb-1.5">
+            <Icon name="Send" size={13} className="text-[#229ED9] shrink-0" />
+            <span className="font-oswald font-bold text-white text-xs">Получайте уведомления в Telegram</span>
+          </div>
+          <p className="font-roboto text-white/40 text-[10px] leading-relaxed mb-2.5">
+            Напишите боту <span className="text-white/70 font-medium">@Skypkaklgbot</span> и отправьте номер заявки — <span className="text-white/60">#{orderId}</span>.
+            Бот пришлёт уведомление, как только статус изменится.
+          </p>
+          <a
+            href={`https://t.me/Skypkaklgbot?start=${orderId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 w-full py-2 bg-[#229ED9] text-white font-oswald font-bold text-xs uppercase hover:bg-[#1e8fc4] transition-colors"
+          >
+            <Icon name="Send" size={12} />
+            Написать боту → #{orderId}
+          </a>
+        </div>
+
+        {/* Нижние кнопки */}
         <div className="flex gap-3">
-          <button onClick={onReset} className="text-white/40 hover:text-white font-roboto text-[10px] transition-colors">
+          <button onClick={onReset} className="text-white/30 hover:text-white font-roboto text-[10px] transition-colors">
             Новая заявка
           </button>
           <button onClick={() => { setStatusId(String(orderId)); setTab("status"); onCheckStatus(); }}
-            className="text-[#FFD700] hover:underline font-roboto text-[10px]">
+            className="text-[#FFD700]/70 hover:text-[#FFD700] font-roboto text-[10px] transition-colors">
             Проверить статус →
           </button>
         </div>
