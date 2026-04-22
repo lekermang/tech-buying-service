@@ -2,6 +2,8 @@ import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import { Order, EditForm, STATUSES, statusInfo, fmt, inp, lbl } from "./repairTypes";
 
+const DELETE_PASSWORD = "231189";
+
 const STATUS_LABEL: Record<string, string> = {
   in_progress:   "В работе",
   waiting_parts: "Ждём запчасть",
@@ -37,6 +39,9 @@ export default function RepairOrderCard({
   const [notifyError, setNotifyError] = useState<string | null>(null);
   const [actSending, setActSending] = useState(false);
   const [actSent, setActSent] = useState(false);
+  const [showDeletePrompt, setShowDeletePrompt] = useState(false);
+  const [deletePass, setDeletePass] = useState("");
+  const [deleteError, setDeleteError] = useState(false);
 
   const handleSendAct = async () => {
     setActSending(true);
@@ -230,9 +235,40 @@ export default function RepairOrderCard({
                     <Icon name={actSent ? "Check" : actSending ? "Loader2" : "Send"} size={11} className={actSending ? "animate-spin" : ""} />
                     {actSent ? "Отправлен" : "Акт в TG"}
                   </button>
-                  <button onClick={() => onDelete(o.id)} className="font-roboto text-[10px] px-2.5 py-1.5 border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-1">
-                    <Icon name="Trash2" size={11} />
-                  </button>
+                  {!showDeletePrompt ? (
+                    <button onClick={() => { setShowDeletePrompt(true); setDeletePass(""); setDeleteError(false); }}
+                      className="font-roboto text-[10px] px-2.5 py-1.5 border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-1">
+                      <Icon name="Trash2" size={11} />
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <input
+                        autoFocus
+                        type="password"
+                        value={deletePass}
+                        onChange={e => { setDeletePass(e.target.value); setDeleteError(false); }}
+                        onKeyDown={e => {
+                          if (e.key === "Enter") {
+                            if (deletePass === DELETE_PASSWORD) { onDelete(o.id); setShowDeletePrompt(false); }
+                            else setDeleteError(true);
+                          }
+                          if (e.key === "Escape") { setShowDeletePrompt(false); setDeletePass(""); }
+                        }}
+                        placeholder="Пароль"
+                        className={`font-roboto text-[10px] w-20 px-2 py-1.5 bg-[#111] border ${deleteError ? "border-red-500" : "border-red-500/40"} text-white outline-none`}
+                      />
+                      <button onClick={() => {
+                        if (deletePass === DELETE_PASSWORD) { onDelete(o.id); setShowDeletePrompt(false); }
+                        else setDeleteError(true);
+                      }} className="font-roboto text-[10px] px-2 py-1.5 border border-red-500/50 text-red-400 hover:bg-red-500/20 transition-colors">
+                        <Icon name="Check" size={11} />
+                      </button>
+                      <button onClick={() => { setShowDeletePrompt(false); setDeletePass(""); setDeleteError(false); }}
+                        className="font-roboto text-[10px] px-2 py-1.5 border border-white/10 text-white/30 hover:bg-white/5 transition-colors">
+                        <Icon name="X" size={11} />
+                      </button>
+                    </div>
+                  )}
                 </div>
                 {financeBlocked && (
                   <div className="font-roboto text-[9px] text-white/25 flex items-center gap-1">
