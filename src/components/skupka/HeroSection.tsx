@@ -311,40 +311,6 @@ const HeroSection = ({ scrollTo, externalModalOpen, onExternalModalClose }: Hero
 
           {/* СПРАВА — виджеты */}
           <div id="evaluate" className="space-y-2">
-            {/* DzChat Мессенджер */}
-            <div className="bg-[#25D366]/10 border border-[#25D366]/40 hover:border-[#25D366]/80 hover:bg-[#25D366]/15 px-4 py-5 transition-colors w-full">
-              <div className="flex items-center justify-between">
-                <a href="/dzchat" className="flex items-center gap-3 flex-1 min-w-0 group">
-                  <div className="w-10 h-10 bg-[#25D366] flex items-center justify-center shrink-0 rounded-full">
-                    <Icon name="MessageCircle" size={20} className="text-white" />
-                  </div>
-                  <div className="min-w-0">
-                    <span className="font-oswald font-bold text-base uppercase text-white tracking-wide block leading-tight">DzChat — Мессенджер</span>
-                    <span className="font-roboto text-[11px] text-white/50 mt-0.5 block">Личные сообщения · Фото · Без рекламы</span>
-                  </div>
-                </a>
-                <div className="flex items-center gap-2 shrink-0 ml-3">
-                  <button
-                    onClick={e => {
-                      e.preventDefault();
-                      const url = `${window.location.origin}/dzchat`;
-                      const text = "DzChat — бесплатный мессенджер. Личные сообщения, фото, без рекламы!";
-                      if (navigator.share) {
-                        navigator.share({ title: "DzChat", text, url }).catch(() => {});
-                      } else {
-                        navigator.clipboard.writeText(url);
-                      }
-                    }}
-                    className="w-9 h-9 flex items-center justify-center rounded-full bg-[#25D366]/20 hover:bg-[#25D366]/40 text-[#25D366] transition-colors"
-                    title="Поделиться">
-                    <Icon name="Share2" size={16} />
-                  </button>
-                  <a href="/dzchat" className="text-white/40 hover:text-[#25D366] transition-colors">
-                    <Icon name="ChevronRight" size={20} />
-                  </a>
-                </div>
-              </div>
-            </div>
             <a href="/catalog"
               className="flex items-center justify-between bg-black/30 border border-white/10 hover:border-[#FFD700]/60 px-4 py-5 transition-colors group w-full">
               <div className="flex items-center gap-3">
