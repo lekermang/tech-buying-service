@@ -439,13 +439,29 @@ def handler(event: dict, context) -> dict:
     if params.get('setup_webhook'):
         token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
         webhook_url = f"{FUNC_URL}?action=tg_webhook"
-        resp = requests.post(
+        r1 = requests.post(
             f'https://api.telegram.org/bot{token}/setWebhook',
             json={'url': webhook_url, 'allowed_updates': ['message', 'callback_query']},
             timeout=10,
         )
+        # Кнопка «Открыть сайт» в меню бота
+        r2 = requests.post(
+            f'https://api.telegram.org/bot{token}/setChatMenuButton',
+            json={'menu_button': {'type': 'web_app', 'text': '🌐 Открыть сайт', 'web_app': {'url': 'https://skypka24.com'}}},
+            timeout=10,
+        )
+        # BotCommands
+        r3 = requests.post(
+            f'https://api.telegram.org/bot{token}/setMyCommands',
+            json={'commands': [
+                {'command': 'start',  'description': 'Главное меню'},
+                {'command': 'status', 'description': 'Статус ремонта'},
+                {'command': 'site',   'description': 'Открыть сайт'},
+            ]},
+            timeout=10,
+        )
         return {'statusCode': 200, 'headers': HEADERS,
-                'body': json.dumps(resp.json(), ensure_ascii=False)}
+                'body': json.dumps({'webhook': r1.json(), 'menu_button': r2.json(), 'commands': r3.json()}, ensure_ascii=False)}
 
     raw = event.get('body') or '{}'
     body = json.loads(raw) if isinstance(raw, str) else (raw or {})
@@ -490,10 +506,11 @@ def handler(event: dict, context) -> dict:
 
         def main_menu_markup():
             return {'inline_keyboard': [
+                [{'text': '🌐 Открыть полный сайт', 'web_app': {'url': SITE}}],
                 [{'text': '📱 Продать технику',          'callback_data': 'sec_sell'}],
                 [{'text': '💍 Сдать украшения',           'callback_data': 'sec_jewelry'}],
                 [{'text': '🔧 Ремонт телефона',           'callback_data': 'sec_repair'}],
-                [{'text': '🛒 Каталог Б/У техники',       'callback_data': 'sec_catalog'}],
+                [{'text': '🛒 Каталог Б/У техники',       'web_app': {'url': f'{SITE}/catalog'}}],
                 [{'text': '🔍 Узнать статус ремонта',     'callback_data': 'sec_status'}],
                 [{'text': '📍 Адреса и контакты',         'callback_data': 'sec_contacts'}],
             ]}
@@ -698,6 +715,29 @@ def handler(event: dict, context) -> dict:
                 'parse_mode': 'HTML',
                 'reply_markup': main_menu_markup(),
                 'disable_web_page_preview': True,
+            })
+            return {'statusCode': 200, 'headers': HEADERS, 'body': '{"ok":true}'}
+
+        # /site — открыть сайт
+        if text.startswith('/site'):
+            tg_api('sendMessage', {
+                'chat_id': chat_id,
+                'text': '🌐 <b>Сайт Скупка24</b>\n\nНажмите кнопку ниже, чтобы открыть полный сайт прямо здесь в Telegram:',
+                'parse_mode': 'HTML',
+                'reply_markup': {'inline_keyboard': [
+                    [{'text': '🌐 Открыть skypka24.com', 'web_app': {'url': SITE}}],
+                    [{'text': '← Главное меню', 'callback_data': 'sec_main'}],
+                ]},
+            })
+            return {'statusCode': 200, 'headers': HEADERS, 'body': '{"ok":true}'}
+
+        # /status — статус ремонта
+        if text.startswith('/status'):
+            tg_api('sendMessage', {
+                'chat_id': chat_id,
+                'text': '🔍 <b>Статус заявки на ремонт</b>\n\nОтправьте <b>номер заявки</b> (например: <code>42</code>)\nили <b>номер телефона</b>, указанный при сдаче.',
+                'parse_mode': 'HTML',
+                'reply_markup': back_markup(),
             })
             return {'statusCode': 200, 'headers': HEADERS, 'body': '{"ok":true}'}
 
