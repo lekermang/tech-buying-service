@@ -40,7 +40,10 @@ export default function RepairOrderCard({
   onCompleteStart, onCompleteCancel, onCompleteFormChange,
   onCompleteRepair, onIssueRepair, onSaveEdit, onDelete,
 }: Props) {
+  const DELETE_PASSWORD = "231189";
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deletePass, setDeletePass] = useState("");
+  const [deleteError, setDeleteError] = useState(false);
   const st = statusInfo(o.status);
   const isEditing = editing === o.id;
   const isCompleting = completing === o.id;
@@ -292,19 +295,35 @@ export default function RepairOrderCard({
           {/* Удалить — только владелец */}
           {isOwner && onDelete && (
             confirmDelete ? (
-              <div className="flex items-center gap-1.5">
-                <span className="font-roboto text-[10px] text-red-400">Удалить заявку?</span>
-                <button onClick={() => { onDelete(o.id); setConfirmDelete(false); }}
-                  className="font-roboto text-[10px] text-red-400 hover:text-red-300 border border-red-500/40 px-2 py-0.5 transition-colors">
-                  Да
+              <div className="flex items-center gap-1">
+                <input
+                  autoFocus
+                  type="password"
+                  value={deletePass}
+                  onChange={e => { setDeletePass(e.target.value); setDeleteError(false); }}
+                  onKeyDown={e => {
+                    if (e.key === "Enter") {
+                      if (deletePass === DELETE_PASSWORD) { onDelete(o.id); setConfirmDelete(false); }
+                      else setDeleteError(true);
+                    }
+                    if (e.key === "Escape") { setConfirmDelete(false); setDeletePass(""); }
+                  }}
+                  placeholder="Пароль"
+                  className={`font-roboto text-[10px] w-20 px-2 py-1 bg-[#111] border ${deleteError ? "border-red-500" : "border-red-500/40"} text-white outline-none`}
+                />
+                <button onClick={() => {
+                  if (deletePass === DELETE_PASSWORD) { onDelete(o.id); setConfirmDelete(false); }
+                  else setDeleteError(true);
+                }} className="font-roboto text-[10px] px-2 py-1 border border-red-500/50 text-red-400 hover:bg-red-500/10 transition-colors">
+                  <Icon name="Check" size={11} />
                 </button>
-                <button onClick={() => setConfirmDelete(false)}
-                  className="font-roboto text-[10px] text-white/30 hover:text-white transition-colors px-1">
-                  Нет
+                <button onClick={() => { setConfirmDelete(false); setDeletePass(""); setDeleteError(false); }}
+                  className="font-roboto text-[10px] px-2 py-1 border border-white/10 text-white/30 hover:bg-white/5 transition-colors">
+                  <Icon name="X" size={11} />
                 </button>
               </div>
             ) : (
-              <button onClick={() => setConfirmDelete(true)}
+              <button onClick={() => { setConfirmDelete(true); setDeletePass(""); setDeleteError(false); }}
                 className="flex items-center gap-1 text-white/20 hover:text-red-400 font-roboto text-[10px] transition-colors">
                 <Icon name="Trash2" size={11} /> Удалить
               </button>
