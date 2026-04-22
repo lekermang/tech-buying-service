@@ -469,7 +469,13 @@ def handler(event: dict, context) -> dict:
     token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
 
     # ── Telegram Webhook от бота ──────────────────────────────────────────────
-    if action == 'tg_webhook':
+    is_tg_webhook = (
+        action == 'tg_webhook'
+        or 'message' in body
+        or 'callback_query' in body
+        or 'edited_message' in body
+    )
+    if is_tg_webhook:
         if not token:
             return {'statusCode': 200, 'headers': HEADERS, 'body': '{"ok":true}'}
 
