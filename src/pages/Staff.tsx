@@ -1,9 +1,31 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Component, type ReactNode } from "react";
 import Icon from "@/components/ui/icon";
 import { EMPLOYEE_AUTH_URL } from "./staff.types";
 import GoodsTab from "./StaffGoodsTab";
 import { SalesTab, ClientsTab, AnalyticsTab, EmployeesTab } from "./StaffOtherTabs";
 import StaffRepairTab from "./StaffRepairTab";
+
+class TabErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(e: Error) { return { error: e.message }; }
+  componentDidCatch(e: Error) { console.error("[TabError]", e); }
+  render() {
+    if (this.state.error) return (
+      <div className="p-6 text-center">
+        <div className="text-red-400 font-roboto text-sm mb-3">Ошибка загрузки раздела</div>
+        <div className="text-white/30 font-roboto text-xs mb-4">{this.state.error}</div>
+        <button onClick={() => this.setState({ error: null })}
+          className="bg-[#FFD700] text-black font-oswald font-bold px-4 py-2 text-sm uppercase">
+          Обновить
+        </button>
+      </div>
+    );
+    return this.props.children;
+  }
+}
 
 const PRICE_SCHEDULER_URL = "https://functions.poehali.dev/b09271ea-c662-4225-973f-4dd4c6a0e32c";
 
@@ -193,12 +215,14 @@ export default function Staff() {
 
       {/* Контент — растягивается, с паддингом под нижнюю панель */}
       <div className="flex-1 overflow-y-auto" style={{ paddingBottom: 'calc(50px + env(safe-area-inset-bottom, 16px))' }}>
-        {tab === "repair"    && <StaffRepairTab token={token} isOwner={empRole === "owner"} />}
-        {tab === "goods"     && <GoodsTab token={token} />}
-        {tab === "sales"     && <SalesTab token={token} />}
-        {tab === "clients"   && <ClientsTab token={token} />}
-        {tab === "analytics" && <AnalyticsTab token={token} />}
-        {tab === "employees" && isOwnerOrAdmin && <EmployeesTab token={token} myRole={empRole} />}
+        <TabErrorBoundary key={tab}>
+          {tab === "repair"    && <StaffRepairTab token={token} isOwner={empRole === "owner"} />}
+          {tab === "goods"     && <GoodsTab token={token} />}
+          {tab === "sales"     && <SalesTab token={token} />}
+          {tab === "clients"   && <ClientsTab token={token} />}
+          {tab === "analytics" && <AnalyticsTab token={token} />}
+          {tab === "employees" && isOwnerOrAdmin && <EmployeesTab token={token} myRole={empRole} />}
+        </TabErrorBoundary>
       </div>
 
       {/* Нижняя навигация — фиксированная, с safe area для iPhone */}

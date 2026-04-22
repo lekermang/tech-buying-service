@@ -170,19 +170,27 @@ export function AnalyticsTab({ token }: { token: string }) {
   const [data, setData] = useState<Analytics | null>(null);
   const [repairData, setRepairData] = useState<RepairAnalytics | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const repairPeriod = period === "today" ? "day" : period === "week" ? "week" : "month";
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [salesRes, repairRes] = await Promise.all([
-      fetch(`${SALES_URL}?action=analytics&period=${period}`, { headers: { "X-Employee-Token": token } }),
-      fetch(`${REPAIR_URL}?action=analytics&period=${repairPeriod}`, { headers: { "X-Employee-Token": token } }),
-    ]);
-    const [salesD, repairD] = await Promise.all([salesRes.json(), repairRes.json()]);
-    setData(salesD);
-    setRepairData(repairD);
-    setLoading(false);
+    setError(null);
+    try {
+      const [salesRes, repairRes] = await Promise.all([
+        fetch(`${SALES_URL}?action=analytics&period=${period}`, { headers: { "X-Employee-Token": token } }),
+        fetch(`${REPAIR_URL}?action=analytics&period=${repairPeriod}`, { headers: { "X-Employee-Token": token } }),
+      ]);
+      const [salesD, repairD] = await Promise.all([salesRes.json(), repairRes.json()]);
+      if (salesD && typeof salesD === "object") setData(salesD);
+      if (repairD && typeof repairD === "object") setRepairData(repairD);
+    } catch (e) {
+      setError("Ошибка загрузки данных. Попробуйте обновить.");
+      console.error("[AnalyticsTab]", e);
+    } finally {
+      setLoading(false);
+    }
   }, [period, repairPeriod, token]);
 
   useEffect(() => { load(); }, [load]);
@@ -200,7 +208,7 @@ export function AnalyticsTab({ token }: { token: string }) {
 
   // Объединяем daily данные ремонта для графика
   const dailyRepair = repairData?.daily || [];
-  const maxRevRepair = Math.max(...dailyRepair.map(d => d.revenue), 1);
+  const maxRevRepair = dailyRepair.length > 0 ? Math.max(...dailyRepair.map(d => d.revenue), 1) : 1;
 
   return (
     <div className="p-4">
@@ -216,6 +224,14 @@ export function AnalyticsTab({ token }: { token: string }) {
           <Icon name={loading ? "Loader" : "RefreshCw"} size={13} className={loading ? "animate-spin" : ""} />
         </button>
       </div>
+
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/30 text-red-400 font-roboto text-sm p-3 mb-4 flex items-center gap-2">
+          <Icon name="AlertCircle" size={14} />
+          {error}
+          <button onClick={load} className="ml-auto underline text-red-400/70 hover:text-red-400">Повторить</button>
+        </div>
+      )}
 
       {loading && <div className="text-center py-8 text-white/30 text-sm">Загружаю...</div>}
 
