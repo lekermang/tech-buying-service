@@ -497,20 +497,29 @@ def handler(event: dict, context) -> dict:
             else:
                 interval = "30 days"
 
+            # Общие показатели: новые/активные — по created_at, выдано — по status_updated_at
             cur.execute(f"""
                 SELECT
-                    COUNT(*) as total,
-                    COUNT(*) FILTER (WHERE status = 'done') as done,
-                    COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled,
-                    COUNT(*) FILTER (WHERE status = 'ready') as ready,
-                    COUNT(*) FILTER (WHERE status = 'in_progress') as in_progress,
-                    COUNT(*) FILTER (WHERE status = 'waiting_parts') as waiting_parts,
-                    COUNT(*) FILTER (WHERE status = 'new') as new_count,
-                    COALESCE(SUM(repair_amount) FILTER (WHERE status = 'done'), 0) as revenue,
-                    COALESCE(SUM(purchase_amount) FILTER (WHERE status = 'done'), 0) as costs,
-                    COALESCE(SUM(master_income) FILTER (WHERE status = 'done'), 0) as master_total
+                    COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '{interval}') as total,
+                    COUNT(*) FILTER (WHERE status = 'done'
+                        AND COALESCE(status_updated_at, updated_at, created_at) >= NOW() - INTERVAL '{interval}') as done,
+                    COUNT(*) FILTER (WHERE status = 'cancelled'
+                        AND created_at >= NOW() - INTERVAL '{interval}') as cancelled,
+                    COUNT(*) FILTER (WHERE status = 'ready'
+                        AND created_at >= NOW() - INTERVAL '{interval}') as ready,
+                    COUNT(*) FILTER (WHERE status = 'in_progress'
+                        AND created_at >= NOW() - INTERVAL '{interval}') as in_progress,
+                    COUNT(*) FILTER (WHERE status = 'waiting_parts'
+                        AND created_at >= NOW() - INTERVAL '{interval}') as waiting_parts,
+                    COUNT(*) FILTER (WHERE status = 'new'
+                        AND created_at >= NOW() - INTERVAL '{interval}') as new_count,
+                    COALESCE(SUM(repair_amount) FILTER (WHERE status = 'done'
+                        AND COALESCE(status_updated_at, updated_at, created_at) >= NOW() - INTERVAL '{interval}'), 0) as revenue,
+                    COALESCE(SUM(purchase_amount) FILTER (WHERE status = 'done'
+                        AND COALESCE(status_updated_at, updated_at, created_at) >= NOW() - INTERVAL '{interval}'), 0) as costs,
+                    COALESCE(SUM(master_income) FILTER (WHERE status = 'done'
+                        AND COALESCE(status_updated_at, updated_at, created_at) >= NOW() - INTERVAL '{interval}'), 0) as master_total
                 FROM {SCHEMA}.repair_orders
-                WHERE created_at >= NOW() - INTERVAL '{interval}'
             """)
             row = cur.fetchone()
 
@@ -519,16 +528,16 @@ def handler(event: dict, context) -> dict:
             master_total = int(row[9]) if row[9] else 0
             profit = revenue - costs
 
-            # Динамика по дням
+            # Динамика по дням — выдано считается по дате выдачи (status_updated_at)
             cur.execute(f"""
                 SELECT
-                    DATE(created_at + INTERVAL '3 hours') as day,
-                    COUNT(*) as total,
+                    DATE((COALESCE(status_updated_at, created_at)) AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Moscow') as day,
                     COUNT(*) FILTER (WHERE status = 'done') as done,
                     COALESCE(SUM(repair_amount) FILTER (WHERE status = 'done'), 0) as revenue,
                     COALESCE(SUM(purchase_amount) FILTER (WHERE status = 'done'), 0) as costs
                 FROM {SCHEMA}.repair_orders
-                WHERE created_at >= NOW() - INTERVAL '{interval}'
+                WHERE status = 'done'
+                  AND COALESCE(status_updated_at, created_at) >= NOW() - INTERVAL '{interval}'
                 GROUP BY day
                 ORDER BY day ASC
             """)
@@ -537,10 +546,10 @@ def handler(event: dict, context) -> dict:
                 {
                     'day': str(r[0]),
                     'total': r[1],
-                    'done': r[2],
-                    'revenue': int(r[3]),
-                    'costs': int(r[4]),
-                    'profit': int(r[3]) - int(r[4]),
+                    'done': r[1],
+                    'revenue': int(r[2]),
+                    'costs': int(r[3]),
+                    'profit': int(r[2]) - int(r[3]),
                 }
                 for r in daily_rows
             ]
