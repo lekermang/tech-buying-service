@@ -641,7 +641,7 @@ export const printReceipt = (o: Order) => {
   <div class="page">
     <div class="half">
       <h1>Скупка24</h1>
-      <div class="subtitle">ИП Мамедов Адиль Мирза Оглы · г.Калуга, ул.Кирова, 21а</div>
+      <div class="subtitle">ИП Мамедов Адиль Мирза Оглы · г.Калуга, ул.Кирова, 7 / ул.Кирова, 11 · skypka24.com</div>
       <div class="section-title">Квитанция об оплате</div>
       <div class="row"><span class="label">№ заявки:</span><span class="val">#${o.id}</span></div>
       <div class="row"><span class="label">Дата:</span><span class="val">${dateStr} ${timeStr}</span></div>
@@ -665,7 +665,7 @@ export const printReceipt = (o: Order) => {
     </div>
     <div class="half">
       <h1>Гарантийный талон</h1>
-      <div class="subtitle">Скупка24 · г.Калуга, ул.Кирова, 21а</div>
+      <div class="subtitle">Скупка24 · г.Калуга, ул.Кирова, 7 / ул.Кирова, 11 · skypka24.com</div>
       <div class="section-title">Данные ремонта</div>
       <div class="row"><span class="label">№ заявки:</span><span class="val">#${o.id}</span></div>
       <div class="row"><span class="label">Дата:</span><span class="val">${dateStr}</span></div>
@@ -689,7 +689,7 @@ export const printReceipt = (o: Order) => {
       `}
       <div style="font-size:10px;color:#555;margin-top:10px">
         Сохраняйте талон до окончания гарантийного срока.<br>
-        По вопросам: ул.Кирова, 21а, г.Калуга
+        По вопросам: ул.Кирова, 7 / ул.Кирова, 11, г.Калуга · skypka24.com
       </div>
       <div class="sign-line"><span>Мастер</span><span>Клиент</span></div>
     </div>
