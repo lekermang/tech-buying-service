@@ -1,0 +1,26 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS returns 204",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 204
+    },
+    {
+      "name": "Unknown action returns 400",
+      "method": "POST",
+      "path": "/?action=unknown",
+      "body": {},
+      "expectedStatus": 400,
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Test action without chat_id returns 400",
+      "method": "POST",
+      "path": "/?action=test",
+      "body": {},
+      "expectedStatus": 400,
+      "bodyMatcher": "partial"
+    }
+  ]
+}
