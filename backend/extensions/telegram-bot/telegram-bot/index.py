@@ -526,10 +526,16 @@ def handle_text_message(chat_id: int, text: str, bot: telebot.TeleBot) -> None:
 def process_webhook(body: dict) -> dict:
     bot = get_bot()
 
-    # Обработка нажатий inline-кнопок
-    if "callback_query" in body:
-        call_data = body["callback_query"]
-        call = telebot.types.CallbackQuery.de_json(call_data)
+    try:
+        # Парсим Update через telebot
+        update = telebot.types.Update.de_json(body)
+    except Exception as e:
+        print(f"Failed to parse update: {e}")
+        return {"statusCode": 200, "body": json.dumps({"ok": True})}
+
+    # Нажатие inline-кнопки
+    if update.callback_query:
+        call = update.callback_query
         chat_type = call.message.chat.type if call.message else "private"
         if chat_type == "private":
             try:
@@ -538,22 +544,24 @@ def process_webhook(body: dict) -> dict:
                 print(f"Callback error: {e}")
         return {"statusCode": 200, "body": json.dumps({"ok": True})}
 
-    # Обработка сообщений
-    message = body.get("message")
+    # Обычное сообщение
+    message = update.message
     if not message:
         return {"statusCode": 200, "body": json.dumps({"ok": True})}
 
-    chat_type = message.get("chat", {}).get("type", "private")
-    if chat_type != "private":
+    if message.chat.type != "private":
         return {"statusCode": 200, "body": json.dumps({"ok": True})}
 
-    text = message.get("text", "") or ""
-    user = message.get("from", {})
-    chat_id = message.get("chat", {}).get("id")
-    has_media = bool(message.get("photo") or message.get("video") or message.get("document"))
-
-    if not chat_id:
-        return {"statusCode": 200, "body": json.dumps({"ok": True})}
+    text = message.text or ""
+    user_obj = message.from_user
+    user = {
+        "id": user_obj.id if user_obj else 0,
+        "username": user_obj.username if user_obj else None,
+        "first_name": user_obj.first_name if user_obj else None,
+        "last_name": user_obj.last_name if user_obj else None,
+    }
+    chat_id = message.chat.id
+    has_media = bool(message.photo or message.video or message.document)
 
     try:
         # /start
