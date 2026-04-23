@@ -43,11 +43,11 @@ def check_token(event: dict) -> bool:
     token = headers.get('x-employee-token', '')
     if not token:
         return False
+    token_safe = token.replace("'", "''")
     conn = get_conn()
     cur = conn.cursor()
     cur.execute(
-        f"SELECT role FROM {SCHEMA}.employees WHERE token = %s AND is_active = true",
-        (token,)
+        f"SELECT role FROM {SCHEMA}.employees WHERE token = '{token_safe}' AND is_active = true"
     )
     row = cur.fetchone()
     cur.close()
