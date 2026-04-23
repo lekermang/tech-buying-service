@@ -43,12 +43,19 @@ function MskClock() {
     return () => clearInterval(t);
   }, []);
   const msk = new Date(now.getTime() + (now.getTimezoneOffset() + 180) * 60000);
-  const time = msk.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-  const date = msk.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const hh = msk.getHours().toString().padStart(2, "0");
+  const mm = msk.getMinutes().toString().padStart(2, "0");
+  const ss = msk.getSeconds().toString().padStart(2, "0");
+  const date = msk.toLocaleDateString("ru-RU", { day: "2-digit", month: "short", weekday: "short" });
   return (
     <div className="text-center leading-tight">
-      <div className="font-oswald font-bold text-[#FFD700] text-sm tracking-wider">{time}</div>
-      <div className="font-roboto text-white/30 text-[9px]">{date} МСК</div>
+      <div className="font-oswald font-bold text-[#FFD700] text-base tracking-wider tabular-nums flex items-baseline justify-center gap-0.5">
+        <span>{hh}</span>
+        <span className="animate-pulse opacity-70">:</span>
+        <span>{mm}</span>
+        <span className="text-[#FFD700]/40 text-xs ml-0.5 tabular-nums">{ss}</span>
+      </div>
+      <div className="font-roboto text-white/40 text-[9px] uppercase tracking-wide">{date} · МСК</div>
     </div>
   );
 }
@@ -200,50 +207,68 @@ export default function Staff() {
   ];
 
   const ROLE_BADGE: Record<string, string> = {
-    owner: "bg-[#FFD700] text-black",
-    admin: "bg-blue-500/20 text-blue-400",
-    staff: "bg-white/10 text-white/50",
+    owner: "bg-gradient-to-r from-[#FFD700] to-yellow-500 text-black shadow-lg shadow-[#FFD700]/20",
+    admin: "bg-gradient-to-r from-blue-500/30 to-blue-600/20 text-blue-300 border border-blue-400/30",
+    staff: "bg-white/10 text-white/60 border border-white/10",
   };
   const ROLE_LABEL: Record<string, string> = { owner: "Владелец", admin: "Админ", staff: "Сотрудник" };
+  const initials = empName.trim().split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase() || "?";
 
   return (
-    <div className="min-h-screen bg-[#0D0D0D] text-white flex flex-col">
-      {/* Шапка — компактная */}
-      <div className="border-b border-[#222] px-4 py-2.5 flex items-center justify-between shrink-0 safe-top">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 bg-[#FFD700] flex items-center justify-center shrink-0">
-            <Icon name="Wrench" size={12} className="text-black" />
+    <div className="min-h-screen bg-[#0A0A0A] text-white flex flex-col">
+      {/* Шапка — премиальная с градиентом */}
+      <div className="relative shrink-0 safe-top border-b border-[#222]">
+        <div className="absolute inset-0 bg-gradient-to-br from-[#FFD700]/[0.04] via-transparent to-blue-500/[0.03] pointer-events-none" />
+        <div className="relative px-3 py-2.5 flex items-center justify-between gap-2">
+          {/* Аватар + имя */}
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className="relative shrink-0">
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center font-oswald font-bold text-sm ${
+                empRole === "owner" ? "bg-gradient-to-br from-[#FFD700] to-yellow-600 text-black" :
+                empRole === "admin" ? "bg-gradient-to-br from-blue-500 to-blue-700 text-white" :
+                "bg-gradient-to-br from-[#333] to-[#1a1a1a] text-white/70 border border-white/10"
+              }`}>
+                {initials}
+              </div>
+              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-400 border-2 border-[#0A0A0A] rounded-full" />
+            </div>
+            <div className="min-w-0">
+              <div className="font-oswald font-bold uppercase text-sm truncate leading-tight">{empName}</div>
+              <span className={`font-roboto text-[9px] px-1.5 py-0.5 rounded-sm inline-flex items-center gap-1 mt-0.5 ${ROLE_BADGE[empRole] || "bg-white/10 text-white/50"}`}>
+                {empRole === "owner" && <span>👑</span>}
+                {ROLE_LABEL[empRole] || empRole}
+              </span>
+            </div>
           </div>
-          <span className="font-oswald font-bold uppercase text-sm truncate max-w-[140px]">{empName}</span>
-          <span className={`font-roboto text-[10px] px-1.5 py-0.5 shrink-0 ${ROLE_BADGE[empRole] || "bg-white/10 text-white/50"}`}>
-            {ROLE_LABEL[empRole] || empRole}
-          </span>
-        </div>
-        <MskClock />
-        <div className="flex items-center gap-1">
-          {isOwnerOrAdmin && (
-            <button
-              onClick={sendReminderNow}
-              disabled={sending}
-              title="Отправить напоминание @PluXan сейчас"
-              className={`flex items-center gap-1 px-2 py-1 text-[10px] font-roboto font-bold uppercase tracking-wide transition-all active:opacity-60 ${
-                sendResult === true ? "bg-green-500/20 text-green-400" :
-                sendResult === false ? "bg-red-500/20 text-red-400" :
-                "bg-[#FFD700]/10 text-[#FFD700] hover:bg-[#FFD700]/20"
-              } ${sending ? "opacity-50 cursor-wait" : ""}`}
-            >
-              <Icon name={sending ? "Loader" : sendResult === true ? "Check" : "Bell"} size={12} className={sending ? "animate-spin" : ""} />
-              {sending ? "..." : sendResult === true ? "Отправлено" : sendResult === false ? "Ошибка" : "Напомнить"}
+
+          <MskClock />
+
+          <div className="flex items-center gap-1 shrink-0">
+            {isOwnerOrAdmin && (
+              <button
+                onClick={sendReminderNow}
+                disabled={sending}
+                title="Отправить напоминание @PluXan сейчас"
+                className={`flex items-center gap-1 px-2 py-1.5 text-[10px] font-roboto font-bold uppercase tracking-wide rounded-sm transition-all active:scale-95 ${
+                  sendResult === true ? "bg-green-500/20 text-green-400 ring-1 ring-green-500/40" :
+                  sendResult === false ? "bg-red-500/20 text-red-400 ring-1 ring-red-500/40" :
+                  "bg-[#FFD700]/10 text-[#FFD700] hover:bg-[#FFD700]/20 ring-1 ring-[#FFD700]/20"
+                } ${sending ? "opacity-60 cursor-wait" : ""}`}
+              >
+                <Icon name={sending ? "Loader" : sendResult === true ? "Check" : "Bell"} size={12} className={sending ? "animate-spin" : ""} />
+                <span className="hidden sm:inline">{sending ? "..." : sendResult === true ? "OK" : sendResult === false ? "Ошибка" : "Напом."}</span>
+              </button>
+            )}
+            <button onClick={logout} title="Выйти"
+              className="text-white/30 hover:text-red-400 active:text-red-500 transition-colors p-2 rounded-sm hover:bg-red-500/10">
+              <Icon name="LogOut" size={16} />
             </button>
-          )}
-          <button onClick={logout} className="text-white/30 active:text-red-400 transition-colors p-2 -mr-2">
-            <Icon name="LogOut" size={16} />
-          </button>
+          </div>
         </div>
       </div>
 
       {/* Контент — растягивается, с паддингом под нижнюю панель */}
-      <div className="flex-1 overflow-y-auto" style={{ paddingBottom: 'calc(50px + env(safe-area-inset-bottom, 16px))' }}>
+      <div className="flex-1 overflow-y-auto" style={{ paddingBottom: 'calc(62px + env(safe-area-inset-bottom, 16px))' }}>
         <TabErrorBoundary key={tab}>
           <React.Suspense fallback={<div className="flex items-center justify-center py-16 text-white/20 font-roboto text-sm"><Icon name="Loader" size={16} className="animate-spin mr-2" />Загружаю...</div>}>
             {tab === "repair"    && <StaffRepairTab token={token} isOwner={empRole === "owner"} />}
@@ -257,50 +282,65 @@ export default function Staff() {
         </TabErrorBoundary>
       </div>
 
-      {/* Нижняя навигация — фиксированная, с safe area для iPhone */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-[#111]/95 backdrop-blur-sm border-t border-[#2A2A2A] z-50"
+      {/* Нижняя навигация — premium glassmorphism */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-        <div className="flex">
-          {TABS.map(t => {
-            const locked = !isOwner && !unlocked[t.k] && (t.k === "gold" || t.k === "analytics" || t.k === "employees");
-            return (
-              <button
-                key={t.k}
-                onClick={() => requestTab(t.k as Tab)}
-                className={`flex-1 flex flex-col items-center justify-center gap-0.5 pt-2 pb-1.5 min-h-[50px] transition-colors active:opacity-60 relative ${
-                  tab === t.k ? "text-[#FFD700]" : "text-white/30"
-                }`}
-              >
-                {tab === t.k && (
-                  <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-[#FFD700] rounded-b-full" />
-                )}
-                <div className="relative">
-                  <Icon name={t.icon} size={20} />
-                  {locked && (
-                    <span className="absolute -top-1 -right-1.5 text-[9px]">🔒</span>
-                  )}
-                </div>
-                <span className="font-roboto text-[8px] leading-none tracking-wide">{t.l}</span>
-              </button>
-            );
-          })}
+        {/* Glow сверху */}
+        <div className="absolute -top-4 left-0 right-0 h-4 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
+        <div className="relative bg-[#0A0A0A]/90 backdrop-blur-xl border-t border-white/[0.06]">
+          <div className="flex">
+            {TABS.map(t => {
+              const locked = !isOwner && !unlocked[t.k] && (t.k === "gold" || t.k === "analytics" || t.k === "employees");
+              const active = tab === t.k;
+              return (
+                <button
+                  key={t.k}
+                  onClick={() => requestTab(t.k as Tab)}
+                  className={`flex-1 flex flex-col items-center justify-center gap-1 pt-2.5 pb-2 min-h-[58px] transition-all duration-300 active:scale-95 relative group ${
+                    active ? "text-[#FFD700]" : "text-white/40 hover:text-white/70"
+                  }`}
+                >
+                  {/* Активная подсветка */}
+                  {active && <>
+                    <span className="absolute top-0 left-1/2 -translate-x-1/2 w-10 h-[2px] bg-gradient-to-r from-transparent via-[#FFD700] to-transparent rounded-b-full" />
+                    <span className="absolute inset-x-3 top-2 bottom-2 bg-gradient-to-b from-[#FFD700]/10 to-transparent rounded-xl -z-10" />
+                  </>}
+
+                  <div className={`relative transition-transform duration-300 ${active ? "scale-110" : "group-active:scale-90"}`}>
+                    <Icon name={t.icon} size={20} />
+                    {locked && (
+                      <span className="absolute -top-1.5 -right-2 text-[9px] bg-[#0A0A0A] rounded-full px-0.5">🔒</span>
+                    )}
+                  </div>
+                  <span className={`font-roboto text-[9px] leading-none tracking-wide transition-all ${active ? "font-bold" : "font-normal"}`}>
+                    {t.l}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </nav>
 
       {/* Модалка пароля для сотрудников */}
       {pwModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={() => setPwModal(null)}>
-          <div onClick={e => e.stopPropagation()} className="bg-[#1A1A1A] border border-[#FFD700]/30 w-full max-w-sm p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-9 h-9 bg-[#FFD700]/10 border border-[#FFD700]/30 flex items-center justify-center">
-                <Icon name="Lock" size={16} className="text-[#FFD700]" />
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setPwModal(null)}>
+          <div onClick={e => e.stopPropagation()}
+            className="relative bg-gradient-to-br from-[#1A1A1A] to-[#111] border border-[#FFD700]/30 w-full max-w-sm p-6 rounded-lg shadow-2xl shadow-[#FFD700]/10">
+            <div className="absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-[#FFD700]/50 to-transparent" />
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#FFD700]/20 to-[#FFD700]/5 border border-[#FFD700]/40 flex items-center justify-center shrink-0">
+                <Icon name="Lock" size={18} className="text-[#FFD700]" />
               </div>
-              <div>
-                <div className="font-oswald font-bold text-white uppercase text-sm">
+              <div className="flex-1 min-w-0">
+                <div className="font-oswald font-bold text-white uppercase text-base leading-tight">
                   {pwModal === "gold" ? "Доступ к золоту" : pwModal === "employees" ? "Доступ к команде" : "Доступ к статистике"}
                 </div>
-                <div className="font-roboto text-white/40 text-[10px]">Требуется пароль владельца</div>
+                <div className="font-roboto text-white/40 text-[11px] mt-0.5">Требуется пароль владельца</div>
               </div>
+              <button onClick={() => setPwModal(null)} className="text-white/30 hover:text-white transition-colors -mr-1">
+                <Icon name="X" size={18} />
+              </button>
             </div>
             <input
               type="password"
@@ -309,20 +349,22 @@ export default function Staff() {
               onChange={e => { setPwInput(e.target.value); setPwError(""); }}
               onKeyDown={e => { if (e.key === "Enter") submitPw(); if (e.key === "Escape") setPwModal(null); }}
               placeholder="••••••••"
-              className="w-full bg-[#0D0D0D] border border-[#333] text-white px-4 py-3 font-roboto text-base focus:outline-none focus:border-[#FFD700] transition-colors mb-2"
+              className={`w-full bg-[#0A0A0A] border-2 text-white px-4 py-3.5 font-roboto text-base focus:outline-none transition-all mb-3 rounded-md tracking-widest ${
+                pwError ? "border-red-500/50 focus:border-red-400" : "border-[#333] focus:border-[#FFD700]"
+              }`}
             />
             {pwError && (
-              <div className="text-red-400 font-roboto text-xs mb-2 flex items-center gap-1">
+              <div className="text-red-400 font-roboto text-xs mb-3 flex items-center gap-1.5 bg-red-500/10 border border-red-500/20 px-2.5 py-2 rounded">
                 <Icon name="AlertCircle" size={12} />{pwError}
               </div>
             )}
             <div className="flex gap-2">
               <button onClick={() => setPwModal(null)}
-                className="flex-1 border border-[#333] text-white/50 font-roboto text-sm py-2.5 hover:text-white transition-colors">
+                className="flex-1 border border-[#333] text-white/60 font-roboto text-sm py-3 rounded-md hover:text-white hover:border-white/20 transition-colors">
                 Отмена
               </button>
               <button onClick={submitPw}
-                className="flex-1 bg-[#FFD700] text-black font-oswald font-bold uppercase text-sm py-2.5 hover:bg-yellow-400 transition-colors">
+                className="flex-1 bg-gradient-to-r from-[#FFD700] to-yellow-500 text-black font-oswald font-bold uppercase text-sm py-3 rounded-md hover:shadow-lg hover:shadow-[#FFD700]/30 active:scale-95 transition-all">
                 Войти
               </button>
             </div>

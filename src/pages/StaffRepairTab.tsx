@@ -236,56 +236,75 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
     payment_method: o.payment_method || "",
   });
 
+  const VIEWS: { k: View; l: string; icon: string; ownerOnly?: boolean }[] = [
+    { k: "list", l: "Заявки", icon: "ClipboardList" },
+    { k: "analytics", l: "Аналитика", icon: "BarChart2" },
+    { k: "labor_prices", l: "Цены", icon: "Tag", ownerOnly: true },
+    { k: "import_parts", l: "Импорт", icon: "FileUp", ownerOnly: true },
+  ];
+
   return (
     <div className="flex flex-col">
-      {/* ── Переключатель вид + кнопка новой заявки ── */}
-      <div className="px-3 pt-3 pb-2 border-b border-[#222] flex items-center gap-2">
-        <div className="flex flex-1 overflow-hidden border border-[#333]">
-          <button onClick={() => setView("list")}
-            className={`flex-1 py-2 font-roboto text-xs transition-colors flex items-center justify-center gap-1.5 ${view === "list" ? "bg-[#FFD700] text-black font-bold" : "text-white/50"}`}>
-            <Icon name="ClipboardList" size={13} /> Заявки
-          </button>
-          <button onClick={() => setView("analytics")}
-            className={`flex-1 py-2 font-roboto text-xs transition-colors flex items-center justify-center gap-1.5 ${view === "analytics" ? "bg-[#FFD700] text-black font-bold" : "text-white/50"}`}>
-            <Icon name="BarChart2" size={13} /> Аналитика
-          </button>
-          {isOwner && (
-            <button onClick={() => setView("labor_prices")}
-              className={`flex-1 py-2 font-roboto text-xs transition-colors flex items-center justify-center gap-1.5 ${view === "labor_prices" ? "bg-[#FFD700] text-black font-bold" : "text-white/50"}`}>
-              <Icon name="Tag" size={13} /> Цены
-            </button>
-          )}
-          {isOwner && (
-            <button onClick={() => setView("import_parts")}
-              className={`flex-1 py-2 font-roboto text-xs transition-colors flex items-center justify-center gap-1.5 ${view === "import_parts" ? "bg-[#FFD700] text-black font-bold" : "text-white/50"}`}>
-              <Icon name="FileUp" size={13} /> Импорт
+      {/* ── Premium переключатель вида ── */}
+      <div className="px-3 pt-3 pb-2 border-b border-[#1A1A1A] bg-gradient-to-b from-[#0D0D0D] to-[#0A0A0A]">
+        <div className="flex items-center gap-2">
+          <div className="flex flex-1 bg-[#141414] border border-[#1F1F1F] rounded-md p-0.5 overflow-x-auto scrollbar-none">
+            {VIEWS.filter(v => !v.ownerOnly || isOwner).map(v => {
+              const active = view === v.k;
+              return (
+                <button
+                  key={v.k}
+                  onClick={() => setView(v.k)}
+                  className={`flex-1 min-w-[72px] py-2 px-2.5 font-roboto text-[11px] rounded-sm transition-all duration-200 flex items-center justify-center gap-1.5 active:scale-95 ${
+                    active
+                      ? "bg-gradient-to-b from-[#FFD700] to-yellow-500 text-black font-bold shadow-lg shadow-[#FFD700]/20"
+                      : "text-white/50 hover:text-white/80"
+                  }`}>
+                  <Icon name={v.icon} size={13} />
+                  <span className="whitespace-nowrap">{v.l}</span>
+                </button>
+              );
+            })}
+          </div>
+          {view === "list" && (
+            <button onClick={() => { setShowForm(v => !v); setForm(EMPTY_FORM); }}
+              className={`flex items-center gap-1.5 font-oswald font-bold px-3.5 py-2.5 text-xs uppercase rounded-md transition-all shrink-0 active:scale-95 ${
+                showForm
+                  ? "bg-[#2A2A2A] text-white/60 border border-[#333]"
+                  : "bg-gradient-to-b from-[#FFD700] to-yellow-500 text-black shadow-lg shadow-[#FFD700]/20 hover:shadow-[#FFD700]/40"
+              }`}>
+              <Icon name={showForm ? "X" : "Plus"} size={14} />
+              {showForm ? "Отмена" : "Заявка"}
             </button>
           )}
         </div>
-        {view === "list" && (
-          <button onClick={() => { setShowForm(v => !v); setForm(EMPTY_FORM); }}
-            className={`flex items-center gap-1 font-oswald font-bold px-3 py-2 text-xs uppercase transition-colors shrink-0 ${showForm ? "bg-[#333] text-white/60" : "bg-[#FFD700] text-black"}`}>
-            <Icon name={showForm ? "X" : "Plus"} size={14} />
-            {showForm ? "Отмена" : "Заявка"}
-          </button>
-        )}
       </div>
 
       {/* ── Поиск + период ── */}
       {view === "list" && (
-        <div className="px-3 py-2 border-b border-[#222] space-y-2">
+        <div className="px-3 py-2.5 border-b border-[#1A1A1A] space-y-2 bg-[#0A0A0A]">
           <div className="flex items-center gap-2">
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Поиск: имя, телефон, модель..."
-              className="flex-1 bg-[#0D0D0D] border border-[#333] text-white px-3 py-2 font-roboto text-sm focus:outline-none focus:border-[#FFD700] placeholder:text-white/20"
-            />
-            <button onClick={loadOrders} disabled={loading} className="text-white/40 active:text-white p-2 transition-colors shrink-0">
+            <div className="flex-1 relative">
+              <Icon name="Search" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Поиск: имя, телефон, модель..."
+                className="w-full bg-[#141414] border border-[#1F1F1F] text-white pl-9 pr-9 py-2.5 font-roboto text-sm rounded-md focus:outline-none focus:border-[#FFD700]/50 focus:bg-[#1A1A1A] placeholder:text-white/25 transition-all"
+              />
+              {search && (
+                <button onClick={() => setSearch("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/30 hover:text-white p-0.5 transition-colors">
+                  <Icon name="X" size={14} />
+                </button>
+              )}
+            </div>
+            <button onClick={loadOrders} disabled={loading}
+              className="text-white/40 hover:text-[#FFD700] active:scale-90 p-2.5 rounded-md transition-all shrink-0 hover:bg-white/5">
               <Icon name={loading ? "Loader" : "RefreshCw"} size={16} className={loading ? "animate-spin" : ""} />
             </button>
           </div>
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
             {[
               { label: "Все",     get: (): [string,string] => ["", ""] },
               { label: "Сегодня", get: (): [string,string] => { const t = new Date().toISOString().slice(0,10); return [t, t]; } },
@@ -296,16 +315,20 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
               const isActive = qf === dateFrom && qt === dateTo;
               return (
                 <button key={q.label} onClick={() => { setDateFrom(qf); setDateTo(qt); }}
-                  className={`px-3 py-1.5 font-roboto text-xs border shrink-0 transition-colors ${isActive ? "border-[#FFD700] text-[#FFD700] bg-[#FFD700]/10" : "border-[#333] text-white/40"}`}>
+                  className={`px-3 py-1.5 font-roboto text-[11px] rounded-full shrink-0 transition-all active:scale-95 ${
+                    isActive
+                      ? "bg-[#FFD700] text-black font-bold shadow-md shadow-[#FFD700]/20"
+                      : "bg-[#141414] border border-[#1F1F1F] text-white/50 hover:text-white hover:border-[#333]"
+                  }`}>
                   {q.label}
                 </button>
               );
             })}
             <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-              className="bg-[#0D0D0D] border border-[#333] text-white/60 px-2 py-1.5 font-roboto text-xs focus:outline-none focus:border-[#FFD700] shrink-0 w-[120px]" />
+              className="bg-[#141414] border border-[#1F1F1F] text-white/60 px-2 py-1.5 font-roboto text-[11px] rounded focus:outline-none focus:border-[#FFD700]/50 shrink-0 w-[120px]" />
             <span className="text-white/20 text-xs shrink-0">—</span>
             <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-              className="bg-[#0D0D0D] border border-[#333] text-white/60 px-2 py-1.5 font-roboto text-xs focus:outline-none focus:border-[#FFD700] shrink-0 w-[120px]" />
+              className="bg-[#141414] border border-[#1F1F1F] text-white/60 px-2 py-1.5 font-roboto text-[11px] rounded focus:outline-none focus:border-[#FFD700]/50 shrink-0 w-[120px]" />
           </div>
         </div>
       )}
@@ -326,26 +349,41 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
       {/* ── СПИСОК ЗАЯВОК ── */}
       {view === "list" && (
         <>
-          {/* Фильтры статуса */}
-          <div className="px-4 py-2 flex gap-1.5 flex-wrap border-b border-[#222]">
+          {/* Фильтры статуса — premium chips */}
+          <div className="px-3 py-2.5 flex gap-1.5 flex-wrap border-b border-[#1A1A1A] bg-[#0A0A0A]">
             <button onClick={() => setFilterStatus("all")}
-              className={`font-roboto text-[10px] px-2.5 py-1 border transition-colors ${filterStatus === "all" ? "border-[#FFD700] text-[#FFD700]" : "border-white/10 text-white/40 hover:text-white"}`}>
-              Все ({orders.length})
+              className={`font-roboto text-[11px] px-3 py-1.5 rounded-full transition-all active:scale-95 flex items-center gap-1.5 ${
+                filterStatus === "all"
+                  ? "bg-[#FFD700] text-black font-bold shadow-md shadow-[#FFD700]/20"
+                  : "bg-[#141414] border border-[#1F1F1F] text-white/60 hover:text-white hover:border-[#333]"
+              }`}>
+              <Icon name="Inbox" size={11} />
+              Все <span className={filterStatus === "all" ? "opacity-70" : "opacity-50"}>({orders.length})</span>
             </button>
-            {STATUSES.map(s => (
-              <button key={s.key} onClick={() => setFilterStatus(s.key)}
-                className={`font-roboto text-[10px] px-2.5 py-1 border transition-colors flex items-center gap-1 ${filterStatus === s.key ? "border-[#FFD700] text-[#FFD700]" : "border-white/10 text-white/40 hover:text-white"}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
-                {s.label}
-                {statusCounts[s.key] ? <span className="opacity-60">({statusCounts[s.key]})</span> : null}
-              </button>
-            ))}
+            {STATUSES.map(s => {
+              const active = filterStatus === s.key;
+              const cnt = statusCounts[s.key] || 0;
+              return (
+                <button key={s.key} onClick={() => setFilterStatus(s.key)}
+                  className={`font-roboto text-[11px] px-3 py-1.5 rounded-full transition-all active:scale-95 flex items-center gap-1.5 ${
+                    active
+                      ? `${s.color} ring-1 ring-current font-bold`
+                      : "bg-[#141414] border border-[#1F1F1F] text-white/50 hover:text-white hover:border-[#333]"
+                  }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${s.dot} ${active ? "animate-pulse" : ""}`} />
+                  {s.label}
+                  {cnt > 0 && <span className={active ? "opacity-70" : "opacity-50"}>({cnt})</span>}
+                </button>
+              );
+            })}
           </div>
 
           {/* Форма новой заявки */}
           {showForm && (
-            <div className="mx-3 mt-3 mb-1 bg-[#1A1A1A] border border-[#FFD700]/30 p-4 space-y-3">
-              <div className="font-roboto text-white/40 text-[10px] uppercase tracking-widest">Новая заявка на ремонт</div>
+            <div className="mx-3 mt-3 mb-1 bg-gradient-to-br from-[#1A1A1A] to-[#141414] border border-[#FFD700]/30 p-4 space-y-3 rounded-lg shadow-xl shadow-[#FFD700]/5 animate-in slide-in-from-top-2 duration-300">
+              <div className="font-oswald font-bold text-[#FFD700] text-xs uppercase tracking-widest flex items-center gap-1.5">
+                <Icon name="FilePlus" size={12} /> Новая заявка на ремонт
+              </div>
               <div>
                 <label className={LBL}>Имя клиента *</label>
                 <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="Иван Иванов" className={INP} />
@@ -375,9 +413,20 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
 
           {/* Карточки */}
           <div className="px-3 py-3 space-y-2">
-            {loading && <div className="text-center py-10 text-white/30 font-roboto text-sm">Загружаю...</div>}
+            {loading && (
+              <div className="flex items-center justify-center py-14 gap-2 text-white/40">
+                <Icon name="Loader" size={18} className="animate-spin text-[#FFD700]" />
+                <span className="font-roboto text-sm">Загружаю заявки...</span>
+              </div>
+            )}
             {!loading && orders.length === 0 && (
-              <div className="text-center py-10 text-white/30 font-roboto text-sm">Заявок нет</div>
+              <div className="text-center py-14 px-4">
+                <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-[#1A1A1A] to-[#0D0D0D] border border-[#222] rounded-full flex items-center justify-center">
+                  <Icon name="Inbox" size={28} className="text-white/20" />
+                </div>
+                <div className="font-oswald font-bold text-white/60 text-base uppercase mb-1">Заявок нет</div>
+                <div className="font-roboto text-white/30 text-xs">Попробуйте изменить фильтры или создать новую заявку</div>
+              </div>
             )}
             {orders.map(o => {
               const isExpanded = expandedId === o.id;
