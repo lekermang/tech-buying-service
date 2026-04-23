@@ -1,9 +1,8 @@
 export const GOLD_URL = "https://functions.poehali.dev/c4424ec1-93d6-47d7-a71a-6eb30fa21246";
 
 export const GOLD_STATUSES = [
-  { key: "new",         label: "Закуплено",      color: "bg-white/10 text-white/70",        dot: "bg-white/40" },
-  { key: "in_progress", label: "Выкуплено",      color: "bg-blue-500/20 text-blue-400",     dot: "bg-blue-400" },
-  { key: "done",        label: "Продано",        color: "bg-green-500/20 text-green-400",   dot: "bg-green-400" },
+  { key: "new",         label: "Закуплено",           color: "bg-white/10 text-white/70",        dot: "bg-white/40" },
+  { key: "done",        label: "Выкуплено продано",   color: "bg-green-500/20 text-green-400",   dot: "bg-green-400" },
   { key: "cancelled",   label: "Отменено",       color: "bg-red-500/20 text-red-400",       dot: "bg-red-400" },
 ];
 
