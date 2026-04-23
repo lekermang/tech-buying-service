@@ -45,34 +45,48 @@ export default function StaffRepairAnalytics({ analytics, analyticsLoading, peri
 
       {analytics && !analyticsLoading && (
         <>
-          {/* KPI */}
-          <div className="grid grid-cols-2 gap-2 mb-3">
-            <div className="bg-[#1A1A1A] border border-[#2A2A2A] p-3">
-              <div className="font-roboto text-white/30 text-[10px] mb-0.5">Выручка</div>
-              <div className="font-oswald font-bold text-[#FFD700] text-xl">{money(analytics.revenue)}</div>
-              <div className="font-roboto text-orange-400/60 text-[10px]">закупка: {money(analytics.costs)}</div>
-            </div>
-            <div className="bg-[#1A1A1A] border border-[#2A2A2A] p-3">
-              <div className="font-roboto text-white/30 text-[10px] mb-0.5">Прибыль</div>
-              <div className={`font-oswald font-bold text-xl ${analytics.profit >= 0 ? "text-green-400" : "text-red-400"}`}>
-                {money(analytics.profit)}
+          {/* Формула прибыли */}
+          <div className="bg-[#1A1A1A] border border-[#2A2A2A] p-3 mb-3">
+            <div className="font-roboto text-white/30 text-[10px] uppercase tracking-wide mb-2">Расчёт прибыли</div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="text-center">
+                <div className="font-oswald font-bold text-[#FFD700] text-lg">{money(analytics.revenue)}</div>
+                <div className="font-roboto text-white/30 text-[9px]">выручка</div>
               </div>
-              <div className="font-roboto text-white/20 text-[10px]">
-                {analytics.revenue > 0 ? Math.round((analytics.profit / analytics.revenue) * 100) : 0}% маржа
+              <div className="font-roboto text-white/20 text-base">−</div>
+              <div className="text-center">
+                <div className="font-oswald font-bold text-orange-400 text-lg">{money(analytics.costs)}</div>
+                <div className="font-roboto text-white/30 text-[9px]">закупка запчастей</div>
+              </div>
+              {analytics.master_total > 0 && <>
+                <div className="font-roboto text-white/20 text-base">−</div>
+                <div className="text-center">
+                  <div className="font-oswald font-bold text-blue-400 text-lg">{money(analytics.master_total)}</div>
+                  <div className="font-roboto text-white/30 text-[9px]">доход мастера</div>
+                </div>
+              </>}
+              <div className="font-roboto text-white/20 text-base">=</div>
+              <div className="text-center">
+                <div className={`font-oswald font-bold text-xl ${analytics.profit - analytics.master_total >= 0 ? "text-green-400" : "text-red-400"}`}>
+                  {money(analytics.profit - analytics.master_total)}
+                </div>
+                <div className="font-roboto text-white/30 text-[9px]">чистая прибыль</div>
+              </div>
+              <div className="ml-auto">
+                <div className="font-roboto text-white/20 text-[9px] text-right">маржа</div>
+                <div className={`font-oswald font-bold text-base ${analytics.revenue > 0 && (analytics.profit - analytics.master_total) / analytics.revenue > 0.2 ? "text-green-400" : "text-white/50"}`}>
+                  {analytics.revenue > 0 ? Math.round(((analytics.profit - analytics.master_total) / analytics.revenue) * 100) : 0}%
+                </div>
               </div>
             </div>
+            {/* Итого прибыль до вычета мастера */}
+            {analytics.master_total > 0 && (
+              <div className="mt-2 pt-2 border-t border-[#2A2A2A] flex justify-between items-center">
+                <span className="font-roboto text-white/20 text-[9px]">До вычета мастера (выручка − закупка)</span>
+                <span className="font-roboto text-white/40 text-[10px] font-bold">{money(analytics.profit)}</span>
+              </div>
+            )}
           </div>
-
-          {/* Доход мастера */}
-          {analytics.master_total > 0 && (
-            <div className="bg-green-500/10 border border-green-500/20 p-3 mb-3 flex items-center justify-between">
-              <div>
-                <div className="font-roboto text-green-400/60 text-[10px] uppercase tracking-wide mb-0.5">Доход мастера (50% прибыли)</div>
-                <div className="font-oswald font-bold text-green-400 text-2xl">{money(analytics.master_total)}</div>
-              </div>
-              <span className="text-3xl opacity-40">🏆</span>
-            </div>
-          )}
 
           {/* Счётчики статусов */}
           <div className="grid grid-cols-3 gap-2 mb-3">
