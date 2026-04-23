@@ -1,7 +1,7 @@
 import Icon from "@/components/ui/icon";
 import { STATUSES, DayStat, fmtDay } from "./types";
 
-type Period = "day" | "week" | "month";
+type Period = "day" | "yesterday" | "week" | "month";
 
 type RepairAnalytics = {
   total: number; done: number; cancelled: number; ready: number;
@@ -20,18 +20,22 @@ type Props = {
   stats: DayStat[];
   onPeriodChange: (p: Period) => void;
   onRefresh: () => void;
+  onShowHistory: () => void;
 };
 
-export default function StaffRepairAnalytics({ analytics, analyticsLoading, period, stats, onPeriodChange, onRefresh }: Props) {
+export default function StaffRepairAnalytics({ analytics, analyticsLoading, period, stats, onPeriodChange, onRefresh, onShowHistory }: Props) {
   return (
     <div className="p-4 overflow-y-auto">
-      <div className="flex gap-2 mb-4 items-center">
-        {(["day", "week", "month"] as Period[]).map(p => (
+      <div className="flex gap-2 mb-4 items-center flex-wrap">
+        {(["day", "yesterday", "week", "month"] as Period[]).map(p => (
           <button key={p} onClick={() => onPeriodChange(p)}
-            className={`px-4 py-1.5 font-roboto text-xs border transition-colors ${period === p ? "border-[#FFD700] text-[#FFD700] bg-[#FFD700]/10" : "border-[#333] text-white/40 hover:text-white"}`}>
-            {p === "day" ? "Сегодня" : p === "week" ? "7 дней" : "30 дней"}
+            className={`px-3 py-1.5 font-roboto text-xs border transition-colors ${period === p ? "border-[#FFD700] text-[#FFD700] bg-[#FFD700]/10" : "border-[#333] text-white/40 hover:text-white"}`}>
+            {p === "day" ? "Сегодня" : p === "yesterday" ? "Вчера" : p === "week" ? "7 дней" : "30 дней"}
           </button>
         ))}
+        <button onClick={onShowHistory} className="flex items-center gap-1 border border-[#333] text-white/40 hover:text-white px-3 py-1.5 font-roboto text-xs transition-colors">
+          <Icon name="History" size={12} />Действия
+        </button>
         <button onClick={onRefresh} disabled={analyticsLoading} className="ml-auto text-white/30 hover:text-white p-1.5 transition-colors">
           <Icon name={analyticsLoading ? "Loader" : "RefreshCw"} size={13} className={analyticsLoading ? "animate-spin" : ""} />
         </button>

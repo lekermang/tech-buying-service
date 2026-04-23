@@ -599,11 +599,13 @@ def handler(event: dict, context) -> dict:
                 }, ensure_ascii=False)
             }
 
-        # Дневная статистика (30 дней) — по дате выдачи в МСК
+        # Дневная статистика (30 дней) — рабочий день с 07:00 МСК до 07:00 МСК
+        # Рабочий день определяется как: DATE(время_МСК - 7 часов)
+        # Т.е. 00:43 МСК 23 апр → 23:43 МСК 22 апр → рабочий день 22 апр
         if action == 'daily_stats':
             cur.execute(f"""
                 SELECT
-                    DATE(COALESCE(status_updated_at, created_at) + INTERVAL '3 hours') as day,
+                    DATE((COALESCE(status_updated_at, created_at) + INTERVAL '3 hours') - INTERVAL '7 hours') as work_day,
                     COUNT(*) as total,
                     COUNT(*) FILTER (WHERE status IN ('done','warranty')) as done,
                     COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled,
@@ -612,9 +614,9 @@ def handler(event: dict, context) -> dict:
                     COALESCE(SUM(master_income) FILTER (WHERE status IN ('done','warranty')), 0) as master_income
                 FROM {SCHEMA}.repair_orders
                 WHERE status IN ('done','warranty')
-                  AND COALESCE(status_updated_at, created_at) >= NOW() - INTERVAL '30 days'
-                GROUP BY day
-                ORDER BY day DESC
+                  AND COALESCE(status_updated_at, created_at) >= NOW() - INTERVAL '31 days'
+                GROUP BY work_day
+                ORDER BY work_day DESC
             """)
             rows = cur.fetchall()
             cur.close(); conn.close()

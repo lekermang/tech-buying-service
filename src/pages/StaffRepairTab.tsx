@@ -6,9 +6,10 @@ import StaffRepairOrderCard from "./repair/StaffRepairOrderCard";
 import StaffRepairReadyModal from "./repair/StaffRepairReadyModal";
 import LaborPricesTab from "@/components/admin/repair/LaborPricesTab";
 import RepairImportTab from "@/components/admin/repair/RepairImportTab";
+import RepairHistoryModal from "@/components/admin/repair/RepairHistoryModal";
 
 type View = "list" | "analytics" | "labor_prices" | "import_parts";
-type Period = "day" | "week" | "month";
+type Period = "day" | "yesterday" | "week" | "month";
 
 type RepairAnalytics = {
   total: number; done: number; cancelled: number; ready: number;
@@ -58,6 +59,7 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
   const [analytics, setAnalytics] = useState<RepairAnalytics | null>(null);
   const [period, setPeriod] = useState<Period>("week");
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   // Статистика (старая, для совместимости)
   const [stats, setStats] = useState<DayStat[]>([]);
@@ -317,6 +319,7 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
           stats={stats}
           onPeriodChange={setPeriod}
           onRefresh={() => loadAnalytics(period)}
+          onShowHistory={() => setShowHistory(true)}
         />
       )}
 
@@ -435,6 +438,10 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
           onSubmit={submitReady}
           onClose={() => setReadyModal(null)}
         />
+      )}
+
+      {showHistory && (
+        <RepairHistoryModal token={token} onClose={() => setShowHistory(false)} />
       )}
     </div>
   );
