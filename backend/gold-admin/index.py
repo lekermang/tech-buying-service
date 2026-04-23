@@ -259,6 +259,14 @@ def handler(event: dict, context) -> dict:
     if method == 'POST':
         action = body.get('action', '')
 
+        # Удалить заявку
+        if action == 'delete':
+            order_id = int(body.get('id', 0))
+            cur.execute(f"DELETE FROM {SCHEMA}.gold_orders WHERE id = {order_id}")
+            conn.commit()
+            cur.close(); conn.close()
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True}, ensure_ascii=False)}
+
         # Создать заявку
         if action == 'create':
             name = str(body.get('name', '')).strip()

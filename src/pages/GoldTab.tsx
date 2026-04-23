@@ -130,6 +130,14 @@ export default function GoldTab({ token }: { token: string }) {
     }
   };
 
+  const onDelete = async (id: number) => {
+    setSaving(true);
+    await fetch(GOLD_URL, { method: "POST", headers, body: JSON.stringify({ action: "delete", id }) });
+    setSaving(false);
+    setExpandedId(null);
+    loadOrders();
+  };
+
   const countByStatus = (key: string) => orders.filter(o => o.status === key).length;
 
   return (
@@ -284,6 +292,7 @@ export default function GoldTab({ token }: { token: string }) {
                 onToggle={() => setExpandedId(expandedId === order.id ? null : order.id)}
                 onStatusChange={onStatusChange}
                 onSave={onSave}
+                onDelete={onDelete}
                 saving={saving}
                 saveError={saveError}
               />

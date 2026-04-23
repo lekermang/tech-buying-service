@@ -8,6 +8,7 @@ type Props = {
   onToggle: () => void;
   onStatusChange: (id: number, status: string, extra?: Partial<EditForm>) => void;
   onSave: (order: GoldOrder, form: EditForm) => void;
+  onDelete: (id: number) => void;
   saving: boolean;
   saveError: string | null;
 };
@@ -25,7 +26,7 @@ function fmt(iso: string) {
   return new Date(iso).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
-export default function GoldOrderCard({ order, expanded, onToggle, onStatusChange, onSave, saving, saveError }: Props) {
+export default function GoldOrderCard({ order, expanded, onToggle, onStatusChange, onSave, onDelete, saving, saveError }: Props) {
   const [form, setForm] = useState<EditForm>({
     name: order.name, phone: order.phone,
     item_name: order.item_name || "", weight: order.weight ? String(order.weight) : "",
@@ -152,10 +153,19 @@ export default function GoldOrderCard({ order, expanded, onToggle, onStatusChang
 
           {saveError && <div className="text-red-400 font-roboto text-xs mb-2">{saveError}</div>}
 
-          <button onClick={() => onSave(order, form)} disabled={saving}
-            className="w-full bg-[#FFD700] text-black font-oswald font-bold py-2 text-xs uppercase hover:bg-yellow-400 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5">
-            {saving ? <><Icon name="Loader" size={12} className="animate-spin" />Сохраняю...</> : "Сохранить"}
-          </button>
+          <div className="flex gap-2">
+            <button onClick={() => onSave(order, form)} disabled={saving}
+              className="flex-1 bg-[#FFD700] text-black font-oswald font-bold py-2 text-xs uppercase hover:bg-yellow-400 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5">
+              {saving ? <><Icon name="Loader" size={12} className="animate-spin" />Сохраняю...</> : "Сохранить"}
+            </button>
+            <button
+              onClick={() => { if (window.confirm(`Удалить заявку #${order.id} (${order.name})?`)) onDelete(order.id); }}
+              disabled={saving}
+              className="px-3 py-2 border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50 flex items-center gap-1 font-roboto text-xs">
+              <Icon name="Trash2" size={13} />
+              Удалить
+            </button>
+          </div>
         </div>
       )}
     </div>
