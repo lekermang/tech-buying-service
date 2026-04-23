@@ -56,10 +56,9 @@ export default function GoldAnalyticsView({ analytics, loading, period, stats, o
           )}
 
           {/* Счётчики статусов */}
-          <div className="grid grid-cols-4 gap-2 mb-3">
+          <div className="grid grid-cols-3 gap-2 mb-3">
             {[
               { key: "new", label: "Закуплено", val: analytics.new, color: "text-white/60" },
-              { key: "in_progress", label: "Выкуплено", val: analytics.in_progress, color: "text-blue-400" },
               { key: "done", label: "Продано", val: analytics.done, color: "text-green-400" },
               { key: "cancelled", label: "Отменено", val: analytics.cancelled, color: "text-red-400" },
             ].map(s => (
