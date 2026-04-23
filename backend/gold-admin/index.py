@@ -47,7 +47,7 @@ def check_token(event: dict) -> bool:
     conn = get_conn()
     cur = conn.cursor()
     cur.execute(
-        f"SELECT role FROM {SCHEMA}.employees WHERE token = '{token_safe}' AND is_active = true"
+        f"SELECT role FROM {SCHEMA}.employees WHERE auth_token='{token_safe}' AND token_expires_at>NOW() AND is_active=true"
     )
     row = cur.fetchone()
     cur.close()
