@@ -492,27 +492,51 @@ def handler(event: dict, context) -> dict:
         # Аналитика за период (day/week/month)
         if action == 'analytics':
             period = params.get('period', 'month')
-            # Период — строго по МСК-дням (UTC+3)
-            # "Сегодня" (day)   = с 00:00 МСК сегодня
-            # "Вчера"  (yesterday) = строго вчерашний МСК-день (00:00–23:59)
-            # "7 дней" (week)   = последние 7 МСК-дней включая сегодня
-            # "Месяц"  (month)  = последние 30 МСК-дней включая сегодня
+            # Рабочий день: с 07:00 МСК текущего дня до 07:00 МСК следующего дня
+            # "Сегодня" (day)      = с 07:00 МСК сегодня (или вчера если сейчас < 07:00) до сейчас
+            # "Вчера"  (yesterday) = с 07:00 МСК позавчера до 07:00 МСК вчера (рабочий день)
+            # "7 дней" (week)      = 7 рабочих дней по 07:00
+            # "Месяц"  (month)     = 30 рабочих дней по 07:00
+            #
+            # Начало текущего рабочего дня: если сейчас МСК >= 07:00 — сегодня 07:00, иначе вчера 07:00
+            # UTC offset МСК = +3h, 07:00 МСК = 04:00 UTC
             if period == 'yesterday':
-                # строго вчерашний день: utc_start = вчера 00:00 МСК, utc_end = сегодня 00:00 МСК
-                period_where = f"""
-                    COALESCE(status_updated_at, created_at) >= DATE_TRUNC('day', (NOW() + INTERVAL '3 hours') - INTERVAL '1 day') - INTERVAL '3 hours'
-                    AND COALESCE(status_updated_at, created_at) < DATE_TRUNC('day', (NOW() + INTERVAL '3 hours')) - INTERVAL '3 hours'
+                # Вчерашний рабочий день: с 07:00 МСК позавчера до 07:00 МСК вчера
+                period_where = """
+                    COALESCE(status_updated_at, created_at) >= (
+                        DATE_TRUNC('day', (NOW() + INTERVAL '3 hours')::date - 1) + INTERVAL '7 hours' - INTERVAL '3 hours'
+                    )
+                    AND COALESCE(status_updated_at, created_at) < (
+                        DATE_TRUNC('day', (NOW() + INTERVAL '3 hours')::date) + INTERVAL '7 hours' - INTERVAL '3 hours'
+                    )
                 """
                 days = None
+            elif period == 'day':
+                # Текущий рабочий день: с 07:00 МСК сегодня (если < 07:00 МСК — с вчера 07:00)
+                period_where = """
+                    COALESCE(status_updated_at, created_at) >= (
+                        CASE
+                            WHEN EXTRACT(HOUR FROM NOW() + INTERVAL '3 hours') >= 7
+                            THEN DATE_TRUNC('day', (NOW() + INTERVAL '3 hours')) + INTERVAL '7 hours' - INTERVAL '3 hours'
+                            ELSE DATE_TRUNC('day', (NOW() + INTERVAL '3 hours') - INTERVAL '1 day') + INTERVAL '7 hours' - INTERVAL '3 hours'
+                        END
+                    )
+                """
+                days = 1
             else:
-                if period == 'day':
-                    days = 1
-                elif period == 'week':
+                if period == 'week':
                     days = 7
                 else:
                     days = 30
+                # Для week/month: N рабочих дней назад от начала текущего рабочего дня
                 period_where = f"""
-                    COALESCE(status_updated_at, created_at) >= DATE_TRUNC('day', (NOW() + INTERVAL '3 hours') - INTERVAL '{days - 1} days') - INTERVAL '3 hours'
+                    COALESCE(status_updated_at, created_at) >= (
+                        CASE
+                            WHEN EXTRACT(HOUR FROM NOW() + INTERVAL '3 hours') >= 7
+                            THEN DATE_TRUNC('day', (NOW() + INTERVAL '3 hours')) + INTERVAL '7 hours' - INTERVAL '3 hours'
+                            ELSE DATE_TRUNC('day', (NOW() + INTERVAL '3 hours') - INTERVAL '1 day') + INTERVAL '7 hours' - INTERVAL '3 hours'
+                        END - INTERVAL '{days - 1} days'
+                    )
                 """
 
             cur.execute(f"""
