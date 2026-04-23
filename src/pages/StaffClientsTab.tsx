@@ -9,27 +9,35 @@ export function ClientsTab({ token }: { token: string }) {
   const [phone, setPhone] = useState("");
   const [found, setFound] = useState<Record<string, unknown> | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [searching, setSearching] = useState(false);
   const [addForm, setAddForm] = useState({ full_name: "", phone: "", email: "" });
   const [added, setAdded] = useState(false);
+  const [addLoading, setAddLoading] = useState(false);
   const [allClients, setAllClients] = useState<Client[]>([]);
   const [loadingAll, setLoadingAll] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [filter, setFilter] = useState("");
 
   const search = async () => {
     if (!phone) return;
+    setSearching(true);
     setNotFound(false); setFound(null);
     const res = await fetch(`${AUTH_CLIENT_URL}?action=profile&phone=${encodeURIComponent(phone)}`);
     const data = await res.json();
     if (data.id) setFound(data);
     else setNotFound(true);
+    setSearching(false);
   };
 
   const addClient = async () => {
     if (!addForm.phone || !addForm.full_name) return;
+    setAddLoading(true);
     await fetch(AUTH_CLIENT_URL, { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "register", ...addForm }) });
     setAdded(true); setAddForm({ full_name: "", phone: "", email: "" });
+    setAddLoading(false);
     if (showAll) loadAllClients();
+    setTimeout(() => setAdded(false), 3000);
   };
 
   const loadAllClients = async () => {
@@ -41,75 +49,193 @@ export function ClientsTab({ token }: { token: string }) {
     setShowAll(true);
   };
 
-  return (
-    <div className="p-4">
-      <div className="font-oswald font-bold uppercase text-sm text-white mb-3">Поиск клиента</div>
-      <div className="flex gap-2 mb-3">
-        <input value={phone} onChange={e => setPhone(formatPhone(e.target.value))} onKeyDown={e => e.key === "Enter" && search()}
-          placeholder="+7 (___) ___-__-__"
-          className="flex-1 bg-[#0D0D0D] border border-[#333] text-white px-3 py-2 font-roboto text-sm focus:outline-none focus:border-[#FFD700]" />
-        <button onClick={search} className="bg-[#FFD700] text-black font-oswald font-bold px-4 py-2 uppercase text-xs hover:bg-yellow-400">Найти</button>
-      </div>
-      {found && (
-        <div className="bg-[#1A1A1A] border border-[#FFD700]/30 p-3 mb-4">
-          <div className="font-oswald font-bold text-[#FFD700] mb-1">{(found as {full_name: string}).full_name}</div>
-          <div className="font-roboto text-white/60 text-sm">{(found as {phone: string}).phone} {(found as {email: string}).email ? `· ${(found as {email: string}).email}` : ""}</div>
-          <div className="font-roboto text-xs text-white/40 mt-1">Скидка: {(found as {discount_pct: number}).discount_pct}% · Баллы: {(found as {loyalty_points: number}).loyalty_points}</div>
-        </div>
-      )}
-      {notFound && <div className="text-white/40 font-roboto text-sm mb-4">Клиент не найден</div>}
+  const filtered = filter.trim()
+    ? allClients.filter(c => {
+        const q = filter.toLowerCase();
+        return c.full_name.toLowerCase().includes(q) || c.phone.includes(q) || (c.email || "").toLowerCase().includes(q);
+      })
+    : allClients;
 
-      <div className="border-t border-white/10 pt-4 mt-4">
-        <div className="font-oswald font-bold uppercase text-sm text-white mb-3">Добавить клиента</div>
+  const fName = (found as { full_name?: string })?.full_name || "";
+  const fPhone = (found as { phone?: string })?.phone || "";
+  const fEmail = (found as { email?: string })?.email || "";
+  const fDiscount = (found as { discount_pct?: number })?.discount_pct || 0;
+  const fPoints = (found as { loyalty_points?: number })?.loyalty_points || 0;
+  const foundInitials = fName.trim().split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase() || "?";
+
+  return (
+    <div className="p-3 space-y-4">
+      {/* Поиск клиента — premium */}
+      <div className="bg-gradient-to-br from-[#141414] to-[#0A0A0A] border border-[#1F1F1F] rounded-lg p-4">
+        <div className="font-oswald font-bold uppercase text-sm text-white mb-3 flex items-center gap-1.5">
+          <Icon name="Search" size={14} className="text-[#FFD700]" />
+          Поиск клиента
+        </div>
+        <div className="flex gap-2 mb-3">
+          <div className="flex-1 relative">
+            <Icon name="Phone" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
+            <input value={phone} onChange={e => setPhone(formatPhone(e.target.value))} onKeyDown={e => e.key === "Enter" && search()}
+              placeholder="+7 (___) ___-__-__"
+              className="w-full bg-[#0A0A0A] border border-[#1F1F1F] text-white pl-9 pr-3 py-2.5 font-roboto text-sm rounded-md focus:outline-none focus:border-[#FFD700]/50 focus:bg-[#141414] placeholder:text-white/25 transition-all" />
+          </div>
+          <button onClick={search} disabled={!phone || searching}
+            className="bg-gradient-to-b from-[#FFD700] to-yellow-500 text-black font-oswald font-bold px-4 py-2.5 uppercase text-xs rounded-md shadow-md shadow-[#FFD700]/20 hover:shadow-[#FFD700]/40 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-1.5">
+            {searching ? <Icon name="Loader" size={13} className="animate-spin" /> : <Icon name="Search" size={13} />}
+            Найти
+          </button>
+        </div>
+
+        {found && (
+          <div className="bg-gradient-to-br from-[#FFD700]/10 to-transparent border border-[#FFD700]/30 rounded-lg p-3 animate-in fade-in slide-in-from-top-1 duration-300">
+            <div className="flex items-start gap-3">
+              <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#FFD700] to-yellow-600 flex items-center justify-center font-oswald font-bold text-black shrink-0">
+                {foundInitials}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="font-oswald font-bold text-white text-base uppercase truncate">{fName}</div>
+                <div className="font-roboto text-[#FFD700]/80 text-sm flex items-center gap-1.5 mt-0.5">
+                  <Icon name="Phone" size={11} />{fPhone}
+                </div>
+                {fEmail && (
+                  <div className="font-roboto text-white/50 text-xs flex items-center gap-1.5 mt-0.5">
+                    <Icon name="Mail" size={10} />{fEmail}
+                  </div>
+                )}
+                <div className="flex gap-3 mt-2">
+                  <div className="bg-[#FFD700]/10 border border-[#FFD700]/30 px-2 py-1 rounded-md">
+                    <div className="font-roboto text-[#FFD700]/60 text-[9px] uppercase">Скидка</div>
+                    <div className="font-oswald font-bold text-[#FFD700] text-sm tabular-nums">{fDiscount}%</div>
+                  </div>
+                  <div className="bg-green-500/10 border border-green-500/30 px-2 py-1 rounded-md">
+                    <div className="font-roboto text-green-400/60 text-[9px] uppercase">Баллы</div>
+                    <div className="font-oswald font-bold text-green-400 text-sm tabular-nums">{fPoints}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        {notFound && (
+          <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 flex items-center gap-2 text-red-400 font-roboto text-sm">
+            <Icon name="UserX" size={14} />Клиент не найден
+          </div>
+        )}
+      </div>
+
+      {/* Добавить клиента — premium */}
+      <div className="bg-gradient-to-br from-[#141414] to-[#0A0A0A] border border-[#1F1F1F] rounded-lg p-4">
+        <div className="font-oswald font-bold uppercase text-sm text-white mb-3 flex items-center gap-1.5">
+          <Icon name="UserPlus" size={14} className="text-[#FFD700]" />
+          Новый клиент
+        </div>
         {added ? (
-          <div className="text-[#FFD700] font-roboto text-sm flex items-center gap-2 mb-3"><Icon name="CheckCircle" size={14} /> Клиент добавлен!</div>
+          <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 text-green-400 font-roboto text-sm flex items-center gap-2 animate-in fade-in zoom-in-95 duration-300">
+            <Icon name="CheckCircle2" size={16} />Клиент добавлен
+          </div>
         ) : (
-          <div className="space-y-2 mb-4">
-            {[{ key: "full_name", label: "ФИО", placeholder: "Иванов Иван Иванович" }, { key: "phone", label: "Телефон *", placeholder: "+7 (___) ___-__-__" }, { key: "email", label: "Email", placeholder: "mail@example.com" }].map(f => (
+          <div className="space-y-2.5">
+            {[
+              { key: "full_name", label: "ФИО", placeholder: "Иванов Иван Иванович", icon: "User" },
+              { key: "phone", label: "Телефон *", placeholder: "+7 (___) ___-__-__", icon: "Phone" },
+              { key: "email", label: "Email", placeholder: "mail@example.com", icon: "Mail" },
+            ].map(f => (
               <div key={f.key}>
-                <label className="font-roboto text-white/30 text-[10px] block mb-1">{f.label}</label>
-                <input value={(addForm as Record<string,string>)[f.key]} onChange={e => setAddForm(p => ({ ...p, [f.key]: f.key === "phone" ? formatPhone(e.target.value) : e.target.value }))} placeholder={f.placeholder}
-                  className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-2 font-roboto text-sm focus:outline-none focus:border-[#FFD700]" />
+                <label className="font-roboto text-white/40 text-[10px] block mb-1 uppercase tracking-wide">{f.label}</label>
+                <div className="relative">
+                  <Icon name={f.icon} size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
+                  <input
+                    value={(addForm as Record<string, string>)[f.key]}
+                    onChange={e => setAddForm(p => ({ ...p, [f.key]: f.key === "phone" ? formatPhone(e.target.value) : e.target.value }))}
+                    placeholder={f.placeholder}
+                    className="w-full bg-[#0A0A0A] border border-[#1F1F1F] text-white pl-9 pr-3 py-2.5 font-roboto text-sm rounded-md focus:outline-none focus:border-[#FFD700]/50 focus:bg-[#141414] placeholder:text-white/25 transition-all" />
+                </div>
               </div>
             ))}
-            <button onClick={addClient} disabled={!addForm.phone || !addForm.full_name}
-              className="bg-[#FFD700] text-black font-oswald font-bold px-4 py-2 uppercase text-xs hover:bg-yellow-400 transition-colors disabled:opacity-50">
-              Добавить
+            <button onClick={addClient} disabled={!addForm.phone || !addForm.full_name || addLoading}
+              className="w-full bg-gradient-to-b from-[#FFD700] to-yellow-500 text-black font-oswald font-bold py-3 uppercase text-xs rounded-md shadow-md shadow-[#FFD700]/20 hover:shadow-[#FFD700]/40 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-1.5 mt-2">
+              {addLoading ? <Icon name="Loader" size={13} className="animate-spin" /> : <Icon name="UserPlus" size={13} />}
+              Добавить клиента
             </button>
           </div>
         )}
       </div>
 
-      {/* Список всех клиентов */}
-      <div className="border-t border-white/10 pt-4 mt-2">
+      {/* Все клиенты — premium */}
+      <div className="bg-gradient-to-br from-[#141414] to-[#0A0A0A] border border-[#1F1F1F] rounded-lg p-4">
         <div className="flex items-center justify-between mb-3">
-          <div className="font-oswald font-bold uppercase text-sm text-white">
-            Все клиенты{showAll ? <span className="text-white/40 ml-1">({allClients.length})</span> : ""}
+          <div className="font-oswald font-bold uppercase text-sm text-white flex items-center gap-1.5">
+            <Icon name="Users" size={14} className="text-[#FFD700]" />
+            База клиентов
+            {showAll && <span className="bg-[#FFD700]/15 text-[#FFD700] font-oswald text-[11px] px-2 py-0.5 rounded-full tabular-nums">{allClients.length}</span>}
           </div>
           {!showAll && (
             <button onClick={loadAllClients} disabled={loadingAll}
-              className="text-[#FFD700] font-roboto text-xs hover:underline disabled:opacity-50">
-              {loadingAll ? "Загружаю..." : "Показать список"}
+              className="bg-[#FFD700]/10 border border-[#FFD700]/30 text-[#FFD700] font-roboto text-xs px-3 py-1.5 rounded-md hover:bg-[#FFD700]/20 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-1.5">
+              {loadingAll ? <Icon name="Loader" size={11} className="animate-spin" /> : <Icon name="Download" size={11} />}
+              {loadingAll ? "Загружаю..." : "Показать всех"}
             </button>
           )}
         </div>
+
         {showAll && (
-          <div className="space-y-1">
+          <>
+            {/* Фильтр */}
+            <div className="mb-3 relative">
+              <Icon name="Search" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
+              <input
+                value={filter}
+                onChange={e => setFilter(e.target.value)}
+                placeholder="Фильтр: имя, телефон, email..."
+                className="w-full bg-[#0A0A0A] border border-[#1F1F1F] text-white pl-9 pr-9 py-2 font-roboto text-sm rounded-md focus:outline-none focus:border-[#FFD700]/50 focus:bg-[#141414] placeholder:text-white/25 transition-all" />
+              {filter && (
+                <button onClick={() => setFilter("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/30 hover:text-white p-0.5 transition-colors">
+                  <Icon name="X" size={14} />
+                </button>
+              )}
+            </div>
+
             {allClients.length === 0 ? (
-              <div className="text-white/30 font-roboto text-sm text-center py-4">Нет зарегистрированных клиентов</div>
-            ) : allClients.map(c => (
-              <div key={c.id} className="bg-[#1A1A1A] border border-[#2A2A2A] px-3 py-2.5 flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="font-roboto text-white text-sm truncate">{c.full_name}</div>
-                  <div className="font-roboto text-white/40 text-xs">{c.phone}{c.email ? ` · ${c.email}` : ""}</div>
+              <div className="text-center py-10">
+                <div className="w-14 h-14 mx-auto mb-2 bg-[#141414] border border-[#222] rounded-full flex items-center justify-center">
+                  <Icon name="Users" size={24} className="text-white/20" />
                 </div>
-                <div className="shrink-0 text-right">
-                  <div className="font-oswald font-bold text-[#FFD700] text-sm">{c.discount_pct}%</div>
-                  <div className="font-roboto text-white/30 text-[10px]">{c.registered_at ? new Date(c.registered_at).toLocaleDateString("ru-RU") : "—"}</div>
-                </div>
+                <div className="font-roboto text-white/40 text-sm">Нет зарегистрированных клиентов</div>
               </div>
-            ))}
-          </div>
+            ) : filtered.length === 0 ? (
+              <div className="text-center py-8 text-white/30 font-roboto text-sm">По фильтру ничего не найдено</div>
+            ) : (
+              <div className="space-y-1.5">
+                {filtered.map(c => {
+                  const initials = c.full_name.trim().split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase() || "?";
+                  return (
+                    <div key={c.id} className="group bg-[#0A0A0A] border border-[#1A1A1A] rounded-md px-3 py-2.5 flex items-center gap-3 hover:border-[#FFD700]/30 hover:bg-[#141414] transition-all">
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#333] to-[#1a1a1a] border border-white/10 flex items-center justify-center font-oswald font-bold text-sm text-white/70 shrink-0 group-hover:border-[#FFD700]/40 transition-colors">
+                        {initials}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-roboto text-white text-sm truncate font-medium">{c.full_name}</div>
+                        <div className="font-roboto text-white/40 text-[11px] flex items-center gap-2 mt-0.5">
+                          <span className="flex items-center gap-1"><Icon name="Phone" size={9} />{c.phone}</span>
+                          {c.email && <span className="flex items-center gap-1 truncate"><Icon name="Mail" size={9} />{c.email}</span>}
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        {c.discount_pct > 0 && (
+                          <div className="inline-flex items-center gap-1 bg-[#FFD700]/10 border border-[#FFD700]/30 px-1.5 py-0.5 rounded text-[#FFD700] font-oswald font-bold text-xs tabular-nums">
+                            {c.discount_pct}%
+                          </div>
+                        )}
+                        <div className="font-roboto text-white/30 text-[9px] mt-0.5">
+                          {c.registered_at ? new Date(c.registered_at).toLocaleDateString("ru-RU", { day: "2-digit", month: "short" }) : "—"}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
