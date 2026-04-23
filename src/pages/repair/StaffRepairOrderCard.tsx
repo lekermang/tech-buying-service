@@ -189,143 +189,213 @@ export default function StaffRepairOrderCard({
 
       {/* ── Раскрытая часть ── */}
       {isExpanded && (
-        <div className="border-t border-[#2A2A2A] p-3 space-y-4">
+        <div className="border-t border-[#FFD700]/15 p-3 space-y-3 bg-gradient-to-b from-transparent to-black/20">
 
-          {/* Комментарий */}
+          {/* Комментарий клиента */}
           {o.comment && (
-            <div className="px-3 py-2 bg-white/5 border border-white/8 text-xs font-roboto text-white/55 italic">"{o.comment}"</div>
+            <div className="relative px-3 py-2.5 bg-[#FFD700]/5 border-l-2 border-[#FFD700]/40 rounded-r-md">
+              <div className="absolute top-1 right-2 text-[9px] font-roboto text-[#FFD700]/40 uppercase tracking-wide">Комментарий клиента</div>
+              <div className="text-xs font-roboto text-white/70 italic mt-3 leading-relaxed">"{o.comment}"</div>
+            </div>
           )}
 
-          {/* Финансы */}
-          <div className="space-y-2">
+          {/* Финансы — премиум блок */}
+          <div className="bg-gradient-to-br from-[#141414] to-[#0A0A0A] border border-[#1F1F1F] rounded-lg p-3 space-y-2.5">
+            <div className="font-oswald font-bold text-[#FFD700]/70 text-[10px] uppercase tracking-widest flex items-center gap-1.5">
+              <Icon name="Wallet" size={11} />
+              Финансы заказа
+            </div>
+
             <div>
-              <label className={LBL + " text-orange-400/80"}>🛒 Купленная запчасть</label>
+              <label className={LBL + " text-orange-400/80 flex items-center gap-1"}>
+                <Icon name="ShoppingBag" size={10} />Купленная запчасть
+              </label>
               <input value={ef.parts_name}
                 onChange={e => onEditFormChange(o.id, { ...ef, parts_name: e.target.value })}
-                placeholder="Дисплей iPhone 14..." className={INP} />
+                placeholder="Дисплей iPhone 14..."
+                className="w-full bg-[#0A0A0A] border border-[#1F1F1F] text-white px-3 py-2 font-roboto text-xs rounded-md focus:outline-none focus:border-[#FFD700]/50 placeholder:text-white/20 transition-colors" />
             </div>
+
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className={LBL + " text-orange-400/80"}>💸 Закупка (₽)</label>
+                <label className={LBL + " text-orange-400/80 flex items-center gap-1"}>
+                  <Icon name="ArrowDownCircle" size={10} />Закупка ₽
+                </label>
                 <input type="number" inputMode="numeric" value={ef.purchase_amount}
                   onChange={e => onEditFormChange(o.id, { ...ef, purchase_amount: e.target.value })}
-                  placeholder="0" className={INP} />
+                  placeholder="0"
+                  className="w-full bg-[#0A0A0A] border border-orange-500/20 text-orange-300 px-3 py-2 font-roboto text-sm font-bold rounded-md focus:outline-none focus:border-orange-500/60 tabular-nums transition-colors" />
                 <label className="flex items-center gap-1.5 mt-1.5 cursor-pointer active:opacity-70"
                   onClick={() => onEditFormChange(o.id, { ...ef, purchase_amount: "0" })}>
-                  <div className={`w-4 h-4 border flex items-center justify-center transition-colors shrink-0 ${ef.purchase_amount === "0" ? "bg-[#FFD700] border-[#FFD700]" : "border-white/30"}`}>
+                  <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all shrink-0 ${ef.purchase_amount === "0" ? "bg-[#FFD700] border-[#FFD700] shadow-md shadow-[#FFD700]/30" : "border-white/30"}`}>
                     {ef.purchase_amount === "0" && <Icon name="Check" size={10} className="text-black" />}
                   </div>
-                  <span className="font-roboto text-[10px] text-white/40">Без закупки (0 ₽)</span>
+                  <span className="font-roboto text-[10px] text-white/40">Без закупки</span>
                 </label>
               </div>
               <div>
-                <label className={LBL + " text-green-400/80"}>💰 Выдано за ремонт (₽)</label>
+                <label className={LBL + " text-green-400/80 flex items-center gap-1"}>
+                  <Icon name="ArrowUpCircle" size={10} />Выдано за ремонт ₽
+                </label>
                 <input type="number" inputMode="numeric" value={ef.repair_amount}
                   onChange={e => onEditFormChange(o.id, { ...ef, repair_amount: e.target.value })}
-                  placeholder="1500" className={INP} />
+                  placeholder="1500"
+                  className="w-full bg-[#0A0A0A] border border-green-500/20 text-green-300 px-3 py-2 font-roboto text-sm font-bold rounded-md focus:outline-none focus:border-green-500/60 tabular-nums transition-colors" />
               </div>
             </div>
 
-            {ef.repair_amount && ef.purchase_amount && (
-              <div className="bg-green-500/10 border border-green-500/20 px-3 py-2 flex gap-4 text-xs font-roboto">
-                <span className="text-white/40">Прибыль: <span className={`font-bold ml-1 ${parseInt(ef.repair_amount) - parseInt(ef.purchase_amount) >= 0 ? "text-[#FFD700]" : "text-red-400"}`}>
-                  {(parseInt(ef.repair_amount) - parseInt(ef.purchase_amount)).toLocaleString("ru-RU")} ₽
-                </span></span>
-                <span className="text-white/40">Мастер: <span className="text-green-400 font-bold ml-1">
-                  {Math.max(0, Math.round((parseInt(ef.repair_amount) - parseInt(ef.purchase_amount)) * 0.5)).toLocaleString("ru-RU")} ₽
-                </span></span>
-              </div>
-            )}
+            {ef.repair_amount && ef.purchase_amount && (() => {
+              const profit = parseInt(ef.repair_amount) - parseInt(ef.purchase_amount);
+              const master = Math.max(0, Math.round(profit * 0.5));
+              const clean = profit - master;
+              return (
+                <div className="bg-gradient-to-r from-[#FFD700]/10 via-green-500/5 to-transparent border border-[#FFD700]/20 rounded-md px-3 py-2.5 animate-in fade-in duration-300">
+                  <div className="font-roboto text-[9px] text-white/40 uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                    <Icon name="Calculator" size={10} className="text-[#FFD700]/60" />
+                    Расчёт прибыли
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <div className="font-roboto text-[9px] text-white/40">Прибыль</div>
+                      <div className={`font-oswald font-bold text-sm tabular-nums ${profit >= 0 ? "text-[#FFD700]" : "text-red-400"}`}>
+                        {profit.toLocaleString("ru-RU")} ₽
+                      </div>
+                    </div>
+                    <div>
+                      <div className="font-roboto text-[9px] text-blue-400/70">Мастер 50%</div>
+                      <div className="font-oswald font-bold text-sm text-blue-400 tabular-nums">
+                        {master.toLocaleString("ru-RU")} ₽
+                      </div>
+                    </div>
+                    <div>
+                      <div className="font-roboto text-[9px] text-green-400/70">Чистая</div>
+                      <div className={`font-oswald font-bold text-sm tabular-nums ${clean >= 0 ? "text-green-400" : "text-red-400"}`}>
+                        {clean.toLocaleString("ru-RU")} ₽
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Аванс + Способ оплаты */}
-            <div className="pt-1 border-t border-white/5 space-y-2">
+            <div className="pt-2.5 border-t border-[#1F1F1F] space-y-2">
               <div>
-                <label className={LBL + " text-blue-400/80"}>💵 Аванс (₽)</label>
+                <label className={LBL + " text-blue-400/80 flex items-center gap-1"}>
+                  <Icon name="Coins" size={10} />Аванс ₽
+                </label>
                 <input type="number" inputMode="numeric" value={ef.advance}
                   onChange={e => onEditFormChange(o.id, { ...ef, advance: e.target.value })}
-                  placeholder="0" className={INP} />
+                  placeholder="0"
+                  className="w-full bg-[#0A0A0A] border border-blue-500/20 text-blue-300 px-3 py-2 font-roboto text-sm font-bold rounded-md focus:outline-none focus:border-blue-500/60 tabular-nums transition-colors" />
                 {ef.advance && parseInt(ef.advance) > 0 && ef.repair_amount && (
-                  <div className="text-[10px] font-roboto text-blue-400/70 mt-1">
-                    Остаток: {(parseInt(ef.repair_amount) - parseInt(ef.advance)).toLocaleString("ru-RU")} ₽
+                  <div className="text-[10px] font-roboto text-blue-400/80 mt-1 flex items-center gap-1 bg-blue-500/5 border border-blue-500/15 rounded px-2 py-1">
+                    <Icon name="Info" size={10} />
+                    Остаток к доплате: <span className="font-bold tabular-nums">{(parseInt(ef.repair_amount) - parseInt(ef.advance)).toLocaleString("ru-RU")} ₽</span>
                   </div>
                 )}
               </div>
               <div>
-                <label className={LBL}>💳 Способ оплаты</label>
-                <div className="grid grid-cols-4 gap-1 mt-1">
+                <label className={LBL + " flex items-center gap-1"}>
+                  <Icon name="CreditCard" size={10} />Способ оплаты
+                </label>
+                <div className="grid grid-cols-4 gap-1.5 mt-1">
                   {[
-                    { v: "",        label: "Нет" },
-                    { v: "cash",    label: "Нал" },
-                    { v: "card",    label: "Карта" },
-                    { v: "transfer",label: "Перевод" },
-                  ].map(opt => (
-                    <button key={opt.v} type="button"
-                      onClick={() => onEditFormChange(o.id, { ...ef, payment_method: opt.v, is_paid: opt.v !== "" })}
-                      className={`font-roboto text-[11px] py-2 border transition-colors ${
-                        ef.payment_method === opt.v
-                          ? "bg-[#FFD700] border-[#FFD700] text-black font-bold"
-                          : "border-white/20 text-white/50 active:bg-white/10"
-                      }`}>
-                      {opt.label}
-                    </button>
-                  ))}
+                    { v: "",        label: "Нет",     emoji: "—",  color: "bg-white/5" },
+                    { v: "cash",    label: "Нал",     emoji: "💵", color: "bg-green-500/10" },
+                    { v: "card",    label: "Карта",   emoji: "💳", color: "bg-blue-500/10" },
+                    { v: "transfer",label: "Перевод", emoji: "📲", color: "bg-purple-500/10" },
+                  ].map(opt => {
+                    const active = ef.payment_method === opt.v;
+                    return (
+                      <button key={opt.v} type="button"
+                        onClick={() => onEditFormChange(o.id, { ...ef, payment_method: opt.v, is_paid: opt.v !== "" })}
+                        className={`font-roboto text-[11px] py-2 rounded-md transition-all active:scale-95 flex flex-col items-center gap-0.5 ${
+                          active
+                            ? "bg-gradient-to-b from-[#FFD700] to-yellow-500 text-black font-bold shadow-md shadow-[#FFD700]/20"
+                            : `${opt.color} border border-[#1F1F1F] text-white/60 hover:text-white hover:border-[#333]`
+                        }`}>
+                        <span className="text-sm leading-none">{opt.emoji}</span>
+                        <span className="leading-none text-[10px]">{opt.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
                 {ef.is_paid && ef.payment_method && (
-                  <div className="text-[10px] font-roboto text-green-400/70 mt-1">✓ Оплачено: {ef.payment_method === "cash" ? "наличными" : ef.payment_method === "card" ? "картой" : "переводом"}</div>
+                  <div className="text-[10px] font-roboto text-green-400 mt-1.5 flex items-center gap-1 bg-green-500/5 border border-green-500/15 rounded px-2 py-1">
+                    <Icon name="CheckCircle2" size={10} />
+                    Оплачено: {ef.payment_method === "cash" ? "наличными" : ef.payment_method === "card" ? "картой" : "переводом"}
+                  </div>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Поля заявки */}
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className={LBL}>Имя</label>
-              <input value={ef.name} onChange={e => onEditFormChange(o.id, { ...ef, name: e.target.value })} className={INP} placeholder="Иван" />
+          {/* Поля заявки — премиум блок */}
+          <div className="bg-gradient-to-br from-[#141414] to-[#0A0A0A] border border-[#1F1F1F] rounded-lg p-3 space-y-2.5">
+            <div className="font-oswald font-bold text-white/50 text-[10px] uppercase tracking-widest flex items-center gap-1.5">
+              <Icon name="FileEdit" size={11} />
+              Данные заявки
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { key: "name", label: "Имя", ph: "Иван", icon: "User", value: ef.name, set: (v: string) => onEditFormChange(o.id, { ...ef, name: v }) },
+                { key: "phone", label: "Телефон", ph: "+7...", icon: "Phone", type: "tel", value: ef.phone, set: (v: string) => onEditFormChange(o.id, { ...ef, phone: formatPhone(v) }) },
+                { key: "model", label: "Модель", ph: "iPhone 14", icon: "Smartphone", value: ef.model, set: (v: string) => onEditFormChange(o.id, { ...ef, model: v }) },
+                { key: "repair_type", label: "Тип ремонта", ph: "Дисплей", icon: "Wrench", value: ef.repair_type, set: (v: string) => onEditFormChange(o.id, { ...ef, repair_type: v }) },
+              ].map(f => (
+                <div key={f.key}>
+                  <label className={LBL + " flex items-center gap-1"}>
+                    <Icon name={f.icon} size={9} className="opacity-50" />{f.label}
+                  </label>
+                  <input type={f.type || "text"} value={f.value}
+                    onChange={e => f.set(e.target.value)}
+                    placeholder={f.ph}
+                    className="w-full bg-[#0A0A0A] border border-[#1F1F1F] text-white px-3 py-2 font-roboto text-xs rounded-md focus:outline-none focus:border-[#FFD700]/50 placeholder:text-white/20 transition-colors" />
+                </div>
+              ))}
             </div>
             <div>
-              <label className={LBL}>Телефон</label>
-              <input type="tel" value={ef.phone} onChange={e => onEditFormChange(o.id, { ...ef, phone: formatPhone(e.target.value) })} className={INP} placeholder="+7..." />
+              <label className={LBL + " flex items-center gap-1"}>
+                <Icon name="StickyNote" size={9} className="opacity-50" />Заметка
+              </label>
+              <textarea value={ef.admin_note}
+                onChange={e => onEditFormChange(o.id, { ...ef, admin_note: e.target.value })}
+                rows={2} placeholder="Внутренняя заметка..."
+                className="w-full bg-[#0A0A0A] border border-[#1F1F1F] text-white px-3 py-2 font-roboto text-xs rounded-md focus:outline-none focus:border-[#FFD700]/50 placeholder:text-white/20 resize-none transition-colors" />
             </div>
-            <div>
-              <label className={LBL}>Модель</label>
-              <input value={ef.model} onChange={e => onEditFormChange(o.id, { ...ef, model: e.target.value })} className={INP} placeholder="iPhone 14" />
-            </div>
-            <div>
-              <label className={LBL}>Тип ремонта</label>
-              <input value={ef.repair_type} onChange={e => onEditFormChange(o.id, { ...ef, repair_type: e.target.value })} className={INP} placeholder="Дисплей" />
-            </div>
-          </div>
-          <div>
-            <label className={LBL}>Заметка</label>
-            <textarea value={ef.admin_note}
-              onChange={e => onEditFormChange(o.id, { ...ef, admin_note: e.target.value })}
-              rows={2} placeholder="Внутренняя заметка..."
-              className={INP + " resize-none"} />
           </div>
 
-          {saveError && <div className="text-red-400 font-roboto text-xs px-1">{saveError}</div>}
+          {saveError && (
+            <div className="bg-red-500/10 border border-red-500/20 rounded-md px-3 py-2 flex items-center gap-1.5 text-red-400 font-roboto text-xs">
+              <Icon name="AlertCircle" size={12} />{saveError}
+            </div>
+          )}
 
           {/* Кнопка сохранить */}
           <button onClick={() => onSaveCard(o)} disabled={saving}
-            className="w-full bg-[#FFD700] text-black font-oswald font-bold py-3 uppercase text-sm disabled:opacity-40 flex items-center justify-center gap-2 transition-colors active:bg-yellow-400">
-            <Icon name="Save" size={15} />{saving ? "Сохраняю..." : "Сохранить изменения"}
+            className="w-full bg-gradient-to-b from-[#FFD700] to-yellow-500 text-black font-oswald font-bold py-3 uppercase text-sm rounded-md shadow-lg shadow-[#FFD700]/20 hover:shadow-[#FFD700]/40 active:scale-[0.98] transition-all disabled:opacity-40 flex items-center justify-center gap-2">
+            <Icon name={saving ? "Loader" : "Save"} size={15} className={saving ? "animate-spin" : ""} />
+            {saving ? "Сохраняю..." : "Сохранить изменения"}
           </button>
 
-          {/* Смена статуса */}
-          <div>
-            <div className="font-roboto text-white/30 text-[10px] uppercase tracking-wider mb-2">Сменить статус</div>
+          {/* Смена статуса — премиум */}
+          <div className="bg-gradient-to-br from-[#141414] to-[#0A0A0A] border border-[#1F1F1F] rounded-lg p-3 space-y-2">
+            <div className="font-oswald font-bold text-white/50 text-[10px] uppercase tracking-widest flex items-center gap-1.5">
+              <Icon name="RefreshCw" size={11} />
+              Сменить статус
+            </div>
 
-            {/* Поле даты выдачи — показываем если статус не "done" */}
+            {/* Поле даты выдачи */}
             {o.status !== "done" && (
-              <div className="mb-2 flex items-center gap-2 bg-[#111] border border-[#FFD700]/10 px-2.5 py-1.5">
-                <Icon name="CalendarCheck" size={12} className="text-[#FFD700]/50 shrink-0" />
-                <span className="font-roboto text-[10px] text-white/30 shrink-0">Дата выдачи:</span>
+              <div className="flex items-center gap-2 bg-gradient-to-r from-[#FFD700]/10 to-transparent border border-[#FFD700]/20 rounded-md px-3 py-2">
+                <Icon name="CalendarCheck" size={13} className="text-[#FFD700] shrink-0" />
+                <span className="font-roboto text-[10px] text-[#FFD700]/70 shrink-0 uppercase tracking-wide">Дата выдачи:</span>
                 <input
                   type="datetime-local"
                   value={issuedAt}
                   onChange={e => setIssuedAt(e.target.value)}
-                  className="flex-1 bg-transparent font-roboto text-[10px] text-white/70 outline-none min-w-0 cursor-pointer"
+                  className="flex-1 bg-transparent font-roboto text-[11px] text-white outline-none min-w-0 cursor-pointer tabular-nums"
                 />
               </div>
             )}
@@ -343,96 +413,135 @@ export default function StaffRepairOrderCard({
                     }}
                     disabled={saving || blocked}
                     title={blocked ? "Введите суммы закупки и выдачи" : undefined}
-                    className={`font-roboto text-xs py-2.5 px-3 border transition-colors flex items-center justify-center gap-1.5 min-h-[44px] ${
+                    className={`font-roboto text-xs py-2.5 px-3 rounded-md border transition-all flex items-center justify-center gap-1.5 min-h-[44px] active:scale-95 ${
                       blocked
-                        ? "border-white/10 text-white/15 cursor-not-allowed"
+                        ? "border-white/5 bg-[#0A0A0A] text-white/20 cursor-not-allowed"
                         : saving
                         ? "opacity-50 cursor-not-allowed border-white/10 text-white/30"
-                        : `${s.color} border-current/20 active:opacity-70`
+                        : `${s.color} border-current/30 hover:ring-1 hover:ring-current/40 font-bold`
                     }`}>
-                    {blocked ? <Icon name="Lock" size={11} /> : <span className={`w-2 h-2 rounded-full shrink-0 ${s.dot}`} />}
+                    {blocked ? <Icon name="Lock" size={11} /> : <span className={`w-2 h-2 rounded-full shrink-0 ${s.dot} animate-pulse`} />}
                     {s.label}
+                  </button>
+                );
+              })}
+            </div>
+            {financeBlocked && (
+              <div className="text-[10px] font-roboto text-white/40 flex items-center gap-1 bg-orange-500/5 border border-orange-500/15 rounded px-2 py-1.5">
+                <Icon name="Info" size={10} className="text-orange-400" />
+                Для статусов «Готово» и «Выдано» укажите суммы закупки и ремонта
+              </div>
+            )}
+          </div>
+
+          {/* Telegram уведомление — премиум */}
+          <div className="relative bg-gradient-to-br from-[#229ED9]/10 to-transparent border border-[#229ED9]/25 rounded-lg p-3">
+            <div className="font-oswald font-bold text-[#229ED9]/80 text-[10px] uppercase tracking-widest mb-2 flex items-center gap-1.5">
+              <Icon name="Send" size={11} />
+              <span>Telegram клиенту</span>
+              {sentKey && !notifyError && (
+                <span className="ml-auto flex items-center gap-1 bg-green-500/15 text-green-400 px-2 py-0.5 rounded-full text-[9px] font-normal animate-in fade-in zoom-in-95">
+                  <Icon name="Check" size={9} />Отправлено
+                </span>
+              )}
+              {notifyError && (
+                <span className="ml-auto bg-orange-500/15 text-orange-400 px-2 py-0.5 rounded-full text-[9px] font-normal">
+                  {notifyError}
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-5 gap-1.5">
+              {Object.entries(STATUS_LABEL).map(([key, label]) => {
+                const sent = sentKey === key;
+                return (
+                  <button key={key} type="button" onClick={() => handleSend(key)}
+                    disabled={sent}
+                    title={label}
+                    className={`font-roboto text-[9px] py-1.5 rounded-md border transition-all active:scale-95 flex flex-col items-center justify-center gap-0.5 min-h-[38px] ${
+                      sent
+                        ? "border-green-500/50 text-green-400 bg-green-500/15 font-bold"
+                        : "border-[#229ED9]/25 bg-[#229ED9]/5 text-[#229ED9] hover:bg-[#229ED9]/15 hover:border-[#229ED9]/50"
+                    }`}>
+                    <Icon name={sent ? "Check" : "Send"} size={10} />
+                    <span className="leading-none text-center">{STATUS_SHORT[key]}</span>
                   </button>
                 );
               })}
             </div>
           </div>
 
-          {/* Telegram уведомление */}
-          <div className="border border-[#229ED9]/20 bg-[#229ED9]/5 px-2.5 py-2">
-            <div className="font-roboto text-white/30 text-[10px] uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
-              <Icon name="Send" size={10} className="text-[#229ED9]" />
-              <span>Telegram клиенту</span>
-              {sentKey && !notifyError && <span className="ml-auto text-green-400/80">✓ Отправлено</span>}
-              {notifyError && <span className="ml-auto text-orange-400">{notifyError}</span>}
+          {/* SMS — премиум */}
+          <div className="relative bg-gradient-to-br from-green-500/10 to-transparent border border-green-500/25 rounded-lg p-3">
+            <div className="font-oswald font-bold text-green-400/80 text-[10px] uppercase tracking-widest mb-2 flex items-center gap-1.5">
+              <Icon name="MessageSquare" size={11} />
+              <span>SMS · <span className="text-white/60 font-roboto normal-case tabular-nums">{o.phone || "—"}</span></span>
+              {smsSentKey && !smsError && (
+                <span className="ml-auto flex items-center gap-1 bg-green-500/15 text-green-400 px-2 py-0.5 rounded-full text-[9px] font-normal animate-in fade-in zoom-in-95">
+                  <Icon name="Check" size={9} />Отправлено
+                </span>
+              )}
+              {smsError && (
+                <span className="ml-auto bg-orange-500/15 text-orange-400 px-2 py-0.5 rounded-full text-[9px] font-normal">
+                  {smsError}
+                </span>
+              )}
             </div>
-            <div className="grid grid-cols-5 gap-1">
-              {Object.entries(STATUS_LABEL).map(([key, label]) => (
-                <button key={key} type="button" onClick={() => handleSend(key)}
-                  disabled={sentKey === key}
-                  title={label}
-                  className={`font-roboto text-[9px] py-1.5 border transition-colors flex flex-col items-center justify-center gap-0.5 min-h-[36px] ${
-                    sentKey === key
-                      ? "border-green-500/40 text-green-400 bg-green-500/10"
-                      : "border-[#229ED9]/20 text-[#229ED9]/70 active:bg-[#229ED9]/10"
-                  }`}>
-                  <Icon name={sentKey === key ? "Check" : "Send"} size={9} />
-                  <span className="leading-none text-center px-0.5">{STATUS_SHORT[key]}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* SMS */}
-          <div className="border border-green-500/20 bg-green-500/5 px-2.5 py-2">
-            <div className="font-roboto text-white/30 text-[10px] uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
-              <Icon name="MessageSquare" size={10} className="text-green-400" />
-              <span>SMS · {o.phone || "—"}</span>
-              {smsSentKey && !smsError && <span className="ml-auto text-green-400/80">✓ Отправлено</span>}
-              {smsError && <span className="ml-auto text-orange-400">{smsError}</span>}
-            </div>
-            <div className="grid grid-cols-5 gap-1">
-              {Object.entries(STATUS_LABEL).map(([key, label]) => (
-                <button key={key} type="button" onClick={() => handleSendSms(key)}
-                  disabled={smsSentKey === key}
-                  title={label}
-                  className={`font-roboto text-[9px] py-1.5 border transition-colors flex flex-col items-center justify-center gap-0.5 min-h-[36px] ${
-                    smsSentKey === key
-                      ? "border-green-500/40 text-green-400 bg-green-500/10"
-                      : "border-green-500/20 text-green-400/70 active:bg-green-500/10"
-                  }`}>
-                  <Icon name={smsSentKey === key ? "Check" : "MessageSquare"} size={9} />
-                  <span className="leading-none text-center px-0.5">{STATUS_SHORT[key]}</span>
-                </button>
-              ))}
+            <div className="grid grid-cols-5 gap-1.5">
+              {Object.entries(STATUS_LABEL).map(([key, label]) => {
+                const sent = smsSentKey === key;
+                return (
+                  <button key={key} type="button" onClick={() => handleSendSms(key)}
+                    disabled={sent}
+                    title={label}
+                    className={`font-roboto text-[9px] py-1.5 rounded-md border transition-all active:scale-95 flex flex-col items-center justify-center gap-0.5 min-h-[38px] ${
+                      sent
+                        ? "border-green-500/50 text-green-400 bg-green-500/15 font-bold"
+                        : "border-green-500/25 bg-green-500/5 text-green-400 hover:bg-green-500/15 hover:border-green-500/50"
+                    }`}>
+                    <Icon name={sent ? "Check" : "MessageSquare"} size={10} />
+                    <span className="leading-none text-center">{STATUS_SHORT[key]}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* Печать + удаление */}
-          <div className="flex gap-2">
-            <button onClick={handleSendAct} disabled={actSending}
-              className={`flex-1 font-roboto text-xs py-2.5 border transition-colors flex items-center justify-center gap-1.5 min-h-[44px] ${actSent ? "border-green-500/40 text-green-400 bg-green-500/10" : "border-[#229ED9]/30 text-[#229ED9]/70 active:bg-[#229ED9]/10"}`}>
-              <Icon name={actSent ? "Check" : actSending ? "Loader2" : "Send"} size={14} className={actSending ? "animate-spin" : ""} />
-              {actSent ? "Отправлен!" : "Акт в TG"}
-            </button>
-            <button onClick={() => printActHTML(o)}
-              className="flex-1 font-roboto text-xs py-2.5 border border-[#FFD700]/40 text-[#FFD700] active:bg-[#FFD700]/10 transition-colors flex items-center justify-center gap-1.5 min-h-[44px]">
-              <Icon name="FileText" size={14} /> Акт
-            </button>
-            <button onClick={() => printAct(o)}
-              className="flex-1 font-roboto text-xs py-2.5 border border-[#FFD700]/20 text-[#FFD700]/60 active:bg-[#FFD700]/10 transition-colors flex items-center justify-center gap-1.5 min-h-[44px]">
-              <Icon name="Download" size={14} /> .docx
-            </button>
-            <button onClick={() => printReceipt(o)}
-              className="flex-1 font-roboto text-xs py-2.5 border border-white/10 text-white/40 active:bg-white/5 transition-colors flex items-center justify-center gap-1.5 min-h-[44px]">
-              <Icon name="Printer" size={14} /> Чек
-            </button>
-            {isOwner && (
-              <button onClick={() => onDelete(o.id)}
-                className="font-roboto text-xs py-2.5 px-4 border border-red-500/20 text-red-400 active:bg-red-500/10 transition-colors flex items-center justify-center gap-1.5 min-h-[44px]">
-                <Icon name="Trash2" size={14} />
+          {/* Печать + удаление — премиум action bar */}
+          <div className="bg-gradient-to-br from-[#141414] to-[#0A0A0A] border border-[#1F1F1F] rounded-lg p-2.5">
+            <div className="font-oswald font-bold text-white/50 text-[10px] uppercase tracking-widest mb-2 flex items-center gap-1.5">
+              <Icon name="Printer" size={11} />
+              Документы и действия
+            </div>
+            <div className="flex gap-1.5 flex-wrap">
+              <button onClick={handleSendAct} disabled={actSending}
+                className={`flex-1 min-w-[72px] font-roboto text-[11px] py-2.5 rounded-md border transition-all active:scale-95 flex items-center justify-center gap-1.5 min-h-[42px] ${
+                  actSent
+                    ? "border-green-500/50 text-green-400 bg-green-500/15 font-bold"
+                    : "border-[#229ED9]/30 bg-[#229ED9]/5 text-[#229ED9] hover:bg-[#229ED9]/15 hover:border-[#229ED9]/50"
+                }`}>
+                <Icon name={actSent ? "Check" : actSending ? "Loader" : "Send"} size={13} className={actSending ? "animate-spin" : ""} />
+                {actSent ? "Отправлен" : "Акт в TG"}
               </button>
-            )}
+              <button onClick={() => printActHTML(o)}
+                className="flex-1 min-w-[72px] font-roboto text-[11px] py-2.5 rounded-md border border-[#FFD700]/40 bg-[#FFD700]/5 text-[#FFD700] hover:bg-[#FFD700]/15 hover:border-[#FFD700]/60 active:scale-95 transition-all flex items-center justify-center gap-1.5 min-h-[42px] font-bold">
+                <Icon name="FileText" size={13} />Акт
+              </button>
+              <button onClick={() => printAct(o)}
+                className="flex-1 min-w-[72px] font-roboto text-[11px] py-2.5 rounded-md border border-[#FFD700]/25 bg-[#0A0A0A] text-[#FFD700]/80 hover:bg-[#FFD700]/10 active:scale-95 transition-all flex items-center justify-center gap-1.5 min-h-[42px]">
+                <Icon name="Download" size={13} />.docx
+              </button>
+              <button onClick={() => printReceipt(o)}
+                className="flex-1 min-w-[72px] font-roboto text-[11px] py-2.5 rounded-md border border-[#1F1F1F] bg-[#0A0A0A] text-white/50 hover:text-white hover:border-white/20 active:scale-95 transition-all flex items-center justify-center gap-1.5 min-h-[42px]">
+                <Icon name="Printer" size={13} />Чек
+              </button>
+              {isOwner && (
+                <button onClick={() => onDelete(o.id)}
+                  title="Удалить заявку"
+                  className="font-roboto text-[11px] py-2.5 px-4 rounded-md border border-red-500/25 bg-red-500/5 text-red-400 hover:bg-red-500/15 hover:border-red-500/50 active:scale-95 transition-all flex items-center justify-center min-h-[42px]">
+                  <Icon name="Trash2" size={13} />
+                </button>
+              )}
+            </div>
           </div>
 
         </div>
