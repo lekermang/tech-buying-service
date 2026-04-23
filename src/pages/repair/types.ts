@@ -38,7 +38,7 @@ export const fmt = (iso: string) => {
 };
 
 export const fmtDay = (day: string) => {
-  const d = new Date(day);
+  const d = new Date(day + "T12:00:00");
   return d.toLocaleDateString("ru-RU", { day: "2-digit", month: "short", weekday: "short" });
 };
 

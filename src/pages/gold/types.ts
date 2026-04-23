@@ -76,6 +76,6 @@ export const money = (v: number | null | undefined) =>
   v != null ? v.toLocaleString("ru-RU") + " ₽" : "—";
 
 export const fmtDay = (iso: string) => {
-  const d = new Date(iso);
+  const d = new Date(iso + "T12:00:00");
   return d.toLocaleDateString("ru-RU", { weekday: "short", day: "numeric", month: "short" });
 };

@@ -99,7 +99,7 @@ export default function StaffRepairAnalytics({ analytics, analyticsLoading, peri
                   return (
                     <div key={d.day} className="flex items-center gap-2">
                       <span className="font-roboto text-[9px] text-white/30 w-10 shrink-0">
-                        {new Date(d.day).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" })}
+                        {new Date(d.day + "T12:00:00").toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" })}
                       </span>
                       <div className="flex-1 h-4 bg-[#111] relative overflow-hidden">
                         <div className="h-full bg-[#FFD700]/25 absolute left-0 top-0 transition-all" style={{ width: barW + "%" }} />
