@@ -6,7 +6,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-const Index = lazy(() => import("./pages/Index"));
+import Index from "./pages/Index";
 const Admin = lazy(() => import("./pages/Admin"));
 const Cabinet = lazy(() => import("./pages/Cabinet"));
 const Staff = lazy(() => import("./pages/Staff"));
