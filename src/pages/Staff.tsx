@@ -4,6 +4,7 @@ import { EMPLOYEE_AUTH_URL } from "./staff.types";
 import GoodsTab from "./StaffGoodsTab";
 import { SalesTab, ClientsTab, AnalyticsTab, EmployeesTab } from "./StaffOtherTabs";
 import StaffRepairTab from "./StaffRepairTab";
+import GoldTab from "./GoldTab";
 
 class TabErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
   constructor(props: { children: ReactNode }) {
@@ -167,6 +168,7 @@ export default function Staff() {
     { k: "sales",     l: "Продажи",   icon: "ShoppingCart" },
     { k: "clients",   l: "Клиенты",   icon: "Users" },
     { k: "analytics", l: "Статистика",icon: "BarChart2" },
+    ...(isOwnerOrAdmin ? [{ k: "gold", l: "Золото", icon: "Gem" }] : []),
     ...(isOwnerOrAdmin ? [{ k: "employees", l: "Команда", icon: "UserCog" }] : []),
   ];
 
@@ -221,6 +223,7 @@ export default function Staff() {
           {tab === "sales"     && <SalesTab token={token} />}
           {tab === "clients"   && <ClientsTab token={token} />}
           {tab === "analytics" && <AnalyticsTab token={token} />}
+          {tab === "gold"      && isOwnerOrAdmin && <GoldTab token={token} />}
           {tab === "employees" && isOwnerOrAdmin && <EmployeesTab token={token} myRole={empRole} />}
         </TabErrorBoundary>
       </div>

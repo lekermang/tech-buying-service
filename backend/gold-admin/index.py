@@ -1,0 +1,389 @@
+import json
+import os
+
+HEADERS = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Employee-Token, X-Admin-Token',
+    'Content-Type': 'application/json',
+}
+
+import psycopg2
+import requests
+
+SCHEMA = 't_p31606708_tech_buying_service'
+
+VALID_STATUSES = ['new', 'in_progress', 'done', 'cancelled']
+
+STATUS_LABELS = {
+    'new': '🟡 Принята',
+    'in_progress': '🔄 В обработке',
+    'done': '✅ Выкуплено',
+    'cancelled': '❌ Отменено',
+}
+
+PURITY_LABELS = {
+    '999': '999 (24K)',
+    '958': '958 (23K)',
+    '916': '916 (22K)',
+    '875': '875 (21K)',
+    '750': '750 (18K)',
+    '585': '585 (14K)',
+    '500': '500 (12K)',
+    '375': '375 (9K)',
+}
+
+
+def get_conn():
+    return psycopg2.connect(os.environ['DATABASE_URL'])
+
+
+def check_token(event: dict) -> bool:
+    headers = {k.lower(): v for k, v in (event.get('headers') or {}).items()}
+    token = headers.get('x-employee-token', '')
+    if not token:
+        return False
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        f"SELECT role FROM {SCHEMA}.employees WHERE token = %s AND is_active = true",
+        (token,)
+    )
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    if not row:
+        return False
+    return row[0] in ('owner', 'admin')
+
+
+def handler(event: dict, context) -> dict:
+    """Управление заявками на скупку золота — CRUD + аналитика. Только для owner/admin."""
+
+    if event.get('httpMethod') == 'OPTIONS':
+        return {'statusCode': 200, 'headers': HEADERS, 'body': ''}
+
+    if not check_token(event):
+        return {'statusCode': 401, 'headers': HEADERS, 'body': json.dumps({'error': 'Unauthorized'}, ensure_ascii=False)}
+
+    method = event.get('httpMethod', 'GET')
+    params = event.get('queryStringParameters') or {}
+    body = {}
+    if event.get('body'):
+        try:
+            body = json.loads(event['body'])
+        except Exception:
+            pass
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    # ─── GET ──────────────────────────────────────────────────────────────────
+    if method == 'GET':
+        action = params.get('action', '')
+
+        # Аналитика за период
+        if action == 'analytics':
+            period = params.get('period', 'month')
+            if period == 'yesterday':
+                period_where = """
+                    COALESCE(status_updated_at, created_at) >= (
+                        DATE_TRUNC('day', (NOW() + INTERVAL '3 hours')::date - 1) + INTERVAL '7 hours' - INTERVAL '3 hours'
+                    )
+                    AND COALESCE(status_updated_at, created_at) < (
+                        DATE_TRUNC('day', (NOW() + INTERVAL '3 hours')::date) + INTERVAL '7 hours' - INTERVAL '3 hours'
+                    )
+                """
+            elif period == 'day':
+                period_where = """
+                    COALESCE(status_updated_at, created_at) >= (
+                        CASE
+                            WHEN EXTRACT(HOUR FROM NOW() + INTERVAL '3 hours') >= 7
+                            THEN DATE_TRUNC('day', (NOW() + INTERVAL '3 hours')) + INTERVAL '7 hours' - INTERVAL '3 hours'
+                            ELSE DATE_TRUNC('day', (NOW() + INTERVAL '3 hours') - INTERVAL '1 day') + INTERVAL '7 hours' - INTERVAL '3 hours'
+                        END
+                    )
+                """
+            elif period == 'week':
+                period_where = """
+                    COALESCE(status_updated_at, created_at) >= (
+                        CASE
+                            WHEN EXTRACT(HOUR FROM NOW() + INTERVAL '3 hours') >= 7
+                            THEN DATE_TRUNC('day', (NOW() + INTERVAL '3 hours')) + INTERVAL '7 hours' - INTERVAL '3 hours'
+                            ELSE DATE_TRUNC('day', (NOW() + INTERVAL '3 hours') - INTERVAL '1 day') + INTERVAL '7 hours' - INTERVAL '3 hours'
+                        END - INTERVAL '6 days'
+                    )
+                """
+            else:
+                period_where = """
+                    COALESCE(status_updated_at, created_at) >= (
+                        CASE
+                            WHEN EXTRACT(HOUR FROM NOW() + INTERVAL '3 hours') >= 7
+                            THEN DATE_TRUNC('day', (NOW() + INTERVAL '3 hours')) + INTERVAL '7 hours' - INTERVAL '3 hours'
+                            ELSE DATE_TRUNC('day', (NOW() + INTERVAL '3 hours') - INTERVAL '1 day') + INTERVAL '7 hours' - INTERVAL '3 hours'
+                        END - INTERVAL '29 days'
+                    )
+                """
+
+            cur.execute(f"""
+                SELECT
+                    COUNT(*) FILTER (WHERE status = 'done') as done,
+                    COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled,
+                    COUNT(*) FILTER (WHERE status = 'in_progress') as in_progress,
+                    COUNT(*) FILTER (WHERE status = 'new') as new_count,
+                    COALESCE(SUM(buy_price) FILTER (WHERE status = 'done'), 0) as total_buy,
+                    COALESCE(SUM(sell_price) FILTER (WHERE status = 'done'), 0) as total_sell,
+                    COALESCE(SUM(profit) FILTER (WHERE status = 'done'), 0) as total_profit,
+                    COUNT(*) as total,
+                    COALESCE(SUM(weight) FILTER (WHERE status = 'done'), 0) as total_weight
+                FROM {SCHEMA}.gold_orders
+                WHERE {period_where}
+            """)
+            row = cur.fetchone()
+            total_buy = int(row[4]) if row[4] else 0
+            total_sell = int(row[5]) if row[5] else 0
+            total_profit = int(row[6]) if row[6] else 0
+
+            cur.execute(f"""
+                SELECT
+                    DATE((COALESCE(status_updated_at, created_at) + INTERVAL '3 hours') - INTERVAL '7 hours') as work_day,
+                    COUNT(*) as done,
+                    COALESCE(SUM(buy_price), 0) as total_buy,
+                    COALESCE(SUM(sell_price), 0) as total_sell,
+                    COALESCE(SUM(profit), 0) as total_profit,
+                    COALESCE(SUM(weight), 0) as total_weight
+                FROM {SCHEMA}.gold_orders
+                WHERE status = 'done' AND {period_where}
+                GROUP BY work_day ORDER BY work_day ASC
+            """)
+            daily_rows = cur.fetchall()
+            daily = [
+                {
+                    'day': str(r[0]),
+                    'done': r[1],
+                    'buy': int(r[2]),
+                    'sell': int(r[3]),
+                    'profit': int(r[4]),
+                    'weight': float(r[5]) if r[5] else 0,
+                }
+                for r in daily_rows
+            ]
+            cur.close(); conn.close()
+            return {
+                'statusCode': 200, 'headers': HEADERS,
+                'body': json.dumps({
+                    'period': period,
+                    'done': row[0], 'cancelled': row[1],
+                    'in_progress': row[2], 'new': row[3],
+                    'total': row[7], 'total_weight': float(row[8]) if row[8] else 0,
+                    'total_buy': total_buy,
+                    'total_sell': total_sell,
+                    'total_profit': total_profit,
+                    'daily': daily,
+                }, ensure_ascii=False)
+            }
+
+        # Статистика за 30 дней (таблица)
+        if action == 'daily_stats':
+            cur.execute(f"""
+                SELECT
+                    DATE((COALESCE(status_updated_at, created_at) + INTERVAL '3 hours') - INTERVAL '7 hours') as work_day,
+                    COUNT(*) as total,
+                    COUNT(*) FILTER (WHERE status = 'done') as done,
+                    COALESCE(SUM(buy_price) FILTER (WHERE status = 'done'), 0) as total_buy,
+                    COALESCE(SUM(sell_price) FILTER (WHERE status = 'done'), 0) as total_sell,
+                    COALESCE(SUM(profit) FILTER (WHERE status = 'done'), 0) as total_profit,
+                    COALESCE(SUM(weight) FILTER (WHERE status = 'done'), 0) as total_weight
+                FROM {SCHEMA}.gold_orders
+                WHERE COALESCE(status_updated_at, created_at) >= NOW() - INTERVAL '31 days'
+                GROUP BY work_day ORDER BY work_day DESC
+            """)
+            rows = cur.fetchall()
+            cur.close(); conn.close()
+            stats = [
+                {
+                    'day': str(r[0]), 'total': r[1], 'done': r[2],
+                    'buy': int(r[3]), 'sell': int(r[4]),
+                    'profit': int(r[5]),
+                    'weight': float(r[6]) if r[6] else 0,
+                }
+                for r in rows
+            ]
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'stats': stats}, ensure_ascii=False)}
+
+        # Список заявок
+        status_filter = params.get('status', '')
+        search = params.get('search', '')
+        date_from = params.get('date_from', '')
+        date_to = params.get('date_to', '')
+
+        wheres = []
+        if status_filter and status_filter != 'all':
+            wheres.append(f"status = '{status_filter}'")
+        if search:
+            s = search.replace("'", "''")
+            wheres.append(f"(name ILIKE '%{s}%' OR phone ILIKE '%{s}%' OR item_name ILIKE '%{s}%')")
+        if date_from:
+            wheres.append(f"DATE(created_at + INTERVAL '3 hours') >= '{date_from}'")
+        if date_to:
+            wheres.append(f"DATE(created_at + INTERVAL '3 hours') <= '{date_to}'")
+
+        where_clause = ('WHERE ' + ' AND '.join(wheres)) if wheres else ''
+        cur.execute(f"""
+            SELECT id, name, phone, item_name, weight, purity, buy_price, sell_price, profit,
+                   comment, status, status_updated_at, created_at, admin_note, completed_at, payment_method
+            FROM {SCHEMA}.gold_orders
+            {where_clause}
+            ORDER BY created_at DESC
+            LIMIT 200
+        """)
+        rows = cur.fetchall()
+        cur.close(); conn.close()
+
+        orders = []
+        for r in rows:
+            orders.append({
+                'id': r[0], 'name': r[1], 'phone': r[2],
+                'item_name': r[3], 'weight': float(r[4]) if r[4] else None,
+                'purity': r[5], 'buy_price': r[6], 'sell_price': r[7], 'profit': r[8],
+                'comment': r[9], 'status': r[10],
+                'status_updated_at': r[11].isoformat() if r[11] else None,
+                'created_at': r[12].isoformat() if r[12] else None,
+                'admin_note': r[13],
+                'completed_at': r[14].isoformat() if r[14] else None,
+                'payment_method': r[15],
+            })
+        return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'orders': orders}, ensure_ascii=False)}
+
+    # ─── POST ─────────────────────────────────────────────────────────────────
+    if method == 'POST':
+        action = body.get('action', '')
+
+        # Создать заявку
+        if action == 'create':
+            name = str(body.get('name', '')).strip()
+            phone = str(body.get('phone', '')).strip()
+            if not name or not phone:
+                cur.close(); conn.close()
+                return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'Имя и телефон обязательны'}, ensure_ascii=False)}
+
+            item_name = str(body.get('item_name', '') or '').replace("'", "''")
+            weight = body.get('weight')
+            purity = str(body.get('purity', '') or '').replace("'", "''")
+            buy_price = body.get('buy_price')
+            sell_price = body.get('sell_price')
+            comment = str(body.get('comment', '') or '').replace("'", "''")
+            profit_val = None
+            if buy_price is not None and sell_price is not None:
+                profit_val = int(sell_price) - int(buy_price)
+
+            name_e = name.replace("'", "''")
+            phone_e = phone.replace("'", "''")
+            weight_sql = str(float(weight)) if weight else 'NULL'
+            buy_sql = str(int(buy_price)) if buy_price is not None else 'NULL'
+            sell_sql = str(int(sell_price)) if sell_price is not None else 'NULL'
+            profit_sql = str(profit_val) if profit_val is not None else 'NULL'
+
+            cur.execute(f"""
+                INSERT INTO {SCHEMA}.gold_orders
+                    (name, phone, item_name, weight, purity, buy_price, sell_price, profit, comment)
+                VALUES
+                    ('{name_e}', '{phone_e}',
+                     '{item_name}', {weight_sql}, '{purity}',
+                     {buy_sql}, {sell_sql}, {profit_sql}, '{comment}')
+                RETURNING id
+            """)
+            order_id = cur.fetchone()[0]
+            conn.commit()
+            cur.close(); conn.close()
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'order_id': order_id}, ensure_ascii=False)}
+
+        # Обновить заявку
+        order_id = int(body.get('id', 0))
+        new_status = body.get('status', '')
+        admin_note = body.get('admin_note')
+        buy_price = body.get('buy_price')
+        sell_price = body.get('sell_price')
+        item_name = body.get('item_name')
+        weight = body.get('weight')
+        purity = body.get('purity')
+        comment = body.get('comment')
+        payment_method = body.get('payment_method')
+        upd_name = body.get('name')
+        upd_phone = body.get('phone')
+
+        if new_status and new_status not in VALID_STATUSES:
+            cur.close(); conn.close()
+            return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'Неверный статус'}, ensure_ascii=False)}
+
+        sets = []
+        if new_status:
+            sets.append(f"status = '{new_status}'")
+            sets.append("status_updated_at = NOW()")
+            if new_status == 'done':
+                sets.append("completed_at = NOW()")
+        if admin_note is not None:
+            sets.append(f"admin_note = '{str(admin_note).replace(chr(39), chr(39)*2)}'")
+        if buy_price is not None:
+            sets.append(f"buy_price = {int(buy_price)}")
+        if sell_price is not None:
+            sets.append(f"sell_price = {int(sell_price)}")
+        if buy_price is not None or sell_price is not None:
+            cur.execute(f"SELECT buy_price, sell_price FROM {SCHEMA}.gold_orders WHERE id = {order_id}")
+            cur_row = cur.fetchone()
+            bp = int(buy_price) if buy_price is not None else (cur_row[0] or 0)
+            sp = int(sell_price) if sell_price is not None else (cur_row[1] or 0)
+            sets.append(f"profit = {sp - bp}")
+        if item_name is not None:
+            sets.append(f"item_name = '{str(item_name).replace(chr(39), chr(39)*2)}'")
+        if weight is not None:
+            sets.append(f"weight = {float(weight)}" if weight else "weight = NULL")
+        if purity is not None:
+            sets.append(f"purity = '{str(purity).replace(chr(39), chr(39)*2)}'")
+        if comment is not None:
+            sets.append(f"comment = '{str(comment).replace(chr(39), chr(39)*2)}'")
+        if payment_method is not None:
+            sets.append(f"payment_method = '{str(payment_method).replace(chr(39), chr(39)*2)}'" if payment_method else "payment_method = NULL")
+        if upd_name is not None:
+            sets.append(f"name = '{str(upd_name).replace(chr(39), chr(39)*2)}'")
+        if upd_phone is not None:
+            sets.append(f"phone = '{str(upd_phone).replace(chr(39), chr(39)*2)}'")
+
+        if not sets:
+            cur.close(); conn.close()
+            return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'Нет данных для обновления'}, ensure_ascii=False)}
+
+        cur.execute(f"UPDATE {SCHEMA}.gold_orders SET {', '.join(sets)} WHERE id = {order_id} RETURNING id, name, phone")
+        row = cur.fetchone()
+        conn.commit()
+
+        if not row:
+            cur.close(); conn.close()
+            return {'statusCode': 404, 'headers': HEADERS, 'body': json.dumps({'error': 'Заявка не найдена'}, ensure_ascii=False)}
+
+        # Telegram при смене статуса
+        if new_status:
+            try:
+                tg_token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+                chat_id = os.environ.get('TELEGRAM_CHAT_ID', '')
+                pluxan = os.environ.get('PLUXAN4IK_CHAT_ID', '')
+                status_lbl = STATUS_LABELS.get(new_status, new_status)
+                msg = (
+                    f"🥇 *Золото #{order_id} — Статус изменён*\n\n"
+                    f"👤 *Клиент:* {row[1]}\n"
+                    f"📞 *Телефон:* {row[2]}\n"
+                    f"📌 *Статус:* {status_lbl}"
+                )
+                for cid in filter(None, [chat_id, pluxan]):
+                    requests.post(
+                        f'https://api.telegram.org/bot{tg_token}/sendMessage',
+                        json={'chat_id': cid, 'text': msg, 'parse_mode': 'Markdown'},
+                        timeout=8
+                    )
+            except Exception:
+                pass
+
+        cur.close(); conn.close()
+        return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True}, ensure_ascii=False)}
+
+    return {'statusCode': 405, 'headers': HEADERS, 'body': json.dumps({'error': 'Method not allowed'}, ensure_ascii=False)}
