@@ -1,10 +1,14 @@
-import { useState, useEffect, Component, type ReactNode } from "react";
+import React, { useState, useEffect, Component, type ReactNode, lazy } from "react";
 import Icon from "@/components/ui/icon";
 import { EMPLOYEE_AUTH_URL } from "./staff.types";
-import GoodsTab from "./StaffGoodsTab";
-import { SalesTab, ClientsTab, AnalyticsTab, EmployeesTab } from "./StaffOtherTabs";
-import StaffRepairTab from "./StaffRepairTab";
-import GoldTab from "./GoldTab";
+
+const GoodsTab      = lazy(() => import("./StaffGoodsTab"));
+const StaffRepairTab = lazy(() => import("./StaffRepairTab"));
+const GoldTab       = lazy(() => import("./GoldTab"));
+const SalesTab      = lazy(() => import("./StaffOtherTabs").then(m => ({ default: m.SalesTab })));
+const ClientsTab    = lazy(() => import("./StaffOtherTabs").then(m => ({ default: m.ClientsTab })));
+const AnalyticsTab  = lazy(() => import("./StaffOtherTabs").then(m => ({ default: m.AnalyticsTab })));
+const EmployeesTab  = lazy(() => import("./StaffOtherTabs").then(m => ({ default: m.EmployeesTab })));
 
 class TabErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
   constructor(props: { children: ReactNode }) {
@@ -218,13 +222,15 @@ export default function Staff() {
       {/* Контент — растягивается, с паддингом под нижнюю панель */}
       <div className="flex-1 overflow-y-auto" style={{ paddingBottom: 'calc(50px + env(safe-area-inset-bottom, 16px))' }}>
         <TabErrorBoundary key={tab}>
-          {tab === "repair"    && <StaffRepairTab token={token} isOwner={empRole === "owner"} />}
-          {tab === "goods"     && <GoodsTab token={token} />}
-          {tab === "sales"     && <SalesTab token={token} />}
-          {tab === "clients"   && <ClientsTab token={token} />}
-          {tab === "analytics" && <AnalyticsTab token={token} />}
-          {tab === "gold"      && isOwnerOrAdmin && <GoldTab token={token} />}
-          {tab === "employees" && isOwnerOrAdmin && <EmployeesTab token={token} myRole={empRole} />}
+          <React.Suspense fallback={<div className="flex items-center justify-center py-16 text-white/20 font-roboto text-sm"><Icon name="Loader" size={16} className="animate-spin mr-2" />Загружаю...</div>}>
+            {tab === "repair"    && <StaffRepairTab token={token} isOwner={empRole === "owner"} />}
+            {tab === "goods"     && <GoodsTab token={token} />}
+            {tab === "sales"     && <SalesTab token={token} />}
+            {tab === "clients"   && <ClientsTab token={token} />}
+            {tab === "analytics" && <AnalyticsTab token={token} />}
+            {tab === "gold"      && isOwnerOrAdmin && <GoldTab token={token} />}
+            {tab === "employees" && isOwnerOrAdmin && <EmployeesTab token={token} myRole={empRole} />}
+          </React.Suspense>
         </TabErrorBoundary>
       </div>
 
