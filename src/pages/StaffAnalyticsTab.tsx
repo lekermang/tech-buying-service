@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 import { SALES_URL, type Analytics } from "./staff.types";
 import { REPAIR_URL } from "./repair/types";
+import { GOLD_URL, type GoldAnalytics } from "./gold/types";
 
 type RepairAnalytics = {
   total: number; done: number; revenue: number; costs: number;
@@ -13,6 +14,7 @@ export function AnalyticsTab({ token }: { token: string }) {
   const [period, setPeriod] = useState("week");
   const [data, setData] = useState<Analytics | null>(null);
   const [repairData, setRepairData] = useState<RepairAnalytics | null>(null);
+  const [goldData, setGoldData] = useState<GoldAnalytics | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,14 +24,18 @@ export function AnalyticsTab({ token }: { token: string }) {
     setLoading(true);
     setError(null);
     try {
-      const [salesRes, repairRes] = await Promise.all([
+      const [salesRes, repairRes, goldRes] = await Promise.all([
         fetch(`${SALES_URL}?action=analytics&period=${period}`, { headers: { "X-Employee-Token": token } }),
         fetch(`${REPAIR_URL}?action=analytics&period=${repairPeriod}`, { headers: { "X-Employee-Token": token } }),
+        fetch(`${GOLD_URL}?action=analytics&period=${repairPeriod}`, { headers: { "X-Employee-Token": token } }),
       ]);
-      const [salesD, repairD] = await Promise.all([salesRes.json(), repairRes.json()]);
+      const [salesD, repairD, goldD] = await Promise.all([salesRes.json(), repairRes.json(), goldRes.json()]);
       if (salesD && typeof salesD === "object" && !salesD.error) setData(salesD);
       if (repairD && typeof repairD === "object" && !repairD.error) {
         setRepairData({ total: 0, done: 0, revenue: 0, costs: 0, profit: 0, master_total: 0, daily: [], ...repairD });
+      }
+      if (goldD && typeof goldD === "object" && !goldD.error) {
+        setGoldData(goldD);
       }
     } catch (e) {
       setError("Ошибка загрузки данных. Попробуйте обновить.");
@@ -49,9 +55,18 @@ export function AnalyticsTab({ token }: { token: string }) {
   ];
   const TYPE_LABELS: Record<string, string> = { goods: "📦 Продажи", repair: "🔧 Ремонт", purchase: "💰 Закупка" };
 
-  const totalRevenue = (data?.total_revenue || 0) + (repairData?.revenue || 0);
+  const repairRevenue = repairData?.revenue || 0;
+  const repairCosts = repairData?.costs || 0;
   const repairProfit = repairData?.profit || 0;
   const masterIncome = repairData?.master_total || 0;
+  const repairNetProfit = repairProfit - masterIncome;
+
+  const goldRevenue = goldData?.total_sell || 0;
+  const goldCosts = goldData?.total_buy || 0;
+  const goldProfit = goldData?.total_profit || 0;
+
+  const totalRevenue = (data?.total_revenue || 0) + repairRevenue + goldRevenue;
+  const totalProfit = repairNetProfit + goldProfit;
 
   const dailyRepair = repairData?.daily || [];
   const maxRevRepair = dailyRepair.length > 0 ? Math.max(...dailyRepair.map(d => d.revenue), 1) : 1;
@@ -83,19 +98,63 @@ export function AnalyticsTab({ token }: { token: string }) {
 
       {!loading && (
         <>
-          {/* Главные KPI */}
-          <div className="grid grid-cols-2 gap-2 mb-3">
-            <div className="bg-[#1A1A1A] border border-[#2A2A2A] p-3">
-              <div className="font-roboto text-white/30 text-[10px] mb-1">Общая выручка</div>
-              <div className="font-oswald font-bold text-2xl text-[#FFD700]">{totalRevenue.toLocaleString("ru-RU")} ₽</div>
-              <div className="font-roboto text-white/20 text-[10px]">{(data?.total_deals || 0) + (repairData?.done || 0)} сделок</div>
+          {/* ОБЩИЙ ДОХОД: Ремонт + Золото */}
+          <div className="bg-gradient-to-br from-[#FFD700]/10 to-green-500/10 border border-[#FFD700]/30 p-4 mb-3">
+            <div className="font-roboto text-[#FFD700]/70 text-[10px] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <Icon name="TrendingUp" size={12} />
+              Общий доход (ремонт + золото)
             </div>
-            <div className="bg-[#1A1A1A] border border-[#2A2A2A] p-3">
-              <div className="font-roboto text-white/30 text-[10px] mb-1">Прибыль ремонта</div>
-              <div className={`font-oswald font-bold text-2xl ${repairProfit >= 0 ? "text-green-400" : "text-red-400"}`}>
-                {repairProfit.toLocaleString("ru-RU")} ₽
+            <div className="flex items-end justify-between gap-2 mb-3">
+              <div>
+                <div className={`font-oswald font-bold text-3xl ${totalProfit >= 0 ? "text-green-400" : "text-red-400"}`}>
+                  {totalProfit.toLocaleString("ru-RU")} ₽
+                </div>
+                <div className="font-roboto text-white/30 text-[10px]">чистая прибыль</div>
               </div>
-              <div className="font-roboto text-orange-400/60 text-[10px]">закупка: {(repairData?.costs || 0).toLocaleString("ru-RU")} ₽</div>
+              <div className="text-right">
+                <div className="font-oswald font-bold text-lg text-[#FFD700]">{totalRevenue.toLocaleString("ru-RU")} ₽</div>
+                <div className="font-roboto text-white/30 text-[9px]">общая выручка</div>
+              </div>
+            </div>
+
+            {/* Разбивка */}
+            <div className="grid grid-cols-2 gap-2 pt-3 border-t border-[#FFD700]/15">
+              {/* Ремонт */}
+              <div className="bg-black/30 border border-[#2A2A2A] p-2">
+                <div className="font-roboto text-white/40 text-[9px] uppercase tracking-wide mb-1 flex items-center gap-1">
+                  <span>🔧</span> Ремонт
+                </div>
+                <div className={`font-oswald font-bold text-lg ${repairNetProfit >= 0 ? "text-green-400" : "text-red-400"}`}>
+                  {repairNetProfit.toLocaleString("ru-RU")} ₽
+                </div>
+                <div className="font-roboto text-white/30 text-[9px] leading-tight mt-1">
+                  <div>выручка: <span className="text-[#FFD700]/70">{repairRevenue.toLocaleString("ru-RU")}</span></div>
+                  <div>закупка: <span className="text-orange-400/70">{repairCosts.toLocaleString("ru-RU")}</span></div>
+                  {masterIncome > 0 && <div>мастер: <span className="text-blue-400/70">{masterIncome.toLocaleString("ru-RU")}</span></div>}
+                </div>
+              </div>
+
+              {/* Золото */}
+              <div className="bg-black/30 border border-[#2A2A2A] p-2">
+                <div className="font-roboto text-white/40 text-[9px] uppercase tracking-wide mb-1 flex items-center gap-1">
+                  <span>🥇</span> Золото
+                </div>
+                <div className={`font-oswald font-bold text-lg ${goldProfit >= 0 ? "text-green-400" : "text-red-400"}`}>
+                  {goldProfit.toLocaleString("ru-RU")} ₽
+                </div>
+                <div className="font-roboto text-white/30 text-[9px] leading-tight mt-1">
+                  <div>продажа: <span className="text-[#FFD700]/70">{goldRevenue.toLocaleString("ru-RU")}</span></div>
+                  <div>закупка: <span className="text-orange-400/70">{goldCosts.toLocaleString("ru-RU")}</span></div>
+                  {goldData && goldData.total_weight > 0 && <div>вес: <span className="text-white/50">{goldData.total_weight.toFixed(2)} г</span></div>}
+                </div>
+              </div>
+            </div>
+
+            {/* Количество сделок */}
+            <div className="flex gap-3 mt-2 pt-2 border-t border-[#FFD700]/15 text-[10px] font-roboto">
+              <span className="text-white/40">Сделок: <span className="text-white font-bold">{(data?.total_deals || 0) + (repairData?.done || 0) + (goldData?.done || 0)}</span></span>
+              <span className="text-white/40">Ремонт: <span className="text-green-400 font-bold">{repairData?.done || 0}</span></span>
+              <span className="text-white/40">Золото: <span className="text-green-400 font-bold">{goldData?.done || 0}</span></span>
             </div>
           </div>
 

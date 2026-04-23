@@ -63,6 +63,10 @@ export default function Staff() {
   const [tab, setTab] = useState<Tab>("repair");
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState<null | boolean>(null);
+  const [pwModal, setPwModal] = useState<null | Tab>(null);
+  const [pwInput, setPwInput] = useState("");
+  const [pwError, setPwError] = useState("");
+  const [unlocked, setUnlocked] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!token) return;
@@ -150,6 +154,27 @@ export default function Staff() {
   );
 
   const isOwnerOrAdmin = empRole === "owner" || empRole === "admin";
+  const isOwner = empRole === "owner";
+  const SECRET_PW = "Mark2015N";
+
+  const requestTab = (t: Tab) => {
+    if (isOwner || unlocked[t]) { setTab(t); return; }
+    if (t === "gold" || t === "analytics") {
+      setPwModal(t); setPwInput(""); setPwError("");
+      return;
+    }
+    setTab(t);
+  };
+
+  const submitPw = () => {
+    if (pwInput === SECRET_PW && pwModal) {
+      setUnlocked(u => ({ ...u, [pwModal]: true }));
+      setTab(pwModal);
+      setPwModal(null); setPwInput(""); setPwError("");
+    } else {
+      setPwError("Неверный пароль");
+    }
+  };
 
   const sendReminderNow = async () => {
     setSending(true);
@@ -238,23 +263,74 @@ export default function Staff() {
       <nav className="fixed bottom-0 left-0 right-0 bg-[#111]/95 backdrop-blur-sm border-t border-[#2A2A2A] z-50"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         <div className="flex">
-          {TABS.map(t => (
-            <button
-              key={t.k}
-              onClick={() => setTab(t.k as Tab)}
-              className={`flex-1 flex flex-col items-center justify-center gap-0.5 pt-2 pb-1.5 min-h-[50px] transition-colors active:opacity-60 relative ${
-                tab === t.k ? "text-[#FFD700]" : "text-white/30"
-              }`}
-            >
-              {tab === t.k && (
-                <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-[#FFD700] rounded-b-full" />
-              )}
-              <Icon name={t.icon} size={20} />
-              <span className="font-roboto text-[8px] leading-none tracking-wide">{t.l}</span>
-            </button>
-          ))}
+          {TABS.map(t => {
+            const locked = !isOwner && !unlocked[t.k] && (t.k === "gold" || t.k === "analytics");
+            return (
+              <button
+                key={t.k}
+                onClick={() => requestTab(t.k as Tab)}
+                className={`flex-1 flex flex-col items-center justify-center gap-0.5 pt-2 pb-1.5 min-h-[50px] transition-colors active:opacity-60 relative ${
+                  tab === t.k ? "text-[#FFD700]" : "text-white/30"
+                }`}
+              >
+                {tab === t.k && (
+                  <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-[#FFD700] rounded-b-full" />
+                )}
+                <div className="relative">
+                  <Icon name={t.icon} size={20} />
+                  {locked && (
+                    <span className="absolute -top-1 -right-1.5 text-[9px]">🔒</span>
+                  )}
+                </div>
+                <span className="font-roboto text-[8px] leading-none tracking-wide">{t.l}</span>
+              </button>
+            );
+          })}
         </div>
       </nav>
+
+      {/* Модалка пароля для сотрудников */}
+      {pwModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={() => setPwModal(null)}>
+          <div onClick={e => e.stopPropagation()} className="bg-[#1A1A1A] border border-[#FFD700]/30 w-full max-w-sm p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-9 h-9 bg-[#FFD700]/10 border border-[#FFD700]/30 flex items-center justify-center">
+                <Icon name="Lock" size={16} className="text-[#FFD700]" />
+              </div>
+              <div>
+                <div className="font-oswald font-bold text-white uppercase text-sm">
+                  {pwModal === "gold" ? "Доступ к золоту" : "Доступ к статистике"}
+                </div>
+                <div className="font-roboto text-white/40 text-[10px]">Требуется пароль владельца</div>
+              </div>
+            </div>
+            <input
+              type="password"
+              autoFocus
+              value={pwInput}
+              onChange={e => { setPwInput(e.target.value); setPwError(""); }}
+              onKeyDown={e => { if (e.key === "Enter") submitPw(); if (e.key === "Escape") setPwModal(null); }}
+              placeholder="••••••••"
+              className="w-full bg-[#0D0D0D] border border-[#333] text-white px-4 py-3 font-roboto text-base focus:outline-none focus:border-[#FFD700] transition-colors mb-2"
+            />
+            {pwError && (
+              <div className="text-red-400 font-roboto text-xs mb-2 flex items-center gap-1">
+                <Icon name="AlertCircle" size={12} />{pwError}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button onClick={() => setPwModal(null)}
+                className="flex-1 border border-[#333] text-white/50 font-roboto text-sm py-2.5 hover:text-white transition-colors">
+                Отмена
+              </button>
+              <button onClick={submitPw}
+                className="flex-1 bg-[#FFD700] text-black font-oswald font-bold uppercase text-sm py-2.5 hover:bg-yellow-400 transition-colors">
+                Войти
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
