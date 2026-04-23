@@ -159,7 +159,7 @@ export default function Staff() {
 
   const requestTab = (t: Tab) => {
     if (isOwner || unlocked[t]) { setTab(t); return; }
-    if (t === "gold" || t === "analytics") {
+    if (t === "gold" || t === "analytics" || t === "employees") {
       setPwModal(t); setPwInput(""); setPwError("");
       return;
     }
@@ -193,8 +193,6 @@ export default function Staff() {
 
   const TABS = [
     { k: "repair",    l: "Ремонт",    icon: "Wrench" },
-    { k: "goods",     l: "Товары",    icon: "Package" },
-    { k: "sales",     l: "Продажи",   icon: "ShoppingCart" },
     { k: "clients",   l: "Клиенты",   icon: "Users" },
     { k: "analytics", l: "Статистика",icon: "BarChart2" },
     ...(isOwnerOrAdmin ? [{ k: "gold", l: "Золото", icon: "Gem" }] : []),
@@ -264,7 +262,7 @@ export default function Staff() {
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         <div className="flex">
           {TABS.map(t => {
-            const locked = !isOwner && !unlocked[t.k] && (t.k === "gold" || t.k === "analytics");
+            const locked = !isOwner && !unlocked[t.k] && (t.k === "gold" || t.k === "analytics" || t.k === "employees");
             return (
               <button
                 key={t.k}
@@ -299,7 +297,7 @@ export default function Staff() {
               </div>
               <div>
                 <div className="font-oswald font-bold text-white uppercase text-sm">
-                  {pwModal === "gold" ? "Доступ к золоту" : "Доступ к статистике"}
+                  {pwModal === "gold" ? "Доступ к золоту" : pwModal === "employees" ? "Доступ к команде" : "Доступ к статистике"}
                 </div>
                 <div className="font-roboto text-white/40 text-[10px]">Требуется пароль владельца</div>
               </div>
