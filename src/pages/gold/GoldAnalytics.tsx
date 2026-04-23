@@ -14,65 +14,96 @@ type Props = {
 
 export default function GoldAnalyticsView({ analytics, loading, period, stats, onPeriodChange, onRefresh }: Props) {
   return (
-    <div className="p-4 overflow-y-auto">
-      <div className="flex gap-2 mb-4 items-center flex-wrap">
-        {(["day", "yesterday", "week", "month"] as Period[]).map(p => (
-          <button key={p} onClick={() => onPeriodChange(p)}
-            className={`px-3 py-1.5 font-roboto text-xs border transition-colors ${period === p ? "border-[#FFD700] text-[#FFD700] bg-[#FFD700]/10" : "border-[#333] text-white/40 hover:text-white"}`}>
-            {p === "day" ? "Сегодня" : p === "yesterday" ? "Вчера" : p === "week" ? "7 дней" : "30 дней"}
-          </button>
-        ))}
-        <button onClick={onRefresh} disabled={loading} className="ml-auto text-white/30 hover:text-white p-1.5 transition-colors">
-          <Icon name={loading ? "Loader" : "RefreshCw"} size={13} className={loading ? "animate-spin" : ""} />
+    <div className="p-3 overflow-y-auto">
+      {/* Период + refresh */}
+      <div className="flex gap-1.5 mb-3 items-center flex-wrap">
+        {(["day", "yesterday", "week", "month"] as Period[]).map(p => {
+          const active = period === p;
+          return (
+            <button key={p} onClick={() => onPeriodChange(p)}
+              className={`px-3 py-1.5 font-roboto text-[11px] rounded-full transition-all active:scale-95 ${
+                active
+                  ? "bg-[#FFD700] text-black font-bold shadow-md shadow-[#FFD700]/20"
+                  : "bg-[#141414] border border-[#1F1F1F] text-white/50 hover:text-white hover:border-[#333]"
+              }`}>
+              {p === "day" ? "Сегодня" : p === "yesterday" ? "Вчера" : p === "week" ? "7 дней" : "30 дней"}
+            </button>
+          );
+        })}
+        <button onClick={onRefresh} disabled={loading}
+          className="ml-auto text-white/40 hover:text-[#FFD700] active:scale-90 p-2 rounded-md transition-all hover:bg-white/5">
+          <Icon name={loading ? "Loader" : "RefreshCw"} size={14} className={loading ? "animate-spin" : ""} />
         </button>
       </div>
 
-      {loading && <div className="text-center py-12 text-white/30 font-roboto text-sm">Загружаю...</div>}
+      {loading && (
+        <div className="flex items-center justify-center py-14 gap-2 text-white/40">
+          <Icon name="Loader" size={18} className="animate-spin text-[#FFD700]" />
+          <span className="font-roboto text-sm">Загружаю аналитику...</span>
+        </div>
+      )}
 
       {analytics && !loading && (
         <>
-          {/* KPI */}
-          <div className="grid grid-cols-2 gap-2 mb-3">
-            <div className="bg-[#1A1A1A] border border-[#2A2A2A] p-3">
-              <div className="font-roboto text-white/30 text-[10px] mb-0.5">Закуплено</div>
-              <div className="font-oswald font-bold text-[#FFD700] text-xl">{money(analytics.total_buy)}</div>
-              <div className="font-roboto text-white/20 text-[10px]">{analytics.total_weight.toFixed(2)} г</div>
-            </div>
-            <div className="bg-[#1A1A1A] border border-[#2A2A2A] p-3">
-              <div className="font-roboto text-white/30 text-[10px] mb-0.5">Выручка продажи</div>
-              <div className="font-oswald font-bold text-blue-400 text-xl">{money(analytics.total_sell)}</div>
-              <div className="font-roboto text-white/20 text-[10px]">{analytics.done} выкуплено</div>
+          {/* Premium большой блок прибыли */}
+          <div className="relative bg-gradient-to-br from-[#FFD700]/10 via-green-500/5 to-transparent border border-[#FFD700]/20 rounded-xl p-4 mb-3 overflow-hidden">
+            <div className="absolute -top-8 -right-8 text-8xl opacity-5 select-none">🥇</div>
+            <div className="relative">
+              <div className="font-roboto text-[#FFD700]/70 text-[10px] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <Icon name="TrendingUp" size={12} />
+                Прибыль от золота
+              </div>
+              <div className={`font-oswald font-bold text-3xl mb-1 ${analytics.total_profit > 0 ? "text-green-400" : analytics.total_profit < 0 ? "text-red-400" : "text-white/40"}`}>
+                {money(analytics.total_profit)}
+              </div>
+              <div className="font-roboto text-white/40 text-[11px]">продажа − закупка</div>
             </div>
           </div>
 
-          {analytics.total_profit > 0 && (
-            <div className="bg-green-500/10 border border-green-500/20 p-3 mb-3 flex items-center justify-between">
-              <div>
-                <div className="font-roboto text-green-400/60 text-[10px] uppercase tracking-wide mb-0.5">Прибыль (продажа − закупка)</div>
-                <div className="font-oswald font-bold text-green-400 text-2xl">{money(analytics.total_profit)}</div>
+          {/* KPI карточки */}
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            <div className="bg-gradient-to-br from-[#1A1A1A] to-[#141414] border border-[#1F1F1F] rounded-lg p-3 hover:border-[#FFD700]/30 transition-colors">
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-roboto text-white/40 text-[10px] uppercase tracking-wide">Закуплено</span>
+                <Icon name="ShoppingBag" size={12} className="text-[#FFD700]/60" />
               </div>
-              <span className="text-3xl opacity-40">🥇</span>
+              <div className="font-oswald font-bold text-[#FFD700] text-xl tabular-nums">{money(analytics.total_buy)}</div>
+              <div className="font-roboto text-white/30 text-[10px] mt-0.5">{analytics.total_weight.toFixed(2)} г</div>
             </div>
-          )}
+            <div className="bg-gradient-to-br from-[#1A1A1A] to-[#141414] border border-[#1F1F1F] rounded-lg p-3 hover:border-blue-400/30 transition-colors">
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-roboto text-white/40 text-[10px] uppercase tracking-wide">Продано</span>
+                <Icon name="TrendingUp" size={12} className="text-blue-400/60" />
+              </div>
+              <div className="font-oswald font-bold text-blue-400 text-xl tabular-nums">{money(analytics.total_sell)}</div>
+              <div className="font-roboto text-white/30 text-[10px] mt-0.5">{analytics.done} шт</div>
+            </div>
+          </div>
 
-          {/* Счётчики статусов */}
+          {/* Счётчики статусов — premium chips */}
           <div className="grid grid-cols-3 gap-2 mb-3">
             {[
-              { key: "new", label: "Закуплено", val: analytics.new, color: "text-white/60" },
-              { key: "done", label: "Продано", val: analytics.done, color: "text-green-400" },
-              { key: "cancelled", label: "Отменено", val: analytics.cancelled, color: "text-red-400" },
+              { key: "new", label: "Закуплено", val: analytics.new, color: "text-white/80", bg: "bg-white/5", dot: "bg-white/40" },
+              { key: "done", label: "Продано", val: analytics.done, color: "text-green-400", bg: "bg-green-500/10", dot: "bg-green-400" },
+              { key: "cancelled", label: "Отменено", val: analytics.cancelled, color: "text-red-400", bg: "bg-red-500/10", dot: "bg-red-400" },
             ].map(s => (
-              <div key={s.key} className="bg-[#1A1A1A] border border-[#2A2A2A] p-2 text-center">
-                <div className={`font-oswald font-bold text-lg ${s.color}`}>{s.val}</div>
-                <div className="font-roboto text-white/30 text-[9px]">{s.label}</div>
+              <div key={s.key} className={`${s.bg} border border-[#1F1F1F] rounded-lg p-2.5 text-center`}>
+                <div className="flex items-center justify-center gap-1 mb-0.5">
+                  <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
+                  <span className="font-roboto text-white/40 text-[9px] uppercase tracking-wide">{s.label}</span>
+                </div>
+                <div className={`font-oswald font-bold text-xl ${s.color} tabular-nums`}>{s.val}</div>
               </div>
             ))}
           </div>
 
           {/* График по дням */}
           {analytics.daily.length > 1 && (
-            <div className="bg-[#1A1A1A] border border-[#2A2A2A] p-3 mb-3">
-              <div className="font-roboto text-white/30 text-[10px] uppercase tracking-wide mb-2">Динамика по дням</div>
+            <div className="bg-gradient-to-br from-[#141414] to-[#0A0A0A] border border-[#1F1F1F] rounded-lg p-3 mb-3">
+              <div className="font-roboto text-white/40 text-[10px] uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <Icon name="Activity" size={11} />
+                Динамика по дням
+              </div>
               <div className="space-y-1.5">
                 {analytics.daily.slice().reverse().map(d => {
                   const maxBuy = Math.max(...analytics.daily.map(x => x.buy), 1);
@@ -80,20 +111,20 @@ export default function GoldAnalyticsView({ analytics, loading, period, stats, o
                   const profW = Math.round((Math.max(0, d.profit) / maxBuy) * 100);
                   return (
                     <div key={d.day} className="flex items-center gap-2">
-                      <span className="font-roboto text-[9px] text-white/30 w-10 shrink-0">
+                      <span className="font-roboto text-[9px] text-white/40 w-10 shrink-0 tabular-nums">
                         {new Date(d.day + "T12:00:00").toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" })}
                       </span>
-                      <div className="flex-1 h-4 bg-[#111] relative overflow-hidden">
-                        <div className="h-full bg-[#FFD700]/25 absolute left-0 top-0 transition-all" style={{ width: barW + "%" }} />
-                        <div className="h-full bg-green-500/35 absolute left-0 top-0 transition-all" style={{ width: profW + "%" }} />
+                      <div className="flex-1 h-4 bg-[#0A0A0A] rounded-sm relative overflow-hidden border border-[#1A1A1A]">
+                        <div className="h-full bg-gradient-to-r from-[#FFD700]/30 to-[#FFD700]/10 absolute left-0 top-0 transition-all" style={{ width: barW + "%" }} />
+                        <div className="h-full bg-gradient-to-r from-green-500/40 to-green-500/20 absolute left-0 top-0 transition-all" style={{ width: profW + "%" }} />
                       </div>
-                      <span className="font-roboto text-[9px] text-white/40 w-16 text-right shrink-0">
+                      <span className="font-roboto text-[9px] text-white/40 w-16 text-right shrink-0 tabular-nums">
                         {d.buy > 0 ? d.buy.toLocaleString("ru-RU") + "₽" : "—"}
                       </span>
-                      <span className={`font-roboto text-[9px] w-12 text-right shrink-0 ${d.profit > 0 ? "text-green-400" : d.profit < 0 ? "text-red-400" : "text-white/20"}`}>
+                      <span className={`font-roboto text-[9px] w-14 text-right shrink-0 tabular-nums font-bold ${d.profit > 0 ? "text-green-400" : d.profit < 0 ? "text-red-400" : "text-white/20"}`}>
                         {d.profit !== 0 ? (d.profit > 0 ? "+" : "") + d.profit.toLocaleString("ru-RU") : "—"}
                       </span>
-                      <span className="font-roboto text-white/20 text-[9px] w-5 text-right shrink-0">{d.done}✓</span>
+                      <span className="font-roboto text-green-400/60 text-[9px] w-5 text-right shrink-0">{d.done}✓</span>
                     </div>
                   );
                 })}
@@ -103,24 +134,25 @@ export default function GoldAnalyticsView({ analytics, loading, period, stats, o
 
           {/* Таблица за 30 дней */}
           {stats.length > 0 && (
-            <div className="bg-[#1A1A1A] border border-[#2A2A2A] overflow-x-auto">
-              <div className="font-roboto text-white/30 text-[10px] uppercase tracking-wide px-3 py-2 border-b border-[#333]">
+            <div className="bg-gradient-to-br from-[#141414] to-[#0A0A0A] border border-[#1F1F1F] rounded-lg overflow-hidden">
+              <div className="font-roboto text-white/40 text-[10px] uppercase tracking-wider px-3 py-2.5 border-b border-[#1F1F1F] flex items-center gap-1.5">
+                <Icon name="Table" size={11} />
                 Таблица за 30 дней
               </div>
-              <div className="grid px-3 py-1.5 border-b border-[#333]" style={{ gridTemplateColumns: "repeat(6,1fr)" }}>
-                {["День", "Всего", "Выкуп.", "Закупка", "Выручка", "Прибыль"].map(h => (
-                  <div key={h} className="font-roboto text-[9px] text-white/25 text-center uppercase">{h}</div>
+              <div className="grid px-3 py-2 border-b border-[#1F1F1F] bg-[#0A0A0A]" style={{ gridTemplateColumns: "repeat(6,1fr)" }}>
+                {["День", "Всего", "Продано", "Закупка", "Выручка", "Прибыль"].map(h => (
+                  <div key={h} className="font-roboto text-[9px] text-white/30 text-center uppercase tracking-wide">{h}</div>
                 ))}
               </div>
               {stats.map(s => (
-                <div key={s.day} className="grid px-3 py-1.5 border-b border-[#222] last:border-0"
+                <div key={s.day} className="grid px-3 py-2 border-b border-[#1A1A1A] last:border-0 hover:bg-white/[0.02] transition-colors"
                   style={{ gridTemplateColumns: "repeat(6,1fr)" }}>
-                  <div className="font-roboto text-[10px] text-white/50">{fmtDay(s.day)}</div>
-                  <div className="font-roboto text-[10px] text-white text-center">{s.total}</div>
-                  <div className="font-roboto text-[10px] text-green-400 text-center">{s.done}</div>
-                  <div className="font-roboto text-[10px] text-[#FFD700] text-center">{s.buy > 0 ? s.buy.toLocaleString("ru-RU") : "—"}</div>
-                  <div className="font-roboto text-[10px] text-blue-400 text-center">{s.sell > 0 ? s.sell.toLocaleString("ru-RU") : "—"}</div>
-                  <div className={`font-oswald font-bold text-[10px] text-center ${s.profit > 0 ? "text-green-400" : s.profit < 0 ? "text-red-400" : "text-white/20"}`}>
+                  <div className="font-roboto text-[10px] text-white/60">{fmtDay(s.day)}</div>
+                  <div className="font-roboto text-[10px] text-white text-center tabular-nums">{s.total}</div>
+                  <div className="font-roboto text-[10px] text-green-400 text-center tabular-nums">{s.done}</div>
+                  <div className="font-roboto text-[10px] text-[#FFD700] text-center tabular-nums">{s.buy > 0 ? s.buy.toLocaleString("ru-RU") : "—"}</div>
+                  <div className="font-roboto text-[10px] text-blue-400 text-center tabular-nums">{s.sell > 0 ? s.sell.toLocaleString("ru-RU") : "—"}</div>
+                  <div className={`font-oswald font-bold text-[11px] text-center tabular-nums ${s.profit > 0 ? "text-green-400" : s.profit < 0 ? "text-red-400" : "text-white/20"}`}>
                     {s.profit !== 0 ? s.profit.toLocaleString("ru-RU") : "—"}
                   </div>
                 </div>

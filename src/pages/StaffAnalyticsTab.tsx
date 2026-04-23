@@ -72,140 +72,168 @@ export function AnalyticsTab({ token }: { token: string }) {
   const maxRevRepair = dailyRepair.length > 0 ? Math.max(...dailyRepair.map(d => d.revenue), 1) : 1;
 
   return (
-    <div className="p-4">
-      {/* Переключатель периода */}
-      <div className="flex gap-1 mb-4 flex-wrap items-center">
-        {PERIODS.map(p => (
-          <button key={p.v} onClick={() => setPeriod(p.v)}
-            className={`font-roboto text-xs px-3 py-1.5 border transition-colors ${period === p.v ? "border-[#FFD700] text-[#FFD700] bg-[#FFD700]/10" : "border-white/10 text-white/40 hover:text-white"}`}>
-            {p.l}
-          </button>
-        ))}
-        <button onClick={load} disabled={loading} className="ml-auto text-white/30 hover:text-white transition-colors p-1">
-          <Icon name={loading ? "Loader" : "RefreshCw"} size={13} className={loading ? "animate-spin" : ""} />
+    <div className="p-3">
+      {/* Premium переключатель периода */}
+      <div className="flex gap-1.5 mb-3 flex-wrap items-center">
+        {PERIODS.map(p => {
+          const active = period === p.v;
+          return (
+            <button key={p.v} onClick={() => setPeriod(p.v)}
+              className={`font-roboto text-[11px] px-3 py-1.5 rounded-full transition-all active:scale-95 ${
+                active
+                  ? "bg-[#FFD700] text-black font-bold shadow-md shadow-[#FFD700]/20"
+                  : "bg-[#141414] border border-[#1F1F1F] text-white/50 hover:text-white hover:border-[#333]"
+              }`}>
+              {p.l}
+            </button>
+          );
+        })}
+        <button onClick={load} disabled={loading}
+          className="ml-auto text-white/40 hover:text-[#FFD700] active:scale-90 p-2 rounded-md transition-all hover:bg-white/5">
+          <Icon name={loading ? "Loader" : "RefreshCw"} size={14} className={loading ? "animate-spin" : ""} />
         </button>
       </div>
 
       {error && (
-        <div className="bg-red-500/10 border border-red-500/30 text-red-400 font-roboto text-sm p-3 mb-4 flex items-center gap-2">
+        <div className="bg-red-500/10 border border-red-500/30 text-red-400 font-roboto text-sm p-3 mb-4 rounded-lg flex items-center gap-2">
           <Icon name="AlertCircle" size={14} />
           {error}
           <button onClick={load} className="ml-auto underline text-red-400/70 hover:text-red-400">Повторить</button>
         </div>
       )}
 
-      {loading && <div className="text-center py-8 text-white/30 text-sm">Загружаю...</div>}
+      {loading && (
+        <div className="flex items-center justify-center py-14 gap-2 text-white/40">
+          <Icon name="Loader" size={18} className="animate-spin text-[#FFD700]" />
+          <span className="font-roboto text-sm">Загружаю аналитику...</span>
+        </div>
+      )}
 
       {!loading && (
         <>
-          {/* ОБЩИЙ ДОХОД: Ремонт + Золото */}
-          <div className="bg-gradient-to-br from-[#FFD700]/10 to-green-500/10 border border-[#FFD700]/30 p-4 mb-3">
-            <div className="font-roboto text-[#FFD700]/70 text-[10px] uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <Icon name="TrendingUp" size={12} />
-              Общий доход (ремонт + золото)
-            </div>
-            <div className="flex items-end justify-between gap-2 mb-3">
-              <div>
-                <div className={`font-oswald font-bold text-3xl ${totalProfit >= 0 ? "text-green-400" : "text-red-400"}`}>
-                  {totalProfit.toLocaleString("ru-RU")} ₽
-                </div>
-                <div className="font-roboto text-white/30 text-[10px]">чистая прибыль</div>
+          {/* Premium ОБЩИЙ ДОХОД */}
+          <div className="relative bg-gradient-to-br from-[#FFD700]/15 via-green-500/8 to-transparent border border-[#FFD700]/30 rounded-xl p-4 mb-3 overflow-hidden">
+            <div className="absolute -top-10 -right-10 text-[140px] opacity-[0.04] select-none">💰</div>
+            <div className="relative">
+              <div className="font-roboto text-[#FFD700]/80 text-[10px] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <Icon name="TrendingUp" size={12} />
+                Общий доход · Ремонт + Золото
               </div>
-              <div className="text-right">
-                <div className="font-oswald font-bold text-lg text-[#FFD700]">{totalRevenue.toLocaleString("ru-RU")} ₽</div>
-                <div className="font-roboto text-white/30 text-[9px]">общая выручка</div>
-              </div>
-            </div>
-
-            {/* Разбивка */}
-            <div className="grid grid-cols-2 gap-2 pt-3 border-t border-[#FFD700]/15">
-              {/* Ремонт */}
-              <div className="bg-black/30 border border-[#2A2A2A] p-2">
-                <div className="font-roboto text-white/40 text-[9px] uppercase tracking-wide mb-1 flex items-center gap-1">
-                  <span>🔧</span> Ремонт
+              <div className="flex items-end justify-between gap-2 mb-3">
+                <div>
+                  <div className={`font-oswald font-bold text-4xl tabular-nums ${totalProfit >= 0 ? "text-green-400" : "text-red-400"}`}>
+                    {totalProfit.toLocaleString("ru-RU")} ₽
+                  </div>
+                  <div className="font-roboto text-white/40 text-[10px] mt-0.5">чистая прибыль</div>
                 </div>
-                <div className={`font-oswald font-bold text-lg ${repairNetProfit >= 0 ? "text-green-400" : "text-red-400"}`}>
-                  {repairNetProfit.toLocaleString("ru-RU")} ₽
-                </div>
-                <div className="font-roboto text-white/30 text-[9px] leading-tight mt-1">
-                  <div>выручка: <span className="text-[#FFD700]/70">{repairRevenue.toLocaleString("ru-RU")}</span></div>
-                  <div>закупка: <span className="text-orange-400/70">{repairCosts.toLocaleString("ru-RU")}</span></div>
-                  {masterIncome > 0 && <div>мастер: <span className="text-blue-400/70">{masterIncome.toLocaleString("ru-RU")}</span></div>}
+                <div className="text-right">
+                  <div className="font-oswald font-bold text-xl text-[#FFD700] tabular-nums">{totalRevenue.toLocaleString("ru-RU")} ₽</div>
+                  <div className="font-roboto text-white/30 text-[9px]">выручка</div>
                 </div>
               </div>
 
-              {/* Золото */}
-              <div className="bg-black/30 border border-[#2A2A2A] p-2">
-                <div className="font-roboto text-white/40 text-[9px] uppercase tracking-wide mb-1 flex items-center gap-1">
-                  <span>🥇</span> Золото
+              {/* Разбивка */}
+              <div className="grid grid-cols-2 gap-2 pt-3 border-t border-[#FFD700]/20">
+                {/* Ремонт */}
+                <div className="bg-black/40 backdrop-blur border border-[#1F1F1F] rounded-lg p-2.5 hover:border-[#FFD700]/30 transition-colors">
+                  <div className="font-roboto text-white/50 text-[9px] uppercase tracking-wide mb-1 flex items-center gap-1">
+                    <span>🔧</span> Ремонт
+                  </div>
+                  <div className={`font-oswald font-bold text-lg tabular-nums ${repairNetProfit >= 0 ? "text-green-400" : "text-red-400"}`}>
+                    {repairNetProfit.toLocaleString("ru-RU")} ₽
+                  </div>
+                  <div className="font-roboto text-[9px] leading-tight mt-1 space-y-0.5">
+                    <div className="text-white/40">выручка: <span className="text-[#FFD700]/80 font-bold tabular-nums">{repairRevenue.toLocaleString("ru-RU")}</span></div>
+                    <div className="text-white/40">закупка: <span className="text-orange-400/80 font-bold tabular-nums">{repairCosts.toLocaleString("ru-RU")}</span></div>
+                    {masterIncome > 0 && <div className="text-white/40">мастер: <span className="text-blue-400/80 font-bold tabular-nums">{masterIncome.toLocaleString("ru-RU")}</span></div>}
+                  </div>
                 </div>
-                <div className={`font-oswald font-bold text-lg ${goldProfit >= 0 ? "text-green-400" : "text-red-400"}`}>
-                  {goldProfit.toLocaleString("ru-RU")} ₽
-                </div>
-                <div className="font-roboto text-white/30 text-[9px] leading-tight mt-1">
-                  <div>продажа: <span className="text-[#FFD700]/70">{goldRevenue.toLocaleString("ru-RU")}</span></div>
-                  <div>закупка: <span className="text-orange-400/70">{goldCosts.toLocaleString("ru-RU")}</span></div>
-                  {goldData && goldData.total_weight > 0 && <div>вес: <span className="text-white/50">{goldData.total_weight.toFixed(2)} г</span></div>}
+
+                {/* Золото */}
+                <div className="bg-black/40 backdrop-blur border border-[#1F1F1F] rounded-lg p-2.5 hover:border-[#FFD700]/30 transition-colors">
+                  <div className="font-roboto text-white/50 text-[9px] uppercase tracking-wide mb-1 flex items-center gap-1">
+                    <span>🥇</span> Золото
+                  </div>
+                  <div className={`font-oswald font-bold text-lg tabular-nums ${goldProfit >= 0 ? "text-green-400" : "text-red-400"}`}>
+                    {goldProfit.toLocaleString("ru-RU")} ₽
+                  </div>
+                  <div className="font-roboto text-[9px] leading-tight mt-1 space-y-0.5">
+                    <div className="text-white/40">продажа: <span className="text-[#FFD700]/80 font-bold tabular-nums">{goldRevenue.toLocaleString("ru-RU")}</span></div>
+                    <div className="text-white/40">закупка: <span className="text-orange-400/80 font-bold tabular-nums">{goldCosts.toLocaleString("ru-RU")}</span></div>
+                    {goldData && goldData.total_weight > 0 && <div className="text-white/40">вес: <span className="text-white/60 font-bold tabular-nums">{goldData.total_weight.toFixed(2)} г</span></div>}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Количество сделок */}
-            <div className="flex gap-3 mt-2 pt-2 border-t border-[#FFD700]/15 text-[10px] font-roboto">
-              <span className="text-white/40">Сделок: <span className="text-white font-bold">{(data?.total_deals || 0) + (repairData?.done || 0) + (goldData?.done || 0)}</span></span>
-              <span className="text-white/40">Ремонт: <span className="text-green-400 font-bold">{repairData?.done || 0}</span></span>
-              <span className="text-white/40">Золото: <span className="text-green-400 font-bold">{goldData?.done || 0}</span></span>
+              {/* Количество сделок */}
+              <div className="flex gap-3 mt-2.5 pt-2.5 border-t border-[#FFD700]/15 text-[10px] font-roboto flex-wrap">
+                <span className="text-white/40 flex items-center gap-1">
+                  <Icon name="CheckCircle2" size={10} />
+                  Всего: <span className="text-white font-bold tabular-nums">{(data?.total_deals || 0) + (repairData?.done || 0) + (goldData?.done || 0)}</span>
+                </span>
+                <span className="text-white/40">🔧 <span className="text-green-400 font-bold tabular-nums">{repairData?.done || 0}</span></span>
+                <span className="text-white/40">🥇 <span className="text-green-400 font-bold tabular-nums">{goldData?.done || 0}</span></span>
+              </div>
             </div>
           </div>
 
-          {/* Доход мастера */}
+          {/* Доход мастера — premium */}
           {masterIncome > 0 && (
-            <div className="bg-green-500/10 border border-green-500/20 p-3 mb-3 flex items-center justify-between">
-              <div>
-                <div className="font-roboto text-green-400/60 text-[10px] uppercase tracking-wide mb-0.5">Доход мастера (50% прибыли)</div>
-                <div className="font-oswald font-bold text-green-400 text-2xl">{masterIncome.toLocaleString("ru-RU")} ₽</div>
+            <div className="relative bg-gradient-to-br from-green-500/15 to-green-500/5 border border-green-500/30 rounded-xl p-4 mb-3 overflow-hidden">
+              <div className="absolute -top-6 -right-4 text-7xl opacity-10 select-none">🏆</div>
+              <div className="relative flex items-center justify-between">
+                <div>
+                  <div className="font-roboto text-green-400/70 text-[10px] uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                    <Icon name="Award" size={12} />
+                    Доход мастера · 50% прибыли
+                  </div>
+                  <div className="font-oswald font-bold text-green-400 text-3xl tabular-nums">{masterIncome.toLocaleString("ru-RU")} ₽</div>
+                </div>
               </div>
-              <span className="text-3xl opacity-40">🏆</span>
             </div>
           )}
 
-          {/* Ремонт: статусы */}
+          {/* Ремонт: статусы — premium */}
           {repairData && (
-            <div className="bg-[#1A1A1A] border border-[#2A2A2A] p-3 mb-3">
-              <div className="font-roboto text-white/40 text-[10px] uppercase tracking-wide mb-2">🔧 Ремонт за период</div>
-              <div className="grid grid-cols-4 gap-2 mb-2">
+            <div className="bg-gradient-to-br from-[#141414] to-[#0A0A0A] border border-[#1F1F1F] rounded-lg p-3 mb-3">
+              <div className="font-roboto text-white/50 text-[10px] uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <Icon name="Wrench" size={11} className="text-[#FFD700]/60" />
+                Ремонт за период
+              </div>
+              <div className="grid grid-cols-4 gap-2 mb-3">
                 {[
-                  { label: "Всего", value: repairData.total, color: "text-white" },
-                  { label: "Выдано", value: repairData.done, color: "text-green-400" },
-                  { label: "Выручка", value: (repairData.revenue || 0).toLocaleString("ru-RU") + " ₽", color: "text-[#FFD700]" },
-                  { label: "Закупка", value: (repairData.costs || 0).toLocaleString("ru-RU") + " ₽", color: "text-orange-400" },
+                  { label: "Всего", value: repairData.total, color: "text-white", bg: "bg-white/5" },
+                  { label: "Выдано", value: repairData.done, color: "text-green-400", bg: "bg-green-500/5" },
+                  { label: "Выручка", value: (repairData.revenue || 0).toLocaleString("ru-RU"), color: "text-[#FFD700]", bg: "bg-[#FFD700]/5" },
+                  { label: "Закупка", value: (repairData.costs || 0).toLocaleString("ru-RU"), color: "text-orange-400", bg: "bg-orange-500/5" },
                 ].map(c => (
-                  <div key={c.label} className="text-center">
-                    <div className={`font-oswald font-bold text-base ${c.color}`}>{c.value}</div>
-                    <div className="font-roboto text-white/30 text-[9px]">{c.label}</div>
+                  <div key={c.label} className={`${c.bg} border border-[#1F1F1F] rounded-md p-2 text-center`}>
+                    <div className={`font-oswald font-bold text-sm ${c.color} tabular-nums`}>{c.value}</div>
+                    <div className="font-roboto text-white/40 text-[9px] mt-0.5">{c.label}</div>
                   </div>
                 ))}
               </div>
 
               {/* Мини-график ремонта по дням */}
               {dailyRepair.length > 1 && (
-                <div className="space-y-1 mt-2">
+                <div className="space-y-1 mt-3 pt-3 border-t border-[#1F1F1F]">
+                  <div className="font-roboto text-white/30 text-[9px] uppercase tracking-wide mb-1">Динамика (7 дней)</div>
                   {dailyRepair.slice().reverse().slice(0, 7).map(d => {
                     const barW = Math.round((d.revenue / maxRevRepair) * 100);
                     const profitBarW = Math.round((Math.max(0, d.profit) / maxRevRepair) * 100);
                     return (
                       <div key={d.day} className="flex items-center gap-2">
-                        <span className="font-roboto text-[9px] text-white/30 w-10 shrink-0">
+                        <span className="font-roboto text-[9px] text-white/40 w-10 shrink-0 tabular-nums">
                           {new Date(d.day).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" })}
                         </span>
-                        <div className="flex-1 h-4 bg-[#111] relative overflow-hidden">
-                          <div className="h-full bg-[#FFD700]/20 absolute left-0 top-0" style={{ width: barW + "%" }} />
-                          <div className="h-full bg-green-500/30 absolute left-0 top-0" style={{ width: profitBarW + "%" }} />
+                        <div className="flex-1 h-4 bg-[#0A0A0A] rounded-sm relative overflow-hidden border border-[#1A1A1A]">
+                          <div className="h-full bg-gradient-to-r from-[#FFD700]/30 to-[#FFD700]/10 absolute left-0 top-0 transition-all" style={{ width: barW + "%" }} />
+                          <div className="h-full bg-gradient-to-r from-green-500/40 to-green-500/20 absolute left-0 top-0 transition-all" style={{ width: profitBarW + "%" }} />
                         </div>
-                        <span className="font-roboto text-[9px] text-white/40 w-16 text-right shrink-0">
-                          {d.revenue > 0 ? d.revenue.toLocaleString("ru-RU") + " ₽" : "—"}
+                        <span className="font-roboto text-[9px] text-white/40 w-16 text-right shrink-0 tabular-nums">
+                          {d.revenue > 0 ? d.revenue.toLocaleString("ru-RU") + "₽" : "—"}
                         </span>
-                        <span className={`font-roboto text-[9px] w-14 text-right shrink-0 ${d.profit > 0 ? "text-green-400" : d.profit < 0 ? "text-red-400" : "text-white/20"}`}>
+                        <span className={`font-roboto text-[9px] w-14 text-right shrink-0 tabular-nums font-bold ${d.profit > 0 ? "text-green-400" : d.profit < 0 ? "text-red-400" : "text-white/20"}`}>
                           {d.profit !== 0 ? (d.profit > 0 ? "+" : "") + d.profit.toLocaleString("ru-RU") : "—"}
                         </span>
                       </div>
@@ -218,37 +246,51 @@ export function AnalyticsTab({ token }: { token: string }) {
 
           {/* По направлениям (продажи) */}
           {Object.entries(data?.by_type || {}).length > 0 && (
-            <div className="bg-[#1A1A1A] border border-[#2A2A2A] p-3 mb-3">
-              <div className="font-roboto text-white/40 text-[10px] uppercase tracking-wide mb-2">По направлениям (продажи)</div>
+            <div className="bg-gradient-to-br from-[#141414] to-[#0A0A0A] border border-[#1F1F1F] rounded-lg p-3 mb-3">
+              <div className="font-roboto text-white/50 text-[10px] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <Icon name="PieChart" size={11} className="text-[#FFD700]/60" />
+                По направлениям
+              </div>
               {Object.entries(data!.by_type).map(([type, stat]) => (
-                <div key={type} className="flex justify-between py-1.5 border-b border-white/5 last:border-0">
-                  <span className="font-roboto text-sm text-white/70">{TYPE_LABELS[type] || type}</span>
+                <div key={type} className="flex justify-between items-center py-2 border-b border-[#1A1A1A] last:border-0">
+                  <span className="font-roboto text-sm text-white/80">{TYPE_LABELS[type] || type}</span>
                   <div className="text-right">
-                    <span className="font-oswald font-bold text-[#FFD700] text-sm">{(stat.sum || 0).toLocaleString("ru-RU")} ₽</span>
-                    <span className="font-roboto text-white/30 text-[10px] ml-2">{stat.count} сд.</span>
+                    <span className="font-oswald font-bold text-[#FFD700] text-sm tabular-nums">{(stat.sum || 0).toLocaleString("ru-RU")} ₽</span>
+                    <span className="font-roboto text-white/40 text-[10px] ml-2 tabular-nums">· {stat.count} сд.</span>
                   </div>
                 </div>
               ))}
             </div>
           )}
 
-          {/* Мотивация сотрудников */}
+          {/* Рейтинг сотрудников — premium */}
           {(data?.staff_stats?.length || 0) > 0 && (
-            <div className="bg-[#1A1A1A] border border-[#2A2A2A] p-3">
-              <div className="font-roboto text-white/40 text-[10px] uppercase tracking-wide mb-2">Рейтинг сотрудников</div>
-              {data!.staff_stats.map((s, i) => (
-                <div key={i} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
-                  <div className="flex items-center gap-2">
-                    {i === 0 && <Icon name="Trophy" size={12} className="text-[#FFD700]" />}
-                    {i > 0 && <span className="font-roboto text-white/20 text-xs w-4 text-center">{i + 1}</span>}
-                    <span className="font-roboto text-sm text-white/80">{s.name}</span>
+            <div className="bg-gradient-to-br from-[#141414] to-[#0A0A0A] border border-[#1F1F1F] rounded-lg p-3">
+              <div className="font-roboto text-white/50 text-[10px] uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <Icon name="Trophy" size={11} className="text-[#FFD700]/60" />
+                Рейтинг сотрудников
+              </div>
+              {data!.staff_stats.map((s, i) => {
+                const medals = ["🥇", "🥈", "🥉"];
+                return (
+                  <div key={i} className={`flex items-center justify-between py-2.5 px-2 rounded-md border-b border-[#1A1A1A] last:border-0 ${
+                    i === 0 ? "bg-gradient-to-r from-[#FFD700]/10 to-transparent" : ""
+                  }`}>
+                    <div className="flex items-center gap-2.5">
+                      {i < 3 ? (
+                        <span className="text-lg">{medals[i]}</span>
+                      ) : (
+                        <span className="font-oswald font-bold text-white/30 text-sm w-6 text-center tabular-nums">{i + 1}</span>
+                      )}
+                      <span className={`font-roboto text-sm ${i === 0 ? "text-white font-bold" : "text-white/80"}`}>{s.name}</span>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-oswald font-bold text-[#FFD700] text-sm tabular-nums">{(s.revenue || 0).toLocaleString("ru-RU")} ₽</div>
+                      <div className="font-roboto text-white/40 text-[10px] tabular-nums">{s.deals} сделок</div>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <div className="font-oswald font-bold text-[#FFD700] text-sm">{(s.revenue || 0).toLocaleString("ru-RU")} ₽</div>
-                    <div className="font-roboto text-white/30 text-[10px]">{s.deals} сделок</div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </>
