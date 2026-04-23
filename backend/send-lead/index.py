@@ -115,14 +115,63 @@ def handler(event: dict, context) -> dict:
     recipients = get_all_recipients(main_chat_id)
 
     if photos_b64:
-        # Фото отправляем только в основной чат (чтобы не таймаутить)
         send_tg_photos(token, main_chat_id, caption, photos_b64)
-        # Остальным — текстовое уведомление
         for cid in recipients[1:]:
             send_tg_text(token, cid, caption)
     else:
-        # Без фото — текст всем
         for cid in recipients:
             send_tg_text(token, cid, caption)
+
+    # Если заявка на золото — сохраняем в gold_orders
+    if category == 'Золото':
+        try:
+            gold_price_val = body.get('gold_price', '')
+            weight_raw = body.get('weight', '')
+            purity_raw = body.get('purity', '')
+            total_price = body.get('total_price')
+
+            name_e = name.replace("'", "''")
+            phone_e = phone.replace("'", "''")
+            desc_e = desc.replace("'", "''")
+            item_name_e = str(purity_raw or '').replace("'", "''")
+            gold_price_e = str(gold_price_val or '').replace("'", "''")
+
+            try:
+                weight_f = float(weight_raw) if weight_raw else None
+            except Exception:
+                weight_f = None
+
+            try:
+                buy_price_i = int(float(total_price)) if total_price else None
+            except Exception:
+                buy_price_i = None
+
+            weight_sql = str(weight_f) if weight_f is not None else 'NULL'
+            buy_sql = str(buy_price_i) if buy_price_i is not None else 'NULL'
+            comment_parts = []
+            if desc_e:
+                comment_parts.append(desc_e)
+            if gold_price_e:
+                comment_parts.append(f'Курс: {gold_price_e}')
+            comment_sql = '; '.join(comment_parts).replace("'", "''")
+
+            conn2 = psycopg2.connect(os.environ['DATABASE_URL'])
+            cur2 = conn2.cursor()
+            cur2.execute(f"""
+                INSERT INTO {SCHEMA}.gold_orders
+                    (name, phone, item_name, weight, purity, buy_price, comment)
+                VALUES
+                    ('{name_e}', '{phone_e}',
+                     'Золото (заявка с сайта)',
+                     {weight_sql},
+                     '{item_name_e}',
+                     {buy_sql},
+                     '{comment_sql}')
+            """)
+            conn2.commit()
+            cur2.close()
+            conn2.close()
+        except Exception:
+            pass
 
     return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True})}

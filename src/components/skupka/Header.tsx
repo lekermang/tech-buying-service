@@ -117,6 +117,9 @@ const Header = ({ scrollTo, goldOpen = false }: HeaderProps) => {
           desc: `Проба: ${probe}, вес: ${weight || '?'} г, цена: ${activePrice} ₽/г, итого: ${totalPrice ? totalPrice.toLocaleString('ru-RU') : '?'} ₽. Тип: ${clientLabel}`,
           client_type: clientLabel,
           gold_price: `${activePrice} ₽/г (проба ${probe}, вес ${weight || '?'} г = ${totalPrice ? totalPrice.toLocaleString('ru-RU') : '?'} ₽)`,
+          weight: weight || null,
+          purity: probe || null,
+          total_price: totalPrice || null,
         }),
       });
       setSent(true);
