@@ -3,7 +3,6 @@ import Header from "@/components/skupka/Header";
 import HeroSection from "@/components/skupka/HeroSection";
 import InfoSections from "@/components/skupka/InfoSections";
 import ContactsFooter from "@/components/skupka/ContactsFooter";
-import Consultant from "@/components/skupka/Consultant";
 import Icon from "@/components/ui/icon";
 import { ymGoal, Goals } from "@/lib/ym";
 import ExitPopup from "@/components/skupka/ExitPopup";
@@ -96,7 +95,6 @@ const Index = ({ goldOpen = false }: { goldOpen?: boolean }) => {
       <InfoSections />
       <JobsSection />
       <ContactsFooter scrollTo={scrollTo} />
-      <Consultant />
       <ExitPopup onOpenEval={() => setEvalOpen(true)} />
       <CookieBanner />
 
