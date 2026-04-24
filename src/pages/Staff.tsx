@@ -1,6 +1,11 @@
 import React, { useState, useEffect, Component, type ReactNode, lazy } from "react";
 import Icon from "@/components/ui/icon";
 import { EMPLOYEE_AUTH_URL } from "./staff.types";
+import { StaffThemeProvider, useStaffTheme } from "./staffTheme/StaffThemeContext";
+import AnimeMascot from "./staffTheme/AnimeMascot";
+import CursorEffects from "./staffTheme/CursorEffects";
+import BackgroundFx from "./staffTheme/BackgroundFx";
+import StaffThemeSettings from "./staffTheme/StaffThemeSettings";
 
 const GoodsTab      = lazy(() => import("./StaffGoodsTab"));
 const StaffRepairTab = lazy(() => import("./StaffRepairTab"));
@@ -61,6 +66,31 @@ function MskClock() {
 }
 
 export default function Staff() {
+  const [tokenBoot] = useState(() => localStorage.getItem("employee_token") || "");
+  return (
+    <StaffThemeProvider token={tokenBoot}>
+      <StaffInner />
+    </StaffThemeProvider>
+  );
+}
+
+function FontApplier() {
+  const { theme } = useStaffTheme();
+  useEffect(() => {
+    const root = document.documentElement;
+    if (!theme.enabled) { root.style.removeProperty("--staff-font"); return; }
+    const map: Record<string, string> = {
+      roboto: "'Roboto', sans-serif",
+      oswald: "'Oswald', sans-serif",
+      inter: "'Inter', sans-serif",
+      mplus: "'M PLUS Rounded 1c', sans-serif",
+    };
+    root.style.setProperty("--staff-font", map[theme.font_family] || map.roboto);
+  }, [theme.enabled, theme.font_family]);
+  return null;
+}
+
+function StaffInner() {
   const [token, setToken] = useState(() => localStorage.getItem("employee_token") || "");
   const [loginForm, setLoginForm] = useState({ login: "", password: "" });
   const [loginError, setLoginError] = useState("");
@@ -74,6 +104,7 @@ export default function Staff() {
   const [pwInput, setPwInput] = useState("");
   const [pwError, setPwError] = useState("");
   const [unlocked, setUnlocked] = useState<Record<string, boolean>>({});
+  const [themeOpen, setThemeOpen] = useState(false);
 
   useEffect(() => {
     if (!token) return;
@@ -240,7 +271,12 @@ export default function Staff() {
   const initials = empName.trim().split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase() || "?";
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] text-white flex flex-col">
+    <div className="min-h-screen bg-[#0A0A0A] text-white flex flex-col relative" style={{ fontFamily: "var(--staff-font, inherit)" }}>
+      <FontApplier />
+      <BackgroundFx />
+      <CursorEffects />
+      <AnimeMascot />
+      {themeOpen && <StaffThemeSettings onClose={() => setThemeOpen(false)} />}
       {/* Шапка — премиальная с градиентом */}
       <div className="relative shrink-0 safe-top border-b border-[#222]">
         <div className="absolute inset-0 bg-gradient-to-br from-[#FFD700]/[0.04] via-transparent to-blue-500/[0.03] pointer-events-none" />
@@ -284,6 +320,10 @@ export default function Staff() {
                 <span className="hidden sm:inline">{sending ? "..." : sendResult === true ? "OK" : sendResult === false ? "Ошибка" : "Напом."}</span>
               </button>
             )}
+            <button onClick={() => setThemeOpen(true)} title="Моя тема"
+              className="text-white/30 hover:text-[#FFD700] active:text-[#FFD700] transition-colors p-2 rounded-sm hover:bg-[#FFD700]/10">
+              <Icon name="Sparkles" size={16} />
+            </button>
             <button onClick={logout} title="Выйти"
               className="text-white/30 hover:text-red-400 active:text-red-500 transition-colors p-2 rounded-sm hover:bg-red-500/10">
               <Icon name="LogOut" size={16} />
