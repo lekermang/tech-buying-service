@@ -22,14 +22,85 @@ type Props = {
 type Source = "stock" | "order";
 
 /** Гарантия в зависимости от качества запчасти. */
-const WARRANTY_BY_QUALITY: Record<string, { label: string; icon: Parameters<typeof Icon>[0]["name"]; color: string }> = {
-  ORIG: { label: "1 год гарантии",  icon: "ShieldCheck", color: "text-[#FFD700] bg-[#FFD700]/15 border-[#FFD700]/40" },
-  AAA:  { label: "6 мес. гарантии", icon: "Shield",      color: "text-green-400 bg-green-500/10 border-green-500/30" },
-  AA:   { label: "3 мес. гарантии", icon: "Shield",      color: "text-sky-400 bg-sky-500/10 border-sky-500/30" },
-  A:    { label: "30 дней гарантии", icon: "Shield",     color: "text-white/60 bg-white/5 border-white/15" },
+const WARRANTY_BY_QUALITY: Record<string, { label: string; short: string; icon: Parameters<typeof Icon>[0]["name"]; color: string; accent: string }> = {
+  ORIG: { label: "1 год гарантии",   short: "1 год",   icon: "ShieldCheck", color: "text-[#FFD700] bg-[#FFD700]/15 border-[#FFD700]/40", accent: "#FFD700" },
+  AAA:  { label: "6 мес. гарантии",  short: "6 мес.",  icon: "Shield",      color: "text-green-400 bg-green-500/10 border-green-500/30", accent: "#4ade80" },
+  AA:   { label: "3 мес. гарантии",  short: "3 мес.",  icon: "Shield",      color: "text-sky-400 bg-sky-500/10 border-sky-500/30",       accent: "#38bdf8" },
+  A:    { label: "30 дней гарантии", short: "30 дней", icon: "Shield",      color: "text-white/60 bg-white/5 border-white/15",            accent: "#a3a3a3" },
 };
 
 const getWarranty = (quality: string) => WARRANTY_BY_QUALITY[quality] || WARRANTY_BY_QUALITY.A;
+
+/** Премиум-шильдик гарантии с раскрывающимся тултипом. Останавливаем bubbling, чтобы не выбирать карточку. */
+function WarrantyBadge({ quality }: { quality: string }) {
+  const [open, setOpen] = useState(false);
+  const w = getWarranty(quality);
+
+  return (
+    <span className="relative inline-block"
+      onMouseLeave={() => setOpen(false)}>
+      <span
+        role="button"
+        tabIndex={0}
+        onClick={(e) => { e.stopPropagation(); e.preventDefault(); setOpen(o => !o); }}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); setOpen(o => !o); } }}
+        onMouseEnter={() => setOpen(true)}
+        className={`inline-flex items-center gap-0.5 border font-oswald font-bold text-[8px] px-1.5 py-0.5 rounded-sm uppercase tracking-wider cursor-help transition-colors ${w.color} hover:brightness-125`}>
+        <Icon name={w.icon} size={8} />
+        {w.label}
+      </span>
+
+      {open && (
+        <span
+          onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
+          className="absolute z-30 left-0 top-full mt-1.5 w-[260px] bg-[#0a0a0a] border rounded-md shadow-[0_8px_24px_rgba(0,0,0,0.5)] p-3 text-left animate-[fadeIn_0.15s_ease]"
+          style={{ borderColor: w.accent + "55", boxShadow: `0 0 0 1px ${w.accent}22, 0 8px 24px rgba(0,0,0,0.5)` }}>
+          {/* Стрелочка */}
+          <span className="absolute -top-1.5 left-3 w-3 h-3 rotate-45 bg-[#0a0a0a]" style={{ borderTop: `1px solid ${w.accent}55`, borderLeft: `1px solid ${w.accent}55` }} />
+
+          <div className="flex items-center gap-1.5 mb-2">
+            <Icon name={w.icon} size={12} style={{ color: w.accent }} />
+            <span className="font-oswald font-bold text-xs uppercase tracking-wide" style={{ color: w.accent }}>
+              {w.label}
+            </span>
+          </div>
+
+          <div className="space-y-1.5 mb-2">
+            <div className="flex items-start gap-1.5">
+              <Icon name="Check" size={10} className="text-green-400 mt-0.5 shrink-0" />
+              <span className="font-roboto text-[10px] text-white/75 leading-snug">
+                Заменим бесплатно при заводском браке
+              </span>
+            </div>
+            <div className="flex items-start gap-1.5">
+              <Icon name="Check" size={10} className="text-green-400 mt-0.5 shrink-0" />
+              <span className="font-roboto text-[10px] text-white/75 leading-snug">
+                Бесплатная диагностика в течение всего срока
+              </span>
+            </div>
+            <div className="flex items-start gap-1.5">
+              <Icon name="Check" size={10} className="text-green-400 mt-0.5 shrink-0" />
+              <span className="font-roboto text-[10px] text-white/75 leading-snug">
+                Официальный акт-договор на руки
+              </span>
+            </div>
+            <div className="flex items-start gap-1.5">
+              <Icon name="X" size={10} className="text-red-400/70 mt-0.5 shrink-0" />
+              <span className="font-roboto text-[10px] text-white/45 leading-snug">
+                Не покрывает механические повреждения и попадание влаги
+              </span>
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-white/5 flex items-center justify-between">
+            <span className="font-roboto text-[9px] text-white/40 uppercase tracking-wide">Срок гарантии</span>
+            <span className="font-oswald font-bold text-xs" style={{ color: w.accent }}>{w.short}</span>
+          </div>
+        </span>
+      )}
+    </span>
+  );
+}
 
 /**
  * Премиум-селектор запчастей.
@@ -194,7 +265,6 @@ export default function RepairPartsSelector({
                 filteredList.map(part => {
                   const isCheapest = cheapestIdByType[part.id] && (categories.length > 1 || filteredList.length > 1);
                   const isPremium = part.quality === "ORIG";
-                  const warranty = getWarranty(part.quality);
                   return (
                     <button key={part.id} type="button"
                       onClick={() => onSelectPart(part)}
@@ -221,11 +291,8 @@ export default function RepairPartsSelector({
                                 Выгодно
                               </span>
                             )}
-                            {/* Гарантия по качеству */}
-                            <span className={`inline-flex items-center gap-0.5 border font-oswald font-bold text-[8px] px-1.5 py-0.5 rounded-sm uppercase tracking-wider ${warranty.color}`}>
-                              <Icon name={warranty.icon} size={8} />
-                              {warranty.label}
-                            </span>
+                            {/* Гарантия по качеству — с тултипом */}
+                            <WarrantyBadge quality={part.quality} />
                             {part.stock <= 3 && part.stock > 0 && (
                               <span className="text-orange-400 font-roboto text-[9px] uppercase">осталось {part.stock}</span>
                             )}
@@ -342,6 +409,8 @@ export default function RepairPartsSelector({
                     {selectedPart.is_latest_batch && <span className="ml-1 bg-[#FFD700] text-black px-1 rounded-sm">NEW</span>}
                   </span>
                 )}
+                {/* Гарантия с тултипом */}
+                <WarrantyBadge quality={selectedPart.quality} />
               </div>
               <div className="font-roboto text-[10px] text-white/60 leading-snug break-words">
                 {selectedPart.name}
