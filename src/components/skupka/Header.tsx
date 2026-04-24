@@ -131,24 +131,44 @@ const Header = ({ scrollTo, goldOpen = false }: HeaderProps) => {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50">
-      {/* Gold ticker */}
-      <div className="bg-[#FFD700] px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 sm:gap-3">
-          <span className="text-black text-sm sm:text-base font-oswald font-bold uppercase tracking-wider">🥇 Золото 999:</span>
-          {goldPrice?.buy ? (
-            <span className="text-black font-roboto font-bold text-base sm:text-xl">
-              {goldPrice.buy.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽/г
-            </span>
-          ) : (
-            <span className="text-black/50 font-roboto text-sm">загрузка...</span>
-          )}
-        </div>
+      {/* Premium Gold ticker */}
+      <div className="relative overflow-hidden border-b border-[#7a5a00]/40">
+        {/* Базовый металлический градиент */}
+        <div className="absolute inset-0 bg-[linear-gradient(95deg,#b8860b_0%,#f5c518_18%,#fff7c2_38%,#ffd700_58%,#d4a017_82%,#8b6508_100%)]" />
+        {/* Двигающийся блик */}
+        <div className="pointer-events-none absolute inset-0 opacity-70 mix-blend-overlay
+                        bg-[linear-gradient(115deg,transparent_30%,rgba(255,255,255,0.55)_45%,rgba(255,255,255,0.85)_50%,rgba(255,255,255,0.55)_55%,transparent_70%)]
+                        bg-[length:250%_100%] animate-gold-shimmer" />
+        {/* Лёгкая текстура «золотой пыли» */}
+        <div className="pointer-events-none absolute inset-0 opacity-[0.07]"
+             style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, #000 1px, transparent 0)', backgroundSize: '4px 4px' }} />
+        {/* Низ — тонкая тёмная линия для глубины */}
+        <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#5a3d00]/60 to-transparent" />
 
-        {goldPrice?.buy && (
-          <div className="hidden md:flex items-center gap-3 font-roboto text-sm">
-            {/* Мини-график 7 дней */}
-            {goldHistory.length >= 2 && (() => {
-              const W = 80, H = 28, pad = 3;
+        <div className="relative max-w-7xl mx-auto px-3 sm:px-5 py-2 sm:py-2.5 flex items-center justify-between gap-3">
+          {/* ЛЕВАЯ ЧАСТЬ — цена золота */}
+          <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+            <div className="hidden sm:flex w-9 h-9 rounded-full bg-gradient-to-br from-[#3a2800] to-black items-center justify-center shadow-[0_0_12px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.1)] shrink-0">
+              <span className="text-base">🥇</span>
+            </div>
+            <div className="flex flex-col leading-none min-w-0">
+              <span className="font-oswald font-bold text-[10px] sm:text-[11px] uppercase tracking-[0.2em] text-black/70">
+                Золото 999
+              </span>
+              {goldPrice?.buy ? (
+                <span className="font-oswald font-bold text-black text-lg sm:text-2xl mt-0.5 tracking-tight whitespace-nowrap"
+                      style={{ textShadow: '0 1px 0 rgba(255,255,255,0.5), 0 -1px 0 rgba(0,0,0,0.15)' }}>
+                  {goldPrice.buy.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}
+                  <span className="text-black/60 text-sm sm:text-base font-bold ml-1">₽/г</span>
+                </span>
+              ) : (
+                <span className="text-black/50 font-roboto text-sm mt-0.5">загрузка...</span>
+              )}
+            </div>
+
+            {/* Мини-график 7 дней — премиум-капсула */}
+            {goldPrice?.buy && goldHistory.length >= 2 && (() => {
+              const W = 70, H = 26, pad = 3;
               const prices = goldHistory.map(h => h.price);
               const min = Math.min(...prices);
               const max = Math.max(...prices);
@@ -161,54 +181,72 @@ const Header = ({ scrollTo, goldOpen = false }: HeaderProps) => {
               const last = prices[prices.length - 1];
               const first = prices[0];
               const up = last >= first;
-              const color = up ? '#16a34a' : '#dc2626';
+              const color = up ? '#0a7d2a' : '#a31515';
               const lastX = pad + (W - pad * 2);
               const lastY = H - pad - ((last - min) / range) * (H - pad * 2);
               return (
-                <div className="flex items-center gap-1.5 bg-black/10 px-2 py-1 rounded" title="Изменение цены за 7 дней">
+                <div className="hidden sm:flex items-center gap-1.5 bg-black/85 backdrop-blur px-2.5 py-1 rounded-md shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_2px_6px_rgba(0,0,0,0.3)]"
+                     title="Изменение цены за 7 дней">
                   <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="overflow-visible">
                     <polyline points={pts} fill="none" stroke={color} strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" />
                     <circle cx={lastX} cy={lastY} r="2.5" fill={color} />
                   </svg>
-                  <span className="text-[11px] font-bold" style={{ color }}>
-                    {up ? '▲' : '▼'} {Math.abs(((last - first) / first) * 100).toFixed(1)}%
-                  </span>
-                  <span className="text-[10px] text-black/40">7д</span>
+                  <div className="flex flex-col leading-none">
+                    <span className="text-[11px] font-bold" style={{ color: up ? '#22c55e' : '#ef4444' }}>
+                      {up ? '▲' : '▼'} {Math.abs(((last - first) / first) * 100).toFixed(1)}%
+                    </span>
+                    <span className="text-[8px] text-white/40 mt-0.5 uppercase tracking-wide">7 дней</span>
+                  </div>
                 </div>
               );
             })()}
-            <div className="w-px h-5 bg-black/20" />
-            <span className="bg-black/10 px-2.5 py-1 text-black font-semibold">
-              Физлица: {priceRetail999?.toLocaleString('ru-RU')} ₽/г
-            </span>
-            <span className="bg-black/10 px-2.5 py-1 text-black font-semibold">
-              Опт от 30 г: {priceWholesale999?.toLocaleString('ru-RU')} ₽/г
-            </span>
           </div>
-        )}
 
-        <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-          <a href="tel:88006006833"
-            onClick={() => ymGoal(Goals.CALL_CLICK, { place: "ticker" })}
-            className="hidden sm:flex items-center gap-1.5 bg-black/15 hover:bg-black/25 active:scale-95 transition-all px-3 py-1.5 rounded">
-            <Icon name="Phone" size={14} className="text-black" />
-            <div className="flex flex-col leading-none">
-              <span className="font-oswald font-bold text-black text-sm tracking-wide">8 800 600-68-33</span>
-              <span className="font-roboto text-black/60 text-[10px]">звонок бесплатный</span>
+          {/* ЦЕНТР — стеклянные капсулы цен */}
+          {goldPrice?.buy && (
+            <div className="hidden lg:flex items-center gap-2 font-roboto">
+              <div className="flex items-center gap-1.5 bg-black/85 px-3 py-1.5 rounded-md shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_2px_6px_rgba(0,0,0,0.3)]">
+                <span className="text-[#FFD700]/60 text-[9px] uppercase tracking-[0.15em] font-oswald font-bold">Физлица</span>
+                <span className="text-[#FFD700] font-oswald font-bold text-sm">
+                  {priceRetail999?.toLocaleString('ru-RU')} ₽/г
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 bg-black/85 px-3 py-1.5 rounded-md shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_2px_6px_rgba(0,0,0,0.3)]">
+                <span className="text-[#FFD700]/60 text-[9px] uppercase tracking-[0.15em] font-oswald font-bold">Опт 30г+</span>
+                <span className="text-[#FFD700] font-oswald font-bold text-sm">
+                  {priceWholesale999?.toLocaleString('ru-RU')} ₽/г
+                </span>
+              </div>
             </div>
-          </a>
-          <a href="tel:88006006833"
-            onClick={() => ymGoal(Goals.CALL_CLICK, { place: "ticker" })}
-            className="sm:hidden flex items-center gap-1 bg-black/15 hover:bg-black/25 active:scale-95 transition-all px-2.5 py-1.5 rounded">
-            <Icon name="Phone" size={14} className="text-black" />
-            <span className="font-oswald font-bold text-black text-sm">8-800</span>
-          </a>
-          <button
-            onClick={() => { setSellOpen(true); setSent(false); setForm({ name: "", phone: "" }); }}
-            className="bg-black text-[#FFD700] font-oswald font-bold text-sm sm:text-base px-4 sm:px-5 py-2 sm:py-2.5 uppercase tracking-wide hover:bg-[#1A1A1A] active:scale-95 transition-all flex items-center gap-2 shrink-0">
-            <Icon name="Zap" size={15} />
-            Продать
-          </button>
+          )}
+
+          {/* ПРАВАЯ ЧАСТЬ — телефон + Продать */}
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <a href="tel:88006006833"
+              onClick={() => ymGoal(Goals.CALL_CLICK, { place: "ticker" })}
+              className="hidden sm:flex items-center gap-2 bg-black/85 hover:bg-black active:scale-95 transition-all px-3 py-1.5 rounded-md shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_2px_6px_rgba(0,0,0,0.3)] group">
+              <div className="w-7 h-7 rounded-full bg-[#FFD700]/15 flex items-center justify-center group-hover:bg-[#FFD700]/25 transition-colors">
+                <Icon name="Phone" size={13} className="text-[#FFD700]" />
+              </div>
+              <div className="flex flex-col leading-none">
+                <span className="font-oswald font-bold text-[#FFD700] text-sm tracking-wide">8 800 600-68-33</span>
+                <span className="font-roboto text-white/40 text-[9px] uppercase tracking-wide">звонок бесплатный</span>
+              </div>
+            </a>
+            <a href="tel:88006006833"
+              onClick={() => ymGoal(Goals.CALL_CLICK, { place: "ticker" })}
+              className="sm:hidden flex items-center gap-1.5 bg-black/85 hover:bg-black active:scale-95 transition-all px-2.5 py-1.5 rounded-md">
+              <Icon name="Phone" size={13} className="text-[#FFD700]" />
+              <span className="font-oswald font-bold text-[#FFD700] text-xs">8-800</span>
+            </a>
+            <button
+              onClick={() => { setSellOpen(true); setSent(false); setForm({ name: "", phone: "" }); }}
+              className="relative overflow-hidden bg-gradient-to-b from-[#1a1a1a] to-black text-[#FFD700] font-oswald font-bold text-sm sm:text-base px-4 sm:px-5 py-2 sm:py-2.5 uppercase tracking-wide hover:from-black hover:to-[#1a1a1a] active:scale-95 transition-all flex items-center gap-2 shrink-0 rounded-md ring-1 ring-[#FFD700]/40 shadow-[0_4px_14px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,215,0,0.2)] group">
+              <span className="absolute inset-0 bg-gradient-to-r from-transparent via-[#FFD700]/15 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+              <Icon name="Zap" size={15} className="relative" />
+              <span className="relative">Продать</span>
+            </button>
+          </div>
         </div>
       </div>
 

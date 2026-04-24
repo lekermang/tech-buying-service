@@ -99,6 +99,10 @@ export default {
 					'50%': { transform: 'translateY(50%)' },
 					'100%': { transform: 'translateY(-50%)' },
 				},
+				'gold-shimmer': {
+					'0%':   { backgroundPosition: '200% 50%' },
+					'100%': { backgroundPosition: '-100% 50%' },
+				},
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
@@ -108,6 +112,7 @@ export default {
 				third: 'moveInCircle 40s linear infinite',
 				fourth: 'moveHorizontal 40s ease infinite',
 				fifth: 'moveInCircle 20s ease infinite',
+				'gold-shimmer': 'gold-shimmer 6s linear infinite',
 			},
 			
 		}
