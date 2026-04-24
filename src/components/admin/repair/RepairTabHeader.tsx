@@ -1,7 +1,7 @@
 import Icon from "@/components/ui/icon";
 import { EMPTY_FORM } from "./repairTypes";
 
-type View = "orders" | "analytics" | "labor_prices" | "import_parts";
+type View = "orders" | "analytics" | "labor_prices" | "price_list" | "import_parts";
 
 type Props = {
   view: View;
@@ -41,6 +41,10 @@ export default function RepairTabHeader({
         <button onClick={() => setView("labor_prices")}
           className={`px-4 py-1.5 font-roboto text-xs transition-colors flex items-center gap-1.5 ${view === "labor_prices" ? "bg-[#FFD700] text-black font-bold" : "text-white/50 hover:text-white"}`}>
           <Icon name="Tag" size={13} />Цены работ
+        </button>
+        <button onClick={() => setView("price_list")}
+          className={`px-4 py-1.5 font-roboto text-xs transition-colors flex items-center gap-1.5 ${view === "price_list" ? "bg-[#FFD700] text-black font-bold" : "text-white/50 hover:text-white"}`}>
+          <Icon name="Percent" size={13} />Прайс
         </button>
         <button onClick={() => setView("import_parts")}
           className={`px-4 py-1.5 font-roboto text-xs transition-colors flex items-center gap-1.5 ${view === "import_parts" ? "bg-[#FFD700] text-black font-bold" : "text-white/50 hover:text-white"}`}>

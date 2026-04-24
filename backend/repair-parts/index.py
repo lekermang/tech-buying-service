@@ -415,8 +415,16 @@ def search_parts(conn, model: str, phone: str = '') -> tuple:
     extra = get_extra_works(cur)
     client_info = get_client_discount(cur, phone)
 
+    # Последний batch загруженного прайса (для метки NEW)
+    try:
+        cur.execute(f"SELECT price_batch_id FROM {SCHEMA}.repair_parts WHERE price_batch_id IS NOT NULL ORDER BY updated_at DESC LIMIT 1")
+        row = cur.fetchone()
+        latest_batch = row[0] if row else None
+    except Exception:
+        latest_batch = None
+
     cur.execute(f"""
-        SELECT id, name, category, price, stock, quality, part_type
+        SELECT id, name, category, price, stock, quality, part_type, price_batch_id, supplier_price
         FROM {SCHEMA}.repair_parts
         WHERE available = true AND ({conditions})
         ORDER BY part_type, quality DESC, price ASC
@@ -426,7 +434,7 @@ def search_parts(conn, model: str, phone: str = '') -> tuple:
     cur.close()
     parts = []
     for r in rows:
-        pid, name, category, price, stock, quality, part_type = r
+        pid, name, category, price, stock, quality, part_type, batch_id, supplier_price = r
         raw_price = float(price or 0)
         marked_price = raw_price + markup
         labor_cost = labor.get(part_type, DEFAULT_LABOR.get(part_type, 500))
@@ -437,12 +445,14 @@ def search_parts(conn, model: str, phone: str = '') -> tuple:
             'category': category,
             'price': marked_price,
             'raw_price': raw_price,
+            'supplier_price': float(supplier_price) if supplier_price is not None else None,
             'markup': markup,
             'stock': float(stock or 0),
             'quality': quality,
             'part_type': part_type,
             'labor_cost': labor_cost,
             'total': total,
+            'is_latest_batch': bool(latest_batch and batch_id == latest_batch),
         })
     return parts, extra, client_info
 

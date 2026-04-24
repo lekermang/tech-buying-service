@@ -45,6 +45,8 @@ export type Part = {
   id: string; name: string; category: string;
   price: number; stock: number; quality: string;
   part_type: string; labor_cost: number; total: number;
+  is_latest_batch?: boolean;
+  supplier_price?: number | null;
 };
 
 export type OrderStatus = {

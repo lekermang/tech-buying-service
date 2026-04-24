@@ -58,7 +58,12 @@ export default function RepairPartsSelector({
                         {part.stock <= 3 && part.stock > 0 && (
                           <span className="ml-1 text-orange-400 font-roboto text-[9px]">мало</span>
                         )}
-                        {part.id.startsWith('moba_') && (
+                        {part.is_latest_batch && (
+                          <span className="ml-1.5 inline-flex items-center gap-0.5 bg-[#FFD700] text-black font-oswald font-bold text-[9px] px-1.5 py-0.5 uppercase tracking-wide">
+                            NEW · 1–2 ч
+                          </span>
+                        )}
+                        {!part.is_latest_batch && part.id.startsWith('moba_') && (
                           <span className="ml-1.5 inline-flex items-center gap-0.5 bg-green-500/15 text-green-400 font-roboto text-[9px] px-1.5 py-0.5 rounded-sm">
                             <Icon name="Clock" size={8} /> 1–2 часа
                           </span>
@@ -134,7 +139,12 @@ export default function RepairPartsSelector({
               </div>
               <div className="font-roboto text-[9px] text-white/30 mt-0.5 flex items-center gap-2 flex-wrap">
                 <span>зап. {selectedPart.price.toLocaleString("ru-RU")} + раб. {selectedPart.labor_cost.toLocaleString("ru-RU")} ₽</span>
-                {selectedPart.id.startsWith('moba_') && (
+                {selectedPart.is_latest_batch && (
+                  <span className="inline-flex items-center gap-0.5 bg-[#FFD700] text-black font-oswald font-bold text-[9px] px-1.5 py-0.5 uppercase tracking-wide">
+                    NEW · 1–2 ч
+                  </span>
+                )}
+                {!selectedPart.is_latest_batch && selectedPart.id.startsWith('moba_') && (
                   <span className="inline-flex items-center gap-0.5 bg-green-500/15 text-green-400 font-roboto text-[9px] px-1.5 py-0.5 rounded-sm">
                     <Icon name="Clock" size={8} /> 1–2 часа
                   </span>

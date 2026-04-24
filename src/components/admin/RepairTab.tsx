@@ -8,6 +8,7 @@ import { printAct } from "@/pages/repair/types";
 import RepairAnalytics from "./repair/RepairAnalytics";
 import RepairReadyModal from "./repair/RepairReadyModal";
 import LaborPricesTab from "./repair/LaborPricesTab";
+import RepairPriceListTab from "./repair/RepairPriceListTab";
 import RepairTabHeader from "./repair/RepairTabHeader";
 import RepairOrdersView from "./repair/RepairOrdersView";
 import RepairImportTab from "./repair/RepairImportTab";
@@ -18,7 +19,7 @@ export { STATUSES } from "./repair/repairTypes";
 
 const REPAIR_PARTS_URL = "https://functions.poehali.dev/68da5b17-ae5f-4568-8e27-0d945b995d82";
 
-type View = "orders" | "analytics" | "labor_prices" | "import_parts";
+type View = "orders" | "analytics" | "labor_prices" | "price_list" | "import_parts";
 type Period = "day" | "yesterday" | "week" | "month";
 
 export default function RepairTab({ token }: { token: string }) {
@@ -297,6 +298,13 @@ export default function RepairTab({ token }: { token: string }) {
       {view === "labor_prices" && (
         <div className="flex-1 overflow-y-auto">
           <LaborPricesTab token={token} authHeader="X-Admin-Token" />
+        </div>
+      )}
+
+      {/* Прайс поставщика: наценка по категориям */}
+      {view === "price_list" && (
+        <div className="flex-1 overflow-y-auto">
+          <RepairPriceListTab token={token} />
         </div>
       )}
 

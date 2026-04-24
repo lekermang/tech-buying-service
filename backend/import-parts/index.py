@@ -52,8 +52,95 @@ def handler(event: dict, context) -> dict:
         return _preview(body, cors)
     elif action == 'import':
         return _import(body, cors)
+    elif action == 'list-categories':
+        return _list_categories(cors)
+    elif action == 'save-markup':
+        return _save_markup(body, cors)
     else:
         return {'statusCode': 400, 'headers': cors, 'body': json.dumps({'error': 'unknown action'})}
+
+
+def _list_categories(cors: dict) -> dict:
+    """Возвращает список категорий из последнего загруженного прайса с наценкой и статистикой."""
+    dsn = os.environ['DATABASE_URL']
+    conn = psycopg2.connect(dsn)
+    cur = conn.cursor()
+
+    # Последний batch
+    cur.execute("SELECT price_batch_id FROM repair_parts WHERE price_batch_id IS NOT NULL ORDER BY updated_at DESC LIMIT 1")
+    row = cur.fetchone()
+    latest_batch = row[0] if row else None
+
+    cur.execute("""
+        SELECT
+            rp.category,
+            COUNT(*) AS parts_count,
+            AVG(rp.supplier_price)::numeric(10,2) AS avg_supplier_price,
+            MIN(rp.supplier_price)::numeric(10,2) AS min_supplier_price,
+            MAX(rp.supplier_price)::numeric(10,2) AS max_supplier_price,
+            COALESCE(m.markup_percent, 0) AS markup_percent,
+            MAX(CASE WHEN rp.price_batch_id = %s THEN 1 ELSE 0 END) AS is_latest
+        FROM repair_parts rp
+        LEFT JOIN repair_parts_markup m ON m.category = rp.category
+        WHERE rp.category IS NOT NULL AND rp.category <> '' AND rp.supplier_price IS NOT NULL
+        GROUP BY rp.category, m.markup_percent
+        ORDER BY parts_count DESC
+    """, (latest_batch,))
+    cats = []
+    for r in cur.fetchall():
+        cats.append({
+            'category': r[0],
+            'parts_count': r[1],
+            'avg_supplier_price': float(r[2] or 0),
+            'min_supplier_price': float(r[3] or 0),
+            'max_supplier_price': float(r[4] or 0),
+            'markup_percent': float(r[5] or 0),
+            'is_latest': bool(r[6]),
+        })
+    cur.close()
+    conn.close()
+    return {
+        'statusCode': 200,
+        'headers': {**cors, 'Content-Type': 'application/json'},
+        'body': json.dumps({'categories': cats, 'latest_batch': latest_batch}, ensure_ascii=False)
+    }
+
+
+def _save_markup(body: dict, cors: dict) -> dict:
+    """Сохраняет наценку для категории и пересчитывает итоговые цены (price = supplier_price * (1 + markup/100))."""
+    category = (body.get('category') or '').strip()
+    try:
+        markup = float(body.get('markup_percent', 0))
+    except (TypeError, ValueError):
+        return {'statusCode': 400, 'headers': cors, 'body': json.dumps({'error': 'неверная наценка'}, ensure_ascii=False)}
+
+    if not category:
+        return {'statusCode': 400, 'headers': cors, 'body': json.dumps({'error': 'нет категории'}, ensure_ascii=False)}
+
+    dsn = os.environ['DATABASE_URL']
+    conn = psycopg2.connect(dsn)
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO repair_parts_markup (category, markup_percent, updated_at)
+        VALUES (%s, %s, NOW())
+        ON CONFLICT (category) DO UPDATE SET markup_percent = EXCLUDED.markup_percent, updated_at = NOW()
+    """, (category, markup))
+    cur.execute("""
+        UPDATE repair_parts
+        SET price = ROUND(COALESCE(supplier_price, price) * (1 + %s / 100.0), 2),
+            updated_at = NOW()
+        WHERE category = %s AND supplier_price IS NOT NULL
+    """, (markup, category))
+    updated = cur.rowcount
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return {
+        'statusCode': 200,
+        'headers': {**cors, 'Content-Type': 'application/json'},
+        'body': json.dumps({'ok': True, 'updated': updated, 'markup_percent': markup}, ensure_ascii=False)
+    }
 
 
 def _upload_url(body: dict, cors: dict) -> dict:
@@ -340,30 +427,47 @@ def _import(body: dict, cors: dict) -> dict:
     conn = psycopg2.connect(dsn)
     cur = conn.cursor()
 
+    # Загружаем существующие наценки по категориям, чтобы применить их к новому прайсу
+    cur.execute("SELECT category, markup_percent FROM repair_parts_markup")
+    markup_map = {row[0]: float(row[1] or 0) for row in cur.fetchall()}
+
+    batch_id = uuid.uuid4().hex
+
     imported = 0
     skipped = 0
     for p in parts:
-        if p['price'] <= 0:
+        supplier = p['price']
+        if supplier <= 0:
             skipped += 1
             continue
+        markup = markup_map.get(p['category'], 0.0)
+        final_price = round(supplier * (1 + markup / 100.0), 2)
+        p_full = {
+            **p,
+            'supplier_price': supplier,
+            'price': final_price,
+            'batch_id': batch_id,
+        }
         cur.execute("""
-            INSERT INTO repair_parts (id, code, name, category, price, stock, quality, part_type, available, updated_at)
+            INSERT INTO repair_parts (id, code, name, category, price, supplier_price, stock, quality, part_type, available, updated_at, price_batch_id)
             VALUES (
                 md5(%(name)s || %(quality)s || COALESCE(%(code)s, '')),
                 %(code)s, %(name)s, %(category)s,
-                %(price)s, %(stock)s, %(quality)s, %(part_type)s,
-                true, NOW()
+                %(price)s, %(supplier_price)s, %(stock)s, %(quality)s, %(part_type)s,
+                true, NOW(), %(batch_id)s
             )
             ON CONFLICT (id) DO UPDATE SET
                 name = EXCLUDED.name,
                 category = EXCLUDED.category,
                 price = EXCLUDED.price,
+                supplier_price = EXCLUDED.supplier_price,
                 stock = EXCLUDED.stock,
                 quality = EXCLUDED.quality,
                 part_type = EXCLUDED.part_type,
                 available = true,
-                updated_at = NOW()
-        """, p)
+                updated_at = NOW(),
+                price_batch_id = EXCLUDED.price_batch_id
+        """, p_full)
         imported += 1
 
     conn.commit()
@@ -373,5 +477,5 @@ def _import(body: dict, cors: dict) -> dict:
     return {
         'statusCode': 200,
         'headers': {**cors, 'Content-Type': 'application/json'},
-        'body': json.dumps({'imported': imported, 'skipped': skipped}, ensure_ascii=False)
+        'body': json.dumps({'imported': imported, 'skipped': skipped, 'batch_id': batch_id}, ensure_ascii=False)
     }
