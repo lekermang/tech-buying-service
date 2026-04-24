@@ -33,12 +33,22 @@ export default function RepairImportTab({ token }: Props) {
       const res = await fetch(IMPORT_PARTS_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...adminHeaders(token) },
-        body: JSON.stringify({ action: 'preview', file: b64 }),
+        body: JSON.stringify({ action: 'preview', file: b64, filename: file.name }),
       });
-      const data = await res.json();
-      setImportPreview(data);
-    } catch {
-      setImportResult('Ошибка чтения файла');
+      const text = await res.text();
+      let data: { error?: string; parts_found?: number; sample?: { name: string; category: string; price: number; quality: string; part_type: string }[] } = {};
+      try { data = JSON.parse(text); } catch { /* not json */ }
+      if (!res.ok || data.error) {
+        setImportResult(`Ошибка: ${data.error || `сервер вернул ${res.status}`}`);
+        return;
+      }
+      if (!data.parts_found) {
+        setImportResult('Не нашли строк с товаром. Проверь, что в файле есть колонки «Наименование» и «Цена».');
+        return;
+      }
+      setImportPreview(data as { parts_found: number; sample: { name: string; category: string; price: number; quality: string; part_type: string }[] });
+    } catch (err) {
+      setImportResult(`Ошибка чтения файла: ${err instanceof Error ? err.message : 'неизвестная'}`);
     }
   };
 
