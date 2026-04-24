@@ -8,6 +8,7 @@ const SEND_LEAD_URL = "https://functions.poehali.dev/52666ff7-db52-4b6a-a90e-d60
 const NAV_LINKS = [
   { label: "Главная", href: "#hero" },
   { label: "Что принимаем", href: "#catalog" },
+  { label: "Trade In", href: "#tradein" },
   { label: "Как работает", href: "#how" },
   { label: "Гарантии", href: "#guarantees" },
   { label: "Филиалы", href: "#branches" },
