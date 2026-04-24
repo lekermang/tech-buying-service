@@ -61,6 +61,18 @@ export default function RepairPartsSelector({
     return sourceList.filter(p => p.part_type === categoryFilter);
   }, [sourceList, categoryFilter]);
 
+  /** ID самой дешёвой позиции в каждом типе ремонта (внутри текущего источника) — для шильдика «🔥 Выгодно». */
+  const cheapestIdByType = useMemo(() => {
+    const map: Record<string, { id: string; total: number }> = {};
+    sourceList.forEach(p => {
+      const cur = map[p.part_type];
+      if (!cur || p.total < cur.total) map[p.part_type] = { id: p.id, total: p.total };
+    });
+    const result: Record<string, true> = {};
+    Object.values(map).forEach(v => { result[v.id] = true; });
+    return result;
+  }, [sourceList]);
+
   return (
     <div>
       {partsLoading && (
@@ -169,41 +181,56 @@ export default function RepairPartsSelector({
                   В этой категории пусто. Выберите другую.
                 </div>
               ) : (
-                filteredList.map(part => (
-                  <button key={part.id} type="button"
-                    onClick={() => onSelectPart(part)}
-                    className="w-full text-left px-3 py-2 block transition-colors border-b border-white/5 last:border-0 hover:bg-[#FFD700]/5 active:bg-[#FFD700]/15">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
-                          <span className={`font-oswald font-bold text-[11px] ${QUALITY_COLOR[part.quality] || "text-white/50"}`}>
-                            {part.quality}
-                          </span>
-                          <span className="font-roboto text-[9px] text-white/30 uppercase tracking-wide">
-                            {PART_TYPE_LABEL[part.part_type] || part.part_type}
-                          </span>
-                          {part.stock <= 3 && part.stock > 0 && (
-                            <span className="text-orange-400 font-roboto text-[9px] uppercase">осталось {part.stock}</span>
-                          )}
-                          {part.is_latest_batch && !part.in_stock && (
-                            <span className="bg-[#FFD700] text-black font-oswald font-bold text-[8px] px-1 py-0 rounded-sm uppercase tracking-wider">NEW</span>
-                          )}
+                filteredList.map(part => {
+                  const isCheapest = cheapestIdByType[part.id] && (categories.length > 1 || filteredList.length > 1);
+                  const isPremium = part.quality === "ORIG";
+                  return (
+                    <button key={part.id} type="button"
+                      onClick={() => onSelectPart(part)}
+                      className="w-full text-left px-3 py-2.5 block transition-colors border-b border-white/5 last:border-0 hover:bg-[#FFD700]/5 active:bg-[#FFD700]/15 group">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                            <span className={`font-oswald font-bold text-[11px] ${QUALITY_COLOR[part.quality] || "text-white/50"}`}>
+                              {part.quality}
+                            </span>
+                            <span className="font-roboto text-[9px] text-white/30 uppercase tracking-wide">
+                              {PART_TYPE_LABEL[part.part_type] || part.part_type}
+                            </span>
+                            {/* Премиум-шильдики */}
+                            {isPremium && (
+                              <span className="inline-flex items-center gap-0.5 bg-gradient-to-r from-[#FFD700]/25 to-[#FFD700]/10 border border-[#FFD700]/50 text-[#FFD700] font-oswald font-bold text-[8px] px-1.5 py-0.5 rounded-sm uppercase tracking-wider">
+                                <Icon name="Star" size={8} />
+                                Премиум
+                              </span>
+                            )}
+                            {isCheapest && !isPremium && (
+                              <span className="inline-flex items-center gap-0.5 bg-gradient-to-r from-orange-500/25 to-orange-500/10 border border-orange-400/50 text-orange-300 font-oswald font-bold text-[8px] px-1.5 py-0.5 rounded-sm uppercase tracking-wider">
+                                <Icon name="Flame" size={8} />
+                                Выгодно
+                              </span>
+                            )}
+                            {part.stock <= 3 && part.stock > 0 && (
+                              <span className="text-orange-400 font-roboto text-[9px] uppercase">осталось {part.stock}</span>
+                            )}
+                            {part.is_latest_batch && !part.in_stock && (
+                              <span className="bg-[#FFD700] text-black font-oswald font-bold text-[8px] px-1 py-0 rounded-sm uppercase tracking-wider">NEW</span>
+                            )}
+                          </div>
+                          <div className="font-roboto text-[11px] text-white/85 leading-snug break-words">
+                            {part.name}
+                          </div>
                         </div>
-                        <div className="font-roboto text-[11px] text-white/85 leading-snug break-words">
-                          {part.name}
+                        <div className="shrink-0 text-right flex flex-col items-end justify-center">
+                          <div className="font-oswald font-bold text-lg text-[#FFD700] whitespace-nowrap leading-none">
+                            {part.total.toLocaleString("ru-RU")} ₽
+                          </div>
+                          <div className="font-roboto text-[9px] text-white/30 mt-1 uppercase tracking-wide">всё включено</div>
                         </div>
                       </div>
-                      <div className="shrink-0 text-right">
-                        <div className="font-oswald font-bold text-base text-[#FFD700] whitespace-nowrap leading-none">
-                          {part.total.toLocaleString("ru-RU")} ₽
-                        </div>
-                        <div className="font-roboto text-[9px] text-white/30 mt-0.5 whitespace-nowrap">
-                          {part.price.toLocaleString("ru-RU")} + {part.labor_cost.toLocaleString("ru-RU")} раб.
-                        </div>
-                      </div>
-                    </div>
-                  </button>
-                ))
+                    </button>
+                  );
+                })
               )}
             </div>
 
@@ -303,14 +330,12 @@ export default function RepairPartsSelector({
               <div className="font-roboto text-[10px] text-white/60 leading-snug break-words">
                 {selectedPart.name}
               </div>
-              <div className="font-roboto text-[9px] text-white/30 mt-0.5">
-                <span>зап. {selectedPart.price.toLocaleString("ru-RU")} + раб. {selectedPart.labor_cost.toLocaleString("ru-RU")} ₽</span>
-              </div>
             </div>
             <div className="shrink-0 text-right">
               <div className="font-oswald font-bold text-base text-[#FFD700]">
                 {selectedPart.total.toLocaleString("ru-RU")} ₽
               </div>
+              <div className="font-roboto text-[8px] text-white/30 mt-0.5 uppercase tracking-wide">всё включено</div>
             </div>
           </div>
 
@@ -351,17 +376,15 @@ export default function RepairPartsSelector({
             </div>
           )}
 
-          {/* Итог с допами */}
-          <div className="border-t border-[#FFD700]/10 px-3 py-2 flex items-center justify-between">
-            <div>
-              <div className="font-roboto text-[10px] text-white/50">Итого за ремонт</div>
-              {extraTotal > 0 && (
-                <div className="font-roboto text-[9px] text-white/30">
-                  {selectedPart.total.toLocaleString("ru-RU")} + {extraTotal.toLocaleString("ru-RU")} ₽ доп.
-                </div>
-              )}
+          {/* Итог за ремонт — только финальная цифра */}
+          <div className="border-t border-[#FFD700]/10 px-3 py-2.5 bg-gradient-to-r from-[#FFD700]/10 to-transparent flex items-center justify-between">
+            <div className="flex flex-col">
+              <span className="font-oswald font-bold text-[10px] text-[#FFD700]/70 uppercase tracking-[0.2em]">Итого за ремонт</span>
+              <span className="font-roboto text-[9px] text-white/40 mt-0.5">
+                {clientInfo?.found && clientInfo.discount_pct > 0 ? `со скидкой −${clientInfo.discount_pct}%` : "запчасть, работа, гарантия"}
+              </span>
             </div>
-            <div className="font-oswald font-bold text-xl text-[#FFD700]">
+            <div className="font-oswald font-bold text-2xl text-[#FFD700]" style={{ textShadow: '0 0 14px rgba(255,215,0,0.25)' }}>
               {grandTotal.toLocaleString("ru-RU")} ₽
             </div>
           </div>
