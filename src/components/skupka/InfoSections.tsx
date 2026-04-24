@@ -269,28 +269,28 @@ const InfoSections = () => {
       </section>
 
       {/* ABOUT */}
-      <section id="about" className="py-20 border-t border-[#FFD700]/10">
+      <section id="about" className="py-14 md:py-20 border-t border-[#FFD700]/10">
         <div className="max-w-7xl mx-auto px-4">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
+          <div className="grid lg:grid-cols-2 gap-8 md:gap-16 items-center">
             <Reveal>
               <p className="font-roboto text-[#FFD700] text-sm uppercase tracking-widest mb-2">О компании</p>
-              <h2 className="font-oswald text-4xl md:text-5xl font-bold mb-6">МЫ ЦЕНИМ<br />ЧЕСТНОСТЬ</h2>
-              <p className="font-roboto text-white/60 leading-relaxed mb-4">
-                Скупка24 работает в Калуге с 2015 года. Наш офис — ул. Кирова, 11. За это время мы провели более 50 000 сделок и выплатили клиентам сотни миллионов рублей. Наш принцип прост: честная цена и уважение к каждому клиенту.
+              <h2 className="font-oswald text-3xl md:text-5xl font-bold mb-4 md:mb-6">МЫ ЦЕНИМ<br />ЧЕСТНОСТЬ</h2>
+              <p className="font-roboto text-white/60 leading-relaxed mb-4 text-sm md:text-base">
+                Скупка24 работает в Калуге с 2015 года. Наши офисы — ул. Кирова, 11 и ул. Кирова, 7/47. За это время мы провели более 50 000 сделок и выплатили клиентам сотни миллионов рублей. Наш принцип прост: честная цена и уважение к каждому клиенту.
               </p>
-              <p className="font-roboto text-white/60 leading-relaxed mb-8">
+              <p className="font-roboto text-white/60 leading-relaxed mb-6 md:mb-8 text-sm md:text-base">
                 Все наши оценщики — сертифицированные специалисты. Мы не занижаем цены и не используем серые схемы. Только прозрачные сделки, официальный договор и выплата день в день. Работаем в Калуге круглосуточно, 24/7.
               </p>
-              <div className="grid grid-cols-3 gap-6">
+              <div className="grid grid-cols-3 gap-3 md:gap-6">
                 {[["50 000+", "сделок"], ["₽ 500 млн", "выплачено"]].map(([num, label]) => (
-                  <div key={label} className="border-l-2 border-[#FFD700] pl-4">
-                    <div className="font-oswald text-2xl font-bold text-[#FFD700]">{num}</div>
-                    <div className="font-roboto text-white/40 text-xs uppercase tracking-wide">{label}</div>
+                  <div key={label} className="border-l-2 border-[#FFD700] pl-3 md:pl-4">
+                    <div className="font-oswald text-lg md:text-2xl font-bold text-[#FFD700]">{num}</div>
+                    <div className="font-roboto text-white/40 text-[10px] md:text-xs uppercase tracking-wide">{label}</div>
                   </div>
                 ))}
-                <div className="border-l-2 border-[#FFD700] pl-4">
-                  <div className="font-oswald text-2xl font-bold text-[#FFD700]">5.0 ★★★★★</div>
-                  <div className="font-roboto text-white/40 text-xs uppercase tracking-wide">рейтинг</div>
+                <div className="border-l-2 border-[#FFD700] pl-3 md:pl-4">
+                  <div className="font-oswald text-lg md:text-2xl font-bold text-[#FFD700]">5.0 ★</div>
+                  <div className="font-roboto text-white/40 text-[10px] md:text-xs uppercase tracking-wide">рейтинг</div>
                 </div>
               </div>
             </Reveal>
@@ -301,8 +301,10 @@ const InfoSections = () => {
                 <div className="absolute bottom-0 left-0 w-1/2 h-1 bg-[#FFD700]" />
                 <img
                   src="https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/a1949b69-d0e9-4258-a070-4865807b102b.jpg"
-                  alt="О компании"
-                  className="w-full h-80 object-cover relative"
+                  alt="Офис Скупка24 в Калуге — Кирова, 11"
+                  className="w-full h-64 md:h-80 object-cover relative"
+                  loading="lazy"
+                  decoding="async"
                 />
               </div>
             </Reveal>
@@ -311,12 +313,12 @@ const InfoSections = () => {
       </section>
 
       {/* REVIEWS */}
-      <section id="reviews" className="py-20 bg-[#111] border-t border-[#FFD700]/10">
+      <section id="reviews" className="py-14 md:py-20 bg-[#111] border-t border-[#FFD700]/10">
         <div className="max-w-7xl mx-auto px-4">
-          <div className="flex items-end justify-between mb-12">
+          <div className="flex items-end justify-between mb-8 md:mb-12">
             <div>
               <p className="font-roboto text-[#FFD700] text-sm uppercase tracking-widest mb-2">Яндекс Карты</p>
-              <h2 className="font-oswald text-4xl md:text-5xl font-bold">ОТЗЫВЫ<br />КЛИЕНТОВ</h2>
+              <h2 className="font-oswald text-3xl md:text-5xl font-bold">ОТЗЫВЫ<br />КЛИЕНТОВ</h2>
             </div>
             <a href="https://yandex.ru/profile/52473097879?lang=ru" target="_blank" rel="noopener noreferrer"
               className="hidden md:flex items-center gap-2 border border-[#FFD700]/30 text-[#FFD700] font-oswald font-bold px-5 py-2 uppercase tracking-wide hover:border-[#FFD700] transition-colors text-sm mb-4">
@@ -325,7 +327,7 @@ const InfoSections = () => {
             </a>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
             {[
               { name: "Антон К.", rating: 5, text: "Отличный сервис! Сдал iPhone 13, оценили быстро и честно. Деньги получил сразу на карту. Рекомендую!", date: "2024" },
               { name: "Марина С.", rating: 5, text: "Приятно удивлена — предложили хорошую цену за ноутбук, без торга и занижений. Всё официально, договор на руках.", date: "2024" },
@@ -361,38 +363,35 @@ const InfoSections = () => {
 
       {/* AVITO */}
       <section id="avito" className="border-t border-[#FFD700]/10">
-        <div className="max-w-7xl mx-auto px-4 py-12">
-          <div className="mb-8">
+        <div className="max-w-7xl mx-auto px-4 py-10 md:py-14">
+          <div className="mb-6 md:mb-8">
             <p className="font-roboto text-[#FFD700] text-sm uppercase tracking-widest mb-2">Маркетплейс</p>
-            <h2 className="font-oswald text-4xl md:text-5xl font-bold">МЫ НА АВИТО</h2>
+            <h2 className="font-oswald text-3xl md:text-5xl font-bold">МЫ НА АВИТО</h2>
           </div>
 
           <a href="https://www.avito.ru/brands/skupka24kirova7" target="_blank" rel="noopener noreferrer"
             className="block group relative overflow-hidden border border-[#00AAFF]/30 hover:border-[#00AAFF] transition-colors">
-            <div className="bg-gradient-to-r from-[#003D5C] to-[#001F2E] p-8 md:p-12 flex flex-wrap items-center justify-between gap-8">
-              {/* Left */}
-              <div className="flex items-center gap-6">
-                <div className="w-16 h-16 bg-[#00AAFF] flex items-center justify-center font-oswald font-bold text-white text-2xl shrink-0">AV</div>
-                <div>
-                  <div className="font-oswald text-2xl md:text-3xl font-bold text-white uppercase mb-1">Скупка24 на Авито</div>
-                  <div className="font-roboto text-white/50 text-sm">Актуальные объявления · Отзывы покупателей · Безопасные сделки</div>
-                  <div className="flex items-center gap-4 mt-3 flex-wrap">
-                    {[["✓ Быстрый ответ", ""], ["✓ Проверенный продавец", ""], ["✓ Безопасная сделка", ""]].map(([label]) => (
-                      <span key={label} className="font-roboto text-[#00AAFF] text-xs">{label}</span>
+            <div className="bg-gradient-to-r from-[#003D5C] to-[#001F2E] p-5 md:p-12 flex flex-col md:flex-row md:flex-wrap md:items-center md:justify-between gap-5 md:gap-8">
+              <div className="flex items-center gap-4 md:gap-6">
+                <div className="w-12 h-12 md:w-16 md:h-16 bg-[#00AAFF] flex items-center justify-center font-oswald font-bold text-white text-lg md:text-2xl shrink-0">AV</div>
+                <div className="min-w-0">
+                  <div className="font-oswald text-lg md:text-3xl font-bold text-white uppercase mb-1 leading-tight">Скупка24 на Авито</div>
+                  <div className="font-roboto text-white/50 text-xs md:text-sm">Актуальные объявления · Отзывы · Безопасные сделки</div>
+                  <div className="flex items-center gap-2 md:gap-4 mt-2 md:mt-3 flex-wrap">
+                    {["✓ Быстрый ответ", "✓ Проверенный продавец", "✓ Безопасная сделка"].map((label) => (
+                      <span key={label} className="font-roboto text-[#00AAFF] text-[10px] md:text-xs">{label}</span>
                     ))}
                   </div>
                 </div>
               </div>
-              {/* Right CTA */}
-              <div className="flex flex-col items-center gap-3 shrink-0">
-                <div className="bg-[#00AAFF] text-white font-oswald font-bold text-lg px-8 py-4 uppercase tracking-wide group-hover:bg-[#0099EE] transition-colors flex items-center gap-3">
-                  <Icon name="ExternalLink" size={18} />
+              <div className="flex flex-col items-stretch md:items-center gap-2 md:gap-3 shrink-0">
+                <div className="bg-[#00AAFF] text-white font-oswald font-bold text-sm md:text-lg px-5 md:px-8 py-3 md:py-4 uppercase tracking-wide group-hover:bg-[#0099EE] transition-colors flex items-center justify-center gap-2 md:gap-3">
+                  <Icon name="ExternalLink" size={16} />
                   Смотреть объявления
                 </div>
-                <span className="font-roboto text-white/30 text-xs">avito.ru/brands/skupka24kirova7</span>
+                <span className="font-roboto text-white/30 text-[10px] md:text-xs text-center">avito.ru/brands/skupka24kirova7</span>
               </div>
             </div>
-            {/* Animated border */}
             <div className="absolute bottom-0 left-0 w-0 group-hover:w-full h-0.5 bg-[#00AAFF] transition-all duration-500" />
           </a>
         </div>

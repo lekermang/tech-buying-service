@@ -11,7 +11,24 @@ import JobsSection from "@/components/skupka/JobsSection";
 
 const scrollTo = (href: string) => {
   const el = document.querySelector(href);
-  if (el) el.scrollIntoView({ behavior: "smooth" });
+  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+};
+
+/** Автоскролл к якорю из URL: поддерживает #section и ?section=xxx (для Яндекс.Директа) */
+const useAutoScroll = (ready: boolean) => {
+  useEffect(() => {
+    if (!ready) return;
+    const params = new URLSearchParams(window.location.search);
+    const section = params.get("section") || params.get("block");
+    const hash = window.location.hash.replace("#", "");
+    const target = section || hash;
+    if (!target) return;
+    const t = setTimeout(() => {
+      const el = document.getElementById(target);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 200);
+    return () => clearTimeout(t);
+  }, [ready]);
 };
 
 const SplashScreen = ({ onDone }: { onDone: () => void }) => {
@@ -66,9 +83,19 @@ const SplashScreen = ({ onDone }: { onDone: () => void }) => {
 const Index = ({ goldOpen = false }: { goldOpen?: boolean }) => {
   const [splashDone, setSplashDone] = useState(false);
   const [evalOpen, setEvalOpen] = useState(false);
+  useAutoScroll(splashDone);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [installed, setInstalled] = useState(false);
+
+  // ?action=eval — открыть форму оценки (для рекламных ссылок)
+  useEffect(() => {
+    if (!splashDone) return;
+    const p = new URLSearchParams(window.location.search);
+    if (p.get("action") === "eval" || p.get("action") === "evaluate") {
+      setEvalOpen(true);
+    }
+  }, [splashDone]);
 
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -115,7 +142,7 @@ const Index = ({ goldOpen = false }: { goldOpen?: boolean }) => {
             <span className="font-oswald font-bold text-sm uppercase tracking-wide">Оценить онлайн</span>
           </button>
           <a
-            href="https://t.me/skypka24"
+            href="https://t.me/skupka24"
             target="_blank" rel="noopener noreferrer"
             onClick={() => ymGoal(Goals.TELEGRAM_CLICK, { place: "sticky_bar" })}
             className="flex-1 flex flex-col items-center justify-center gap-1 text-[#FFD700] hover:bg-[#FFD700]/5 active:bg-[#FFD700]/10 transition-colors">
