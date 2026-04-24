@@ -22,25 +22,48 @@ export default function RepairImportTab({ token }: Props) {
       r.readAsDataURL(file);
     });
 
-  const MAX_MB = 10;
+  const MAX_MB = 100;
+  const SMALL_FILE_MB = 4;
+  const [s3Key, setS3Key] = useState<string | null>(null);
 
-  const postWithTimeout = async (action: 'preview' | 'import', b64: string, filename: string): Promise<{ ok: boolean; status: number; data: Record<string, unknown>; text: string }> => {
+  const postToFunc = async (payload: Record<string, unknown>): Promise<{ ok: boolean; status: number; data: Record<string, unknown> }> => {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 90000);
+    const timer = setTimeout(() => ctrl.abort(), 120000);
     try {
       const res = await fetch(IMPORT_PARTS_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...adminHeaders(token) },
-        body: JSON.stringify({ action, file: b64, filename }),
+        body: JSON.stringify(payload),
         signal: ctrl.signal,
       });
       const text = await res.text();
       let data: Record<string, unknown> = {};
       try { data = JSON.parse(text); } catch { /* not json */ }
-      return { ok: res.ok, status: res.status, data, text };
+      return { ok: res.ok, status: res.status, data };
     } finally {
       clearTimeout(timer);
     }
+  };
+
+  const uploadToS3 = async (file: File, onProgress: (percent: number) => void): Promise<string> => {
+    const { ok, status, data } = await postToFunc({ action: 'upload-url', filename: file.name });
+    if (!ok || !data.upload_url) {
+      throw new Error((data.error as string) || `не удалось получить ссылку (${status})`);
+    }
+    const uploadUrl = data.upload_url as string;
+    const key = data.s3_key as string;
+
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', uploadUrl);
+      xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100)); };
+      xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`S3 вернул ${xhr.status}`)));
+      xhr.onerror = () => reject(new Error('сеть недоступна при загрузке в хранилище'));
+      xhr.onabort = () => reject(new Error('загрузка отменена'));
+      xhr.send(file);
+    });
+
+    return key;
   };
 
   const handleImportFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -51,18 +74,31 @@ export default function RepairImportTab({ token }: Props) {
     if (sizeMb > MAX_MB) {
       setImportFile(null);
       setImportPreview(null);
-      setImportResult(`Файл слишком большой: ${sizeMb.toFixed(1)} МБ. Максимум — ${MAX_MB} МБ. Пересохрани лист как отдельный .xlsx или раздели прайс на части.`);
+      setS3Key(null);
+      setImportResult(`Файл слишком большой: ${sizeMb.toFixed(1)} МБ. Максимум — ${MAX_MB} МБ.`);
       return;
     }
 
     setImportFile(file);
     setImportPreview(null);
-    setImportResult('Читаю файл...');
+    setS3Key(null);
+    setImportResult('Подготавливаю файл...');
 
     try {
-      const b64 = await fileToBase64(file);
-      setImportResult('Отправляю на сервер...');
-      const { ok, status, data } = await postWithTimeout('preview', b64, file.name);
+      let payload: Record<string, unknown>;
+
+      if (sizeMb > SMALL_FILE_MB) {
+        setImportResult('Загружаю в облачное хранилище...');
+        const key = await uploadToS3(file, (p) => setImportResult(`Загрузка в хранилище: ${p}%`));
+        setS3Key(key);
+        payload = { action: 'preview', s3_key: key, filename: file.name };
+      } else {
+        const b64 = await fileToBase64(file);
+        payload = { action: 'preview', file: b64, filename: file.name };
+      }
+
+      setImportResult('Анализирую прайс-лист...');
+      const { ok, status, data } = await postToFunc(payload);
 
       if (!ok || data.error) {
         setImportResult(`Ошибка: ${(data.error as string) || `сервер вернул ${status}`}`);
@@ -78,9 +114,9 @@ export default function RepairImportTab({ token }: Props) {
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'неизвестная';
       if (msg.includes('abort') || msg.includes('Abort')) {
-        setImportResult('Ошибка: превышено время ожидания. Файл слишком большой или сервер недоступен. Попробуй файл поменьше.');
-      } else if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
-        setImportResult(`Ошибка сети: сервер недоступен или файл слишком большой (${sizeMb.toFixed(1)} МБ). Попробуй уменьшить файл или повторить позже.`);
+        setImportResult('Ошибка: превышено время ожидания. Попробуй ещё раз.');
+      } else if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('сеть')) {
+        setImportResult(`Ошибка сети: ${msg}. Проверь интернет и попробуй ещё раз.`);
       } else {
         setImportResult(`Ошибка чтения файла: ${msg}`);
       }
@@ -90,14 +126,21 @@ export default function RepairImportTab({ token }: Props) {
   const handleImport = async () => {
     if (!importFile) return;
     setImporting(true);
-    setImportResult('Загружаю на сервер...');
+    setImportResult('Загружаю позиции в базу...');
     try {
-      const b64 = await fileToBase64(importFile);
-      const { ok, status, data } = await postWithTimeout('import', b64, importFile.name);
+      let payload: Record<string, unknown>;
+      if (s3Key) {
+        payload = { action: 'import', s3_key: s3Key, filename: importFile.name };
+      } else {
+        const b64 = await fileToBase64(importFile);
+        payload = { action: 'import', file: b64, filename: importFile.name };
+      }
+      const { ok, status, data } = await postToFunc(payload);
       if (!ok || data.error) setImportResult(`Ошибка: ${(data.error as string) || `сервер вернул ${status}`}`);
       else setImportResult(`Загружено ${data.imported} позиций, пропущено ${data.skipped}`);
       setImportFile(null);
       setImportPreview(null);
+      setS3Key(null);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'неизвестная';
       setImportResult(`Ошибка соединения: ${msg}`);
@@ -109,7 +152,7 @@ export default function RepairImportTab({ token }: Props) {
     <div className="flex-1 overflow-y-auto px-4 py-5 space-y-5 max-w-xl">
       <div>
         <p className="font-roboto text-white/50 text-xs mb-3">
-          Загрузи прайс-лист поставщика в формате .xlsx или .xls (до {MAX_MB} МБ). Система автоматически определит колонки с названием, ценой, остатком и качеством.
+          Загрузи прайс-лист поставщика в формате .xlsx или .xls (до {MAX_MB} МБ). Большие файлы автоматически загружаются через облако. Система определит колонки с названием, ценой, остатком и качеством.
         </p>
         <label className="flex flex-col items-center justify-center border-2 border-dashed border-[#333] hover:border-[#FFD700]/50 transition-colors cursor-pointer py-8 px-4 text-center">
           <Icon name="FileUp" size={28} className="text-white/20 mb-2" />

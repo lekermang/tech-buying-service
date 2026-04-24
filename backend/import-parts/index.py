@@ -3,14 +3,32 @@ import os
 import base64
 import io
 import re
+import uuid
 import psycopg2
+import boto3
+from botocore.client import Config as BotoConfig
+
+S3_ENDPOINT = 'https://bucket.poehali.dev'
+S3_BUCKET = 'files'
+S3_PREFIX = 'import-parts/'
+
+
+def _s3_client():
+    return boto3.client(
+        's3',
+        endpoint_url=S3_ENDPOINT,
+        aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
+        aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
+        config=BotoConfig(signature_version='s3v4'),
+    )
+
 
 def handler(event: dict, context) -> dict:
-    """Импорт запчастей из Excel-файла (base64). Парсит колонки: название, категория, цена, остаток, качество."""
+    """Импорт запчастей из Excel-файла. Поддерживает два режима: base64 в теле и загрузку через S3 (presigned URL). Парсит колонки: название, категория, цена, остаток, качество."""
     cors = {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, X-Authorization, X-User-Id, X-Auth-Token',
+        'Access-Control-Allow-Headers': 'Content-Type, X-Authorization, X-User-Id, X-Auth-Token, X-Admin-Token',
     }
 
     if event.get('httpMethod') == 'OPTIONS':
@@ -28,7 +46,9 @@ def handler(event: dict, context) -> dict:
     body = json.loads(event.get('body') or '{}')
     action = body.get('action', 'import')
 
-    if action == 'preview':
+    if action == 'upload-url':
+        return _upload_url(body, cors)
+    elif action == 'preview':
         return _preview(body, cors)
     elif action == 'import':
         return _import(body, cors)
@@ -36,13 +56,46 @@ def handler(event: dict, context) -> dict:
         return {'statusCode': 400, 'headers': cors, 'body': json.dumps({'error': 'unknown action'})}
 
 
-def _parse_excel(file_b64: str, filename: str = ''):
-    """Парсит Excel (.xlsx/.xlsm/.xls) из base64, возвращает list[list[str]] строк. Пробует все листы, берёт самый «жирный»."""
-    try:
-        data = base64.b64decode(file_b64)
-    except Exception as e:
-        raise RuntimeError(f'не удалось декодировать файл: {e}')
+def _upload_url(body: dict, cors: dict) -> dict:
+    """Выдаёт presigned URL для загрузки файла напрямую в S3 из браузера."""
+    filename = body.get('filename', 'price.xlsx')
+    ext = filename.lower().rsplit('.', 1)[-1] if '.' in filename else 'xlsx'
+    if ext not in ('xlsx', 'xlsm', 'xls'):
+        return {'statusCode': 400, 'headers': cors, 'body': json.dumps({'error': 'только .xlsx / .xls'}, ensure_ascii=False)}
 
+    key = f"{S3_PREFIX}{uuid.uuid4().hex}.{ext}"
+    s3 = _s3_client()
+    try:
+        url = s3.generate_presigned_url(
+            'put_object',
+            Params={'Bucket': S3_BUCKET, 'Key': key},
+            ExpiresIn=600,
+        )
+    except Exception as e:
+        return {'statusCode': 500, 'headers': cors, 'body': json.dumps({'error': f'не удалось создать ссылку: {e}'}, ensure_ascii=False)}
+
+    return {
+        'statusCode': 200,
+        'headers': {**cors, 'Content-Type': 'application/json'},
+        'body': json.dumps({'upload_url': url, 's3_key': key}, ensure_ascii=False),
+    }
+
+
+def _load_excel_bytes(body: dict) -> bytes:
+    """Загружает байты Excel либо из base64, либо из S3."""
+    s3_key = body.get('s3_key')
+    if s3_key:
+        s3 = _s3_client()
+        obj = s3.get_object(Bucket=S3_BUCKET, Key=s3_key)
+        return obj['Body'].read()
+    file_b64 = body.get('file')
+    if not file_b64:
+        raise RuntimeError('нет файла (ни base64, ни s3_key)')
+    return base64.b64decode(file_b64)
+
+
+def _parse_excel(data: bytes, filename: str = ''):
+    """Парсит Excel (.xlsx/.xlsm/.xls) из bytes, возвращает list[list[str]] строк. Пробует все листы, берёт самый «жирный»."""
     is_old_xls = filename.lower().endswith('.xls') and not filename.lower().endswith('.xlsx')
     # По первым байтам: старый .xls начинается с D0 CF 11 E0 (OLE)
     if not is_old_xls and len(data) >= 4 and data[:4] == b'\xd0\xcf\x11\xe0':
@@ -216,13 +269,14 @@ def _find_header_row(rows: list) -> tuple[int, dict]:
 
 
 def _preview(body: dict, cors: dict) -> dict:
-    file_b64 = body.get('file')
     filename = body.get('filename', '')
-    if not file_b64:
-        return {'statusCode': 400, 'headers': cors, 'body': json.dumps({'error': 'нет файла'}, ensure_ascii=False)}
+    try:
+        data = _load_excel_bytes(body)
+    except Exception as e:
+        return {'statusCode': 200, 'headers': {**cors, 'Content-Type': 'application/json'}, 'body': json.dumps({'error': f'не удалось загрузить файл: {e}'}, ensure_ascii=False)}
 
     try:
-        rows = _parse_excel(file_b64, filename)
+        rows = _parse_excel(data, filename)
     except Exception as e:
         return {
             'statusCode': 200,
@@ -258,13 +312,14 @@ def _preview(body: dict, cors: dict) -> dict:
 
 
 def _import(body: dict, cors: dict) -> dict:
-    file_b64 = body.get('file')
     filename = body.get('filename', '')
-    if not file_b64:
-        return {'statusCode': 400, 'headers': cors, 'body': json.dumps({'error': 'нет файла'}, ensure_ascii=False)}
+    try:
+        data = _load_excel_bytes(body)
+    except Exception as e:
+        return {'statusCode': 200, 'headers': {**cors, 'Content-Type': 'application/json'}, 'body': json.dumps({'error': f'не удалось загрузить файл: {e}'}, ensure_ascii=False)}
 
     try:
-        rows = _parse_excel(file_b64, filename)
+        rows = _parse_excel(data, filename)
     except Exception as e:
         return {
             'statusCode': 200,
