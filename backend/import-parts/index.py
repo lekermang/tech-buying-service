@@ -322,6 +322,46 @@ def _detect_part_type(name: str, category: str) -> str:
     return 'accessory'
 
 
+PART_TYPE_CATEGORY_RU = {
+    'display': 'Дисплеи',
+    'battery_iphone': 'Аккумуляторы iPhone',
+    'battery_other': 'Аккумуляторы',
+    'rear_glass': 'Задние стёкла',
+    'camera_glass': 'Стёкла камер',
+    'flex_board': 'Шлейфы и платы',
+    'speaker_ear': 'Слуховые динамики',
+    'speaker_loud': 'Громкие динамики',
+    'vibro': 'Вибромоторы',
+    'back_cover': 'Корпуса и крышки',
+    'accessory': 'Прочее',
+}
+
+
+def _extract_model_keywords(name: str, category: str) -> str:
+    """Собирает ключевые слова модели для поиска: iphone/samsung/redmi/13/pro/max и т.п. из имени и скобок."""
+    text = f"{name} {category}".lower()
+    # Вытаскиваем содержимое скобок (часто там перечисление моделей)
+    brackets = re.findall(r'\(([^)]+)\)', name.lower())
+    tokens: list[str] = []
+    for b in brackets:
+        for p in re.split(r'[/,;+]+', b):
+            p = p.strip()
+            if p:
+                tokens.append(p)
+    # Добавляем значимые слова из имени и категории
+    for w in re.findall(r'[a-zа-я0-9]+', text):
+        if len(w) >= 2:
+            tokens.append(w)
+    # Уникализация с сохранением порядка
+    seen = set()
+    uniq = []
+    for t in tokens:
+        if t not in seen:
+            seen.add(t)
+            uniq.append(t)
+    return ' '.join(uniq)[:1000]
+
+
 def _rows_to_parts(rows: list, col_map: dict, header_row_idx: int) -> list:
     parts = []
     for i, row in enumerate(rows):
@@ -345,6 +385,13 @@ def _rows_to_parts(rows: list, col_map: dict, header_row_idx: int) -> list:
         quality = _detect_quality(name, quality_str)
         part_type = _detect_part_type(name, category)
 
+        # Если категория не указана в файле — берём русскую по типу запчасти,
+        # чтобы в Staff отображалась таблица с наценкой по категориям
+        if not category or not category.strip():
+            category = PART_TYPE_CATEGORY_RU.get(part_type, 'Прочее')
+
+        model_keywords = _extract_model_keywords(name, category)
+
         parts.append({
             'code': code[:32] if code else '',
             'name': name[:500],
@@ -353,6 +400,7 @@ def _rows_to_parts(rows: list, col_map: dict, header_row_idx: int) -> list:
             'stock': stock,
             'quality': quality,
             'part_type': part_type,
+            'model_keywords': model_keywords,
         })
     return parts
 
@@ -475,6 +523,7 @@ def _import(body: dict, cors: dict) -> dict:
         tuples.append((
             pid, p.get('code') or '', p['name'], p['category'],
             final_price, supplier, p['stock'], p['quality'], p['part_type'],
+            p.get('model_keywords') or '',
             batch_id,
         ))
 
@@ -485,7 +534,7 @@ def _import(body: dict, cors: dict) -> dict:
             cur,
             """
             INSERT INTO repair_parts
-                (id, code, name, category, price, supplier_price, stock, quality, part_type, available, updated_at, price_batch_id)
+                (id, code, name, category, price, supplier_price, stock, quality, part_type, model_keywords, available, updated_at, price_batch_id)
             VALUES %s
             ON CONFLICT (id) DO UPDATE SET
                 name = EXCLUDED.name,
@@ -495,12 +544,13 @@ def _import(body: dict, cors: dict) -> dict:
                 stock = EXCLUDED.stock,
                 quality = EXCLUDED.quality,
                 part_type = EXCLUDED.part_type,
+                model_keywords = EXCLUDED.model_keywords,
                 available = true,
                 updated_at = NOW(),
                 price_batch_id = EXCLUDED.price_batch_id
             """,
             tuples,
-            template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, true, NOW(), %s)",
+            template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, true, NOW(), %s)",
             page_size=500,
         )
         imported = len(tuples)

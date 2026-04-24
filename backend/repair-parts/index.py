@@ -407,11 +407,15 @@ def search_parts(conn, model: str, phone: str = '') -> tuple:
     words = [w for w in model.lower().split() if len(w) >= 2]
     if not words:
         return [], [], {}
-    conditions = ' AND '.join([f"LOWER(model_keywords) LIKE '%%{w}%%'" for w in words])
+    # Ищем по model_keywords ИЛИ по name/category — чтобы работало даже для старых
+    # записей без keywords и для только что загруженных Excel-прайсов
+    conditions = ' AND '.join([
+        f"(LOWER(COALESCE(model_keywords,'')) LIKE '%%{w}%%' OR LOWER(name) LIKE '%%{w}%%' OR LOWER(COALESCE(category,'')) LIKE '%%{w}%%')"
+        for w in words
+    ])
     cur = conn.cursor()
 
     labor = get_labor_prices(cur)
-    markup = get_parts_markup(cur)
     extra = get_extra_works(cur)
     client_info = get_client_discount(cur, phone)
 
@@ -435,18 +439,19 @@ def search_parts(conn, model: str, phone: str = '') -> tuple:
     parts = []
     for r in rows:
         pid, name, category, price, stock, quality, part_type, batch_id, supplier_price = r
-        raw_price = float(price or 0)
-        marked_price = raw_price + markup
+        # price уже с наценкой (применяется при импорте по таблице repair_parts_markup per-category)
+        final_price = float(price or 0)
         labor_cost = labor.get(part_type, DEFAULT_LABOR.get(part_type, 500))
-        total = marked_price + labor_cost
+        total = final_price + labor_cost
+        sup = float(supplier_price) if supplier_price is not None else None
         parts.append({
             'id': pid,
             'name': name,
             'category': category,
-            'price': marked_price,
-            'raw_price': raw_price,
-            'supplier_price': float(supplier_price) if supplier_price is not None else None,
-            'markup': markup,
+            'price': final_price,
+            'raw_price': sup if sup is not None else final_price,
+            'supplier_price': sup,
+            'markup': round(final_price - sup, 2) if sup else 0,
             'stock': float(stock or 0),
             'quality': quality,
             'part_type': part_type,
