@@ -31,6 +31,69 @@ const useAutoScroll = (ready: boolean) => {
   }, [ready]);
 };
 
+/** Динамические SEO-метатеги в зависимости от ?section= (для рекламы в Яндекс.Директе) */
+const SECTION_SEO: Record<string, { title: string; description: string }> = {
+  catalog: {
+    title: "Что принимаем в скупку — Скупка24 Калуга | iPhone, MacBook, золото",
+    description: "Принимаем: iPhone до 95 000 ₽, MacBook и ноутбуки до 150 000 ₽, iPad, Apple Watch, PlayStation, Xbox, золото и украшения до 500 000 ₽. Честная оценка за 15 минут в Калуге.",
+  },
+  how: {
+    title: "Как работает Скупка24 — 4 шага до денег | Калуга",
+    description: "Оставьте заявку → получите оценку за 15 минут → приезжайте в офис на Кирова 11 или 7/47 → получите деньги в день обращения. Наличные или перевод на карту.",
+  },
+  guarantees: {
+    title: "Наши гарантии — Скупка24 | Честная оценка и официальный договор",
+    description: "Работаем с 2015 года, 50 000+ сделок, 4.9 на Яндекс Картах. Честная оценка, официальный договор, выплата день в день. Никаких скрытых комиссий.",
+  },
+  branches: {
+    title: "Наши офисы в Калуге — Кирова 11 и Кирова 7/47 | Скупка24",
+    description: "Два офиса Скупка24 в центре Калуги: ул. Кирова, 11 и ул. Кирова, 7/47. Работаем 24/7 без выходных. Телефон: +7 (992) 999-03-33, 8 (800) 600-68-33.",
+  },
+  reviews: {
+    title: "Отзывы клиентов Скупка24 на Яндекс Картах | Рейтинг 5.0",
+    description: "Более 200 отзывов на Яндекс Картах. Рейтинг 5.0. Клиенты отмечают честную оценку, быстрое оформление и выплату день в день.",
+  },
+  avito: {
+    title: "Скупка24 на Авито — Проверенный продавец | Безопасная сделка",
+    description: "Актуальные объявления Скупка24 на Авито. Проверенный продавец, быстрый ответ, безопасные сделки с гарантией Авито Доставки.",
+  },
+  contacts: {
+    title: "Контакты Скупка24 Калуга | Телефон, Telegram, адреса офисов",
+    description: "Телефон: +7 (992) 999-03-33, бесплатно 8 (800) 600-68-33. Telegram @skypka24. Два офиса в Калуге: Кирова 11 и 7/47. Работаем круглосуточно.",
+  },
+  jobs: {
+    title: "Работа в Скупка24 Калуга — Вакансии | Менеджер, оценщик, кассир",
+    description: "Открыты вакансии в Скупка24: менеджер онлайн, оценщик техники, кассир-приёмщик. Стабильная зарплата, обучение, удобный график. Откликнитесь онлайн.",
+  },
+};
+
+const useDynamicSeo = (ready: boolean) => {
+  useEffect(() => {
+    if (!ready) return;
+    const params = new URLSearchParams(window.location.search);
+    const section = params.get("section") || params.get("block") || window.location.hash.replace("#", "");
+    if (!section) return;
+    const seo = SECTION_SEO[section];
+    if (!seo) return;
+
+    const prevTitle = document.title;
+    document.title = seo.title;
+    const setMeta = (selector: string, value: string) => {
+      const el = document.querySelector<HTMLMetaElement>(selector);
+      if (el) el.setAttribute("content", value);
+    };
+    setMeta('meta[name="description"]', seo.description);
+    setMeta('meta[property="og:title"]', seo.title);
+    setMeta('meta[property="og:description"]', seo.description);
+    setMeta('meta[name="twitter:title"]', seo.title);
+    setMeta('meta[name="twitter:description"]', seo.description);
+
+    return () => {
+      document.title = prevTitle;
+    };
+  }, [ready]);
+};
+
 const SplashScreen = ({ onDone }: { onDone: () => void }) => {
   const [hiding, setHiding] = useState(false);
 
@@ -84,6 +147,7 @@ const Index = ({ goldOpen = false }: { goldOpen?: boolean }) => {
   const [splashDone, setSplashDone] = useState(false);
   const [evalOpen, setEvalOpen] = useState(false);
   useAutoScroll(splashDone);
+  useDynamicSeo(splashDone);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [installed, setInstalled] = useState(false);
