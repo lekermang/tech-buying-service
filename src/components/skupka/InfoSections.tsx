@@ -163,6 +163,40 @@ const InfoSections = () => {
               </Reveal>
             ))}
           </div>
+
+          {/* Карты офисов */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mt-6 md:mt-8">
+            <Reveal>
+              <div className="border border-[#FFD700]/20 overflow-hidden">
+                <div className="px-4 py-2.5 bg-[#FFD700]/5 border-b border-[#FFD700]/20 flex items-center gap-2">
+                  <Icon name="MapPin" size={14} className="text-[#FFD700]" />
+                  <span className="font-oswald font-bold text-sm uppercase text-white">Кирова, 11</span>
+                </div>
+                <iframe
+                  src="https://yandex.ru/map-widget/v1/?z=12&ol=biz&oid=52473097879"
+                  className="w-full h-[320px] md:h-[400px] block"
+                  frameBorder="0"
+                  loading="lazy"
+                  title="Скупка24 — Кирова 11"
+                />
+              </div>
+            </Reveal>
+            <Reveal delay={1}>
+              <div className="border border-[#FFD700]/20 overflow-hidden">
+                <div className="px-4 py-2.5 bg-[#FFD700]/5 border-b border-[#FFD700]/20 flex items-center gap-2">
+                  <Icon name="MapPin" size={14} className="text-[#FFD700]" />
+                  <span className="font-oswald font-bold text-sm uppercase text-white">Кирова, 7/47</span>
+                </div>
+                <iframe
+                  src="https://yandex.ru/map-widget/v1/?z=12&ol=biz&oid=114124804072"
+                  className="w-full h-[320px] md:h-[400px] block"
+                  frameBorder="0"
+                  loading="lazy"
+                  title="Скупка24 — Кирова 7/47"
+                />
+              </div>
+            </Reveal>
+          </div>
         </div>
       </section>
 
