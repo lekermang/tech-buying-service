@@ -179,6 +179,16 @@ const InfoSections = () => {
                   loading="lazy"
                   title="Скупка24 — Кирова 11"
                 />
+                <div className="px-4 py-2.5 bg-[#0A0A0A] border-t border-[#FFD700]/10 flex items-center justify-between gap-3 text-xs font-roboto">
+                  <span className="flex items-center gap-1.5 text-white/60">
+                    <Icon name="Footprints" size={13} className="text-[#FFD700]" />
+                    ~8 мин пешком от пл. Победы
+                  </span>
+                  <span className="flex items-center gap-1.5 text-white/40">
+                    <Icon name="Car" size={13} className="text-[#FFD700]/70" />
+                    ~5 мин
+                  </span>
+                </div>
                 <a
                   href="https://yandex.ru/maps/?rtext=~54.513845,36.261215&rtt=auto&oid=52473097879"
                   target="_blank"
@@ -203,6 +213,16 @@ const InfoSections = () => {
                   loading="lazy"
                   title="Скупка24 — Кирова 7/47"
                 />
+                <div className="px-4 py-2.5 bg-[#0A0A0A] border-t border-[#FFD700]/10 flex items-center justify-between gap-3 text-xs font-roboto">
+                  <span className="flex items-center gap-1.5 text-white/60">
+                    <Icon name="Footprints" size={13} className="text-[#FFD700]" />
+                    ~5 мин пешком от пл. Победы
+                  </span>
+                  <span className="flex items-center gap-1.5 text-white/40">
+                    <Icon name="Car" size={13} className="text-[#FFD700]/70" />
+                    ~3 мин
+                  </span>
+                </div>
                 <a
                   href="https://yandex.ru/maps/?rtext=~54.510800,36.253900&rtt=auto&oid=114124804072"
                   target="_blank"
