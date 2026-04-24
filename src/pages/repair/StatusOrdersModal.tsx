@@ -25,6 +25,20 @@ const periodLabel = (p: Period) =>
 const money = (v: number | null | undefined) =>
   v != null ? v.toLocaleString("ru-RU") + " ₽" : "—";
 
+const STATUS_LABEL: Record<string, string> = {
+  new: "Принята", accepted: "Принят мастером", in_progress: "В работе",
+  waiting_parts: "Ждём запчасть", ready: "Готово", done: "Выдано",
+  warranty: "На гарантии", cancelled: "Отменено",
+};
+
+const csvEscape = (v: unknown): string => {
+  const s = v == null ? "" : String(v);
+  if (s.includes('"') || s.includes(";") || s.includes("\n") || s.includes("\r")) {
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s;
+};
+
 export default function StatusOrdersModal({ token, period, statuses, title, accent, onClose, fetchUrl, fetchHeaders, onOrderClick }: Props) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,6 +67,49 @@ export default function StatusOrdersModal({ token, period, statuses, title, acce
   );
   const profit = totals.revenue - totals.costs;
 
+  const [exporting, setExporting] = useState(false);
+  const exportCsv = async () => {
+    if (!orders.length) return;
+    setExporting(true);
+    const { saveAs } = await import("file-saver");
+    const header = [
+      "№", "Дата", "Статус", "Клиент", "Телефон", "Модель", "Тип ремонта",
+      "Запчасть", "Закупка", "Выручка", "Мастеру", "Прибыль",
+      "Комментарий", "Заметка",
+    ];
+    const rows = orders.map((o) => {
+      const when = o.status_updated_at || o.picked_up_at || o.completed_at || o.created_at;
+      const p = (o.repair_amount || 0) - (o.purchase_amount || 0) - (o.master_income || 0);
+      return [
+        o.id,
+        when ? new Date(when).toLocaleString("ru-RU") : "",
+        STATUS_LABEL[o.status] || o.status,
+        o.name,
+        o.phone,
+        o.model || "",
+        o.repair_type || "",
+        o.parts_name || "",
+        o.purchase_amount != null ? o.purchase_amount : "",
+        o.repair_amount != null ? o.repair_amount : "",
+        o.master_income != null ? o.master_income : "",
+        p,
+        o.comment || "",
+        o.admin_note || "",
+      ];
+    });
+    const totalsRow = [
+      "", "", "ИТОГО", `${orders.length} заказов`, "", "", "", "",
+      totals.costs, totals.revenue, totals.master, profit - totals.master, "", "",
+    ];
+    const csv = [header, ...rows, totalsRow].map((r) => r.map(csvEscape).join(";")).join("\r\n");
+    // UTF-8 BOM — чтобы Excel правильно открыл кириллицу
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+    const periodName = period === "day" ? "сегодня" : period === "yesterday" ? "вчера" : period === "week" ? "7-дней" : "30-дней";
+    const stamp = new Date().toISOString().slice(0, 10);
+    saveAs(blob, `ремонт-${periodName}-${stamp}.csv`);
+    setExporting(false);
+  };
+
   return (
     <div className="fixed inset-0 z-[200] bg-black/80 flex items-end sm:items-center justify-center" onClick={onClose}>
       <div
@@ -60,16 +117,27 @@ export default function StatusOrdersModal({ token, period, statuses, title, acce
         onClick={(e) => e.stopPropagation()}
       >
         {/* Шапка */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[#2A2A2A] shrink-0">
-          <div>
-            <div className="font-oswald font-bold text-white text-base">{title}</div>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[#2A2A2A] shrink-0 gap-2">
+          <div className="min-w-0">
+            <div className="font-oswald font-bold text-white text-base truncate">{title}</div>
             <div className="font-roboto text-white/40 text-[10px] mt-0.5">
               {periodLabel(period)} · {orders.length} {orders.length === 1 ? "заказ" : "заказов"}
             </div>
           </div>
-          <button onClick={onClose} className="text-white/40 hover:text-white p-1">
-            <Icon name="X" size={20} />
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={exportCsv}
+              disabled={!orders.length || exporting}
+              className="flex items-center gap-1 text-[#FFD700] hover:bg-[#FFD700]/10 disabled:opacity-30 disabled:hover:bg-transparent px-2 py-1.5 font-roboto text-[11px] border border-[#FFD700]/30 transition-colors"
+              title="Выгрузить в Excel"
+            >
+              <Icon name={exporting ? "Loader" : "Download"} size={12} className={exporting ? "animate-spin" : ""} />
+              Excel
+            </button>
+            <button onClick={onClose} className="text-white/40 hover:text-white p-1">
+              <Icon name="X" size={20} />
+            </button>
+          </div>
         </div>
 
         {/* Итого */}
