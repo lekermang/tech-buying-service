@@ -108,39 +108,88 @@ const SplashScreen = ({ onDone }: { onDone: () => void }) => {
   }, [onDone]);
 
   return (
-    <div className={`fixed inset-0 z-[100] flex flex-col items-center justify-center transition-opacity duration-500 ${hiding ? "opacity-0" : "opacity-100"}`}
+    <div className={`fixed inset-0 z-[100] flex flex-col items-center justify-center transition-opacity duration-500 overflow-hidden ${hiding ? "opacity-0" : "opacity-100"}`}
       style={{ background: "radial-gradient(ellipse at center, #1a1400 0%, #0D0D0D 60%, #000 100%)" }}>
-      <div className="absolute inset-0" style={{ backgroundImage: "linear-gradient(rgba(255,215,0,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(255,215,0,0.06) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
-      <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at center, rgba(255,215,0,0.07) 0%, transparent 65%)" }} />
-      <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#FFD700]" />
 
-      <div className="relative flex flex-col items-center gap-8">
-        <div className="flex items-center gap-3 animate-[fadeIn_0.4s_ease]">
-          <img
-            src="https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/9c9b4fca-bfd7-4841-a827-eb0354dad8da.JPG"
-            alt="Скупка24"
-            className="w-12 h-12 rounded-full object-cover border border-[#FFD700]/40"
-          />
-          <span className="font-oswald font-bold text-2xl text-[#FFD700] tracking-widest uppercase">Скупка24</span>
+      {/* Premium-фон Trade In DNA: сетка + свечения по углам + переливающаяся линия */}
+      <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: "linear-gradient(rgba(255,215,0,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(255,215,0,0.06) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
+      <div className="absolute -top-32 -left-32 w-[500px] h-[500px] rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(255,215,0,0.10)" }} />
+      <div className="absolute -bottom-32 -right-32 w-[500px] h-[500px] rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(255,184,0,0.07)" }} />
+      <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at center, rgba(255,215,0,0.08) 0%, transparent 65%)" }} />
+      <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-transparent via-[#FFD700] to-transparent" />
+      <div className="absolute right-0 top-0 bottom-0 w-1 bg-gradient-to-b from-transparent via-[#FFD700]/40 to-transparent" />
+
+      <div className="relative flex flex-col items-center gap-8 px-4">
+
+        {/* Премиум-медальон с золотым ободком и пульсацией */}
+        <div className="relative animate-[fadeIn_0.4s_ease]">
+          <div className="absolute inset-0 rounded-full blur-2xl animate-pulse" style={{ background: "rgba(255,215,0,0.4)" }} />
+          <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full p-[2px]
+                          bg-[conic-gradient(from_0deg,#b8860b,#ffd700,#fff3a0,#ffd700,#b8860b)]
+                          shadow-[0_0_40px_rgba(255,215,0,0.5)] animate-[spin_8s_linear_infinite]">
+            <div className="w-full h-full rounded-full bg-black p-1">
+              <img
+                src="https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/9c9b4fca-bfd7-4841-a827-eb0354dad8da.JPG"
+                alt="Скупка24"
+                className="w-full h-full rounded-full object-cover"
+              />
+            </div>
+          </div>
         </div>
 
-        <h2 className="font-oswald text-4xl sm:text-5xl font-bold uppercase text-center animate-[slideDown_0.5s_ease_0.2s_both]">
-          Купим дорого{" "}
-          <span className="animate-shimmer">всё!</span>
+        {/* Бренд + бейдж */}
+        <div className="flex flex-col items-center gap-2 animate-[fadeIn_0.4s_ease_0.15s_both]">
+          <span className="font-oswald font-bold text-3xl sm:text-4xl text-[#FFD700] tracking-[0.3em] uppercase"
+                style={{ textShadow: '0 0 20px rgba(255,215,0,0.4)' }}>
+            Скупка24
+          </span>
+          <span className="inline-flex items-center gap-1.5 bg-[#FFD700]/10 border border-[#FFD700]/40 px-3 py-1 rounded-full">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#FFD700] opacity-75" />
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#FFD700]" />
+            </span>
+            <span className="font-roboto text-[10px] text-[#FFD700] uppercase tracking-[0.25em] font-semibold">Премиум · 24/7</span>
+          </span>
+        </div>
+
+        {/* Главный слоган с золотым градиентом */}
+        <h2 className="font-oswald text-4xl sm:text-5xl md:text-6xl font-bold uppercase text-center leading-[0.95] animate-[slideDown_0.5s_ease_0.2s_both]">
+          <span className="block text-white">Купим дорого</span>
+          <span className="block bg-gradient-to-r from-[#FFD700] via-[#fff3a0] to-[#FFD700] bg-clip-text text-transparent animate-shimmer">всё!</span>
         </h2>
 
-        <div className="w-64 sm:w-80 flex flex-col gap-2 animate-[fadeIn_0.4s_ease_0.5s_both]">
-          <div className="h-[3px] w-full bg-white/10 rounded-full overflow-hidden">
+        {/* Прогресс-бар с золотым градиентом */}
+        <div className="w-64 sm:w-80 flex flex-col gap-2.5 animate-[fadeIn_0.4s_ease_0.5s_both]">
+          <div className="h-[4px] w-full bg-white/10 rounded-full overflow-hidden shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)]">
             <div
               className="h-full rounded-full"
               style={{
-                background: "linear-gradient(90deg, #ffd700, #fffacd, #ffa500, #ffd700)",
+                background: "linear-gradient(90deg, #b8860b, #ffd700, #fff3a0, #ffd700, #b8860b)",
                 backgroundSize: "200% auto",
                 animation: "splashBar 2.3s cubic-bezier(0.4,0,0.2,1) forwards, shimmer 1.5s linear infinite",
+                boxShadow: "0 0 12px rgba(255,215,0,0.5)",
               }}
             />
           </div>
-          <span className="font-roboto text-white/30 text-xs text-center uppercase tracking-widest">Загрузка...</span>
+          <div className="flex items-center justify-center gap-1.5">
+            <div className="w-1 h-1 rounded-full bg-[#FFD700] animate-pulse" />
+            <span className="font-roboto text-[#FFD700]/60 text-[10px] uppercase tracking-[0.3em] font-semibold">Загружаем витрину</span>
+            <div className="w-1 h-1 rounded-full bg-[#FFD700] animate-pulse" />
+          </div>
+        </div>
+
+        {/* Триггеры доверия */}
+        <div className="flex flex-wrap items-center justify-center gap-2 max-w-md animate-[fadeIn_0.4s_ease_0.8s_both]">
+          {[
+            { icon: "Award", label: "9 лет на рынке" },
+            { icon: "Users", label: "50 000+ клиентов" },
+            { icon: "Star", label: "4.9 на картах" },
+          ].map(t => (
+            <div key={t.label} className="flex items-center gap-1.5 bg-black/40 border border-[#FFD700]/20 px-2.5 py-1 rounded-full">
+              <Icon name={t.icon as Parameters<typeof Icon>[0]["name"]} size={10} className="text-[#FFD700]" />
+              <span className="font-roboto text-white/70 text-[10px] uppercase tracking-wide">{t.label}</span>
+            </div>
+          ))}
         </div>
       </div>
     </div>
