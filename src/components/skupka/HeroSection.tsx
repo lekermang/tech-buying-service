@@ -255,91 +255,179 @@ const HeroSection = ({ scrollTo, externalModalOpen, onExternalModalClose }: Hero
     <>
       {isOpen && <EvaluateModal onClose={handleClose} />}
 
-      <section id="hero" className="relative min-h-screen flex items-center pt-[88px] md:pt-[104px]" style={{ backgroundImage: "linear-gradient(rgba(255,215,0,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,215,0,0.04) 1px, transparent 1px)", backgroundSize: "60px 60px" }}>
+      <section id="hero" className="relative min-h-screen flex items-center pt-[88px] md:pt-[104px] overflow-hidden"
+        style={{ backgroundImage: "linear-gradient(rgba(255,215,0,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,215,0,0.04) 1px, transparent 1px)", backgroundSize: "60px 60px" }}>
+
+        {/* Фоновое фото с градиентом */}
         <div className="absolute inset-0 overflow-hidden">
           <img
             src="https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/47a9e726-1666-459a-824f-d2c990b98092.jpg"
             alt="Скупка24"
             className="w-full h-full object-cover opacity-15"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#0D0D0D] via-[#0D0D0D]/85 to-[#0D0D0D]/40" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#0D0D0D] via-[#0D0D0D]/90 to-[#0D0D0D]/40" />
         </div>
-        <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#FFD700]" />
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-8 md:py-14 lg:py-16 grid lg:grid-cols-2 gap-8 lg:gap-12 items-start w-full">
+        {/* Премиум свечения по углам (Trade-In DNA) */}
+        <div className="absolute -top-24 -left-24 w-[420px] h-[420px] rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(255,215,0,0.10)" }} />
+        <div className="absolute -bottom-32 left-1/3 w-[360px] h-[360px] rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(255,184,0,0.06)" }} />
+        <div className="absolute top-1/3 -right-24 w-[380px] h-[380px] rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(255,215,0,0.05)" }} />
 
-          {/* СЛЕВА — заголовок */}
+        {/* Левая золотая полоска (золотой акцент-символ бренда) */}
+        <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-transparent via-[#FFD700] to-transparent" />
+
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-8 md:py-14 lg:py-16 grid lg:grid-cols-2 gap-8 lg:gap-14 items-start w-full">
+
+          {/* ── СЛЕВА — продающий hero ────────────────────────────────────── */}
           <div className="flex flex-col">
-            <div className="inline-flex items-center gap-2 bg-[#FFD700]/10 border border-[#FFD700]/30 px-3 py-1.5 mb-4 md:mb-5 self-start">
-              <div className="w-2 h-2 bg-[#FFD700] rounded-full animate-pulse" />
-              <span className="font-roboto text-[11px] md:text-xs text-[#FFD700] uppercase tracking-widest">Работаем 24/7 без выходных</span>
+
+            {/* Бейдж «24/7» — премиум-капсула как в секциях Trade In */}
+            <div className="inline-flex items-center gap-2 bg-gradient-to-r from-[#FFD700]/15 to-[#FFD700]/5 border border-[#FFD700]/40 px-3.5 py-1.5 mb-5 md:mb-6 self-start rounded-full shadow-[0_0_24px_rgba(255,215,0,0.1)]">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#FFD700] opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#FFD700]" />
+              </span>
+              <span className="font-roboto text-[11px] md:text-xs text-[#FFD700] uppercase tracking-[0.25em] font-semibold">Работаем 24/7 без выходных</span>
             </div>
 
-            <h1 className="font-oswald text-[2.8rem] sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-none mb-4 md:mb-5">
-              ПРОДАЙ<br />
-              <span className="animate-shimmer">ТЕХНИКУ</span><br />
-              ВЫГОДНО
+            {/* Продающий заголовок с премиум-градиентом */}
+            <h1 className="font-oswald text-[3rem] sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-[0.92] mb-4 md:mb-5 tracking-tight">
+              <span className="block text-white">ПРОДАЙ</span>
+              <span className="block bg-gradient-to-r from-[#FFD700] via-[#fff3a0] to-[#FFD700] bg-clip-text text-transparent animate-shimmer">ТЕХНИКУ</span>
+              <span className="block text-white">
+                ВЫГОДНО
+                <span className="text-[#FFD700]">.</span>
+              </span>
             </h1>
 
-            <p className="font-roboto text-white/65 text-sm sm:text-base md:text-lg mb-5 md:mb-7 max-w-md leading-relaxed">
-              Честная оценка за 15 минут. Смартфоны, ноутбуки, ювелирные украшения — принимаем всё. Выплата в день обращения.
+            {/* Подзаголовок с ключевыми триггерами */}
+            <p className="font-roboto text-white/75 text-sm sm:text-base md:text-lg mb-5 md:mb-7 max-w-md leading-relaxed">
+              Честная оценка <span className="text-[#FFD700] font-semibold">за 15 минут</span>. Смартфоны, ноутбуки, ювелирные украшения — принимаем всё. <span className="text-[#FFD700] font-semibold">Выплата</span> в день обращения.
             </p>
 
-            <div className="flex gap-3 mb-6 md:mb-8">
-              <button onClick={() => { setModalOpen(true); ymGoal(Goals.FORM_OPEN, { place: "hero" }); }}
-                className="flex-1 sm:flex-none bg-[#FFD700] text-black font-oswald font-bold text-base sm:text-lg px-6 sm:px-8 py-4 uppercase tracking-wide hover:bg-yellow-400 active:scale-95 transition-all flex items-center justify-center gap-2">
-                <Icon name="Zap" size={18} />
-                Оценить онлайн
-              </button>
-              <a href="tel:+79929990333"
-                onClick={() => ymGoal(Goals.CALL_CLICK, { place: "hero" })}
-                className="flex-1 sm:flex-none border-2 border-[#FFD700] text-[#FFD700] font-oswald font-bold text-base sm:text-lg px-6 sm:px-8 py-4 uppercase tracking-wide hover:bg-[#FFD700] hover:text-black active:scale-95 transition-all flex items-center justify-center gap-2">
-                <Icon name="Phone" size={18} />
-                Позвонить
-              </a>
-            </div>
-
-            <div className="flex gap-6 md:gap-8 pb-6 md:pb-8 border-b border-white/5">
-              {[["50 000+", "клиентов"], ["9 лет", "на рынке"], ["2", "филиала"]].map(([num, label]) => (
-                <div key={label}>
-                  <div className="font-oswald text-xl md:text-2xl font-bold text-[#FFD700]">{num}</div>
-                  <div className="font-roboto text-white/40 text-[10px] md:text-xs uppercase tracking-wide">{label}</div>
+            {/* USP-чипы (продающие триггеры) */}
+            <div className="flex flex-wrap gap-1.5 mb-6">
+              {[
+                { icon: "Zap" as const, label: "За 15 минут" },
+                { icon: "BadgeCheck" as const, label: "Честная цена" },
+                { icon: "Banknote" as const, label: "Деньги сразу" },
+                { icon: "FileText" as const, label: "Договор" },
+              ].map(f => (
+                <div key={f.label} className="flex items-center gap-1.5 bg-black/40 border border-[#FFD700]/20 hover:border-[#FFD700]/50 px-2.5 py-1.5 rounded-md transition-colors">
+                  <Icon name={f.icon} size={12} className="text-[#FFD700]" />
+                  <span className="font-roboto text-white/80 text-[11px] uppercase tracking-wide">{f.label}</span>
                 </div>
               ))}
             </div>
+
+            {/* Премиум-CTA */}
+            <div className="flex flex-col sm:flex-row gap-3 mb-7 md:mb-9">
+              <button onClick={() => { setModalOpen(true); ymGoal(Goals.FORM_OPEN, { place: "hero" }); }}
+                className="group relative overflow-hidden font-oswald font-bold text-black text-base sm:text-lg px-7 sm:px-9 py-4 uppercase tracking-wide active:scale-95 transition-all flex items-center justify-center gap-2 rounded-md
+                           bg-[linear-gradient(180deg,#fff3a0_0%,#ffd700_45%,#d4a017_100%)]
+                           shadow-[0_0_0_1px_rgba(255,215,0,0.6),0_10px_30px_rgba(255,215,0,0.3),inset_0_1px_0_rgba(255,255,255,0.5)]
+                           hover:shadow-[0_0_0_1px_rgba(255,215,0,0.8),0_12px_40px_rgba(255,215,0,0.5),inset_0_1px_0_rgba(255,255,255,0.6)]">
+                <span className="absolute inset-0 bg-[linear-gradient(115deg,transparent_35%,rgba(255,255,255,0.7)_50%,transparent_65%)] bg-[length:200%_100%] -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+                <Icon name="Zap" size={18} className="relative" />
+                <span className="relative">Оценить онлайн</span>
+                <Icon name="ArrowRight" size={16} className="relative opacity-60 group-hover:translate-x-1 transition-transform" />
+              </button>
+              <a href="tel:+79929990333"
+                onClick={() => ymGoal(Goals.CALL_CLICK, { place: "hero" })}
+                className="group bg-black/40 backdrop-blur-sm border border-[#FFD700]/40 hover:border-[#FFD700] text-[#FFD700] font-oswald font-bold text-base sm:text-lg px-6 sm:px-8 py-4 uppercase tracking-wide active:scale-95 transition-all flex items-center justify-center gap-2.5 rounded-md">
+                <div className="w-8 h-8 rounded-full bg-[#FFD700]/15 border border-[#FFD700]/40 flex items-center justify-center group-hover:bg-[#FFD700]/25 transition-colors">
+                  <Icon name="Phone" size={14} />
+                </div>
+                <div className="flex flex-col items-start leading-none">
+                  <span className="text-[10px] text-[#FFD700]/60 tracking-wider">Звонок бесплатный</span>
+                  <span>Позвонить</span>
+                </div>
+              </a>
+            </div>
+
+            {/* Социальные доказательства — премиум-стат-блок */}
+            <div className="grid grid-cols-3 gap-2 md:gap-3 pb-6 md:pb-8">
+              {[
+                { num: "50 000+", label: "клиентов", icon: "Users" as const },
+                { num: "9 лет", label: "на рынке", icon: "Award" as const },
+                { num: "4.9 ★", label: "на картах", icon: "Star" as const },
+              ].map((s) => (
+                <div key={s.label} className="relative group">
+                  <div className="absolute -inset-1 bg-gradient-to-br from-[#FFD700]/15 to-transparent blur-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                  <div className="relative bg-black/50 border border-[#FFD700]/20 hover:border-[#FFD700]/50 px-3 py-3 md:py-4 transition-colors rounded-md">
+                    <Icon name={s.icon} size={14} className="text-[#FFD700]/50 mb-1.5" />
+                    <div className="font-oswald text-xl md:text-2xl font-bold text-[#FFD700] leading-none">{s.num}</div>
+                    <div className="font-roboto text-white/50 text-[10px] md:text-xs uppercase tracking-wide mt-1">{s.label}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Нижний слоган-триггер */}
+            <div className="hidden lg:flex items-center gap-2 self-start bg-black/40 border border-[#FFD700]/25 px-4 py-2 rounded-full">
+              <span className="text-lg">🍎</span>
+              <span className="font-oswald font-bold text-[#FFD700] text-sm uppercase tracking-wide">Купим дороже всех Apple технику!</span>
+            </div>
           </div>
 
-          {/* СПРАВА — виджеты */}
-          <div id="evaluate" className="space-y-2">
+          {/* ── СПРАВА — премиум-виджеты ──────────────────────────────────── */}
+          <div id="evaluate" className="space-y-2.5 relative">
+            {/* Декоративное свечение за стаком */}
+            <div className="absolute -inset-4 bg-gradient-to-br from-[#FFD700]/8 via-transparent to-[#FFD700]/5 blur-2xl pointer-events-none" />
+
             <a href="/catalog"
-              className="flex items-center justify-between bg-black/30 border border-white/10 hover:border-[#FFD700]/60 px-4 py-5 transition-colors group w-full">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-[#FFD700] flex items-center justify-center shrink-0">
+              className="relative flex items-center justify-between bg-black/50 backdrop-blur-sm border border-[#FFD700]/20 hover:border-[#FFD700]/60 hover:bg-black/70 px-4 py-4 transition-all group w-full rounded-md overflow-hidden">
+              <div className="absolute -inset-1 bg-gradient-to-br from-[#FFD700]/15 to-transparent blur-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+              <div className="relative flex items-center gap-3">
+                <div className="w-11 h-11 bg-[linear-gradient(135deg,#fff3a0,#ffd700,#d4a017)] rounded-md flex items-center justify-center shrink-0 shadow-[0_4px_12px_rgba(255,215,0,0.25)]">
                   <Icon name="ShoppingBag" size={20} className="text-black" />
                 </div>
                 <div>
                   <span className="font-oswald font-bold text-base uppercase text-white tracking-wide block leading-tight">Каталог новой техники</span>
-                  <span className="bg-[#FFD700]/20 text-[#FFD700] font-roboto text-[11px] px-1.5 py-0.5 border border-[#FFD700]/30 mt-1 inline-block">Гарантия 2 года</span>
+                  <span className="inline-flex items-center gap-1 bg-[#FFD700]/15 text-[#FFD700] font-oswald font-bold text-[10px] px-2 py-0.5 rounded-sm border border-[#FFD700]/30 mt-1 uppercase tracking-wider">
+                    <Icon name="ShieldCheck" size={9} />
+                    Гарантия 2 года
+                  </span>
                 </div>
               </div>
-              <Icon name="ChevronRight" size={20} className="text-white/40 group-hover:text-[#FFD700] transition-colors shrink-0" />
+              <Icon name="ChevronRight" size={20} className="relative text-[#FFD700]/40 group-hover:text-[#FFD700] group-hover:translate-x-1 transition-all shrink-0" />
             </a>
-            <UsedGoodsSearch />
-            <RepairWidget />
+
+            <div className="relative">
+              <UsedGoodsSearch />
+            </div>
+
+            <div className="relative">
+              <RepairWidget />
+            </div>
+
             <a href="/tools"
-              className="flex items-center justify-between bg-black/30 border border-white/10 hover:border-[#FFD700]/60 px-4 py-5 transition-colors group w-full">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-[#FFD700]/20 border border-[#FFD700]/40 flex items-center justify-center shrink-0">
+              className="relative flex items-center justify-between bg-black/50 backdrop-blur-sm border border-[#FFD700]/20 hover:border-[#FFD700]/60 hover:bg-black/70 px-4 py-4 transition-all group w-full rounded-md overflow-hidden">
+              <div className="absolute -inset-1 bg-gradient-to-br from-[#FFD700]/15 to-transparent blur-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+              <div className="relative flex items-center gap-3">
+                <div className="w-11 h-11 bg-[#FFD700]/15 border border-[#FFD700]/40 rounded-md flex items-center justify-center shrink-0">
                   <Icon name="Wrench" size={20} className="text-[#FFD700]" />
                 </div>
                 <div>
                   <span className="font-oswald font-bold text-base uppercase text-white tracking-wide leading-tight block">Каталог инструментов и расходных материалов</span>
-                  <span className="bg-[#FFD700]/20 text-[#FFD700] font-roboto text-[11px] px-1.5 py-0.5 border border-[#FFD700]/30 mt-1 inline-block">Гарантия 3 года</span>
+                  <span className="inline-flex items-center gap-1 bg-[#FFD700]/15 text-[#FFD700] font-oswald font-bold text-[10px] px-2 py-0.5 rounded-sm border border-[#FFD700]/30 mt-1 uppercase tracking-wider">
+                    <Icon name="ShieldCheck" size={9} />
+                    Гарантия 3 года
+                  </span>
                 </div>
               </div>
-              <Icon name="ChevronRight" size={20} className="text-white/40 group-hover:text-[#FFD700] transition-colors shrink-0" />
+              <Icon name="ChevronRight" size={20} className="relative text-[#FFD700]/40 group-hover:text-[#FFD700] group-hover:translate-x-1 transition-all shrink-0" />
             </a>
-            <AppleWidget compact />
+
+            <div className="relative">
+              <AppleWidget compact />
+            </div>
+
+            {/* Мобильный Apple-слоган — показывается ниже lg */}
+            <div className="lg:hidden flex items-center justify-center gap-2 bg-black/40 border border-[#FFD700]/25 px-4 py-2.5 rounded-full mt-3">
+              <span className="text-lg">🍎</span>
+              <span className="font-oswald font-bold text-[#FFD700] text-sm uppercase tracking-wide">Купим дороже всех Apple технику!</span>
+            </div>
           </div>
 
         </div>
