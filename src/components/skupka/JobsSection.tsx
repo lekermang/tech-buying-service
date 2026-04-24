@@ -50,18 +50,26 @@ export default function JobsSection() {
   const selectedVacancy = VACANCIES.find(v => v.id === form.vacancy) || VACANCIES[0];
 
   return (
-    <section id="jobs" className="bg-[#0D0D0D] py-16 px-4">
-      <div className="max-w-5xl mx-auto">
+    <section id="jobs" className="relative bg-[#0D0D0D] py-16 px-4 overflow-hidden border-t border-[#FFD700]/10">
+      {/* Премиум-фон как в Trade In */}
+      <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, rgba(6,182,212,0.06) 0%, transparent 50%, rgba(255,215,0,0.06) 100%)" }} />
+      <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(6,182,212,0.08)" }} />
+      <div className="absolute -bottom-24 -left-24 w-80 h-80 rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(255,215,0,0.08)" }} />
 
-        {/* Заголовок */}
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-1 h-8 bg-[#FFD700]" />
-          <span className="font-roboto text-[#FFD700] text-xs uppercase tracking-widest">Карьера</span>
+      <div className="relative max-w-5xl mx-auto">
+
+        {/* Заголовок в стиле Trade In */}
+        <div className="flex items-center gap-2 mb-2">
+          <span className="inline-flex items-center gap-1.5 bg-cyan-500/15 border border-cyan-500/40 text-cyan-400 font-roboto text-[10px] md:text-xs uppercase tracking-widest px-2.5 py-1 rounded-full">
+            <Icon name="Briefcase" size={12} />
+            Карьера
+          </span>
+          <span className="font-roboto text-[#FFD700] text-sm uppercase tracking-widest">Вакансии</span>
         </div>
-        <h2 className="font-oswald text-3xl sm:text-4xl font-bold uppercase text-white mb-2">
-          Работай с нами <span className="text-[#FFD700]">онлайн</span>
+        <h2 className="font-oswald text-3xl md:text-5xl font-bold uppercase text-white mb-2 leading-[1.05]">
+          Работай <span className="text-[#FFD700]">с нами.</span><br /><span className="text-cyan-400">Онлайн и в офисе.</span>
         </h2>
-        <p className="font-roboto text-white/50 text-sm mb-10 max-w-xl">
+        <p className="font-roboto text-white/60 text-sm md:text-base mb-8 md:mb-10 max-w-xl">
           Ищем активных и честных людей. Гибкий график, стабильная выплата, дружная команда.
         </p>
 

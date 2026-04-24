@@ -1,5 +1,6 @@
 import Icon from "@/components/ui/icon";
 import Reveal from "@/components/skupka/Reveal";
+import PremiumSection from "@/components/skupka/PremiumSection";
 import { ymGoal, Goals } from "@/lib/ym";
 
 const BRANCHES = [
@@ -10,15 +11,16 @@ const BRANCHES = [
 const InfoBranchesAbout = () => {
   return (
     <>
-      {/* BRANCHES */}
-      <section id="branches" className="py-14 md:py-20 bg-[#111] border-t border-[#FFD700]/10">
-        <div className="max-w-7xl mx-auto px-4">
-          <Reveal className="mb-8 md:mb-12">
-            <p className="font-roboto text-[#FFD700] text-sm uppercase tracking-widest mb-2">Калуга</p>
-            <h2 className="font-oswald text-3xl md:text-5xl font-bold">НАШ<br />ОФИС В КАЛУГЕ</h2>
-          </Reveal>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+      {/* BRANCHES — премиум в стиле Trade In */}
+      <PremiumSection
+        id="branches"
+        badge={{ icon: "MapPin", label: "Калуга · 24/7", color: "purple" }}
+        eyebrow="Филиалы"
+        title={<><span className="text-[#FFD700]">Два офиса</span><br />в центре Калуги.</>}
+        accentA="rgba(255,215,0,0.08)"
+        accentB="rgba(139,92,246,0.08)"
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
             {BRANCHES.map((b, i) => (
               <Reveal key={b.city} delay={(i) as 0|1|2|3|4|5}>
               <div className="border border-[#FFD700]/20 p-6 hover:border-[#FFD700]/60 transition-colors group relative overflow-hidden">
@@ -153,16 +155,25 @@ const InfoBranchesAbout = () => {
               </div>
             </Reveal>
           </div>
-        </div>
-      </section>
+      </PremiumSection>
 
-      {/* ABOUT */}
-      <section id="about" className="py-14 md:py-20 border-t border-[#FFD700]/10">
-        <div className="max-w-7xl mx-auto px-4">
+      {/* ABOUT — премиум */}
+      <section id="about" className="relative py-14 md:py-20 border-t border-[#FFD700]/10 overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(135deg, rgba(255,215,0,0.05) 0%, transparent 60%)" }} />
+        <div className="absolute -top-24 -left-24 w-80 h-80 rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(255,215,0,0.08)" }} />
+        <div className="relative max-w-7xl mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-8 md:gap-16 items-center">
             <Reveal>
-              <p className="font-roboto text-[#FFD700] text-sm uppercase tracking-widest mb-2">О компании</p>
-              <h2 className="font-oswald text-3xl md:text-5xl font-bold mb-4 md:mb-6">МЫ ЦЕНИМ<br />ЧЕСТНОСТЬ</h2>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="inline-flex items-center gap-1.5 bg-[#FFD700]/15 border border-[#FFD700]/40 text-[#FFD700] font-roboto text-[10px] md:text-xs uppercase tracking-widest px-2.5 py-1 rounded-full">
+                  <Icon name="BadgeCheck" size={12} />
+                  С 2015 года
+                </span>
+                <span className="font-roboto text-[#FFD700] text-sm uppercase tracking-widest">О компании</span>
+              </div>
+              <h2 className="font-oswald text-3xl md:text-5xl font-bold mb-4 md:mb-6 leading-[1.05]">
+                МЫ ЦЕНИМ<br /><span className="text-[#FFD700]">честность.</span>
+              </h2>
               <p className="font-roboto text-white/60 leading-relaxed mb-4 text-sm md:text-base">
                 Скупка24 работает в Калуге с 2015 года. Наши офисы — ул. Кирова, 11 и ул. Кирова, 7/47. За это время мы провели более 50 000 сделок и выплатили клиентам сотни миллионов рублей. Наш принцип прост: честная цена и уважение к каждому клиенту.
               </p>

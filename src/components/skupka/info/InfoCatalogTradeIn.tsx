@@ -1,5 +1,6 @@
 import Icon from "@/components/ui/icon";
 import Reveal from "@/components/skupka/Reveal";
+import PremiumSection from "@/components/skupka/PremiumSection";
 
 const CATEGORIES = [
   { icon: "Smartphone", title: "Смартфоны", desc: "iPhone, Samsung, Xiaomi и другие", price: "до 95 000 ₽" },
@@ -15,32 +16,36 @@ const CATEGORIES = [
 const InfoCatalogTradeIn = () => {
   return (
     <>
-      {/* CATEGORIES */}
-      <section id="catalog" className="py-14 md:py-20 border-t border-[#FFD700]/10">
-        <div className="max-w-7xl mx-auto px-4">
-          <Reveal className="flex items-end justify-between mb-8 md:mb-12">
-            <div>
-              <p className="font-roboto text-[#FFD700] text-sm uppercase tracking-widest mb-2">Что принимаем</p>
-              <h2 className="font-oswald text-3xl md:text-5xl font-bold">ВСЁ ЧТО ИМЕЕТ<br />ЦЕННОСТЬ</h2>
-            </div>
-            <div className="hidden md:block w-24 h-1 bg-[#FFD700] mb-4" />
-          </Reveal>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-px bg-[#FFD700]/10">
-            {CATEGORIES.map((cat, i) => (
-              <Reveal key={cat.title} delay={(i % 4) as 0|1|2|3|4|5}>
-                <div className="bg-[#0D0D0D] p-4 sm:p-5 md:p-6 hover:bg-[#1A1A1A] transition-colors group cursor-pointer relative overflow-hidden h-full">
-                  <div className="absolute top-0 left-0 w-0 group-hover:w-full h-0.5 bg-[#FFD700] transition-all duration-300" />
-                  <Icon name={cat.icon} size={28} className="text-[#FFD700] mb-3" />
-                  <h3 className="font-oswald text-base sm:text-lg md:text-xl font-bold mb-1 uppercase">{cat.title}</h3>
-                  <p className="font-roboto text-white/50 text-xs md:text-sm mb-2 md:mb-3 hidden sm:block">{cat.desc}</p>
-                  <span className="font-oswald text-[#FFD700] font-bold text-sm">{cat.price}</span>
+      {/* CATEGORIES — премиум в стиле Trade In */}
+      <PremiumSection
+        id="catalog"
+        badge={{ icon: "Sparkles", label: "Что принимаем", color: "gold" }}
+        eyebrow="Каталог"
+        title={<>ВСЁ ЧТО ИМЕЕТ<br /><span className="text-[#FFD700]">ценность.</span></>}
+        accentA="rgba(255,215,0,0.10)"
+        accentB="rgba(255,184,0,0.06)"
+      >
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
+          {CATEGORIES.map((cat, i) => (
+            <Reveal key={cat.title} delay={(i % 4) as 0|1|2|3|4|5}>
+              <div className="relative group h-full">
+                <div className="absolute -inset-1 bg-gradient-to-br from-[#FFD700]/15 to-transparent blur-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                <div className="relative bg-[#0D0D0D] border border-[#FFD700]/15 hover:border-[#FFD700]/40 p-4 sm:p-5 md:p-6 transition-colors h-full flex flex-col">
+                  <div className="w-11 h-11 md:w-12 md:h-12 bg-[#FFD700]/10 border border-[#FFD700]/30 rounded-md flex items-center justify-center mb-3 group-hover:bg-[#FFD700]/20 transition-colors">
+                    <Icon name={cat.icon} size={22} className="text-[#FFD700]" />
+                  </div>
+                  <h3 className="font-oswald text-base sm:text-lg md:text-xl font-bold mb-1 uppercase leading-tight">{cat.title}</h3>
+                  <p className="font-roboto text-white/50 text-xs md:text-sm mb-3 hidden sm:block flex-1">{cat.desc}</p>
+                  <div className="mt-auto flex items-center justify-between">
+                    <span className="font-oswald text-[#FFD700] font-bold text-sm">{cat.price}</span>
+                    <Icon name="ArrowUpRight" size={14} className="text-[#FFD700]/40 group-hover:text-[#FFD700] transition-colors" />
+                  </div>
                 </div>
-              </Reveal>
-            ))}
-          </div>
+              </div>
+            </Reveal>
+          ))}
         </div>
-      </section>
+      </PremiumSection>
 
       {/* TRADE-IN */}
       <section id="tradein" className="relative py-14 md:py-20 border-t border-[#FFD700]/10 overflow-hidden">
