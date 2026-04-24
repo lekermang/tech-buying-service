@@ -242,26 +242,6 @@ const InfoSections = () => {
         </div>
       </section>
 
-      {/* MAP */}
-      <section id="map" className="border-t border-[#FFD700]/10">
-        <div className="max-w-7xl mx-auto px-4 py-12">
-          <div className="mb-8">
-            <p className="font-roboto text-[#FFD700] text-sm uppercase tracking-widest mb-2">Где мы находимся</p>
-            <h2 className="font-oswald text-4xl font-bold">НА КАРТЕ</h2>
-          </div>
-          <div className="w-full overflow-hidden border border-[#FFD700]/20">
-            <iframe
-              src="https://yandex.ru/map-widget/v1/?z=12&ol=biz&oid=52473097879"
-              width="100%"
-              height="400"
-              frameBorder="0"
-              title="Скупка24 на карте"
-              className="block"
-            />
-          </div>
-        </div>
-      </section>
-
       {/* REVIEWS */}
       <section id="reviews" className="py-20 bg-[#111] border-t border-[#FFD700]/10">
         <div className="max-w-7xl mx-auto px-4">
