@@ -359,6 +359,19 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
           title={ordersModal.title}
           accent={ordersModal.accent}
           onClose={() => setOrdersModal(null)}
+          onOrderClick={(orderId) => {
+            setOrdersModal(null);
+            setFilterStatus("all");
+            setSearch("");
+            setDateFrom("");
+            setDateTo("");
+            setView("list");
+            setExpandedId(orderId);
+            setTimeout(() => {
+              const el = document.getElementById(`order-${orderId}`);
+              if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+            }, 350);
+          }}
         />
       )}
 

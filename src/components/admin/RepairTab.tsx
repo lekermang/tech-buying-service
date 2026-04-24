@@ -249,6 +249,19 @@ export default function RepairTab({ token }: { token: string }) {
           fetchUrl={ADMIN_URL}
           fetchHeaders={adminHeaders(token)}
           onClose={() => setOrdersModal(null)}
+          onOrderClick={(orderId) => {
+            setOrdersModal(null);
+            setFilterStatus("all");
+            setSearch("");
+            setDateFrom("");
+            setDateTo("");
+            setView("orders");
+            setExpandedId(orderId);
+            setTimeout(() => {
+              const el = document.getElementById(`order-${orderId}`);
+              if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+            }, 350);
+          }}
         />
       )}
 

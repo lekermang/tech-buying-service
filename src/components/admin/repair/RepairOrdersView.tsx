@@ -117,8 +117,8 @@ export default function RepairOrdersView({
             admin_note: o.admin_note || "",
           };
           return (
+            <div key={o.id} id={`order-${o.id}`} className={`scroll-mt-24 ${isExpanded ? "ring-2 ring-[#FFD700]/30 rounded" : ""}`}>
             <RepairOrderCard
-              key={o.id}
               o={o}
               isExpanded={isExpanded}
               ef={ef}
@@ -142,6 +142,7 @@ export default function RepairOrdersView({
               onSaveEdit={saveEdit}
               onDelete={deleteOrder}
             />
+            </div>
           );
         })}
       </div>

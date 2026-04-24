@@ -15,6 +15,8 @@ type Props = {
   fetchUrl?: string;
   /** Кастомные заголовки (для админки) */
   fetchHeaders?: Record<string, string>;
+  /** Клик по заказу — переход к карточке */
+  onOrderClick?: (orderId: number) => void;
 };
 
 const periodLabel = (p: Period) =>
@@ -23,7 +25,7 @@ const periodLabel = (p: Period) =>
 const money = (v: number | null | undefined) =>
   v != null ? v.toLocaleString("ru-RU") + " ₽" : "—";
 
-export default function StatusOrdersModal({ token, period, statuses, title, accent, onClose, fetchUrl, fetchHeaders }: Props) {
+export default function StatusOrdersModal({ token, period, statuses, title, accent, onClose, fetchUrl, fetchHeaders, onOrderClick }: Props) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -112,8 +114,13 @@ export default function StatusOrdersModal({ token, period, statuses, title, acce
             orders.map((o) => {
               const st = STATUSES.find((s) => s.key === o.status) || STATUSES[0];
               const when = o.status_updated_at || o.picked_up_at || o.completed_at || o.created_at;
+              const clickable = !!onOrderClick;
               return (
-                <div key={o.id} className="px-4 py-3 border-b border-[#1F1F1F] hover:bg-white/[0.02]">
+                <div
+                  key={o.id}
+                  onClick={() => clickable && onOrderClick!(o.id)}
+                  className={`px-4 py-3 border-b border-[#1F1F1F] transition-colors ${clickable ? "cursor-pointer hover:bg-white/[0.04] active:bg-white/[0.06]" : "hover:bg-white/[0.02]"}`}
+                >
                   <div className="flex items-start justify-between gap-2 mb-1">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className={`inline-block px-1.5 py-0.5 text-[9px] font-roboto ${st.color}`}>
@@ -122,9 +129,12 @@ export default function StatusOrdersModal({ token, period, statuses, title, acce
                       <span className="font-oswald font-bold text-white text-sm">#{o.id}</span>
                       <span className="font-roboto text-white text-xs truncate">{o.name}</span>
                     </div>
-                    <span className="font-roboto text-white/30 text-[10px] shrink-0">
-                      {when ? fmt(when) : "—"}
-                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="font-roboto text-white/30 text-[10px]">
+                        {when ? fmt(when) : "—"}
+                      </span>
+                      {clickable && <Icon name="ChevronRight" size={14} className="text-white/30" />}
+                    </div>
                   </div>
                   <div className="font-roboto text-white/60 text-xs mb-1">
                     {o.model || "—"}
@@ -160,7 +170,7 @@ export default function StatusOrdersModal({ token, period, statuses, title, acce
                     )}
                   </div>
                   {o.phone && (
-                    <div className="font-roboto text-white/30 text-[10px] mt-1">
+                    <div className="font-roboto text-white/30 text-[10px] mt-1" onClick={(e) => e.stopPropagation()}>
                       <a href={`tel:${o.phone}`} className="hover:text-white">
                         {o.phone}
                       </a>

@@ -38,9 +38,9 @@ export default function StaffRepairOrderCard({
   const financeBlocked = !hasAmount || !hasPurchase;
 
   return (
-    <div className={`border transition-all duration-300 rounded-lg overflow-hidden ${
+    <div id={`order-${o.id}`} className={`border transition-all duration-300 rounded-lg overflow-hidden scroll-mt-24 ${
       isExpanded
-        ? "bg-gradient-to-br from-[#1A1A1A] to-[#141414] border-[#FFD700]/40 shadow-lg shadow-[#FFD700]/5"
+        ? "bg-gradient-to-br from-[#1A1A1A] to-[#141414] border-[#FFD700]/40 shadow-lg shadow-[#FFD700]/5 ring-2 ring-[#FFD700]/30"
         : "bg-[#141414] border-[#1F1F1F] hover:border-[#2A2A2A]"
     }`}>
 
