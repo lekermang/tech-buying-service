@@ -181,14 +181,27 @@ def _load_excel_bytes(body: dict) -> bytes:
     return base64.b64decode(file_b64)
 
 
+MAX_ROWS = 20000  # жёсткий лимит: 20k позиций — более чем достаточно для любого прайса
+
+
 def _parse_excel(data: bytes, filename: str = ''):
-    """Парсит Excel (.xlsx/.xlsm/.xls) из bytes, возвращает list[list[str]] строк. Пробует все листы, берёт самый «жирный»."""
+    """Парсит Excel (.xlsx/.xlsm/.xls) из bytes. Идёт по листам лениво, возвращает первый лист, где удалось найти шапку с name+price."""
     is_old_xls = filename.lower().endswith('.xls') and not filename.lower().endswith('.xlsx')
-    # По первым байтам: старый .xls начинается с D0 CF 11 E0 (OLE)
     if not is_old_xls and len(data) >= 4 and data[:4] == b'\xd0\xcf\x11\xe0':
         is_old_xls = True
 
-    all_sheets: list[list[list]] = []
+    def _pick_best(sheet_iter):
+        """Идёт по листам лениво: возвращает первый лист с name+price или самый «жирный», если шапки нет нигде."""
+        fallback = None
+        for rows in sheet_iter:
+            if not rows:
+                continue
+            _, col_map = _find_header_row(rows)
+            if 'name' in col_map and 'price' in col_map:
+                return rows
+            if fallback is None or len(rows) > len(fallback):
+                fallback = rows
+        return fallback or []
 
     if is_old_xls:
         try:
@@ -199,15 +212,20 @@ def _parse_excel(data: bytes, filename: str = ''):
             wb = xlrd.open_workbook(file_contents=data)
         except Exception as e:
             raise RuntimeError(f'не удалось открыть .xls: {e}')
-        for sh in wb.sheets():
-            rows = []
-            for ri in range(sh.nrows):
-                row = []
-                for ci in range(sh.ncols):
-                    v = sh.cell_value(ri, ci)
-                    row.append(str(v).strip() if v not in (None, '') else '')
-                rows.append(row)
-            all_sheets.append(rows)
+
+        def xls_sheets():
+            for sh in wb.sheets():
+                rows = []
+                limit = min(sh.nrows, MAX_ROWS)
+                for ri in range(limit):
+                    row = []
+                    for ci in range(sh.ncols):
+                        v = sh.cell_value(ri, ci)
+                        row.append(str(v).strip() if v not in (None, '') else '')
+                    rows.append(row)
+                yield rows
+
+        best = _pick_best(xls_sheets())
     else:
         try:
             import openpyxl
@@ -217,25 +235,23 @@ def _parse_excel(data: bytes, filename: str = ''):
             wb = openpyxl.load_workbook(io.BytesIO(data), read_only=True, data_only=True)
         except Exception as e:
             raise RuntimeError(f'не удалось открыть .xlsx: {e}. Убедись, что файл не повреждён и не запаролен')
-        for ws in wb.worksheets:
-            rows = []
-            for row in ws.iter_rows(values_only=True):
-                rows.append([str(c).strip() if c is not None else '' for c in row])
-            all_sheets.append(rows)
-        wb.close()
 
-    if not all_sheets:
-        raise RuntimeError('в файле нет листов')
+        def xlsx_sheets():
+            for ws in wb.worksheets:
+                rows = []
+                for row in ws.iter_rows(values_only=True):
+                    rows.append([str(c).strip() if c is not None else '' for c in row])
+                    if len(rows) >= MAX_ROWS:
+                        break
+                yield rows
 
-    # Выбираем лист, где нашлась шапка с name+price, иначе — самый большой
-    best = all_sheets[0]
-    best_score = -1
-    for rows in all_sheets:
-        idx, col_map = _find_header_row(rows)
-        score = (2 if 'name' in col_map and 'price' in col_map else (1 if 'name' in col_map else 0)) * 10000 + len(rows)
-        if score > best_score:
-            best_score = score
-            best = rows
+        try:
+            best = _pick_best(xlsx_sheets())
+        finally:
+            wb.close()
+
+    if not best:
+        raise RuntimeError('в файле нет листов с данными')
     return best
 
 
@@ -362,6 +378,8 @@ def _preview(body: dict, cors: dict) -> dict:
     except Exception as e:
         return {'statusCode': 200, 'headers': {**cors, 'Content-Type': 'application/json'}, 'body': json.dumps({'error': f'не удалось загрузить файл: {e}'}, ensure_ascii=False)}
 
+    size_mb = len(data) / 1024 / 1024
+
     try:
         rows = _parse_excel(data, filename)
     except Exception as e:
@@ -390,6 +408,7 @@ def _preview(body: dict, cors: dict) -> dict:
         'headers': {**cors, 'Content-Type': 'application/json'},
         'body': json.dumps({
             'total_rows': len(rows),
+            'file_size_mb': round(size_mb, 2),
             'header_row': header_idx,
             'columns_detected': col_map,
             'parts_found': len(parts),
@@ -433,8 +452,13 @@ def _import(body: dict, cors: dict) -> dict:
 
     batch_id = uuid.uuid4().hex
 
-    imported = 0
+    # Готовим кортежи для batch-insert
+    import hashlib
+    from psycopg2.extras import execute_values
+
+    tuples = []
     skipped = 0
+    seen_ids = set()
     for p in parts:
         supplier = p['price']
         if supplier <= 0:
@@ -442,20 +466,27 @@ def _import(body: dict, cors: dict) -> dict:
             continue
         markup = markup_map.get(p['category'], 0.0)
         final_price = round(supplier * (1 + markup / 100.0), 2)
-        p_full = {
-            **p,
-            'supplier_price': supplier,
-            'price': final_price,
-            'batch_id': batch_id,
-        }
-        cur.execute("""
-            INSERT INTO repair_parts (id, code, name, category, price, supplier_price, stock, quality, part_type, available, updated_at, price_batch_id)
-            VALUES (
-                md5(%(name)s || %(quality)s || COALESCE(%(code)s, '')),
-                %(code)s, %(name)s, %(category)s,
-                %(price)s, %(supplier_price)s, %(stock)s, %(quality)s, %(part_type)s,
-                true, NOW(), %(batch_id)s
-            )
+        key = (p['name'] + p['quality'] + (p.get('code') or '')).encode('utf-8')
+        pid = hashlib.md5(key).hexdigest()
+        if pid in seen_ids:
+            skipped += 1
+            continue
+        seen_ids.add(pid)
+        tuples.append((
+            pid, p.get('code') or '', p['name'], p['category'],
+            final_price, supplier, p['stock'], p['quality'], p['part_type'],
+            batch_id,
+        ))
+
+    imported = 0
+    if tuples:
+        # Пакетная вставка — в 50-100 раз быстрее, чем INSERT в цикле
+        execute_values(
+            cur,
+            """
+            INSERT INTO repair_parts
+                (id, code, name, category, price, supplier_price, stock, quality, part_type, available, updated_at, price_batch_id)
+            VALUES %s
             ON CONFLICT (id) DO UPDATE SET
                 name = EXCLUDED.name,
                 category = EXCLUDED.category,
@@ -467,8 +498,12 @@ def _import(body: dict, cors: dict) -> dict:
                 available = true,
                 updated_at = NOW(),
                 price_batch_id = EXCLUDED.price_batch_id
-        """, p_full)
-        imported += 1
+            """,
+            tuples,
+            template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, true, NOW(), %s)",
+            page_size=500,
+        )
+        imported = len(tuples)
 
     conn.commit()
     cur.close()
