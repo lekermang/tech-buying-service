@@ -96,7 +96,7 @@ const InfoCatalogTradeIn = () => {
                   В магазин Скупка24
                   <Icon name="ArrowRight" size={16} />
                 </a>
-                <a href="tel:+79929990333"
+                <a href="tel:88006006833"
                   className="inline-flex items-center justify-center gap-2 border border-[#FFD700]/40 text-[#FFD700] font-oswald font-bold text-sm md:text-base px-6 py-3 md:py-4 uppercase tracking-wide hover:border-[#FFD700] hover:bg-[#FFD700]/5 transition-all">
                   <Icon name="Phone" size={16} />
                   Узнать детали
