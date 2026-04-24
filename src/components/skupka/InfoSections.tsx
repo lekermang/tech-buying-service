@@ -168,9 +168,24 @@ const InfoSections = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mt-6 md:mt-8">
             <Reveal>
               <div className="border border-[#FFD700]/20 overflow-hidden flex flex-col">
-                <div className="px-4 py-2.5 bg-[#FFD700]/5 border-b border-[#FFD700]/20 flex items-center gap-2">
-                  <Icon name="MapPin" size={14} className="text-[#FFD700]" />
-                  <span className="font-oswald font-bold text-sm uppercase text-white">Кирова, 11</span>
+                <div className="px-4 py-2.5 bg-[#FFD700]/5 border-b border-[#FFD700]/20 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Icon name="MapPin" size={14} className="text-[#FFD700] shrink-0" />
+                    <span className="font-oswald font-bold text-sm uppercase text-white truncate">Кирова, 11</span>
+                  </div>
+                  <a
+                    href="https://yandex.ru/profile/52473097879?lang=ru"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 shrink-0 hover:opacity-80 transition-opacity"
+                    title="Отзывы на Яндекс Картах"
+                  >
+                    <span className="flex items-center gap-0.5 text-[#FFD700] text-xs leading-none">
+                      <span>★</span><span>★</span><span>★</span><span>★</span><span>★</span>
+                    </span>
+                    <span className="font-oswald font-bold text-[#FFD700] text-sm leading-none">5.0</span>
+                    <span className="font-roboto text-white/40 text-[10px] leading-none hidden sm:inline">Яндекс</span>
+                  </a>
                 </div>
                 <iframe
                   src="https://yandex.ru/map-widget/v1/?z=12&ol=biz&oid=52473097879"
@@ -202,9 +217,24 @@ const InfoSections = () => {
             </Reveal>
             <Reveal delay={1}>
               <div className="border border-[#FFD700]/20 overflow-hidden flex flex-col">
-                <div className="px-4 py-2.5 bg-[#FFD700]/5 border-b border-[#FFD700]/20 flex items-center gap-2">
-                  <Icon name="MapPin" size={14} className="text-[#FFD700]" />
-                  <span className="font-oswald font-bold text-sm uppercase text-white">Кирова, 7/47</span>
+                <div className="px-4 py-2.5 bg-[#FFD700]/5 border-b border-[#FFD700]/20 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Icon name="MapPin" size={14} className="text-[#FFD700] shrink-0" />
+                    <span className="font-oswald font-bold text-sm uppercase text-white truncate">Кирова, 7/47</span>
+                  </div>
+                  <a
+                    href="https://yandex.ru/profile/114124804072?lang=ru"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 shrink-0 hover:opacity-80 transition-opacity"
+                    title="Отзывы на Яндекс Картах"
+                  >
+                    <span className="flex items-center gap-0.5 text-[#FFD700] text-xs leading-none">
+                      <span>★</span><span>★</span><span>★</span><span>★</span><span>★</span>
+                    </span>
+                    <span className="font-oswald font-bold text-[#FFD700] text-sm leading-none">5.0</span>
+                    <span className="font-roboto text-white/40 text-[10px] leading-none hidden sm:inline">Яндекс</span>
+                  </a>
                 </div>
                 <iframe
                   src="https://yandex.ru/map-widget/v1/?z=12&ol=biz&oid=114124804072"
