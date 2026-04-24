@@ -21,6 +21,16 @@ type Props = {
 
 type Source = "stock" | "order";
 
+/** Гарантия в зависимости от качества запчасти. */
+const WARRANTY_BY_QUALITY: Record<string, { label: string; icon: Parameters<typeof Icon>[0]["name"]; color: string }> = {
+  ORIG: { label: "1 год гарантии",  icon: "ShieldCheck", color: "text-[#FFD700] bg-[#FFD700]/15 border-[#FFD700]/40" },
+  AAA:  { label: "6 мес. гарантии", icon: "Shield",      color: "text-green-400 bg-green-500/10 border-green-500/30" },
+  AA:   { label: "3 мес. гарантии", icon: "Shield",      color: "text-sky-400 bg-sky-500/10 border-sky-500/30" },
+  A:    { label: "30 дней гарантии", icon: "Shield",     color: "text-white/60 bg-white/5 border-white/15" },
+};
+
+const getWarranty = (quality: string) => WARRANTY_BY_QUALITY[quality] || WARRANTY_BY_QUALITY.A;
+
 /**
  * Премиум-селектор запчастей.
  * UX-решения проблемы «выпадающий список перекрывает доп. услуги»:
@@ -184,6 +194,7 @@ export default function RepairPartsSelector({
                 filteredList.map(part => {
                   const isCheapest = cheapestIdByType[part.id] && (categories.length > 1 || filteredList.length > 1);
                   const isPremium = part.quality === "ORIG";
+                  const warranty = getWarranty(part.quality);
                   return (
                     <button key={part.id} type="button"
                       onClick={() => onSelectPart(part)}
@@ -210,6 +221,11 @@ export default function RepairPartsSelector({
                                 Выгодно
                               </span>
                             )}
+                            {/* Гарантия по качеству */}
+                            <span className={`inline-flex items-center gap-0.5 border font-oswald font-bold text-[8px] px-1.5 py-0.5 rounded-sm uppercase tracking-wider ${warranty.color}`}>
+                              <Icon name={warranty.icon} size={8} />
+                              {warranty.label}
+                            </span>
                             {part.stock <= 3 && part.stock > 0 && (
                               <span className="text-orange-400 font-roboto text-[9px] uppercase">осталось {part.stock}</span>
                             )}
@@ -380,8 +396,11 @@ export default function RepairPartsSelector({
           <div className="border-t border-[#FFD700]/10 px-3 py-2.5 bg-gradient-to-r from-[#FFD700]/10 to-transparent flex items-center justify-between">
             <div className="flex flex-col">
               <span className="font-oswald font-bold text-[10px] text-[#FFD700]/70 uppercase tracking-[0.2em]">Итого за ремонт</span>
-              <span className="font-roboto text-[9px] text-white/40 mt-0.5">
-                {clientInfo?.found && clientInfo.discount_pct > 0 ? `со скидкой −${clientInfo.discount_pct}%` : "запчасть, работа, гарантия"}
+              <span className="font-roboto text-[9px] text-white/40 mt-0.5 flex items-center gap-1">
+                <Icon name={getWarranty(selectedPart.quality).icon} size={9} className="text-[#FFD700]/60" />
+                {clientInfo?.found && clientInfo.discount_pct > 0
+                  ? `со скидкой −${clientInfo.discount_pct}% · ${getWarranty(selectedPart.quality).label}`
+                  : `запчасть · работа · ${getWarranty(selectedPart.quality).label}`}
               </span>
             </div>
             <div className="font-oswald font-bold text-2xl text-[#FFD700]" style={{ textShadow: '0 0 14px rgba(255,215,0,0.25)' }}>
