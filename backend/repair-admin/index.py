@@ -631,6 +631,75 @@ def handler(event: dict, context) -> dict:
             ]
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'stats': stats}, ensure_ascii=False)}
 
+        # Список заказов по статусу(ам) за период (для модалки в аналитике)
+        if action == 'analytics_orders':
+            period_o = params.get('period', 'day')
+            status_filter = params.get('statuses', '').strip()
+            if period_o == 'yesterday':
+                period_where_o = """
+                    COALESCE(status_updated_at, created_at) >= (
+                        DATE_TRUNC('day', (NOW() + INTERVAL '3 hours')::date - 1) + INTERVAL '7 hours' - INTERVAL '3 hours'
+                    )
+                    AND COALESCE(status_updated_at, created_at) < (
+                        DATE_TRUNC('day', (NOW() + INTERVAL '3 hours')::date) + INTERVAL '7 hours' - INTERVAL '3 hours'
+                    )
+                """
+            elif period_o == 'day':
+                period_where_o = """
+                    COALESCE(status_updated_at, created_at) >= (
+                        CASE
+                            WHEN EXTRACT(HOUR FROM NOW() + INTERVAL '3 hours') >= 7
+                            THEN DATE_TRUNC('day', (NOW() + INTERVAL '3 hours')) + INTERVAL '7 hours' - INTERVAL '3 hours'
+                            ELSE DATE_TRUNC('day', (NOW() + INTERVAL '3 hours') - INTERVAL '1 day') + INTERVAL '7 hours' - INTERVAL '3 hours'
+                        END
+                    )
+                """
+            else:
+                days_o = 7 if period_o == 'week' else 30
+                period_where_o = f"""
+                    COALESCE(status_updated_at, created_at) >= (
+                        CASE
+                            WHEN EXTRACT(HOUR FROM NOW() + INTERVAL '3 hours') >= 7
+                            THEN DATE_TRUNC('day', (NOW() + INTERVAL '3 hours')) + INTERVAL '7 hours' - INTERVAL '3 hours'
+                            ELSE DATE_TRUNC('day', (NOW() + INTERVAL '3 hours') - INTERVAL '1 day') + INTERVAL '7 hours' - INTERVAL '3 hours'
+                        END - INTERVAL '{days_o - 1} days'
+                    )
+                """
+            # Фильтр по статусам (через запятую), разрешаем только безопасные значения
+            allowed = {'new','accepted','in_progress','waiting_parts','ready','done','warranty','cancelled'}
+            status_where = ''
+            if status_filter:
+                vals = [s.strip() for s in status_filter.split(',') if s.strip() in allowed]
+                if vals:
+                    status_where = " AND status IN (" + ",".join(f"'{v}'" for v in vals) + ")"
+            cur.execute(f"""
+                SELECT id, name, phone, model, repair_type, price, status,
+                       admin_note, created_at, comment, purchase_amount,
+                       repair_amount, completed_at, master_income, parts_name,
+                       picked_up_at, advance, is_paid, payment_method, status_updated_at
+                FROM {SCHEMA}.repair_orders
+                WHERE {period_where_o}{status_where}
+                ORDER BY COALESCE(status_updated_at, created_at) DESC
+                LIMIT 200
+            """)
+            rows_o = cur.fetchall()
+            cur.close(); conn.close()
+            orders_o = []
+            for r in rows_o:
+                orders_o.append({
+                    'id': r[0], 'name': r[1], 'phone': r[2], 'model': r[3],
+                    'repair_type': r[4], 'price': r[5], 'status': r[6],
+                    'admin_note': r[7],
+                    'created_at': r[8].isoformat() if r[8] else None,
+                    'comment': r[9], 'purchase_amount': r[10], 'repair_amount': r[11],
+                    'completed_at': r[12].isoformat() if r[12] else None,
+                    'master_income': r[13], 'parts_name': r[14],
+                    'picked_up_at': r[15].isoformat() if r[15] else None,
+                    'advance': r[16], 'is_paid': r[17], 'payment_method': r[18],
+                    'status_updated_at': r[19].isoformat() if r[19] else None,
+                })
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'orders': orders_o}, ensure_ascii=False)}
+
         # История последних действий над заявками (50 последних записей)
         if action == 'history':
             limit = int(params.get('limit', '50'))

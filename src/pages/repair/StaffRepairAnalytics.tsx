@@ -21,9 +21,15 @@ type Props = {
   onPeriodChange: (p: Period) => void;
   onRefresh: () => void;
   onShowHistory: () => void;
+  onShowOrders?: (params: { statuses: string[]; title: string; accent: "revenue" | "costs" | "master" | "profit" | "status" }) => void;
 };
 
-export default function StaffRepairAnalytics({ analytics, analyticsLoading, period, stats, onPeriodChange, onRefresh, onShowHistory }: Props) {
+export default function StaffRepairAnalytics({ analytics, analyticsLoading, period, stats, onPeriodChange, onRefresh, onShowHistory, onShowOrders }: Props) {
+  const DONE_STATUSES = ["done", "warranty", "ready"];
+  const openFinance = (accent: "revenue" | "costs" | "master" | "profit", title: string) =>
+    onShowOrders?.({ statuses: DONE_STATUSES, title, accent });
+  const openStatus = (key: string, label: string) =>
+    onShowOrders?.({ statuses: key === "new" ? ["new", "accepted"] : [key], title: label, accent: "status" });
   return (
     <div className="p-4 overflow-y-auto">
       <div className="flex gap-2 mb-4 items-center flex-wrap">
@@ -49,29 +55,29 @@ export default function StaffRepairAnalytics({ analytics, analyticsLoading, peri
           <div className="bg-[#1A1A1A] border border-[#2A2A2A] p-3 mb-3">
             <div className="font-roboto text-white/30 text-[10px] uppercase tracking-wide mb-2">Расчёт прибыли</div>
             <div className="flex items-center gap-2 flex-wrap">
-              <div className="text-center">
+              <button onClick={() => openFinance("revenue", "Выручка — детализация")} className="text-center hover:bg-white/5 px-1.5 py-0.5 -mx-1.5 transition-colors">
                 <div className="font-oswald font-bold text-[#FFD700] text-lg">{money(analytics.revenue)}</div>
                 <div className="font-roboto text-white/30 text-[9px]">выручка</div>
-              </div>
+              </button>
               <div className="font-roboto text-white/20 text-base">−</div>
-              <div className="text-center">
+              <button onClick={() => openFinance("costs", "Закупка запчастей")} className="text-center hover:bg-white/5 px-1.5 py-0.5 -mx-1.5 transition-colors">
                 <div className="font-oswald font-bold text-orange-400 text-lg">{money(analytics.costs)}</div>
                 <div className="font-roboto text-white/30 text-[9px]">закупка запчастей</div>
-              </div>
+              </button>
               {analytics.master_total > 0 && <>
                 <div className="font-roboto text-white/20 text-base">−</div>
-                <div className="text-center">
+                <button onClick={() => openFinance("master", "Доход мастера")} className="text-center hover:bg-white/5 px-1.5 py-0.5 -mx-1.5 transition-colors">
                   <div className="font-oswald font-bold text-blue-400 text-lg">{money(analytics.master_total)}</div>
                   <div className="font-roboto text-white/30 text-[9px]">доход мастера</div>
-                </div>
+                </button>
               </>}
               <div className="font-roboto text-white/20 text-base">=</div>
-              <div className="text-center">
+              <button onClick={() => openFinance("profit", "Чистая прибыль")} className="text-center hover:bg-white/5 px-1.5 py-0.5 -mx-1.5 transition-colors">
                 <div className={`font-oswald font-bold text-xl ${analytics.profit - analytics.master_total >= 0 ? "text-green-400" : "text-red-400"}`}>
                   {money(analytics.profit - analytics.master_total)}
                 </div>
                 <div className="font-roboto text-white/30 text-[9px]">чистая прибыль</div>
-              </div>
+              </button>
               <div className="ml-auto">
                 <div className="font-roboto text-white/20 text-[9px] text-right">маржа</div>
                 <div className={`font-oswald font-bold text-base ${analytics.revenue > 0 && (analytics.profit - analytics.master_total) / analytics.revenue > 0.2 ? "text-green-400" : "text-white/50"}`}>
@@ -92,11 +98,17 @@ export default function StaffRepairAnalytics({ analytics, analyticsLoading, peri
           <div className="grid grid-cols-3 gap-2 mb-3">
             {STATUSES.map(s => {
               const val = (analytics as Record<string, unknown>)[s.key === "new" ? "new" : s.key] as number ?? 0;
+              const clickable = val > 0 && !!onShowOrders;
               return (
-                <div key={s.key} className="bg-[#1A1A1A] border border-[#2A2A2A] p-2 text-center">
+                <button
+                  key={s.key}
+                  disabled={!clickable}
+                  onClick={() => clickable && openStatus(s.key, s.label.replace(" ✓", ""))}
+                  className={`bg-[#1A1A1A] border border-[#2A2A2A] p-2 text-center transition-colors ${clickable ? "hover:border-[#FFD700]/40 hover:bg-[#1F1F1F] cursor-pointer" : "cursor-default"}`}
+                >
                   <div className={`font-oswald font-bold text-lg ${s.color.split(" ")[1]}`}>{val}</div>
                   <div className="font-roboto text-white/30 text-[9px]">{s.label.replace(" ✓", "")}</div>
-                </div>
+                </button>
               );
             })}
           </div>

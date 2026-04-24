@@ -4,6 +4,7 @@ import { REPAIR_URL, STATUSES, Order, DayStat, EMPTY_FORM, INP, LBL, printReceip
 import StaffRepairAnalytics from "./repair/StaffRepairAnalytics";
 import StaffRepairOrderCard from "./repair/StaffRepairOrderCard";
 import StaffRepairReadyModal from "./repair/StaffRepairReadyModal";
+import StatusOrdersModal from "./repair/StatusOrdersModal";
 import LaborPricesTab from "@/components/admin/repair/LaborPricesTab";
 import RepairImportTab from "@/components/admin/repair/RepairImportTab";
 import RepairHistoryModal from "@/components/admin/repair/RepairHistoryModal";
@@ -60,6 +61,9 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
   const [period, setPeriod] = useState<Period>("week");
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+
+  // Модалка с заказами по статусу/метрике
+  const [ordersModal, setOrdersModal] = useState<{ statuses: string[]; title: string; accent: "revenue" | "costs" | "master" | "profit" | "status" } | null>(null);
 
   // Статистика (старая, для совместимости)
   const [stats, setStats] = useState<DayStat[]>([]);
@@ -343,6 +347,18 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
           onPeriodChange={setPeriod}
           onRefresh={() => loadAnalytics(period)}
           onShowHistory={() => setShowHistory(true)}
+          onShowOrders={(p) => setOrdersModal(p)}
+        />
+      )}
+
+      {ordersModal && (
+        <StatusOrdersModal
+          token={token}
+          period={period}
+          statuses={ordersModal.statuses}
+          title={ordersModal.title}
+          accent={ordersModal.accent}
+          onClose={() => setOrdersModal(null)}
         />
       )}
 

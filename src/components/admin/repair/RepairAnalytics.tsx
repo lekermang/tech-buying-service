@@ -9,9 +9,15 @@ type Props = {
   period: Period;
   onPeriodChange: (p: Period) => void;
   onRefresh: () => void;
+  onShowOrders?: (params: { statuses: string[]; title: string; accent: "revenue" | "costs" | "master" | "profit" | "status" }) => void;
 };
 
-export default function RepairAnalytics({ analytics, analyticsLoading, period, onPeriodChange, onRefresh }: Props) {
+export default function RepairAnalytics({ analytics, analyticsLoading, period, onPeriodChange, onRefresh, onShowOrders }: Props) {
+  const DONE_STATUSES = ["done", "warranty", "ready"];
+  const openFinance = (accent: "revenue" | "costs" | "master" | "profit", title: string) =>
+    onShowOrders?.({ statuses: DONE_STATUSES, title, accent });
+  const openStatus = (key: string, label: string) =>
+    onShowOrders?.({ statuses: key === "new" ? ["new", "accepted"] : [key], title: label, accent: "status" });
   return (
     <div className="flex-1 overflow-y-auto p-4">
       {/* Переключатель периода */}
@@ -33,34 +39,41 @@ export default function RepairAnalytics({ analytics, analyticsLoading, period, o
         <>
           {/* Финансовые KPI */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
-            <div className="bg-[#1A1A1A] border border-[#2A2A2A] p-4">
+            <button onClick={() => openFinance("revenue", "Выручка — детализация")} className="bg-[#1A1A1A] border border-[#2A2A2A] p-4 text-left hover:border-[#FFD700]/40 hover:bg-[#1F1F1F] transition-colors">
               <div className="font-roboto text-white/40 text-[10px] uppercase tracking-wider mb-1">Выручка</div>
               <div className="font-oswald font-bold text-[#FFD700] text-xl">{money(analytics.revenue)}</div>
-            </div>
-            <div className="bg-[#1A1A1A] border border-[#2A2A2A] p-4">
+            </button>
+            <button onClick={() => openFinance("costs", "Закупка запчастей")} className="bg-[#1A1A1A] border border-[#2A2A2A] p-4 text-left hover:border-orange-400/40 hover:bg-[#1F1F1F] transition-colors">
               <div className="font-roboto text-white/40 text-[10px] uppercase tracking-wider mb-1">Закупка</div>
               <div className="font-oswald font-bold text-orange-400 text-xl">{money(analytics.costs)}</div>
-            </div>
-            <div className="bg-[#1A1A1A] border border-[#2A2A2A] p-4">
+            </button>
+            <button onClick={() => openFinance("profit", "Прибыль — детализация")} className="bg-[#1A1A1A] border border-[#2A2A2A] p-4 text-left hover:border-green-400/40 hover:bg-[#1F1F1F] transition-colors">
               <div className="font-roboto text-white/40 text-[10px] uppercase tracking-wider mb-1">Прибыль</div>
               <div className={`font-oswald font-bold text-xl ${analytics.profit >= 0 ? "text-green-400" : "text-red-400"}`}>{money(analytics.profit)}</div>
-            </div>
-            <div className="bg-[#1A1A1A] border border-green-500/20 p-4">
+            </button>
+            <button onClick={() => openFinance("master", "Доход мастера (50%)")} className="bg-[#1A1A1A] border border-green-500/20 p-4 text-left hover:border-green-400/50 hover:bg-[#1F1F1F] transition-colors">
               <div className="font-roboto text-white/40 text-[10px] uppercase tracking-wider mb-1">Доход мастера (50%)</div>
               <div className="font-oswald font-bold text-green-400 text-xl">{money(analytics.master_total)}</div>
-            </div>
+            </button>
           </div>
 
           {/* Статусы */}
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-5">
-            {STATUSES.map(s => (
-              <div key={s.key} className="bg-[#1A1A1A] border border-[#2A2A2A] p-3 text-center">
-                <div className={`font-oswald font-bold text-lg ${s.color.split(" ")[1]}`}>
-                  {(analytics as Record<string, unknown>)[s.key === "new" ? "new" : s.key] as number ?? 0}
-                </div>
-                <div className="font-roboto text-white/30 text-[10px] mt-0.5">{s.label.replace(" ✓","")}</div>
-              </div>
-            ))}
+            {STATUSES.map(s => {
+              const val = (analytics as Record<string, unknown>)[s.key === "new" ? "new" : s.key] as number ?? 0;
+              const clickable = val > 0 && !!onShowOrders;
+              return (
+                <button
+                  key={s.key}
+                  disabled={!clickable}
+                  onClick={() => clickable && openStatus(s.key, s.label.replace(" ✓", ""))}
+                  className={`bg-[#1A1A1A] border border-[#2A2A2A] p-3 text-center transition-colors ${clickable ? "hover:border-[#FFD700]/40 hover:bg-[#1F1F1F] cursor-pointer" : "cursor-default"}`}
+                >
+                  <div className={`font-oswald font-bold text-lg ${s.color.split(" ")[1]}`}>{val}</div>
+                  <div className="font-roboto text-white/30 text-[10px] mt-0.5">{s.label.replace(" ✓","")}</div>
+                </button>
+              );
+            })}
           </div>
 
           {/* График по дням */}

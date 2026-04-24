@@ -12,6 +12,7 @@ import RepairTabHeader from "./repair/RepairTabHeader";
 import RepairOrdersView from "./repair/RepairOrdersView";
 import RepairImportTab from "./repair/RepairImportTab";
 import RepairHistoryModal from "./repair/RepairHistoryModal";
+import StatusOrdersModal from "@/pages/repair/StatusOrdersModal";
 
 export { STATUSES } from "./repair/repairTypes";
 
@@ -50,6 +51,8 @@ export default function RepairTab({ token }: { token: string }) {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+
+  const [ordersModal, setOrdersModal] = useState<{ statuses: string[]; title: string; accent: "revenue" | "costs" | "master" | "profit" | "status" } | null>(null);
 
   const syncParts = async () => {
     setSyncing(true);
@@ -233,6 +236,19 @@ export default function RepairTab({ token }: { token: string }) {
           period={period}
           onPeriodChange={setPeriod}
           onRefresh={() => loadAnalytics(period)}
+          onShowOrders={(p) => setOrdersModal(p)}
+        />
+      )}
+
+      {ordersModal && (
+        <StatusOrdersModal
+          period={period}
+          statuses={ordersModal.statuses}
+          title={ordersModal.title}
+          accent={ordersModal.accent}
+          fetchUrl={ADMIN_URL}
+          fetchHeaders={adminHeaders(token)}
+          onClose={() => setOrdersModal(null)}
         />
       )}
 
