@@ -142,7 +142,7 @@ const Index = ({ goldOpen = false }: { goldOpen?: boolean }) => {
             <span className="font-oswald font-bold text-sm uppercase tracking-wide">Оценить онлайн</span>
           </button>
           <a
-            href="https://t.me/skupka24"
+            href="https://t.me/skypka24"
             target="_blank" rel="noopener noreferrer"
             onClick={() => ymGoal(Goals.TELEGRAM_CLICK, { place: "sticky_bar" })}
             className="flex-1 flex flex-col items-center justify-center gap-1 text-[#FFD700] hover:bg-[#FFD700]/5 active:bg-[#FFD700]/10 transition-colors">

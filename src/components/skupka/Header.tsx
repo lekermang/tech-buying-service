@@ -300,7 +300,7 @@ const Header = ({ scrollTo, goldOpen = false }: HeaderProps) => {
               <Icon name="Phone" size={22} />
               +7 (992) 999-03-33
             </a>
-            <a href="https://t.me/skupka24"
+            <a href="https://t.me/skypka24"
               target="_blank" rel="noopener noreferrer"
               onClick={() => ymGoal(Goals.TELEGRAM_CLICK, { place: "mobile_menu" })}
               className="flex items-center justify-center gap-3 w-full border-2 border-[#FFD700]/40 text-[#FFD700] font-oswald font-bold text-base py-3.5 uppercase tracking-wide active:scale-95 transition-all">
