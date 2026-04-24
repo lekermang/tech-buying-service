@@ -73,11 +73,11 @@ export type StaffThemeSettings = {
 };
 
 export const DEFAULT_THEME: StaffThemeSettings = {
-  enabled: false,
+  enabled: true,
   character_id: "sakura",
   cursor_effect: "eyes",
   accent_color: "#FFD700",
-  bg_style: "default",
+  bg_style: "sakura",
   ui_density: "normal",
   font_family: "roboto",
 };

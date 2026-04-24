@@ -3,7 +3,7 @@ import { CHARACTERS } from "./characters";
 import { useStaffTheme } from "./StaffThemeContext";
 
 /** Аниме-маскот фиксированный в правом нижнем углу. Глаза / наклон следят за курсором. */
-export default function AnimeMascot() {
+export default function AnimeMascot({ onOpenSettings }: { onOpenSettings?: () => void } = {}) {
   const { theme } = useStaffTheme();
   const boxRef = useRef<HTMLDivElement>(null);
   const [mouse, setMouse] = useState<{ x: number; y: number } | null>(null);
@@ -62,9 +62,11 @@ export default function AnimeMascot() {
 
   return (
     <>
-      <div
-        ref={boxRef}
-        className="fixed z-[80] pointer-events-none select-none"
+      <button
+        ref={boxRef as unknown as React.RefObject<HTMLButtonElement>}
+        onClick={onOpenSettings}
+        title="Настроить тему"
+        className="fixed z-[80] select-none cursor-pointer"
         style={{
           right: 12,
           bottom: 80,
@@ -73,8 +75,12 @@ export default function AnimeMascot() {
           transform: showTilt ? `perspective(400px) rotateX(${tiltX}deg) rotateY(${tiltY}deg)` : undefined,
           transition: "transform 0.15s ease-out",
           filter: "drop-shadow(0 10px 20px rgba(0,0,0,0.55))",
+          background: "transparent",
+          border: 0,
+          padding: 0,
         }}
       >
+        <span className="absolute inset-0 rounded-full animate-ping" style={{ background: char.accent + "33" }} />
         <div className="absolute inset-0 rounded-full overflow-hidden border-2" style={{ borderColor: char.accent + "80" }}>
           <img src={char.image} alt={char.name} className="w-full h-full object-cover" draggable={false} />
           {showEyes && (
@@ -106,12 +112,12 @@ export default function AnimeMascot() {
         </div>
         {/* ласковое покачивание */}
         <style>{`@keyframes mascotFloat { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-4px) } }`}</style>
-      </div>
+      </button>
 
       {/* Кнопка скрыть */}
       <button
-        onClick={() => setHidden(true)}
-        className="fixed z-[81] right-[90px] bottom-[155px] w-5 h-5 rounded-full bg-black/70 border border-white/20 text-white/70 hover:text-white text-[10px] flex items-center justify-center"
+        onClick={(e) => { e.stopPropagation(); setHidden(true); }}
+        className="fixed z-[82] right-[90px] bottom-[155px] w-5 h-5 rounded-full bg-black/70 border border-white/20 text-white/70 hover:text-white text-[10px] flex items-center justify-center"
         title="Скрыть маскота"
       >
         ×

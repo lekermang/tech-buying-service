@@ -275,7 +275,7 @@ function StaffInner() {
       <FontApplier />
       <BackgroundFx />
       <CursorEffects />
-      <AnimeMascot />
+      <AnimeMascot onOpenSettings={() => setThemeOpen(true)} />
       {themeOpen && <StaffThemeSettings onClose={() => setThemeOpen(false)} />}
       {/* Шапка — премиальная с градиентом */}
       <div className="relative shrink-0 safe-top border-b border-[#222]">
