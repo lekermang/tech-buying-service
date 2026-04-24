@@ -541,15 +541,15 @@ def handler(event: dict, context) -> dict:
 
             cur.execute(f"""
                 SELECT
-                    COUNT(*) FILTER (WHERE status IN ('done','warranty')) as done,
+                    COUNT(*) FILTER (WHERE status IN ('done','warranty','ready')) as done,
                     COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled,
                     COUNT(*) FILTER (WHERE status = 'ready') as ready,
                     COUNT(*) FILTER (WHERE status = 'in_progress') as in_progress,
                     COUNT(*) FILTER (WHERE status = 'waiting_parts') as waiting_parts,
                     COUNT(*) FILTER (WHERE status IN ('new','accepted')) as new_count,
-                    COALESCE(SUM(repair_amount) FILTER (WHERE status IN ('done','warranty')), 0) as revenue,
-                    COALESCE(SUM(purchase_amount) FILTER (WHERE status IN ('done','warranty')), 0) as costs,
-                    COALESCE(SUM(master_income) FILTER (WHERE status IN ('done','warranty')), 0) as master_total,
+                    COALESCE(SUM(repair_amount) FILTER (WHERE status IN ('done','warranty','ready')), 0) as revenue,
+                    COALESCE(SUM(purchase_amount) FILTER (WHERE status IN ('done','warranty','ready')), 0) as costs,
+                    COALESCE(SUM(master_income) FILTER (WHERE status IN ('done','warranty','ready')), 0) as master_total,
                     COUNT(*) as total
                 FROM {SCHEMA}.repair_orders
                 WHERE {period_where}
@@ -569,7 +569,7 @@ def handler(event: dict, context) -> dict:
                     COALESCE(SUM(repair_amount), 0) as revenue,
                     COALESCE(SUM(purchase_amount), 0) as costs
                 FROM {SCHEMA}.repair_orders
-                WHERE status IN ('done','warranty')
+                WHERE status IN ('done','warranty','ready')
                   AND {period_where}
                 GROUP BY day
                 ORDER BY day ASC
@@ -607,13 +607,13 @@ def handler(event: dict, context) -> dict:
                 SELECT
                     DATE((COALESCE(status_updated_at, created_at) + INTERVAL '3 hours') - INTERVAL '7 hours') as work_day,
                     COUNT(*) as total,
-                    COUNT(*) FILTER (WHERE status IN ('done','warranty')) as done,
+                    COUNT(*) FILTER (WHERE status IN ('done','warranty','ready')) as done,
                     COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled,
-                    COALESCE(SUM(repair_amount) FILTER (WHERE status IN ('done','warranty')), 0) as revenue,
-                    COALESCE(SUM(purchase_amount) FILTER (WHERE status IN ('done','warranty')), 0) as costs,
-                    COALESCE(SUM(master_income) FILTER (WHERE status IN ('done','warranty')), 0) as master_income
+                    COALESCE(SUM(repair_amount) FILTER (WHERE status IN ('done','warranty','ready')), 0) as revenue,
+                    COALESCE(SUM(purchase_amount) FILTER (WHERE status IN ('done','warranty','ready')), 0) as costs,
+                    COALESCE(SUM(master_income) FILTER (WHERE status IN ('done','warranty','ready')), 0) as master_income
                 FROM {SCHEMA}.repair_orders
-                WHERE status IN ('done','warranty')
+                WHERE status IN ('done','warranty','ready')
                   AND COALESCE(status_updated_at, created_at) >= NOW() - INTERVAL '31 days'
                 GROUP BY work_day
                 ORDER BY work_day DESC
