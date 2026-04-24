@@ -56,8 +56,52 @@ def handler(event: dict, context) -> dict:
         return _list_categories(cors)
     elif action == 'save-markup':
         return _save_markup(body, cors)
+    elif action == 'save-markup-all':
+        return _save_markup_all(body, cors)
     else:
         return {'statusCode': 400, 'headers': cors, 'body': json.dumps({'error': 'unknown action'})}
+
+
+def _save_markup_all(body: dict, cors: dict) -> dict:
+    """Применяет одну наценку ко всем категориям разом — один SQL-запрос."""
+    try:
+        markup = float(body.get('markup_percent', 0))
+    except (TypeError, ValueError):
+        return {'statusCode': 400, 'headers': cors, 'body': json.dumps({'error': 'неверная наценка'}, ensure_ascii=False)}
+
+    dsn = os.environ['DATABASE_URL']
+    conn = psycopg2.connect(dsn)
+    cur = conn.cursor()
+
+    # Берём все категории, которые есть в прайсе
+    cur.execute("SELECT DISTINCT category FROM repair_parts WHERE category IS NOT NULL AND category != ''")
+    cats = [r[0] for r in cur.fetchall()]
+
+    # Массовый upsert наценки по каждой категории
+    for c in cats:
+        cur.execute("""
+            INSERT INTO repair_parts_markup (category, markup_percent, updated_at)
+            VALUES (%s, %s, NOW())
+            ON CONFLICT (category) DO UPDATE SET markup_percent = EXCLUDED.markup_percent, updated_at = NOW()
+        """, (c, markup))
+
+    # Один UPDATE на всю таблицу — пересчёт итоговых цен
+    cur.execute("""
+        UPDATE repair_parts
+        SET price = ROUND(COALESCE(supplier_price, price) * (1 + %s / 100.0), 2),
+            updated_at = NOW()
+        WHERE supplier_price IS NOT NULL
+    """, (markup,))
+    updated = cur.rowcount
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return {
+        'statusCode': 200,
+        'headers': {**cors, 'Content-Type': 'application/json'},
+        'body': json.dumps({'ok': True, 'updated': updated, 'categories': len(cats), 'markup_percent': markup}, ensure_ascii=False)
+    }
 
 
 def _list_categories(cors: dict) -> dict:

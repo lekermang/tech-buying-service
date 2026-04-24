@@ -23,6 +23,7 @@ export default function RepairPriceListTab({ token }: Props) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [savingCat, setSavingCat] = useState<string | null>(null);
   const [bulkMarkup, setBulkMarkup] = useState("");
+  const [bulkSaving, setBulkSaving] = useState(false);
   const [search, setSearch] = useState("");
 
   const load = async () => {
@@ -77,16 +78,24 @@ export default function RepairPriceListTab({ token }: Props) {
   const applyBulkMarkup = async () => {
     const markup = parseFloat(bulkMarkup.replace(",", ".")) || 0;
     if (!rows.length) return;
-    if (!confirm(`Применить наценку ${markup}% ко всем ${rows.length} категориям?`)) return;
-    for (const r of rows) {
-      await fetch(IMPORT_PARTS_URL, {
+    if (!confirm(`Применить наценку ${markup}% ко всем ${rows.length} категориям?\n\nПересчитаются итоговые цены всех позиций прайса.`)) return;
+    setBulkSaving(true);
+    try {
+      const res = await fetch(IMPORT_PARTS_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...adminHeaders(token) },
-        body: JSON.stringify({ action: "save-markup", category: r.category, markup_percent: markup }),
+        body: JSON.stringify({ action: "save-markup-all", markup_percent: markup }),
       });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        alert("Ошибка: " + (data.error || res.status));
+        return;
+      }
+      setBulkMarkup("");
+      await load();
+    } finally {
+      setBulkSaving(false);
     }
-    setBulkMarkup("");
-    await load();
   };
 
   const finalPrice = (supplier: number, markup: number) => Math.round(supplier * (1 + markup / 100));
@@ -127,10 +136,11 @@ export default function RepairPriceListTab({ token }: Props) {
           />
           <button
             onClick={applyBulkMarkup}
-            disabled={!bulkMarkup}
-            className="bg-[#FFD700] text-black font-oswald font-bold px-3 py-1 text-[11px] uppercase disabled:opacity-40"
+            disabled={!bulkMarkup || bulkSaving}
+            className="bg-[#FFD700] text-black font-oswald font-bold px-3 py-1 text-[11px] uppercase disabled:opacity-40 flex items-center gap-1.5"
           >
-            Применить
+            {bulkSaving && <Icon name="Loader" size={11} className="animate-spin" />}
+            {bulkSaving ? "Применяю..." : "Применить ко всем"}
           </button>
         </div>
         <div className="flex items-center gap-2 bg-[#0D0D0D] border border-[#222] px-3 py-2">
