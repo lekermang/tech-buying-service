@@ -97,9 +97,14 @@ const InfoCatalogTradeIn = () => {
                   <Icon name="ArrowRight" size={16} />
                 </a>
                 <a href="tel:88006006833"
-                  className="inline-flex items-center justify-center gap-2 border border-[#FFD700]/40 text-[#FFD700] font-oswald font-bold text-sm md:text-base px-6 py-3 md:py-4 uppercase tracking-wide hover:border-[#FFD700] hover:bg-[#FFD700]/5 transition-all">
-                  <Icon name="Phone" size={16} />
-                  Узнать детали
+                  className="inline-flex flex-col items-center justify-center gap-0.5 border border-[#FFD700]/40 text-[#FFD700] font-oswald font-bold px-6 py-2.5 md:py-3 uppercase tracking-wide hover:border-[#FFD700] hover:bg-[#FFD700]/5 transition-all leading-none">
+                  <span className="flex items-center gap-2 text-sm md:text-base">
+                    <Icon name="Phone" size={16} />
+                    Узнать детали
+                  </span>
+                  <span className="font-roboto font-normal normal-case text-[10px] md:text-[11px] text-[#FFD700]/70 tracking-normal mt-1">
+                    8 (800) 600-68-33 · бесплатно
+                  </span>
                 </a>
               </div>
             </Reveal>
