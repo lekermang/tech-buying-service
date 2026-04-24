@@ -90,6 +90,27 @@ function FontApplier() {
   return null;
 }
 
+function ThemeBanner({ onOpen }: { onOpen: () => void }) {
+  const { theme, saved } = useStaffTheme();
+  if (saved) {
+    return (
+      <div className="w-full py-1.5 px-3 text-center text-[11px] font-roboto font-bold"
+        style={{ background: theme.accent_color + "22", color: theme.accent_color }}>
+        ✓ Настройки темы сохранены
+      </div>
+    );
+  }
+  return (
+    <button onClick={onOpen}
+      className="w-full py-1.5 px-3 flex items-center justify-center gap-2 text-[11px] font-roboto transition-colors hover:bg-white/5"
+      style={{ background: theme.accent_color + "11", color: theme.accent_color }}>
+      <span>✨</span>
+      <span className="font-bold">Моя аниме-тема</span>
+      <span className="opacity-70 hidden sm:inline">— настроить персонажа и эффекты</span>
+    </button>
+  );
+}
+
 function StaffInner() {
   const [token, setToken] = useState(() => localStorage.getItem("employee_token") || "");
   const [loginForm, setLoginForm] = useState({ login: "", password: "" });
@@ -277,6 +298,8 @@ function StaffInner() {
       <CursorEffects />
       <AnimeMascot onOpenSettings={() => setThemeOpen(true)} />
       {themeOpen && <StaffThemeSettings onClose={() => setThemeOpen(false)} />}
+      {/* Баннер темы — самый верх */}
+      <ThemeBanner onOpen={() => setThemeOpen(true)} />
       {/* Шапка — премиальная с градиентом */}
       <div className="relative shrink-0 safe-top border-b border-[#222]">
         <div className="absolute inset-0 bg-gradient-to-br from-[#FFD700]/[0.04] via-transparent to-blue-500/[0.03] pointer-events-none" />
