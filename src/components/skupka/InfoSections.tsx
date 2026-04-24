@@ -174,7 +174,7 @@ const InfoSections = () => {
                     <span className="font-oswald font-bold text-sm uppercase text-white truncate">Кирова, 11</span>
                   </div>
                   <a
-                    href="https://yandex.ru/profile/52473097879?lang=ru"
+                    href="https://yandex.ru/profile/114124804072?lang=ru"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-1.5 shrink-0 hover:opacity-80 transition-opacity"
@@ -184,11 +184,11 @@ const InfoSections = () => {
                       <span>★</span><span>★</span><span>★</span><span>★</span><span>★</span>
                     </span>
                     <span className="font-oswald font-bold text-[#FFD700] text-sm leading-none">5.0</span>
-                    <span className="font-roboto text-white/40 text-[10px] leading-none hidden sm:inline">Яндекс</span>
+                    <span className="font-roboto text-white/50 text-[10px] leading-none">· 90+ отзывов</span>
                   </a>
                 </div>
                 <iframe
-                  src="https://yandex.ru/map-widget/v1/?z=12&ol=biz&oid=52473097879"
+                  src="https://yandex.ru/map-widget/v1/?z=12&ol=biz&oid=114124804072"
                   className="w-full h-[320px] md:h-[400px] block"
                   frameBorder="0"
                   loading="lazy"
@@ -223,7 +223,7 @@ const InfoSections = () => {
                     <span className="font-oswald font-bold text-sm uppercase text-white truncate">Кирова, 7/47</span>
                   </div>
                   <a
-                    href="https://yandex.ru/profile/114124804072?lang=ru"
+                    href="https://yandex.ru/profile/52473097879?lang=ru"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-1.5 shrink-0 hover:opacity-80 transition-opacity"
@@ -233,11 +233,11 @@ const InfoSections = () => {
                       <span>★</span><span>★</span><span>★</span><span>★</span><span>★</span>
                     </span>
                     <span className="font-oswald font-bold text-[#FFD700] text-sm leading-none">5.0</span>
-                    <span className="font-roboto text-white/40 text-[10px] leading-none hidden sm:inline">Яндекс</span>
+                    <span className="font-roboto text-white/50 text-[10px] leading-none">· 180+ отзывов</span>
                   </a>
                 </div>
                 <iframe
-                  src="https://yandex.ru/map-widget/v1/?z=12&ol=biz&oid=114124804072"
+                  src="https://yandex.ru/map-widget/v1/?z=12&ol=biz&oid=52473097879"
                   className="w-full h-[320px] md:h-[400px] block"
                   frameBorder="0"
                   loading="lazy"
