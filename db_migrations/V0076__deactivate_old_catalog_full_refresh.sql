@@ -1,0 +1,1 @@
+UPDATE t_p31606708_tech_buying_service.catalog SET is_active = FALSE;
