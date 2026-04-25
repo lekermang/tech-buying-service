@@ -83,11 +83,16 @@ const ContactsFooter = ({ scrollTo }: ContactsFooterProps) => {
                     8 800 600-68-33
                   </div>
                   <div className="flex items-center gap-3 mt-2">
-                    <a href="tel:+79929990333"
-                       onClick={(e) => { e.stopPropagation(); ymGoal(Goals.CALL_CLICK, { place: "footer_secondary" }); }}
-                       className="font-roboto text-white/60 hover:text-[#FFD700] text-xs md:text-sm transition-colors">
+                    <button type="button"
+                       onClick={(e) => {
+                         e.stopPropagation();
+                         e.preventDefault();
+                         ymGoal(Goals.CALL_CLICK, { place: "footer_secondary" });
+                         window.location.href = "tel:+79929990333";
+                       }}
+                       className="font-roboto text-white/60 hover:text-[#FFD700] text-xs md:text-sm transition-colors bg-transparent border-0 p-0 cursor-pointer">
                       или +7 (992) 999-03-33
-                    </a>
+                    </button>
                     <span className="text-[#FFD700]/30">·</span>
                     <span className="font-roboto text-white/40 text-xs md:text-sm flex items-center gap-1">
                       <Icon name="Clock" size={11} className="text-[#FFD700]/60" />
