@@ -20,6 +20,15 @@ export type Order = {
   advance: number | null; is_paid: boolean | null;
   payment_method: string | null;
   status_updated_at?: string | null;
+  // Выбранная клиентом запчасть из подбора (откуда заказывать)
+  part_id?: string | null;
+  part_name?: string | null;
+  part_quality?: string | null;
+  part_source?: string | null;     // 'stock' (МойСклад) | 'order' (Прайс)
+  part_supplier?: string | null;
+  part_code?: string | null;
+  part_category?: string | null;
+  part_supplier_price?: number | null;
 };
 
 export type DayStat = {
