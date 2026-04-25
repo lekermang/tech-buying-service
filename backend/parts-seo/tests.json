@@ -1,0 +1,18 @@
+{
+  "tests": [
+    {
+      "name": "Sitemap.xml возвращает 200",
+      "method": "GET",
+      "path": "/?action=sitemap",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Index — выдаёт список категорий",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {"ok": true},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

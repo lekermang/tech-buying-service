@@ -95,15 +95,13 @@ const InfoCatalogTradeIn = () => {
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3">
-                <a href="/catalog"
-                  className="inline-flex items-center justify-center gap-2 bg-[#FFD700] text-black font-oswald font-bold text-sm md:text-base px-6 md:px-8 py-3 md:py-4 uppercase tracking-wide hover:bg-yellow-400 active:scale-95 transition-all">
+                <a href="/catalog" className="btn-gold-premium btn-lg">
                   <Icon name="ShoppingBag" size={18} />
                   В магазин Скупка24
                   <Icon name="ArrowRight" size={16} />
                 </a>
-                <a href="tel:88006006833"
-                  className="inline-flex flex-col items-center justify-center gap-0.5 border border-[#FFD700]/40 text-[#FFD700] font-oswald font-bold px-6 py-2.5 md:py-3 uppercase tracking-wide hover:border-[#FFD700] hover:bg-[#FFD700]/5 transition-all leading-none">
-                  <span className="flex items-center gap-2 text-sm md:text-base">
+                <a href="tel:88006006833" className="btn-gold-outline btn-lg flex-col leading-none">
+                  <span className="flex items-center gap-2">
                     <Icon name="Phone" size={16} />
                     Узнать детали
                   </span>

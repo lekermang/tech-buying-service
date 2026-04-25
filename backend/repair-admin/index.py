@@ -840,7 +840,10 @@ def handler(event: dict, context) -> dict:
 
         where = ('WHERE ' + ' AND '.join(conditions)) if conditions else ''
         cur.execute(
-            f"SELECT id, name, phone, model, repair_type, price, status, admin_note, created_at, comment, purchase_amount, repair_amount, completed_at, master_income, parts_name, picked_up_at, advance, is_paid, payment_method FROM {SCHEMA}.repair_orders {where} ORDER BY created_at DESC LIMIT 500"
+            f"SELECT id, name, phone, model, repair_type, price, status, admin_note, created_at, comment, "
+            f"purchase_amount, repair_amount, completed_at, master_income, parts_name, picked_up_at, advance, is_paid, payment_method, "
+            f"part_id, part_name, part_quality, part_source, part_supplier, part_code, part_category, part_supplier_price "
+            f"FROM {SCHEMA}.repair_orders {where} ORDER BY created_at DESC LIMIT 500"
         )
         rows = cur.fetchall()
         cur.close(); conn.close()
@@ -855,6 +858,10 @@ def handler(event: dict, context) -> dict:
                 'master_income': r[13], 'parts_name': r[14],
                 'picked_up_at': r[15].isoformat() if r[15] else None,
                 'advance': r[16], 'is_paid': r[17], 'payment_method': r[18],
+                'part_id': r[19], 'part_name': r[20], 'part_quality': r[21],
+                'part_source': r[22], 'part_supplier': r[23], 'part_code': r[24],
+                'part_category': r[25],
+                'part_supplier_price': float(r[26]) if r[26] is not None else None,
             }
             for r in rows
         ]

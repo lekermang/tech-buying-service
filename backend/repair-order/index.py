@@ -919,6 +919,20 @@ def handler(event: dict, context) -> dict:
     price = body.get('price')
     comment = body.get('comment', '').strip()
 
+    # Выбранная клиентом запчасть из подбора (если есть)
+    sel = body.get('selected_part') or {}
+    part_id        = (sel.get('id') or '').strip() or None
+    part_name      = (sel.get('name') or '').strip() or None
+    part_quality   = (sel.get('quality') or '').strip() or None
+    part_source    = 'stock' if sel.get('in_stock') else ('order' if sel else None)
+    part_supplier  = 'МойСклад' if sel.get('in_stock') else ('Прайс поставщика' if sel else None)
+    part_code      = (sel.get('code') or '').strip() or None
+    part_category  = (sel.get('category') or '').strip() or None
+    try:
+        part_supplier_price = float(sel.get('supplier_price')) if sel.get('supplier_price') is not None else None
+    except (TypeError, ValueError):
+        part_supplier_price = None
+
     if not name or not phone:
         return {'statusCode': 400, 'headers': HEADERS,
                 'body': json.dumps({'error': 'Имя и телефон обязательны'}, ensure_ascii=False)}
@@ -942,9 +956,12 @@ def handler(event: dict, context) -> dict:
         client_chat_id = prow[0] if prow else None
 
         cur.execute(
-            f"INSERT INTO {SCHEMA}.repair_orders (name, phone, model, repair_type, price, comment, client_tg_chat_id) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
-            (name, phone, model or None, repair_type or None, price, comment or None, client_chat_id)
+            f"INSERT INTO {SCHEMA}.repair_orders "
+            "(name, phone, model, repair_type, price, comment, client_tg_chat_id, "
+            " part_id, part_name, part_quality, part_source, part_supplier, part_code, part_category, part_supplier_price) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+            (name, phone, model or None, repair_type or None, price, comment or None, client_chat_id,
+             part_id, part_name, part_quality, part_source, part_supplier, part_code, part_category, part_supplier_price)
         )
         order_id = cur.fetchone()[0]
         conn.commit()

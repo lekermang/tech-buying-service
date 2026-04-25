@@ -141,7 +141,7 @@ const EvaluateModal = ({ onClose }: { onClose: () => void }) => {
               </div>
               <h3 className="font-oswald text-2xl font-bold text-[#FFD700] mb-2">ЗАЯВКА ОТПРАВЛЕНА</h3>
               <p className="font-roboto text-white/60 mb-6">Перезвоним в течение 15 минут</p>
-              <button onClick={onClose} className="bg-[#FFD700] text-black font-oswald font-bold px-8 py-3 uppercase tracking-wide hover:bg-yellow-400 transition-colors">
+              <button onClick={onClose} className="btn-gold-premium btn-lg">
                 Закрыть
               </button>
             </div>
@@ -227,7 +227,7 @@ const EvaluateModal = ({ onClose }: { onClose: () => void }) => {
               )}
 
               <button type="submit" disabled={loading}
-                className="w-full bg-[#FFD700] text-black font-oswald font-bold text-lg py-4 uppercase tracking-wide hover:bg-yellow-400 active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                className="btn-gold-premium btn-xl w-full">
                 {loading ? (
                   <><Icon name="Loader" size={20} className="animate-spin" /> Отправляем...</>
                 ) : (

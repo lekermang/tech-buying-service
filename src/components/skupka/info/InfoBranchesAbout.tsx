@@ -98,7 +98,7 @@ const InfoBranchesAbout = () => {
                   href="https://yandex.ru/maps/?rtext=~54.513845,36.261215&rtt=auto&oid=52473097879"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 bg-[#FFD700] text-black font-oswald font-bold text-sm uppercase tracking-wide py-3 hover:bg-[#FFED4E] active:scale-[0.98] transition-all"
+                  className="btn-gold-premium btn-md w-full"
                 >
                   <Icon name="Navigation" size={16} />
                   Построить маршрут
@@ -147,7 +147,7 @@ const InfoBranchesAbout = () => {
                   href="https://yandex.ru/maps/?rtext=~54.510800,36.253900&rtt=auto&oid=114124804072"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 bg-[#FFD700] text-black font-oswald font-bold text-sm uppercase tracking-wide py-3 hover:bg-[#FFED4E] active:scale-[0.98] transition-all"
+                  className="btn-gold-premium btn-md w-full"
                 >
                   <Icon name="Navigation" size={16} />
                   Построить маршрут

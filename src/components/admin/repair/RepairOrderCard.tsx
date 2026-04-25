@@ -110,6 +110,44 @@ export default function RepairOrderCard({
           {o.repair_amount && <span className="text-green-400 text-[10px]">Выдано: {o.repair_amount.toLocaleString("ru-RU")} ₽</span>}
           {o.master_income && <span className="text-green-300 text-[10px]">Мастер: {o.master_income.toLocaleString("ru-RU")} ₽</span>}
         </div>
+
+        {/* Информация о выбранной запчасти — откуда заказывать */}
+        {o.part_name && (
+          <div className={`mt-2 rounded-md border px-2.5 py-1.5 text-xs font-roboto flex items-start gap-2
+            ${o.part_source === "stock"
+              ? "bg-green-500/10 border-green-500/30"
+              : "bg-[#FFD700]/10 border-[#FFD700]/30"}`}
+            onClick={e => e.stopPropagation()}>
+            <Icon
+              name={o.part_source === "stock" ? "Zap" : "Truck"}
+              size={14}
+              className={o.part_source === "stock" ? "text-green-400 mt-0.5 shrink-0" : "text-[#FFD700] mt-0.5 shrink-0"}
+            />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                <span className={`font-oswald font-bold text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm
+                  ${o.part_source === "stock"
+                    ? "bg-green-500/25 text-green-300"
+                    : "bg-[#FFD700]/25 text-[#FFD700]"}`}>
+                  {o.part_source === "stock" ? "🟢 МойСклад · в наличии" : "🟡 Прайс поставщика · под заказ"}
+                </span>
+                {o.part_quality && (
+                  <span className="font-oswald font-bold text-[10px] text-[#FFD700]">{o.part_quality}</span>
+                )}
+                {o.part_code && (
+                  <span className="font-roboto text-[10px] text-white/40">арт. {o.part_code}</span>
+                )}
+              </div>
+              <div className="text-white/85 leading-snug break-words">{o.part_name}</div>
+              <div className="flex items-center gap-3 mt-0.5 text-[10px]">
+                {o.part_category && <span className="text-white/40">📁 {o.part_category}</span>}
+                {o.part_supplier_price != null && (
+                  <span className="text-orange-400/90">закупка {o.part_supplier_price.toLocaleString("ru-RU")} ₽</span>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
         <div className="flex gap-4 mt-1 flex-wrap text-[10px] font-roboto text-white/25">
           <span>📥 Сдан: {fmt(o.created_at)}</span>
           {o.picked_up_at && <span className="text-green-400/60">📤 Забрал: {fmt(o.picked_up_at)}</span>}

@@ -35,6 +35,15 @@ export function useRepairSubmit() {
             : [form.fault, ...staticExtraLabels].filter(Boolean).join(" + "),
           price: selectedPart ? grandTotal : (staticExtraTotal > 0 ? staticExtraTotal : undefined),
           comment: form.fault,
+          // Полная информация о выбранной запчасти — чтобы Staff знал откуда заказывать
+          selected_part: selectedPart ? {
+            id: selectedPart.id,
+            name: selectedPart.name,
+            quality: selectedPart.quality,
+            category: selectedPart.category,
+            in_stock: selectedPart.in_stock,
+            supplier_price: selectedPart.supplier_price,
+          } : null,
         }),
       });
       const data = await res.json();

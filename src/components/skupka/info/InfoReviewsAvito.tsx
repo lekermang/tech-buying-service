@@ -45,7 +45,7 @@ const InfoReviewsAvito = () => {
 
         <div className="mt-8 text-center">
           <a href="https://yandex.ru/profile/52473097879?lang=ru" target="_blank" rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 bg-[#FFD700] text-black font-oswald font-bold px-6 md:px-8 py-3 md:py-4 uppercase tracking-wide hover:bg-yellow-400 active:scale-95 transition-all">
+            className="btn-gold-premium btn-lg">
             <Icon name="Star" size={16} />
             Читать все отзывы на Яндексе
             <Icon name="ArrowRight" size={16} />

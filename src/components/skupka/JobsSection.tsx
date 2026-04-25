@@ -183,7 +183,7 @@ export default function JobsSection() {
                 <button
                   type="submit"
                   disabled={sending}
-                  className="w-full bg-[#FFD700] text-black font-oswald font-bold text-base uppercase tracking-wider py-3.5 hover:bg-yellow-400 active:scale-[0.98] transition-all disabled:opacity-60"
+                  className="btn-gold-premium btn-lg w-full"
                 >
                   {sending ? "Отправляем..." : "Отправить заявку"}
                 </button>
