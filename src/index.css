@@ -50,6 +50,36 @@
     @apply bg-background text-foreground;
     font-family: "Roboto", sans-serif;
     -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeSpeed;
+    overflow-x: hidden;
+  }
+
+  html {
+    -webkit-overflow-scrolling: touch;
+    overflow-x: hidden;
+  }
+
+  /* iPhone 15 Pro Max и др. — учёт Dynamic Island и Home Indicator */
+  @supports (padding: env(safe-area-inset-top)) {
+    body {
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+  }
+
+  /* Минимальный тач-таргет 44px (Apple HIG) */
+  @media (hover: none) and (pointer: coarse) {
+    button,
+    a,
+    [role="button"] {
+      touch-action: manipulation;
+    }
+  }
+
+  /* Картинки не «прыгают» при загрузке на медленных сетях */
+  img {
+    content-visibility: auto;
   }
 
   /* Премиум глобальный скроллбар */

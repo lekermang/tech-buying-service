@@ -6,7 +6,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
+
+const Index = lazy(() => import("./pages/Index"));
 const Admin = lazy(() => import("./pages/Admin"));
 const Cabinet = lazy(() => import("./pages/Cabinet"));
 const Staff = lazy(() => import("./pages/Staff"));
@@ -31,19 +32,26 @@ const queryClient = new QueryClient({
 
 const ADMIN_URL = "https://functions.poehali.dev/a105aede-d55d-4b99-9d3e-5e977887aa04";
 
+const fetchWithTimeout = (url: string, ms: number) => {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  return fetch(url, { signal: ctrl.signal }).finally(() => clearTimeout(t));
+};
+
 const App = () => {
   useEffect(() => {
-    // Сначала применяем локальную тему мгновенно
     saveAndApplyTheme(getSavedThemeId());
-    // Затем проверяем глобальную тему с сервера
-    fetch(`${ADMIN_URL}?action=theme_get`)
-      .then(r => r.json())
-      .then(d => {
-        if (d.theme) {
-          applyTheme(d.theme);
-        }
-      })
-      .catch(() => { /* ignore */ });
+    const idle = (cb: () => void) => {
+      const w = window as unknown as { requestIdleCallback?: (cb: () => void) => void };
+      if (typeof w.requestIdleCallback === "function") w.requestIdleCallback(cb);
+      else setTimeout(cb, 1500);
+    };
+    idle(() => {
+      fetchWithTimeout(`${ADMIN_URL}?action=theme_get`, 4000)
+        .then(r => r.json())
+        .then(d => { if (d.theme) applyTheme(d.theme); })
+        .catch(() => { /* ignore */ });
+    });
   }, []);
 
   return (
