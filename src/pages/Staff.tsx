@@ -14,6 +14,7 @@ const SalesTab      = lazy(() => import("./StaffOtherTabs").then(m => ({ default
 const ClientsTab    = lazy(() => import("./StaffOtherTabs").then(m => ({ default: m.ClientsTab })));
 const AnalyticsTab  = lazy(() => import("./StaffOtherTabs").then(m => ({ default: m.AnalyticsTab })));
 const EmployeesTab  = lazy(() => import("./StaffOtherTabs").then(m => ({ default: m.EmployeesTab })));
+const VipChatTab    = lazy(() => import("./StaffVipChatTab"));
 
 class TabErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
   constructor(props: { children: ReactNode }) {
@@ -39,7 +40,7 @@ class TabErrorBoundary extends Component<{ children: ReactNode }, { error: strin
 
 const PRICE_SCHEDULER_URL = "https://functions.poehali.dev/b09271ea-c662-4225-973f-4dd4c6a0e32c";
 
-type Tab = "goods" | "sales" | "clients" | "analytics" | "employees" | "repair";
+type Tab = "goods" | "sales" | "clients" | "analytics" | "employees" | "repair" | "chat";
 
 function MskClock() {
   const [now, setNow] = useState(() => new Date());
@@ -126,6 +127,7 @@ function StaffInner() {
   const [pwError, setPwError] = useState("");
   const [unlocked, setUnlocked] = useState<Record<string, boolean>>({});
   const [themeOpen, setThemeOpen] = useState(false);
+  const [chatUnread, setChatUnread] = useState(0);
 
   useEffect(() => {
     if (!token) return;
@@ -137,6 +139,25 @@ function StaffInner() {
       })
       .catch(() => {});
   }, [token]);
+
+  // Фоновый polling счётчика непрочитанных в чате (каждые 15 сек, когда чат не открыт)
+  useEffect(() => {
+    if (!authed || !token || tab === "chat") return;
+    const VIP_URL = "https://functions.poehali.dev/f4a88e67-03e7-4387-a091-32588d90df73";
+    const fetchUnread = () => {
+      fetch(VIP_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Employee-Token": token },
+        body: JSON.stringify({ action: "poll", after_id: -1, limit: 1 }),
+      })
+        .then(r => r.json())
+        .then(d => { if (typeof d.unread === "number") setChatUnread(d.unread); })
+        .catch(() => {});
+    };
+    fetchUnread();
+    const t = setInterval(fetchUnread, 15000);
+    return () => clearInterval(t);
+  }, [authed, token, tab]);
 
   const [loginLoading, setLoginLoading] = useState(false);
 
@@ -277,6 +298,7 @@ function StaffInner() {
 
   const TABS = [
     { k: "repair",    l: "Ремонт",    icon: "Wrench" },
+    { k: "chat",      l: "Чат",       icon: "MessageCircle", badge: chatUnread },
     { k: "clients",   l: "Клиенты",   icon: "Users" },
     { k: "analytics", l: "Статистика",icon: "BarChart2" },
     ...(isOwnerOrAdmin ? [{ k: "gold", l: "Золото", icon: "Gem" }] : []),
@@ -366,6 +388,7 @@ function StaffInner() {
             {tab === "analytics" && <AnalyticsTab token={token} />}
             {tab === "gold"      && isOwnerOrAdmin && <GoldTab token={token} />}
             {tab === "employees" && isOwnerOrAdmin && <EmployeesTab token={token} myRole={empRole} />}
+            {tab === "chat"      && <VipChatTab token={token} onUnread={setChatUnread} />}
           </React.Suspense>
         </TabErrorBoundary>
       </div>
@@ -398,6 +421,11 @@ function StaffInner() {
                     <Icon name={t.icon} size={20} />
                     {locked && (
                       <span className="absolute -top-1.5 -right-2 text-[9px] bg-[#0A0A0A] rounded-full px-0.5">🔒</span>
+                    )}
+                    {("badge" in t) && typeof t.badge === "number" && t.badge > 0 && (
+                      <span className="absolute -top-2 -right-2 min-w-[16px] h-[16px] px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center animate-pulse">
+                        {t.badge > 99 ? "99+" : t.badge}
+                      </span>
                     )}
                   </div>
                   <span className={`font-roboto text-[9px] leading-none tracking-wide transition-all ${active ? "font-bold" : "font-normal"}`}>
