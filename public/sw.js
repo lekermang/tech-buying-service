@@ -195,8 +195,15 @@ self.addEventListener('notificationclick', e => {
   const targetUrl = (e.notification.data?.url) || '/dzchat';
   e.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      // Для vip-чата ищем /staff, для dzchat — /dzchat
+      const matchPath = targetUrl.includes('/staff') ? '/staff' : '/dzchat';
       for (const c of list) {
-        if (c.url.includes('/dzchat') && 'focus' in c) { c.focus(); return; }
+        if (c.url.includes(matchPath) && 'focus' in c) {
+          c.focus();
+          // Постмесседжом просим страницу открыть нужную вкладку
+          c.postMessage({ type: 'OPEN_TAB', tab: targetUrl.includes('tab=chat') ? 'chat' : null });
+          return;
+        }
       }
       return clients.openWindow(targetUrl);
     })
@@ -205,21 +212,32 @@ self.addEventListener('notificationclick', e => {
 
 // ── Входящий Web Push (когда страница закрыта) ────────────────────────────────
 self.addEventListener('push', e => {
-  let data = { title: 'DzChat', body: 'Новое сообщение' };
+  let data = { title: 'Скупка24', body: 'Новое сообщение' };
   if (e.data) {
     try { data = { ...data, ...e.data.json() }; }
     catch(_) { data.body = e.data.text(); }
   }
-  e.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: ICON,
-      badge: ICON,
-      vibrate: [200, 100, 200],
-      tag: `dzchat-push-${data.chat_id || 'new'}`,
-      renotify: true,
-      silent: false,
-      data: { url: data.url || '/dzchat', chatId: data.chat_id }
-    })
-  );
+
+  const isVip = data.tag === 'vip-chat' || (data.url || '').includes('/staff');
+  const tag = isVip ? `vip-chat-${data.msg_id || 'new'}` : `dzchat-push-${data.chat_id || 'new'}`;
+
+  const options = {
+    body: data.body,
+    icon: ICON,
+    badge: ICON,
+    vibrate: [200, 100, 200],
+    tag,
+    renotify: true,
+    silent: false,
+    data: {
+      url: data.url || (isVip ? '/staff?tab=chat' : '/dzchat'),
+      chatId: data.chat_id,
+      msgId: data.msg_id,
+    },
+  };
+  if (isVip && data.photo) {
+    options.image = data.photo;
+  }
+
+  e.waitUntil(self.registration.showNotification(data.title, options));
 });

@@ -2,13 +2,15 @@
 Чат «СКУПКА24Vip» для сотрудников.
 
 Действия (POST с action в JSON):
-  - poll          : получить новые сообщения + список участников + счётчик непрочитанных
-                    (одновременно обновляет last_seen_at сотрудника)
-  - send          : отправить сообщение (text и/или photo_url)
-  - upload_photo  : загрузить фото в S3 (base64), возвращает CDN URL
-  - mark_read     : отметить последнее прочитанное сообщение
-  - update_avatar : обновить avatar_url своего профиля
-  - admin_set_avatar : (admin/owner) обновить avatar_url любого сотрудника
+  - poll              : получить новые сообщения + список участников + счётчик непрочитанных
+  - send              : отправить сообщение (text и/или photo_url) + push всем кроме автора
+  - upload_photo      : загрузить фото в S3 (base64), возвращает CDN URL
+  - mark_read         : отметить последнее прочитанное сообщение
+  - update_avatar     : обновить avatar_url своего профиля
+  - admin_set_avatar  : (admin/owner) обновить avatar_url любого сотрудника
+  - vapid_public      : вернуть VAPID public key (без авторизации не требует, но проверяет токен)
+  - push_subscribe    : сохранить web push подписку браузера
+  - push_unsubscribe  : удалить web push подписку
 """
 import base64
 import json
@@ -17,6 +19,12 @@ import uuid
 import psycopg2
 import boto3
 from botocore.client import Config as BotoConfig
+
+try:
+    from pywebpush import webpush, WebPushException  # type: ignore
+    HAS_WEBPUSH = True
+except Exception:
+    HAS_WEBPUSH = False
 
 SCHEMA = 't_p31606708_tech_buying_service'
 
@@ -99,7 +107,7 @@ def _err(msg: str, code: int = 400) -> dict:
 
 
 def handler(event: dict, context) -> dict:
-    """Чат «СКУПКА24Vip»: групповая переписка сотрудников + загрузка фото в S3 + онлайн-статусы."""
+    """Чат «СКУПКА24Vip»: групповая переписка сотрудников + загрузка фото в S3 + онлайн-статусы + Web Push."""
     if event.get('httpMethod') == 'OPTIONS':
         return {'statusCode': 200, 'headers': CORS, 'body': ''}
 
@@ -113,6 +121,13 @@ def handler(event: dict, context) -> dict:
     except Exception:
         body = {}
     action = body.get('action', 'poll')
+
+    if action == 'vapid_public':
+        return _ok({'public_key': os.environ.get('VAPID_PUBLIC_KEY', '')})
+    if action == 'push_subscribe':
+        return _action_push_subscribe(me, body)
+    if action == 'push_unsubscribe':
+        return _action_push_unsubscribe(me, body)
 
     if action == 'poll':
         return _action_poll(me, body)
@@ -240,12 +255,28 @@ def _action_send(me: dict, body: dict) -> dict:
         """)
         _touch_last_seen(cur, me['id'])
         conn.commit()
-        return _ok({'ok': True, 'id': new_id, 'created_at': created_at.isoformat()})
     except Exception as e:
         conn.rollback()
-        return _err(f'send failed: {e}', 500)
-    finally:
         cur.close(); conn.close()
+        return _err(f'send failed: {e}', 500)
+    cur.close(); conn.close()
+
+    # Рассылка push всем подписанным сотрудникам, кроме автора
+    preview = text[:120] if text else ('📷 Фото' if photo_url else 'Новое сообщение')
+    payload = {
+        'title': f"{me['full_name']} · СКУПКА24Vip",
+        'body': preview,
+        'url': '/staff?tab=chat',
+        'tag': 'vip-chat',
+        'photo': photo_url,
+        'msg_id': new_id,
+    }
+    try:
+        _send_push_to_all_except(me['id'], payload)
+    except Exception:
+        pass
+
+    return _ok({'ok': True, 'id': new_id, 'created_at': created_at.isoformat()})
 
 
 def _action_upload_photo(me: dict, body: dict) -> dict:
@@ -343,3 +374,116 @@ def _action_admin_set_avatar(me: dict, body: dict) -> dict:
         return _err(f'admin_set_avatar failed: {e}', 500)
     finally:
         cur.close(); conn.close()
+
+
+# ─── Web Push ──────────────────────────────────────────────────────────────────
+
+def _action_push_subscribe(me: dict, body: dict) -> dict:
+    """Сохранить web push подписку браузера сотрудника."""
+    sub = body.get('subscription') or {}
+    endpoint = (sub.get('endpoint') or '').strip()
+    keys = sub.get('keys') or {}
+    p256dh = (keys.get('p256dh') or '').strip()
+    auth = (keys.get('auth') or '').strip()
+    user_agent = (body.get('user_agent') or '')[:500]
+    if not endpoint or not p256dh or not auth:
+        return _err('Нужны endpoint и keys.{p256dh,auth}')
+
+    conn = _connect()
+    cur = conn.cursor()
+    try:
+        cur.execute(f"""
+            INSERT INTO {SCHEMA}.vip_chat_push_subs (employee_id, endpoint, p256dh, auth, user_agent, updated_at)
+            VALUES (%s, %s, %s, %s, %s, NOW())
+            ON CONFLICT (endpoint) DO UPDATE SET
+                employee_id = EXCLUDED.employee_id,
+                p256dh = EXCLUDED.p256dh,
+                auth   = EXCLUDED.auth,
+                user_agent = EXCLUDED.user_agent,
+                updated_at = NOW()
+        """, (me['id'], endpoint, p256dh, auth, user_agent))
+        conn.commit()
+        return _ok({'ok': True})
+    except Exception as e:
+        conn.rollback()
+        return _err(f'push_subscribe failed: {e}', 500)
+    finally:
+        cur.close(); conn.close()
+
+
+def _action_push_unsubscribe(me: dict, body: dict) -> dict:
+    """Удалить подписку (логически — переводим на UPDATE на NULL endpoint)."""
+    endpoint = (body.get('endpoint') or '').strip()
+    if not endpoint:
+        return _err('endpoint обязателен')
+    conn = _connect()
+    cur = conn.cursor()
+    try:
+        # «Тушим» — затираем p256dh/auth, чтобы не получать на эту подписку
+        cur.execute(f"""
+            UPDATE {SCHEMA}.vip_chat_push_subs
+               SET p256dh = '', auth = '', updated_at = NOW()
+             WHERE endpoint = %s AND employee_id = %s
+        """, (endpoint, me['id']))
+        conn.commit()
+        return _ok({'ok': True})
+    except Exception as e:
+        conn.rollback()
+        return _err(f'push_unsubscribe failed: {e}', 500)
+    finally:
+        cur.close(); conn.close()
+
+
+def _send_push_to_all_except(author_id: int, payload: dict) -> int:
+    """Рассылает push всем подписанным сотрудникам, кроме автора. Возвращает кол-во успешных доставок."""
+    if not HAS_WEBPUSH:
+        return 0
+    private_key = os.environ.get('VAPID_PRIVATE_KEY', '')
+    public_key = os.environ.get('VAPID_PUBLIC_KEY', '')
+    if not private_key or not public_key:
+        return 0
+
+    vapid_claims = {'sub': 'mailto:lekermany@yandex.ru'}
+
+    conn = _connect()
+    cur = conn.cursor()
+    sent = 0
+    dead_endpoints: list[str] = []
+    try:
+        cur.execute(f"""
+            SELECT endpoint, p256dh, auth FROM {SCHEMA}.vip_chat_push_subs
+             WHERE employee_id <> %s AND p256dh <> '' AND auth <> ''
+        """, (author_id,))
+        rows = cur.fetchall()
+        body_str = json.dumps(payload, ensure_ascii=False)
+        for endpoint, p256dh, auth in rows:
+            try:
+                webpush(
+                    subscription_info={
+                        'endpoint': endpoint,
+                        'keys': {'p256dh': p256dh, 'auth': auth},
+                    },
+                    data=body_str,
+                    vapid_private_key=private_key,
+                    vapid_claims=vapid_claims,
+                    timeout=8,
+                )
+                sent += 1
+            except WebPushException as e:
+                code = getattr(e.response, 'status_code', 0) if e.response else 0
+                if code in (404, 410):
+                    dead_endpoints.append(endpoint)
+            except Exception:
+                pass
+        # Чистим протухшие подписки
+        if dead_endpoints:
+            cur.executemany(
+                f"UPDATE {SCHEMA}.vip_chat_push_subs SET p256dh='', auth='', updated_at=NOW() WHERE endpoint=%s",
+                [(e,) for e in dead_endpoints]
+            )
+            conn.commit()
+    except Exception:
+        pass
+    finally:
+        cur.close(); conn.close()
+    return sent

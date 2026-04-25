@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import Icon from "@/components/ui/icon";
+import {
+  isPushSupported, vipChatPushState, enableVipChatPush, disableVipChatPush,
+} from "@/lib/vipChatPush";
 
 const VIP_CHAT_URL = "https://functions.poehali.dev/f4a88e67-03e7-4387-a091-32588d90df73";
 const POLL_INTERVAL_MS = 4000;
@@ -88,6 +91,13 @@ export default function StaffVipChatTab({ token, onUnread }: Props) {
   const [showMembers, setShowMembers] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Web Push
+  const [pushSupported, setPushSupported] = useState(false);
+  const [pushSubscribed, setPushSubscribed] = useState(false);
+  const [pushPermission, setPushPermission] = useState<NotificationPermission>("default");
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushHint, setPushHint] = useState<string | null>(null);
+
   const listRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const lastIdRef = useRef(0);
@@ -158,6 +168,40 @@ export default function StaffVipChatTab({ token, onUnread }: Props) {
     const t = setInterval(poll, POLL_INTERVAL_MS);
     return () => clearInterval(t);
   }, [poll]);
+
+  // Стартовое состояние Web Push
+  useEffect(() => {
+    setPushSupported(isPushSupported());
+    vipChatPushState().then(s => {
+      setPushSubscribed(s.subscribed);
+      setPushPermission(s.permission);
+    });
+  }, []);
+
+  const togglePush = async () => {
+    if (pushBusy) return;
+    setPushBusy(true);
+    setPushHint(null);
+    try {
+      if (pushSubscribed) {
+        await disableVipChatPush(token);
+        setPushSubscribed(false);
+        setPushHint("Уведомления отключены");
+      } else {
+        const res = await enableVipChatPush(token);
+        if (res.ok) {
+          setPushSubscribed(true);
+          setPushPermission("granted");
+          setPushHint("✓ Уведомления включены");
+        } else {
+          setPushHint(res.error || "Не удалось включить");
+        }
+      }
+    } finally {
+      setPushBusy(false);
+      setTimeout(() => setPushHint(null), 4000);
+    }
+  };
 
   // Отметка о прочтении при просмотре
   useEffect(() => {
@@ -311,12 +355,46 @@ export default function StaffVipChatTab({ token, onUnread }: Props) {
               </div>
             </div>
           </div>
-          {unread > 0 && (
-            <span className="font-oswald font-bold text-[10px] bg-red-500 text-white px-2 py-0.5 rounded-full animate-pulse">
-              +{unread}
-            </span>
-          )}
+          <div className="flex items-center gap-2 shrink-0">
+            {pushSupported && (
+              <button
+                onClick={togglePush}
+                disabled={pushBusy || pushPermission === "denied"}
+                title={
+                  pushPermission === "denied"
+                    ? "Уведомления заблокированы — разблокируйте в настройках браузера"
+                    : pushSubscribed
+                      ? "Отключить уведомления"
+                      : "Включить браузерные уведомления о новых сообщениях"
+                }
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-[10px] font-roboto font-bold uppercase tracking-wide transition-all
+                  ${pushSubscribed
+                    ? "bg-green-500/15 border-green-500/40 text-green-400 hover:bg-green-500/25"
+                    : pushPermission === "denied"
+                      ? "bg-red-500/10 border-red-500/30 text-red-400/70 cursor-not-allowed"
+                      : "bg-[#FFD700]/10 border-[#FFD700]/30 text-[#FFD700] hover:bg-[#FFD700]/20"}
+                  ${pushBusy ? "opacity-60" : ""}`}>
+                <Icon name={pushBusy ? "Loader" : pushSubscribed ? "BellRing" : "BellOff"}
+                  size={12} className={pushBusy ? "animate-spin" : ""} />
+                <span className="hidden sm:inline">
+                  {pushBusy ? "..." : pushSubscribed ? "Уведомления вкл" : pushPermission === "denied" ? "Заблокированы" : "Уведомления"}
+                </span>
+              </button>
+            )}
+            {unread > 0 && (
+              <span className="font-oswald font-bold text-[10px] bg-red-500 text-white px-2 py-0.5 rounded-full animate-pulse">
+                +{unread}
+              </span>
+            )}
+          </div>
         </header>
+
+        {/* Hint про push */}
+        {pushHint && (
+          <div className="px-4 py-1.5 text-center text-[11px] font-roboto bg-[#FFD700]/8 text-[#FFD700]/80 border-b border-[#FFD700]/10">
+            {pushHint}
+          </div>
+        )}
 
         {/* Лента сообщений */}
         <div ref={listRef} className="flex-1 overflow-y-auto px-3 py-3 space-y-3 scrollbar-premium">
