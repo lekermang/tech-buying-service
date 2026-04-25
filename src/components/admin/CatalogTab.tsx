@@ -5,6 +5,7 @@ import { adminHeaders } from "@/lib/adminFetch";
 const TG_PARSER_URL = "https://functions.poehali.dev/2e98b33f-0f6a-4bc3-9c93-6bbb80277fac";
 const TG_AUTO_SYNC_URL = "https://functions.poehali.dev/79437e4a-387b-4d66-952b-a6e8e8d627a2";
 const PHOTOS_URL = "https://functions.poehali.dev/76998fa9-f1f9-4986-8449-ecfe56cc3ee8";
+const PRICE_SCHEDULER_URL = "https://functions.poehali.dev/b09271ea-c662-4225-973f-4dd4c6a0e32c";
 const AUTO_INTERVAL = 5 * 60; // 5 минут
 
 type CatalogItem = {
@@ -296,6 +297,12 @@ export default function CatalogTab({ token }: { token: string }) {
   const [lastRun, setLastRun] = useState<string | null>(() => localStorage.getItem("tg_parser_last_run"));
   const [nextRun, setNextRun] = useState<number>(AUTO_INTERVAL);
   const [autoEnabled, setAutoEnabled] = useState(() => localStorage.getItem("tg_parser_auto") === "1");
+  const [publishing, setPublishing] = useState(false);
+  const [publishResult, setPublishResult] = useState<{
+    sent?: boolean; categories?: number; items?: number;
+    edited?: number; new_messages?: number; reason?: string; error?: string;
+  } | null>(null);
+  const [publishedAt, setPublishedAt] = useState<string | null>(() => localStorage.getItem("tg_price_published_at"));
 
   const runParser = useCallback(async () => {
     setRunning(true);
@@ -332,6 +339,27 @@ export default function CatalogTab({ token }: { token: string }) {
     setAutoEnabled(next);
     localStorage.setItem("tg_parser_auto", next ? "1" : "0");
     if (next) setNextRun(AUTO_INTERVAL);
+  };
+
+  const publishPrice = async () => {
+    setPublishing(true);
+    setPublishResult(null);
+    try {
+      const res = await fetch(`${PRICE_SCHEDULER_URL}?action=send_now`, {
+        headers: { ...adminHeaders(token) },
+      });
+      const data = await res.json();
+      setPublishResult(data);
+      if (data?.sent) {
+        const now = new Date().toLocaleString("ru-RU");
+        setPublishedAt(now);
+        localStorage.setItem("tg_price_published_at", now);
+      }
+    } catch (e) {
+      setPublishResult({ error: e instanceof Error ? e.message : "Ошибка" });
+    } finally {
+      setPublishing(false);
+    }
   };
 
   const setupWebhook = async () => {
@@ -443,6 +471,53 @@ export default function CatalogTab({ token }: { token: string }) {
               )}
             </div>
           )}
+
+          <div className="bg-[#1A1A1A] border border-[#2A2A2A] p-4 mb-4">
+            <div className="flex items-center gap-2 mb-1">
+              <Icon name="Send" size={14} className="text-[#FFD700]" />
+              <span className="font-oswald font-bold text-white uppercase text-sm tracking-wide">Прайс в Telegram-канале</span>
+            </div>
+            <p className="font-roboto text-white/40 text-xs mb-4">
+              Обновляет существующие сообщения с прайсом в канале. Новых постов не публикует — подписчикам не приходит спам.
+            </p>
+
+            <button onClick={publishPrice} disabled={publishing}
+              className="w-full bg-[#FFD700] text-black font-oswald font-bold py-2.5 uppercase tracking-wide hover:bg-yellow-400 transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
+              {publishing
+                ? <><Icon name="Loader" size={15} className="animate-spin" /> Обновляю...</>
+                : <><Icon name="Send" size={14} /> Обновить прайс в канале</>}
+            </button>
+
+            {publishedAt && (
+              <div className="font-roboto text-white/30 text-[10px] mt-3">
+                Последнее обновление: {publishedAt}
+              </div>
+            )}
+
+            {publishResult && (
+              <div className="mt-3 pt-3 border-t border-[#2A2A2A]">
+                {publishResult.error || publishResult.reason ? (
+                  <div className="font-roboto text-red-400 text-xs">
+                    {publishResult.error || (publishResult.reason === "catalog_empty" ? "Каталог пуст" : publishResult.reason)}
+                  </div>
+                ) : publishResult.sent ? (
+                  <div className="grid grid-cols-4 gap-2">
+                    {[
+                      { label: "Категорий", val: publishResult.categories ?? 0, color: "text-white" },
+                      { label: "Товаров", val: publishResult.items ?? 0, color: "text-white" },
+                      { label: "Обновлено", val: publishResult.edited ?? 0, color: "text-yellow-400" },
+                      { label: "Новых", val: publishResult.new_messages ?? 0, color: "text-green-400" },
+                    ].map((s) => (
+                      <div key={s.label} className="text-center">
+                        <div className={`font-oswald font-bold text-xl ${s.color}`}>{s.val}</div>
+                        <div className="font-roboto text-white/30 text-[10px]">{s.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
 
           <div className="bg-[#1A1A1A] border border-[#2A2A2A] p-3">
             <div className="font-roboto text-white/30 text-[10px] uppercase tracking-wide mb-2">Как работает</div>
