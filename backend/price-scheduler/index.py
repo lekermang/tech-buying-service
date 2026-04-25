@@ -271,6 +271,112 @@ def send_tg_message(chat_id, text, reply_markup=None):
         raise ValueError(f'Telegram API {e.code}: {body}')
 
 
+def edit_tg_message(chat_id, message_id, text, reply_markup=None):
+    """Редактирует существующее сообщение. Возвращает (ok, error_str).
+    error_str = 'not_modified' | 'not_found' | прочие тексты."""
+    token = os.environ.get('CATALOG_BOT_TOKEN', '')
+    if not token:
+        return False, 'no_token'
+
+    payload_dict = {
+        'chat_id': chat_id,
+        'message_id': message_id,
+        'text': text,
+        'parse_mode': 'HTML',
+        'disable_web_page_preview': True,
+    }
+    if reply_markup:
+        payload_dict['reply_markup'] = reply_markup
+
+    url = 'https://api.telegram.org/bot' + token + '/editMessageText'
+    payload = json.dumps(payload_dict).encode('utf-8')
+    req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'})
+    try:
+        urllib.request.urlopen(req, timeout=15).read()
+        return True, None
+    except urllib.error.HTTPError as e:
+        body = e.read().decode('utf-8', errors='replace').lower()
+        if 'not modified' in body:
+            return True, 'not_modified'
+        if 'message to edit not found' in body or 'message_id_invalid' in body or 'message can\'t be edited' in body:
+            return False, 'not_found'
+        return False, body[:200]
+    except Exception as e:
+        return False, str(e)[:200]
+
+
+def get_pinned_message_id(chat_id, kind, category=''):
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute(
+            f"SELECT message_id FROM {SCHEMA}.tg_pinned_messages "
+            f"WHERE chat_id=%s AND kind=%s AND category=%s LIMIT 1",
+            (str(chat_id), kind, category)
+        )
+        row = cur.fetchone()
+        cur.close()
+        conn.close()
+        return int(row[0]) if row else None
+    except Exception:
+        return None
+
+
+def save_pinned_message_id(chat_id, kind, message_id, category=''):
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.tg_pinned_messages (chat_id, kind, category, message_id, updated_at) "
+            f"VALUES (%s,%s,%s,%s,NOW()) "
+            f"ON CONFLICT (chat_id, kind, category) DO UPDATE SET "
+            f"message_id=EXCLUDED.message_id, updated_at=NOW()",
+            (str(chat_id), kind, category, int(message_id))
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception:
+        pass
+
+
+def delete_pinned_message_id(chat_id, kind, category=''):
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute(
+            f"DELETE FROM {SCHEMA}.tg_pinned_messages "
+            f"WHERE chat_id=%s AND kind=%s AND category=%s",
+            (str(chat_id), kind, category)
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception:
+        pass
+
+
+def upsert_tg_message(chat_id, kind, text, reply_markup=None, category=''):
+    """Если message_id есть — редактирует. Если нет / 'not_found' — отправляет новое.
+    Возвращает message_id или None."""
+    existing_id = get_pinned_message_id(chat_id, kind, category)
+    if existing_id:
+        ok_edit, err_str = edit_tg_message(chat_id, existing_id, text, reply_markup)
+        if ok_edit:
+            return existing_id
+        if err_str == 'not_found':
+            delete_pinned_message_id(chat_id, kind, category)
+        else:
+            # прочие ошибки — пробуем переотправить
+            delete_pinned_message_id(chat_id, kind, category)
+
+    result = send_tg_message(chat_id, text, reply_markup=reply_markup)
+    msg_id = result.get('result', {}).get('message_id')
+    if msg_id:
+        save_pinned_message_id(chat_id, kind, msg_id, category)
+    return msg_id
+
+
 def format_price_messages(items):
     if not items:
         return []
@@ -321,13 +427,15 @@ def get_channel_username():
 
 
 def do_send_price(chat_id):
+    """Обновляет прайс в Telegram БЕЗ спама: редактирует существующие сообщения по категориям.
+    Если сообщения нет (первый запуск или удалили) — отправляет новое и сохраняет message_id."""
     items = get_catalog()
     if not items:
         return {'sent': False, 'reason': 'catalog_empty'}
 
     markup = get_price_markup()
     now_msk = datetime.now(MSK)
-    date_str = now_msk.strftime('%d.%m.%Y')
+    date_str = now_msk.strftime('%d.%m.%Y %H:%M')
 
     by_cat = {}
     for it in items:
@@ -336,16 +444,31 @@ def do_send_price(chat_id):
 
     channel_username = get_channel_username()
 
-    # Отправляем каждую категорию отдельным сообщением, запоминаем message_id
+    # Обновляем (или создаём) сообщение для каждой категории
     cat_message_ids = {}
+    edited_count = 0
+    sent_count = 0
     for cat, cat_items in by_cat.items():
         text, order_button = format_category_message(cat, cat_items, date_str, markup)
+        existing_id = get_pinned_message_id(chat_id, 'category', cat)
+        if existing_id:
+            ok_edit, err_str = edit_tg_message(chat_id, existing_id, text, order_button)
+            if ok_edit:
+                cat_message_ids[cat] = existing_id
+                if err_str != 'not_modified':
+                    edited_count += 1
+                continue
+            # сообщение пропало — удалим запись и пошлём заново
+            delete_pinned_message_id(chat_id, 'category', cat)
+
         result = send_tg_message(chat_id, text, reply_markup=order_button)
         msg_id = result.get('result', {}).get('message_id')
         if msg_id:
+            save_pinned_message_id(chat_id, 'category', msg_id, cat)
             cat_message_ids[cat] = msg_id
+            sent_count += 1
 
-    # Формируем inline-кнопки навигации (2 в ряд)
+    # Меню навигации (2 кнопки в ряд)
     cats = list(cat_message_ids.keys())
     keyboard_rows = []
     for i in range(0, len(cats), 2):
@@ -355,22 +478,26 @@ def do_send_price(chat_id):
             if channel_username:
                 url = f'https://t.me/{channel_username}/{mid}'
             else:
-                # Для приватных групп используем tg://
                 cid = str(chat_id).replace('-100', '')
                 url = f'https://t.me/c/{cid}/{mid}'
             row.append({'text': cat, 'url': url})
         keyboard_rows.append(row)
 
-    now_msk = datetime.now(MSK)
     menu_text = (
         f'📲 <b>Прайс-лист Скупки24</b>\n'
         f'Обновлён: {date_str}\n\n'
         f'Выбери категорию 👇'
     )
-    reply_markup = {'inline_keyboard': keyboard_rows}
-    send_tg_message(chat_id, menu_text, reply_markup=reply_markup)
+    menu_markup = {'inline_keyboard': keyboard_rows}
+    upsert_tg_message(chat_id, 'menu', menu_text, reply_markup=menu_markup, category='')
 
-    return {'sent': True, 'categories': len(by_cat), 'items': len(items)}
+    return {
+        'sent': True,
+        'categories': len(by_cat),
+        'items': len(items),
+        'edited': edited_count,
+        'new_messages': sent_count,
+    }
 
 
 def check_tools_synced_today():
