@@ -22,7 +22,7 @@ const InfoBranchesAbout = () => {
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
             {BRANCHES.map((b, i) => (
-              <Reveal key={b.city} delay={(i) as 0|1|2|3|4|5}>
+              <Reveal key={`${b.city}-${b.addr}`} delay={(i) as 0|1|2|3|4|5}>
               <div className="border border-[#FFD700]/20 p-6 hover:border-[#FFD700]/60 transition-colors group relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-1 h-0 group-hover:h-full bg-[#FFD700] transition-all duration-300" />
                 <div className="flex items-start justify-between mb-4">
@@ -95,7 +95,7 @@ const InfoBranchesAbout = () => {
                   </span>
                 </div>
                 <a
-                  href="https://yandex.ru/maps/?rtext=~54.513845,36.261215&rtt=auto&oid=52473097879"
+                  href="https://yandex.ru/maps/?rtext=~54.513845,36.261215&rtt=auto&oid=114124804072"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn-gold-premium btn-md w-full"
@@ -144,7 +144,7 @@ const InfoBranchesAbout = () => {
                   </span>
                 </div>
                 <a
-                  href="https://yandex.ru/maps/?rtext=~54.510800,36.253900&rtt=auto&oid=114124804072"
+                  href="https://yandex.ru/maps/?rtext=~54.510800,36.253900&rtt=auto&oid=52473097879"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn-gold-premium btn-md w-full"

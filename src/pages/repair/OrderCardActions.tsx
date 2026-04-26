@@ -72,7 +72,8 @@ export default function OrderCardActions({
         headers: { "Content-Type": "application/json", [authHeader]: token },
         body: JSON.stringify({ action: "send_act", id: o.id }),
       });
-      const data = await res.json();
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json().catch(() => ({}));
       if (data.ok) { setActSent(true); setTimeout(() => setActSent(false), 3000); }
     } catch (_e) { /* ignore */ }
     setActSending(false);
@@ -87,8 +88,12 @@ export default function OrderCardActions({
         headers: { "Content-Type": "application/json", [authHeader]: token },
         body: JSON.stringify({ action: "notify", order_id: o.id, status_key: statusKey }),
       });
-      const data = await res.json();
-      if (!data.ok) setNotifyError(data.error || "Ошибка отправки");
+      if (!res.ok) {
+        setNotifyError(`Ошибка сервера (${res.status})`);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        if (!data.ok) setNotifyError(data.error || "Ошибка отправки");
+      }
     } catch {
       setNotifyError("Ошибка соединения");
     }
@@ -104,8 +109,12 @@ export default function OrderCardActions({
         headers: { "Content-Type": "application/json", [authHeader]: token },
         body: JSON.stringify({ action: "notify_sms", order_id: o.id, status_key: statusKey }),
       });
-      const data = await res.json();
-      if (!data.ok) setSmsError(data.error || "Ошибка SMS");
+      if (!res.ok) {
+        setSmsError(`Ошибка сервера (${res.status})`);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        if (!data.ok) setSmsError(data.error || "Ошибка SMS");
+      }
     } catch {
       setSmsError("Ошибка соединения");
     }
