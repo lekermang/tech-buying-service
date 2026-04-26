@@ -3,7 +3,10 @@ import os
 import re
 from datetime import datetime, timedelta, timezone
 
+import psycopg2
 import requests
+
+CACHE_TTL_SECONDS = 60
 
 BASE = 'https://online.smartlombard.ru'
 LOGIN_URL = f'{BASE}/login/auth'
@@ -19,15 +22,18 @@ HEADERS = {
 SCHEMA = 't_p31606708_tech_buying_service'
 
 
+def _get_conn():
+    return psycopg2.connect(os.environ['DATABASE_URL'])
+
+
 def _check_token(event: dict) -> bool:
     headers = {k.lower(): v for k, v in (event.get('headers') or {}).items()}
     token = headers.get('x-employee-token', '')
     if not token:
         return False
     try:
-        import psycopg2
         token_safe = token.replace("'", "''")
-        conn = psycopg2.connect(os.environ['DATABASE_URL'])
+        conn = _get_conn()
         cur = conn.cursor()
         cur.execute(
             f"SELECT role FROM {SCHEMA}.employees WHERE auth_token='{token_safe}' AND token_expires_at>NOW() AND is_active=true"
@@ -39,6 +45,45 @@ def _check_token(event: dict) -> bool:
         return row[0] in ('owner', 'admin')
     except Exception:
         return False
+
+
+def _cache_get(key: str) -> dict | None:
+    try:
+        key_safe = key.replace("'", "''")
+        conn = _get_conn()
+        cur = conn.cursor()
+        cur.execute(
+            f"SELECT payload, EXTRACT(EPOCH FROM (NOW() - updated_at)) FROM {SCHEMA}.smartlombard_cache WHERE cache_key='{key_safe}'"
+        )
+        row = cur.fetchone()
+        cur.close(); conn.close()
+        if not row:
+            return None
+        payload, age = row
+        if age is None or float(age) > CACHE_TTL_SECONDS:
+            return None
+        if isinstance(payload, str):
+            return json.loads(payload)
+        return payload
+    except Exception:
+        return None
+
+
+def _cache_set(key: str, data: dict) -> None:
+    try:
+        key_safe = key.replace("'", "''")
+        payload_safe = json.dumps(data, ensure_ascii=False).replace("'", "''")
+        conn = _get_conn()
+        cur = conn.cursor()
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.smartlombard_cache (cache_key, payload, updated_at) "
+            f"VALUES ('{key_safe}', '{payload_safe}'::jsonb, NOW()) "
+            f"ON CONFLICT (cache_key) DO UPDATE SET payload=EXCLUDED.payload, updated_at=NOW()"
+        )
+        conn.commit()
+        cur.close(); conn.close()
+    except Exception:
+        pass
 
 
 def _msk_today_str() -> str:
@@ -164,6 +209,15 @@ def handler(event: dict, context) -> dict:
     date_from = _parse_date_param(params.get('date_from') or params.get('date') or '')
     date_to = _parse_date_param(params.get('date_to') or params.get('date') or '') if (params.get('date_to') or params.get('date')) else date_from
 
+    nocache = (params.get('nocache') or '').lower() in ('1', 'true', 'yes')
+    cache_key = f'{date_from}__{date_to}'
+
+    if not nocache:
+        cached = _cache_get(cache_key)
+        if cached is not None:
+            cached['cached'] = True
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps(cached, ensure_ascii=False)}
+
     session = requests.Session()
     login_res = _login(session)
     if not login_res.get('ok'):
@@ -176,15 +230,18 @@ def handler(event: dict, context) -> dict:
                 'body': json.dumps({'error': ops.get('error', 'ops failed')}, ensure_ascii=False)}
 
     data = ops['data']
+    payload = {
+        'date_from': date_from,
+        'date_to': date_to,
+        'income': data['income'],
+        'expense': data['expense'],
+        'period_income': data['period_income'],
+        'period_costs': data['period_costs'],
+        'period_profit': data['period_profit'],
+    }
+    _cache_set(cache_key, payload)
+    payload['cached'] = False
     return {
         'statusCode': 200, 'headers': HEADERS,
-        'body': json.dumps({
-            'date_from': date_from,
-            'date_to': date_to,
-            'income': data['income'],
-            'expense': data['expense'],
-            'period_income': data['period_income'],
-            'period_costs': data['period_costs'],
-            'period_profit': data['period_profit'],
-        }, ensure_ascii=False)
+        'body': json.dumps(payload, ensure_ascii=False)
     }

@@ -63,8 +63,8 @@ export function AnalyticsTab({ token }: { token: string }) {
 
   useEffect(() => { load(); }, [load]);
 
-  // smartlombard: подгружаем при сегодня/вчера
-  const loadSmartlombard = useCallback(async () => {
+  // smartlombard: подгружаем при сегодня/вчера (force=true — мимо кэша)
+  const loadSmartlombard = useCallback(async (force = false) => {
     if (period !== "today" && period !== "yesterday") {
       setSlData(null);
       setSlError(null);
@@ -77,7 +77,8 @@ export function AnalyticsTab({ token }: { token: string }) {
       const msk = new Date(now.getTime() + (now.getTimezoneOffset() + 180) * 60000);
       if (period === "yesterday") msk.setDate(msk.getDate() - 1);
       const date = msk.toISOString().slice(0, 10);
-      const res = await fetch(`${SMARTLOMBARD_URL}?date=${date}`, { headers: { "X-Employee-Token": token } });
+      const url = `${SMARTLOMBARD_URL}?date=${date}${force ? "&nocache=1" : ""}`;
+      const res = await fetch(url, { headers: { "X-Employee-Token": token } });
       const d = await res.json();
       if (d && !d.error) setSlData(d);
       else setSlError(d?.error || "Ошибка загрузки smartlombard");
@@ -89,7 +90,7 @@ export function AnalyticsTab({ token }: { token: string }) {
     }
   }, [period, token]);
 
-  useEffect(() => { loadSmartlombard(); }, [loadSmartlombard]);
+  useEffect(() => { loadSmartlombard(false); }, [loadSmartlombard]);
 
   const PERIODS = [
     { v: "today", l: "Сегодня" },
@@ -309,8 +310,8 @@ export function AnalyticsTab({ token }: { token: string }) {
                     Продажи б/у техники · smartlombard
                   </div>
                   <div className="flex items-center gap-2">
-                    {slData && <span className="font-roboto text-white/30 text-[10px] tabular-nums">{slData.date_from}</span>}
-                    <button onClick={loadSmartlombard} disabled={slLoading}
+                    {slData && <span className="font-roboto text-white/30 text-[10px] tabular-nums">{slData.date_from}{(slData as SmartlombardStats & { cached?: boolean }).cached ? " · кэш" : ""}</span>}
+                    <button onClick={() => loadSmartlombard(true)} disabled={slLoading}
                       className="text-white/40 hover:text-purple-300 active:scale-90 p-1 rounded transition-all">
                       <Icon name={slLoading ? "Loader" : "RefreshCw"} size={11} className={slLoading ? "animate-spin" : ""} />
                     </button>
