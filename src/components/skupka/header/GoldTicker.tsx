@@ -2,7 +2,7 @@ import Icon from "@/components/ui/icon";
 import { ymGoal, Goals } from "@/lib/ym";
 
 interface GoldTickerProps {
-  goldPrice: { buy: number; buy_usd?: number; date: string } | null;
+  goldPrice: { buy: number; buy_usd?: number; xau_usd?: number; date: string } | null;
   goldHistory: { date: string; price: number }[];
   priceRetail999: number | null;
   priceWholesale999: number | null;
@@ -48,10 +48,10 @@ const GoldTicker = ({
                     {goldPrice.buy.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}
                     <span className="text-[#FFD700]/60 text-[10px] sm:text-xs font-bold ml-0.5">₽/г</span>
                   </span>
-                  {typeof goldPrice.buy_usd === 'number' && (
+                  {typeof goldPrice.xau_usd === 'number' && (
                     <span className="font-oswald font-semibold text-[#FFD700]/70 text-[10px] sm:text-[11px] mt-1 tracking-tight whitespace-nowrap leading-none">
-                      ${goldPrice.buy_usd.toLocaleString('en-US', { maximumFractionDigits: 2 })}
-                      <span className="text-[#FFD700]/45 text-[9px] sm:text-[10px] font-bold ml-0.5">/г</span>
+                      ${goldPrice.xau_usd.toLocaleString('en-US', { maximumFractionDigits: 2 })}
+                      <span className="text-[#FFD700]/45 text-[9px] sm:text-[10px] font-bold ml-0.5">/oz</span>
                     </span>
                   )}
                 </>

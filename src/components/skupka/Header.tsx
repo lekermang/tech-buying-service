@@ -36,7 +36,7 @@ const PROBES: Probe[] = [
 
 const Header = ({ scrollTo, goldOpen = false }: HeaderProps) => {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [goldPrice, setGoldPrice] = useState<{ buy: number; buy_usd?: number; date: string } | null>(null);
+  const [goldPrice, setGoldPrice] = useState<{ buy: number; buy_usd?: number; xau_usd?: number; date: string } | null>(null);
   const [goldHistory, setGoldHistory] = useState<{ date: string; price: number }[]>([]);
   const [goldSettings, setGoldSettings] = useState({
     retail_discount: 15, retail_deduction: 0,
@@ -61,7 +61,12 @@ const Header = ({ scrollTo, goldOpen = false }: HeaderProps) => {
         .then(r => r.json())
         .then(d => {
           if (d && typeof d.buy === 'number') {
-            setGoldPrice({ buy: d.buy, buy_usd: typeof d.buy_usd === 'number' ? d.buy_usd : undefined, date: d.date || '' });
+            setGoldPrice({
+              buy: d.buy,
+              buy_usd: typeof d.buy_usd === 'number' ? d.buy_usd : undefined,
+              xau_usd: typeof d.xau_usd === 'number' ? d.xau_usd : undefined,
+              date: d.date || '',
+            });
           }
           if (Array.isArray(d.history) && d.history.length > 0) setGoldHistory(d.history);
           if (d.settings) {
