@@ -159,6 +159,28 @@ def handler(event: dict, context) -> dict:
 
             cur.execute(f"""
                 SELECT
+                    COALESCE(purity, '—') as purity,
+                    COALESCE(SUM(weight), 0) as weight,
+                    COALESCE(SUM(buy_price), 0) as buy_sum,
+                    COUNT(*) as cnt
+                FROM {SCHEMA}.gold_orders
+                WHERE status = 'new'
+                GROUP BY purity
+                ORDER BY weight DESC
+            """)
+            purity_rows = cur.fetchall()
+            stock_by_purity = [
+                {
+                    'purity': r[0] or '—',
+                    'weight': float(r[1]) if r[1] else 0,
+                    'buy_sum': int(r[2]) if r[2] else 0,
+                    'count': int(r[3]) if r[3] else 0,
+                }
+                for r in purity_rows
+            ]
+
+            cur.execute(f"""
+                SELECT
                     DATE((COALESCE(status_updated_at, created_at) + INTERVAL '3 hours') - INTERVAL '7 hours') as work_day,
                     COUNT(*) as done,
                     COALESCE(SUM(buy_price), 0) as total_buy,
@@ -195,6 +217,7 @@ def handler(event: dict, context) -> dict:
                     'stock_weight': stock_weight,
                     'stock_buy_sum': stock_buy_sum,
                     'stock_count': stock_count,
+                    'stock_by_purity': stock_by_purity,
                     'daily': daily,
                 }, ensure_ascii=False)
             }

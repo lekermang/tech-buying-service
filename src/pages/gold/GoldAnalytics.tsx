@@ -18,6 +18,7 @@ export default function GoldAnalyticsView({ analytics, loading, period, stats, o
   const stockWeight = analytics?.stock_weight ?? 0;
   const stockBuySum = analytics?.stock_buy_sum ?? 0;
   const stockCount = analytics?.stock_count ?? 0;
+  const stockByPurity = analytics?.stock_by_purity ?? [];
   const pricePerGramNum = parseFloat(sellPricePerGram) || 0;
   const expectedRevenue = Math.round(stockWeight * pricePerGramNum);
   const expectedProfit = expectedRevenue - stockBuySum;
@@ -133,6 +134,39 @@ export default function GoldAnalyticsView({ analytics, loading, period, stats, o
                 </div>
               </div>
             </div>
+
+            {/* Разбивка по пробам */}
+            {stockByPurity.length > 0 && (
+              <div className="mt-3 bg-[#0A0A0A] border border-[#1F1F1F] rounded-lg overflow-hidden">
+                <div className="font-roboto text-white/40 text-[10px] uppercase tracking-wider px-3 py-2 border-b border-[#1F1F1F] flex items-center gap-1.5">
+                  <Icon name="Layers" size={11} />
+                  Разбивка по пробам
+                </div>
+                <div className="grid px-3 py-1.5 border-b border-[#1F1F1F] bg-[#0F0F0F]" style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr 1.2fr" }}>
+                  {["Проба", "Поз.", "Вес", "Закупка", "Продажа"].map(h => (
+                    <div key={h} className="font-roboto text-[9px] text-white/30 uppercase tracking-wide">{h}</div>
+                  ))}
+                </div>
+                {stockByPurity.map(p => {
+                  const revenue = Math.round(p.weight * pricePerGramNum);
+                  const profit = revenue - p.buy_sum;
+                  return (
+                    <div key={p.purity} className="grid px-3 py-2 border-b border-[#141414] last:border-0 items-center" style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr 1.2fr" }}>
+                      <div className="font-oswald font-bold text-[#FFD700] text-sm">{p.purity}</div>
+                      <div className="font-roboto text-white/60 text-[11px] tabular-nums">{p.count}</div>
+                      <div className="font-oswald font-bold text-white text-sm tabular-nums">{p.weight.toFixed(2)} <span className="text-[10px] text-white/40">г</span></div>
+                      <div className="font-roboto text-white/70 text-[11px] tabular-nums">{p.buy_sum.toLocaleString("ru-RU")}</div>
+                      <div className="flex flex-col leading-tight">
+                        <span className="font-roboto text-blue-300 text-[11px] tabular-nums">{revenue.toLocaleString("ru-RU")}</span>
+                        <span className={`font-roboto text-[10px] tabular-nums font-bold ${profit >= 0 ? "text-green-400" : "text-red-400"}`}>
+                          {profit >= 0 ? "+" : ""}{profit.toLocaleString("ru-RU")}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* KPI карточки */}
