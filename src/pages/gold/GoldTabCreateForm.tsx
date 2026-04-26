@@ -16,6 +16,12 @@ type Props = {
 };
 
 export default function GoldTabCreateForm({ form, onFormChange, creating, onCreate }: Props) {
+  const weightNum = parseFloat(form.weight) || 0;
+  const purityNum = parseInt(form.purity, 10) || 0;
+  const coef585 = purityNum ? purityNum / 585 : 0;
+  const weight585 = +(weightNum * coef585).toFixed(2);
+  const showHint = weightNum > 0 && purityNum > 0 && form.purity !== "585";
+
   return (
     <div className="mx-3 mt-3 mb-1 bg-gradient-to-br from-[#1A1A1A] to-[#141414] border border-[#FFD700]/30 rounded-lg p-4 shadow-xl shadow-[#FFD700]/5 animate-in slide-in-from-top-2 duration-300">
       <div className="font-oswald font-bold text-[#FFD700] text-xs uppercase tracking-widest mb-3 flex items-center gap-1.5">
@@ -57,6 +63,19 @@ export default function GoldTabCreateForm({ form, onFormChange, creating, onCrea
           <input type="number" className={INP} placeholder="0" value={form.sell_price} onChange={e => onFormChange(f => ({ ...f, sell_price: e.target.value }))} />
         </div>
       </div>
+      {showHint && (
+        <div className="mb-2 bg-green-500/10 border border-green-400/20 rounded-md px-3 py-1.5 flex items-center justify-between gap-2">
+          <span className="font-roboto text-[10px] text-green-300/70 uppercase tracking-wide flex items-center gap-1.5">
+            <Icon name="Calculator" size={11} /> В 585 пробе
+          </span>
+          <span className="font-oswald font-bold text-green-400 text-sm tabular-nums">
+            {weight585.toFixed(2)} г
+            <span className="text-green-400/50 text-[10px] ml-1.5 font-roboto">
+              ({weightNum.toFixed(2)} × {coef585.toFixed(3)})
+            </span>
+          </span>
+        </div>
+      )}
       <div className="mb-3">
         <div className="font-roboto text-[10px] text-white/30 mb-0.5">Комментарий</div>
         <input className={INP} placeholder="Комментарий..." value={form.comment} onChange={e => onFormChange(f => ({ ...f, comment: e.target.value }))} />
