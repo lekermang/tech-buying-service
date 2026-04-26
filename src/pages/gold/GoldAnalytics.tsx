@@ -174,7 +174,10 @@ export default function GoldAnalyticsView({ analytics, loading, period, stats, o
                       <div className="font-oswald font-bold text-[#FFD700] text-sm">{p.purity}</div>
                       <div className="font-roboto text-white/60 text-[11px] tabular-nums">{p.count}</div>
                       <div className="font-oswald font-bold text-white text-sm tabular-nums">{p.weight.toFixed(2)} <span className="text-[10px] text-white/40">г</span></div>
-                      <div className="font-oswald font-bold text-green-400 text-sm tabular-nums">{p.weight585.toFixed(2)} <span className="text-[10px] text-green-400/50">г</span></div>
+                      <div className="flex flex-col leading-tight">
+                        <span className="font-oswald font-bold text-green-400 text-sm tabular-nums">{p.weight585.toFixed(2)} <span className="text-[10px] text-green-400/50">г</span></span>
+                        <span className="font-roboto text-white/35 text-[9px] tabular-nums">×{p.coef.toFixed(3)}</span>
+                      </div>
                       <div className="font-roboto text-white/70 text-[11px] tabular-nums">{p.buy_sum.toLocaleString("ru-RU")}</div>
                       <div className="flex items-center gap-1">
                         <span className={`font-oswald font-bold text-[12px] tabular-nums ${inProfit ? "text-green-400" : "text-orange-400"}`}>
