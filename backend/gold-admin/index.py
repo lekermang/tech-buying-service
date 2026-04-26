@@ -85,43 +85,33 @@ def handler(event: dict, context) -> dict:
         # Аналитика за период
         if action == 'analytics':
             period = params.get('period', 'month')
+            # Календарный день МСК: 00:00–23:59 (UTC+3)
+            # Старт сегодня в МСК = DATE_TRUNC('day', NOW()+3h) - 3h (в UTC)
             if period == 'yesterday':
                 period_where = """
                     COALESCE(status_updated_at, created_at) >= (
-                        DATE_TRUNC('day', (NOW() + INTERVAL '3 hours')::date - 1) + INTERVAL '7 hours' - INTERVAL '3 hours'
+                        DATE_TRUNC('day', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours' - INTERVAL '1 day'
                     )
                     AND COALESCE(status_updated_at, created_at) < (
-                        DATE_TRUNC('day', (NOW() + INTERVAL '3 hours')::date) + INTERVAL '7 hours' - INTERVAL '3 hours'
+                        DATE_TRUNC('day', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours'
                     )
                 """
             elif period == 'day':
                 period_where = """
                     COALESCE(status_updated_at, created_at) >= (
-                        CASE
-                            WHEN EXTRACT(HOUR FROM NOW() + INTERVAL '3 hours') >= 7
-                            THEN DATE_TRUNC('day', (NOW() + INTERVAL '3 hours')) + INTERVAL '7 hours' - INTERVAL '3 hours'
-                            ELSE DATE_TRUNC('day', (NOW() + INTERVAL '3 hours') - INTERVAL '1 day') + INTERVAL '7 hours' - INTERVAL '3 hours'
-                        END
+                        DATE_TRUNC('day', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours'
                     )
                 """
             elif period == 'week':
                 period_where = """
                     COALESCE(status_updated_at, created_at) >= (
-                        CASE
-                            WHEN EXTRACT(HOUR FROM NOW() + INTERVAL '3 hours') >= 7
-                            THEN DATE_TRUNC('day', (NOW() + INTERVAL '3 hours')) + INTERVAL '7 hours' - INTERVAL '3 hours'
-                            ELSE DATE_TRUNC('day', (NOW() + INTERVAL '3 hours') - INTERVAL '1 day') + INTERVAL '7 hours' - INTERVAL '3 hours'
-                        END - INTERVAL '6 days'
+                        DATE_TRUNC('day', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours' - INTERVAL '6 days'
                     )
                 """
             else:
                 period_where = """
                     COALESCE(status_updated_at, created_at) >= (
-                        CASE
-                            WHEN EXTRACT(HOUR FROM NOW() + INTERVAL '3 hours') >= 7
-                            THEN DATE_TRUNC('day', (NOW() + INTERVAL '3 hours')) + INTERVAL '7 hours' - INTERVAL '3 hours'
-                            ELSE DATE_TRUNC('day', (NOW() + INTERVAL '3 hours') - INTERVAL '1 day') + INTERVAL '7 hours' - INTERVAL '3 hours'
-                        END - INTERVAL '29 days'
+                        DATE_TRUNC('day', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours' - INTERVAL '29 days'
                     )
                 """
 
@@ -169,6 +159,33 @@ def handler(event: dict, context) -> dict:
                 ORDER BY weight DESC
             """)
             purity_rows = cur.fetchall()
+
+            # Период по дате ЗАКУПКИ (created_at) — для прогноза прибыли
+            if period == 'yesterday':
+                buy_period_where = """
+                    created_at >= (DATE_TRUNC('day', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours' - INTERVAL '1 day')
+                    AND created_at < (DATE_TRUNC('day', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours')
+                """
+            elif period == 'day':
+                buy_period_where = "created_at >= (DATE_TRUNC('day', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours')"
+            elif period == 'week':
+                buy_period_where = "created_at >= (DATE_TRUNC('day', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours' - INTERVAL '6 days')"
+            else:
+                buy_period_where = "created_at >= (DATE_TRUNC('day', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours' - INTERVAL '29 days')"
+
+            cur.execute(f"""
+                SELECT
+                    COALESCE(SUM(buy_price), 0) as buy_sum,
+                    COALESCE(SUM(weight * (CAST(NULLIF(purity, '') AS NUMERIC) / 585.0)), 0) as weight_585,
+                    COUNT(*) as cnt
+                FROM {SCHEMA}.gold_orders
+                WHERE status <> 'cancelled' AND {buy_period_where}
+            """)
+            period_buy_row = cur.fetchone()
+            period_buy_sum = int(period_buy_row[0]) if period_buy_row[0] else 0
+            period_weight585 = float(period_buy_row[1]) if period_buy_row[1] else 0
+            period_buy_count = int(period_buy_row[2]) if period_buy_row[2] else 0
+
             stock_by_purity = [
                 {
                     'purity': r[0] or '—',
@@ -181,7 +198,7 @@ def handler(event: dict, context) -> dict:
 
             cur.execute(f"""
                 SELECT
-                    DATE((COALESCE(status_updated_at, created_at) + INTERVAL '3 hours') - INTERVAL '7 hours') as work_day,
+                    DATE(COALESCE(status_updated_at, created_at) + INTERVAL '3 hours') as work_day,
                     COUNT(*) as done,
                     COALESCE(SUM(buy_price), 0) as total_buy,
                     COALESCE(SUM(sell_price), 0) as total_sell,
@@ -218,6 +235,9 @@ def handler(event: dict, context) -> dict:
                     'stock_buy_sum': stock_buy_sum,
                     'stock_count': stock_count,
                     'stock_by_purity': stock_by_purity,
+                    'period_buy_sum': period_buy_sum,
+                    'period_weight585': period_weight585,
+                    'period_buy_count': period_buy_count,
                     'daily': daily,
                 }, ensure_ascii=False)
             }
@@ -226,7 +246,7 @@ def handler(event: dict, context) -> dict:
         if action == 'daily_stats':
             cur.execute(f"""
                 SELECT
-                    DATE((COALESCE(status_updated_at, created_at) + INTERVAL '3 hours') - INTERVAL '7 hours') as work_day,
+                    DATE(COALESCE(status_updated_at, created_at) + INTERVAL '3 hours') as work_day,
                     COUNT(*) as total,
                     COUNT(*) FILTER (WHERE status = 'done') as done,
                     COALESCE(SUM(buy_price) FILTER (WHERE status = 'done'), 0) as total_buy,
