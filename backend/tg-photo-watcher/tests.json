@@ -1,0 +1,30 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS — CORS",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "GET status без токена — 403",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 403
+    },
+    {
+      "name": "POST пустое тело (Telegram webhook) — 200 ok",
+      "method": "POST",
+      "path": "/",
+      "body": {},
+      "expectedStatus": 200
+    },
+    {
+      "name": "POST без фото — 200 ok skipped",
+      "method": "POST",
+      "path": "/",
+      "body": {"channel_post": {"message_id": 1, "caption": "тест"}},
+      "expectedStatus": 200
+    }
+  ]
+}

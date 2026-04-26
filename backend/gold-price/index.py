@@ -127,6 +127,7 @@ def handler(event: dict, context) -> dict:
         'headers': HEADERS,
         'body': json.dumps({
             'buy': gold_per_gram_rub,
+            'buy_usd': round(gold_per_gram_usd, 2),
             'sell': None,
             'xau_usd': round(xau_usd, 2),
             'usd_rub': round(usd_rub, 4),
