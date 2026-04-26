@@ -20,7 +20,20 @@ export default function GoldAnalyticsView({ analytics, loading, period, stats, o
   const stockCount = analytics?.stock_count ?? 0;
   const stockByPurity = analytics?.stock_by_purity ?? [];
   const pricePerGramNum = parseFloat(sellPricePerGram) || 0;
-  const expectedRevenue = Math.round(stockWeight * pricePerGramNum);
+
+  // Перевод любой пробы в эквивалент 585: вес × (проба/585)
+  const purityToCoef = (purity: string): number => {
+    const n = parseInt(purity, 10);
+    if (!n || isNaN(n)) return 0;
+    return n / 585;
+  };
+  const stockByPurityCalc = stockByPurity.map(p => {
+    const coef = purityToCoef(p.purity);
+    const weight585 = +(p.weight * coef).toFixed(2);
+    return { ...p, coef, weight585 };
+  });
+  const stockWeight585 = +stockByPurityCalc.reduce((s, p) => s + p.weight585, 0).toFixed(2);
+  const expectedRevenue = Math.round(stockWeight585 * pricePerGramNum);
   const expectedProfit = expectedRevenue - stockBuySum;
 
   return (
@@ -88,6 +101,9 @@ export default function GoldAnalyticsView({ analytics, loading, period, stats, o
                 <div className="font-oswald font-bold text-[#FFD700] text-2xl tabular-nums">
                   {stockWeight.toFixed(2)} <span className="text-sm text-[#FFD700]/60">г</span>
                 </div>
+                <div className="font-roboto text-white/40 text-[10px] mt-1 tabular-nums">
+                  ≈ <span className="text-green-400 font-bold">{stockWeight585.toFixed(2)} г</span> в 585 пробе
+                </div>
               </div>
               <div className="bg-[#0A0A0A] border border-[#1F1F1F] rounded-lg p-3">
                 <div className="font-roboto text-white/40 text-[10px] uppercase tracking-wide mb-1">
@@ -112,7 +128,7 @@ export default function GoldAnalyticsView({ analytics, loading, period, stats, o
                 className="w-full bg-[#141414] border border-[#1F1F1F] focus:border-[#FFD700]/50 outline-none rounded-md px-3 py-2 font-oswald font-bold text-[#FFD700] text-xl tabular-nums"
               />
               <div className="font-roboto text-white/30 text-[10px] mt-1.5">
-                {stockWeight.toFixed(2)} г × {pricePerGramNum.toLocaleString("ru-RU")} ₽
+                {stockWeight585.toFixed(2)} г <span className="text-green-400/70">(в 585)</span> × {pricePerGramNum.toLocaleString("ru-RU")} ₽
               </div>
             </div>
 
@@ -142,21 +158,23 @@ export default function GoldAnalyticsView({ analytics, loading, period, stats, o
                   <Icon name="Layers" size={11} />
                   Разбивка по пробам
                 </div>
-                <div className="grid px-3 py-1.5 border-b border-[#1F1F1F] bg-[#0F0F0F] gap-1" style={{ gridTemplateColumns: "0.7fr 0.5fr 0.9fr 1fr 1fr 1.2fr" }}>
-                  {["Проба", "Поз.", "Вес", "Закупка", "Ср. ₽/г", "Продажа"].map(h => (
+                <div className="grid px-3 py-1.5 border-b border-[#1F1F1F] bg-[#0F0F0F] gap-1" style={{ gridTemplateColumns: "0.65fr 0.45fr 0.85fr 0.95fr 0.95fr 0.9fr 1.15fr" }}>
+                  {["Проба", "Поз.", "Вес", "В 585", "Закупка", "Ср. ₽/г", "Продажа"].map(h => (
                     <div key={h} className="font-roboto text-[9px] text-white/30 uppercase tracking-wide">{h}</div>
                   ))}
                 </div>
-                {stockByPurity.map(p => {
-                  const revenue = Math.round(p.weight * pricePerGramNum);
+                {stockByPurityCalc.map(p => {
+                  const revenue = Math.round(p.weight585 * pricePerGramNum);
                   const profit = revenue - p.buy_sum;
                   const avgBuyPerGram = p.weight > 0 ? p.buy_sum / p.weight : 0;
-                  const inProfit = pricePerGramNum > 0 && pricePerGramNum >= avgBuyPerGram;
+                  const breakEven585 = p.weight585 > 0 ? p.buy_sum / p.weight585 : 0;
+                  const inProfit = pricePerGramNum > 0 && pricePerGramNum >= breakEven585;
                   return (
-                    <div key={p.purity} className="grid px-3 py-2 border-b border-[#141414] last:border-0 items-center gap-1" style={{ gridTemplateColumns: "0.7fr 0.5fr 0.9fr 1fr 1fr 1.2fr" }}>
+                    <div key={p.purity} className="grid px-3 py-2 border-b border-[#141414] last:border-0 items-center gap-1" style={{ gridTemplateColumns: "0.65fr 0.45fr 0.85fr 0.95fr 0.95fr 0.9fr 1.15fr" }}>
                       <div className="font-oswald font-bold text-[#FFD700] text-sm">{p.purity}</div>
                       <div className="font-roboto text-white/60 text-[11px] tabular-nums">{p.count}</div>
                       <div className="font-oswald font-bold text-white text-sm tabular-nums">{p.weight.toFixed(2)} <span className="text-[10px] text-white/40">г</span></div>
+                      <div className="font-oswald font-bold text-green-400 text-sm tabular-nums">{p.weight585.toFixed(2)} <span className="text-[10px] text-green-400/50">г</span></div>
                       <div className="font-roboto text-white/70 text-[11px] tabular-nums">{p.buy_sum.toLocaleString("ru-RU")}</div>
                       <div className="flex items-center gap-1">
                         <span className={`font-oswald font-bold text-[12px] tabular-nums ${inProfit ? "text-green-400" : "text-orange-400"}`}>
