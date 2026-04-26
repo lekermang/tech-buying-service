@@ -1,20 +1,28 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import Icon from "@/components/ui/icon";
 import { adminHeaders } from "@/lib/adminFetch";
-import SkyTab from "@/components/admin/SkyTab";
-import RepairTab from "@/components/admin/RepairTab";
-import PricesTab from "@/components/admin/PricesTab";
-import CatalogTab from "@/components/admin/CatalogTab";
-import CatalogEditTab from "@/components/admin/CatalogEditTab";
-import { ApiCatalogContent } from "@/pages/ApiCatalog";
-import ToolsImportTab from "@/components/admin/ToolsImportTab";
-import AnalyticsTab from "@/components/admin/AnalyticsTab";
-import NotificationsTab from "@/components/admin/NotificationsTab";
-import SettingsTab from "@/components/admin/SettingsTab";
-import ClientsAdminTab from "@/components/admin/ClientsAdminTab";
-import SmsBlastTab from "@/components/admin/SmsBlastTab";
-import ThemeTab from "@/components/admin/ThemeTab";
 import { MODEL_PHOTOS, CATEGORY_PHOTOS } from "@/pages/catalog.types";
+
+const SkyTab           = lazy(() => import("@/components/admin/SkyTab"));
+const RepairTab        = lazy(() => import("@/components/admin/RepairTab"));
+const PricesTab        = lazy(() => import("@/components/admin/PricesTab"));
+const CatalogTab       = lazy(() => import("@/components/admin/CatalogTab"));
+const CatalogEditTab   = lazy(() => import("@/components/admin/CatalogEditTab"));
+const ApiCatalogContent= lazy(() => import("@/pages/ApiCatalog").then(m => ({ default: m.ApiCatalogContent })));
+const ToolsImportTab   = lazy(() => import("@/components/admin/ToolsImportTab"));
+const AnalyticsTab     = lazy(() => import("@/components/admin/AnalyticsTab"));
+const NotificationsTab = lazy(() => import("@/components/admin/NotificationsTab"));
+const SettingsTab      = lazy(() => import("@/components/admin/SettingsTab"));
+const ClientsAdminTab  = lazy(() => import("@/components/admin/ClientsAdminTab"));
+const SmsBlastTab      = lazy(() => import("@/components/admin/SmsBlastTab"));
+const ThemeTab         = lazy(() => import("@/components/admin/ThemeTab"));
+
+const TabFallback = () => (
+  <div className="flex items-center justify-center h-full text-white/40 gap-2 py-12">
+    <Icon name="Loader" size={16} className="animate-spin" />
+    <span className="text-sm">Загружаю раздел...</span>
+  </div>
+);
 
 const ADMIN_URL = "https://functions.poehali.dev/a105aede-d55d-4b99-9d3e-5e977887aa04";
 const EXPORT_URL = "https://functions.poehali.dev/13db4dbd-0d2b-47d4-8e09-c6f82483ffde";
@@ -274,19 +282,21 @@ export default function Admin() {
         </div>
 
         <div className={`flex-1 ${tab === "analytics" ? "overflow-hidden flex flex-col" : "overflow-auto"}`}>
-          {tab === "analytics"     && <AnalyticsTab />}
-          {tab === "repair"        && <RepairTab token={token} />}
-          {tab === "prices"        && <PricesTab token={token} />}
-          {tab === "notifications" && <NotificationsTab token={token} />}
-          {tab === "sky"           && <SkyTab token={token} />}
-          {tab === "items"         && <CatalogEditTab token={token} />}
-          {tab === "catalog"       && <CatalogTab token={token} />}
-          {tab === "api-catalog"   && <ApiCatalogContent token={token} />}
-          {tab === "tools-import"  && <ToolsImportTab token={token} />}
-          {tab === "sms-blast"     && <SmsBlastTab token={token} />}
-          {tab === "clients"       && <ClientsAdminTab token={token} />}
-          {tab === "settings"      && <SettingsTab token={token} />}
-          {tab === "theme"         && <ThemeTab token={token} />}
+          <Suspense fallback={<TabFallback />}>
+            {tab === "analytics"     && <AnalyticsTab />}
+            {tab === "repair"        && <RepairTab token={token} />}
+            {tab === "prices"        && <PricesTab token={token} />}
+            {tab === "notifications" && <NotificationsTab token={token} />}
+            {tab === "sky"           && <SkyTab token={token} />}
+            {tab === "items"         && <CatalogEditTab token={token} />}
+            {tab === "catalog"       && <CatalogTab token={token} />}
+            {tab === "api-catalog"   && <ApiCatalogContent token={token} />}
+            {tab === "tools-import"  && <ToolsImportTab token={token} />}
+            {tab === "sms-blast"     && <SmsBlastTab token={token} />}
+            {tab === "clients"       && <ClientsAdminTab token={token} />}
+            {tab === "settings"      && <SettingsTab token={token} />}
+            {tab === "theme"         && <ThemeTab token={token} />}
+          </Suspense>
         </div>
       </div>
     </div>

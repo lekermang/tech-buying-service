@@ -1,0 +1,35 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS — CORS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "GET без item_id — 400",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 400
+    },
+    {
+      "name": "GET список фото несуществующего товара — 200",
+      "method": "GET",
+      "path": "/?item_id=999999",
+      "expectedStatus": 200
+    },
+    {
+      "name": "POST без токена — 403",
+      "method": "POST",
+      "path": "/",
+      "body": {"item_id": 1, "file_b64": "AA=="},
+      "expectedStatus": 403
+    },
+    {
+      "name": "DELETE без токена — 403",
+      "method": "DELETE",
+      "path": "/?id=1",
+      "expectedStatus": 403
+    }
+  ]
+}

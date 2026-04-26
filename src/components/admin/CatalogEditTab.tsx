@@ -3,7 +3,7 @@ import Icon from "@/components/ui/icon";
 import { adminHeaders } from "@/lib/adminFetch";
 
 const CATALOG_URL = "https://functions.poehali.dev/e0e6576c-f000-4288-86ef-1de08ad7bcc4";
-const PHOTOS_URL = "https://functions.poehali.dev/76998fa9-f1f9-4986-8449-ecfe56cc3ee8";
+const PHOTOS_URL = "https://functions.poehali.dev/06375f20-54a8-439c-921c-6cff0f1cecf2";
 const MAX_PHOTOS = 5;
 
 const CATEGORIES = ["Смартфоны", "Планшеты", "Ноутбуки", "Наушники", "Умные часы", "Компьютеры", "Техника", "Игровые консоли", "Камеры", "Прочее"];

@@ -1,0 +1,23 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS — CORS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "GET без токена — 403",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 403
+    },
+    {
+      "name": "POST без токена — 403",
+      "method": "POST",
+      "path": "/",
+      "body": {"action": "scan"},
+      "expectedStatus": 403
+    }
+  ]
+}
