@@ -2,7 +2,7 @@ import Icon from "@/components/ui/icon";
 import { ymGoal, Goals } from "@/lib/ym";
 
 interface GoldTickerProps {
-  goldPrice: { buy: number; buy_usd?: number; xau_usd?: number; date: string } | null;
+  goldPrice: { buy: number; buy_usd?: number; xau_usd?: number; usd_rub?: number; date: string } | null;
   goldHistory: { date: string; price: number }[];
   priceRetail999: number | null;
   priceWholesale999: number | null;
@@ -97,28 +97,45 @@ const GoldTicker = ({
         </div>
 
         {/* ── ЦЕНТР: цены покупки по типам клиента ────────────────────── */}
-        {goldPrice?.buy && (
-          <div className="hidden xl:flex items-center gap-2 font-roboto shrink-0">
-            <div className="flex items-center gap-2 bg-black/60 border border-[#FFD700]/20 px-3 py-1.5 rounded-md hover:border-[#FFD700]/40 transition-colors">
-              <Icon name="User" size={12} className="text-[#FFD700]/60" />
-              <div className="flex flex-col leading-none">
-                <span className="text-[#FFD700]/55 text-[9px] uppercase tracking-[0.15em] font-oswald font-bold">Физлица</span>
-                <span className="text-[#FFD700] font-oswald font-bold text-sm mt-0.5 whitespace-nowrap">
-                  {priceRetail999?.toLocaleString('ru-RU')} ₽/г
-                </span>
+        {goldPrice?.buy && (() => {
+          const usdRub = goldPrice.usd_rub;
+          const toUsdOz = (rubPerGram: number | null) =>
+            (rubPerGram && usdRub) ? (rubPerGram / usdRub) * 31.1035 : null;
+          const retailUsdOz = toUsdOz(priceRetail999);
+          const wholesaleUsdOz = toUsdOz(priceWholesale999);
+          return (
+            <div className="hidden xl:flex items-center gap-2 font-roboto shrink-0">
+              <div className="flex items-center gap-2 bg-black/60 border border-[#FFD700]/20 px-3 py-1.5 rounded-md hover:border-[#FFD700]/40 transition-colors">
+                <Icon name="User" size={12} className="text-[#FFD700]/60" />
+                <div className="flex flex-col leading-none">
+                  <span className="text-[#FFD700]/55 text-[9px] uppercase tracking-[0.15em] font-oswald font-bold">Физлица</span>
+                  <span className="text-[#FFD700] font-oswald font-bold text-sm mt-0.5 whitespace-nowrap">
+                    {priceRetail999?.toLocaleString('ru-RU')} ₽/г
+                  </span>
+                  {retailUsdOz && (
+                    <span className="text-[#FFD700]/55 font-oswald font-semibold text-[10px] mt-0.5 whitespace-nowrap">
+                      ${retailUsdOz.toLocaleString('en-US', { maximumFractionDigits: 0 })}/oz
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 bg-black/60 border border-[#FFD700]/20 px-3 py-1.5 rounded-md hover:border-[#FFD700]/40 transition-colors">
+                <Icon name="Package" size={12} className="text-[#FFD700]/60" />
+                <div className="flex flex-col leading-none">
+                  <span className="text-[#FFD700]/55 text-[9px] uppercase tracking-[0.15em] font-oswald font-bold">Опт 30г+</span>
+                  <span className="text-[#FFD700] font-oswald font-bold text-sm mt-0.5 whitespace-nowrap">
+                    {priceWholesale999?.toLocaleString('ru-RU')} ₽/г
+                  </span>
+                  {wholesaleUsdOz && (
+                    <span className="text-[#FFD700]/55 font-oswald font-semibold text-[10px] mt-0.5 whitespace-nowrap">
+                      ${wholesaleUsdOz.toLocaleString('en-US', { maximumFractionDigits: 0 })}/oz
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-2 bg-black/60 border border-[#FFD700]/20 px-3 py-1.5 rounded-md hover:border-[#FFD700]/40 transition-colors">
-              <Icon name="Package" size={12} className="text-[#FFD700]/60" />
-              <div className="flex flex-col leading-none">
-                <span className="text-[#FFD700]/55 text-[9px] uppercase tracking-[0.15em] font-oswald font-bold">Опт 30г+</span>
-                <span className="text-[#FFD700] font-oswald font-bold text-sm mt-0.5 whitespace-nowrap">
-                  {priceWholesale999?.toLocaleString('ru-RU')} ₽/г
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* ── ПРАВО: телефон + Продать ────────────────────────────────── */}
         <div className="flex items-center gap-2 shrink-0">
