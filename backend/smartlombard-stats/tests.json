@@ -1,0 +1,18 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS returns 200",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "No token returns 401",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 401,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

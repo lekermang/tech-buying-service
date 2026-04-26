@@ -4,6 +4,18 @@ import { SALES_URL, type Analytics } from "./staff.types";
 import { REPAIR_URL } from "./repair/types";
 import { GOLD_URL, type GoldAnalytics } from "./gold/types";
 
+const SMARTLOMBARD_URL = "https://functions.poehali.dev/e628ca7a-012b-4d92-bf0a-2853b05a7f4e";
+
+type SmartlombardStats = {
+  date_from: string;
+  date_to: string;
+  income: number;
+  expense: number;
+  period_income: number;
+  period_costs: number;
+  period_profit: number;
+};
+
 type RepairAnalytics = {
   total: number; done: number; revenue: number; costs: number;
   profit: number; master_total: number;
@@ -17,6 +29,10 @@ export function AnalyticsTab({ token }: { token: string }) {
   const [goldData, setGoldData] = useState<GoldAnalytics | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [slData, setSlData] = useState<SmartlombardStats | null>(null);
+  const [slLoading, setSlLoading] = useState(false);
+  const [slError, setSlError] = useState<string | null>(null);
 
   const repairPeriod = period === "today" ? "day" : period === "yesterday" ? "yesterday" : period === "week" ? "week" : "month";
 
@@ -46,6 +62,34 @@ export function AnalyticsTab({ token }: { token: string }) {
   }, [period, repairPeriod, token]);
 
   useEffect(() => { load(); }, [load]);
+
+  // smartlombard: подгружаем при сегодня/вчера
+  const loadSmartlombard = useCallback(async () => {
+    if (period !== "today" && period !== "yesterday") {
+      setSlData(null);
+      setSlError(null);
+      return;
+    }
+    setSlLoading(true);
+    setSlError(null);
+    try {
+      const now = new Date();
+      const msk = new Date(now.getTime() + (now.getTimezoneOffset() + 180) * 60000);
+      if (period === "yesterday") msk.setDate(msk.getDate() - 1);
+      const date = msk.toISOString().slice(0, 10);
+      const res = await fetch(`${SMARTLOMBARD_URL}?date=${date}`, { headers: { "X-Employee-Token": token } });
+      const d = await res.json();
+      if (d && !d.error) setSlData(d);
+      else setSlError(d?.error || "Ошибка загрузки smartlombard");
+    } catch (e) {
+      setSlError("Не удалось получить данные smartlombard");
+      console.error("[smartlombard]", e);
+    } finally {
+      setSlLoading(false);
+    }
+  }, [period, token]);
+
+  useEffect(() => { loadSmartlombard(); }, [loadSmartlombard]);
 
   const PERIODS = [
     { v: "today", l: "Сегодня" },
@@ -250,6 +294,67 @@ export function AnalyticsTab({ token }: { token: string }) {
                 <div className="font-roboto text-white/30 text-[9px] mt-2">
                   Учитывается дата закупки. Вес пересчитан в 585 пробу. Без отменённых.
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Smartlombard — Продажи б/у техники за день */}
+          {(period === "today" || period === "yesterday") && (
+            <div className="relative bg-gradient-to-br from-purple-500/10 via-pink-500/5 to-transparent border border-purple-400/25 rounded-xl p-4 mb-3 overflow-hidden">
+              <div className="absolute -top-6 -right-6 text-7xl opacity-[0.06] select-none">📦</div>
+              <div className="relative">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="font-roboto text-purple-300/80 text-[10px] uppercase tracking-wider flex items-center gap-1.5">
+                    <Icon name="ShoppingCart" size={12} />
+                    Продажи б/у техники · smartlombard
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {slData && <span className="font-roboto text-white/30 text-[10px] tabular-nums">{slData.date_from}</span>}
+                    <button onClick={loadSmartlombard} disabled={slLoading}
+                      className="text-white/40 hover:text-purple-300 active:scale-90 p-1 rounded transition-all">
+                      <Icon name={slLoading ? "Loader" : "RefreshCw"} size={11} className={slLoading ? "animate-spin" : ""} />
+                    </button>
+                  </div>
+                </div>
+
+                {slError && (
+                  <div className="bg-red-500/10 border border-red-500/30 text-red-400 font-roboto text-[11px] p-2 mb-2 rounded-md flex items-center gap-1.5">
+                    <Icon name="AlertCircle" size={11} />
+                    {slError}
+                  </div>
+                )}
+
+                {!slError && slData && (
+                  <>
+                    <div className="grid grid-cols-3 gap-2 mb-2">
+                      <div className="bg-black/40 border border-[#1F1F1F] rounded-lg p-2.5">
+                        <div className="font-roboto text-white/40 text-[9px] uppercase tracking-wide mb-0.5">Приход</div>
+                        <div className="font-oswald font-bold text-green-400 text-lg tabular-nums">{slData.income.toLocaleString("ru-RU")} ₽</div>
+                      </div>
+                      <div className="bg-black/40 border border-[#1F1F1F] rounded-lg p-2.5">
+                        <div className="font-roboto text-white/40 text-[9px] uppercase tracking-wide mb-0.5">Расход</div>
+                        <div className="font-oswald font-bold text-orange-400 text-lg tabular-nums">{slData.expense.toLocaleString("ru-RU")} ₽</div>
+                      </div>
+                      <div className={`border rounded-lg p-2.5 ${slData.period_profit >= 0 ? "bg-green-500/10 border-green-400/20" : "bg-red-500/10 border-red-400/20"}`}>
+                        <div className={`font-roboto text-[9px] uppercase tracking-wide mb-0.5 ${slData.period_profit >= 0 ? "text-green-300/70" : "text-red-300/70"}`}>Прибыль</div>
+                        <div className={`font-oswald font-bold text-lg tabular-nums ${slData.period_profit >= 0 ? "text-green-300" : "text-red-300"}`}>
+                          {slData.period_profit >= 0 ? "+" : ""}{slData.period_profit.toLocaleString("ru-RU")} ₽
+                        </div>
+                      </div>
+                    </div>
+                    <div className="font-roboto text-white/30 text-[9px] flex flex-wrap gap-x-3 gap-y-0.5">
+                      <span>Доход за период: <span className="text-white/60 tabular-nums">{slData.period_income.toLocaleString("ru-RU")} ₽</span></span>
+                      <span>Затраты: <span className="text-white/60 tabular-nums">{slData.period_costs.toLocaleString("ru-RU")} ₽</span></span>
+                    </div>
+                  </>
+                )}
+
+                {!slError && !slData && slLoading && (
+                  <div className="font-roboto text-white/40 text-[11px] flex items-center gap-1.5 py-2">
+                    <Icon name="Loader" size={11} className="animate-spin text-purple-300" />
+                    Загружаю данные smartlombard…
+                  </div>
+                )}
               </div>
             </div>
           )}
