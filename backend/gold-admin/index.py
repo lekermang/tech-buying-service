@@ -146,6 +146,19 @@ def handler(event: dict, context) -> dict:
 
             cur.execute(f"""
                 SELECT
+                    COALESCE(SUM(weight), 0) as stock_weight,
+                    COALESCE(SUM(buy_price), 0) as stock_buy_sum,
+                    COUNT(*) as stock_count
+                FROM {SCHEMA}.gold_orders
+                WHERE status = 'new'
+            """)
+            stock_row = cur.fetchone()
+            stock_weight = float(stock_row[0]) if stock_row[0] else 0
+            stock_buy_sum = int(stock_row[1]) if stock_row[1] else 0
+            stock_count = int(stock_row[2]) if stock_row[2] else 0
+
+            cur.execute(f"""
+                SELECT
                     DATE((COALESCE(status_updated_at, created_at) + INTERVAL '3 hours') - INTERVAL '7 hours') as work_day,
                     COUNT(*) as done,
                     COALESCE(SUM(buy_price), 0) as total_buy,
@@ -179,6 +192,9 @@ def handler(event: dict, context) -> dict:
                     'total_buy': total_buy,
                     'total_sell': total_sell,
                     'total_profit': total_profit,
+                    'stock_weight': stock_weight,
+                    'stock_buy_sum': stock_buy_sum,
+                    'stock_count': stock_count,
                     'daily': daily,
                 }, ensure_ascii=False)
             }

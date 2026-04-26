@@ -63,6 +63,9 @@ export type GoldAnalytics = {
   total_buy: number;
   total_sell: number;
   total_profit: number;
+  stock_weight?: number;
+  stock_buy_sum?: number;
+  stock_count?: number;
   daily: { day: string; done: number; buy: number; sell: number; profit: number; weight: number }[];
 };
 

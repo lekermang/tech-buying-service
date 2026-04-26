@@ -1,3 +1,4 @@
+import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import { GoldAnalytics, GoldDayStat, money, fmtDay } from "./types";
 
@@ -13,6 +14,14 @@ type Props = {
 };
 
 export default function GoldAnalyticsView({ analytics, loading, period, stats, onPeriodChange, onRefresh }: Props) {
+  const [sellPricePerGram, setSellPricePerGram] = useState<string>("6300");
+  const stockWeight = analytics?.stock_weight ?? 0;
+  const stockBuySum = analytics?.stock_buy_sum ?? 0;
+  const stockCount = analytics?.stock_count ?? 0;
+  const pricePerGramNum = parseFloat(sellPricePerGram) || 0;
+  const expectedRevenue = Math.round(stockWeight * pricePerGramNum);
+  const expectedProfit = expectedRevenue - stockBuySum;
+
   return (
     <div className="p-3 overflow-y-auto">
       {/* Период + refresh */}
@@ -57,6 +66,72 @@ export default function GoldAnalyticsView({ analytics, loading, period, stats, o
                 {money(analytics.total_profit)}
               </div>
               <div className="font-roboto text-white/40 text-[11px]">продажа − закупка</div>
+            </div>
+          </div>
+
+          {/* Остаток металла (только статус "Закуплено") + калькулятор продажи */}
+          <div className="bg-gradient-to-br from-[#1A1A1A] to-[#0F0F0F] border border-[#FFD700]/25 rounded-xl p-4 mb-3">
+            <div className="flex items-center justify-between mb-3">
+              <div className="font-roboto text-[#FFD700]/80 text-[10px] uppercase tracking-wider flex items-center gap-1.5">
+                <Icon name="Coins" size={12} />
+                Остаток металла в наличии
+              </div>
+              <span className="font-roboto text-white/30 text-[10px]">{stockCount} поз.</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <div className="bg-[#0A0A0A] border border-[#1F1F1F] rounded-lg p-3">
+                <div className="font-roboto text-white/40 text-[10px] uppercase tracking-wide mb-1">
+                  Общий вес (для сверки)
+                </div>
+                <div className="font-oswald font-bold text-[#FFD700] text-2xl tabular-nums">
+                  {stockWeight.toFixed(2)} <span className="text-sm text-[#FFD700]/60">г</span>
+                </div>
+              </div>
+              <div className="bg-[#0A0A0A] border border-[#1F1F1F] rounded-lg p-3">
+                <div className="font-roboto text-white/40 text-[10px] uppercase tracking-wide mb-1">
+                  Потрачено на закупку
+                </div>
+                <div className="font-oswald font-bold text-white text-2xl tabular-nums">
+                  {money(stockBuySum)}
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-[#0A0A0A] border border-[#1F1F1F] rounded-lg p-3 mb-2">
+              <label className="font-roboto text-white/50 text-[10px] uppercase tracking-wide block mb-1.5">
+                Цена продажи за грамм, ₽
+              </label>
+              <input
+                type="number"
+                inputMode="decimal"
+                value={sellPricePerGram}
+                onChange={(e) => setSellPricePerGram(e.target.value)}
+                placeholder="6300"
+                className="w-full bg-[#141414] border border-[#1F1F1F] focus:border-[#FFD700]/50 outline-none rounded-md px-3 py-2 font-oswald font-bold text-[#FFD700] text-xl tabular-nums"
+              />
+              <div className="font-roboto text-white/30 text-[10px] mt-1.5">
+                {stockWeight.toFixed(2)} г × {pricePerGramNum.toLocaleString("ru-RU")} ₽
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-blue-500/10 border border-blue-400/20 rounded-lg p-3">
+                <div className="font-roboto text-blue-300/70 text-[10px] uppercase tracking-wide mb-1">
+                  Сумма продажи
+                </div>
+                <div className="font-oswald font-bold text-blue-300 text-xl tabular-nums">
+                  {money(expectedRevenue)}
+                </div>
+              </div>
+              <div className={`border rounded-lg p-3 ${expectedProfit >= 0 ? "bg-green-500/10 border-green-400/20" : "bg-red-500/10 border-red-400/20"}`}>
+                <div className={`font-roboto text-[10px] uppercase tracking-wide mb-1 ${expectedProfit >= 0 ? "text-green-300/70" : "text-red-300/70"}`}>
+                  Прибыль
+                </div>
+                <div className={`font-oswald font-bold text-xl tabular-nums ${expectedProfit >= 0 ? "text-green-300" : "text-red-300"}`}>
+                  {expectedProfit >= 0 ? "+" : ""}{money(expectedProfit)}
+                </div>
+              </div>
             </div>
           </div>
 
