@@ -141,32 +141,38 @@ def _to_int(s: str) -> int:
         return 0
 
 
+_NUM_RE = r'(-?[0-9][0-9 \xa0]*[\.,]?[0-9]*)'
+
+
+def _find_number_after(html: str, label: str) -> int:
+    """Ищет первое число после указанной метки (в пределах ~500 символов)."""
+    # Регэксп: метка + любые символы (включая теги) + первое число
+    pat = re.escape(label) + r'.{0,500}?' + _NUM_RE
+    m = re.search(pat, html, re.DOTALL)
+    if not m:
+        return 0
+    raw = m.group(1).replace('\xa0', ' ').replace(' ', '').replace(',', '.')
+    # отбрасываем дробную часть
+    if '.' in raw:
+        raw = raw.split('.')[0]
+    try:
+        return int(raw)
+    except Exception:
+        return 0
+
+
 def _parse_ops_page(html: str) -> dict:
-    """Достаём суммы Прихода / Расхода / Дохода из страницы операций по датам."""
+    """Достаём Приход / Расход и блок «Доход за период / Затраты / Прибыль»."""
     result = {'income': 0, 'expense': 0, 'period_income': 0, 'period_costs': 0, 'period_profit': 0}
 
-    # Приход: 20 499.00 руб.
-    m = re.search(r'Приход:\s*</?[^>]*>?\s*([0-9 \xa0\.,]+)\s*руб', html)
-    if m:
-        result['income'] = _to_int(m.group(1).replace(',', '.').split('.')[0])
+    result['income'] = _find_number_after(html, 'Приход:')
+    result['expense'] = _find_number_after(html, 'Расход:')
+    result['period_income'] = _find_number_after(html, 'Доход за период')
+    result['period_costs'] = _find_number_after(html, 'Затраты за период')
+    result['period_profit'] = _find_number_after(html, 'Прибыль за период')
 
-    m = re.search(r'Расход:\s*</?[^>]*>?\s*([0-9 \xa0\.,]+)\s*руб', html)
-    if m:
-        result['expense'] = _to_int(m.group(1).replace(',', '.').split('.')[0])
-
-    # Доход за период / Затраты за период / Прибыль за период
-    m = re.search(r'Доход за период[^<]*</[^>]+>\s*<[^>]+>\s*([0-9 \xa0\.,]+)', html)
-    if m:
-        result['period_income'] = _to_int(m.group(1).replace(',', '.').split('.')[0])
-    m = re.search(r'Затраты за период[^<]*</[^>]+>\s*<[^>]+>\s*([0-9 \xa0\.,]+)', html)
-    if m:
-        result['period_costs'] = _to_int(m.group(1).replace(',', '.').split('.')[0])
-    m = re.search(r'Прибыль за период[^<]*</[^>]+>\s*<[^>]+>\s*([0-9 \xa0\.,]+)', html)
-    if m:
-        result['period_profit'] = _to_int(m.group(1).replace(',', '.').split('.')[0])
-
-    # Запасной вариант — простая разница
-    if result['period_profit'] == 0 and (result['income'] or result['expense']):
+    # Запасной вариант — разница
+    if result['period_profit'] == 0 and (result['period_income'] or result['period_costs']):
         result['period_profit'] = result['period_income'] - result['period_costs']
 
     return result

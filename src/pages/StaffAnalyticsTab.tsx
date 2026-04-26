@@ -165,6 +165,55 @@ export function AnalyticsTab({ token }: { token: string }) {
 
       {!loading && (
         <>
+          {/* ИТОГО ЗА ДЕНЬ — ремонт + золото (прогноз) + б/у техника */}
+          {(() => {
+            const repairPart = repairNetProfit;
+            const goldPart = goldForecastProfit;
+            const slPart = slData?.period_profit || 0;
+            const totalDay = repairPart + goldPart + slPart;
+            const periodLabel =
+              period === "today" ? "сегодня" :
+              period === "yesterday" ? "вчера" :
+              period === "week" ? "за 7 дней" : "за 30 дней";
+            return (
+              <div className="relative bg-gradient-to-br from-emerald-500/15 via-[#FFD700]/8 to-purple-500/10 border border-emerald-400/30 rounded-xl p-4 mb-3 overflow-hidden">
+                <div className="absolute -top-8 -right-8 text-[120px] opacity-[0.05] select-none">💎</div>
+                <div className="relative">
+                  <div className="font-roboto text-emerald-300/80 text-[10px] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <Icon name="Sparkles" size={12} />
+                    Итого прибыль · {periodLabel}
+                  </div>
+                  <div className={`font-oswald font-bold text-5xl tabular-nums mb-3 ${totalDay >= 0 ? "text-emerald-300" : "text-red-300"}`}>
+                    {totalDay >= 0 ? "+" : ""}{totalDay.toLocaleString("ru-RU")} ₽
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="bg-black/40 border border-[#1F1F1F] rounded-lg p-2.5">
+                      <div className="font-roboto text-white/40 text-[9px] uppercase tracking-wide mb-0.5 flex items-center gap-1">🔧 Ремонт</div>
+                      <div className={`font-oswald font-bold text-base tabular-nums ${repairPart >= 0 ? "text-green-400" : "text-red-400"}`}>
+                        {repairPart >= 0 ? "+" : ""}{repairPart.toLocaleString("ru-RU")}
+                      </div>
+                    </div>
+                    <div className="bg-black/40 border border-[#1F1F1F] rounded-lg p-2.5">
+                      <div className="font-roboto text-white/40 text-[9px] uppercase tracking-wide mb-0.5 flex items-center gap-1">🥇 Золото</div>
+                      <div className={`font-oswald font-bold text-base tabular-nums ${goldPart >= 0 ? "text-green-400" : "text-red-400"}`}>
+                        {goldPart >= 0 ? "+" : ""}{goldPart.toLocaleString("ru-RU")}
+                      </div>
+                      <div className="font-roboto text-white/30 text-[9px] tabular-nums mt-0.5">по {goldForecastPriceNum.toLocaleString("ru-RU")} ₽/г</div>
+                    </div>
+                    <div className="bg-black/40 border border-[#1F1F1F] rounded-lg p-2.5">
+                      <div className="font-roboto text-white/40 text-[9px] uppercase tracking-wide mb-0.5 flex items-center gap-1">📦 Б/У</div>
+                      <div className={`font-oswald font-bold text-base tabular-nums ${slPart >= 0 ? "text-green-400" : "text-red-400"}`}>
+                        {(period === "today" || period === "yesterday")
+                          ? `${slPart >= 0 ? "+" : ""}${slPart.toLocaleString("ru-RU")}`
+                          : <span className="text-white/30 text-xs font-normal">—</span>}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Premium ОБЩИЙ ДОХОД */}
           <div className="relative bg-gradient-to-br from-[#FFD700]/15 via-green-500/8 to-transparent border border-[#FFD700]/30 rounded-xl p-4 mb-3 overflow-hidden">
             <div className="absolute -top-10 -right-10 text-[140px] opacity-[0.04] select-none">💰</div>
@@ -262,9 +311,9 @@ export function AnalyticsTab({ token }: { token: string }) {
 
                 <div className="grid grid-cols-2 gap-2 mb-3">
                   <div className="bg-black/40 border border-[#1F1F1F] rounded-lg p-3">
-                    <div className="font-roboto text-white/40 text-[10px] uppercase tracking-wide mb-1">Закуплено за период</div>
-                    <div className="font-oswald font-bold text-[#FFD700] text-2xl tabular-nums">{periodBuySum.toLocaleString("ru-RU")} ₽</div>
-                    <div className="font-roboto text-white/30 text-[10px] mt-0.5">{periodWeight585.toFixed(2)} г <span className="text-green-400/60">(в 585)</span></div>
+                    <div className="font-roboto text-white/40 text-[10px] uppercase tracking-wide mb-1">Вес за период (в 585)</div>
+                    <div className="font-oswald font-bold text-green-400 text-2xl tabular-nums">{periodWeight585.toFixed(2)} <span className="text-sm text-green-400/60">г</span></div>
+                    <div className="font-roboto text-white/30 text-[10px] mt-0.5">закупка: <span className="text-[#FFD700]/80 tabular-nums">{periodBuySum.toLocaleString("ru-RU")} ₽</span></div>
                   </div>
                   <div className="bg-black/40 border border-[#1F1F1F] rounded-lg p-3">
                     <div className="font-roboto text-white/40 text-[10px] uppercase tracking-wide mb-1">Цена продажи ₽/г</div>
