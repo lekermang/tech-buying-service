@@ -399,7 +399,7 @@ function StaffInner() {
         {/* Glow сверху */}
         <div className="absolute -top-4 left-0 right-0 h-4 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
         <div className="relative bg-[#0A0A0A]/90 backdrop-blur-xl border-t border-white/[0.06]">
-          <div className="flex">
+          <div className="flex overflow-x-auto no-scrollbar">
             {TABS.map(t => {
               const locked = !isOwner && !unlocked[t.k] && (t.k === "gold" || t.k === "analytics" || t.k === "employees");
               const active = tab === t.k;
@@ -407,7 +407,7 @@ function StaffInner() {
                 <button
                   key={t.k}
                   onClick={() => requestTab(t.k as Tab)}
-                  className={`flex-1 flex flex-col items-center justify-center gap-1 pt-2.5 pb-2 min-h-[58px] transition-all duration-300 active:scale-95 relative group ${
+                  className={`flex-1 min-w-[64px] flex flex-col items-center justify-center gap-1 pt-2.5 pb-2 min-h-[58px] transition-all duration-300 active:scale-95 relative group ${
                     active ? "text-[#FFD700]" : "text-white/40 hover:text-white/70"
                   }`}
                 >

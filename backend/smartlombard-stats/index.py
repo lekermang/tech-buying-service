@@ -194,6 +194,12 @@ def _get_access_token(force: bool = False) -> tuple[str | None, str | None]:
     return token, err
 
 
+def _is_no_data_error(data: dict) -> bool:
+    """Smartlombard на page=1 при отсутствии данных возвращает 412 со словом 'максимальное количество страниц: 0'."""
+    msg_blob = json.dumps(data, ensure_ascii=False).lower()
+    return 'максимальное количество страниц' in msg_blob or 'максимальное кол' in msg_blob
+
+
 def _fetch_all_pages(url: str, token: str, params: dict, max_pages: int = 50) -> tuple[list, str | None, dict | None]:
     items: list = []
     page = 1
@@ -210,6 +216,11 @@ def _fetch_all_pages(url: str, token: str, params: dict, max_pages: int = 50) ->
             data = r.json()
         except Exception:
             return items, f'ops: bad json (status {r.status_code})', debug_first
+        # 412 "максимальное количество страниц: 0" = данных нет, это не ошибка
+        if r.status_code == 412 and _is_no_data_error(data):
+            if page == 1:
+                debug_first = {'page1_count': 0, 'sample': [], 'pagination': {'total_pages': 0}, 'no_data': True}
+            break
         if not data.get('status'):
             return items, f'ops: {data.get("message") or data.get("error") or "failed"} (status {r.status_code})', debug_first
         result = data.get('result') or {}
