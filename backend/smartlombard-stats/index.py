@@ -7,6 +7,8 @@ import psycopg2
 import requests
 
 CACHE_TTL_SECONDS = 60
+TOKEN_TTL_SECONDS = 19 * 60  # smartlombard: токен можно получать не чаще 1 раза в 20 мин
+TOKEN_CACHE_KEY = '__access_token__'
 
 API_BASE = 'https://online.smartlombard.ru/api/exchange/v1'
 AUTH_URL = f'{API_BASE}/auth/access_token'
@@ -110,7 +112,46 @@ def _parse_date_param(val: str) -> str:
     return _msk_today_dmy()
 
 
-def _get_access_token() -> tuple[str | None, str | None]:
+def _token_cache_get() -> str | None:
+    """Берём токен из БД, если он младше TOKEN_TTL_SECONDS."""
+    try:
+        conn = _get_conn()
+        cur = conn.cursor()
+        cur.execute(
+            f"SELECT payload, EXTRACT(EPOCH FROM (NOW() - updated_at)) FROM {SCHEMA}.smartlombard_cache WHERE cache_key='{TOKEN_CACHE_KEY}'"
+        )
+        row = cur.fetchone()
+        cur.close(); conn.close()
+        if not row:
+            return None
+        payload, age = row
+        if age is None or float(age) > TOKEN_TTL_SECONDS:
+            return None
+        if isinstance(payload, str):
+            payload = json.loads(payload)
+        token = (payload or {}).get('token')
+        return token if token else None
+    except Exception:
+        return None
+
+
+def _token_cache_set(token: str) -> None:
+    try:
+        payload_safe = json.dumps({'token': token}, ensure_ascii=False).replace("'", "''")
+        conn = _get_conn()
+        cur = conn.cursor()
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.smartlombard_cache (cache_key, payload, updated_at) "
+            f"VALUES ('{TOKEN_CACHE_KEY}', '{payload_safe}'::jsonb, NOW()) "
+            f"ON CONFLICT (cache_key) DO UPDATE SET payload=EXCLUDED.payload, updated_at=NOW()"
+        )
+        conn.commit()
+        cur.close(); conn.close()
+    except Exception:
+        pass
+
+
+def _request_new_token() -> tuple[str | None, str | None]:
     account_id = os.environ.get('SMARTLOMBARD_ACCOUNT_ID', '').strip()
     secret_key = os.environ.get('SMARTLOMBARD_SECRET_KEY', '').strip()
     if not account_id or not secret_key:
@@ -139,6 +180,18 @@ def _get_access_token() -> tuple[str | None, str | None]:
     if not token:
         return None, 'auth: no access_token in response'
     return str(token), None
+
+
+def _get_access_token(force: bool = False) -> tuple[str | None, str | None]:
+    """Возвращает токен из кэша БД (если ему меньше 19 мин) либо запрашивает новый."""
+    if not force:
+        cached = _token_cache_get()
+        if cached:
+            return cached, None
+    token, err = _request_new_token()
+    if token:
+        _token_cache_set(token)
+    return token, err
 
 
 def _fetch_all_pages(url: str, token: str, params: dict, max_pages: int = 50) -> tuple[list, str | None, dict | None]:
