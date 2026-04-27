@@ -1,3 +1,4 @@
+import { useState } from "react";
 import Icon from "@/components/ui/icon";
 
 export type SmartlombardStats = {
@@ -16,9 +17,37 @@ type Props = {
   slLoading: boolean;
   slError: string | null;
   loadSmartlombard: (force?: boolean) => void;
+  token: string;
+  smartlombardUrl: string;
 };
 
-export default function AnalyticsSmartlombard({ period, slData, slLoading, slError, loadSmartlombard }: Props) {
+export default function AnalyticsSmartlombard({ period, slData, slLoading, slError, loadSmartlombard, token, smartlombardUrl }: Props) {
+  const [debugOpen, setDebugOpen] = useState(false);
+  const [debugLoading, setDebugLoading] = useState(false);
+  const [debugData, setDebugData] = useState<unknown>(null);
+  const [debugError, setDebugError] = useState<string | null>(null);
+
+  const runDebug = async () => {
+    setDebugOpen(true);
+    setDebugLoading(true);
+    setDebugError(null);
+    setDebugData(null);
+    try {
+      const now = new Date();
+      const msk = new Date(now.getTime() + (now.getTimezoneOffset() + 180) * 60000);
+      if (period === "yesterday") msk.setDate(msk.getDate() - 1);
+      const date = msk.toISOString().slice(0, 10);
+      const url = `${smartlombardUrl}?date=${date}&debug=1&nocache=1`;
+      const res = await fetch(url, { headers: { "X-Employee-Token": token } });
+      const d = await res.json();
+      setDebugData(d);
+    } catch (e) {
+      setDebugError(String(e));
+    } finally {
+      setDebugLoading(false);
+    }
+  };
+
   if (period !== "today" && period !== "yesterday") return null;
 
   return (
@@ -32,6 +61,11 @@ export default function AnalyticsSmartlombard({ period, slData, slLoading, slErr
           </div>
           <div className="flex items-center gap-2">
             {slData && <span className="font-roboto text-white/30 text-[10px] tabular-nums">{slData.date_from}{(slData as SmartlombardStats & { cached?: boolean }).cached ? " · кэш" : ""}</span>}
+            <button onClick={runDebug} disabled={debugLoading}
+              title="Диагностика парсера"
+              className="text-white/40 hover:text-yellow-300 active:scale-90 p-1 rounded transition-all">
+              <Icon name={debugLoading ? "Loader" : "Bug"} size={11} className={debugLoading ? "animate-spin" : ""} />
+            </button>
             <button onClick={() => loadSmartlombard(true)} disabled={slLoading}
               className="text-white/40 hover:text-purple-300 active:scale-90 p-1 rounded transition-all">
               <Icon name={slLoading ? "Loader" : "RefreshCw"} size={11} className={slLoading ? "animate-spin" : ""} />
@@ -75,6 +109,26 @@ export default function AnalyticsSmartlombard({ period, slData, slLoading, slErr
           <div className="font-roboto text-white/40 text-[11px] flex items-center gap-1.5 py-2">
             <Icon name="Loader" size={11} className="animate-spin text-purple-300" />
             Загружаю данные smartlombard…
+          </div>
+        )}
+
+        {debugOpen && (
+          <div className="mt-3 bg-black/60 border border-yellow-500/30 rounded-lg p-2 relative">
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="font-roboto text-yellow-300/80 text-[10px] uppercase tracking-wider flex items-center gap-1">
+                <Icon name="Bug" size={10} /> Диагностика парсера
+              </div>
+              <button onClick={() => setDebugOpen(false)} className="text-white/40 hover:text-white/80 p-0.5">
+                <Icon name="X" size={11} />
+              </button>
+            </div>
+            {debugLoading && <div className="text-white/40 text-[11px]">Запрашиваю…</div>}
+            {debugError && <div className="text-red-400 text-[11px]">{debugError}</div>}
+            {debugData != null && (
+              <pre className="text-white/70 text-[10px] font-mono whitespace-pre-wrap break-all max-h-72 overflow-auto leading-tight">
+{JSON.stringify(debugData, null, 2)}
+              </pre>
+            )}
           </div>
         )}
       </div>

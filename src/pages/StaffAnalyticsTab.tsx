@@ -192,6 +192,8 @@ export function AnalyticsTab({ token }: { token: string }) {
             slLoading={slLoading}
             slError={slError}
             loadSmartlombard={loadSmartlombard}
+            token={token}
+            smartlombardUrl={SMARTLOMBARD_URL}
           />
 
           <AnalyticsRepairAndStaff
