@@ -161,15 +161,23 @@ def _find_number_after(html: str, label: str) -> int:
         return 0
 
 
+def _find_number_any(html: str, labels: list[str]) -> int:
+    for lab in labels:
+        v = _find_number_after(html, lab)
+        if v:
+            return v
+    return 0
+
+
 def _parse_ops_page(html: str) -> dict:
     """Достаём Приход / Расход и блок «Доход за период / Затраты / Прибыль»."""
     result = {'income': 0, 'expense': 0, 'period_income': 0, 'period_costs': 0, 'period_profit': 0}
 
-    result['income'] = _find_number_after(html, 'Приход:')
-    result['expense'] = _find_number_after(html, 'Расход:')
-    result['period_income'] = _find_number_after(html, 'Доход за период')
-    result['period_costs'] = _find_number_after(html, 'Затраты за период')
-    result['period_profit'] = _find_number_after(html, 'Прибыль за период')
+    result['income'] = _find_number_any(html, ['Приход:', 'Приход', 'Income:', 'Поступления:', 'Поступления'])
+    result['expense'] = _find_number_any(html, ['Расход:', 'Расход', 'Expense:', 'Списания:', 'Списания'])
+    result['period_income'] = _find_number_any(html, ['Доход за период', 'Доход за период:', 'Доход'])
+    result['period_costs'] = _find_number_any(html, ['Затраты за период', 'Затраты за период:', 'Затраты'])
+    result['period_profit'] = _find_number_any(html, ['Прибыль за период', 'Прибыль за период:', 'Прибыль'])
 
     # Запасной вариант — разница
     if result['period_profit'] == 0 and (result['period_income'] or result['period_costs']):
@@ -198,7 +206,7 @@ def _fetch_ops(session: requests.Session, date_from: str, date_to: str) -> dict:
     if 'formlogin' in html or 'Вход в программу' in html:
         return {'ok': False, 'error': 'session expired / not logged in'}
     parsed = _parse_ops_page(html)
-    return {'ok': True, 'data': parsed}
+    return {'ok': True, 'data': parsed, 'html': html}
 
 
 def handler(event: dict, context) -> dict:
@@ -236,6 +244,22 @@ def handler(event: dict, context) -> dict:
                 'body': json.dumps({'error': ops.get('error', 'ops failed')}, ensure_ascii=False)}
 
     data = ops['data']
+
+    # Debug: вернуть фрагменты HTML для понимания структуры страницы
+    if (params.get('debug') or '').lower() in ('1', 'true', 'yes'):
+        html = ops.get('html') or ''
+        snippets: dict = {}
+        for lab in ['Приход', 'Расход', 'Доход', 'Затрат', 'Прибыль']:
+            idx = html.find(lab)
+            snippets[lab] = (html[idx:idx + 600] if idx >= 0 else None)
+        return {'statusCode': 200, 'headers': HEADERS,
+                'body': json.dumps({
+                    'date_from': date_from, 'date_to': date_to,
+                    'parsed': data,
+                    'html_len': len(html),
+                    'snippets': snippets,
+                }, ensure_ascii=False)}
+
     payload = {
         'date_from': date_from,
         'date_to': date_to,
