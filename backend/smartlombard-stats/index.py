@@ -8,9 +8,10 @@ import requests
 
 CACHE_TTL_SECONDS = 60
 
-BASE = 'https://online.smartlombard.ru'
-LOGIN_URL = f'{BASE}/login/auth'
-OPS_URL = f'{BASE}/cash/operations_by_date/'
+API_BASE = 'https://online.smartlombard.ru/api/exchange/v1'
+AUTH_URL = f'{API_BASE}/auth/access_token'
+OPS_URL = f'{API_BASE}/operations'
+ELEM_OPS_URL = f'{API_BASE}/elementary_operations'
 
 HEADERS = {
     'Access-Control-Allow-Origin': '*',
@@ -20,6 +21,9 @@ HEADERS = {
 }
 
 SCHEMA = 't_p31606708_tech_buying_service'
+
+INCOME_TYPES = {'buyout', 'part_buyout', 'part_buyout_pawn_good', 'prolongation', 'prolongation_online', 'sell_realization'}
+EXPENSE_TYPES = {'pledge', 'repledge', 'dobor'}
 
 
 def _get_conn():
@@ -86,16 +90,15 @@ def _cache_set(key: str, data: dict) -> None:
         pass
 
 
-def _msk_today_str() -> str:
+def _msk_today_dmy() -> str:
     msk = datetime.now(timezone.utc) + timedelta(hours=3)
     return msk.strftime('%d.%m.%Y')
 
 
 def _parse_date_param(val: str) -> str:
     if not val:
-        return _msk_today_str()
+        return _msk_today_dmy()
     val = val.strip()
-    # accept YYYY-MM-DD or DD.MM.YYYY
     try:
         if re.match(r'^\d{4}-\d{2}-\d{2}$', val):
             d = datetime.strptime(val, '%Y-%m-%d')
@@ -104,114 +107,123 @@ def _parse_date_param(val: str) -> str:
             return val
     except Exception:
         pass
-    return _msk_today_str()
+    return _msk_today_dmy()
 
 
-def _login(session: requests.Session) -> dict:
-    login = os.environ.get('SMARTLOMBARD_LOGIN', '')
-    password = os.environ.get('SMARTLOMBARD_PASSWORD', '')
-    if not login or not password:
-        return {'ok': False, 'error': 'SMARTLOMBARD_LOGIN/PASSWORD не заданы'}
-    # Прогрев — получим cookie сессии
-    session.get(BASE + '/', timeout=15, headers={'User-Agent': 'Mozilla/5.0'})
-    r = session.post(
-        LOGIN_URL,
-        data={'login': login, 'password': password},
-        headers={
-            'User-Agent': 'Mozilla/5.0',
-            'X-Requested-With': 'XMLHttpRequest',
-            'Referer': BASE + '/',
-        },
-        timeout=20,
-    )
+def _get_access_token() -> tuple[str | None, str | None]:
+    account_id = os.environ.get('SMARTLOMBARD_ACCOUNT_ID', '').strip()
+    secret_key = os.environ.get('SMARTLOMBARD_SECRET_KEY', '').strip()
+    if not account_id or not secret_key:
+        return None, 'SMARTLOMBARD_ACCOUNT_ID/SMARTLOMBARD_SECRET_KEY не заданы'
+    try:
+        r = requests.post(
+            AUTH_URL,
+            files={
+                'account_id': (None, str(account_id)),
+                'secret_key': (None, secret_key),
+            },
+            timeout=20,
+        )
+    except Exception as e:
+        return None, f'auth: network error {e}'
     try:
         data = r.json()
     except Exception:
-        return {'ok': False, 'error': f'login: bad json (status {r.status_code})'}
-    if not data.get('success'):
-        return {'ok': False, 'error': data.get('fail') or 'login failed'}
-    return {'ok': True}
+        return None, f'auth: bad json (status {r.status_code})'
+    if not data.get('status'):
+        return None, f'auth: {data.get("message") or data.get("error") or "failed"} (status {r.status_code})'
+    res = data.get('result') or {}
+    token = res.get('access_token')
+    if isinstance(token, dict):
+        token = token.get('access_token') or token.get('token') or token.get('value')
+    if not token:
+        return None, 'auth: no access_token in response'
+    return str(token), None
 
 
-def _to_int(s: str) -> int:
-    s = re.sub(r'[^\d\-]', '', s or '')
+def _fetch_all_pages(url: str, token: str, params: dict, max_pages: int = 50) -> tuple[list, str | None, dict | None]:
+    items: list = []
+    page = 1
+    debug_first: dict | None = None
+    while page <= max_pages:
+        q = dict(params)
+        q['page'] = page
+        q['limit'] = 100
+        try:
+            r = requests.get(url, params=q, headers={'Authorization': f'Bearer {token}'}, timeout=25)
+        except Exception as e:
+            return items, f'ops: network error {e}', debug_first
+        try:
+            data = r.json()
+        except Exception:
+            return items, f'ops: bad json (status {r.status_code})', debug_first
+        if not data.get('status'):
+            return items, f'ops: {data.get("message") or data.get("error") or "failed"} (status {r.status_code})', debug_first
+        result = data.get('result') or {}
+        ops = result.get('operations') or []
+        if page == 1:
+            debug_first = {
+                'page1_count': len(ops),
+                'sample': ops[:2],
+                'pagination': (data.get('metadata') or {}).get('pagination'),
+            }
+        if not ops:
+            break
+        items.extend(ops)
+        pagination = (data.get('metadata') or {}).get('pagination') or {}
+        total_pages = pagination.get('total_pages') or pagination.get('totalPages')
+        if total_pages and page >= int(total_pages):
+            break
+        if len(ops) < 100:
+            break
+        page += 1
+    return items, None, debug_first
+
+
+def _to_float(x) -> float:
     try:
-        return int(s)
+        if x is None:
+            return 0.0
+        return float(x)
     except Exception:
-        return 0
+        return 0.0
 
 
-_NUM_RE = r'(-?[0-9][0-9 \xa0]*[\.,]?[0-9]*)'
+def _aggregate(operations: list, elem_operations: list) -> dict:
+    income = 0.0
+    expense = 0.0
+    by_type: dict[str, float] = {}
 
+    for op in operations:
+        t = (op.get('type_operation') or '').strip()
+        primary = t.split(',')[0].strip() if t else ''
+        s = _to_float(op.get('sum'))
+        by_type[primary] = by_type.get(primary, 0.0) + s
+        if primary in INCOME_TYPES:
+            income += s
+        elif primary in EXPENSE_TYPES:
+            expense += s
 
-def _find_number_after(html: str, label: str) -> int:
-    """Ищет первое число после указанной метки (в пределах ~500 символов)."""
-    # Регэксп: метка + любые символы (включая теги) + первое число
-    pat = re.escape(label) + r'.{0,500}?' + _NUM_RE
-    m = re.search(pat, html, re.DOTALL)
-    if not m:
-        return 0
-    raw = m.group(1).replace('\xa0', ' ').replace(' ', '').replace(',', '.')
-    # отбрасываем дробную часть
-    if '.' in raw:
-        raw = raw.split('.')[0]
-    try:
-        return int(raw)
-    except Exception:
-        return 0
+    period_income = 0.0
+    period_costs = 0.0
+    for eo in elem_operations:
+        period_income += _to_float(eo.get('percent')) + _to_float(eo.get('overprofit'))
+        period_costs += _to_float(eo.get('loss'))
+    period_profit = period_income - period_costs
 
-
-def _find_number_any(html: str, labels: list[str]) -> int:
-    for lab in labels:
-        v = _find_number_after(html, lab)
-        if v:
-            return v
-    return 0
-
-
-def _parse_ops_page(html: str) -> dict:
-    """Достаём Приход / Расход и блок «Доход за период / Затраты / Прибыль»."""
-    result = {'income': 0, 'expense': 0, 'period_income': 0, 'period_costs': 0, 'period_profit': 0}
-
-    result['income'] = _find_number_any(html, ['Приход:', 'Приход', 'Income:', 'Поступления:', 'Поступления'])
-    result['expense'] = _find_number_any(html, ['Расход:', 'Расход', 'Expense:', 'Списания:', 'Списания'])
-    result['period_income'] = _find_number_any(html, ['Доход за период', 'Доход за период:', 'Доход'])
-    result['period_costs'] = _find_number_any(html, ['Затраты за период', 'Затраты за период:', 'Затраты'])
-    result['period_profit'] = _find_number_any(html, ['Прибыль за период', 'Прибыль за период:', 'Прибыль'])
-
-    # Запасной вариант — разница
-    if result['period_profit'] == 0 and (result['period_income'] or result['period_costs']):
-        result['period_profit'] = result['period_income'] - result['period_costs']
-
-    return result
-
-
-def _fetch_ops(session: requests.Session, date_from: str, date_to: str) -> dict:
-    # Сначала GET — чтобы понять, какие параметры формы ожидает страница
-    params = {
-        'from': date_from + ' 00:00',
-        'to': date_to + ' 23:59',
-        'mode': 'accountant',
+    return {
+        'income': int(round(income)),
+        'expense': int(round(expense)),
+        'period_income': int(round(period_income)),
+        'period_costs': int(round(period_costs)),
+        'period_profit': int(round(period_profit)),
+        'by_type': {k: int(round(v)) for k, v in by_type.items()},
     }
-    r = session.get(
-        OPS_URL,
-        params=params,
-        timeout=25,
-        headers={'User-Agent': 'Mozilla/5.0', 'Referer': BASE + '/'},
-    )
-    if r.status_code != 200:
-        return {'ok': False, 'error': f'ops: status {r.status_code}'}
-    html = r.text
-    # Не залогинены — редирект на /
-    if 'formlogin' in html or 'Вход в программу' in html:
-        return {'ok': False, 'error': 'session expired / not logged in'}
-    parsed = _parse_ops_page(html)
-    return {'ok': True, 'data': parsed, 'html': html}
 
 
 def handler(event: dict, context) -> dict:
-    """Парсит smartlombard.ru — Касса и банк / Операции по датам.
-    GET ?date=YYYY-MM-DD (по умолчанию — сегодня МСК). Только owner/admin.
+    """Получает данные из smartlombard REST API (operations + elementary_operations)
+    и считает приход/расход/прибыль за период. Только owner/admin.
     """
     if event.get('httpMethod') == 'OPTIONS':
         return {'statusCode': 200, 'headers': HEADERS, 'body': ''}
@@ -224,50 +236,52 @@ def handler(event: dict, context) -> dict:
     date_to = _parse_date_param(params.get('date_to') or params.get('date') or '') if (params.get('date_to') or params.get('date')) else date_from
 
     nocache = (params.get('nocache') or '').lower() in ('1', 'true', 'yes')
-    cache_key = f'{date_from}__{date_to}'
+    debug = (params.get('debug') or '').lower() in ('1', 'true', 'yes')
+    cache_key = f'api__{date_from}__{date_to}'
 
-    if not nocache:
+    if not nocache and not debug:
         cached = _cache_get(cache_key)
         if cached is not None:
             cached['cached'] = True
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps(cached, ensure_ascii=False)}
 
-    session = requests.Session()
-    login_res = _login(session)
-    if not login_res.get('ok'):
+    token, err = _get_access_token()
+    if err or not token:
         return {'statusCode': 502, 'headers': HEADERS,
-                'body': json.dumps({'error': login_res.get('error', 'login failed')}, ensure_ascii=False)}
+                'body': json.dumps({'error': err or 'auth failed'}, ensure_ascii=False)}
 
-    ops = _fetch_ops(session, date_from, date_to)
-    if not ops.get('ok'):
+    q = {'date_begin': date_from, 'date_end': date_to}
+    operations, err1, dbg1 = _fetch_all_pages(OPS_URL, token, q)
+    if err1:
         return {'statusCode': 502, 'headers': HEADERS,
-                'body': json.dumps({'error': ops.get('error', 'ops failed')}, ensure_ascii=False)}
+                'body': json.dumps({'error': err1, 'stage': 'operations'}, ensure_ascii=False)}
 
-    data = ops['data']
+    elem_operations, err2, dbg2 = _fetch_all_pages(ELEM_OPS_URL, token, q)
+    if err2:
+        elem_operations = []
 
-    # Debug: вернуть фрагменты HTML для понимания структуры страницы
-    if (params.get('debug') or '').lower() in ('1', 'true', 'yes'):
-        html = ops.get('html') or ''
-        snippets: dict = {}
-        for lab in ['Приход', 'Расход', 'Доход', 'Затрат', 'Прибыль']:
-            idx = html.find(lab)
-            snippets[lab] = (html[idx:idx + 600] if idx >= 0 else None)
+    agg = _aggregate(operations, elem_operations)
+
+    if debug:
         return {'statusCode': 200, 'headers': HEADERS,
                 'body': json.dumps({
                     'date_from': date_from, 'date_to': date_to,
-                    'parsed': data,
-                    'html_len': len(html),
-                    'snippets': snippets,
+                    'aggregated': agg,
+                    'operations_total': len(operations),
+                    'elem_operations_total': len(elem_operations),
+                    'operations_debug': dbg1,
+                    'elem_debug': dbg2,
                 }, ensure_ascii=False)}
 
     payload = {
         'date_from': date_from,
         'date_to': date_to,
-        'income': data['income'],
-        'expense': data['expense'],
-        'period_income': data['period_income'],
-        'period_costs': data['period_costs'],
-        'period_profit': data['period_profit'],
+        'income': agg['income'],
+        'expense': agg['expense'],
+        'period_income': agg['period_income'],
+        'period_costs': agg['period_costs'],
+        'period_profit': agg['period_profit'],
+        'operations_total': len(operations),
     }
     _cache_set(cache_key, payload)
     payload['cached'] = False
