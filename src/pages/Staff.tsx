@@ -15,6 +15,7 @@ const ClientsTab    = lazy(() => import("./StaffOtherTabs").then(m => ({ default
 const AnalyticsTab  = lazy(() => import("./StaffOtherTabs").then(m => ({ default: m.AnalyticsTab })));
 const EmployeesTab  = lazy(() => import("./StaffOtherTabs").then(m => ({ default: m.EmployeesTab })));
 const VipChatTab    = lazy(() => import("./StaffVipChatTab"));
+const SmartLombardTab = lazy(() => import("./smartlombard/SmartLombardTab"));
 
 class TabErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
   constructor(props: { children: ReactNode }) {
@@ -40,7 +41,7 @@ class TabErrorBoundary extends Component<{ children: ReactNode }, { error: strin
 
 const PRICE_SCHEDULER_URL = "https://functions.poehali.dev/b09271ea-c662-4225-973f-4dd4c6a0e32c";
 
-type Tab = "goods" | "sales" | "clients" | "analytics" | "employees" | "repair" | "chat";
+type Tab = "goods" | "sales" | "clients" | "analytics" | "employees" | "repair" | "chat" | "smartlombard";
 
 function MskClock() {
   const [now, setNow] = useState(() => new Date());
@@ -301,7 +302,8 @@ function StaffInner() {
     { k: "chat",      l: "Чат",       icon: "MessageCircle", badge: chatUnread },
     { k: "clients",   l: "Клиенты",   icon: "Users" },
     { k: "analytics", l: "Статистика",icon: "BarChart2" },
-    ...(isOwnerOrAdmin ? [{ k: "gold", l: "Золото", icon: "Gem" }] : []),
+    { k: "smartlombard", l: "SmartLombard", icon: "Gem" },
+    ...(isOwnerOrAdmin ? [{ k: "gold", l: "Золото", icon: "Coins" }] : []),
     ...(isOwnerOrAdmin ? [{ k: "employees", l: "Команда", icon: "UserCog" }] : []),
   ];
 
@@ -389,6 +391,7 @@ function StaffInner() {
             {tab === "gold"      && isOwnerOrAdmin && <GoldTab token={token} />}
             {tab === "employees" && isOwnerOrAdmin && <EmployeesTab token={token} myRole={empRole} />}
             {tab === "chat"      && <VipChatTab token={token} onUnread={setChatUnread} />}
+            {tab === "smartlombard" && <SmartLombardTab token={token} myRole={empRole} />}
           </React.Suspense>
         </TabErrorBoundary>
       </div>

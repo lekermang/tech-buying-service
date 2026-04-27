@@ -2,6 +2,46 @@ export const EMPLOYEE_AUTH_URL = "https://functions.poehali.dev/29210248-0b73-4c
 export const GOODS_URL = "https://functions.poehali.dev/de4c1e8e-0c7b-4f25-a3fd-155c46fa3399";
 export const SALES_URL = "https://functions.poehali.dev/1610b50a-9d00-450f-a2ca-6311f04eafe7";
 export const AUTH_CLIENT_URL = "https://functions.poehali.dev/58edd0bc-cce3-4ece-acca-a003e2260758";
+export const SMARTLOMBARD_URL = "https://functions.poehali.dev/e628ca7a-012b-4d92-bf0a-2853b05a7f4e";
+
+/** Универсальный proxy-вызов к smartlombard.ru через наш бэкенд. */
+export async function smartlombardCall<T = unknown>(opts: {
+  token: string;
+  path: string;
+  method?: "GET" | "POST" | "PUT";
+  params?: Record<string, string | number | undefined | null>;
+  body?: unknown;
+  goods?: boolean;
+}): Promise<{ ok: boolean; status: number; data: T | null; error?: string }> {
+  const cleanParams: Record<string, string> = {};
+  Object.entries(opts.params || {}).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== "") cleanParams[k] = String(v);
+  });
+  try {
+    const res = await fetch(`${SMARTLOMBARD_URL}?action=proxy`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Employee-Token": opts.token },
+      body: JSON.stringify({
+        path: opts.path,
+        method: opts.method || "GET",
+        params: cleanParams,
+        body: opts.body,
+        goods: !!opts.goods,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { ok: false, status: res.status, data: null, error: data?.error || `HTTP ${res.status}` };
+    }
+    if (data && data.status === false) {
+      const errMsg = data.message || data.error || "Ошибка smartlombard";
+      return { ok: false, status: res.status, data: null, error: errMsg };
+    }
+    return { ok: true, status: res.status, data: (data?.result ?? data) as T };
+  } catch (e) {
+    return { ok: false, status: 0, data: null, error: e instanceof Error ? e.message : String(e) };
+  }
+}
 
 export type Good = { id: number; title: string; category: string; brand: string; model: string; condition: string; color: string; storage: string; imei: string; sell_price: number; purchase_price: number; status: string; description: string };
 export type Sale = { id: number; type: string; amount: number; payment: string; contract: string; date: string; client: string; phone: string; employee: string };
