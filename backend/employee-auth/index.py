@@ -56,17 +56,40 @@ def handler(event: dict, context) -> dict:
             return _err(401, 'Токен недействителен')
         return _ok(emp)
 
-    # GET /list — список сотрудников (только owner/admin)
+    # GET /list — список сотрудников (только owner/admin) с поиском и фильтром
     if method == 'GET' and params.get('action') == 'list':
         emp = get_employee_by_token(emp_token)
         if not emp or emp['role'] not in ('owner', 'admin'):
             return _err(403, 'Нет доступа')
+        q = (params.get('q') or '').strip()
+        status_f = (params.get('status') or '').strip()  # active | inactive | ''
+        role_f = (params.get('role') or '').strip()
+        conditions = []
+        values: list = []
+        if q:
+            conditions.append("(full_name ILIKE %s OR login ILIKE %s OR COALESCE(email,'') ILIKE %s OR COALESCE(phone,'') ILIKE %s OR COALESCE(position,'') ILIKE %s)")
+            like = f"%{q}%"
+            values.extend([like, like, like, like, like])
+        if status_f == 'active':
+            conditions.append("is_active = true")
+        elif status_f == 'inactive':
+            conditions.append("is_active = false")
+        if role_f in ('owner', 'admin', 'staff', 'master'):
+            conditions.append("role = %s"); values.append(role_f)
+        where = (" WHERE " + " AND ".join(conditions)) if conditions else ""
         conn = get_conn(); cur = conn.cursor()
-        cur.execute(f"SELECT id, full_name, login, role, is_active, created_at FROM {SCHEMA}.employees ORDER BY id")
+        cur.execute(
+            f"SELECT id, full_name, login, role, is_active, created_at, position, email, phone, note "
+            f"FROM {SCHEMA}.employees{where} ORDER BY is_active DESC, id",
+            values,
+        )
         rows = cur.fetchall(); cur.close(); conn.close()
-        employees = [{'id': r[0], 'full_name': r[1], 'login': r[2], 'role': r[3],
-                      'is_active': r[4], 'created_at': r[5].isoformat() if r[5] else None} for r in rows]
-        return _ok({'employees': employees})
+        employees = [{
+            'id': r[0], 'full_name': r[1], 'login': r[2], 'role': r[3],
+            'is_active': r[4], 'created_at': r[5].isoformat() if r[5] else None,
+            'position': r[6], 'email': r[7], 'phone': r[8], 'note': r[9],
+        } for r in rows]
+        return _ok({'employees': employees, 'total': len(employees)})
 
     # GET /clients — список клиентов программы скидок (owner/admin)
     if method == 'GET' and params.get('action') == 'clients':
@@ -139,10 +162,13 @@ def handler(event: dict, context) -> dict:
         full_name = body.get('full_name', '').strip()
         password = body.get('password', '').strip()
         role = body.get('role', 'staff')
-        # owner не может создать другого owner
+        position = (body.get('position') or '').strip() or None
+        email = (body.get('email') or '').strip() or None
+        phone = (body.get('phone') or '').strip() or None
+        note = (body.get('note') or '').strip() or None
         if emp['role'] == 'admin' and role == 'owner':
             return _err(403, 'Нельзя назначить роль владельца')
-        if role not in ('staff', 'admin'):
+        if role not in ('staff', 'admin', 'master'):
             role = 'staff'
         if not login_val or not full_name or not password:
             return _err(400, 'Логин, ФИО и пароль обязательны')
@@ -151,8 +177,11 @@ def handler(event: dict, context) -> dict:
         if cur.fetchone():
             cur.close(); conn.close(); return _err(409, 'Логин уже занят')
         pw_hash = hash_pw(password)
-        cur.execute(f"INSERT INTO {SCHEMA}.employees (full_name, login, password_hash, role) VALUES (%s,%s,%s,%s) RETURNING id",
-                    (full_name, login_val, pw_hash, role))
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.employees (full_name, login, password_hash, role, position, email, phone, note) "
+            f"VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+            (full_name, login_val, pw_hash, role, position, email, phone, note),
+        )
         new_id = cur.fetchone()[0]
         conn.commit(); cur.close(); conn.close()
         return _ok({'id': new_id, 'ok': True})
@@ -181,9 +210,17 @@ def handler(event: dict, context) -> dict:
             fields.append("is_active=%s"); values.append(bool(body['is_active']))
         if 'full_name' in body and body['full_name']:
             fields.append("full_name=%s"); values.append(body['full_name'])
-        if 'role' in body and body['role'] in ('staff', 'admin'):
+        if 'role' in body and body['role'] in ('staff', 'admin', 'master'):
             if emp['role'] == 'owner':
                 fields.append("role=%s"); values.append(body['role'])
+        if 'position' in body:
+            fields.append("position=%s"); values.append((body.get('position') or '').strip() or None)
+        if 'email' in body:
+            fields.append("email=%s"); values.append((body.get('email') or '').strip() or None)
+        if 'phone' in body:
+            fields.append("phone=%s"); values.append((body.get('phone') or '').strip() or None)
+        if 'note' in body:
+            fields.append("note=%s"); values.append((body.get('note') or '').strip() or None)
         if fields:
             values.append(int(target_id))
             cur.execute(f"UPDATE {SCHEMA}.employees SET {', '.join(fields)} WHERE id=%s", values)
