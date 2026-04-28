@@ -2,7 +2,7 @@ import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import { GoldAnalytics, GoldDayStat, money, fmtDay } from "./types";
 
-type Period = "day" | "yesterday" | "week" | "month";
+type Period = "day" | "yesterday" | "week" | "month" | "year" | "all" | "custom";
 
 type Props = {
   analytics: GoldAnalytics | null;
@@ -10,10 +10,24 @@ type Props = {
   period: Period;
   stats: GoldDayStat[];
   onPeriodChange: (p: Period) => void;
+  periodFrom?: string;
+  periodTo?: string;
+  onPeriodFromChange?: (v: string) => void;
+  onPeriodToChange?: (v: string) => void;
   onRefresh: () => void;
 };
 
-export default function GoldAnalyticsView({ analytics, loading, period, stats, onPeriodChange, onRefresh }: Props) {
+const PERIOD_LABELS: Record<Period, string> = {
+  day: "Сегодня",
+  yesterday: "Вчера",
+  week: "7 дней",
+  month: "30 дней",
+  year: "Год",
+  all: "Всё время",
+  custom: "Период",
+};
+
+export default function GoldAnalyticsView({ analytics, loading, period, stats, onPeriodChange, periodFrom = "", periodTo = "", onPeriodFromChange, onPeriodToChange, onRefresh }: Props) {
   const [sellPricePerGram, setSellPricePerGram] = useState<string>("6300");
   const stockWeight = analytics?.stock_weight ?? 0;
   const stockBuySum = analytics?.stock_buy_sum ?? 0;
@@ -39,8 +53,8 @@ export default function GoldAnalyticsView({ analytics, loading, period, stats, o
   return (
     <div className="p-3 overflow-y-auto">
       {/* Период + refresh */}
-      <div className="flex gap-1.5 mb-3 items-center flex-wrap">
-        {(["day", "yesterday", "week", "month"] as Period[]).map(p => {
+      <div className="flex gap-1.5 mb-2 items-center flex-wrap">
+        {(["day", "yesterday", "week", "month", "year", "all", "custom"] as Period[]).map(p => {
           const active = period === p;
           return (
             <button key={p} onClick={() => onPeriodChange(p)}
@@ -49,7 +63,7 @@ export default function GoldAnalyticsView({ analytics, loading, period, stats, o
                   ? "bg-[#FFD700] text-black font-bold shadow-md shadow-[#FFD700]/20"
                   : "bg-[#141414] border border-[#1F1F1F] text-white/50 hover:text-white hover:border-[#333]"
               }`}>
-              {p === "day" ? "Сегодня" : p === "yesterday" ? "Вчера" : p === "week" ? "7 дней" : "30 дней"}
+              {PERIOD_LABELS[p]}
             </button>
           );
         })}
@@ -58,6 +72,34 @@ export default function GoldAnalyticsView({ analytics, loading, period, stats, o
           <Icon name={loading ? "Loader" : "RefreshCw"} size={14} className={loading ? "animate-spin" : ""} />
         </button>
       </div>
+
+      {/* Выбор произвольных дат */}
+      {period === "custom" && (
+        <div className="flex gap-2 mb-3 items-center flex-wrap bg-[#0F0F0F] border border-[#1F1F1F] rounded-lg p-2">
+          <Icon name="Calendar" size={13} className="text-[#FFD700]/60 ml-1" />
+          <input
+            type="date"
+            value={periodFrom}
+            onChange={(e) => onPeriodFromChange?.(e.target.value)}
+            className="bg-[#0A0A0A] border border-[#222] text-white px-2 py-1 rounded font-roboto text-xs focus:outline-none focus:border-[#FFD700]/50"
+          />
+          <span className="text-white/30 text-xs">—</span>
+          <input
+            type="date"
+            value={periodTo}
+            onChange={(e) => onPeriodToChange?.(e.target.value)}
+            className="bg-[#0A0A0A] border border-[#222] text-white px-2 py-1 rounded font-roboto text-xs focus:outline-none focus:border-[#FFD700]/50"
+          />
+          {(periodFrom || periodTo) && (
+            <button
+              onClick={() => { onPeriodFromChange?.(""); onPeriodToChange?.(""); }}
+              className="text-white/30 hover:text-red-400 text-[10px] font-roboto px-2 py-1"
+            >
+              сброс
+            </button>
+          )}
+        </div>
+      )}
 
       {loading && (
         <div className="flex items-center justify-center py-14 gap-2 text-white/40">
@@ -68,18 +110,39 @@ export default function GoldAnalyticsView({ analytics, loading, period, stats, o
 
       {analytics && !loading && (
         <>
-          {/* Premium большой блок прибыли */}
+          {/* Premium большой блок прибыли за период */}
           <div className="relative bg-gradient-to-br from-[#FFD700]/10 via-green-500/5 to-transparent border border-[#FFD700]/20 rounded-xl p-4 mb-3 overflow-hidden">
             <div className="absolute -top-8 -right-8 text-8xl opacity-5 select-none">🥇</div>
             <div className="relative">
-              <div className="font-roboto text-[#FFD700]/70 text-[10px] uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                <Icon name="TrendingUp" size={12} />
-                Прибыль от золота
+              <div className="font-roboto text-[#FFD700]/70 text-[10px] uppercase tracking-wider mb-2 flex items-center gap-1.5 justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Icon name="TrendingUp" size={12} />
+                  Прибыль за период
+                </span>
+                <span className="text-white/40 normal-case tracking-normal">
+                  {period === "custom"
+                    ? (periodFrom || periodTo ? `${periodFrom || "…"} — ${periodTo || "…"}` : "выбери даты")
+                    : PERIOD_LABELS[period]}
+                </span>
               </div>
-              <div className={`font-oswald font-bold text-3xl mb-1 ${analytics.total_profit > 0 ? "text-green-400" : analytics.total_profit < 0 ? "text-red-400" : "text-white/40"}`}>
+              <div className={`font-oswald font-bold text-4xl mb-2 tabular-nums ${analytics.total_profit > 0 ? "text-green-400" : analytics.total_profit < 0 ? "text-red-400" : "text-white/40"}`}>
                 {money(analytics.total_profit)}
               </div>
-              <div className="font-roboto text-white/40 text-[11px]">продажа − закупка</div>
+              <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-white/10">
+                <div>
+                  <div className="font-roboto text-white/40 text-[9px] uppercase tracking-wide">Продано</div>
+                  <div className="font-oswald font-bold text-white text-base tabular-nums">{analytics.done}</div>
+                  <div className="font-roboto text-white/30 text-[10px] tabular-nums">{(analytics.total_weight || 0).toFixed(2)} г</div>
+                </div>
+                <div>
+                  <div className="font-roboto text-white/40 text-[9px] uppercase tracking-wide">Выручка</div>
+                  <div className="font-oswald font-bold text-blue-300 text-base tabular-nums">{money(analytics.total_sell)}</div>
+                </div>
+                <div>
+                  <div className="font-roboto text-white/40 text-[9px] uppercase tracking-wide">Закупка</div>
+                  <div className="font-oswald font-bold text-[#FFD700] text-base tabular-nums">{money(analytics.total_buy)}</div>
+                </div>
+              </div>
             </div>
           </div>
 

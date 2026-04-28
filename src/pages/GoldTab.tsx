@@ -10,7 +10,7 @@ import GoldTabCreateForm from "./gold/GoldTabCreateForm";
 import GoldTabList from "./gold/GoldTabList";
 
 type View = "list" | "analytics";
-type Period = "day" | "yesterday" | "week" | "month";
+type Period = "day" | "yesterday" | "week" | "month" | "year" | "all" | "custom";
 
 type EditForm = {
   name: string; phone: string; item_name: string; weight: string;
@@ -38,6 +38,8 @@ export default function GoldTab({ token }: { token: string }) {
 
   const [analytics, setAnalytics] = useState<GoldAnalytics | null>(null);
   const [period, setPeriod] = useState<Period>("week");
+  const [periodFrom, setPeriodFrom] = useState("");
+  const [periodTo, setPeriodTo] = useState("");
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [stats, setStats] = useState<GoldDayStat[]>([]);
 
@@ -57,10 +59,15 @@ export default function GoldTab({ token }: { token: string }) {
     setLoading(false);
   }, [token, filterStatus, search, dateFrom, dateTo]);
 
-  const loadAnalytics = useCallback(async (p: Period) => {
+  const loadAnalytics = useCallback(async (p: Period, from: string, to: string) => {
     setAnalyticsLoading(true);
+    let url = `${GOLD_URL}?action=analytics&period=${p}`;
+    if (p === "custom") {
+      if (from) url += `&date_from=${from}`;
+      if (to) url += `&date_to=${to}`;
+    }
     const [aRes, sRes] = await Promise.all([
-      fetch(`${GOLD_URL}?action=analytics&period=${p}`, { headers: { "X-Employee-Token": token } }),
+      fetch(url, { headers: { "X-Employee-Token": token } }),
       fetch(`${GOLD_URL}?action=daily_stats`, { headers: { "X-Employee-Token": token } }),
     ]);
     const [aData, sData] = await Promise.all([aRes.json(), sRes.json()]);
@@ -71,8 +78,8 @@ export default function GoldTab({ token }: { token: string }) {
 
   useEffect(() => {
     if (view === "list") loadOrders();
-    else loadAnalytics(period);
-  }, [view, loadOrders, loadAnalytics, period]);
+    else loadAnalytics(period, periodFrom, periodTo);
+  }, [view, loadOrders, loadAnalytics, period, periodFrom, periodTo]);
 
   const createOrder = async () => {
     if (!form.name || !form.phone) return;
@@ -175,7 +182,11 @@ export default function GoldTab({ token }: { token: string }) {
           period={period}
           stats={stats}
           onPeriodChange={setPeriod}
-          onRefresh={() => loadAnalytics(period)}
+          periodFrom={periodFrom}
+          periodTo={periodTo}
+          onPeriodFromChange={setPeriodFrom}
+          onPeriodToChange={setPeriodTo}
+          onRefresh={() => loadAnalytics(period, periodFrom, periodTo)}
         />
       )}
 

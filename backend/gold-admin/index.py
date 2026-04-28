@@ -85,9 +85,40 @@ def handler(event: dict, context) -> dict:
         # Аналитика за период
         if action == 'analytics':
             period = params.get('period', 'month')
-            # Календарный день МСК: 00:00–23:59 (UTC+3)
-            # Старт сегодня в МСК = DATE_TRUNC('day', NOW()+3h) - 3h (в UTC)
-            if period == 'yesterday':
+            date_from = (params.get('date_from') or '').strip()
+            date_to = (params.get('date_to') or '').strip()
+
+            # Календарный день МСК: 00:00–23:59 (UTC+3).
+            # Старт сегодня в МСК = DATE_TRUNC('day', NOW()+3h) - 3h (в UTC).
+            def _safe_date(s: str) -> str:
+                # YYYY-MM-DD only — фильтруем посторонние символы для Simple Query
+                return ''.join(ch for ch in s if ch.isdigit() or ch == '-')[:10]
+
+            if period == 'custom' and (date_from or date_to):
+                df = _safe_date(date_from)
+                dt = _safe_date(date_to)
+                conds_p = []
+                conds_b = []
+                if df:
+                    conds_p.append(f"COALESCE(status_updated_at, created_at) >= ('{df}'::date - INTERVAL '3 hours')")
+                    conds_b.append(f"created_at >= ('{df}'::date - INTERVAL '3 hours')")
+                if dt:
+                    # включаем весь день dt
+                    conds_p.append(f"COALESCE(status_updated_at, created_at) < (('{dt}'::date + INTERVAL '1 day') - INTERVAL '3 hours')")
+                    conds_b.append(f"created_at < (('{dt}'::date + INTERVAL '1 day') - INTERVAL '3 hours')")
+                period_where = ' AND '.join(conds_p) if conds_p else 'TRUE'
+                buy_period_where = ' AND '.join(conds_b) if conds_b else 'TRUE'
+            elif period == 'all':
+                period_where = 'TRUE'
+                buy_period_where = 'TRUE'
+            elif period == 'year':
+                period_where = """
+                    COALESCE(status_updated_at, created_at) >= (
+                        DATE_TRUNC('year', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours'
+                    )
+                """
+                buy_period_where = "created_at >= (DATE_TRUNC('year', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours')"
+            elif period == 'yesterday':
                 period_where = """
                     COALESCE(status_updated_at, created_at) >= (
                         DATE_TRUNC('day', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours' - INTERVAL '1 day'
@@ -96,24 +127,32 @@ def handler(event: dict, context) -> dict:
                         DATE_TRUNC('day', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours'
                     )
                 """
+                buy_period_where = """
+                    created_at >= (DATE_TRUNC('day', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours' - INTERVAL '1 day')
+                    AND created_at < (DATE_TRUNC('day', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours')
+                """
             elif period == 'day':
                 period_where = """
                     COALESCE(status_updated_at, created_at) >= (
                         DATE_TRUNC('day', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours'
                     )
                 """
+                buy_period_where = "created_at >= (DATE_TRUNC('day', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours')"
             elif period == 'week':
                 period_where = """
                     COALESCE(status_updated_at, created_at) >= (
                         DATE_TRUNC('day', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours' - INTERVAL '6 days'
                     )
                 """
+                buy_period_where = "created_at >= (DATE_TRUNC('day', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours' - INTERVAL '6 days')"
             else:
+                # month — последние 30 дней
                 period_where = """
                     COALESCE(status_updated_at, created_at) >= (
                         DATE_TRUNC('day', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours' - INTERVAL '29 days'
                     )
                 """
+                buy_period_where = "created_at >= (DATE_TRUNC('day', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours' - INTERVAL '29 days')"
 
             cur.execute(f"""
                 SELECT
@@ -159,19 +198,6 @@ def handler(event: dict, context) -> dict:
                 ORDER BY weight DESC
             """)
             purity_rows = cur.fetchall()
-
-            # Период по дате ЗАКУПКИ (created_at) — для прогноза прибыли
-            if period == 'yesterday':
-                buy_period_where = """
-                    created_at >= (DATE_TRUNC('day', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours' - INTERVAL '1 day')
-                    AND created_at < (DATE_TRUNC('day', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours')
-                """
-            elif period == 'day':
-                buy_period_where = "created_at >= (DATE_TRUNC('day', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours')"
-            elif period == 'week':
-                buy_period_where = "created_at >= (DATE_TRUNC('day', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours' - INTERVAL '6 days')"
-            else:
-                buy_period_where = "created_at >= (DATE_TRUNC('day', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours' - INTERVAL '29 days')"
 
             cur.execute(f"""
                 SELECT
@@ -395,6 +421,20 @@ def handler(event: dict, context) -> dict:
         if new_status and new_status not in VALID_STATUSES:
             cur.close(); conn.close()
             return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'Неверный статус'}, ensure_ascii=False)}
+
+        # При переводе в "Продано" — авто-пересчёт sell_price из ₽/г × вес,
+        # если в запросе ни sell_price, ни sell_price_per_gram не пришли.
+        if new_status == 'done' and sell_price is None and sell_price_per_gram is None:
+            cur.execute(f"SELECT weight, sell_price_per_gram, sell_price FROM {SCHEMA}.gold_orders WHERE id = {order_id}")
+            r = cur.fetchone()
+            if r:
+                w_db = float(r[0]) if r[0] is not None else 0.0
+                spg_db = float(r[1]) if r[1] is not None else 0.0
+                cur_sell = r[2]
+                if spg_db > 0 and w_db > 0:
+                    sell_price = int(round(spg_db * w_db))
+                elif cur_sell:
+                    sell_price = int(cur_sell)
 
         # Если пришла цена за грамм — пересчитаем sell_price от текущего/нового веса
         if sell_price_per_gram is not None:
