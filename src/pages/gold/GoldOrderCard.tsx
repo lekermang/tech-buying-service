@@ -16,6 +16,7 @@ type Props = {
 type EditForm = {
   name: string; phone: string; item_name: string; weight: string;
   purity: string; buy_price: string; sell_price: string;
+  sell_price_per_gram: string;
   comment: string; admin_note: string; payment_method: string;
 };
 
@@ -32,14 +33,24 @@ export default function GoldOrderCard({ order, expanded, onToggle, onStatusChang
     item_name: order.item_name || "", weight: order.weight ? String(order.weight) : "",
     purity: order.purity || "585", buy_price: order.buy_price ? String(order.buy_price) : "",
     sell_price: order.sell_price ? String(order.sell_price) : "",
+    sell_price_per_gram: order.sell_price_per_gram ? String(order.sell_price_per_gram) : "",
     comment: order.comment || "", admin_note: order.admin_note || "",
     payment_method: order.payment_method || "",
   });
 
   const st = GOLD_STATUSES.find(s => s.key === order.status) || GOLD_STATUSES[0];
 
-  const profit = form.buy_price && form.sell_price
-    ? parseInt(form.sell_price) - parseInt(form.buy_price) : order.profit;
+  // Live-расчёт: если задана цена за грамм и вес — итог = цена × вес.
+  // Если оператор ввёл общую сумму вручную (sell_price) — берём её.
+  const wNum = parseFloat(form.weight.replace(",", "."));
+  const spgNum = parseFloat(form.sell_price_per_gram.replace(",", "."));
+  const computedSell =
+    !isNaN(spgNum) && spgNum > 0 && !isNaN(wNum) && wNum > 0
+      ? Math.round(spgNum * wNum)
+      : (form.sell_price ? parseInt(form.sell_price) : null);
+
+  const buyNum = form.buy_price ? parseInt(form.buy_price) : (order.buy_price || 0);
+  const profit = computedSell != null ? computedSell - buyNum : order.profit;
 
   return (
     <div className="border-b border-[#1A1A1A]">
@@ -59,11 +70,24 @@ export default function GoldOrderCard({ order, expanded, onToggle, onStatusChang
           {order.purity && <span className="font-roboto text-white/30 text-xs">· {order.purity}</span>}
           {order.weight && <span className="font-roboto text-white/30 text-xs">· {order.weight}г</span>}
         </div>
-        {(order.buy_price || order.sell_price) && (
-          <div className="flex gap-3 mt-1 flex-wrap">
-            {order.buy_price && <span className="font-oswald font-bold text-[#FFD700] text-sm">{money(order.buy_price)}</span>}
-            {order.sell_price && <span className="font-roboto text-blue-400 text-xs">продажа: {money(order.sell_price)}</span>}
-            {order.profit != null && order.profit > 0 && <span className="font-roboto text-green-400 text-xs">прибыль: {money(order.profit)}</span>}
+        {(order.buy_price || order.sell_price || order.sell_price_per_gram) && (
+          <div className="flex gap-3 mt-1 flex-wrap items-baseline">
+            {order.buy_price != null && <span className="font-oswald font-bold text-[#FFD700] text-sm">{money(order.buy_price)}</span>}
+            {order.sell_price_per_gram != null && (
+              <span className="font-roboto text-blue-400 text-xs">
+                продажа: {Math.round(order.sell_price_per_gram).toLocaleString("ru-RU")} ₽/г
+              </span>
+            )}
+            {order.sell_price != null && order.sell_price > 0 && (
+              <span className="font-roboto text-blue-300 text-xs">
+                сумма: <span className="font-bold">{money(order.sell_price)}</span>
+              </span>
+            )}
+            {order.profit != null && order.profit !== 0 && (
+              <span className={`font-roboto text-xs ${order.profit > 0 ? "text-green-400" : "text-red-400"}`}>
+                прибыль: <span className="font-bold">{money(order.profit)}</span>
+              </span>
+            )}
           </div>
         )}
         <div className="font-roboto text-white/20 text-[10px] mt-0.5">{fmt(order.created_at)}</div>
@@ -122,14 +146,36 @@ export default function GoldOrderCard({ order, expanded, onToggle, onStatusChang
               <input type="number" className={INP} placeholder="0" value={form.buy_price} onChange={e => setForm(f => ({ ...f, buy_price: e.target.value }))} />
             </div>
             <div>
-              <div className={LBL}>Продажа ₽</div>
-              <input type="number" className={INP} placeholder="0" value={form.sell_price} onChange={e => setForm(f => ({ ...f, sell_price: e.target.value }))} />
+              <div className={LBL}>Продажа ₽/г</div>
+              <input type="number" step="0.01" className={INP + " border-blue-500/30"} placeholder="6200"
+                value={form.sell_price_per_gram}
+                onChange={e => setForm(f => ({ ...f, sell_price_per_gram: e.target.value }))} />
             </div>
           </div>
 
-          {profit != null && profit > 0 && (
-            <div className="bg-green-500/10 border border-green-500/20 px-3 py-1.5 mb-2 font-roboto text-green-400 text-xs">
-              Прибыль: <span className="font-bold">{money(profit)}</span>
+          {/* Live-итог продажи и прибыли */}
+          {(computedSell != null && computedSell > 0) && (
+            <div className="bg-blue-500/5 border border-blue-500/20 rounded px-3 py-2 mb-2 grid grid-cols-2 gap-2">
+              <div>
+                <div className="font-roboto text-[10px] text-white/40 uppercase">Сумма продажи</div>
+                <div className="font-oswald font-bold text-blue-300 text-base tabular-nums">
+                  {money(computedSell)}
+                </div>
+                {!isNaN(spgNum) && spgNum > 0 && !isNaN(wNum) && wNum > 0 && (
+                  <div className="font-roboto text-[10px] text-white/30">
+                    {spgNum.toLocaleString("ru-RU")} × {wNum}г
+                  </div>
+                )}
+              </div>
+              <div>
+                <div className="font-roboto text-[10px] text-white/40 uppercase">Прибыль</div>
+                <div className={`font-oswald font-bold text-base tabular-nums ${(profit || 0) >= 0 ? "text-green-400" : "text-red-400"}`}>
+                  {money(profit)}
+                </div>
+                {buyNum > 0 && (
+                  <div className="font-roboto text-[10px] text-white/30">продажа − закупка</div>
+                )}
+              </div>
             </div>
           )}
 

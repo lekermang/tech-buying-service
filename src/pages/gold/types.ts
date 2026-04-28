@@ -32,6 +32,7 @@ export type GoldOrder = {
   purity: string | null;
   buy_price: number | null;
   sell_price: number | null;
+  sell_price_per_gram: number | null;
   profit: number | null;
   comment: string | null;
   status: string;

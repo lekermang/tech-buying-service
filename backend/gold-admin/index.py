@@ -290,7 +290,8 @@ def handler(event: dict, context) -> dict:
         where_clause = ('WHERE ' + ' AND '.join(wheres)) if wheres else ''
         cur.execute(f"""
             SELECT id, name, phone, item_name, weight, purity, buy_price, sell_price, profit,
-                   comment, status, status_updated_at, created_at, admin_note, completed_at, payment_method
+                   comment, status, status_updated_at, created_at, admin_note, completed_at, payment_method,
+                   sell_price_per_gram
             FROM {SCHEMA}.gold_orders
             {where_clause}
             ORDER BY created_at DESC
@@ -311,6 +312,7 @@ def handler(event: dict, context) -> dict:
                 'admin_note': r[13],
                 'completed_at': r[14].isoformat() if r[14] else None,
                 'payment_method': r[15],
+                'sell_price_per_gram': float(r[16]) if r[16] is not None else None,
             })
         return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'orders': orders}, ensure_ascii=False)}
 
@@ -339,7 +341,16 @@ def handler(event: dict, context) -> dict:
             purity = str(body.get('purity', '') or '').replace("'", "''")
             buy_price = body.get('buy_price')
             sell_price = body.get('sell_price')
+            sell_price_per_gram = body.get('sell_price_per_gram')
             comment = str(body.get('comment', '') or '').replace("'", "''")
+
+            # Если задана цена за грамм и вес — считаем общую сумму продажи
+            if sell_price_per_gram is not None and weight:
+                try:
+                    sell_price = int(round(float(sell_price_per_gram) * float(weight)))
+                except Exception:
+                    pass
+
             profit_val = None
             if buy_price is not None and sell_price is not None:
                 profit_val = int(sell_price) - int(buy_price)
@@ -349,15 +360,16 @@ def handler(event: dict, context) -> dict:
             weight_sql = str(float(weight)) if weight else 'NULL'
             buy_sql = str(int(buy_price)) if buy_price is not None else 'NULL'
             sell_sql = str(int(sell_price)) if sell_price is not None else 'NULL'
+            spg_sql = str(float(sell_price_per_gram)) if sell_price_per_gram not in (None, '', 0) else 'NULL'
             profit_sql = str(profit_val) if profit_val is not None else 'NULL'
 
             cur.execute(f"""
                 INSERT INTO {SCHEMA}.gold_orders
-                    (name, phone, item_name, weight, purity, buy_price, sell_price, profit, comment)
+                    (name, phone, item_name, weight, purity, buy_price, sell_price, sell_price_per_gram, profit, comment)
                 VALUES
                     ('{name_e}', '{phone_e}',
                      '{item_name}', {weight_sql}, '{purity}',
-                     {buy_sql}, {sell_sql}, {profit_sql}, '{comment}')
+                     {buy_sql}, {sell_sql}, {spg_sql}, {profit_sql}, '{comment}')
                 RETURNING id
             """)
             order_id = cur.fetchone()[0]
@@ -371,6 +383,7 @@ def handler(event: dict, context) -> dict:
         admin_note = body.get('admin_note')
         buy_price = body.get('buy_price')
         sell_price = body.get('sell_price')
+        sell_price_per_gram = body.get('sell_price_per_gram')
         item_name = body.get('item_name')
         weight = body.get('weight')
         purity = body.get('purity')
@@ -382,6 +395,25 @@ def handler(event: dict, context) -> dict:
         if new_status and new_status not in VALID_STATUSES:
             cur.close(); conn.close()
             return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'Неверный статус'}, ensure_ascii=False)}
+
+        # Если пришла цена за грамм — пересчитаем sell_price от текущего/нового веса
+        if sell_price_per_gram is not None:
+            try:
+                spg_f = float(sell_price_per_gram) if sell_price_per_gram != '' else 0.0
+            except Exception:
+                spg_f = 0.0
+            # вес: если передан в этом же запросе — берём из body, иначе — из БД
+            if weight is not None:
+                try:
+                    w_f = float(weight) if weight else 0.0
+                except Exception:
+                    w_f = 0.0
+            else:
+                cur.execute(f"SELECT weight FROM {SCHEMA}.gold_orders WHERE id = {order_id}")
+                wrow = cur.fetchone()
+                w_f = float(wrow[0]) if wrow and wrow[0] is not None else 0.0
+            if spg_f > 0 and w_f > 0:
+                sell_price = int(round(spg_f * w_f))
 
         sets = []
         if new_status:
@@ -395,6 +427,14 @@ def handler(event: dict, context) -> dict:
             sets.append(f"buy_price = {int(buy_price)}")
         if sell_price is not None:
             sets.append(f"sell_price = {int(sell_price)}")
+        if sell_price_per_gram is not None:
+            if sell_price_per_gram in ('', 0, '0'):
+                sets.append("sell_price_per_gram = NULL")
+            else:
+                try:
+                    sets.append(f"sell_price_per_gram = {float(sell_price_per_gram)}")
+                except Exception:
+                    pass
         if buy_price is not None or sell_price is not None:
             cur.execute(f"SELECT buy_price, sell_price FROM {SCHEMA}.gold_orders WHERE id = {order_id}")
             cur_row = cur.fetchone()

@@ -15,6 +15,7 @@ type Period = "day" | "yesterday" | "week" | "month";
 type EditForm = {
   name: string; phone: string; item_name: string; weight: string;
   purity: string; buy_price: string; sell_price: string;
+  sell_price_per_gram: string;
   comment: string; admin_note: string; payment_method: string;
 };
 
@@ -107,14 +108,24 @@ export default function GoldTab({ token }: { token: string }) {
   const onSave = async (order: GoldOrder, ef: EditForm) => {
     setSaving(true);
     setSaveError(null);
+    // Если задана цена за грамм — отдаём её, бэкенд сам пересчитает sell_price.
+    // Если её нет, но есть sell_price (старые записи) — оставляем как есть.
+    const spg = ef.sell_price_per_gram ? parseFloat(ef.sell_price_per_gram.replace(",", ".")) : null;
+    const w = ef.weight ? parseFloat(ef.weight.replace(",", ".")) : null;
+    let sellTotal: number | null = ef.sell_price ? parseInt(ef.sell_price) : null;
+    if (spg && spg > 0 && w && w > 0) {
+      sellTotal = Math.round(spg * w);
+    }
+
     const body: Record<string, unknown> = {
       id: order.id,
       name: ef.name, phone: ef.phone,
       item_name: ef.item_name || null,
-      weight: ef.weight ? parseFloat(ef.weight) : null,
+      weight: w,
       purity: ef.purity || null,
       buy_price: ef.buy_price ? parseInt(ef.buy_price) : null,
-      sell_price: ef.sell_price ? parseInt(ef.sell_price) : null,
+      sell_price: sellTotal,
+      sell_price_per_gram: spg,
       comment: ef.comment || null,
       admin_note: ef.admin_note || null,
       payment_method: ef.payment_method || null,
