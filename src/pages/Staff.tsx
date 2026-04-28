@@ -6,6 +6,7 @@ import AnimeMascot from "./staffTheme/AnimeMascot";
 import CursorEffects from "./staffTheme/CursorEffects";
 import BackgroundFx from "./staffTheme/BackgroundFx";
 import StaffThemeSettings from "./staffTheme/StaffThemeSettings";
+import InstallPwaButton from "./staff/InstallPwaButton";
 
 const GoodsTab      = lazy(() => import("./StaffGoodsTab"));
 const StaffRepairTab = lazy(() => import("./StaffRepairTab"));
@@ -67,8 +68,54 @@ function MskClock() {
   );
 }
 
+function useStaffPwa() {
+  useEffect(() => {
+    // Динамически подменяем manifest на /staff
+    const head = document.head;
+    const prev = head.querySelector('link[rel="manifest"]') as HTMLLinkElement | null;
+    const prevHref = prev?.href || "";
+    const link = prev || document.createElement("link");
+    link.rel = "manifest";
+    link.href = "/staff-manifest.json";
+    if (!prev) head.appendChild(link);
+
+    // theme-color для статус-бара
+    let themeMeta = head.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
+    const prevTheme = themeMeta?.content || "";
+    if (!themeMeta) {
+      themeMeta = document.createElement("meta");
+      themeMeta.name = "theme-color";
+      head.appendChild(themeMeta);
+    }
+    themeMeta.content = "#0A0A0A";
+
+    // Apple title для иконки на рабочем столе
+    let appleTitle = head.querySelector('meta[name="apple-mobile-web-app-title"]') as HTMLMetaElement | null;
+    const prevTitle = appleTitle?.content || "";
+    if (!appleTitle) {
+      appleTitle = document.createElement("meta");
+      appleTitle.name = "apple-mobile-web-app-title";
+      head.appendChild(appleTitle);
+    }
+    appleTitle.content = "Скупка24";
+
+    // Регистрация лёгкого SW для /staff PWA (offline старт)
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/staff-sw.js", { scope: "/staff" }).catch(() => {});
+    }
+
+    return () => {
+      // Возвращаем как было, чтобы не ломать другие страницы при SPA-навигации
+      if (prev && prevHref) prev.href = prevHref;
+      if (themeMeta && prevTheme) themeMeta.content = prevTheme;
+      if (appleTitle && prevTitle) appleTitle.content = prevTitle;
+    };
+  }, []);
+}
+
 export default function Staff() {
   const [tokenBoot] = useState(() => localStorage.getItem("employee_token") || "");
+  useStaffPwa();
   return (
     <StaffThemeProvider token={tokenBoot}>
       <StaffInner />
@@ -393,10 +440,13 @@ function StaffInner() {
         </div>
 
         <a href="/cabinet"
-          className="flex items-center justify-center gap-2 w-full border border-[#1F1F1F] text-white/50 hover:text-white hover:border-[#FFD700]/30 hover:bg-[#141414] active:scale-95 font-roboto text-sm py-3.5 rounded-md transition-all">
+          className="flex items-center justify-center gap-2 w-full border border-[#1F1F1F] text-white/50 hover:text-white hover:border-[#FFD700]/30 hover:bg-[#141414] active:scale-95 font-roboto text-sm py-3.5 rounded-md transition-all mb-3">
           <Icon name="UserPlus" size={16} />
           Зарегистрироваться как клиент
         </a>
+        <div className="flex justify-center">
+          <InstallPwaButton />
+        </div>
       </div>
     </div>
   );
@@ -509,6 +559,7 @@ function StaffInner() {
                 <span className="hidden sm:inline">{sending ? "..." : sendResult === true ? "OK" : sendResult === false ? "Ошибка" : "Напом."}</span>
               </button>
             )}
+            <InstallPwaButton />
             <button onClick={() => setThemeOpen(true)} title="Моя тема"
               className="text-white/30 hover:text-[#FFD700] active:text-[#FFD700] transition-colors p-2 rounded-sm hover:bg-[#FFD700]/10">
               <Icon name="Sparkles" size={16} />

@@ -1,0 +1,50 @@
+{
+  "id": "/staff",
+  "name": "Скупка24 — Сотрудник",
+  "short_name": "Скупка24",
+  "description": "Рабочее приложение сотрудника Скупка24: ремонт, клиенты, золото, чат, аналитика.",
+  "start_url": "/staff",
+  "scope": "/staff",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "background_color": "#0A0A0A",
+  "theme_color": "#0A0A0A",
+  "orientation": "portrait-primary",
+  "lang": "ru",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/82ca056c-ebd5-4bd2-bb00-3169b472a822.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any"
+    },
+    {
+      "src": "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/82ca056c-ebd5-4bd2-bb00-3169b472a822.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Ремонт",
+      "short_name": "Ремонт",
+      "url": "/staff?tab=repair",
+      "icons": [{"src": "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/82ca056c-ebd5-4bd2-bb00-3169b472a822.jpg", "sizes": "96x96"}]
+    },
+    {
+      "name": "Чат",
+      "short_name": "Чат",
+      "url": "/staff?tab=chat",
+      "icons": [{"src": "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/82ca056c-ebd5-4bd2-bb00-3169b472a822.jpg", "sizes": "96x96"}]
+    },
+    {
+      "name": "Золото",
+      "short_name": "Золото",
+      "url": "/staff?tab=gold",
+      "icons": [{"src": "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/82ca056c-ebd5-4bd2-bb00-3169b472a822.jpg", "sizes": "96x96"}]
+    }
+  ],
+  "prefer_related_applications": false
+}
