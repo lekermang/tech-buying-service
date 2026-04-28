@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Component, type ReactNode, lazy } from "react";
+import React, { useState, useEffect, useCallback, Component, type ReactNode, lazy } from "react";
 import Icon from "@/components/ui/icon";
 import { EMPLOYEE_AUTH_URL } from "./staff.types";
 import { StaffThemeProvider, useStaffTheme } from "./staffTheme/StaffThemeContext";
@@ -7,16 +7,54 @@ import CursorEffects from "./staffTheme/CursorEffects";
 import BackgroundFx from "./staffTheme/BackgroundFx";
 import StaffThemeSettings from "./staffTheme/StaffThemeSettings";
 import InstallPwaButton from "./staff/InstallPwaButton";
+import {
+  PRICE_SCHEDULER_URL,
+  VIP_CHAT_URL,
+  SECRET_PW,
+  PROTECTED_TABS,
+  ROLE_BADGE,
+  ROLE_LABEL,
+  getInitials,
+  readSavedTab,
+  saveTab,
+  type StaffTab,
+} from "./staff/staffConstants";
+import { OfflineBanner, UpdateAvailableBanner } from "./staff/StaffStatusBanners";
 
-const GoodsTab      = lazy(() => import("./StaffGoodsTab"));
-const StaffRepairTab = lazy(() => import("./StaffRepairTab"));
-const GoldTab       = lazy(() => import("./GoldTab"));
-const SalesTab      = lazy(() => import("./StaffOtherTabs").then(m => ({ default: m.SalesTab })));
-const ClientsTab    = lazy(() => import("./StaffOtherTabs").then(m => ({ default: m.ClientsTab })));
-const AnalyticsTab  = lazy(() => import("./StaffOtherTabs").then(m => ({ default: m.AnalyticsTab })));
-const EmployeesTab  = lazy(() => import("./StaffOtherTabs").then(m => ({ default: m.EmployeesTab })));
-const VipChatTab    = lazy(() => import("./StaffVipChatTab"));
-const SmartLombardTab = lazy(() => import("./smartlombard/SmartLombardTab"));
+// Ленивые модули + прелоадеры (для предзагрузки по hover/touchstart)
+const loadGoods         = () => import("./StaffGoodsTab");
+const loadRepair        = () => import("./StaffRepairTab");
+const loadGold          = () => import("./GoldTab");
+const loadOtherTabs     = () => import("./StaffOtherTabs");
+const loadVipChat       = () => import("./StaffVipChatTab");
+const loadSmartLombard  = () => import("./smartlombard/SmartLombardTab");
+
+const GoodsTab        = lazy(loadGoods);
+const StaffRepairTab  = lazy(loadRepair);
+const GoldTab         = lazy(loadGold);
+const SalesTab        = lazy(() => loadOtherTabs().then(m => ({ default: m.SalesTab })));
+const ClientsTab      = lazy(() => loadOtherTabs().then(m => ({ default: m.ClientsTab })));
+const AnalyticsTab    = lazy(() => loadOtherTabs().then(m => ({ default: m.AnalyticsTab })));
+const EmployeesTab    = lazy(() => loadOtherTabs().then(m => ({ default: m.EmployeesTab })));
+const VipChatTab      = lazy(loadVipChat);
+const SmartLombardTab = lazy(loadSmartLombard);
+
+const TAB_PRELOADERS: Record<string, () => Promise<unknown>> = {
+  goods: loadGoods,
+  repair: loadRepair,
+  gold: loadGold,
+  sales: loadOtherTabs,
+  clients: loadOtherTabs,
+  analytics: loadOtherTabs,
+  employees: loadOtherTabs,
+  chat: loadVipChat,
+  smartlombard: loadSmartLombard,
+};
+
+function prefetchTab(t: string): void {
+  const fn = TAB_PRELOADERS[t];
+  if (fn) fn().catch(() => {});
+}
 
 class TabErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
   constructor(props: { children: ReactNode }) {
@@ -40,9 +78,7 @@ class TabErrorBoundary extends Component<{ children: ReactNode }, { error: strin
   }
 }
 
-const PRICE_SCHEDULER_URL = "https://functions.poehali.dev/b09271ea-c662-4225-973f-4dd4c6a0e32c";
-
-type Tab = "goods" | "sales" | "clients" | "analytics" | "employees" | "repair" | "chat" | "smartlombard";
+type Tab = StaffTab;
 
 function MskClock() {
   const [now, setNow] = useState(() => new Date());
@@ -172,7 +208,8 @@ function StaffInner() {
   const [pinLoading, setPinLoading] = useState(false);
   const [empName, setEmpName] = useState(() => localStorage.getItem("employee_name") || "");
   const [empRole, setEmpRole] = useState(() => localStorage.getItem("employee_role") || "");
-  const [tab, setTab] = useState<Tab>("repair");
+  const [tab, setTabRaw] = useState<Tab>(() => readSavedTab("repair"));
+  const setTab = useCallback((t: Tab) => { setTabRaw(t); saveTab(t); }, []);
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState<null | boolean>(null);
   const [pwModal, setPwModal] = useState<null | Tab>(null);
@@ -184,32 +221,69 @@ function StaffInner() {
 
   useEffect(() => {
     if (!token) return;
-    fetch(EMPLOYEE_AUTH_URL, { headers: { "X-Employee-Token": token } })
+    const ctrl = new AbortController();
+    fetch(EMPLOYEE_AUTH_URL, { headers: { "X-Employee-Token": token }, signal: ctrl.signal })
       .then(r => r.json())
       .then(d => {
         if (d.id) { setAuthed(true); setEmpName(d.full_name); setEmpRole(d.role); }
         else { localStorage.removeItem("employee_token"); setToken(""); }
       })
       .catch(() => {});
+    return () => ctrl.abort();
   }, [token]);
 
-  // Фоновый polling счётчика непрочитанных в чате (каждые 15 сек, когда чат не открыт)
+  // Прогрев соседних чанков после авторизации
+  useEffect(() => {
+    if (!authed) return;
+    prefetchTab(tab);
+    if (tab !== "chat") prefetchTab("chat");
+    if (tab !== "repair") prefetchTab("repair");
+  }, [authed, tab]);
+
+  // Хоткеи 1–7 на десктопе
+  useEffect(() => {
+    if (!authed) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
+      const isOwnerOrAdminLocal = empRole === "owner" || empRole === "admin";
+      const order: Tab[] = [
+        "repair", "chat", "clients", "analytics", "smartlombard",
+        ...(isOwnerOrAdminLocal ? (["gold", "employees"] as Tab[]) : []),
+      ];
+      const n = parseInt(e.key, 10);
+      if (!Number.isFinite(n) || n < 1 || n > order.length) return;
+      const next = order[n - 1];
+      const isOwnerLocal = empRole === "owner";
+      if (next && (isOwnerLocal || unlocked[next] || !(PROTECTED_TABS as readonly string[]).includes(next))) {
+        setTab(next);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [authed, empRole, unlocked, setTab]);
+
+  // Фоновый polling счётчика непрочитанных в чате (каждые 15 сек, когда чат не открыт и вкладка видима)
   useEffect(() => {
     if (!authed || !token || tab === "chat") return;
-    const VIP_URL = "https://functions.poehali.dev/f4a88e67-03e7-4387-a091-32588d90df73";
+    let cancelled = false;
     const fetchUnread = () => {
-      fetch(VIP_URL, {
+      if (typeof document !== "undefined" && document.hidden) return;
+      fetch(VIP_CHAT_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Employee-Token": token },
         body: JSON.stringify({ action: "poll", after_id: -1, limit: 1 }),
       })
         .then(r => r.json())
-        .then(d => { if (typeof d.unread === "number") setChatUnread(d.unread); })
+        .then(d => { if (!cancelled && typeof d.unread === "number") setChatUnread(d.unread); })
         .catch(() => {});
     };
     fetchUnread();
     const t = setInterval(fetchUnread, 15000);
-    return () => clearInterval(t);
+    const onVisible = () => { if (!document.hidden) fetchUnread(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { cancelled = true; clearInterval(t); document.removeEventListener("visibilitychange", onVisible); };
   }, [authed, token, tab]);
 
   const [loginLoading, setLoginLoading] = useState(false);
@@ -453,11 +527,10 @@ function StaffInner() {
 
   const isOwnerOrAdmin = empRole === "owner" || empRole === "admin";
   const isOwner = empRole === "owner";
-  const SECRET_PW = "Mark2015N";
 
   const requestTab = (t: Tab) => {
     if (isOwner || unlocked[t]) { setTab(t); return; }
-    if (t === "gold" || t === "analytics" || t === "employees") {
+    if ((PROTECTED_TABS as readonly string[]).includes(t)) {
       setPwModal(t); setPwInput(""); setPwError("");
       return;
     }
@@ -489,23 +562,17 @@ function StaffInner() {
     }
   };
 
-  const TABS = [
-    { k: "repair",    l: "Ремонт",    icon: "Wrench" },
-    { k: "chat",      l: "Чат",       icon: "MessageCircle", badge: chatUnread },
-    { k: "clients",   l: "Клиенты",   icon: "Users" },
-    { k: "analytics", l: "Статистика",icon: "BarChart2" },
+  const TABS: { k: Tab; l: string; icon: string; badge?: number }[] = [
+    { k: "repair",       l: "Ремонт",       icon: "Wrench" },
+    { k: "chat",         l: "Чат",          icon: "MessageCircle", badge: chatUnread },
+    { k: "clients",      l: "Клиенты",      icon: "Users" },
+    { k: "analytics",    l: "Статистика",   icon: "BarChart2" },
     { k: "smartlombard", l: "SmartLombard", icon: "Gem" },
-    ...(isOwnerOrAdmin ? [{ k: "gold", l: "Золото", icon: "Coins" }] : []),
-    ...(isOwnerOrAdmin ? [{ k: "employees", l: "Команда", icon: "UserCog" }] : []),
+    ...(isOwnerOrAdmin ? [{ k: "gold" as Tab, l: "Золото", icon: "Coins" }] : []),
+    ...(isOwnerOrAdmin ? [{ k: "employees" as Tab, l: "Команда", icon: "UserCog" }] : []),
   ];
 
-  const ROLE_BADGE: Record<string, string> = {
-    owner: "bg-gradient-to-r from-[#FFD700] to-yellow-500 text-black shadow-lg shadow-[#FFD700]/20",
-    admin: "bg-gradient-to-r from-blue-500/30 to-blue-600/20 text-blue-300 border border-blue-400/30",
-    staff: "bg-white/10 text-white/60 border border-white/10",
-  };
-  const ROLE_LABEL: Record<string, string> = { owner: "Владелец", admin: "Админ", staff: "Сотрудник" };
-  const initials = empName.trim().split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase() || "?";
+  const initials = getInitials(empName);
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-white flex flex-col relative" style={{ fontFamily: "var(--staff-font, inherit)" }}>
@@ -514,7 +581,10 @@ function StaffInner() {
       <CursorEffects />
       <AnimeMascot onOpenSettings={() => setThemeOpen(true)} />
       {themeOpen && <StaffThemeSettings onClose={() => setThemeOpen(false)} />}
-      {/* Баннер темы — самый верх */}
+      {/* Системные баннеры */}
+      <OfflineBanner />
+      <UpdateAvailableBanner />
+      {/* Баннер темы */}
       <ThemeBanner onOpen={() => setThemeOpen(true)} />
       {/* Шапка — премиальная с градиентом */}
       <div className="relative shrink-0 safe-top border-b border-[#222]">
@@ -597,12 +667,16 @@ function StaffInner() {
         <div className="relative bg-[#0A0A0A]/90 backdrop-blur-xl border-t border-white/[0.06]">
           <div className="flex overflow-x-auto no-scrollbar">
             {TABS.map(t => {
-              const locked = !isOwner && !unlocked[t.k] && (t.k === "gold" || t.k === "analytics" || t.k === "employees");
+              const locked = !isOwner && !unlocked[t.k] && (PROTECTED_TABS as readonly string[]).includes(t.k);
               const active = tab === t.k;
               return (
                 <button
                   key={t.k}
                   onClick={() => requestTab(t.k as Tab)}
+                  onMouseEnter={() => prefetchTab(t.k)}
+                  onTouchStart={() => prefetchTab(t.k)}
+                  aria-label={t.l}
+                  aria-current={active ? "page" : undefined}
                   className={`flex-1 min-w-[64px] flex flex-col items-center justify-center gap-1 pt-2.5 pb-2 min-h-[58px] transition-all duration-300 active:scale-95 relative group ${
                     active ? "text-[#FFD700]" : "text-white/40 hover:text-white/70"
                   }`}

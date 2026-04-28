@@ -1,9 +1,13 @@
-const CACHE_NAME = 'staff-v1';
+const CACHE_NAME = 'staff-v2';
 const STATIC_ASSETS = ['/staff'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(STATIC_ASSETS).catch(() => {})));
-  self.skipWaiting();
+  // Не скипаем автоматически — страница покажет баннер «доступно обновление»
+});
+
+self.addEventListener('message', e => {
+  if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', e => {
