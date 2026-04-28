@@ -23,6 +23,14 @@ def hash_pw(pw: str) -> str:
     return hashlib.sha256(pw.encode()).hexdigest()
 
 
+def hash_pin(pin: str) -> str:
+    # отдельная соль, чтобы PIN-хеш не совпадал с password_hash
+    return hashlib.sha256(('pin:' + pin).encode()).hexdigest()
+
+
+OWNER_REQUIRED_PIN = '231189'
+
+
 def get_employee_by_token(token: str):
     if not token:
         return None
@@ -124,7 +132,7 @@ def handler(event: dict, context) -> dict:
             return _err(404, 'Сотрудник не найден')
         return _ok({'ok': True})
 
-    # POST /login
+    # POST /login — шаг 1: проверка логина+пароля, выдаём pin_ticket
     if method == 'POST' and body.get('action') == 'login':
         login_val = body.get('login', '').strip()
         password = body.get('password', '').strip()
@@ -132,26 +140,135 @@ def handler(event: dict, context) -> dict:
             return _err(400, 'Логин и пароль обязательны')
         conn = get_conn(); cur = conn.cursor()
         pw_hash = hash_pw(password)
-        cur.execute(f"SELECT id, full_name, role, password_hash FROM {SCHEMA}.employees WHERE login=%s AND is_active=true", (login_val,))
+        cur.execute(f"SELECT id, full_name, role, password_hash, pin_hash, pin_locked_until FROM {SCHEMA}.employees WHERE login=%s AND is_active=true", (login_val,))
         row = cur.fetchone()
         if not row:
             cur.close(); conn.close(); return _err(401, 'Неверный логин или пароль')
-        emp_id, full_name, role, stored_hash = row
-        # CHANGE_ME — пароль ещё не установлен, принимаем любой и устанавливаем
+        emp_id, full_name, role, stored_hash, pin_hash, pin_locked_until = row
+        # CHANGE_ME — пароль ещё не установлен, фиксируем введённый
         if stored_hash == 'CHANGE_ME':
-            token = secrets.token_hex(32)
-            expires = datetime.utcnow() + timedelta(days=30)
-            cur.execute(f"UPDATE {SCHEMA}.employees SET password_hash=%s, auth_token=%s, token_expires_at=%s WHERE id=%s",
-                        (pw_hash, token, expires, emp_id))
-            conn.commit(); cur.close(); conn.close()
-            return _ok({'token': token, 'full_name': full_name, 'role': role, 'first_login': True})
+            cur.execute(f"UPDATE {SCHEMA}.employees SET password_hash=%s WHERE id=%s", (pw_hash, emp_id))
+            stored_hash = pw_hash
         if stored_hash != pw_hash:
             cur.close(); conn.close(); return _err(401, 'Неверный логин или пароль')
+
+        # Блокировка PIN ещё активна?
+        if pin_locked_until and pin_locked_until > datetime.utcnow():
+            cur.close(); conn.close()
+            return _err(423, 'PIN временно заблокирован из-за ошибок. Попробуйте позже.')
+
+        # Выдаём короткоживущий pin_ticket (5 минут) для шага 2
+        ticket = secrets.token_hex(24)
+        ticket_exp = datetime.utcnow() + timedelta(minutes=5)
+        cur.execute(
+            f"UPDATE {SCHEMA}.employees SET auth_token=%s, token_expires_at=%s, pin_pending=true WHERE id=%s",
+            (ticket, ticket_exp, emp_id),
+        )
+        conn.commit(); cur.close(); conn.close()
+        # Если PIN не задан — сотруднику предложим создать его (владельцу — обязан быть 231189)
+        return _ok({
+            'stage': 'pin',
+            'pin_ticket': ticket,
+            'pin_set': bool(pin_hash),
+            'role': role,
+            'full_name': full_name,
+        })
+
+    # POST /verify_pin — шаг 2: проверка/создание PIN, выдаём финальный токен
+    if method == 'POST' and body.get('action') == 'verify_pin':
+        ticket = (body.get('pin_ticket') or '').strip()
+        pin = (body.get('pin') or '').strip()
+        if not ticket or not pin:
+            return _err(400, 'PIN обязателен')
+        if not pin.isdigit() or not (4 <= len(pin) <= 8):
+            return _err(400, 'PIN должен быть 4–8 цифр')
+
+        conn = get_conn(); cur = conn.cursor()
+        cur.execute(
+            f"SELECT id, full_name, role, pin_hash, pin_failed_count, pin_locked_until "
+            f"FROM {SCHEMA}.employees "
+            f"WHERE auth_token=%s AND token_expires_at>NOW() AND pin_pending=true AND is_active=true",
+            (ticket,),
+        )
+        row = cur.fetchone()
+        if not row:
+            cur.close(); conn.close(); return _err(401, 'Сессия входа истекла, войдите заново')
+        emp_id, full_name, role, pin_hash, pin_failed, pin_locked = row
+
+        if pin_locked and pin_locked > datetime.utcnow():
+            cur.close(); conn.close()
+            return _err(423, 'PIN временно заблокирован, попробуйте позже')
+
+        new_pin_hash = hash_pin(pin)
+
+        # Создание PIN при первом входе
+        if not pin_hash:
+            # Владельцу разрешён только конкретный PIN
+            if role == 'owner' and pin != OWNER_REQUIRED_PIN:
+                cur.close(); conn.close()
+                return _err(403, 'Неверный PIN владельца')
+            cur.execute(
+                f"UPDATE {SCHEMA}.employees SET pin_hash=%s, pin_failed_count=0, pin_locked_until=NULL WHERE id=%s",
+                (new_pin_hash, emp_id),
+            )
+        else:
+            # Проверка существующего PIN
+            if role == 'owner':
+                # Владелец всегда обязан вводить фиксированный PIN
+                if pin != OWNER_REQUIRED_PIN:
+                    failed = (pin_failed or 0) + 1
+                    locked_sql = ''
+                    locked_val = None
+                    if failed >= 5:
+                        locked_val = datetime.utcnow() + timedelta(minutes=15)
+                        locked_sql = ", pin_locked_until=%s"
+                    if locked_val is not None:
+                        cur.execute(
+                            f"UPDATE {SCHEMA}.employees SET pin_failed_count=%s{locked_sql} WHERE id=%s",
+                            (failed, locked_val, emp_id),
+                        )
+                    else:
+                        cur.execute(
+                            f"UPDATE {SCHEMA}.employees SET pin_failed_count=%s WHERE id=%s",
+                            (failed, emp_id),
+                        )
+                    conn.commit(); cur.close(); conn.close()
+                    return _err(401, 'Неверный PIN')
+            else:
+                if pin_hash != new_pin_hash:
+                    failed = (pin_failed or 0) + 1
+                    locked_val = None
+                    if failed >= 5:
+                        locked_val = datetime.utcnow() + timedelta(minutes=15)
+                    if locked_val is not None:
+                        cur.execute(
+                            f"UPDATE {SCHEMA}.employees SET pin_failed_count=%s, pin_locked_until=%s WHERE id=%s",
+                            (failed, locked_val, emp_id),
+                        )
+                    else:
+                        cur.execute(
+                            f"UPDATE {SCHEMA}.employees SET pin_failed_count=%s WHERE id=%s",
+                            (failed, emp_id),
+                        )
+                    conn.commit(); cur.close(); conn.close()
+                    return _err(401, 'Неверный PIN')
+
+        # Успех — выдаём финальный токен на 30 дней
         token = secrets.token_hex(32)
         expires = datetime.utcnow() + timedelta(days=30)
-        cur.execute(f"UPDATE {SCHEMA}.employees SET auth_token=%s, token_expires_at=%s WHERE id=%s", (token, expires, emp_id))
+        cur.execute(
+            f"UPDATE {SCHEMA}.employees "
+            f"SET auth_token=%s, token_expires_at=%s, pin_pending=false, pin_failed_count=0, pin_locked_until=NULL "
+            f"WHERE id=%s",
+            (token, expires, emp_id),
+        )
         conn.commit(); cur.close(); conn.close()
-        return _ok({'token': token, 'full_name': full_name, 'role': role})
+        return _ok({
+            'token': token,
+            'full_name': full_name,
+            'role': role,
+            'first_pin': not bool(pin_hash),
+        })
 
     # POST /create — создать сотрудника (owner/admin)
     if method == 'POST' and body.get('action') == 'create':

@@ -118,6 +118,11 @@ function StaffInner() {
   const [loginForm, setLoginForm] = useState({ login: "", password: "" });
   const [loginError, setLoginError] = useState("");
   const [authed, setAuthed] = useState(false);
+  const [pinStage, setPinStage] = useState<null | { ticket: string; pin_set: boolean; role: string; full_name: string }>(null);
+  const [pinValue, setPinValue] = useState("");
+  const [pinConfirm, setPinConfirm] = useState("");
+  const [pinError, setPinError] = useState("");
+  const [pinLoading, setPinLoading] = useState(false);
   const [empName, setEmpName] = useState(() => localStorage.getItem("employee_name") || "");
   const [empRole, setEmpRole] = useState(() => localStorage.getItem("employee_role") || "");
   const [tab, setTab] = useState<Tab>("repair");
@@ -169,7 +174,11 @@ function StaffInner() {
     try {
       const res = await fetch(EMPLOYEE_AUTH_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "login", ...loginForm }) });
       const data = await res.json();
-      if (data.token) {
+      if (data.stage === "pin" && data.pin_ticket) {
+        setPinStage({ ticket: data.pin_ticket, pin_set: !!data.pin_set, role: data.role, full_name: data.full_name });
+        setPinValue(""); setPinConfirm(""); setPinError("");
+      } else if (data.token) {
+        // обратная совместимость
         localStorage.setItem("employee_token", data.token);
         localStorage.setItem("employee_name", data.full_name);
         localStorage.setItem("employee_role", data.role);
@@ -184,10 +193,143 @@ function StaffInner() {
     }
   };
 
+  const verifyPin = async () => {
+    if (!pinStage) return;
+    if (!/^\d{4,8}$/.test(pinValue)) { setPinError("PIN — 4–8 цифр"); return; }
+    if (!pinStage.pin_set) {
+      if (pinStage.role === "owner" && pinValue !== "231189") {
+        setPinError("Неверный PIN владельца"); return;
+      }
+      if (pinStage.role !== "owner" && pinValue !== pinConfirm) {
+        setPinError("PIN-коды не совпадают"); return;
+      }
+    }
+    setPinLoading(true);
+    setPinError("");
+    try {
+      const res = await fetch(EMPLOYEE_AUTH_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "verify_pin", pin_ticket: pinStage.ticket, pin: pinValue }),
+      });
+      const data = await res.json();
+      if (data.token) {
+        localStorage.setItem("employee_token", data.token);
+        localStorage.setItem("employee_name", data.full_name);
+        localStorage.setItem("employee_role", data.role);
+        setToken(data.token); setEmpName(data.full_name); setEmpRole(data.role); setAuthed(true);
+        setPinStage(null); setPinValue(""); setPinConfirm("");
+      } else {
+        setPinError(data.error || "Неверный PIN");
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setPinError(`Ошибка: ${msg}`);
+    } finally {
+      setPinLoading(false);
+    }
+  };
+
+  const cancelPin = () => {
+    setPinStage(null); setPinValue(""); setPinConfirm(""); setPinError("");
+    setLoginForm({ login: "", password: "" });
+  };
+
   const logout = () => {
     localStorage.removeItem("employee_token"); localStorage.removeItem("employee_name"); localStorage.removeItem("employee_role");
     setToken(""); setAuthed(false); setEmpName(""); setEmpRole("");
   };
+
+  if (!authed && pinStage) {
+    const isOwnerPin = pinStage.role === "owner";
+    const needConfirm = !pinStage.pin_set && !isOwnerPin;
+    const title = pinStage.pin_set
+      ? "Введите PIN-код"
+      : isOwnerPin
+        ? "PIN владельца"
+        : "Создайте PIN-код";
+    const subtitle = pinStage.pin_set
+      ? `${pinStage.full_name}`
+      : isOwnerPin
+        ? "Введите ваш персональный PIN"
+        : "Запомните его — будете вводить при каждом входе";
+    return (
+      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center px-4 safe-area-inset relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-[#FFD700]/[0.04] via-transparent to-blue-500/[0.03] pointer-events-none" />
+        <div className="absolute top-0 left-0 w-64 h-64 bg-[#FFD700]/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative w-full max-w-sm">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-12 h-12 bg-gradient-to-br from-[#FFD700] to-yellow-600 rounded-lg flex items-center justify-center shrink-0 shadow-lg shadow-[#FFD700]/20">
+              <Icon name="ShieldCheck" size={22} className="text-black" />
+            </div>
+            <div>
+              <div className="font-oswald font-bold text-white uppercase tracking-wider text-lg">{title}</div>
+              <div className="font-roboto text-white/40 text-[11px]">{subtitle}</div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-[#141414] to-[#0A0A0A] border border-[#1F1F1F] rounded-xl p-5 space-y-3.5 mb-4 shadow-2xl shadow-black/50">
+            <div>
+              <label className="font-roboto text-white/40 text-[10px] uppercase tracking-wider block mb-1.5">PIN-код</label>
+              <div className="relative">
+                <Icon name="Lock" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  autoFocus
+                  maxLength={8}
+                  value={pinValue}
+                  onChange={(e) => setPinValue(e.target.value.replace(/\D/g, ""))}
+                  onKeyDown={(e) => e.key === "Enter" && verifyPin()}
+                  placeholder="••••"
+                  className="w-full bg-[#0A0A0A] border border-[#1F1F1F] text-white pl-10 pr-3 py-3 font-oswald font-bold text-2xl tracking-[0.5em] tabular-nums rounded-md focus:outline-none focus:border-[#FFD700]/50 focus:bg-[#141414] placeholder:text-white/20 transition-all text-center"
+                />
+              </div>
+            </div>
+
+            {needConfirm && (
+              <div>
+                <label className="font-roboto text-white/40 text-[10px] uppercase tracking-wider block mb-1.5">Повторите PIN</label>
+                <div className="relative">
+                  <Icon name="Lock" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    maxLength={8}
+                    value={pinConfirm}
+                    onChange={(e) => setPinConfirm(e.target.value.replace(/\D/g, ""))}
+                    onKeyDown={(e) => e.key === "Enter" && verifyPin()}
+                    placeholder="••••"
+                    className="w-full bg-[#0A0A0A] border border-[#1F1F1F] text-white pl-10 pr-3 py-3 font-oswald font-bold text-2xl tracking-[0.5em] tabular-nums rounded-md focus:outline-none focus:border-[#FFD700]/50 focus:bg-[#141414] placeholder:text-white/20 transition-all text-center"
+                  />
+                </div>
+              </div>
+            )}
+
+            {pinError && (
+              <div className="bg-red-500/10 border border-red-500/20 rounded px-2.5 py-2 text-red-400 font-roboto text-xs flex items-center gap-1.5">
+                <Icon name="AlertCircle" size={12} />{pinError}
+              </div>
+            )}
+
+            <button onClick={verifyPin} disabled={pinLoading}
+              className="w-full bg-gradient-to-b from-[#FFD700] to-yellow-500 text-black font-oswald font-bold py-3.5 uppercase tracking-wide text-sm rounded-md shadow-lg shadow-[#FFD700]/20 hover:shadow-[#FFD700]/40 active:scale-95 transition-all disabled:opacity-60 flex items-center justify-center gap-2">
+              {pinLoading
+                ? <><Icon name="Loader" size={16} className="animate-spin" /> Проверяю...</>
+                : <><Icon name="ShieldCheck" size={16} />{pinStage.pin_set ? "Войти" : "Сохранить и войти"}</>}
+            </button>
+
+            <button onClick={cancelPin}
+              className="w-full text-white/40 hover:text-white font-roboto text-xs py-2 flex items-center justify-center gap-1.5">
+              <Icon name="ArrowLeft" size={12} /> Назад к логину
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!authed) return (
     <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center px-4 safe-area-inset relative overflow-hidden">
