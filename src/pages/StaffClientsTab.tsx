@@ -2,16 +2,16 @@ import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import { AUTH_CLIENT_URL, EMPLOYEE_AUTH_URL } from "./staff.types";
 import { formatPhone } from "@/lib/phoneFormat";
+import { useStaffToast } from "./staff/StaffToast";
 
 type Client = { id: number; full_name: string; phone: string; email: string | null; discount_pct: number; loyalty_points: number; registered_at: string | null };
 
 export function ClientsTab({ token }: { token: string }) {
+  const toast = useStaffToast();
   const [phone, setPhone] = useState("");
   const [found, setFound] = useState<Record<string, unknown> | null>(null);
-  const [notFound, setNotFound] = useState(false);
   const [searching, setSearching] = useState(false);
   const [addForm, setAddForm] = useState({ full_name: "", phone: "", email: "" });
-  const [added, setAdded] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
   const [allClients, setAllClients] = useState<Client[]>([]);
   const [loadingAll, setLoadingAll] = useState(false);
@@ -21,23 +21,49 @@ export function ClientsTab({ token }: { token: string }) {
   const search = async () => {
     if (!phone) return;
     setSearching(true);
-    setNotFound(false); setFound(null);
-    const res = await fetch(`${AUTH_CLIENT_URL}?action=profile&phone=${encodeURIComponent(phone)}`);
-    const data = await res.json();
-    if (data.id) setFound(data);
-    else setNotFound(true);
-    setSearching(false);
+    setFound(null);
+    try {
+      const res = await fetch(`${AUTH_CLIENT_URL}?action=profile&phone=${encodeURIComponent(phone)}`);
+      const data = await res.json();
+      if (data.id) {
+        setFound(data);
+        toast.success(`Найден: ${data.full_name || "клиент"}`);
+      } else {
+        toast.error("Клиент не найден");
+      }
+    } catch {
+      toast.error("Ошибка поиска. Проверьте интернет.");
+    } finally {
+      setSearching(false);
+    }
   };
 
   const addClient = async () => {
-    if (!addForm.phone || !addForm.full_name) return;
+    if (!addForm.phone || !addForm.full_name) {
+      toast.warning("Заполните ФИО и телефон");
+      return;
+    }
     setAddLoading(true);
-    await fetch(AUTH_CLIENT_URL, { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "register", ...addForm }) });
-    setAdded(true); setAddForm({ full_name: "", phone: "", email: "" });
-    setAddLoading(false);
-    if (showAll) loadAllClients();
-    setTimeout(() => setAdded(false), 3000);
+    const tid = toast.loading("Добавляю клиента...");
+    try {
+      const res = await fetch(AUTH_CLIENT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "register", ...addForm }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && (data.ok !== false)) {
+        toast.update(tid, { kind: "success", message: "Клиент добавлен", duration: 3000 });
+        setAddForm({ full_name: "", phone: "", email: "" });
+        if (showAll) loadAllClients();
+      } else {
+        toast.update(tid, { kind: "error", message: data.error || "Не удалось добавить клиента", duration: 5000 });
+      }
+    } catch {
+      toast.update(tid, { kind: "error", message: "Сбой сети при добавлении", duration: 5000 });
+    } finally {
+      setAddLoading(false);
+    }
   };
 
   const loadAllClients = async () => {
@@ -115,11 +141,6 @@ export function ClientsTab({ token }: { token: string }) {
             </div>
           </div>
         )}
-        {notFound && (
-          <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 flex items-center gap-2 text-red-400 font-roboto text-sm">
-            <Icon name="UserX" size={14} />Клиент не найден
-          </div>
-        )}
       </div>
 
       {/* Добавить клиента — premium */}
@@ -128,12 +149,7 @@ export function ClientsTab({ token }: { token: string }) {
           <Icon name="UserPlus" size={14} className="text-[#FFD700]" />
           Новый клиент
         </div>
-        {added ? (
-          <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 text-green-400 font-roboto text-sm flex items-center gap-2 animate-in fade-in zoom-in-95 duration-300">
-            <Icon name="CheckCircle2" size={16} />Клиент добавлен
-          </div>
-        ) : (
-          <div className="space-y-2.5">
+        <div className="space-y-2.5">
             {[
               { key: "full_name", label: "ФИО", placeholder: "Иванов Иван Иванович", icon: "User" },
               { key: "phone", label: "Телефон *", placeholder: "+7 (___) ___-__-__", icon: "Phone" },
@@ -156,8 +172,7 @@ export function ClientsTab({ token }: { token: string }) {
               {addLoading ? <Icon name="Loader" size={13} className="animate-spin" /> : <Icon name="UserPlus" size={13} />}
               Добавить клиента
             </button>
-          </div>
-        )}
+        </div>
       </div>
 
       {/* Все клиенты — premium */}

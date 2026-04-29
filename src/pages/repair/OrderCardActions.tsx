@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import { Order, STATUSES, printReceipt, printAct, printActHTML } from "./types";
+import { useStaffToast } from "../staff/StaffToast";
 
 const STATUS_LABEL: Record<string, string> = {
   accepted:      "Принят мастером",
@@ -49,10 +50,9 @@ export default function OrderCardActions({
   o, ef, saving, isOwner, token, authHeader, financeBlocked,
   onChangeStatus, onOpenReadyModal, onIssueOrder, onDelete,
 }: Props) {
+  const toast = useStaffToast();
   const [sentKey, setSentKey] = useState<string | null>(null);
-  const [notifyError, setNotifyError] = useState<string | null>(null);
   const [smsSentKey, setSmsSentKey] = useState<string | null>(null);
-  const [smsError, setSmsError] = useState<string | null>(null);
   const [actSending, setActSending] = useState(false);
   const [actSent, setActSent] = useState(false);
 
@@ -66,6 +66,7 @@ export default function OrderCardActions({
 
   const handleSendAct = async () => {
     setActSending(true);
+    const tid = toast.loading(`Отправляю акт по заявке #${o.id} в Telegram...`);
     try {
       const res = await fetch("https://functions.poehali.dev/a105aede-d55d-4b99-9d3e-5e977887aa04", {
         method: "POST",
@@ -74,14 +75,24 @@ export default function OrderCardActions({
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json().catch(() => ({}));
-      if (data.ok) { setActSent(true); setTimeout(() => setActSent(false), 3000); }
-    } catch (_e) { /* ignore */ }
-    setActSending(false);
+      if (data.ok) {
+        setActSent(true);
+        setTimeout(() => setActSent(false), 3000);
+        toast.update(tid, { kind: "success", message: "Акт отправлен в Telegram", duration: 3000 });
+      } else {
+        toast.update(tid, { kind: "error", message: data.error || "Не удалось отправить акт", duration: 5000 });
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Ошибка соединения";
+      toast.update(tid, { kind: "error", message: `Ошибка отправки акта: ${msg}`, duration: 5000 });
+    } finally {
+      setActSending(false);
+    }
   };
 
   const handleSend = async (statusKey: string) => {
     setSentKey(statusKey);
-    setNotifyError(null);
+    const tid = toast.loading(`Отправляю Telegram (${STATUS_LABEL[statusKey] || statusKey})...`);
     try {
       const res = await fetch(REPAIR_ORDER_URL, {
         method: "POST",
@@ -89,20 +100,21 @@ export default function OrderCardActions({
         body: JSON.stringify({ action: "notify", order_id: o.id, status_key: statusKey }),
       });
       if (!res.ok) {
-        setNotifyError(`Ошибка сервера (${res.status})`);
+        toast.update(tid, { kind: "error", message: `Ошибка сервера (${res.status})`, duration: 5000 });
       } else {
         const data = await res.json().catch(() => ({}));
-        if (!data.ok) setNotifyError(data.error || "Ошибка отправки");
+        if (data.ok) toast.update(tid, { kind: "success", message: "Telegram отправлен", duration: 2500 });
+        else toast.update(tid, { kind: "error", message: data.error || "Не удалось отправить", duration: 5000 });
       }
     } catch {
-      setNotifyError("Ошибка соединения");
+      toast.update(tid, { kind: "error", message: "Ошибка соединения", duration: 5000 });
     }
     setTimeout(() => setSentKey(null), 3000);
   };
 
   const handleSendSms = async (statusKey: string) => {
     setSmsSentKey(statusKey);
-    setSmsError(null);
+    const tid = toast.loading(`Отправляю SMS (${STATUS_LABEL[statusKey] || statusKey})...`);
     try {
       const res = await fetch(REPAIR_ORDER_URL, {
         method: "POST",
@@ -110,13 +122,14 @@ export default function OrderCardActions({
         body: JSON.stringify({ action: "notify_sms", order_id: o.id, status_key: statusKey }),
       });
       if (!res.ok) {
-        setSmsError(`Ошибка сервера (${res.status})`);
+        toast.update(tid, { kind: "error", message: `Ошибка сервера (${res.status})`, duration: 5000 });
       } else {
         const data = await res.json().catch(() => ({}));
-        if (!data.ok) setSmsError(data.error || "Ошибка SMS");
+        if (data.ok) toast.update(tid, { kind: "success", message: `SMS отправлено на ${o.phone || "клиента"}`, duration: 2500 });
+        else toast.update(tid, { kind: "error", message: data.error || "Не удалось отправить SMS", duration: 5000 });
       }
     } catch {
-      setSmsError("Ошибка соединения");
+      toast.update(tid, { kind: "error", message: "Ошибка соединения", duration: 5000 });
     }
     setTimeout(() => setSmsSentKey(null), 3000);
   };
@@ -183,14 +196,9 @@ export default function OrderCardActions({
         <div className="font-oswald font-bold text-[#229ED9]/80 text-[10px] uppercase tracking-widest mb-2 flex items-center gap-1.5">
           <Icon name="Send" size={11} />
           <span>Telegram клиенту</span>
-          {sentKey && !notifyError && (
+          {sentKey && (
             <span className="ml-auto flex items-center gap-1 bg-green-500/15 text-green-400 px-2 py-0.5 rounded-full text-[9px] font-normal animate-in fade-in zoom-in-95">
               <Icon name="Check" size={9} />Отправлено
-            </span>
-          )}
-          {notifyError && (
-            <span className="ml-auto bg-orange-500/15 text-orange-400 px-2 py-0.5 rounded-full text-[9px] font-normal">
-              {notifyError}
             </span>
           )}
         </div>
@@ -219,14 +227,9 @@ export default function OrderCardActions({
         <div className="font-oswald font-bold text-green-400/80 text-[10px] uppercase tracking-widest mb-2 flex items-center gap-1.5">
           <Icon name="MessageSquare" size={11} />
           <span>SMS · <span className="text-white/60 font-roboto normal-case tabular-nums">{o.phone || "—"}</span></span>
-          {smsSentKey && !smsError && (
+          {smsSentKey && (
             <span className="ml-auto flex items-center gap-1 bg-green-500/15 text-green-400 px-2 py-0.5 rounded-full text-[9px] font-normal animate-in fade-in zoom-in-95">
               <Icon name="Check" size={9} />Отправлено
-            </span>
-          )}
-          {smsError && (
-            <span className="ml-auto bg-orange-500/15 text-orange-400 px-2 py-0.5 rounded-full text-[9px] font-normal">
-              {smsError}
             </span>
           )}
         </div>

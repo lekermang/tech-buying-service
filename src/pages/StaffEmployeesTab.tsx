@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Icon from "@/components/ui/icon";
 import { EMPLOYEE_AUTH_URL } from "./staff.types";
+import { useStaffToast } from "./staff/StaffToast";
 
 type Employee = {
   id: number;
@@ -39,12 +40,12 @@ type FormFields = {
 const EMPTY_FORM: FormFields = { full_name: "", login: "", password: "", role: "staff", position: "", email: "", phone: "", note: "" };
 
 export function EmployeesTab({ token, myRole }: { token: string; myRole: string }) {
+  const toast = useStaffToast();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [addForm, setAddForm] = useState<FormFields>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
-  const [addError, setAddError] = useState("");
   const [editId, setEditId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<FormFields>(EMPTY_FORM);
 
@@ -76,27 +77,52 @@ export function EmployeesTab({ token, myRole }: { token: string; myRole: string 
 
   const createEmployee = async () => {
     if (!addForm.full_name || !addForm.login || !addForm.password) {
-      setAddError("Заполните ФИО, логин и пароль"); return;
+      toast.warning("Заполните ФИО, логин и пароль");
+      return;
     }
-    setSaving(true); setAddError("");
-    const res = await fetch(EMPLOYEE_AUTH_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Employee-Token": token },
-      body: JSON.stringify({ action: "create", ...addForm }),
-    });
-    const data = await res.json();
-    setSaving(false);
-    if (data.ok) { setShowAdd(false); setAddForm(EMPTY_FORM); load(); }
-    else setAddError(data.error || "Ошибка");
+    setSaving(true);
+    const tid = toast.loading("Создаю сотрудника...");
+    try {
+      const res = await fetch(EMPLOYEE_AUTH_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Employee-Token": token },
+        body: JSON.stringify({ action: "create", ...addForm }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        toast.update(tid, { kind: "success", message: `Сотрудник «${addForm.full_name}» добавлен`, duration: 3000 });
+        setShowAdd(false);
+        setAddForm(EMPTY_FORM);
+        load();
+      } else {
+        toast.update(tid, { kind: "error", message: data.error || "Не удалось создать сотрудника", duration: 5000 });
+      }
+    } catch {
+      toast.update(tid, { kind: "error", message: "Сбой сети при создании", duration: 5000 });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const updateEmployee = async (id: number, fields: Record<string, unknown>) => {
-    await fetch(EMPLOYEE_AUTH_URL, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json", "X-Employee-Token": token },
-      body: JSON.stringify({ id, ...fields }),
-    });
-    setEditId(null); load();
+    const tid = toast.loading("Сохраняю изменения...");
+    try {
+      const res = await fetch(EMPLOYEE_AUTH_URL, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "X-Employee-Token": token },
+        body: JSON.stringify({ id, ...fields }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.ok !== false) {
+        toast.update(tid, { kind: "success", message: "Изменения сохранены", duration: 2500 });
+        setEditId(null);
+        load();
+      } else {
+        toast.update(tid, { kind: "error", message: data.error || "Не удалось сохранить", duration: 5000 });
+      }
+    } catch {
+      toast.update(tid, { kind: "error", message: "Сбой сети при сохранении", duration: 5000 });
+    }
   };
 
   const startEdit = (emp: Employee) => {
@@ -136,7 +162,7 @@ export function EmployeesTab({ token, myRole }: { token: string; myRole: string 
             <div className="font-roboto text-[#FFD700]/70 text-[10px] uppercase tracking-wider">Команда</div>
             <div className="font-oswald font-bold text-white text-2xl tabular-nums">{employees.length}</div>
           </div>
-          <button onClick={() => { setShowAdd(v => !v); setAddError(""); }}
+          <button onClick={() => setShowAdd(v => !v)}
             className={`flex items-center gap-1.5 font-oswald font-bold px-3.5 py-2.5 text-xs uppercase rounded-md transition-all active:scale-95 ${
               showAdd
                 ? "bg-[#2A2A2A] text-white/60 border border-[#333]"
@@ -258,11 +284,6 @@ export function EmployeesTab({ token, myRole }: { token: string; myRole: string 
                 })}
               </div>
             </div>
-            {addError && (
-              <div className="bg-red-500/10 border border-red-500/20 rounded px-2.5 py-2 text-red-400 font-roboto text-xs flex items-center gap-1.5">
-                <Icon name="AlertCircle" size={12} />{addError}
-              </div>
-            )}
             <button onClick={createEmployee} disabled={saving}
               className="w-full bg-gradient-to-b from-[#FFD700] to-yellow-500 text-black font-oswald font-bold py-3 uppercase text-xs rounded-md shadow-md shadow-[#FFD700]/20 hover:shadow-[#FFD700]/40 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-1.5">
               {saving ? <Icon name="Loader" size={13} className="animate-spin" /> : <Icon name="Check" size={13} />}

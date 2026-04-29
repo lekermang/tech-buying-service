@@ -10,8 +10,10 @@ import StaffRepairToolbar from "./repair/staffTab/StaffRepairToolbar";
 import StaffRepairSearchBar from "./repair/staffTab/StaffRepairSearchBar";
 import StaffRepairList from "./repair/staffTab/StaffRepairList";
 import { View, Period, RepairAnalytics, EditForm, EMPTY_READY } from "./repair/staffTab/staffTabTypes";
+import { useStaffToast } from "./staff/StaffToast";
 
 export default function StaffRepairTab({ token, isOwner = false }: { token: string; isOwner?: boolean }) {
+  const toast = useStaffToast();
   const [view, setView] = useState<View>("list");
 
   // Список заявок
@@ -88,30 +90,42 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
 
   // ─── Создать заявку ───────────────────────────────────────────────────────────
   const createOrder = async () => {
-    if (!form.name || !form.phone) return;
-    setCreating(true);
-    const res = await fetch(REPAIR_URL, {
-      method: "POST", headers,
-      body: JSON.stringify({ action: "create", ...form, price: form.price ? parseInt(form.price) : null }),
-    });
-    const data = await res.json();
-    setCreating(false);
-    setShowForm(false);
-    if (data.order_id) {
-      const newOrder: Order = {
-        id: data.order_id, name: form.name, phone: form.phone,
-        model: form.model || null, repair_type: form.repair_type || null,
-        price: form.price ? parseInt(form.price) : null,
-        comment: form.comment || null, status: "new",
-        admin_note: null, created_at: new Date().toISOString(),
-        purchase_amount: null, repair_amount: null,
-        completed_at: null, master_income: null, parts_name: null, picked_up_at: null,
-        advance: null, is_paid: null, payment_method: null,
-      };
-      printAct(newOrder);
+    if (!form.name || !form.phone) {
+      toast.warning("Укажите имя клиента и телефон");
+      return;
     }
-    setForm(EMPTY_FORM);
-    loadOrders();
+    setCreating(true);
+    const tid = toast.loading("Создаю заявку...");
+    try {
+      const res = await fetch(REPAIR_URL, {
+        method: "POST", headers,
+        body: JSON.stringify({ action: "create", ...form, price: form.price ? parseInt(form.price) : null }),
+      });
+      const data = await res.json();
+      if (data.order_id) {
+        toast.update(tid, { kind: "success", message: `Заявка #${data.order_id} создана`, duration: 3000 });
+        const newOrder: Order = {
+          id: data.order_id, name: form.name, phone: form.phone,
+          model: form.model || null, repair_type: form.repair_type || null,
+          price: form.price ? parseInt(form.price) : null,
+          comment: form.comment || null, status: "new",
+          admin_note: null, created_at: new Date().toISOString(),
+          purchase_amount: null, repair_amount: null,
+          completed_at: null, master_income: null, parts_name: null, picked_up_at: null,
+          advance: null, is_paid: null, payment_method: null,
+        };
+        printAct(newOrder);
+        setShowForm(false);
+        setForm(EMPTY_FORM);
+        loadOrders();
+      } else {
+        toast.update(tid, { kind: "error", message: data.error || "Не удалось создать заявку", duration: 5000 });
+      }
+    } catch {
+      toast.update(tid, { kind: "error", message: "Сбой сети при создании", duration: 5000 });
+    } finally {
+      setCreating(false);
+    }
   };
 
   // ─── Сохранить поля карточки ─────────────────────────────────────────────────
@@ -133,30 +147,57 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
     body.model = ef.model || null; body.repair_type = ef.repair_type || null;
     body.price = ef.price ? parseInt(ef.price) : null;
     body.comment = ef.comment || null;
-    const res = await fetch(REPAIR_URL, {
-      method: "POST", headers,
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    setSaving(false);
-    if (!res.ok || data.error) { setSaveError(data.error || "Ошибка"); return; }
-    setExpandedId(null);
-    loadOrders();
+    try {
+      const res = await fetch(REPAIR_URL, {
+        method: "POST", headers,
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setSaveError(data.error || "Ошибка");
+        toast.error(data.error || "Не удалось сохранить заявку");
+        return;
+      }
+      toast.success(`Заявка #${o.id} сохранена`);
+      setExpandedId(null);
+      loadOrders();
+    } catch {
+      setSaveError("Ошибка сети");
+      toast.error("Сбой сети при сохранении");
+    } finally {
+      setSaving(false);
+    }
   };
 
   // ─── Изменить статус ─────────────────────────────────────────────────────────
+  const STATUS_LABELS: Record<string, string> = {
+    new: "Новая", in_progress: "В работе", waiting_parts: "Ждёт запчасть",
+    ready: "Готова к выдаче", done: "Выдана клиенту", cancelled: "Отменена", refused: "Отказ",
+  };
   const changeStatus = async (id: number, status: string, extra?: Record<string, unknown>) => {
     setSaving(true);
     setSaveError(null);
-    const res = await fetch(REPAIR_URL, {
-      method: "POST", headers,
-      body: JSON.stringify({ id, status, ...(extra || {}) }),
-    });
-    const data = await res.json();
-    setSaving(false);
-    if (!res.ok || data.error) { setSaveError(data.error || "Ошибка"); return false; }
-    loadOrders();
-    return true;
+    try {
+      const res = await fetch(REPAIR_URL, {
+        method: "POST", headers,
+        body: JSON.stringify({ id, status, ...(extra || {}) }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setSaveError(data.error || "Ошибка");
+        toast.error(data.error || "Не удалось изменить статус");
+        return false;
+      }
+      toast.success(`#${id}: ${STATUS_LABELS[status] || status}`);
+      loadOrders();
+      return true;
+    } catch {
+      setSaveError("Ошибка сети");
+      toast.error("Сбой сети при смене статуса");
+      return false;
+    } finally {
+      setSaving(false);
+    }
   };
 
   // ─── Выдать клиенту ──────────────────────────────────────────────────────────
@@ -169,11 +210,22 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
   // ─── Удалить заявку ──────────────────────────────────────────────────────────
   const deleteOrder = async (id: number) => {
     if (!confirm(`Удалить заявку #${id}?`)) return;
-    await fetch(REPAIR_URL, {
-      method: "POST", headers,
-      body: JSON.stringify({ action: "delete", id }),
-    });
-    loadOrders();
+    const tid = toast.loading(`Удаляю заявку #${id}...`);
+    try {
+      const res = await fetch(REPAIR_URL, {
+        method: "POST", headers,
+        body: JSON.stringify({ action: "delete", id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.error == null) {
+        toast.update(tid, { kind: "success", message: `Заявка #${id} удалена`, duration: 3000 });
+        loadOrders();
+      } else {
+        toast.update(tid, { kind: "error", message: data.error || "Не удалось удалить заявку", duration: 5000 });
+      }
+    } catch {
+      toast.update(tid, { kind: "error", message: "Сбой сети при удалении", duration: 5000 });
+    }
   };
 
   // ─── Открыть модалку «Готово» ────────────────────────────────────────────────
@@ -191,8 +243,16 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
   // ─── Подтвердить «Готово» ────────────────────────────────────────────────────
   const submitReady = async () => {
     if (!readyModal) return;
-    if (!readyForm.repair_amount) { setReadyError("Укажите выданную сумму за ремонт"); return; }
-    if (readyForm.purchase_amount === "" || readyForm.purchase_amount == null) { setReadyError("Укажите сумму закупки (можно 0)"); return; }
+    if (!readyForm.repair_amount) {
+      setReadyError("Укажите выданную сумму за ремонт");
+      toast.warning("Укажите выданную сумму за ремонт");
+      return;
+    }
+    if (readyForm.purchase_amount === "" || readyForm.purchase_amount == null) {
+      setReadyError("Укажите сумму закупки (можно 0)");
+      toast.warning("Укажите сумму закупки (можно 0)");
+      return;
+    }
     setReadySaving(true);
     const ok = await changeStatus(readyModal.id, "ready", {
       purchase_amount: parseInt(readyForm.purchase_amount),
@@ -201,8 +261,12 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
       admin_note: readyForm.admin_note,
     });
     setReadySaving(false);
-    if (ok) { setReadyModal(null); setExpandedId(null); }
-    else setReadyError("Ошибка сохранения");
+    if (ok) {
+      setReadyModal(null);
+      setExpandedId(null);
+    } else {
+      setReadyError("Ошибка сохранения");
+    }
   };
 
   // ─── Счётчики статусов ───────────────────────────────────────────────────────
