@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import Icon from "@/components/ui/icon";
 import { ymGoal, Goals } from "@/lib/ym";
+import InstallAppModal, { isStandaloneApp } from "@/components/InstallAppModal";
 
 export type NavLink = { label: string; href: string };
 
@@ -62,6 +63,8 @@ const NavItem = ({ link, active, onClick, compact }: NavItemProps) => (
 const MainNav = ({ navLinks, menuOpen, onToggleMenu, onNav }: MainNavProps) => {
   const hrefs = navLinks.map(l => l.href);
   const active = useActiveSection(hrefs);
+  const [installOpen, setInstallOpen] = useState(false);
+  const installed = isStandaloneApp();
 
   return (
     <div className="relative bg-[#0D0D0D]/95 backdrop-blur-sm border-b border-[#FFD700]/20 overflow-hidden">
@@ -132,16 +135,24 @@ const MainNav = ({ navLinks, menuOpen, onToggleMenu, onNav }: MainNavProps) => {
             className="hidden md:flex lg:hidden items-center justify-center w-9 h-9 rounded-md border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10 transition-colors">
             <Icon name="Phone" size={16} />
           </a>
+          {!installed && (
+            <button onClick={() => setInstallOpen(true)} title="Установить как приложение"
+              className="hidden md:flex items-center gap-1.5 border border-[#FFD700]/40 text-[#FFD700] font-roboto text-xs px-2.5 py-1.5 rounded-md hover:bg-[#FFD700]/10 transition-all">
+              <Icon name="Download" size={13} />
+              <span className="hidden lg:inline">Приложение</span>
+            </button>
+          )}
           <a href="/staff"
             className="hidden md:flex items-center gap-1.5 border border-[#FFD700]/25 hover:border-[#FFD700]/60 text-[#FFD700]/70 hover:text-[#FFD700] font-roboto text-xs px-2.5 py-1.5 rounded-md hover:bg-[#FFD700]/5 transition-all">
             <Icon name="LogIn" size={13} />
-            <span className="hidden lg:inline">Войти</span>
+            <span className="hidden lg:inline">Сотрудник</span>
           </a>
           <button onClick={onToggleMenu} className="md:hidden p-2 text-white hover:text-[#FFD700] active:scale-95 transition-all">
             <Icon name={menuOpen ? "X" : "Menu"} size={26} />
           </button>
         </div>
       </div>
+      <InstallAppModal open={installOpen} onClose={() => setInstallOpen(false)} />
     </div>
   );
 };

@@ -24,6 +24,12 @@ export default function OrderCardHeader({ o, isExpanded, onToggle }: Props) {
           <span className={`font-roboto text-[10px] px-2 py-0.5 flex items-center gap-1 shrink-0 rounded-full ${st.color}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />{st.label}
           </span>
+          {o.status === "ready" && (o.repair_amount == null || o.purchase_amount == null) && (
+            <span title="Не заполнены суммы для статистики"
+              className="font-oswald font-bold text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm bg-orange-500/20 text-orange-300 border border-orange-400/40 flex items-center gap-0.5 shrink-0 animate-pulse">
+              <Icon name="AlertTriangle" size={10} /> Заполнить
+            </span>
+          )}
           <span className="font-roboto text-sm text-white font-semibold truncate">{o.name}</span>
         </div>
         <Icon name={isExpanded ? "ChevronUp" : "ChevronDown"} size={16} className={`shrink-0 mt-0.5 transition-all ${isExpanded ? "text-[#FFD700]" : "text-white/30"}`} />

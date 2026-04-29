@@ -51,6 +51,11 @@ const App = () => {
         .then(r => r.json())
         .then(d => { if (d.theme) applyTheme(d.theme); })
         .catch(() => { /* ignore */ });
+
+      // Регистрация SW сайта (только на корне и публичных страницах, не на /staff)
+      if ("serviceWorker" in navigator && !window.location.pathname.startsWith("/staff")) {
+        navigator.serviceWorker.register("/site-sw.js", { scope: "/" }).catch(() => { /* ignore */ });
+      }
     });
   }, []);
 

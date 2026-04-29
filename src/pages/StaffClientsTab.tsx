@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Icon from "@/components/ui/icon";
 import { AUTH_CLIENT_URL, EMPLOYEE_AUTH_URL } from "./staff.types";
 import { formatPhone } from "@/lib/phoneFormat";
 import { useStaffToast } from "./staff/StaffToast";
+import useDebouncedValue from "@/hooks/useDebouncedValue";
 
 type Client = { id: number; full_name: string; phone: string; email: string | null; discount_pct: number; loyalty_points: number; registered_at: string | null };
 
@@ -75,12 +76,16 @@ export function ClientsTab({ token }: { token: string }) {
     setShowAll(true);
   };
 
-  const filtered = filter.trim()
-    ? allClients.filter(c => {
-        const q = filter.toLowerCase();
-        return c.full_name.toLowerCase().includes(q) || c.phone.includes(q) || (c.email || "").toLowerCase().includes(q);
-      })
-    : allClients;
+  const debouncedFilter = useDebouncedValue(filter, 250);
+  const filtered = useMemo(() => {
+    const q = debouncedFilter.trim().toLowerCase();
+    if (!q) return allClients;
+    return allClients.filter(c =>
+      c.full_name.toLowerCase().includes(q) ||
+      c.phone.includes(q) ||
+      (c.email || "").toLowerCase().includes(q)
+    );
+  }, [allClients, debouncedFilter]);
 
   const fName = (found as { full_name?: string })?.full_name || "";
   const fPhone = (found as { phone?: string })?.phone || "";

@@ -1,4 +1,5 @@
 import { Order } from "./types";
+import Icon from "@/components/ui/icon";
 import OrderCardHeader from "./OrderCardHeader";
 import OrderCardFinance from "./OrderCardFinance";
 import OrderCardFields from "./OrderCardFields";
@@ -56,6 +57,19 @@ export default function StaffRepairOrderCard({
             <div className="relative px-3 py-2.5 bg-[#FFD700]/5 border-l-2 border-[#FFD700]/40 rounded-r-md">
               <div className="absolute top-1 right-2 text-[9px] font-roboto text-[#FFD700]/40 uppercase tracking-wide">Комментарий клиента</div>
               <div className="text-xs font-roboto text-white/70 italic mt-3 leading-relaxed">"{o.comment}"</div>
+            </div>
+          )}
+
+          {/* Напоминание для статуса «Готово к выдаче» — нет сумм */}
+          {o.status === "ready" && financeBlocked && (
+            <div className="relative px-3 py-2.5 bg-gradient-to-r from-orange-500/15 to-orange-500/5 border border-orange-500/40 rounded-md flex items-start gap-2 animate-pulse">
+              <Icon name="AlertTriangle" size={16} className="text-orange-400 shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <div className="font-oswald font-bold text-orange-300 text-xs uppercase tracking-wide">Заполните суммы перед выдачей</div>
+                <div className="font-roboto text-orange-200/80 text-[11px] leading-snug mt-0.5">
+                  Заявка в статусе «Готово», но не указаны {!ef.repair_amount && "сумма выдачи"}{!ef.repair_amount && !ef.purchase_amount && " и "}{!ef.purchase_amount && "сумма закупки"}. Без них нельзя нажать «Выдано» — данные нужны для статистики.
+                </div>
+              </div>
             </div>
           )}
 

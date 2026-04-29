@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import Icon from "@/components/ui/icon";
 import { EMPLOYEE_AUTH_URL } from "./staff.types";
 import { useStaffToast } from "./staff/StaffToast";
+import useDebouncedValue from "@/hooks/useDebouncedValue";
 
 type Employee = {
   id: number;
@@ -53,18 +54,25 @@ export function EmployeesTab({ token, myRole }: { token: string; myRole: string 
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [roleFilter, setRoleFilter] = useState<string>("all");
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
-    const res = await fetch(`${EMPLOYEE_AUTH_URL}?action=list`, { headers: { "X-Employee-Token": token } });
-    const data = await res.json();
-    setEmployees(data.employees || []);
-    setLoading(false);
+    try {
+      const res = await fetch(`${EMPLOYEE_AUTH_URL}?action=list`, { headers: { "X-Employee-Token": token }, signal });
+      const data = await res.json();
+      setEmployees(data.employees || []);
+    } catch (_) { /* abort/network */ }
+    finally { setLoading(false); }
   }, [token]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const ctrl = new AbortController();
+    load(ctrl.signal);
+    return () => ctrl.abort();
+  }, [load]);
 
+  const debouncedSearch = useDebouncedValue(search, 250);
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = debouncedSearch.trim().toLowerCase();
     return employees.filter(e => {
       if (statusFilter === "active" && !e.is_active) return false;
       if (statusFilter === "inactive" && e.is_active) return false;
@@ -73,7 +81,7 @@ export function EmployeesTab({ token, myRole }: { token: string; myRole: string 
       const hay = [e.full_name, e.login, e.email || "", e.phone || "", e.position || ""].join(" ").toLowerCase();
       return hay.includes(q);
     });
-  }, [employees, search, statusFilter, roleFilter]);
+  }, [employees, debouncedSearch, statusFilter, roleFilter]);
 
   const createEmployee = async () => {
     if (!addForm.full_name || !addForm.login || !addForm.password) {

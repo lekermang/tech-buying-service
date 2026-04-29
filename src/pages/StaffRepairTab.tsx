@@ -11,6 +11,7 @@ import StaffRepairSearchBar from "./repair/staffTab/StaffRepairSearchBar";
 import StaffRepairList from "./repair/staffTab/StaffRepairList";
 import { View, Period, RepairAnalytics, EditForm, EMPTY_READY } from "./repair/staffTab/staffTabTypes";
 import { useStaffToast } from "./staff/StaffToast";
+import useDebouncedValue from "@/hooks/useDebouncedValue";
 
 export default function StaffRepairTab({ token, isOwner = false }: { token: string; isOwner?: boolean }) {
   const toast = useStaffToast();
@@ -21,6 +22,7 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
   const [loading, setLoading] = useState(false);
   const [filterStatus, setFilterStatus] = useState("all");
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 350);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
@@ -56,36 +58,50 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
   const headers = { "Content-Type": "application/json", "X-Employee-Token": token };
 
   // ─── Загрузка заявок ─────────────────────────────────────────────────────────
-  const loadOrders = useCallback(async () => {
+  const loadOrders = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     const ps: string[] = [];
     if (filterStatus !== "all") ps.push("status=" + filterStatus);
-    if (search.trim()) ps.push("search=" + encodeURIComponent(search.trim()));
+    if (debouncedSearch.trim()) ps.push("search=" + encodeURIComponent(debouncedSearch.trim()));
     if (dateFrom) ps.push("date_from=" + dateFrom);
     if (dateTo) ps.push("date_to=" + dateTo);
     const url = REPAIR_URL + (ps.length ? "?" + ps.join("&") : "");
-    const res = await fetch(url, { headers: { "X-Employee-Token": token } });
-    const data = await res.json();
-    setOrders(data.orders || []);
-    setLoading(false);
-  }, [token, filterStatus, search, dateFrom, dateTo]);
+    try {
+      const res = await fetch(url, { headers: { "X-Employee-Token": token }, signal });
+      const data = await res.json();
+      setOrders(data.orders || []);
+    } catch (e) {
+      if ((e as { name?: string })?.name !== "AbortError") {
+        toast.error("Не удалось загрузить заявки");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [token, filterStatus, debouncedSearch, dateFrom, dateTo, toast]);
 
   // ─── Загрузка аналитики ───────────────────────────────────────────────────────
-  const loadAnalytics = useCallback(async (p: Period) => {
+  const loadAnalytics = useCallback(async (p: Period, signal?: AbortSignal) => {
     setAnalyticsLoading(true);
-    const [analyticsRes, statsRes] = await Promise.all([
-      fetch(`${REPAIR_URL}?action=analytics&period=${p}`, { headers: { "X-Employee-Token": token } }),
-      fetch(`${REPAIR_URL}?action=daily_stats`, { headers: { "X-Employee-Token": token } }),
-    ]);
-    const [analyticsD, statsD] = await Promise.all([analyticsRes.json(), statsRes.json()]);
-    setAnalytics(analyticsD);
-    setStats(statsD.stats || []);
-    setAnalyticsLoading(false);
+    try {
+      const [analyticsRes, statsRes] = await Promise.all([
+        fetch(`${REPAIR_URL}?action=analytics&period=${p}`, { headers: { "X-Employee-Token": token }, signal }),
+        fetch(`${REPAIR_URL}?action=daily_stats`, { headers: { "X-Employee-Token": token }, signal }),
+      ]);
+      const [analyticsD, statsD] = await Promise.all([analyticsRes.json(), statsRes.json()]);
+      setAnalytics(analyticsD);
+      setStats(statsD.stats || []);
+    } catch (_) {
+      /* abort/network */
+    } finally {
+      setAnalyticsLoading(false);
+    }
   }, [token]);
 
   useEffect(() => {
-    if (view === "list") loadOrders();
-    else loadAnalytics(period);
+    const ctrl = new AbortController();
+    if (view === "list") loadOrders(ctrl.signal);
+    else loadAnalytics(period, ctrl.signal);
+    return () => ctrl.abort();
   }, [view, loadOrders, loadAnalytics, period]);
 
   // ─── Создать заявку ───────────────────────────────────────────────────────────
@@ -202,7 +218,32 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
 
   // ─── Выдать клиенту ──────────────────────────────────────────────────────────
   const issueOrder = async (o: Order, issuedAt?: string) => {
-    const extra = issuedAt ? { picked_up_at: new Date(issuedAt).toISOString() } : {};
+    // Жёсткая валидация: для «Выдано» обязательны суммы и дата выдачи
+    const ef = editForm[o.id];
+    const purchaseStr = ef?.purchase_amount ?? (o.purchase_amount != null ? String(o.purchase_amount) : "");
+    const repairStr   = ef?.repair_amount   ?? (o.repair_amount   != null ? String(o.repair_amount)   : "");
+    const purchaseOk  = purchaseStr !== "" && !Number.isNaN(parseInt(purchaseStr));
+    const repairOk    = repairStr !== ""   && parseInt(repairStr) > 0;
+    const dateOk      = !!issuedAt;
+
+    if (!purchaseOk || !repairOk || !dateOk) {
+      const missing: string[] = [];
+      if (!repairOk)   missing.push("сумму выдачи (ремонт)");
+      if (!purchaseOk) missing.push("сумму закупки");
+      if (!dateOk)     missing.push("дату выдачи");
+      toast.warning(
+        `Нельзя выдать заявку #${o.id}: укажите ${missing.join(", ")} — это нужно для статистики`,
+        { title: "Заполните обязательные поля", duration: 6000 },
+      );
+      // Открываем модалку «Готово» — там удобно ввести закупку/выдачу/запчасть
+      openReadyModal(o);
+      return;
+    }
+
+    const extra: Record<string, unknown> = { picked_up_at: new Date(issuedAt!).toISOString() };
+    extra.purchase_amount = parseInt(purchaseStr);
+    extra.repair_amount   = parseInt(repairStr);
+    if (ef?.parts_name) extra.parts_name = ef.parts_name;
     await changeStatus(o.id, "done", extra);
     printReceipt({ ...o, status: "done" });
   };
@@ -243,12 +284,14 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
   // ─── Подтвердить «Готово» ────────────────────────────────────────────────────
   const submitReady = async () => {
     if (!readyModal) return;
-    if (!readyForm.repair_amount) {
-      setReadyError("Укажите выданную сумму за ремонт");
-      toast.warning("Укажите выданную сумму за ремонт");
+    const repairNum = parseInt(readyForm.repair_amount);
+    if (!readyForm.repair_amount || Number.isNaN(repairNum) || repairNum <= 0) {
+      setReadyError("Укажите сумму выдачи за ремонт (больше 0)");
+      toast.warning("Укажите сумму выдачи за ремонт (больше 0)");
       return;
     }
-    if (readyForm.purchase_amount === "" || readyForm.purchase_amount == null) {
+    const purchaseStr = readyForm.purchase_amount;
+    if (purchaseStr === "" || purchaseStr == null || Number.isNaN(parseInt(purchaseStr))) {
       setReadyError("Укажите сумму закупки (можно 0)");
       toast.warning("Укажите сумму закупки (можно 0)");
       return;

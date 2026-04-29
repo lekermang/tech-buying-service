@@ -1,17 +1,17 @@
 {
-  "id": "/staff",
-  "name": "Скупка24 — Сотрудник",
+  "id": "/",
+  "name": "Скупка24 — Калуга",
   "short_name": "Скупка24",
-  "description": "Рабочее приложение сотрудника Скупка24: ремонт, клиенты, золото, чат, аналитика.",
-  "start_url": "/staff",
-  "scope": "/staff",
+  "description": "Скупка24 — скупка техники, iPhone, MacBook, золота и украшений в Калуге. Оценка за 15 минут, выплата сразу. Работаем 24/7.",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
   "background_color": "#0A0A0A",
   "theme_color": "#0A0A0A",
   "orientation": "portrait-primary",
   "lang": "ru",
-  "categories": ["business", "productivity"],
+  "categories": ["business", "shopping", "finance"],
   "icons": [
     {
       "src": "/icon-s.svg",
@@ -40,21 +40,21 @@
   ],
   "shortcuts": [
     {
-      "name": "Ремонт",
-      "short_name": "Ремонт",
-      "url": "/staff?tab=repair",
+      "name": "Оценка техники",
+      "short_name": "Оценка",
+      "url": "/?action=estimate",
       "icons": [{"src": "/icon-s.svg", "sizes": "any"}]
     },
     {
-      "name": "Чат",
-      "short_name": "Чат",
-      "url": "/staff?tab=chat",
+      "name": "Кабинет клиента",
+      "short_name": "Кабинет",
+      "url": "/cabinet",
       "icons": [{"src": "/icon-s.svg", "sizes": "any"}]
     },
     {
-      "name": "Золото",
-      "short_name": "Золото",
-      "url": "/staff?tab=gold",
+      "name": "Кабинет сотрудника",
+      "short_name": "Сотрудник",
+      "url": "/staff",
       "icons": [{"src": "/icon-s.svg", "sizes": "any"}]
     }
   ],
