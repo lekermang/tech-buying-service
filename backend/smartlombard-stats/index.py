@@ -248,6 +248,39 @@ def _request_new_token() -> tuple[str | None, str | None]:
     return str(token), None
 
 
+def _request_new_token_verbose() -> dict:
+    """Возвращает аудит-инфу о текущем кэшированном токене (без сетевого запроса).
+    Чтобы не упереться в rate-limit, реальный POST не делаем."""
+    info: dict = {
+        'request_url': AUTH_URL,
+        'request_method': 'POST',
+        'request_body_form': {
+            'account_id': os.environ.get('SMARTLOMBARD_ACCOUNT_ID', '(не задан)'),
+            'secret_key': '(скрыт)' if os.environ.get('SMARTLOMBARD_SECRET_KEY') else '(не задан)',
+        },
+        'note': 'Реальный POST к /auth/access_token не делается — лимит 1 раз / 20 мин. Используется кэшированный токен.',
+    }
+    try:
+        conn = _get_conn()
+        cur = conn.cursor()
+        cur.execute(
+            f"SELECT EXTRACT(EPOCH FROM (NOW() - updated_at)), payload IS NOT NULL "
+            f"FROM {SCHEMA}.smartlombard_cache WHERE cache_key='{TOKEN_CACHE_KEY}'"
+        )
+        row = cur.fetchone()
+        cur.close(); conn.close()
+        if row:
+            age, has = row
+            info['cached_token_age_sec'] = int(float(age)) if age is not None else None
+            info['cached_token_present'] = bool(has)
+            info['cached_token_fresh'] = (age is not None and float(age) <= TOKEN_TTL_SECONDS)
+        else:
+            info['cached_token_present'] = False
+    except Exception as e:
+        info['cache_error'] = str(e)
+    return info
+
+
 def _get_access_token(force: bool = False) -> tuple[str | None, str | None]:
     """Возвращает токен из кэша БД (если ему меньше 19 мин) либо запрашивает новый.
     При 429 (rate limit) откатывается на старый токен из БД, если он там есть."""
@@ -876,18 +909,43 @@ def handler(event: dict, context) -> dict:
             cached['cached'] = True
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps(cached, ensure_ascii=False)}
 
+    # Полный аудит-лог цепочки запросов (для тикета в SmartLombard)
+    audit: list = []
+    auth_dbg = _request_new_token_verbose() if debug else None
+    if auth_dbg:
+        audit.append({'stage': 'auth', **auth_dbg})
+
     token, err = _get_access_token()
     if err or not token:
+        body = {'error': err or 'auth failed', 'stage': 'auth'}
+        if debug:
+            body['date_from'] = date_from
+            body['date_to'] = date_to
+            body['operations_total'] = 0
+            body['elem_operations_total'] = 0
+            body['audit'] = audit
         return {'statusCode': 502, 'headers': HEADERS,
-                'body': json.dumps({'error': err or 'auth failed'}, ensure_ascii=False)}
+                'body': json.dumps(body, ensure_ascii=False)}
 
     q = {'date_begin': date_from, 'date_end': date_to}
     operations, err1, dbg1 = _fetch_all_pages(OPS_URL, token, q)
+    if debug and dbg1:
+        audit.append({'stage': 'operations', **dbg1})
     if err1:
+        body = {'error': err1, 'stage': 'operations'}
+        if debug:
+            body['date_from'] = date_from
+            body['date_to'] = date_to
+            body['operations_total'] = len(operations or [])
+            body['elem_operations_total'] = 0
+            body['operations_debug'] = dbg1
+            body['audit'] = audit
         return {'statusCode': 502, 'headers': HEADERS,
-                'body': json.dumps({'error': err1, 'stage': 'operations'}, ensure_ascii=False)}
+                'body': json.dumps(body, ensure_ascii=False)}
 
     elem_operations, err2, dbg2 = _fetch_all_pages(ELEM_OPS_URL, token, q)
+    if debug and dbg2:
+        audit.append({'stage': 'elementary_operations', **dbg2})
     if err2:
         elem_operations = []
 
@@ -902,6 +960,7 @@ def handler(event: dict, context) -> dict:
                     'elem_operations_total': len(elem_operations),
                     'operations_debug': dbg1,
                     'elem_debug': dbg2,
+                    'audit': audit,
                 }, ensure_ascii=False)}
 
     payload = {
