@@ -282,32 +282,75 @@ def _upsert_good(action: str, item: dict) -> tuple[bool, int | None, str]:
         cur.close(); conn.close()
 
 
-def _verify_signature(raw_data: str, signature: str) -> bool:
+def _verify_signature(raw_data: str, signature: str, raw_body: str = '') -> tuple[bool, str]:
+    """Возвращает (валидно, диагностика).
+    Пробуем все варианты, что мог хешировать SmartLombard:
+    1) raw_data (то, что после parse_qs)
+    2) URL-encoded версия raw_data (как было в теле POST)
+    3) raw_body целиком (вдруг хеш от всего тела)
+    4) Префикс 'data=' + raw_data в URL-encoded виде
+    """
     secret = (os.environ.get('SMARTLOMBARD_WEBHOOK_SECRET') or '').strip()
-    if not secret or not signature:
-        return False
-    expected = hashlib.sha1(
-        (hashlib.sha1(raw_data.encode('utf-8')).hexdigest() + secret).encode('utf-8')
-    ).hexdigest()
-    return expected == signature.strip()
+    sig = (signature or '').strip().lower()
+    if not secret or not sig:
+        return False, f'no_secret_or_sig (secret_present={bool(secret)}, sig_present={bool(sig)})'
+
+    candidates: list[tuple[str, str]] = []
+    candidates.append(('raw_data', raw_data or ''))
+    try:
+        candidates.append(('raw_data_urlenc', urllib.parse.quote(raw_data or '', safe='')))
+    except Exception:
+        pass
+    if raw_body:
+        candidates.append(('raw_body', raw_body))
+        try:
+            # тело без префикса data=
+            if raw_body.startswith('data='):
+                candidates.append(('body_no_prefix', raw_body[5:]))
+        except Exception:
+            pass
+
+    diag_lines = [f'sig_received={sig[:16]}…', f'secret_len={len(secret)}']
+    for name, val in candidates:
+        try:
+            inner = hashlib.sha1((val or '').encode('utf-8')).hexdigest()
+            outer = hashlib.sha1((inner + secret).encode('utf-8')).hexdigest()
+            diag_lines.append(f'{name}: len={len(val)}, sha1(sha1+secret)={outer[:16]}…')
+            if outer == sig:
+                return True, f'OK via {name}'
+        except Exception as e:
+            diag_lines.append(f'{name}: error {e}')
+
+    return False, '; '.join(diag_lines)
 
 
 def _log(auth_ok: bool, auth_hdr: str, raw: str, parsed: Any, resp: list, items_count: int, error: str | None):
     try:
         conn = _get_conn(); cur = conn.cursor()
-        raw_safe = (raw or '')[:50000].replace("'", "''")
-        parsed_safe = json.dumps(parsed, ensure_ascii=False)[:100000].replace("'", "''") if parsed is not None else 'null'
+        raw_safe = ((raw or '')[:50000]).replace("'", "''")
+        if parsed is not None:
+            try:
+                parsed_safe = json.dumps(parsed, ensure_ascii=False)[:100000].replace("'", "''")
+                parsed_sql = f"'{parsed_safe}'::jsonb"
+            except Exception:
+                parsed_sql = 'NULL'
+        else:
+            parsed_sql = 'NULL'
         resp_safe = json.dumps(resp, ensure_ascii=False).replace("'", "''")
-        err_safe = (error or '').replace("'", "''")
+        err_safe = ((error or '')[:500]).replace("'", "''")
+        hdr_safe = (auth_hdr or '')[:200].replace("'", "''")
         cur.execute(
             f"INSERT INTO {SCHEMA}.sl_webhook_log "
             f"(auth_ok, auth_header, raw_data, parsed, response, items_count, error) VALUES "
-            f"({'TRUE' if auth_ok else 'FALSE'}, '{_safe(auth_hdr)[:200]}', '{raw_safe}', "
-            f"'{parsed_safe}'::jsonb, '{resp_safe}'::jsonb, {items_count}, '{err_safe}'[:500])"
+            f"({'TRUE' if auth_ok else 'FALSE'}, '{hdr_safe}', '{raw_safe}', "
+            f"{parsed_sql}, '{resp_safe}'::jsonb, {int(items_count or 0)}, '{err_safe}')"
         )
         conn.commit(); cur.close(); conn.close()
-    except Exception:
-        pass
+    except Exception as e:
+        try:
+            print(f'[sl_webhook_log] insert failed: {e}', flush=True)
+        except Exception:
+            pass
 
 
 def _check_employee_token(event: dict) -> bool:
@@ -411,10 +454,14 @@ def handler(event: dict, context) -> dict:
                                    ensure_ascii=False)}
 
     # Проверка подписи: sha1(sha1(data) + secret)
-    auth_ok = _verify_signature(raw_data, auth_hdr)
+    auth_ok, auth_diag = _verify_signature(raw_data, auth_hdr, raw_body)
+    try:
+        print(f'[webhook] auth_ok={auth_ok} diag={auth_diag}', flush=True)
+    except Exception:
+        pass
     if not auth_ok:
         resp = [{'status': False, 'type': 'auth', 'message': 'Authorization failed'}]
-        _log(False, auth_hdr, raw_body[:5000], parsed_payload, resp, 0, 'auth fail')
+        _log(False, auth_hdr, raw_body[:5000], parsed_payload, resp, 0, f'auth fail: {auth_diag}')
         return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps(resp, ensure_ascii=False)}
 
     if parsed_payload is None:
