@@ -1040,6 +1040,64 @@ def handler(event: dict, context) -> dict:
             'token_expires_in_sec': ttl_left,
         })
 
+    # ---------- ACCOUNT_CHECK: проверка содержимого аккаунта SmartLombard ----------
+    # Опрашивает справочники (branches, employees, pawn_tickets, clients) для каждого
+    # API-ключа из SMARTLOMBARD_API_KEYS — чтобы понять, есть ли в аккаунте хоть что-то.
+    if action == 'account_check':
+        ok, _r = _check_token(event, allow_all_staff=False)
+        if not ok:
+            return _err(401, 'Unauthorized')
+
+        check_paths = [
+            ('/branches', 'branches', 'Филиалы'),
+            ('/employees', 'employees', 'Сотрудники'),
+            ('/pawn_tickets', 'pawn_tickets', 'Билеты'),
+            ('/clients', 'clients', 'Клиенты'),
+            ('/categories', 'categories', 'Категории'),
+        ]
+        keys = _get_api_keys_list()
+        results: list = []
+        for k in keys:
+            aid = k['account_id']
+            sk = k['secret_key']
+            tok, terr = _get_token_for_key(aid, sk)
+            account_block: dict = {'account_id': aid, 'paths': []}
+            if terr or not tok:
+                account_block['auth_error'] = terr or 'no token'
+                results.append(account_block)
+                continue
+            for path, key, label in check_paths:
+                url_path = f'{API_BASE}{path}'
+                try:
+                    r = requests.get(
+                        url_path,
+                        params={'limit': 5, 'offset': 0},
+                        headers={'Authorization': f'Bearer {tok}'},
+                        timeout=15,
+                    )
+                    try:
+                        data = r.json()
+                    except Exception:
+                        data = {'_raw': r.text[:200]}
+                    items = []
+                    if isinstance(data, dict):
+                        result = data.get('result') or {}
+                        if isinstance(result, dict):
+                            items = result.get(key) or []
+                    account_block['paths'].append({
+                        'path': path, 'label': label,
+                        'http_status': r.status_code,
+                        'count': len(items) if isinstance(items, list) else 0,
+                        'sample': items[:2] if isinstance(items, list) else [],
+                        'message': (data.get('error', {}) or {}).get('message') if isinstance(data, dict) else None,
+                    })
+                except Exception as e:
+                    account_block['paths'].append({
+                        'path': path, 'label': label, 'error': str(e),
+                    })
+            results.append(account_block)
+        return _ok({'ok': True, 'accounts': results})
+
     # ---------- KASSA_PERIOD: парсинг «Касса и банк → Операции по датам» ----------
     if action == 'kassa_period':
         ok, _r = _check_token(event, allow_all_staff=False)

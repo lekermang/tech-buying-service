@@ -9,6 +9,7 @@ import {
 import { SLDateRangePicker } from "./dashboard/SLDateRangePicker";
 import { SLTokenStatusBar } from "./dashboard/SLTokenStatusBar";
 import { SLDiagnosticsPanel } from "./dashboard/SLDiagnosticsPanel";
+import { SLAccountCheckPanel } from "./dashboard/SLAccountCheckPanel";
 import { SLStatsGrid } from "./dashboard/SLStatsGrid";
 
 export function SLDashboard({ token }: { token: string }) {
@@ -32,6 +33,24 @@ export function SLDashboard({ token }: { token: string }) {
   // Диагностика API SmartLombard — что реально вернул /operations
   const [diagData, setDiagData] = useState<Record<string, unknown> | null>(null);
   const [diagLoading, setDiagLoading] = useState(false);
+
+  // Проверка содержимого аккаунта (branches/employees/clients/pawn_tickets)
+  const [accountData, setAccountData] = useState<Record<string, unknown> | null>(null);
+  const [accountLoading, setAccountLoading] = useState(false);
+
+  const runAccountCheck = useCallback(async () => {
+    setAccountLoading(true);
+    try {
+      const url = `${SMARTLOMBARD_URL}?action=account_check`;
+      const res = await fetch(url, { headers: { "X-Employee-Token": token } });
+      const data = await res.json();
+      setAccountData(data);
+    } catch (e) {
+      setAccountData({ error: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setAccountLoading(false);
+    }
+  }, [token]);
 
   // Возвращает {from, to} для текущего пресета (или кастомного диапазона)
   const getRange = useCallback(() => {
@@ -129,6 +148,13 @@ export function SLDashboard({ token }: { token: string }) {
       />
 
       <SLDiagnosticsPanel diagData={diagData} onClose={() => setDiagData(null)} />
+
+      <SLAccountCheckPanel
+        data={accountData}
+        loading={accountLoading}
+        onRun={runAccountCheck}
+        onClose={() => setAccountData(null)}
+      />
 
       <SLStatsGrid error={error} stats={stats} loading={loading} />
     </div>
