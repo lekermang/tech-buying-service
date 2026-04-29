@@ -1,5 +1,7 @@
+import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import { ymGoal, Goals } from "@/lib/ym";
+import InstallAppModal, { isStandaloneApp } from "@/components/InstallAppModal";
 
 interface GoldTickerProps {
   goldPrice: { buy: number; buy_usd?: number; xau_usd?: number; usd_rub?: number; date: string } | null;
@@ -16,6 +18,8 @@ const GoldTicker = ({
   priceWholesale999,
   onSellClick,
 }: GoldTickerProps) => {
+  const [installOpen, setInstallOpen] = useState(false);
+  const installed = isStandaloneApp();
   return (
     <div className="relative overflow-hidden bg-[#0A0A0A] border-b border-[#FFD700]/20">
       {/* Мягкое золотое свечение по краям (как в Trade In) */}
@@ -137,8 +141,23 @@ const GoldTicker = ({
           );
         })()}
 
-        {/* ── ПРАВО: телефон + Продать ────────────────────────────────── */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* ── ПРАВО: установить + телефон + Продать ─────────────────────── */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Кнопка «Установить как приложение» — иконка S, чёрный фон */}
+          {!installed && (
+            <button
+              onClick={() => setInstallOpen(true)}
+              title="Установить как приложение"
+              aria-label="Установить как приложение"
+              className="relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-md bg-black border-2 border-[#FFD700] hover:bg-[#FFD700]/5 active:scale-95 transition-all shadow-[0_0_10px_rgba(255,215,0,0.25)] shrink-0 group"
+            >
+              <span className="font-oswald font-black text-[#FFD700] text-base sm:text-lg leading-none -mt-px">S</span>
+              <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-[#FFD700] flex items-center justify-center shadow-[0_0_6px_rgba(255,215,0,0.6)]">
+                <Icon name="Download" size={8} className="text-black" />
+              </span>
+            </button>
+          )}
+
           {/* Десктоп: большой телефон с подписью */}
           <a href="tel:88006006833"
             onClick={() => ymGoal(Goals.CALL_CLICK, { place: "ticker" })}
@@ -173,6 +192,8 @@ const GoldTicker = ({
           </button>
         </div>
       </div>
+
+      <InstallAppModal open={installOpen} onClose={() => setInstallOpen(false)} />
 
       {/* Мобильная вторая строка с ценами физлица/опт — появляется ниже xl */}
       {goldPrice?.buy && (
