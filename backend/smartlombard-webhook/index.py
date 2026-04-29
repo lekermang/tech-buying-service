@@ -324,7 +324,9 @@ def _verify_signature(raw_data: str, signature: str, raw_body: str = '') -> tupl
     return False, '; '.join(diag_lines)
 
 
-def _log(auth_ok: bool, auth_hdr: str, raw: str, parsed: Any, resp: list, items_count: int, error: str | None):
+def _log(auth_ok: bool, auth_hdr: str, raw: str, parsed: Any, resp: list,
+         items_count: int, error: str | None,
+         http_method: str = '', content_type: str = '', all_headers: dict | None = None):
     try:
         conn = _get_conn(); cur = conn.cursor()
         raw_safe = ((raw or '')[:50000]).replace("'", "''")
@@ -339,11 +341,25 @@ def _log(auth_ok: bool, auth_hdr: str, raw: str, parsed: Any, resp: list, items_
         resp_safe = json.dumps(resp, ensure_ascii=False).replace("'", "''")
         err_safe = ((error or '')[:500]).replace("'", "''")
         hdr_safe = (auth_hdr or '')[:200].replace("'", "''")
+        method_safe = (http_method or '')[:20].replace("'", "''")
+        ct_safe = (content_type or '')[:200].replace("'", "''")
+        if all_headers:
+            try:
+                hdrs_clean = {k: v for k, v in all_headers.items()
+                              if k.lower() not in ('cookie', 'x-cookie', 'authorization', 'x-authorization')}
+                hdrs_json = json.dumps(hdrs_clean, ensure_ascii=False)[:5000].replace("'", "''")
+                hdrs_sql = f"'{hdrs_json}'::jsonb"
+            except Exception:
+                hdrs_sql = 'NULL'
+        else:
+            hdrs_sql = 'NULL'
         cur.execute(
             f"INSERT INTO {SCHEMA}.sl_webhook_log "
-            f"(auth_ok, auth_header, raw_data, parsed, response, items_count, error) VALUES "
+            f"(auth_ok, auth_header, raw_data, parsed, response, items_count, error, "
+            f"http_method, content_type, all_headers) VALUES "
             f"({'TRUE' if auth_ok else 'FALSE'}, '{hdr_safe}', '{raw_safe}', "
-            f"{parsed_sql}, '{resp_safe}'::jsonb, {int(items_count or 0)}, '{err_safe}')"
+            f"{parsed_sql}, '{resp_safe}'::jsonb, {int(items_count or 0)}, '{err_safe}', "
+            f"'{method_safe}', '{ct_safe}', {hdrs_sql})"
         )
         conn.commit(); cur.close(); conn.close()
     except Exception as e:
@@ -428,6 +444,13 @@ def handler(event: dict, context) -> dict:
         except Exception:
             pass
 
+    # Полная диагностика: метод, content-type, все заголовки, размер тела
+    try:
+        hdr_dump = json.dumps({k: v for k, v in headers.items() if k not in ('cookie', 'x-cookie', 'authorization', 'x-authorization')}, ensure_ascii=False)[:1500]
+        print(f'[webhook] method={method} ct={headers.get("content-type", "")} body_len={len(raw_body)} headers={hdr_dump} body_preview={raw_body[:300]}', flush=True)
+    except Exception:
+        pass
+
     # SmartLombard шлёт application/x-www-form-urlencoded с полем data=<json>
     raw_data = ''
     parsed_payload = None
@@ -459,14 +482,17 @@ def handler(event: dict, context) -> dict:
         print(f'[webhook] auth_ok={auth_ok} diag={auth_diag}', flush=True)
     except Exception:
         pass
+    ct_hdr = headers.get('content-type', '')
     if not auth_ok:
         resp = [{'status': False, 'type': 'auth', 'message': 'Authorization failed'}]
-        _log(False, auth_hdr, raw_body[:5000], parsed_payload, resp, 0, f'auth fail: {auth_diag}')
+        _log(False, auth_hdr, raw_body[:5000], parsed_payload, resp, 0, f'auth fail: {auth_diag}',
+             http_method=method, content_type=ct_hdr, all_headers=headers)
         return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps(resp, ensure_ascii=False)}
 
     if parsed_payload is None:
         resp = [{'status': False, 'type': 'auth', 'message': 'invalid json in data'}]
-        _log(True, auth_hdr, raw_body[:5000], None, resp, 0, 'bad json')
+        _log(True, auth_hdr, raw_body[:5000], None, resp, 0, 'bad json',
+             http_method=method, content_type=ct_hdr, all_headers=headers)
         return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps(resp, ensure_ascii=False)}
 
     messages: list = []
@@ -510,5 +536,6 @@ def handler(event: dict, context) -> dict:
     if not messages:
         messages.append({'status': True, 'type': 'good-add', 'unique': None, 'message': 'empty payload accepted'})
 
-    _log(True, auth_hdr, raw_body[:5000], parsed_payload, messages, items_count, None)
+    _log(True, auth_hdr, raw_body[:5000], parsed_payload, messages, items_count, None,
+         http_method=method, content_type=ct_hdr, all_headers=headers)
     return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps(messages, ensure_ascii=False)}
