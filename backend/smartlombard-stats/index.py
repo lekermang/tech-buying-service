@@ -12,7 +12,8 @@ TOKEN_CACHE_KEY = '__access_token__'
 
 API_BASE = 'https://online.smartlombard.ru/api/exchange/v1'
 GOODS_API_BASE = 'https://goods.api.smartlombard.ru/api/exchange/v1'
-AUTH_URL = f'{API_BASE}/auth/access_token'
+AUTH_API_BASE = 'https://auth.api.smartlombard.ru/api/exchange/v1'
+AUTH_URL = f'{AUTH_API_BASE}/auth/access_token'
 OPS_URL = f'{API_BASE}/operations'
 ELEM_OPS_URL = f'{API_BASE}/elementary_operations'
 
@@ -422,20 +423,22 @@ def _fetch_all_pages_multi_account(url: str, params: dict) -> tuple[list, list[d
 
 
 def _fetch_all_pages(url: str, token: str, params: dict, max_pages: int = 50) -> tuple[list, str | None, dict | None]:
+    """Пагинация по offset (page deprecated в SmartLombard). limit=100, offset=0,100,200..."""
     items: list = []
-    page = 1
+    limit = 100
+    offset = 0
+    iteration = 0
     debug_first: dict | None = None
-    while page <= max_pages:
+    while iteration < max_pages:
         q = dict(params)
-        q['page'] = page
-        q['limit'] = 100
-        # Полный URL с query — чтобы можно было скопировать для тикета поддержки
+        q['limit'] = limit
+        q['offset'] = offset
         try:
             from urllib.parse import urlencode
             full_url = f'{url}?{urlencode(q)}'
         except Exception:
             full_url = url
-        req_headers = {'Authorization': f'Bearer {token[:8]}…(скрыто)'}  # для дебага
+        req_headers = {'Authorization': f'Bearer {token[:8]}…(скрыто)'}
         try:
             r = requests.get(url, params=q, headers={'Authorization': f'Bearer {token}'}, timeout=25)
         except Exception as e:
@@ -444,24 +447,24 @@ def _fetch_all_pages(url: str, token: str, params: dict, max_pages: int = 50) ->
         try:
             data = r.json()
         except Exception:
-            if page == 1:
+            if iteration == 0:
                 debug_first = {
                     'page1_count': 0, 'sample': [], 'no_data': True,
                     'request_url': full_url, 'request_headers': req_headers,
                     'response_status': r.status_code, 'response_raw': raw_body,
                 }
             return items, f'ops: bad json (status {r.status_code})', debug_first
-        # 412 "максимальное количество страниц: 0" = данных нет, это не ошибка
+        # 412 "превышает максимальное количество" по offset = данных нет / offset за пределами
         if r.status_code == 412 and _is_no_data_error(data):
-            if page == 1:
+            if iteration == 0:
                 debug_first = {
-                    'page1_count': 0, 'sample': [], 'pagination': {'total_pages': 0}, 'no_data': True,
+                    'page1_count': 0, 'sample': [], 'pagination': {'total': 0}, 'no_data': True,
                     'request_url': full_url, 'request_headers': req_headers,
                     'response_status': r.status_code, 'response_raw': raw_body,
                 }
             break
         if not data.get('status'):
-            if page == 1:
+            if iteration == 0:
                 debug_first = {
                     'page1_count': 0, 'sample': [], 'no_data': True,
                     'request_url': full_url, 'request_headers': req_headers,
@@ -470,7 +473,7 @@ def _fetch_all_pages(url: str, token: str, params: dict, max_pages: int = 50) ->
             return items, f'ops: {data.get("message") or data.get("error") or "failed"} (status {r.status_code})', debug_first
         result = data.get('result') or {}
         ops = result.get('operations') or []
-        if page == 1:
+        if iteration == 0:
             debug_first = {
                 'page1_count': len(ops),
                 'sample': ops[:2],
@@ -484,12 +487,17 @@ def _fetch_all_pages(url: str, token: str, params: dict, max_pages: int = 50) ->
             break
         items.extend(ops)
         pagination = (data.get('metadata') or {}).get('pagination') or {}
-        total_pages = pagination.get('total_pages') or pagination.get('totalPages')
-        if total_pages and page >= int(total_pages):
+        total = pagination.get('total') or pagination.get('total_count') or pagination.get('totalCount')
+        if total is not None:
+            try:
+                if offset + len(ops) >= int(total):
+                    break
+            except Exception:
+                pass
+        if len(ops) < limit:
             break
-        if len(ops) < 100:
-            break
-        page += 1
+        offset += limit
+        iteration += 1
     return items, None, debug_first
 
 
