@@ -13,7 +13,7 @@ import { SLAccountCheckPanel } from "./dashboard/SLAccountCheckPanel";
 import { SLStatsGrid } from "./dashboard/SLStatsGrid";
 
 export function SLDashboard({ token }: { token: string }) {
-  const [preset, setPreset] = useState("today");
+  const [preset, setPreset] = useState("m30");
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
