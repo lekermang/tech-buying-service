@@ -19,7 +19,8 @@ import {
   saveTab,
   type StaffTab,
 } from "./staff/staffConstants";
-import { OfflineBanner, UpdateAvailableBanner } from "./staff/StaffStatusBanners";
+import { OfflineBanner } from "./staff/StaffStatusBanners";
+import { StaffToastProvider, useStaffToast } from "./staff/StaffToast";
 
 // Ленивые модули + прелоадеры (для предзагрузки по hover/touchstart)
 const loadGoods         = () => import("./StaffGoodsTab");
@@ -154,7 +155,9 @@ export default function Staff() {
   useStaffPwa();
   return (
     <StaffThemeProvider token={tokenBoot}>
-      <StaffInner />
+      <StaffToastProvider>
+        <StaffInner />
+      </StaffToastProvider>
     </StaffThemeProvider>
   );
 }
@@ -197,6 +200,7 @@ function ThemeBanner({ onOpen }: { onOpen: () => void }) {
 }
 
 function StaffInner() {
+  const toast = useStaffToast();
   const [token, setToken] = useState(() => localStorage.getItem("employee_token") || "");
   const [loginForm, setLoginForm] = useState({ login: "", password: "" });
   const [loginError, setLoginError] = useState("");
@@ -231,6 +235,51 @@ function StaffInner() {
       .catch(() => {});
     return () => ctrl.abort();
   }, [token]);
+
+  // Тост при появлении новой версии PWA
+  useEffect(() => {
+    if (!authed || !("serviceWorker" in navigator)) return;
+    let shown = false;
+    const showOnce = (sw: ServiceWorker) => {
+      if (shown) return;
+      shown = true;
+      toast.info("Доступна новая версия приложения", {
+        title: "Обновление",
+        duration: 0,
+        action: {
+          label: "Обновить",
+          onClick: () => {
+            sw.postMessage({ type: "SKIP_WAITING" });
+            setTimeout(() => window.location.reload(), 300);
+          },
+        },
+      });
+    };
+    navigator.serviceWorker.getRegistration("/staff").then((reg) => {
+      if (!reg) return;
+      if (reg.waiting) showOnce(reg.waiting);
+      reg.addEventListener("updatefound", () => {
+        const sw = reg.installing;
+        if (!sw) return;
+        sw.addEventListener("statechange", () => {
+          if (sw.state === "installed" && navigator.serviceWorker.controller) showOnce(sw);
+        });
+      });
+    });
+  }, [authed, toast]);
+
+  // Тосты при потере/восстановлении сети
+  useEffect(() => {
+    if (!authed) return;
+    const onOnline = () => toast.success("Связь восстановлена");
+    const onOffline = () => toast.warning("Нет интернета — работаем в офлайне", { duration: 4000 });
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, [authed, toast]);
 
   // Прогрев соседних чанков после авторизации
   useEffect(() => {
@@ -304,11 +353,17 @@ function StaffInner() {
         localStorage.setItem("employee_name", data.full_name);
         localStorage.setItem("employee_role", data.role);
         setToken(data.token); setEmpName(data.full_name); setEmpRole(data.role); setAuthed(true);
-      } else setLoginError(data.error || "Неверный логин или пароль");
+        toast.success(`Добро пожаловать, ${data.full_name || "сотрудник"}!`);
+      } else {
+        const msg = data.error || "Неверный логин или пароль";
+        setLoginError(msg);
+        toast.error(msg);
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error('[login error]', msg, err);
       setLoginError(`Ошибка: ${msg}`);
+      toast.error("Не удалось войти. Проверьте интернет.");
     } finally {
       setLoginLoading(false);
     }
@@ -340,12 +395,16 @@ function StaffInner() {
         localStorage.setItem("employee_role", data.role);
         setToken(data.token); setEmpName(data.full_name); setEmpRole(data.role); setAuthed(true);
         setPinStage(null); setPinValue(""); setPinConfirm("");
+        toast.success(`Вход выполнен. Здравствуйте, ${data.full_name || "сотрудник"}!`);
       } else {
-        setPinError(data.error || "Неверный PIN");
+        const msg = data.error || "Неверный PIN";
+        setPinError(msg);
+        toast.error(msg);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setPinError(`Ошибка: ${msg}`);
+      toast.error("Сбой проверки PIN");
     } finally {
       setPinLoading(false);
     }
@@ -359,6 +418,7 @@ function StaffInner() {
   const logout = () => {
     localStorage.removeItem("employee_token"); localStorage.removeItem("employee_name"); localStorage.removeItem("employee_role");
     setToken(""); setAuthed(false); setEmpName(""); setEmpRole("");
+    toast.info("Вы вышли из системы");
   };
 
   if (!authed && pinStage) {
@@ -539,23 +599,32 @@ function StaffInner() {
 
   const submitPw = () => {
     if (pwInput === SECRET_PW && pwModal) {
-      setUnlocked(u => ({ ...u, [pwModal]: true }));
-      setTab(pwModal);
+      const opened = pwModal;
+      setUnlocked(u => ({ ...u, [opened]: true }));
+      setTab(opened);
       setPwModal(null); setPwInput(""); setPwError("");
+      toast.success("Доступ открыт");
     } else {
       setPwError("Неверный пароль");
+      toast.error("Неверный пароль");
     }
   };
 
   const sendReminderNow = async () => {
     setSending(true);
     setSendResult(null);
+    const tid = toast.loading("Отправляю напоминание @PluXan...");
     try {
       const res = await fetch(`${PRICE_SCHEDULER_URL}?action=send_morning_reminder_now`);
       const data = await res.json();
-      setSendResult(data.sent === true);
+      const ok = data.sent === true;
+      setSendResult(ok);
+      toast.update(tid, ok
+        ? { kind: "success", message: "Напоминание отправлено", duration: 3000 }
+        : { kind: "error", message: data.error || "Не удалось отправить напоминание", duration: 5000 });
     } catch {
       setSendResult(false);
+      toast.update(tid, { kind: "error", message: "Сбой сети при отправке", duration: 5000 });
     } finally {
       setSending(false);
       setTimeout(() => setSendResult(null), 4000);
@@ -581,9 +650,8 @@ function StaffInner() {
       <CursorEffects />
       <AnimeMascot onOpenSettings={() => setThemeOpen(true)} />
       {themeOpen && <StaffThemeSettings onClose={() => setThemeOpen(false)} />}
-      {/* Системные баннеры */}
+      {/* Системный баннер офлайн (постоянный, пока нет сети) */}
       <OfflineBanner />
-      <UpdateAvailableBanner />
       {/* Баннер темы */}
       <ThemeBanner onOpen={() => setThemeOpen(true)} />
       {/* Шапка — премиальная с градиентом */}
