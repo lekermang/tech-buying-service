@@ -6,7 +6,6 @@ export type StaffTab =
   | "employees"
   | "repair"
   | "chat"
-  | "smartlombard"
   | "gold";
 
 export const PRICE_SCHEDULER_URL =
@@ -64,7 +63,6 @@ export function readSavedTab(fallback: StaffTab): StaffTab {
       "employees",
       "repair",
       "chat",
-      "smartlombard",
       "gold",
     ];
     if (fromUrl && (allowed as string[]).includes(fromUrl)) return fromUrl as StaffTab;
