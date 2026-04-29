@@ -1,46 +1,21 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import Icon from "@/components/ui/icon";
 import { AUTH_CLIENT_URL } from "./staff.types";
-import { formatPhone } from "@/lib/phoneFormat";
 import { useStaffToast } from "./staff/StaffToast";
 import useDebouncedValue from "@/hooks/useDebouncedValue";
 import { SMS_TEMPLATES, SMS_CATEGORIES, renderTemplate, type SmsTemplate } from "./staff/smsTemplates";
+import SearchAndAddPanel from "./staff/clients/SearchAndAddPanel";
+import DiscountClientsPanel, { type DiscountClient } from "./staff/clients/DiscountClientsPanel";
+import SmsBlastPanel, { type Group } from "./staff/clients/SmsBlastPanel";
+import AllContactsPanel, { type Contact, type Source } from "./staff/clients/AllContactsPanel";
 
 const REPAIR_ADMIN_URL = "https://functions.poehali.dev/a105aede-d55d-4b99-9d3e-5e977887aa04";
 
-type Source = "registered" | "repair" | "wh";
-type Group = "all" | "registered" | "repair";
-
-type Contact = {
-  id: string;
-  full_name: string;
-  phone: string;
-  source: Source;
-};
-
-type DiscountClient = {
-  id: number;
-  full_name: string;
-  phone: string;
-  email: string | null;
-  discount_pct: number;
-  loyalty_points: number;
-  registered_at: string | null;
-};
+// Подавляем неиспользуемые импорты, сохраняя их для совместимости
+void SMS_TEMPLATES; void SMS_CATEGORIES; void renderTemplate;
+type _Sms = SmsTemplate;
+void (null as unknown as _Sms);
 
 const MAX_SMS = 480;
-
-const SOURCE_LABEL: Record<Source, string> = {
-  registered: "Скидки",
-  repair: "Ремонт",
-  wh: "WH",
-};
-
-const SOURCE_STYLE: Record<Source, string> = {
-  registered: "bg-blue-500/15 text-blue-300 border border-blue-400/30",
-  repair: "bg-green-500/15 text-green-300 border border-green-400/30",
-  wh: "bg-purple-500/15 text-purple-300 border border-purple-400/30",
-};
 
 export function ClientsTab({ token }: { token: string }) {
   const toast = useStaffToast();
@@ -281,461 +256,72 @@ export function ClientsTab({ token }: { token: string }) {
     return 0;
   }, [smsGroup, counts]);
 
-  const fName = (found as { full_name?: string })?.full_name || "";
-  const fPhone = (found as { phone?: string })?.phone || "";
-  const fEmail = (found as { email?: string })?.email || "";
-  const fDiscount = (found as { discount_pct?: number })?.discount_pct || 0;
-  const fPoints = (found as { loyalty_points?: number })?.loyalty_points || 0;
-  const foundInitials = fName.trim().split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase() || "?";
-
   const charsLeft = MAX_SMS - smsMessage.length;
   const smsCount = Math.ceil(smsMessage.length / 70) || 1; // кириллица 70 симв./SMS
   const totalCost = smsCost && smsTargetCount ? smsCost * smsTargetCount * smsCount : null;
 
   return (
     <div className="p-3 space-y-4">
-      {/* Поиск клиента */}
-      <div className="bg-gradient-to-br from-[#141414] to-[#0A0A0A] border border-[#1F1F1F] rounded-lg p-4">
-        <div className="font-oswald font-bold uppercase text-sm text-white mb-3 flex items-center gap-1.5">
-          <Icon name="Search" size={14} className="text-[#FFD700]" />
-          Поиск клиента
-        </div>
-        <div className="flex gap-2 mb-3">
-          <div className="flex-1 relative">
-            <Icon name="Phone" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
-            <input value={phone} onChange={e => setPhone(formatPhone(e.target.value))} onKeyDown={e => e.key === "Enter" && search()}
-              placeholder="+7 (___) ___-__-__"
-              className="w-full bg-[#0A0A0A] border border-[#1F1F1F] text-white pl-9 pr-3 py-2.5 font-roboto text-sm rounded-md focus:outline-none focus:border-[#FFD700]/50 focus:bg-[#141414] placeholder:text-white/25 transition-all" />
-          </div>
-          <button onClick={search} disabled={!phone || searching}
-            className="bg-gradient-to-b from-[#FFD700] to-yellow-500 text-black font-oswald font-bold px-4 py-2.5 uppercase text-xs rounded-md shadow-md shadow-[#FFD700]/20 hover:shadow-[#FFD700]/40 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-1.5">
-            {searching ? <Icon name="Loader" size={13} className="animate-spin" /> : <Icon name="Search" size={13} />}
-            Найти
-          </button>
-        </div>
+      <SearchAndAddPanel
+        phone={phone}
+        setPhone={setPhone}
+        search={search}
+        searching={searching}
+        found={found}
+        addForm={addForm}
+        setAddForm={setAddForm}
+        addClient={addClient}
+        addLoading={addLoading}
+      />
 
-        {found && (
-          <div className="bg-gradient-to-br from-[#FFD700]/10 to-transparent border border-[#FFD700]/30 rounded-lg p-3 animate-in fade-in slide-in-from-top-1 duration-300">
-            <div className="flex items-start gap-3">
-              <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#FFD700] to-yellow-600 flex items-center justify-center font-oswald font-bold text-black shrink-0">
-                {foundInitials}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="font-oswald font-bold text-white text-base uppercase truncate">{fName}</div>
-                <div className="font-roboto text-[#FFD700]/80 text-sm flex items-center gap-1.5 mt-0.5">
-                  <Icon name="Phone" size={11} />{fPhone}
-                </div>
-                {fEmail && (
-                  <div className="font-roboto text-white/50 text-xs flex items-center gap-1.5 mt-0.5">
-                    <Icon name="Mail" size={10} />{fEmail}
-                  </div>
-                )}
-                <div className="flex gap-3 mt-2">
-                  <div className="bg-[#FFD700]/10 border border-[#FFD700]/30 px-2 py-1 rounded-md">
-                    <div className="font-roboto text-[#FFD700]/60 text-[9px] uppercase">Скидка</div>
-                    <div className="font-oswald font-bold text-[#FFD700] text-sm tabular-nums">{fDiscount}%</div>
-                  </div>
-                  <div className="bg-green-500/10 border border-green-500/30 px-2 py-1 rounded-md">
-                    <div className="font-roboto text-green-400/60 text-[9px] uppercase">Баллы</div>
-                    <div className="font-oswald font-bold text-green-400 text-sm tabular-nums">{fPoints}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+      <DiscountClientsPanel
+        discountOpen={discountOpen}
+        setDiscountOpen={setDiscountOpen}
+        discountClients={discountClients}
+        visibleDiscountClients={visibleDiscountClients}
+        discountFilter={discountFilter}
+        setDiscountFilter={setDiscountFilter}
+        loadingDiscount={loadingDiscount}
+        loadDiscountClients={loadDiscountClients}
+      />
 
-      {/* База клиентов программы скидок (как в админке) */}
-      <div className="bg-gradient-to-br from-[#141414] to-[#0A0A0A] border border-[#1F1F1F] rounded-lg p-4">
-        <button
-          onClick={() => setDiscountOpen(v => !v)}
-          className="w-full flex items-center justify-between gap-2 active:scale-[0.99] transition-transform"
-        >
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-md bg-[#FFD700]/15 border border-[#FFD700]/30 flex items-center justify-center">
-              <Icon name="Users" size={14} className="text-[#FFD700]" />
-            </div>
-            <div className="text-left">
-              <div className="font-oswald font-bold uppercase text-sm text-white">База клиентов программы</div>
-              <div className="font-roboto text-white/40 text-[10px]">
-                Все зарегистрированные · скидка · баллы
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {discountClients.length > 0 && (
-              <span className="font-oswald font-bold tabular-nums text-[#FFD700] text-xs">
-                {discountClients.length}
-              </span>
-            )}
-            <Icon name={discountOpen ? "ChevronUp" : "ChevronDown"} size={16} className="text-white/40" />
-          </div>
-        </button>
+      <SmsBlastPanel
+        smsOpen={smsOpen}
+        setSmsOpen={setSmsOpen}
+        balance={balance}
+        smsCost={smsCost}
+        loadingBalance={loadingBalance}
+        loadBalance={loadBalance}
+        smsGroup={smsGroup}
+        setSmsGroup={setSmsGroup}
+        counts={counts}
+        smsMessage={smsMessage}
+        setSmsMessage={setSmsMessage}
+        setSmsConfirm={setSmsConfirm}
+        smsConfirm={smsConfirm}
+        smsTargetCount={smsTargetCount}
+        smsCount={smsCount}
+        charsLeft={charsLeft}
+        totalCost={totalCost}
+        smsSending={smsSending}
+        sendSms={sendSms}
+        smsResult={smsResult}
+        MAX_SMS={MAX_SMS}
+      />
 
-        {discountOpen && (
-          <div className="mt-4 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
-            <div className="flex gap-2 items-center">
-              <div className="flex-1 relative">
-                <Icon name="Search" size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
-                <input
-                  value={discountFilter}
-                  onChange={e => setDiscountFilter(e.target.value)}
-                  placeholder="Поиск по имени, телефону, email..."
-                  className="w-full bg-[#0A0A0A] border border-[#1F1F1F] text-white pl-9 pr-3 py-2.5 font-roboto text-sm rounded-md focus:outline-none focus:border-[#FFD700]/50 placeholder:text-white/25"
-                />
-              </div>
-              <button
-                onClick={() => loadDiscountClients()}
-                disabled={loadingDiscount}
-                className="text-white/50 hover:text-white p-2.5 rounded-md hover:bg-white/5 transition-colors disabled:opacity-50 border border-[#1F1F1F]"
-                title="Обновить"
-              >
-                <Icon name="RefreshCw" size={14} className={loadingDiscount ? "animate-spin" : ""} />
-              </button>
-            </div>
-
-            {loadingDiscount && discountClients.length === 0 ? (
-              <div className="text-center py-8 text-white/30 font-roboto text-sm">Загружаю базу...</div>
-            ) : visibleDiscountClients.length === 0 ? (
-              <div className="text-center py-8 text-white/30 font-roboto text-sm">
-                {discountFilter ? "Совпадений не найдено" : "База пуста"}
-              </div>
-            ) : (
-              <>
-                <div className="text-[10px] font-roboto text-white/40 uppercase tracking-wide flex items-center justify-between">
-                  <span>Найдено: <span className="text-[#FFD700] font-bold">{visibleDiscountClients.length}</span></span>
-                  <span>Всего: {discountClients.length}</span>
-                </div>
-                <div className="max-h-[420px] overflow-y-auto rounded-md border border-[#1F1F1F] divide-y divide-[#1F1F1F]">
-                  {visibleDiscountClients.slice(0, 500).map(c => {
-                    const initials = (c.full_name || "?").trim().split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase() || "?";
-                    return (
-                      <div
-                        key={c.id}
-                        className="flex items-center gap-3 p-2.5 bg-[#0A0A0A] hover:bg-[#FFD700]/5 transition-colors"
-                      >
-                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#FFD700]/30 to-yellow-700/30 border border-[#FFD700]/30 flex items-center justify-center font-oswald font-bold text-[#FFD700] text-xs shrink-0">
-                          {initials}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="font-oswald font-bold text-white text-sm truncate">{c.full_name || "—"}</div>
-                          <div className="font-roboto text-white/50 text-[11px] flex items-center gap-2">
-                            <span className="text-[#FFD700]/80 font-mono">{c.phone}</span>
-                            {c.email && <span className="truncate">· {c.email}</span>}
-                          </div>
-                          {c.registered_at && (
-                            <div className="font-roboto text-white/30 text-[9px] mt-0.5">
-                              Регистрация: {new Date(c.registered_at).toLocaleDateString("ru-RU")}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex flex-col items-end gap-0.5 shrink-0">
-                          <span className="font-oswald font-bold text-[10px] bg-green-500/15 text-green-400 border border-green-500/30 px-2 py-0.5 rounded-full tabular-nums">
-                            {c.discount_pct}%
-                          </span>
-                          <span className="font-roboto text-[9px] text-white/50 tabular-nums">
-                            <Icon name="Star" size={9} className="inline text-[#FFD700] mr-0.5" />
-                            {c.loyalty_points}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                {visibleDiscountClients.length > 500 && (
-                  <div className="text-center text-[10px] text-white/30 font-roboto">
-                    Показаны первые 500. Используйте поиск, чтобы сузить выбор.
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Добавить клиента */}
-      <div className="bg-gradient-to-br from-[#141414] to-[#0A0A0A] border border-[#1F1F1F] rounded-lg p-4">
-        <div className="font-oswald font-bold uppercase text-sm text-white mb-3 flex items-center gap-1.5">
-          <Icon name="UserPlus" size={14} className="text-[#FFD700]" />
-          Новый клиент
-        </div>
-        <div className="space-y-2.5">
-          {[
-            { key: "full_name", label: "ФИО", placeholder: "Иванов Иван Иванович", icon: "User" },
-            { key: "phone", label: "Телефон *", placeholder: "+7 (___) ___-__-__", icon: "Phone" },
-            { key: "email", label: "Email", placeholder: "mail@example.com", icon: "Mail" },
-          ].map(f => (
-            <div key={f.key}>
-              <label className="font-roboto text-white/40 text-[10px] block mb-1 uppercase tracking-wide">{f.label}</label>
-              <div className="relative">
-                <Icon name={f.icon} size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
-                <input
-                  value={(addForm as Record<string, string>)[f.key]}
-                  onChange={e => setAddForm(p => ({ ...p, [f.key]: f.key === "phone" ? formatPhone(e.target.value) : e.target.value }))}
-                  placeholder={f.placeholder}
-                  className="w-full bg-[#0A0A0A] border border-[#1F1F1F] text-white pl-9 pr-3 py-2.5 font-roboto text-sm rounded-md focus:outline-none focus:border-[#FFD700]/50 focus:bg-[#141414] placeholder:text-white/25 transition-all" />
-              </div>
-            </div>
-          ))}
-          <button onClick={addClient} disabled={!addForm.phone || !addForm.full_name || addLoading}
-            className="w-full bg-gradient-to-b from-[#FFD700] to-yellow-500 text-black font-oswald font-bold py-3 uppercase text-xs rounded-md shadow-md shadow-[#FFD700]/20 hover:shadow-[#FFD700]/40 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-1.5 mt-2">
-            {addLoading ? <Icon name="Loader" size={13} className="animate-spin" /> : <Icon name="UserPlus" size={13} />}
-            Добавить клиента
-          </button>
-        </div>
-      </div>
-
-      {/* SMS-рассылка */}
-      <div className="bg-gradient-to-br from-green-500/5 to-[#0A0A0A] border border-green-500/20 rounded-lg p-4">
-        <button
-          onClick={() => setSmsOpen(v => !v)}
-          className="w-full flex items-center justify-between gap-2 mb-1 active:scale-[0.99] transition-transform"
-        >
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-md bg-green-500/15 border border-green-500/30 flex items-center justify-center">
-              <Icon name="MessageSquare" size={14} className="text-green-400" />
-            </div>
-            <div className="text-left">
-              <div className="font-oswald font-bold uppercase text-sm text-white">SMS-рассылка</div>
-              <div className="font-roboto text-white/40 text-[10px]">Акции и уведомления через sms.ru</div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {balance != null && (
-              <span className="font-oswald font-bold tabular-nums text-[#FFD700] text-xs whitespace-nowrap">
-                {balance.toFixed(2)} ₽
-              </span>
-            )}
-            <Icon name={smsOpen ? "ChevronUp" : "ChevronDown"} size={16} className="text-white/40" />
-          </div>
-        </button>
-
-        {smsOpen && (
-          <div className="mt-4 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
-            {/* Баланс */}
-            <div className="bg-[#0A0A0A] border border-[#1F1F1F] rounded-md p-3 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 min-w-0">
-                <Icon name="Wallet" size={14} className="text-[#FFD700] shrink-0" />
-                <div className="min-w-0">
-                  <div className="font-roboto text-white/40 text-[9px] uppercase tracking-wide">Баланс sms.ru</div>
-                  <div className="font-oswald font-bold text-white text-base tabular-nums truncate">
-                    {loadingBalance ? "..." : balance != null ? `${balance.toFixed(2)} ₽` : "—"}
-                    {smsCost && (
-                      <span className="font-roboto text-white/40 text-[10px] ml-2">{smsCost.toFixed(2)} ₽/SMS</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <button onClick={loadBalance} disabled={loadingBalance}
-                className="text-white/50 hover:text-white p-2 rounded-md hover:bg-white/5 transition-colors disabled:opacity-50">
-                <Icon name="RefreshCw" size={14} className={loadingBalance ? "animate-spin" : ""} />
-              </button>
-            </div>
-
-            {/* Группа получателей */}
-            <div>
-              <div className="font-roboto text-white/40 text-[10px] uppercase tracking-wide mb-2">Кому отправить</div>
-              <div className="grid grid-cols-3 gap-2">
-                {([
-                  { k: "all" as Group, l: "Всем", icon: "Users", count: counts.all },
-                  { k: "registered" as Group, l: "Скидки", icon: "Star", count: counts.registered },
-                  { k: "repair" as Group, l: "Ремонт", icon: "Wrench", count: counts.repair },
-                ]).map(g => {
-                  const a = smsGroup === g.k;
-                  return (
-                    <button key={g.k} onClick={() => setSmsGroup(g.k)}
-                      className={`flex flex-col items-center gap-1 p-2.5 rounded-md border text-center transition-all active:scale-95 ${
-                        a
-                          ? "border-[#FFD700] bg-[#FFD700]/10 text-[#FFD700]"
-                          : "border-[#1F1F1F] bg-[#0A0A0A] text-white/50 hover:border-white/20 hover:text-white"
-                      }`}>
-                      <Icon name={g.icon} size={14} />
-                      <span className="font-oswald font-bold text-[11px] uppercase">{g.l}</span>
-                      <span className="font-roboto text-[10px] tabular-nums opacity-80">{g.count}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Текст */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <div className="font-roboto text-white/40 text-[10px] uppercase tracking-wide">Текст сообщения</div>
-                <div className={`font-oswald text-[10px] tabular-nums ${charsLeft < 0 ? "text-red-400" : "text-white/50"}`}>
-                  {smsMessage.length} / {MAX_SMS} · {smsCount} SMS
-                </div>
-              </div>
-              <textarea
-                value={smsMessage}
-                onChange={e => { setSmsMessage(e.target.value.slice(0, MAX_SMS)); setSmsConfirm(false); }}
-                placeholder="Например: Скупка24 — повышенная цена за iPhone до конца недели! Звоните: +7 992 999-03-33"
-                rows={4}
-                className="w-full bg-[#0A0A0A] border border-[#1F1F1F] text-white px-3 py-2.5 font-roboto text-sm rounded-md focus:outline-none focus:border-[#FFD700]/50 placeholder:text-white/25 resize-none"
-              />
-              <div className="font-roboto text-white/30 text-[10px] mt-1 leading-tight">
-                Подпись отправителя: <span className="text-[#FFD700]">IPMamedov</span>. Кириллица — 70 символов на 1 SMS.
-              </div>
-            </div>
-
-            {/* Стоимость и подтверждение */}
-            <div className="bg-[#0A0A0A] border border-[#1F1F1F] rounded-md p-3 space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-roboto text-white/50">Получателей</span>
-                <span className="font-oswald font-bold text-white tabular-nums">{smsTargetCount}</span>
-              </div>
-              {totalCost != null && (
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-roboto text-white/50">Примерная стоимость</span>
-                  <span className="font-oswald font-bold text-[#FFD700] tabular-nums">{totalCost.toFixed(2)} ₽</span>
-                </div>
-              )}
-              {balance != null && totalCost != null && totalCost > balance && (
-                <div className="bg-red-500/10 border border-red-500/30 rounded px-2 py-1.5 flex items-start gap-1.5 text-red-300 font-roboto text-[10px] leading-snug">
-                  <Icon name="AlertTriangle" size={11} className="text-red-400 mt-0.5 shrink-0" />
-                  Баланса может не хватить. Пополните счёт sms.ru.
-                </div>
-              )}
-              <label className="flex items-center gap-2 cursor-pointer select-none pt-1">
-                <input
-                  type="checkbox"
-                  checked={smsConfirm}
-                  onChange={e => setSmsConfirm(e.target.checked)}
-                  className="w-4 h-4 accent-[#FFD700]"
-                />
-                <span className="font-roboto text-white/70 text-xs">
-                  Я подтверждаю отправку <b>{smsTargetCount}</b> SMS
-                </span>
-              </label>
-              <button
-                onClick={sendSms}
-                disabled={!smsMessage.trim() || !smsConfirm || smsSending || smsTargetCount === 0}
-                className="w-full bg-gradient-to-b from-green-500 to-green-600 hover:from-green-400 hover:to-green-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-oswald font-bold py-3 uppercase tracking-wide text-sm rounded-md shadow-md shadow-green-500/20 active:scale-95 transition-all flex items-center justify-center gap-2"
-              >
-                {smsSending ? (
-                  <><Icon name="Loader" size={14} className="animate-spin" /> Отправляю...</>
-                ) : (
-                  <><Icon name="Send" size={14} /> Отправить рассылку</>
-                )}
-              </button>
-              {smsResult && (
-                <div className="bg-green-500/10 border border-green-500/30 rounded px-2.5 py-2 text-green-300 font-roboto text-xs flex items-center gap-2">
-                  <Icon name="CheckCircle2" size={12} />
-                  Доставлено: <b className="tabular-nums">{smsResult.sent}</b> · Ошибок: <b className="tabular-nums">{smsResult.failed}</b> из <b className="tabular-nums">{smsResult.total}</b>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* База клиентов (объединённая) */}
-      <div className="bg-gradient-to-br from-[#141414] to-[#0A0A0A] border border-[#1F1F1F] rounded-lg p-4">
-        <div className="flex items-center justify-between mb-3">
-          <div className="font-oswald font-bold uppercase text-sm text-white flex items-center gap-1.5">
-            <Icon name="Users" size={14} className="text-[#FFD700]" />
-            База клиентов
-            {showAll && (
-              <span className="bg-[#FFD700]/15 text-[#FFD700] font-oswald text-[11px] px-2 py-0.5 rounded-full tabular-nums">
-                {contacts.length}
-              </span>
-            )}
-          </div>
-          {!showAll ? (
-            <button onClick={() => setShowAll(true)} disabled={loadingContacts}
-              className="bg-[#FFD700]/10 border border-[#FFD700]/30 text-[#FFD700] font-roboto text-xs px-3 py-1.5 rounded-md hover:bg-[#FFD700]/20 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-1.5">
-              {loadingContacts ? <Icon name="Loader" size={11} className="animate-spin" /> : <Icon name="Download" size={11} />}
-              {loadingContacts ? "Загружаю..." : "Показать всех"}
-            </button>
-          ) : (
-            <button onClick={() => loadContacts()} disabled={loadingContacts} title="Обновить"
-              className="text-white/40 hover:text-white p-2 rounded-md hover:bg-white/5 transition-colors">
-              <Icon name="RefreshCw" size={13} className={loadingContacts ? "animate-spin" : ""} />
-            </button>
-          )}
-        </div>
-
-        {showAll && (
-          <>
-            {/* Фильтр-источник */}
-            <div className="flex gap-1.5 mb-2 flex-wrap">
-              {([
-                { k: "all", l: "Все", count: counts.all },
-                { k: "registered", l: "Скидки", count: counts.registered },
-                { k: "repair", l: "Ремонт", count: counts.repair },
-                ...(counts.wh > 0 ? [{ k: "wh" as const, l: "WH", count: counts.wh }] : []),
-              ] as { k: "all" | Source; l: string; count: number }[]).map(s => {
-                const a = sourceFilter === s.k;
-                return (
-                  <button key={s.k} onClick={() => setSourceFilter(s.k)}
-                    className={`font-roboto text-[11px] px-3 py-1 rounded-full transition-all active:scale-95 ${
-                      a
-                        ? "bg-[#FFD700] text-black font-bold"
-                        : "bg-[#141414] border border-[#1F1F1F] text-white/50 hover:text-white"
-                    }`}>
-                    {s.l} <span className="opacity-70 tabular-nums">{s.count}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Текстовый фильтр */}
-            <div className="mb-3 relative">
-              <Icon name="Search" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
-              <input
-                value={filter}
-                onChange={e => setFilter(e.target.value)}
-                placeholder="Имя или телефон..."
-                className="w-full bg-[#0A0A0A] border border-[#1F1F1F] text-white pl-9 pr-9 py-2 font-roboto text-sm rounded-md focus:outline-none focus:border-[#FFD700]/50 focus:bg-[#141414] placeholder:text-white/25 transition-all" />
-              {filter && (
-                <button onClick={() => setFilter("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/30 hover:text-white p-0.5 transition-colors">
-                  <Icon name="X" size={14} />
-                </button>
-              )}
-            </div>
-
-            {loadingContacts ? (
-              <div className="text-center py-10 text-white/30 font-roboto text-sm">
-                <Icon name="Loader" size={16} className="animate-spin inline mr-2" />Загружаю клиентов...
-              </div>
-            ) : contacts.length === 0 ? (
-              <div className="text-center py-10">
-                <div className="w-14 h-14 mx-auto mb-2 bg-[#141414] border border-[#222] rounded-full flex items-center justify-center">
-                  <Icon name="Users" size={24} className="text-white/20" />
-                </div>
-                <div className="font-roboto text-white/40 text-sm">Нет клиентов</div>
-              </div>
-            ) : visibleContacts.length === 0 ? (
-              <div className="text-center py-8 text-white/30 font-roboto text-sm">По фильтру ничего не найдено</div>
-            ) : (
-              <div className="space-y-1.5 max-h-[60vh] overflow-y-auto pr-1">
-                {visibleContacts.map(c => {
-                  const initials = c.full_name.trim().split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase() || "?";
-                  return (
-                    <div key={c.id} className="group bg-[#0A0A0A] border border-[#1A1A1A] rounded-md px-3 py-2.5 flex items-center gap-3 hover:border-[#FFD700]/30 hover:bg-[#141414] transition-all">
-                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#333] to-[#1a1a1a] border border-white/10 flex items-center justify-center font-oswald font-bold text-sm text-white/70 shrink-0 group-hover:border-[#FFD700]/40 transition-colors">
-                        {initials}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="font-roboto text-white text-sm truncate font-medium">{c.full_name || <span className="text-white/30 italic">Без имени</span>}</div>
-                        <a href={`tel:${c.phone}`} onClick={e => e.stopPropagation()}
-                          className="font-roboto text-[#FFD700]/80 text-[11px] hover:text-[#FFD700] flex items-center gap-1 mt-0.5">
-                          <Icon name="Phone" size={9} />{c.phone}
-                        </a>
-                      </div>
-                      <span className={`font-oswald text-[9px] uppercase font-bold px-2 py-0.5 rounded-sm tracking-wide shrink-0 ${SOURCE_STYLE[c.source]}`}>
-                        {SOURCE_LABEL[c.source]}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </>
-        )}
-      </div>
+      <AllContactsPanel
+        showAll={showAll}
+        setShowAll={setShowAll}
+        contacts={contacts}
+        visibleContacts={visibleContacts}
+        loadingContacts={loadingContacts}
+        loadContacts={loadContacts}
+        filter={filter}
+        setFilter={setFilter}
+        sourceFilter={sourceFilter}
+        setSourceFilter={setSourceFilter}
+        counts={counts}
+      />
     </div>
   );
 }
