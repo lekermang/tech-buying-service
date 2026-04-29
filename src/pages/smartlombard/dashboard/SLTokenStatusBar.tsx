@@ -2,6 +2,7 @@ import Icon from "@/components/ui/icon";
 
 type Props = {
   tokenError: string;
+  tokenRateLimited?: boolean;
   tokenTtl: number | null;
   tokenAge: number | null;
   diagLoading: boolean;
@@ -11,31 +12,61 @@ type Props = {
 };
 
 export function SLTokenStatusBar({
-  tokenError, tokenTtl, tokenAge,
+  tokenError, tokenRateLimited, tokenTtl, tokenAge,
   diagLoading, tokenChecking,
   onRunDiag, onCheckToken,
 }: Props) {
+  // Сколько минут осталось до возможного перевыпуска (lockout 20 мин с момента получения токена)
+  const cooldownMin = tokenAge !== null && tokenAge < 20 * 60
+    ? Math.ceil((20 * 60 - tokenAge) / 60)
+    : 0;
+
+  const tone = tokenError
+    ? 'red'
+    : tokenRateLimited
+      ? 'amber'
+      : tokenTtl !== null && tokenTtl < 120
+        ? 'orange'
+        : 'green';
+
+  const wrapClass = {
+    red:    "bg-red-500/10 border-red-500/30",
+    amber:  "bg-amber-500/10 border-amber-500/30",
+    orange: "bg-orange-500/10 border-orange-500/30",
+    green:  "bg-green-500/5 border-green-500/20",
+  }[tone];
+
+  const titleClass = {
+    red:    "text-red-300",
+    amber:  "text-amber-300",
+    orange: "text-orange-300",
+    green:  "text-green-300",
+  }[tone];
+
+  const iconName = tokenError ? "AlertCircle" : tokenRateLimited ? "Clock" : "ShieldCheck";
+  const iconClass = {
+    red:    "text-red-400",
+    amber:  "text-amber-400",
+    orange: "text-orange-400",
+    green:  "text-green-400",
+  }[tone];
+
   return (
-    <div className={`rounded-lg p-2.5 border flex items-center justify-between gap-2 ${
-      tokenError
-        ? "bg-red-500/10 border-red-500/30"
-        : tokenTtl !== null && tokenTtl < 120
-          ? "bg-orange-500/10 border-orange-500/30"
-          : "bg-green-500/5 border-green-500/20"
-    }`}>
+    <div className={`rounded-lg p-2.5 border flex items-center justify-between gap-2 ${wrapClass}`}>
       <div className="flex items-center gap-2 min-w-0">
-        <Icon
-          name={tokenError ? "AlertCircle" : "ShieldCheck"}
-          size={14}
-          className={tokenError ? "text-red-400 shrink-0" : "text-green-400 shrink-0"}
-        />
+        <Icon name={iconName} size={14} className={`${iconClass} shrink-0`} />
         <div className="min-w-0">
-          <div className={`font-oswald font-bold text-[10px] uppercase tracking-wide ${tokenError ? "text-red-300" : "text-green-300"}`}>
+          <div className={`font-oswald font-bold text-[10px] uppercase tracking-wide ${titleClass}`}>
             Токен SmartLombard
           </div>
           <div className="font-roboto text-white/60 text-[11px] truncate">
             {tokenError ? (
               tokenError
+            ) : tokenRateLimited ? (
+              <>
+                Лимит SmartLombard: 1 перевыпуск / 20 мин.
+                {cooldownMin > 0 && <> Можно повторить через <span className="font-bold text-amber-200">~{cooldownMin} мин</span>.</>}
+              </>
             ) : tokenTtl !== null ? (
               <>
                 Действует ещё <span className="font-bold text-white tabular-nums">{Math.floor(tokenTtl / 60)} мин {tokenTtl % 60} сек</span>

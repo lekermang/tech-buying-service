@@ -26,6 +26,7 @@ export function SLDashboard({ token }: { token: string }) {
   const [tokenAge, setTokenAge] = useState<number | null>(null);
   const [tokenTtl, setTokenTtl] = useState<number | null>(null);
   const [tokenError, setTokenError] = useState("");
+  const [tokenRateLimited, setTokenRateLimited] = useState(false);
   const [tokenChecking, setTokenChecking] = useState(false);
 
   // Диагностика API SmartLombard — что реально вернул /operations
@@ -55,7 +56,7 @@ export function SLDashboard({ token }: { token: string }) {
   }, [getRange, token]);
 
   const checkToken = useCallback(async (force = false) => {
-    setTokenChecking(true); setTokenError("");
+    setTokenChecking(true); setTokenError(""); setTokenRateLimited(false);
     try {
       const url = `${SMARTLOMBARD_URL}?action=auth_check${force ? "&force=1" : ""}`;
       const res = await fetch(url, { headers: { "X-Employee-Token": token } });
@@ -64,6 +65,10 @@ export function SLDashboard({ token }: { token: string }) {
         setTokenError(errToText(data.error) || `HTTP ${res.status}`);
         setTokenAge(null); setTokenTtl(null);
       } else {
+        // rate_limited — лимит на перевыпуск, но старый токен ещё рабочий
+        if (data.rate_limited) {
+          setTokenRateLimited(true);
+        }
         setTokenAge(data.token_age_sec ?? 0);
         setTokenTtl(data.token_expires_in_sec ?? null);
       }
@@ -114,6 +119,7 @@ export function SLDashboard({ token }: { token: string }) {
 
       <SLTokenStatusBar
         tokenError={tokenError}
+        tokenRateLimited={tokenRateLimited}
         tokenTtl={tokenTtl}
         tokenAge={tokenAge}
         diagLoading={diagLoading}

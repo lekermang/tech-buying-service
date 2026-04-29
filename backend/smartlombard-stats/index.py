@@ -993,9 +993,26 @@ def handler(event: dict, context) -> dict:
         except Exception:
             pass
 
+        # 429 = это НЕ ошибка, это нормальное состояние «лимит на перевыпуск»
+        def _is_rate_limit(e: str | None) -> bool:
+            if not e:
+                return False
+            el = e.lower()
+            return ('429' in e) or ('1 раз' in e) or ('rate' in el) or ('лимит' in el)
+
         if force:
             tok, err = _request_new_token()
             if err or not tok:
+                # При 429 не падаем 502, отдаём 200 с rate_limited=true и старым токеном из БД
+                if _is_rate_limit(err):
+                    ttl_left = max(0, TOKEN_TTL_SECONDS - (token_age_sec or 0))
+                    return _ok({
+                        'ok': True, 'forced': False,
+                        'rate_limited': True,
+                        'rate_limit_message': err,
+                        'token_age_sec': token_age_sec or 0,
+                        'token_expires_in_sec': ttl_left,
+                    })
                 return _err(502, err or 'auth failed')
             _token_cache_set(tok)
             return _ok({
@@ -1006,6 +1023,15 @@ def handler(event: dict, context) -> dict:
 
         tok, err = _get_access_token(force=False)
         if err or not tok:
+            if _is_rate_limit(err):
+                ttl_left = max(0, TOKEN_TTL_SECONDS - (token_age_sec or 0))
+                return _ok({
+                    'ok': True, 'forced': False,
+                    'rate_limited': True,
+                    'rate_limit_message': err,
+                    'token_age_sec': token_age_sec or 0,
+                    'token_expires_in_sec': ttl_left,
+                })
             return _err(502, err or 'auth failed')
         ttl_left = max(0, TOKEN_TTL_SECONDS - (token_age_sec or 0))
         return _ok({
