@@ -110,58 +110,6 @@ export function SLDashboard({ token }: { token: string }) {
 
       {!error && stats && (
         <div className="grid grid-cols-2 gap-2">
-          {/* КАССА И БАНК (HTML-парсер online.smartlombard.ru) */}
-          {(stats.kassa_ok || (stats.kassa_income ?? 0) > 0 || (stats.kassa_sales_total ?? 0) > 0) && (
-            <div className="col-span-2 bg-gradient-to-br from-[#FFD700]/15 via-green-500/5 to-transparent border-2 border-[#FFD700]/40 rounded-xl p-3">
-              <div className="flex items-center justify-between mb-2">
-                <div className="font-oswald font-bold text-[#FFD700] text-xs uppercase tracking-wider flex items-center gap-1.5">
-                  <Icon name="Wallet" size={13} />
-                  Касса и банк (со SmartLombard)
-                </div>
-                <span className="font-roboto text-white/30 text-[9px]">по датам</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2 mb-2">
-                <div className="bg-green-500/10 border border-green-500/30 rounded-md p-2">
-                  <div className="font-roboto text-green-300/70 text-[9px] uppercase">Приход</div>
-                  <div className="font-oswald font-bold text-green-300 text-base tabular-nums">{fmt(stats.kassa_income ?? 0)} <span className="text-white/30 text-xs">₽</span></div>
-                </div>
-                <div className="bg-red-500/10 border border-red-500/30 rounded-md p-2">
-                  <div className="font-roboto text-red-300/70 text-[9px] uppercase">Расход</div>
-                  <div className="font-oswald font-bold text-red-300 text-base tabular-nums">{fmt(stats.kassa_expense ?? 0)} <span className="text-white/30 text-xs">₽</span></div>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-[#0A0A0A] border border-[#1F1F1F] rounded-md p-2">
-                  <div className="font-roboto text-white/50 text-[9px] uppercase flex items-center gap-1">
-                    <Icon name="ShoppingCart" size={10} className="text-pink-400" />
-                    Продажа товара
-                  </div>
-                  <div className="font-oswald font-bold text-pink-300 text-base tabular-nums">{fmt(stats.kassa_sales_total ?? 0)} <span className="text-white/30 text-xs">₽</span></div>
-                  <div className="font-roboto text-white/40 text-[9px]">{stats.kassa_sales_count ?? 0} продаж</div>
-                </div>
-                <div className="bg-[#0A0A0A] border border-[#1F1F1F] rounded-md p-2">
-                  <div className="font-roboto text-white/50 text-[9px] uppercase flex items-center gap-1">
-                    <Icon name="Package" size={10} className="text-blue-400" />
-                    Скупка
-                  </div>
-                  <div className="font-oswald font-bold text-blue-300 text-base tabular-nums">{fmt(stats.kassa_buyout_total ?? 0)} <span className="text-white/30 text-xs">₽</span></div>
-                  <div className="font-roboto text-white/40 text-[9px]">{stats.kassa_buyout_count ?? 0} скупок</div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Ошибка парсера кассы */}
-          {!stats.kassa_ok && stats.kassa_error && (
-            <div className="col-span-2 bg-orange-500/10 border border-orange-500/30 rounded-md p-2.5 flex items-start gap-2">
-              <Icon name="AlertTriangle" size={13} className="text-orange-400 mt-0.5 shrink-0" />
-              <div className="min-w-0">
-                <div className="font-oswald font-bold text-orange-300 text-[11px] uppercase">Парсер кассы недоступен</div>
-                <div className="font-roboto text-orange-300/70 text-[10px] mt-0.5 break-words">{stats.kassa_error}</div>
-              </div>
-            </div>
-          )}
-
           {/* ВЫДЕЛЕННАЯ карточка ПРОДАЖИ ТОВАРА (sell_realization) */}
           <div className="col-span-2">
             <Card

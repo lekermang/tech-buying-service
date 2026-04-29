@@ -72,8 +72,11 @@ export function SLOperations({ token }: { token: string }) {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
 
-  // Источник: REST API smartlombard или HTML «Касса и банк → Операции по датам»
-  const [source, setSource] = useState<Source>("kassa");
+  // Источник: REST API smartlombard.
+  // Раньше был и HTML-парсер «Кассы и банк», но поддержка SmartLombard
+  // подтвердила: токен через REST /auth/access_token выдаётся 1 раз и живёт 20 мин.
+  // Все продажи (sell_realization) уже доступны через REST /operations.
+  const [source, setSource] = useState<Source>("api");
   const [kassa, setKassa] = useState<KassaData | null>(null);
   const [kassaTab, setKassaTab] = useState<KassaTab>("sales");
   const [kassaLoading, setKassaLoading] = useState(false);
@@ -168,32 +171,6 @@ export function SLOperations({ token }: { token: string }) {
 
   return (
     <div className="p-3 space-y-3">
-      {/* Переключатель источника: Касса (HTML) ↔ API */}
-      <div className="bg-gradient-to-br from-[#FFD700]/10 to-transparent border border-[#FFD700]/30 rounded-lg p-1 flex gap-1">
-        <button
-          onClick={() => setSource("kassa")}
-          className={`flex-1 flex items-center justify-center gap-1.5 font-oswald font-bold text-[11px] uppercase py-2 rounded-md transition-all active:scale-95 ${
-            source === "kassa"
-              ? "bg-[#FFD700] text-black shadow-md shadow-[#FFD700]/20"
-              : "bg-transparent text-white/60 hover:text-white"
-          }`}
-        >
-          <Icon name="Wallet" size={13} />
-          Касса (продажи товара)
-        </button>
-        <button
-          onClick={() => setSource("api")}
-          className={`flex-1 flex items-center justify-center gap-1.5 font-oswald font-bold text-[11px] uppercase py-2 rounded-md transition-all active:scale-95 ${
-            source === "api"
-              ? "bg-[#FFD700] text-black shadow-md shadow-[#FFD700]/20"
-              : "bg-transparent text-white/60 hover:text-white"
-          }`}
-        >
-          <Icon name="Activity" size={13} />
-          API (залоги, выкупы)
-        </button>
-      </div>
-
       {/* Период */}
       <div className="bg-[#141414] border border-[#1F1F1F] rounded-lg p-3 space-y-2">
         <div className="flex gap-1.5 overflow-x-auto no-scrollbar">

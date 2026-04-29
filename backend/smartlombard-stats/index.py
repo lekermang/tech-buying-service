@@ -823,33 +823,11 @@ def handler(event: dict, context) -> dict:
         'operations_total': len(operations),
     }
 
-    # Подмешиваем кассовые данные (HTML-парсер) — если REST API не отдал продажи,
-    # берём цифры из «Касса и банк → Операции по датам».
-    try:
-        kassa, kerr = _kassa_fetch_period(date_from, date_to)
-        if kassa and not kerr:
-            payload['kassa_income'] = kassa.get('income_total', 0)
-            payload['kassa_expense'] = kassa.get('expense_total', 0)
-            payload['kassa_sales_total'] = kassa.get('sales_total', 0)
-            payload['kassa_sales_count'] = kassa.get('sales_count', 0)
-            payload['kassa_buyout_total'] = kassa.get('buyout_total', 0)
-            payload['kassa_buyout_count'] = kassa.get('buyout_count', 0)
-            # Если REST API ничего не отдал — заменяем основные показатели кассой
-            if (payload.get('sales_total') or 0) == 0 and kassa.get('sales_total', 0) > 0:
-                payload['sales_total'] = int(round(kassa['sales_total']))
-                payload['sales_count'] = kassa.get('sales_count', 0)
-            if (payload.get('buyout_total') or 0) == 0 and kassa.get('buyout_total', 0) > 0:
-                payload['buyout_total'] = int(round(kassa['buyout_total']))
-                payload['buyout_count'] = kassa.get('buyout_count', 0)
-            if (payload.get('income') or 0) == 0 and kassa.get('income_total', 0) > 0:
-                payload['income'] = int(round(kassa['income_total']))
-            if (payload.get('expense') or 0) == 0 and kassa.get('expense_total', 0) > 0:
-                payload['expense'] = int(round(kassa['expense_total']))
-            payload['kassa_ok'] = True
-        elif kerr:
-            payload['kassa_error'] = kerr
-    except Exception as e:
-        payload['kassa_error'] = f'kassa exception: {e}'
+    # ВАЖНО: HTML-парсер «Кассы и банк» отключён — поддержка SmartLombard
+    # подтвердила, что токен через REST /auth/access_token выдаётся 1 раз и
+    # действует ~20 мин. Все нужные данные (приход/расход, продажи товара
+    # sell_realization, выкупы) уже приходят через REST API /operations.
+    # Кэширование токена в _get_access_token уже учитывает ограничение 19 мин.
 
     _cache_set(cache_key, payload)
     payload['cached'] = False
