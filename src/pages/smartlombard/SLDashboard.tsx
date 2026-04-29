@@ -207,6 +207,9 @@ export function SLDashboard({ token }: { token: string }) {
           audit?: Array<Record<string, unknown>>;
           operations_debug?: Record<string, unknown>;
           elem_debug?: Record<string, unknown>;
+          accounts_used?: string[];
+          operations_per_account?: Array<{account_id: string; count: number; added?: number; error?: string | null}>;
+          elem_per_account?: Array<{account_id: string; count: number; added?: number; error?: string | null}>;
         };
         const audit = d.audit || [];
         // Если backend не вернул audit — собираем его из operations_debug/elem_debug
@@ -271,6 +274,34 @@ export function SLDashboard({ token }: { token: string }) {
                 <div className="font-mono text-white">{String(d.operations_total ?? '—')} / {String(d.elem_operations_total ?? '—')}</div>
               </div>
             </div>
+
+            {/* Что вернул каждый API-сотрудник */}
+            {d.operations_per_account && d.operations_per_account.length > 0 && (
+              <div className="bg-[#0A0A0A] border border-[#1F1F1F] rounded-md p-2 space-y-1.5">
+                <div className="text-white/40 uppercase text-[9px]">Операции по сотрудникам</div>
+                <div className="space-y-1">
+                  {d.operations_per_account.map((acc, i) => {
+                    const isOk = !acc.error && acc.count > 0;
+                    const isEmpty = !acc.error && acc.count === 0;
+                    return (
+                      <div key={i} className={`flex items-center justify-between gap-2 px-2 py-1.5 rounded text-[10px] border ${
+                        isOk ? 'bg-green-500/10 border-green-500/30' :
+                        isEmpty ? 'bg-yellow-500/5 border-yellow-500/20' :
+                        'bg-red-500/10 border-red-500/30'
+                      }`}>
+                        <span className="font-mono text-white/70 shrink-0">#{acc.account_id}</span>
+                        <span className={`font-bold tabular-nums ${isOk ? 'text-green-300' : isEmpty ? 'text-yellow-300' : 'text-red-300'}`}>
+                          {acc.error ? acc.error.slice(0, 40) : `${acc.count} оп.`}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="font-roboto text-white/40 text-[9px] leading-snug pt-1">
+                  Зелёный = есть данные · Жёлтый = доступ есть, операций нет · Красный = ошибка авторизации
+                </div>
+              </div>
+            )}
 
             {stages.length === 0 && (
               <div className="bg-[#0A0A0A] border border-[#1F1F1F] rounded-md p-3 text-white/60 text-[11px] text-center">

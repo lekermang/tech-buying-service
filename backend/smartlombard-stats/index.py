@@ -195,24 +195,41 @@ def _token_cache_set(token: str) -> None:
         pass
 
 
-def _request_new_token() -> tuple[str | None, str | None]:
-    """POST https://online.smartlombard.ru/api/exchange/v1/auth/access_token
-    multipart/form-data: account_id (int), secret_key (str)
-    Документация: https://docs.api.smartlombard.ru/src/methods_autorization.html
-    Ответ: {status: true, result: {access_token: ...}}
-    ВАЖНО: secret_key удаляется при смене пароля сотрудника,
-    восстановлении через «Забыли?», отключении ключа вручную или увольнении.
+def _get_api_keys_list() -> list[dict]:
+    """Возвращает список всех API-сотрудников: [{account_id, secret_key}, ...].
+    1) Сначала читает SMARTLOMBARD_API_KEYS (JSON-массив) — основной способ.
+    2) Если его нет — fallback на старые SMARTLOMBARD_ACCOUNT_ID + SMARTLOMBARD_SECRET_KEY.
     """
-    account_id_raw = (os.environ.get('SMARTLOMBARD_ACCOUNT_ID') or '').strip()
-    secret_key = (os.environ.get('SMARTLOMBARD_SECRET_KEY') or '').strip()
+    raw = (os.environ.get('SMARTLOMBARD_API_KEYS') or '').strip()
+    keys: list[dict] = []
+    if raw:
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, list):
+                for item in parsed:
+                    if isinstance(item, dict):
+                        aid = str(item.get('account_id') or '').strip()
+                        sk = str(item.get('secret_key') or '').strip()
+                        if aid and sk:
+                            keys.append({'account_id': aid, 'secret_key': sk})
+        except Exception:
+            pass
+    if not keys:
+        aid = (os.environ.get('SMARTLOMBARD_ACCOUNT_ID') or '').strip()
+        sk = (os.environ.get('SMARTLOMBARD_SECRET_KEY') or '').strip()
+        if aid and sk:
+            keys.append({'account_id': aid, 'secret_key': sk})
+    return keys
+
+
+def _request_new_token_for(account_id_raw: str, secret_key: str) -> tuple[str | None, str | None]:
+    """POST /auth/access_token для конкретной пары account_id+secret_key."""
     if not account_id_raw or not secret_key:
-        return None, 'SMARTLOMBARD_ACCOUNT_ID/SMARTLOMBARD_SECRET_KEY не заданы'
-    # account_id строго integer (по спеке)
+        return None, 'account_id/secret_key пусты'
     try:
         account_id_int = int(account_id_raw)
     except Exception:
-        return None, f'auth: SMARTLOMBARD_ACCOUNT_ID должен быть числом, получено: "{account_id_raw}"'
-
+        return None, f'auth: account_id должен быть числом, получено: "{account_id_raw}"'
     try:
         r = requests.post(
             AUTH_URL,
@@ -230,22 +247,87 @@ def _request_new_token() -> tuple[str | None, str | None]:
         return None, f'auth: bad json (status {r.status_code}, body={r.text[:200]})'
     if not data.get('status'):
         msg = data.get('message') or data.get('error') or data.get('errors') or 'failed'
-        # Полезные подсказки по типичным причинам
-        hint = ''
         msg_str = json.dumps(msg, ensure_ascii=False) if not isinstance(msg, str) else msg
-        msg_low = msg_str.lower()
-        if 'secret' in msg_low or 'ключ' in msg_low:
-            hint = ' (возможно, secret_key был удалён в SmartLombard — перевыпусти его в карточке сотрудника)'
-        elif 'account' in msg_low or 'пользоват' in msg_low:
-            hint = ' (проверь SMARTLOMBARD_ACCOUNT_ID в секретах)'
-        return None, f'auth: {msg_str} (HTTP {r.status_code}){hint}'
+        return None, f'auth[{account_id_raw}]: {msg_str} (HTTP {r.status_code})'
     res = data.get('result') or {}
     token = res.get('access_token')
     if isinstance(token, dict):
         token = token.get('access_token') or token.get('token') or token.get('value')
     if not token:
-        return None, f'auth: no access_token in response (got: {json.dumps(data, ensure_ascii=False)[:200]})'
+        return None, f'auth[{account_id_raw}]: no access_token in response'
     return str(token), None
+
+
+def _request_new_token() -> tuple[str | None, str | None]:
+    """Совместимость: получает токен для первого ключа в списке."""
+    keys = _get_api_keys_list()
+    if not keys:
+        return None, 'SMARTLOMBARD_API_KEYS / SMARTLOMBARD_ACCOUNT_ID не заданы'
+    return _request_new_token_for(keys[0]['account_id'], keys[0]['secret_key'])
+
+
+def _token_cache_key_for(account_id: str) -> str:
+    return f'__access_token_{account_id}__'
+
+
+def _get_token_for_key(account_id: str, secret_key: str, force: bool = False) -> tuple[str | None, str | None]:
+    """Возвращает токен конкретного API-сотрудника (из БД-кэша или новый).
+    Кэш индивидуальный по account_id, чтобы каждый сотрудник попадал в свой 20-минутный лимит."""
+    cache_key = _token_cache_key_for(account_id)
+    if not force:
+        try:
+            conn = _get_conn()
+            cur = conn.cursor()
+            cur.execute(
+                f"SELECT payload, EXTRACT(EPOCH FROM (NOW() - updated_at)) FROM {SCHEMA}.smartlombard_cache WHERE cache_key='{cache_key}'"
+            )
+            row = cur.fetchone()
+            cur.close(); conn.close()
+            if row:
+                payload, age = row
+                if age is not None and float(age) <= TOKEN_TTL_SECONDS:
+                    if isinstance(payload, str):
+                        payload = json.loads(payload)
+                    tok = (payload or {}).get('token')
+                    if tok:
+                        return tok, None
+        except Exception:
+            pass
+    token, err = _request_new_token_for(account_id, secret_key)
+    if token:
+        try:
+            payload_safe = json.dumps({'token': token}, ensure_ascii=False).replace("'", "''")
+            conn = _get_conn()
+            cur = conn.cursor()
+            cur.execute(
+                f"INSERT INTO {SCHEMA}.smartlombard_cache (cache_key, payload, updated_at) "
+                f"VALUES ('{cache_key}', '{payload_safe}'::jsonb, NOW()) "
+                f"ON CONFLICT (cache_key) DO UPDATE SET payload=EXCLUDED.payload, updated_at=NOW()"
+            )
+            conn.commit(); cur.close(); conn.close()
+        except Exception:
+            pass
+        return token, None
+    # Fallback при 429: используем последний валидный токен из кэша, даже просроченный
+    if err and ('429' in err or 'не более чем 1 раз' in err):
+        try:
+            conn = _get_conn()
+            cur = conn.cursor()
+            cur.execute(
+                f"SELECT payload FROM {SCHEMA}.smartlombard_cache WHERE cache_key='{cache_key}'"
+            )
+            row = cur.fetchone()
+            cur.close(); conn.close()
+            if row:
+                payload = row[0]
+                if isinstance(payload, str):
+                    payload = json.loads(payload)
+                tok = (payload or {}).get('token')
+                if tok:
+                    return tok, None
+        except Exception:
+            pass
+    return None, err
 
 
 def _request_new_token_verbose() -> dict:
@@ -304,6 +386,39 @@ def _is_no_data_error(data: dict) -> bool:
     """Smartlombard на page=1 при отсутствии данных возвращает 412 со словом 'максимальное количество страниц: 0'."""
     msg_blob = json.dumps(data, ensure_ascii=False).lower()
     return 'максимальное количество страниц' in msg_blob or 'максимальное кол' in msg_blob
+
+
+def _fetch_all_pages_multi_account(url: str, params: dict) -> tuple[list, list[dict], list[dict]]:
+    """Перебирает ВСЕХ API-сотрудников из SMARTLOMBARD_API_KEYS и объединяет
+    операции от каждого (дедупликация по id). Возвращает (items, per_account_stats, audit).
+    per_account_stats — что вернул каждый сотрудник (для дебага)."""
+    keys = _get_api_keys_list()
+    seen_ids: set = set()
+    all_items: list = []
+    per_account: list[dict] = []
+    audit: list[dict] = []
+    for k in keys:
+        aid = k['account_id']
+        sk = k['secret_key']
+        token, terr = _get_token_for_key(aid, sk)
+        if terr or not token:
+            per_account.append({'account_id': aid, 'count': 0, 'error': terr or 'no token'})
+            audit.append({'stage': f'auth[{aid}]', 'error': terr or 'no token'})
+            continue
+        items, ferr, dbg = _fetch_all_pages(url, token, params)
+        # Дедупликация: операция могла вернуться у нескольких сотрудников
+        added = 0
+        for op in items:
+            op_id = op.get('id') if isinstance(op, dict) else None
+            if op_id is None or op_id not in seen_ids:
+                if op_id is not None:
+                    seen_ids.add(op_id)
+                all_items.append(op)
+                added += 1
+        per_account.append({'account_id': aid, 'count': len(items), 'added': added, 'error': ferr})
+        if dbg:
+            audit.append({'stage': f'operations[{aid}]', **dbg})
+    return all_items, per_account, audit
 
 
 def _fetch_all_pages(url: str, token: str, params: dict, max_pages: int = 50) -> tuple[list, str | None, dict | None]:
@@ -909,45 +1024,23 @@ def handler(event: dict, context) -> dict:
             cached['cached'] = True
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps(cached, ensure_ascii=False)}
 
-    # Полный аудит-лог цепочки запросов (для тикета в SmartLombard)
-    audit: list = []
-    auth_dbg = _request_new_token_verbose() if debug else None
-    if auth_dbg:
-        audit.append({'stage': 'auth', **auth_dbg})
-
-    token, err = _get_access_token()
-    if err or not token:
-        body = {'error': err or 'auth failed', 'stage': 'auth'}
-        if debug:
-            body['date_from'] = date_from
-            body['date_to'] = date_to
-            body['operations_total'] = 0
-            body['elem_operations_total'] = 0
-            body['audit'] = audit
+    # МУЛЬТИ-АККАУНТНЫЙ режим: перебираем всех API-сотрудников из SMARTLOMBARD_API_KEYS,
+    # объединяем операции (с дедупликацией по id). Так если у разных сотрудников
+    # доступ к разным филиалам — мы видим общую картину.
+    keys = _get_api_keys_list()
+    if not keys:
+        body = {'error': 'SMARTLOMBARD_API_KEYS не задан', 'stage': 'config'}
         return {'statusCode': 502, 'headers': HEADERS,
                 'body': json.dumps(body, ensure_ascii=False)}
 
     q = {'date_begin': date_from, 'date_end': date_to}
-    operations, err1, dbg1 = _fetch_all_pages(OPS_URL, token, q)
-    if debug and dbg1:
-        audit.append({'stage': 'operations', **dbg1})
-    if err1:
-        body = {'error': err1, 'stage': 'operations'}
-        if debug:
-            body['date_from'] = date_from
-            body['date_to'] = date_to
-            body['operations_total'] = len(operations or [])
-            body['elem_operations_total'] = 0
-            body['operations_debug'] = dbg1
-            body['audit'] = audit
-        return {'statusCode': 502, 'headers': HEADERS,
-                'body': json.dumps(body, ensure_ascii=False)}
+    operations, ops_per_account, ops_audit = _fetch_all_pages_multi_account(OPS_URL, q)
+    elem_operations, elem_per_account, elem_audit = _fetch_all_pages_multi_account(ELEM_OPS_URL, q)
 
-    elem_operations, err2, dbg2 = _fetch_all_pages(ELEM_OPS_URL, token, q)
-    if debug and dbg2:
-        audit.append({'stage': 'elementary_operations', **dbg2})
-    if err2:
-        elem_operations = []
+    audit: list = []
+    if debug:
+        audit.extend(ops_audit)
+        audit.extend(elem_audit)
 
     agg = _aggregate(operations, elem_operations)
 
@@ -958,8 +1051,9 @@ def handler(event: dict, context) -> dict:
                     'aggregated': agg,
                     'operations_total': len(operations),
                     'elem_operations_total': len(elem_operations),
-                    'operations_debug': dbg1,
-                    'elem_debug': dbg2,
+                    'accounts_used': [k['account_id'] for k in keys],
+                    'operations_per_account': ops_per_account,
+                    'elem_per_account': elem_per_account,
                     'audit': audit,
                 }, ensure_ascii=False)}
 
@@ -980,6 +1074,7 @@ def handler(event: dict, context) -> dict:
         'by_type': agg['by_type'],
         'by_type_count': agg['by_type_count'],
         'operations_total': len(operations),
+        'accounts_used': len(keys),
     }
 
     # ВАЖНО: HTML-парсер «Кассы и банк» отключён — поддержка SmartLombard
