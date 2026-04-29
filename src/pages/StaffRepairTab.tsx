@@ -112,18 +112,27 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
     }
     setCreating(true);
     const tid = toast.loading("Создаю заявку...");
+    // Аккуратно парсим price: пустая строка / нечисло -> null (а не NaN)
+    let priceNum: number | null = null;
+    if (form.price !== undefined && form.price !== null && String(form.price).trim() !== "") {
+      const cleaned = String(form.price).replace(/[^\d.-]/g, "");
+      const n = parseInt(cleaned, 10);
+      priceNum = Number.isFinite(n) ? n : null;
+    }
     try {
+      const payload = { action: "new_order", ...form, price: priceNum };
       const res = await fetch(REPAIR_URL, {
         method: "POST", headers,
-        body: JSON.stringify({ action: "create", ...form, price: form.price ? parseInt(form.price) : null }),
+        body: JSON.stringify(payload),
       });
-      const data = await res.json();
+      let data: { order_id?: number; error?: string } = {};
+      try { data = await res.json(); } catch { /* not json */ }
       if (data.order_id) {
         toast.update(tid, { kind: "success", message: `Заявка #${data.order_id} создана`, duration: 3000 });
         const newOrder: Order = {
           id: data.order_id, name: form.name, phone: form.phone,
           model: form.model || null, repair_type: form.repair_type || null,
-          price: form.price ? parseInt(form.price) : null,
+          price: priceNum,
           comment: form.comment || null, status: "new",
           admin_note: null, created_at: new Date().toISOString(),
           purchase_amount: null, repair_amount: null,
@@ -135,10 +144,14 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
         setForm(EMPTY_FORM);
         loadOrders();
       } else {
-        toast.update(tid, { kind: "error", message: data.error || "Не удалось создать заявку", duration: 5000 });
+        const msg = data.error
+          ? `Не удалось создать заявку: ${data.error}`
+          : `Не удалось создать заявку (HTTP ${res.status})`;
+        toast.update(tid, { kind: "error", message: msg, duration: 7000 });
       }
-    } catch {
-      toast.update(tid, { kind: "error", message: "Сбой сети при создании", duration: 5000 });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.update(tid, { kind: "error", message: `Сбой сети: ${msg}`, duration: 7000 });
     } finally {
       setCreating(false);
     }

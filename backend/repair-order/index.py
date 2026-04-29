@@ -912,12 +912,23 @@ def handler(event: dict, context) -> dict:
                     'body': json.dumps({'error': tg_data.get('description', 'Ошибка Telegram')}, ensure_ascii=False)}
 
     # ── Создать новую заявку ─────────────────────────────────────────────────
-    name = body.get('name', '').strip()
-    phone = body.get('phone', '').strip()
-    model = body.get('model', '').strip()
-    repair_type = body.get('repair_type', '').strip()
-    price = body.get('price')
-    comment = body.get('comment', '').strip()
+    # Принимаем action=new_order или create (или пустой — по умолчанию)
+    name = (body.get('name') or '').strip()
+    phone = (body.get('phone') or '').strip()
+    model = (body.get('model') or '').strip()
+    repair_type = (body.get('repair_type') or '').strip()
+    price_raw = body.get('price')
+    # Безопасное приведение price к int|None (никаких NaN/строк/пустых)
+    price = None
+    if price_raw is not None and price_raw != '' and price_raw != 'null':
+        try:
+            if isinstance(price_raw, bool):
+                price = None
+            else:
+                price = int(float(price_raw))
+        except (TypeError, ValueError):
+            price = None
+    comment = (body.get('comment') or '').strip()
 
     # Выбранная клиентом запчасть из подбора (если есть)
     sel = body.get('selected_part') or {}
@@ -990,7 +1001,7 @@ def handler(event: dict, context) -> dict:
             except Exception:
                 pass
         return {'statusCode': 500, 'headers': HEADERS,
-                'body': json.dumps({'error': 'Ошибка сохранения заявки, попробуйте ещё раз'}, ensure_ascii=False)}
+                'body': json.dumps({'error': f'БД: {db_err}'}, ensure_ascii=False)}
     finally:
         if conn:
             try:
