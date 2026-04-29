@@ -61,6 +61,25 @@ export function SLDashboard({ token }: { token: string }) {
   const [tokenError, setTokenError] = useState("");
   const [tokenChecking, setTokenChecking] = useState(false);
 
+  // Диагностика API SmartLombard — что реально вернул /operations
+  const [diagData, setDiagData] = useState<Record<string, unknown> | null>(null);
+  const [diagLoading, setDiagLoading] = useState(false);
+
+  const runDiag = useCallback(async () => {
+    setDiagLoading(true);
+    try {
+      const cur = PRESETS.find(p => p.k === preset) || PRESETS[0];
+      const url = `${SMARTLOMBARD_URL}?date_from=${cur.from()}&date_to=${cur.to()}&debug=1&nocache=1`;
+      const res = await fetch(url, { headers: { "X-Employee-Token": token } });
+      const data = await res.json();
+      setDiagData(data);
+    } catch (e) {
+      setDiagData({ error: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setDiagLoading(false);
+    }
+  }, [preset, token]);
+
   const checkToken = useCallback(async (force = false) => {
     setTokenChecking(true); setTokenError("");
     try {
@@ -157,16 +176,78 @@ export function SLDashboard({ token }: { token: string }) {
             </div>
           </div>
         </div>
-        <button
-          onClick={() => checkToken(true)}
-          disabled={tokenChecking}
-          title="Принудительно перевыпустить токен (нужно при ошибках авторизации)"
-          className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-[#FFD700]/15 border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/25 active:scale-95 transition-all font-oswald font-bold text-[10px] uppercase disabled:opacity-50"
-        >
-          <Icon name={tokenChecking ? "Loader" : "RefreshCw"} size={11} className={tokenChecking ? "animate-spin" : ""} />
-          Перевыпустить
-        </button>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={runDiag}
+            disabled={diagLoading}
+            title="Диагностика API: что реально вернул SmartLombard"
+            className="flex items-center gap-1 px-2 py-1.5 rounded-md bg-blue-500/15 border border-blue-400/40 text-blue-300 hover:bg-blue-500/25 active:scale-95 transition-all font-oswald font-bold text-[10px] uppercase disabled:opacity-50"
+          >
+            <Icon name={diagLoading ? "Loader" : "Bug"} size={11} className={diagLoading ? "animate-spin" : ""} />
+            Диагностика
+          </button>
+          <button
+            onClick={() => checkToken(true)}
+            disabled={tokenChecking}
+            title="Принудительно перевыпустить токен (нужно при ошибках авторизации)"
+            className="flex items-center gap-1 px-2 py-1.5 rounded-md bg-[#FFD700]/15 border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/25 active:scale-95 transition-all font-oswald font-bold text-[10px] uppercase disabled:opacity-50"
+          >
+            <Icon name={tokenChecking ? "Loader" : "RefreshCw"} size={11} className={tokenChecking ? "animate-spin" : ""} />
+            Перевыпустить
+          </button>
+        </div>
       </div>
+
+      {/* Результаты диагностики API */}
+      {diagData && (
+        <div className="bg-blue-500/5 border border-blue-400/30 rounded-lg p-3 space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
+          <div className="flex items-center justify-between">
+            <div className="font-oswald font-bold text-blue-300 text-[11px] uppercase flex items-center gap-1.5">
+              <Icon name="Bug" size={12} />
+              Ответ SmartLombard API (debug)
+            </div>
+            <button onClick={() => setDiagData(null)} className="text-white/40 hover:text-white p-1">
+              <Icon name="X" size={13} />
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-[10px]">
+            <div className="bg-[#0A0A0A] border border-[#1F1F1F] rounded-md p-2">
+              <div className="text-white/40 uppercase">Период (в API)</div>
+              <div className="font-mono text-white">
+                {String((diagData as { date_from?: string }).date_from || "—")} → {String((diagData as { date_to?: string }).date_to || "—")}
+              </div>
+            </div>
+            <div className="bg-[#0A0A0A] border border-[#1F1F1F] rounded-md p-2">
+              <div className="text-white/40 uppercase">Operations / Elem</div>
+              <div className="font-mono text-white">
+                {String((diagData as { operations_total?: number }).operations_total ?? "—")} / {String((diagData as { elem_operations_total?: number }).elem_operations_total ?? "—")}
+              </div>
+            </div>
+          </div>
+          {(() => {
+            const dbg = (diagData as { operations_debug?: Record<string, unknown> }).operations_debug;
+            if (!dbg) return null;
+            const sample = (dbg.sample as unknown[] | undefined) || [];
+            return (
+              <div className="bg-[#0A0A0A] border border-[#1F1F1F] rounded-md p-2 max-h-[280px] overflow-auto">
+                <div className="text-white/40 uppercase text-[9px] mb-1">Первая запись из /operations:</div>
+                <pre className="font-mono text-[10px] text-white/80 whitespace-pre-wrap break-all">
+                  {sample.length > 0 ? JSON.stringify(sample[0], null, 2) : "(массив пуст — SmartLombard не вернул операций)"}
+                </pre>
+              </div>
+            );
+          })()}
+          {(diagData as { error?: string }).error && (
+            <div className="bg-red-500/10 border border-red-500/30 rounded p-2 text-red-300 text-[11px]">
+              {String((diagData as { error?: string }).error)}
+            </div>
+          )}
+          <div className="font-roboto text-white/40 text-[9px] leading-snug">
+            Если operations = 0 — SmartLombard сам не вернул операций за этот период. Проверь:
+            тот ли филиал у API-сотрудника, нет ли фильтра по branch_id, попробуй больший период (30 дней).
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 flex items-start gap-2">
