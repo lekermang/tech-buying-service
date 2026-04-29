@@ -4,6 +4,7 @@ import { AUTH_CLIENT_URL } from "./staff.types";
 import { formatPhone } from "@/lib/phoneFormat";
 import { useStaffToast } from "./staff/StaffToast";
 import useDebouncedValue from "@/hooks/useDebouncedValue";
+import { SMS_TEMPLATES, SMS_CATEGORIES, renderTemplate, type SmsTemplate } from "./staff/smsTemplates";
 
 const REPAIR_ADMIN_URL = "https://functions.poehali.dev/a105aede-d55d-4b99-9d3e-5e977887aa04";
 
