@@ -55,6 +55,32 @@ export function SLDashboard({ token }: { token: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Состояние токена SmartLombard (по доке: 1 запрос → 20 минут жизни)
+  const [tokenAge, setTokenAge] = useState<number | null>(null);
+  const [tokenTtl, setTokenTtl] = useState<number | null>(null);
+  const [tokenError, setTokenError] = useState("");
+  const [tokenChecking, setTokenChecking] = useState(false);
+
+  const checkToken = useCallback(async (force = false) => {
+    setTokenChecking(true); setTokenError("");
+    try {
+      const url = `${SMARTLOMBARD_URL}?action=auth_check${force ? "&force=1" : ""}`;
+      const res = await fetch(url, { headers: { "X-Employee-Token": token } });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        setTokenError(data.error || `HTTP ${res.status}`);
+        setTokenAge(null); setTokenTtl(null);
+      } else {
+        setTokenAge(data.token_age_sec ?? 0);
+        setTokenTtl(data.token_expires_in_sec ?? null);
+      }
+    } catch (e) {
+      setTokenError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setTokenChecking(false);
+    }
+  }, [token]);
+
   const load = useCallback(async (force = false) => {
     setLoading(true); setError("");
     const cur = PRESETS.find(p => p.k === preset) || PRESETS[0];
@@ -76,6 +102,7 @@ export function SLDashboard({ token }: { token: string }) {
   }, [preset, token]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { checkToken(false); }, [checkToken]);
 
   return (
     <div className="p-3 space-y-3">
@@ -95,6 +122,49 @@ export function SLDashboard({ token }: { token: string }) {
           title="Обновить"
           className="shrink-0 p-2 rounded-md bg-[#141414] border border-[#1F1F1F] text-white/60 hover:text-[#FFD700] active:scale-95 transition-all disabled:opacity-50">
           <Icon name={loading ? "Loader" : "RefreshCw"} size={14} className={loading ? "animate-spin" : ""} />
+        </button>
+      </div>
+
+      {/* Состояние токена SmartLombard */}
+      <div className={`rounded-lg p-2.5 border flex items-center justify-between gap-2 ${
+        tokenError
+          ? "bg-red-500/10 border-red-500/30"
+          : tokenTtl !== null && tokenTtl < 120
+            ? "bg-orange-500/10 border-orange-500/30"
+            : "bg-green-500/5 border-green-500/20"
+      }`}>
+        <div className="flex items-center gap-2 min-w-0">
+          <Icon
+            name={tokenError ? "AlertCircle" : "ShieldCheck"}
+            size={14}
+            className={tokenError ? "text-red-400 shrink-0" : "text-green-400 shrink-0"}
+          />
+          <div className="min-w-0">
+            <div className={`font-oswald font-bold text-[10px] uppercase tracking-wide ${tokenError ? "text-red-300" : "text-green-300"}`}>
+              Токен SmartLombard
+            </div>
+            <div className="font-roboto text-white/60 text-[11px] truncate">
+              {tokenError ? (
+                tokenError
+              ) : tokenTtl !== null ? (
+                <>
+                  Действует ещё <span className="font-bold text-white tabular-nums">{Math.floor(tokenTtl / 60)} мин {tokenTtl % 60} сек</span>
+                  {tokenAge !== null && <span className="text-white/30 ml-1">(возраст: {Math.floor(tokenAge / 60)}м)</span>}
+                </>
+              ) : (
+                "Проверка..."
+              )}
+            </div>
+          </div>
+        </div>
+        <button
+          onClick={() => checkToken(true)}
+          disabled={tokenChecking}
+          title="Принудительно перевыпустить токен (нужно при ошибках авторизации)"
+          className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-[#FFD700]/15 border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/25 active:scale-95 transition-all font-oswald font-bold text-[10px] uppercase disabled:opacity-50"
+        >
+          <Icon name={tokenChecking ? "Loader" : "RefreshCw"} size={11} className={tokenChecking ? "animate-spin" : ""} />
+          Перевыпустить
         </button>
       </div>
 

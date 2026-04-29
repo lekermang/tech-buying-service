@@ -195,15 +195,28 @@ def _token_cache_set(token: str) -> None:
 
 
 def _request_new_token() -> tuple[str | None, str | None]:
-    account_id = os.environ.get('SMARTLOMBARD_ACCOUNT_ID', '').strip()
-    secret_key = os.environ.get('SMARTLOMBARD_SECRET_KEY', '').strip()
-    if not account_id or not secret_key:
+    """POST https://online.smartlombard.ru/api/exchange/v1/auth/access_token
+    multipart/form-data: account_id (int), secret_key (str)
+    Документация: https://docs.api.smartlombard.ru/src/methods_autorization.html
+    Ответ: {status: true, result: {access_token: ...}}
+    ВАЖНО: secret_key удаляется при смене пароля сотрудника,
+    восстановлении через «Забыли?», отключении ключа вручную или увольнении.
+    """
+    account_id_raw = (os.environ.get('SMARTLOMBARD_ACCOUNT_ID') or '').strip()
+    secret_key = (os.environ.get('SMARTLOMBARD_SECRET_KEY') or '').strip()
+    if not account_id_raw or not secret_key:
         return None, 'SMARTLOMBARD_ACCOUNT_ID/SMARTLOMBARD_SECRET_KEY не заданы'
+    # account_id строго integer (по спеке)
+    try:
+        account_id_int = int(account_id_raw)
+    except Exception:
+        return None, f'auth: SMARTLOMBARD_ACCOUNT_ID должен быть числом, получено: "{account_id_raw}"'
+
     try:
         r = requests.post(
             AUTH_URL,
             files={
-                'account_id': (None, str(account_id)),
+                'account_id': (None, str(account_id_int)),
                 'secret_key': (None, secret_key),
             },
             timeout=20,
@@ -213,15 +226,24 @@ def _request_new_token() -> tuple[str | None, str | None]:
     try:
         data = r.json()
     except Exception:
-        return None, f'auth: bad json (status {r.status_code})'
+        return None, f'auth: bad json (status {r.status_code}, body={r.text[:200]})'
     if not data.get('status'):
-        return None, f'auth: {data.get("message") or data.get("error") or "failed"} (status {r.status_code})'
+        msg = data.get('message') or data.get('error') or data.get('errors') or 'failed'
+        # Полезные подсказки по типичным причинам
+        hint = ''
+        msg_str = json.dumps(msg, ensure_ascii=False) if not isinstance(msg, str) else msg
+        msg_low = msg_str.lower()
+        if 'secret' in msg_low or 'ключ' in msg_low:
+            hint = ' (возможно, secret_key был удалён в SmartLombard — перевыпусти его в карточке сотрудника)'
+        elif 'account' in msg_low or 'пользоват' in msg_low:
+            hint = ' (проверь SMARTLOMBARD_ACCOUNT_ID в секретах)'
+        return None, f'auth: {msg_str} (HTTP {r.status_code}){hint}'
     res = data.get('result') or {}
     token = res.get('access_token')
     if isinstance(token, dict):
         token = token.get('access_token') or token.get('token') or token.get('value')
     if not token:
-        return None, 'auth: no access_token in response'
+        return None, f'auth: no access_token in response (got: {json.dumps(data, ensure_ascii=False)[:200]})'
     return str(token), None
 
 
@@ -735,6 +757,48 @@ def handler(event: dict, context) -> dict:
         base = GOODS_API_BASE if use_goods else API_BASE
         status, data = _proxy_call(target_method, target_path, target_params, target_body, base)
         return {'statusCode': status, 'headers': HEADERS, 'body': json.dumps(data, ensure_ascii=False)}
+
+    # ---------- AUTH_CHECK: проверка/перевыпуск токена SmartLombard ----------
+    # Документация: https://docs.api.smartlombard.ru/src/methods_autorization.html
+    if action == 'auth_check':
+        ok, _r = _check_token(event, allow_all_staff=False)
+        if not ok:
+            return _err(401, 'Unauthorized')
+        force = (params.get('force') or body.get('force') or '').strip().lower() in ('1', 'true', 'yes')
+        # Возраст текущего токена в кэше
+        token_age_sec: int | None = None
+        try:
+            conn = _get_conn(); cur = conn.cursor()
+            cur.execute(
+                f"SELECT EXTRACT(EPOCH FROM (NOW() - updated_at)) FROM {SCHEMA}.smartlombard_cache WHERE cache_key='{TOKEN_CACHE_KEY}'"
+            )
+            row = cur.fetchone()
+            cur.close(); conn.close()
+            if row and row[0] is not None:
+                token_age_sec = int(float(row[0]))
+        except Exception:
+            pass
+
+        if force:
+            tok, err = _request_new_token()
+            if err or not tok:
+                return _err(502, err or 'auth failed')
+            _token_cache_set(tok)
+            return _ok({
+                'ok': True, 'forced': True,
+                'token_age_sec': 0,
+                'token_expires_in_sec': TOKEN_TTL_SECONDS,
+            })
+
+        tok, err = _get_access_token(force=False)
+        if err or not tok:
+            return _err(502, err or 'auth failed')
+        ttl_left = max(0, TOKEN_TTL_SECONDS - (token_age_sec or 0))
+        return _ok({
+            'ok': True, 'forced': False,
+            'token_age_sec': token_age_sec or 0,
+            'token_expires_in_sec': ttl_left,
+        })
 
     # ---------- KASSA_PERIOD: парсинг «Касса и банк → Операции по датам» ----------
     if action == 'kassa_period':
