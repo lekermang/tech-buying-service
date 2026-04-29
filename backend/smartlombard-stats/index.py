@@ -6,6 +6,9 @@ from datetime import datetime, timedelta, timezone
 import psycopg2
 import requests
 
+# Build marker — bump для принудительного передеплоя и подхвата новых секретов
+_BUILD_MARKER = '2026-04-29-redeploy-keys'
+
 CACHE_TTL_SECONDS = 60
 TOKEN_TTL_SECONDS = 19 * 60  # smartlombard: токен можно получать не чаще 1 раза в 20 мин
 TOKEN_CACHE_KEY = '__access_token__'
@@ -1056,6 +1059,20 @@ def handler(event: dict, context) -> dict:
             ('/categories', 'categories', 'Категории'),
         ]
         keys = _get_api_keys_list()
+
+        # Диагностика секретов — что реально видит функция
+        raw_api_keys = (os.environ.get('SMARTLOMBARD_API_KEYS') or '')
+        env_diag = {
+            'SMARTLOMBARD_API_KEYS_present': bool(raw_api_keys),
+            'SMARTLOMBARD_API_KEYS_length': len(raw_api_keys),
+            'SMARTLOMBARD_API_KEYS_first_chars': raw_api_keys[:30] if raw_api_keys else '',
+            'SMARTLOMBARD_ACCOUNT_ID_present': bool(os.environ.get('SMARTLOMBARD_ACCOUNT_ID')),
+            'SMARTLOMBARD_SECRET_KEY_present': bool(os.environ.get('SMARTLOMBARD_SECRET_KEY')),
+            'parsed_keys_count': len(keys),
+            'parsed_account_ids': [k.get('account_id') for k in keys],
+            'build_marker': _BUILD_MARKER,
+        }
+
         results: list = []
         for k in keys:
             aid = k['account_id']
@@ -1096,7 +1113,7 @@ def handler(event: dict, context) -> dict:
                         'path': path, 'label': label, 'error': str(e),
                     })
             results.append(account_block)
-        return _ok({'ok': True, 'accounts': results})
+        return _ok({'ok': True, 'accounts': results, 'env_diag': env_diag})
 
     # ---------- KASSA_PERIOD: парсинг «Касса и банк → Операции по датам» ----------
     if action == 'kassa_period':
