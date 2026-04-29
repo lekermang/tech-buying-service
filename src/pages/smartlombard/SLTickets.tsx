@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 import { smartlombardCall } from "../staff.types";
+import { errToText } from "./dashboard/SLDashboardTypes";
 
 type Ticket = {
   id: number;
@@ -37,7 +38,7 @@ export function SLTickets({ token }: { token: string }) {
       token, path: "/pawn_tickets",
       params: { page: 1, limit: 50, status: statusFilter !== "all" ? statusFilter : undefined },
     });
-    if (!r.ok) { setError(r.error || "Ошибка"); setItems([]); }
+    if (!r.ok) { setError(errToText(r.error) || "Ошибка"); setItems([]); }
     else setItems(r.data?.pawn_tickets || []);
     setLoading(false);
   }, [token, statusFilter]);

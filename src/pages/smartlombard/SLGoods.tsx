@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 import { smartlombardCall } from "../staff.types";
+import { errToText } from "./dashboard/SLDashboardTypes";
 
 type GoodItem = {
   id: number;
@@ -28,7 +29,7 @@ export function SLGoods({ token }: { token: string }) {
       token, path: "/goods", goods: true,
       params: { offset: 0, limit: 100 },
     });
-    if (!r.ok) { setError(r.error || "Ошибка"); setItems([]); }
+    if (!r.ok) { setError(errToText(r.error) || "Ошибка"); setItems([]); }
     else setItems(r.data?.goods || []);
     setLoading(false);
   }, [token]);

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import { smartlombardCall } from "../staff.types";
+import { errToText } from "./dashboard/SLDashboardTypes";
 
 type Branch = { id: number; name?: string; title?: string };
 type Category = { id: number; name?: string; title?: string };
@@ -104,7 +105,7 @@ export function SLNewPledge({ token }: { token: string }) {
     });
     setSubmitting(false);
     if (!r.ok) {
-      setError(r.error || "Не удалось создать залог");
+      setError(errToText(r.error) || "Не удалось создать залог");
     } else {
       setResultId(r.data?.id || r.data?.pawn_ticket_id || 0);
       setStep(4);

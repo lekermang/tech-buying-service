@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 import { smartlombardCall } from "../staff.types";
+import { errToText } from "./dashboard/SLDashboardTypes";
 
 type Client = {
   id: number;
@@ -39,7 +40,7 @@ export function SLClients({ token, myRole }: { token: string; myRole: string }) 
     if (q.trim()) params.search = q.trim();
     const r = await smartlombardCall<{ clients?: Client[] }>({ token, path: "/clients", params });
     if (!r.ok) {
-      setError(r.error || "Ошибка"); setItems([]);
+      setError(errToText(r.error) || "Ошибка"); setItems([]);
     } else {
       const list = r.data?.clients || [];
       setItems(prev => (resetPage ? list : [...prev, ...list]));
@@ -141,7 +142,7 @@ function ClientDetailsModal({ token, client, onClose }: { token: string; client:
   useEffect(() => {
     (async () => {
       const r = await smartlombardCall<Record<string, unknown>>({ token, path: `/clients/${client.id}` });
-      if (!r.ok) setError(r.error || "Ошибка");
+      if (!r.ok) setError(errToText(r.error) || "Ошибка");
       else setDetails(r.data || {});
       setLoading(false);
     })();
@@ -202,7 +203,7 @@ function AddClientModal({ token, onClose, onCreated }: { token: string; onClose:
       body: form,
     });
     setSaving(false);
-    if (!r.ok) setError(r.error || "Не удалось создать");
+    if (!r.ok) setError(errToText(r.error) || "Не удалось создать");
     else onCreated();
   };
 

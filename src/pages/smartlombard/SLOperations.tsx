@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 import { smartlombardCall, SMARTLOMBARD_URL } from "../staff.types";
+import { errToText } from "./dashboard/SLDashboardTypes";
 
 type Op = {
   id: number;
@@ -89,7 +90,7 @@ export function SLOperations({ token }: { token: string }) {
       const res = await fetch(url, { headers: { "X-Employee-Token": token } });
       const data = await res.json();
       if (!res.ok || data.error) {
-        setKassaError(data.error || `Ошибка ${res.status}`);
+        setKassaError(errToText(data.error) || `Ошибка ${res.status}`);
         setKassa(null);
       } else {
         setKassa(data);
@@ -110,7 +111,7 @@ export function SLOperations({ token }: { token: string }) {
       params: { date_begin: dateFrom, date_end: dateTo, page: targetPage, limit: 50 },
     });
     if (!r.ok) {
-      setError(r.error || "Ошибка"); setItems([]);
+      setError(errToText(r.error) || "Ошибка"); setItems([]);
     } else {
       const ops = r.data?.operations || [];
       setItems(prev => (resetPage ? ops : [...prev, ...ops]));
