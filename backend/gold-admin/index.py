@@ -164,7 +164,8 @@ def handler(event: dict, context) -> dict:
                     COALESCE(SUM(sell_price) FILTER (WHERE status = 'done'), 0) as total_sell,
                     COALESCE(SUM(profit) FILTER (WHERE status = 'done'), 0) as total_profit,
                     COUNT(*) as total,
-                    COALESCE(SUM(weight) FILTER (WHERE status = 'done'), 0) as total_weight
+                    COALESCE(SUM(weight) FILTER (WHERE status = 'done'), 0) as total_weight,
+                    COALESCE(SUM(weight * (CAST(NULLIF(purity, '') AS NUMERIC) / 585.0)) FILTER (WHERE status = 'done'), 0) as total_weight_585
                 FROM {SCHEMA}.gold_orders
                 WHERE {period_where}
             """)
@@ -172,6 +173,7 @@ def handler(event: dict, context) -> dict:
             total_buy = int(row[4]) if row[4] else 0
             total_sell = int(row[5]) if row[5] else 0
             total_profit = int(row[6]) if row[6] else 0
+            total_weight_585 = float(row[9]) if len(row) > 9 and row[9] else 0.0
 
             cur.execute(f"""
                 SELECT
@@ -254,6 +256,7 @@ def handler(event: dict, context) -> dict:
                     'done': row[0], 'cancelled': row[1],
                     'in_progress': row[2], 'new': row[3],
                     'total': row[7], 'total_weight': float(row[8]) if row[8] else 0,
+                    'total_weight_585': total_weight_585,
                     'total_buy': total_buy,
                     'total_sell': total_sell,
                     'total_profit': total_profit,
@@ -353,6 +356,104 @@ def handler(event: dict, context) -> dict:
             conn.commit()
             cur.close(); conn.close()
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True}, ensure_ascii=False)}
+
+        # ─── ПРОДАТЬ ВСЁ одним актом по цене за грамм 585-эквивалента ────────
+        # Берём все строки status='new', считаем общую массу в эквиваленте 585,
+        # умножаем на цену за грамм 585 → получаем общую выручку.
+        # Распределяем выручку пропорционально весу_585 каждой позиции.
+        if action == 'sell_all':
+            try:
+                price_per_gram_585 = float(body.get('price_per_gram_585') or body.get('price_per_gram') or 0)
+            except Exception:
+                price_per_gram_585 = 0.0
+            payment_method = str(body.get('payment_method') or '').strip().replace("'", "''")
+            if price_per_gram_585 <= 0:
+                cur.close(); conn.close()
+                return {'statusCode': 400, 'headers': HEADERS,
+                        'body': json.dumps({'error': 'Укажите цену за грамм (₽/г)'}, ensure_ascii=False)}
+
+            # 1) Получаем все позиции в наличии
+            cur.execute(f"""
+                SELECT id, weight, COALESCE(NULLIF(purity, ''), '585') as purity, COALESCE(buy_price, 0) as buy_price
+                FROM {SCHEMA}.gold_orders
+                WHERE status = 'new' AND weight > 0
+            """)
+            rows = cur.fetchall()
+            if not rows:
+                cur.close(); conn.close()
+                return {'statusCode': 400, 'headers': HEADERS,
+                        'body': json.dumps({'error': 'Нет позиций в наличии для продажи'}, ensure_ascii=False)}
+
+            # 2) Считаем эквивалент 585 для каждой позиции и общий вес 585
+            items = []
+            total_weight_585 = 0.0
+            total_weight_raw = 0.0
+            total_buy = 0
+            for r in rows:
+                oid = r[0]
+                w = float(r[1]) if r[1] is not None else 0.0
+                purity_str = str(r[2]).strip()
+                bp = int(r[3]) if r[3] is not None else 0
+                try:
+                    p_num = float(''.join(ch for ch in purity_str if ch.isdigit() or ch == '.') or '585')
+                except Exception:
+                    p_num = 585.0
+                w_585 = w * (p_num / 585.0)
+                items.append({'id': oid, 'w': w, 'w_585': w_585, 'buy': bp})
+                total_weight_585 += w_585
+                total_weight_raw += w
+                total_buy += bp
+
+            if total_weight_585 <= 0:
+                cur.close(); conn.close()
+                return {'statusCode': 400, 'headers': HEADERS,
+                        'body': json.dumps({'error': 'Общий вес = 0'}, ensure_ascii=False)}
+
+            # 3) Общая выручка
+            total_revenue = int(round(total_weight_585 * price_per_gram_585))
+
+            # 4) Распределяем по позициям пропорционально w_585
+            distributed = 0
+            updates = []
+            for idx, it in enumerate(items):
+                if idx == len(items) - 1:
+                    sell_price = total_revenue - distributed
+                else:
+                    sell_price = int(round(total_revenue * (it['w_585'] / total_weight_585)))
+                    distributed += sell_price
+                profit = sell_price - it['buy']
+                # цена за грамм исходного веса этой позиции:
+                spg = (sell_price / it['w']) if it['w'] > 0 else 0.0
+                updates.append((it['id'], sell_price, profit, spg))
+
+            # 5) Обновляем БД
+            for oid, sell_price, profit, spg in updates:
+                pm_clause = f", payment_method = '{payment_method}'" if payment_method else ''
+                cur.execute(f"""
+                    UPDATE {SCHEMA}.gold_orders
+                    SET status = 'done', status_updated_at = NOW(), completed_at = NOW(),
+                        sell_price = {int(sell_price)}, profit = {int(profit)},
+                        sell_price_per_gram = {float(spg):.4f}
+                        {pm_clause}
+                    WHERE id = {int(oid)}
+                """)
+            conn.commit()
+            cur.close(); conn.close()
+
+            total_profit = int(total_revenue - total_buy)
+            return {
+                'statusCode': 200, 'headers': HEADERS,
+                'body': json.dumps({
+                    'ok': True,
+                    'sold_count': len(updates),
+                    'total_weight': round(total_weight_raw, 3),
+                    'total_weight_585': round(total_weight_585, 3),
+                    'price_per_gram_585': price_per_gram_585,
+                    'total_revenue': total_revenue,
+                    'total_buy': total_buy,
+                    'total_profit': total_profit,
+                }, ensure_ascii=False)
+            }
 
         # Создать заявку
         if action == 'create':

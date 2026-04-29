@@ -26,7 +26,7 @@ def handler(event: dict, context) -> dict:
     if event.get('httpMethod') == 'OPTIONS':
         return {'statusCode': 200, 'headers': {**HEADERS,
             'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, X-Client-Token'}, 'body': ''}
+            'Access-Control-Allow-Headers': 'Content-Type, X-Client-Token, X-Admin-Token, X-Employee-Token'}, 'body': ''}
 
     method = event.get('httpMethod', 'GET')
     params = event.get('queryStringParameters') or {}
@@ -35,15 +35,23 @@ def handler(event: dict, context) -> dict:
     headers_in = {k.lower(): v for k, v in (event.get('headers') or {}).items()}
     client_token = headers_in.get('x-client-token', '').strip()
 
-    # GET /list — список всех клиентов (только для admin, X-Admin-Token)
+    # GET /list — список всех клиентов (для admin по X-Admin-Token или для сотрудника по X-Employee-Token)
     if method == 'GET' and params.get('action') == 'list':
         admin_token = headers_in.get('x-admin-token', '').strip()
+        emp_token = headers_in.get('x-employee-token', '').strip()
         expected = os.environ.get('ADMIN_TOKEN', '')
-        if not admin_token or admin_token != expected:
+        is_admin = bool(admin_token) and admin_token == expected
+        is_staff = False
+        if not is_admin and emp_token:
+            conn = get_conn(); cur = conn.cursor()
+            cur.execute(f"SELECT 1 FROM {SCHEMA}.employees WHERE auth_token=%s AND token_expires_at>NOW() AND is_active=true", (emp_token,))
+            is_staff = cur.fetchone() is not None
+            cur.close(); conn.close()
+        if not (is_admin or is_staff):
             return _err(403, 'Нет доступа')
         conn = get_conn(); cur = conn.cursor()
         cur.execute(f"""SELECT id, full_name, phone, email, discount_pct, loyalty_points, registered_at
-                        FROM {SCHEMA}.clients ORDER BY registered_at DESC""")
+                        FROM {SCHEMA}.clients ORDER BY registered_at DESC NULLS LAST, id DESC""")
         rows = cur.fetchall(); cur.close(); conn.close()
         clients = [{'id': r[0], 'full_name': r[1], 'phone': r[2], 'email': r[3],
                     'discount_pct': r[4], 'loyalty_points': r[5],

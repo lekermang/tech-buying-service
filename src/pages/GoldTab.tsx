@@ -187,6 +187,8 @@ export default function GoldTab({ token }: { token: string }) {
           onPeriodFromChange={setPeriodFrom}
           onPeriodToChange={setPeriodTo}
           onRefresh={() => loadAnalytics(period, periodFrom, periodTo)}
+          token={token}
+          onSold={() => loadAnalytics(period, periodFrom, periodTo)}
         />
       )}
 

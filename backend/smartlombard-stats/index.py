@@ -299,17 +299,34 @@ def _to_float(x) -> float:
 def _aggregate(operations: list, elem_operations: list) -> dict:
     income = 0.0
     expense = 0.0
+    sales_total = 0.0   # продажи товаров (реализация)
+    sales_count = 0
+    pledge_total = 0.0
+    pledge_count = 0
+    buyout_total = 0.0
+    buyout_count = 0
     by_type: dict[str, float] = {}
+    by_type_count: dict[str, int] = {}
 
     for op in operations:
         t = (op.get('type_operation') or '').strip()
         primary = t.split(',')[0].strip() if t else ''
         s = _to_float(op.get('sum'))
         by_type[primary] = by_type.get(primary, 0.0) + s
+        by_type_count[primary] = by_type_count.get(primary, 0) + 1
         if primary in INCOME_TYPES:
             income += s
         elif primary in EXPENSE_TYPES:
             expense += s
+        if primary == 'sell_realization':
+            sales_total += s
+            sales_count += 1
+        elif primary == 'pledge':
+            pledge_total += s
+            pledge_count += 1
+        elif primary in ('buyout', 'part_buyout', 'part_buyout_pawn_good'):
+            buyout_total += s
+            buyout_count += 1
 
     period_income = 0.0
     period_costs = 0.0
@@ -324,7 +341,14 @@ def _aggregate(operations: list, elem_operations: list) -> dict:
         'period_income': int(round(period_income)),
         'period_costs': int(round(period_costs)),
         'period_profit': int(round(period_profit)),
+        'sales_total': int(round(sales_total)),
+        'sales_count': sales_count,
+        'pledge_total': int(round(pledge_total)),
+        'pledge_count': pledge_count,
+        'buyout_total': int(round(buyout_total)),
+        'buyout_count': buyout_count,
         'by_type': {k: int(round(v)) for k, v in by_type.items()},
+        'by_type_count': by_type_count,
     }
 
 
@@ -490,6 +514,14 @@ def handler(event: dict, context) -> dict:
         'period_income': agg['period_income'],
         'period_costs': agg['period_costs'],
         'period_profit': agg['period_profit'],
+        'sales_total': agg['sales_total'],
+        'sales_count': agg['sales_count'],
+        'pledge_total': agg['pledge_total'],
+        'pledge_count': agg['pledge_count'],
+        'buyout_total': agg['buyout_total'],
+        'buyout_count': agg['buyout_count'],
+        'by_type': agg['by_type'],
+        'by_type_count': agg['by_type_count'],
         'operations_total': len(operations),
     }
     _cache_set(cache_key, payload)

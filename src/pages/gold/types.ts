@@ -61,6 +61,7 @@ export type GoldAnalytics = {
   new: number;
   total: number;
   total_weight: number;
+  total_weight_585?: number;
   total_buy: number;
   total_sell: number;
   total_profit: number;

@@ -28,6 +28,7 @@ const loadRepair        = () => import("./StaffRepairTab");
 const loadGold          = () => import("./GoldTab");
 const loadOtherTabs     = () => import("./StaffOtherTabs");
 const loadVipChat       = () => import("./StaffVipChatTab");
+const loadSmartLombard  = () => import("./smartlombard/SmartLombardTab");
 
 const GoodsTab        = lazy(loadGoods);
 const StaffRepairTab  = lazy(loadRepair);
@@ -37,6 +38,7 @@ const ClientsTab      = lazy(() => loadOtherTabs().then(m => ({ default: m.Clien
 const AnalyticsTab    = lazy(() => loadOtherTabs().then(m => ({ default: m.AnalyticsTab })));
 const EmployeesTab    = lazy(() => loadOtherTabs().then(m => ({ default: m.EmployeesTab })));
 const VipChatTab      = lazy(loadVipChat);
+const SmartLombardTab = lazy(loadSmartLombard);
 
 const TAB_PRELOADERS: Record<string, () => Promise<unknown>> = {
   goods: loadGoods,
@@ -47,6 +49,7 @@ const TAB_PRELOADERS: Record<string, () => Promise<unknown>> = {
   analytics: loadOtherTabs,
   employees: loadOtherTabs,
   chat: loadVipChat,
+  smartlombard: loadSmartLombard,
 };
 
 function prefetchTab(t: string): void {
@@ -633,6 +636,7 @@ function StaffInner() {
     { k: "chat",         l: "Чат",          icon: "MessageCircle", badge: chatUnread },
     { k: "clients",      l: "Клиенты",      icon: "Users" },
     { k: "analytics",    l: "Статистика",   icon: "BarChart2" },
+    ...(isOwnerOrAdmin ? [{ k: "smartlombard" as Tab, l: "СмартЛомбард", icon: "Gem" }] : []),
     ...(isOwnerOrAdmin ? [{ k: "gold" as Tab, l: "Золото", icon: "Coins" }] : []),
     ...(isOwnerOrAdmin ? [{ k: "employees" as Tab, l: "Команда", icon: "UserCog" }] : []),
   ];
@@ -717,6 +721,7 @@ function StaffInner() {
             {tab === "analytics" && <AnalyticsTab token={token} />}
             {tab === "gold"      && isOwnerOrAdmin && <GoldTab token={token} />}
             {tab === "employees" && isOwnerOrAdmin && <EmployeesTab token={token} myRole={empRole} />}
+            {tab === "smartlombard" && isOwnerOrAdmin && <SmartLombardTab token={token} myRole={empRole} />}
             {tab === "chat"      && <VipChatTab token={token} onUnread={setChatUnread} />}
           </React.Suspense>
         </TabErrorBoundary>

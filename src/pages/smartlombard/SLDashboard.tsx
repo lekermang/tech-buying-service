@@ -10,6 +10,12 @@ type Stats = {
   period_income: number;
   period_costs: number;
   period_profit: number;
+  sales_total?: number;
+  sales_count?: number;
+  pledge_total?: number;
+  pledge_count?: number;
+  buyout_total?: number;
+  buyout_count?: number;
   operations_total: number;
   cached?: boolean;
   error?: string;
@@ -96,8 +102,21 @@ export function SLDashboard({ token }: { token: string }) {
 
       {!error && stats && (
         <div className="grid grid-cols-2 gap-2">
+          {/* ВЫДЕЛЕННАЯ карточка ПРОДАЖИ ТОВАРА (sell_realization) */}
+          <div className="col-span-2">
+            <Card
+              label="Продажи товара (Iphone, Sony и т.д.)"
+              value={stats.sales_total ?? 0}
+              icon="ShoppingCart"
+              tint="gold"
+              big
+              sub={`${stats.sales_count ?? 0} операций`}
+            />
+          </div>
           <Card label="Приход" value={stats.income} icon="ArrowDownToLine" tint="green" />
           <Card label="Расход" value={stats.expense} icon="ArrowUpFromLine" tint="red" />
+          <Card label="Залоги" value={stats.pledge_total ?? 0} icon="ArrowDownToLine" tint="red" sub={`${stats.pledge_count ?? 0} операций`} />
+          <Card label="Выкупы" value={stats.buyout_total ?? 0} icon="ArrowUpFromLine" tint="green" sub={`${stats.buyout_count ?? 0} операций`} />
           <Card label="Доход (%)" value={stats.period_income} icon="TrendingUp" tint="green" sub="проценты + сверх" />
           <Card label="Издержки" value={stats.period_costs} icon="TrendingDown" tint="red" sub="убытки" />
           <div className="col-span-2">

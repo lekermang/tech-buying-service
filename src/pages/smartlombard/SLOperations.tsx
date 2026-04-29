@@ -123,6 +123,28 @@ export function SLOperations({ token }: { token: string }) {
         </div>
       </div>
 
+      {/* Быстрые пресеты */}
+      <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
+        <button onClick={() => setTypeFilter("sell_realization")}
+          className={`shrink-0 flex items-center gap-1.5 font-oswald font-bold text-[11px] uppercase px-3 py-2 rounded-md transition-all active:scale-95 border ${
+            typeFilter === "sell_realization"
+              ? "bg-[#FFD700] text-black border-[#FFD700]"
+              : "bg-pink-500/15 text-pink-300 border-pink-400/30 hover:bg-pink-500/20"
+          }`}>
+          <Icon name="ShoppingCart" size={13} />
+          Только продажи товара
+        </button>
+        <button onClick={() => setTypeFilter("all")}
+          className={`shrink-0 flex items-center gap-1.5 font-oswald font-bold text-[11px] uppercase px-3 py-2 rounded-md transition-all active:scale-95 border ${
+            typeFilter === "all"
+              ? "bg-[#FFD700] text-black border-[#FFD700]"
+              : "bg-[#141414] text-white/60 border-[#1F1F1F] hover:text-white"
+          }`}>
+          <Icon name="List" size={13} />
+          Все операции
+        </button>
+      </div>
+
       {/* Поиск + фильтр типа */}
       <div className="space-y-2">
         <div className="relative">

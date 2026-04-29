@@ -6,7 +6,8 @@ export type StaffTab =
   | "employees"
   | "repair"
   | "chat"
-  | "gold";
+  | "gold"
+  | "smartlombard";
 
 export const PRICE_SCHEDULER_URL =
   "https://functions.poehali.dev/b09271ea-c662-4225-973f-4dd4c6a0e32c";
@@ -18,7 +19,7 @@ export const VIP_CHAT_URL =
 export const SECRET_PW = "Mark2015N";
 
 // Какие вкладки требуют доп. пароль (для НЕ-владельца)
-export const PROTECTED_TABS: ReadonlyArray<StaffTab> = ["gold", "analytics", "employees"];
+export const PROTECTED_TABS: ReadonlyArray<StaffTab> = ["gold", "analytics", "employees", "smartlombard"];
 
 // Тип записи табов в нижней панели
 export type TabConfig = {
@@ -64,6 +65,7 @@ export function readSavedTab(fallback: StaffTab): StaffTab {
       "repair",
       "chat",
       "gold",
+      "smartlombard",
     ];
     if (fromUrl && (allowed as string[]).includes(fromUrl)) return fromUrl as StaffTab;
     const saved = localStorage.getItem(TAB_KEY);
