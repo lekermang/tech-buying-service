@@ -1,0 +1,28 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "GET ping (public)",
+      "method": "GET",
+      "path": "/?action=ping",
+      "expectedStatus": 200,
+      "expectedBody": {"ok": true},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "POST without signature returns auth fail",
+      "method": "POST",
+      "path": "/",
+      "body": "data=%5B%7B%7D%5D",
+      "headers": {"Content-Type": "application/x-www-form-urlencoded"},
+      "expectedStatus": 200,
+      "expectedBody": [{"status": false, "type": "auth"}],
+      "bodyMatcher": "partial"
+    }
+  ]
+}

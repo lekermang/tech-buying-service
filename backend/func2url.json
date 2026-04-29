@@ -1,4 +1,5 @@
 {
+  "smartlombard-webhook": "https://functions.poehali.dev/1915486d-a14e-4337-a95f-75b9a7b8687f",
   "smartlombard-stats": "https://functions.poehali.dev/e628ca7a-012b-4d92-bf0a-2853b05a7f4e",
   "tg-photo-watcher": "https://functions.poehali.dev/d0251a0f-324f-47dc-9601-9a0398c26299",
   "tg-channel-import": "https://functions.poehali.dev/e80fdfcd-2c87-4b96-a313-0480c28874ec",
