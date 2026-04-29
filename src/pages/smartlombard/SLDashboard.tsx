@@ -31,6 +31,26 @@ type Stats = {
 
 const fmt = (n: number) => (n || 0).toLocaleString("ru-RU");
 
+// SmartLombard может вернуть error как строку, объект {message}, или массив [{field, message}].
+// Превращаем что угодно в безопасную строку для рендера.
+function errToText(v: unknown): string {
+  if (v == null || v === '') return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+  if (Array.isArray(v)) {
+    return v.map(errToText).filter(Boolean).join('; ');
+  }
+  if (typeof v === 'object') {
+    const o = v as Record<string, unknown>;
+    if (typeof o.message === 'string') {
+      return o.field ? `${o.field}: ${o.message}` : o.message;
+    }
+    if (typeof o.error === 'string') return o.error;
+    try { return JSON.stringify(v); } catch { return '[object]'; }
+  }
+  return String(v);
+}
+
 function todayDmy() {
   const d = new Date();
   return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
@@ -87,7 +107,7 @@ export function SLDashboard({ token }: { token: string }) {
       const res = await fetch(url, { headers: { "X-Employee-Token": token } });
       const data = await res.json();
       if (!res.ok || data.error) {
-        setTokenError(data.error || `HTTP ${res.status}`);
+        setTokenError(errToText(data.error) || `HTTP ${res.status}`);
         setTokenAge(null); setTokenTtl(null);
       } else {
         setTokenAge(data.token_age_sec ?? 0);
@@ -108,7 +128,7 @@ export function SLDashboard({ token }: { token: string }) {
       const res = await fetch(url, { headers: { "X-Employee-Token": token } });
       const data = await res.json();
       if (!res.ok || data.error) {
-        setError(data.error || `Ошибка ${res.status}`);
+        setError(errToText(data.error) || `Ошибка ${res.status}`);
         setStats(null);
       } else {
         setStats(data);
@@ -203,14 +223,15 @@ export function SLDashboard({ token }: { token: string }) {
         const d = diagData as {
           date_from?: string; date_to?: string;
           operations_total?: number; elem_operations_total?: number;
-          error?: string; stage?: string;
+          error?: unknown; stage?: string;
           audit?: Array<Record<string, unknown>>;
           operations_debug?: Record<string, unknown>;
           elem_debug?: Record<string, unknown>;
           accounts_used?: string[];
-          operations_per_account?: Array<{account_id: string; count: number; added?: number; error?: string | null}>;
-          elem_per_account?: Array<{account_id: string; count: number; added?: number; error?: string | null}>;
+          operations_per_account?: Array<{account_id: string; count: number; added?: number; error?: unknown}>;
+          elem_per_account?: Array<{account_id: string; count: number; added?: number; error?: unknown}>;
         };
+        const toText = errToText;
         const audit = d.audit || [];
         // Если backend не вернул audit — собираем его из operations_debug/elem_debug
         const fallbackAudit: Array<Record<string, unknown>> = [];
@@ -257,10 +278,10 @@ export function SLDashboard({ token }: { token: string }) {
               </button>
             </div>
 
-            {d.error && (
+            {d.error != null && d.error !== '' && (
               <div className="bg-red-500/10 border border-red-500/30 rounded p-2 text-red-300 text-[11px]">
                 <div className="font-bold uppercase text-[9px] mb-1">Ошибка ({d.stage || '?'})</div>
-                <div className="break-words">{d.error}</div>
+                <div className="break-words">{toText(d.error)}</div>
               </div>
             )}
 
@@ -281,8 +302,10 @@ export function SLDashboard({ token }: { token: string }) {
                 <div className="text-white/40 uppercase text-[9px]">Операции по сотрудникам</div>
                 <div className="space-y-1">
                   {d.operations_per_account.map((acc, i) => {
-                    const isOk = !acc.error && acc.count > 0;
-                    const isEmpty = !acc.error && acc.count === 0;
+                    const errText = toText(acc.error);
+                    const hasErr = !!errText;
+                    const isOk = !hasErr && acc.count > 0;
+                    const isEmpty = !hasErr && acc.count === 0;
                     return (
                       <div key={i} className={`flex items-center justify-between gap-2 px-2 py-1.5 rounded text-[10px] border ${
                         isOk ? 'bg-green-500/10 border-green-500/30' :
@@ -290,8 +313,8 @@ export function SLDashboard({ token }: { token: string }) {
                         'bg-red-500/10 border-red-500/30'
                       }`}>
                         <span className="font-mono text-white/70 shrink-0">#{acc.account_id}</span>
-                        <span className={`font-bold tabular-nums ${isOk ? 'text-green-300' : isEmpty ? 'text-yellow-300' : 'text-red-300'}`}>
-                          {acc.error ? acc.error.slice(0, 40) : `${acc.count} оп.`}
+                        <span className={`font-bold tabular-nums text-right break-all ${isOk ? 'text-green-300' : isEmpty ? 'text-yellow-300' : 'text-red-300'}`}>
+                          {hasErr ? errText.slice(0, 60) : `${acc.count} оп.`}
                         </span>
                       </div>
                     );
