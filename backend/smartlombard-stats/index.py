@@ -1137,6 +1137,166 @@ def handler(event: dict, context) -> dict:
         data['cached'] = False
         return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps(data, ensure_ascii=False)}
 
+    # ---------- GOODS_DB: содержимое sl_goods (для сверки с API operations) ----------
+    if action == 'goods_db':
+        ok, _r = _check_token(event, allow_all_staff=False)
+        if not ok:
+            return _err(401, 'Unauthorized')
+        try:
+            conn = _get_conn(); cur = conn.cursor()
+            cur.execute(
+                f"SELECT article, item_type, name, price, organization, "
+                f"sold, withdrawn, hidden, removed, "
+                f"COALESCE(updated_at, created_at) AS upd "
+                f"FROM {SCHEMA}.sl_goods "
+                f"ORDER BY article DESC LIMIT 5000"
+            )
+            rows = cur.fetchall()
+            cur.close(); conn.close()
+            goods = []
+            for r in rows:
+                goods.append({
+                    'article': int(r[0]) if r[0] is not None else None,
+                    'item_type': int(r[1]) if r[1] is not None else 1,
+                    'name': r[2],
+                    'price': float(r[3]) if r[3] is not None else 0.0,
+                    'organization': int(r[4]) if r[4] is not None else None,
+                    'sold': int(r[5]) if r[5] is not None else 0,
+                    'withdrawn': int(r[6]) if r[6] is not None else 0,
+                    'hidden': int(r[7]) if r[7] is not None else 0,
+                    'removed': bool(r[8]) if r[8] is not None else False,
+                    'updated_at': r[9].isoformat() if r[9] else None,
+                })
+            return _ok({'goods': goods, 'total': len(goods)})
+        except Exception as e:
+            return _err(500, f'goods_db error: {e}')
+
+    # ---------- RECONCILE: сверка API operations vs sl_goods ----------
+    if action == 'reconcile':
+        ok, _r = _check_token(event, allow_all_staff=False)
+        if not ok:
+            return _err(401, 'Unauthorized')
+
+        date_from_r = _parse_date_param(params.get('date_from') or body.get('date_from') or '')
+        date_to_r = _parse_date_param(params.get('date_to') or body.get('date_to') or '') \
+            if (params.get('date_to') or body.get('date_to')) else date_from_r
+
+        # 1) API operations за период (мульти-аккаунт)
+        keys = _get_api_keys_list()
+        if not keys:
+            return _err(502, 'SMARTLOMBARD_API_KEYS не задан')
+        q = {'date_begin': date_from_r, 'date_end': date_to_r}
+        operations, _ops_per, _ops_audit = _fetch_all_pages_multi_account(OPS_URL, q)
+
+        # 2) Наши товары (sl_goods)
+        try:
+            conn = _get_conn(); cur = conn.cursor()
+            cur.execute(
+                f"SELECT article, item_type, name, price, sold, withdrawn, removed "
+                f"FROM {SCHEMA}.sl_goods"
+            )
+            db_rows = cur.fetchall()
+            cur.close(); conn.close()
+        except Exception as e:
+            return _err(500, f'db read error: {e}')
+
+        db_by_article: dict[int, dict] = {}
+        for r in db_rows:
+            try:
+                art = int(r[0])
+            except Exception:
+                continue
+            db_by_article[art] = {
+                'article': art,
+                'item_type': int(r[1]) if r[1] is not None else 1,
+                'name': r[2] or '',
+                'price': float(r[3]) if r[3] is not None else 0.0,
+                'sold': int(r[4]) if r[4] is not None else 0,
+                'withdrawn': int(r[5]) if r[5] is not None else 0,
+                'removed': bool(r[6]) if r[6] is not None else False,
+            }
+
+        # 3) Группируем операции по pawn_ticket_id (=article)
+        api_by_article: dict[int, dict] = {}
+        for op in operations:
+            pid = op.get('pawn_ticket_id')
+            if pid is None:
+                continue
+            try:
+                pid_i = int(pid)
+            except Exception:
+                continue
+            t = (op.get('type_operation') or '').split(',')[0].strip()
+            row = api_by_article.setdefault(pid_i, {
+                'article': pid_i,
+                'types': [],
+                'last_type': '',
+                'last_sum': 0.0,
+                'last_date': '',
+                'employee': '',
+                'client': '',
+            })
+            row['types'].append(t)
+            # Берём последнюю операцию (первая в API — обычно самая свежая)
+            if not row['last_type']:
+                row['last_type'] = t
+                try:
+                    row['last_sum'] = float(op.get('sum') or 0)
+                except Exception:
+                    row['last_sum'] = 0.0
+                row['last_date'] = op.get('created_at') or ''
+                row['employee'] = op.get('employee_name') or ''
+                row['client'] = op.get('client_name') or ''
+
+        # 4) Расхождения
+        only_in_api: list = []   # есть в API operations, нет в нашей БД
+        only_in_db: list = []    # есть в БД, нет в API operations
+        in_both: list = []       # есть и там и там
+        # «релевантные» типы — те, что должны порождать товар на витрине
+        TRANSFER_TYPES = {'send_to_realization', 'sell_realization', 'seizure'}
+
+        for art, api_row in api_by_article.items():
+            db_row = db_by_article.get(art)
+            relevant = any(t in TRANSFER_TYPES for t in api_row['types'])
+            if db_row is None:
+                only_in_api.append({**api_row, 'relevant_for_goods': relevant})
+            else:
+                in_both.append({
+                    'article': art,
+                    'api_types': api_row['types'],
+                    'api_last_type': api_row['last_type'],
+                    'api_last_sum': api_row['last_sum'],
+                    'api_last_date': api_row['last_date'],
+                    'api_employee': api_row['employee'],
+                    'api_client': api_row['client'],
+                    'db_name': db_row['name'],
+                    'db_price': db_row['price'],
+                    'db_sold': db_row['sold'],
+                    'db_withdrawn': db_row['withdrawn'],
+                    'db_removed': db_row['removed'],
+                })
+
+        # БД-товары, которых нет в API за период
+        for art, db_row in db_by_article.items():
+            if art not in api_by_article:
+                only_in_db.append(db_row)
+
+        return _ok({
+            'date_from': date_from_r,
+            'date_to': date_to_r,
+            'api_operations_total': len(operations),
+            'api_articles_total': len(api_by_article),
+            'db_goods_total': len(db_by_article),
+            'only_in_api': only_in_api,
+            'only_in_db': only_in_db,
+            'in_both': in_both,
+            'counts': {
+                'only_in_api': len(only_in_api),
+                'only_in_db': len(only_in_db),
+                'in_both': len(in_both),
+            },
+        })
+
     # ---------- STATS (owner/admin) ----------
     ok, _ = _check_token(event, allow_all_staff=False)
     if not ok:

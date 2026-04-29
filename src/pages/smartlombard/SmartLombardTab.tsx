@@ -7,8 +7,9 @@ const Clients = lazy(() => import("./SLClients"));
 const NewPledge = lazy(() => import("./SLNewPledge"));
 const Tickets = lazy(() => import("./SLTickets"));
 const GoodsList = lazy(() => import("./SLGoods"));
+const Reconcile = lazy(() => import("./SLReconcile"));
 
-type Section = "dashboard" | "operations" | "clients" | "new_pledge" | "tickets" | "goods";
+type Section = "dashboard" | "operations" | "clients" | "new_pledge" | "tickets" | "goods" | "reconcile";
 
 const SECTIONS: { k: Section; l: string; icon: string; ownerOnly?: boolean }[] = [
   { k: "dashboard",  l: "Сводка",     icon: "LayoutDashboard" },
@@ -17,6 +18,7 @@ const SECTIONS: { k: Section; l: string; icon: string; ownerOnly?: boolean }[] =
   { k: "new_pledge", l: "Новый залог", icon: "PlusCircle", ownerOnly: true },
   { k: "tickets",    l: "Билеты",     icon: "FileText" },
   { k: "goods",      l: "Товары",     icon: "Package" },
+  { k: "reconcile",  l: "Сверка",     icon: "GitCompareArrows", ownerOnly: true },
 ];
 
 export function SmartLombardTab({ token, myRole }: { token: string; myRole: string }) {
@@ -72,6 +74,7 @@ export function SmartLombardTab({ token, myRole }: { token: string; myRole: stri
         {section === "new_pledge" && isOwnerOrAdmin && <NewPledge token={token} />}
         {section === "tickets"    && <Tickets token={token} />}
         {section === "goods"      && <GoodsList token={token} />}
+        {section === "reconcile"  && isOwnerOrAdmin && <Reconcile token={token} />}
       </Suspense>
     </div>
   );
