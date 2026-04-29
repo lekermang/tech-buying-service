@@ -228,12 +228,51 @@ export function SLDashboard({ token }: { token: string }) {
             const dbg = (diagData as { operations_debug?: Record<string, unknown> }).operations_debug;
             if (!dbg) return null;
             const sample = (dbg.sample as unknown[] | undefined) || [];
+            const reqUrl = String(dbg.request_url ?? "");
+            const reqHeaders = dbg.request_headers as Record<string, string> | undefined;
+            const respStatus = dbg.response_status;
+            const respRaw = String(dbg.response_raw ?? "");
+            const fullReport = [
+              "=== ЗАПРОС ===",
+              `GET ${reqUrl}`,
+              `Headers: ${JSON.stringify(reqHeaders || {}, null, 2)}`,
+              "",
+              "=== ОТВЕТ ===",
+              `HTTP ${respStatus}`,
+              respRaw,
+            ].join("\n");
+            const copy = (text: string) => {
+              try { navigator.clipboard.writeText(text); } catch { /* ignore */ }
+            };
             return (
-              <div className="bg-[#0A0A0A] border border-[#1F1F1F] rounded-md p-2 max-h-[280px] overflow-auto">
-                <div className="text-white/40 uppercase text-[9px] mb-1">Первая запись из /operations:</div>
-                <pre className="font-mono text-[10px] text-white/80 whitespace-pre-wrap break-all">
-                  {sample.length > 0 ? JSON.stringify(sample[0], null, 2) : "(массив пуст — SmartLombard не вернул операций)"}
-                </pre>
+              <div className="space-y-2">
+                <div className="bg-[#0A0A0A] border border-[#1F1F1F] rounded-md p-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="text-white/40 uppercase text-[9px]">Запрос (URL)</div>
+                    <button onClick={() => copy(reqUrl)} className="text-[9px] text-blue-300 hover:text-blue-200 px-1.5 py-0.5 rounded bg-blue-500/15 border border-blue-400/30">Копировать</button>
+                  </div>
+                  <pre className="font-mono text-[10px] text-white/80 whitespace-pre-wrap break-all">{reqUrl || "—"}</pre>
+                </div>
+                <div className="bg-[#0A0A0A] border border-[#1F1F1F] rounded-md p-2 max-h-[200px] overflow-auto">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="text-white/40 uppercase text-[9px]">Ответ (HTTP {String(respStatus ?? "—")})</div>
+                    <button onClick={() => copy(respRaw)} className="text-[9px] text-blue-300 hover:text-blue-200 px-1.5 py-0.5 rounded bg-blue-500/15 border border-blue-400/30">Копировать</button>
+                  </div>
+                  <pre className="font-mono text-[10px] text-white/80 whitespace-pre-wrap break-all">{respRaw || "(пусто)"}</pre>
+                </div>
+                <div className="bg-[#0A0A0A] border border-[#1F1F1F] rounded-md p-2 max-h-[200px] overflow-auto">
+                  <div className="text-white/40 uppercase text-[9px] mb-1">Первая запись из /operations:</div>
+                  <pre className="font-mono text-[10px] text-white/80 whitespace-pre-wrap break-all">
+                    {sample.length > 0 ? JSON.stringify(sample[0], null, 2) : "(массив пуст — SmartLombard не вернул операций)"}
+                  </pre>
+                </div>
+                <button
+                  onClick={() => copy(fullReport)}
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-md bg-blue-500/20 border border-blue-400/40 text-blue-200 hover:bg-blue-500/30 active:scale-[0.98] transition-all font-oswald font-bold text-[11px] uppercase"
+                >
+                  <Icon name="Copy" size={12} />
+                  Скопировать полный отчёт для поддержки
+                </button>
               </div>
             );
           })()}

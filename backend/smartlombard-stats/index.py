@@ -155,8 +155,9 @@ def _parse_date_param(val: str) -> str:
     return _msk_today_dmy()
 
 
-def _token_cache_get() -> str | None:
-    """Берём токен из БД, если он младше TOKEN_TTL_SECONDS."""
+def _token_cache_get(ignore_ttl: bool = False) -> str | None:
+    """Берём токен из БД, если он младше TOKEN_TTL_SECONDS.
+    ignore_ttl=True — берём любой ненулевой токен (используется как fallback при 429)."""
     try:
         conn = _get_conn()
         cur = conn.cursor()
@@ -168,7 +169,7 @@ def _token_cache_get() -> str | None:
         if not row:
             return None
         payload, age = row
-        if age is None or float(age) > TOKEN_TTL_SECONDS:
+        if not ignore_ttl and (age is None or float(age) > TOKEN_TTL_SECONDS):
             return None
         if isinstance(payload, str):
             payload = json.loads(payload)
@@ -248,7 +249,8 @@ def _request_new_token() -> tuple[str | None, str | None]:
 
 
 def _get_access_token(force: bool = False) -> tuple[str | None, str | None]:
-    """Возвращает токен из кэша БД (если ему меньше 19 мин) либо запрашивает новый."""
+    """Возвращает токен из кэша БД (если ему меньше 19 мин) либо запрашивает новый.
+    При 429 (rate limit) откатывается на старый токен из БД, если он там есть."""
     if not force:
         cached = _token_cache_get()
         if cached:
@@ -256,6 +258,12 @@ def _get_access_token(force: bool = False) -> tuple[str | None, str | None]:
     token, err = _request_new_token()
     if token:
         _token_cache_set(token)
+        return token, None
+    # Fallback: если SmartLombard вернул 429 — пробуем старый токен из БД (часто он ещё рабочий)
+    if err and ('429' in err or 'не более чем 1 раз' in err or 'rate' in err.lower()):
+        old = _token_cache_get(ignore_ttl=True)
+        if old:
+            return old, None
     return token, err
 
 
@@ -273,20 +281,44 @@ def _fetch_all_pages(url: str, token: str, params: dict, max_pages: int = 50) ->
         q = dict(params)
         q['page'] = page
         q['limit'] = 100
+        # Полный URL с query — чтобы можно было скопировать для тикета поддержки
+        try:
+            from urllib.parse import urlencode
+            full_url = f'{url}?{urlencode(q)}'
+        except Exception:
+            full_url = url
+        req_headers = {'Authorization': f'Bearer {token[:8]}…(скрыто)'}  # для дебага
         try:
             r = requests.get(url, params=q, headers={'Authorization': f'Bearer {token}'}, timeout=25)
         except Exception as e:
             return items, f'ops: network error {e}', debug_first
+        raw_body = r.text[:2500] if hasattr(r, 'text') else ''
         try:
             data = r.json()
         except Exception:
+            if page == 1:
+                debug_first = {
+                    'page1_count': 0, 'sample': [], 'no_data': True,
+                    'request_url': full_url, 'request_headers': req_headers,
+                    'response_status': r.status_code, 'response_raw': raw_body,
+                }
             return items, f'ops: bad json (status {r.status_code})', debug_first
         # 412 "максимальное количество страниц: 0" = данных нет, это не ошибка
         if r.status_code == 412 and _is_no_data_error(data):
             if page == 1:
-                debug_first = {'page1_count': 0, 'sample': [], 'pagination': {'total_pages': 0}, 'no_data': True}
+                debug_first = {
+                    'page1_count': 0, 'sample': [], 'pagination': {'total_pages': 0}, 'no_data': True,
+                    'request_url': full_url, 'request_headers': req_headers,
+                    'response_status': r.status_code, 'response_raw': raw_body,
+                }
             break
         if not data.get('status'):
+            if page == 1:
+                debug_first = {
+                    'page1_count': 0, 'sample': [], 'no_data': True,
+                    'request_url': full_url, 'request_headers': req_headers,
+                    'response_status': r.status_code, 'response_raw': raw_body,
+                }
             return items, f'ops: {data.get("message") or data.get("error") or "failed"} (status {r.status_code})', debug_first
         result = data.get('result') or {}
         ops = result.get('operations') or []
@@ -295,6 +327,10 @@ def _fetch_all_pages(url: str, token: str, params: dict, max_pages: int = 50) ->
                 'page1_count': len(ops),
                 'sample': ops[:2],
                 'pagination': (data.get('metadata') or {}).get('pagination'),
+                'request_url': full_url,
+                'request_headers': req_headers,
+                'response_status': r.status_code,
+                'response_raw': raw_body,
             }
         if not ops:
             break
