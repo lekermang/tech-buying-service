@@ -34,6 +34,20 @@ const STATUS_META: Record<string, { icon: string; tint: string; ring: string }> 
   cancelled:     { icon: "XCircle",       tint: "text-rose-300",    ring: "ring-rose-400/40" },
 };
 
+// Премиум-палитра для блока «Сменить статус» — заметные градиенты + glow
+const STATUS_FX: Record<string, {
+  icon: string; grad: string; bg: string; border: string; text: string; dot: string; glow: string;
+}> = {
+  new:           { icon: "Inbox",         grad: "from-white/10 to-white/5",            bg: "bg-white/[0.04]",       border: "border-white/15",            text: "text-white/80",      dot: "bg-white/60",      glow: "shadow-white/10" },
+  accepted:      { icon: "UserCheck",     grad: "from-violet-500/25 to-violet-500/5",  bg: "bg-violet-500/10",      border: "border-violet-400/30",       text: "text-violet-200",    dot: "bg-violet-400",    glow: "shadow-violet-500/20" },
+  in_progress:   { icon: "Wrench",        grad: "from-sky-500/25 to-sky-500/5",        bg: "bg-sky-500/10",         border: "border-sky-400/30",          text: "text-sky-200",       dot: "bg-sky-400",       glow: "shadow-sky-500/20" },
+  waiting_parts: { icon: "PackageSearch", grad: "from-amber-500/25 to-amber-500/5",    bg: "bg-amber-500/10",       border: "border-amber-400/30",        text: "text-amber-200",     dot: "bg-amber-400",     glow: "shadow-amber-500/20" },
+  ready:         { icon: "CheckCircle2",  grad: "from-[#FFD700]/30 to-[#FFD700]/5",    bg: "bg-[#FFD700]/10",       border: "border-[#FFD700]/40",        text: "text-[#FFD700]",     dot: "bg-[#FFD700]",     glow: "shadow-[#FFD700]/30" },
+  done:          { icon: "PackageCheck",  grad: "from-emerald-500/25 to-emerald-500/5",bg: "bg-emerald-500/10",     border: "border-emerald-400/30",      text: "text-emerald-200",   dot: "bg-emerald-400",   glow: "shadow-emerald-500/20" },
+  warranty:      { icon: "ShieldCheck",   grad: "from-teal-500/25 to-teal-500/5",      bg: "bg-teal-500/10",        border: "border-teal-400/30",         text: "text-teal-200",      dot: "bg-teal-400",      glow: "shadow-teal-500/20" },
+  cancelled:     { icon: "XCircle",       grad: "from-rose-500/25 to-rose-500/5",      bg: "bg-rose-500/10",        border: "border-rose-400/30",         text: "text-rose-200",      dot: "bg-rose-400",      glow: "shadow-rose-500/20" },
+};
+
 type Channel = "tg" | "sms" | "both";
 
 const REPAIR_ORDER_URL = "https://functions.poehali.dev/8d0ee3bd-41eb-44fe-9d30-aab6ddc2042d";
@@ -170,30 +184,52 @@ export default function OrderCardActions({
   return (
     <>
       {/* Смена статуса — премиум */}
-      <div className="bg-gradient-to-br from-[#141414] to-[#0A0A0A] border border-[#1F1F1F] rounded-lg p-3 space-y-2">
-        <div className="font-oswald font-bold text-white/50 text-[10px] uppercase tracking-widest flex items-center gap-1.5">
-          <Icon name="RefreshCw" size={11} />
-          Сменить статус
+      <div className="relative overflow-hidden rounded-xl border border-[#FFD700]/15 bg-gradient-to-br from-[#1a1a1a] via-[#0E0E0E] to-[#0A0A0A] p-3 shadow-[0_0_30px_-15px_rgba(255,215,0,0.25)]">
+        {/* декоративные блики */}
+        <div className="pointer-events-none absolute -top-20 -right-10 w-44 h-44 bg-[#FFD700]/8 rounded-full blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-20 -left-10 w-44 h-44 bg-violet-500/8 rounded-full blur-3xl" />
+
+        {/* Header */}
+        <div className="relative flex items-center gap-2 mb-3">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#FFD700] to-yellow-600 text-black flex items-center justify-center shrink-0 shadow-lg shadow-[#FFD700]/20">
+            <Icon name="RefreshCw" size={13} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-oswald font-bold text-white text-[12px] uppercase tracking-wider leading-tight">Сменить статус</div>
+            <div className="font-roboto text-[10px] text-white/40 leading-tight truncate">
+              текущий: <span className={STATUS_FX[o.status]?.text || "text-white/60"}>
+                {(STATUSES.find(s => s.key === o.status)?.label) || o.status}
+              </span>
+            </div>
+          </div>
+          {saving && (
+            <span className="flex items-center gap-1 bg-[#FFD700]/15 text-[#FFD700] border border-[#FFD700]/30 px-2 py-0.5 rounded-full text-[9px] font-roboto">
+              <Icon name="Loader" size={9} className="animate-spin" />Сохраняю
+            </span>
+          )}
         </div>
 
-        {/* Поле даты выдачи */}
+        {/* Поле даты выдачи — премиум */}
         {o.status !== "done" && (
-          <div className="flex items-center gap-2 bg-gradient-to-r from-[#FFD700]/10 to-transparent border border-[#FFD700]/20 rounded-md px-3 py-2">
-            <Icon name="CalendarCheck" size={13} className="text-[#FFD700] shrink-0" />
-            <span className="font-roboto text-[10px] text-[#FFD700]/70 shrink-0 uppercase tracking-wide">Дата выдачи:</span>
+          <div className="relative flex items-center gap-2 bg-gradient-to-r from-[#FFD700]/[0.08] via-[#FFD700]/[0.04] to-transparent border border-[#FFD700]/25 rounded-lg px-3 py-2 mb-3">
+            <Icon name="CalendarCheck" size={14} className="text-[#FFD700] shrink-0" />
+            <span className="font-roboto text-[10px] text-[#FFD700]/80 shrink-0 uppercase tracking-wider font-bold">Дата выдачи</span>
             <input
               type="datetime-local"
               value={issuedAt}
               onChange={e => setIssuedAt(e.target.value)}
-              className="flex-1 bg-transparent font-roboto text-[11px] text-white outline-none min-w-0 cursor-pointer tabular-nums"
+              className="flex-1 bg-transparent font-roboto text-[11px] text-white outline-none min-w-0 cursor-pointer tabular-nums text-right"
             />
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-2">
+        {/* Сетка статусов — премиум-плитки */}
+        <div className="relative grid grid-cols-2 gap-2">
           {STATUSES.filter(s => s.key !== o.status).map(s => {
+            const fx = STATUS_FX[s.key] || STATUS_FX.new;
             const needsFinance = s.key === "ready" || s.key === "done";
             const blocked = needsFinance && financeBlocked;
+            const isLoading = saving;
             return (
               <button key={s.key}
                 onClick={() => {
@@ -201,25 +237,38 @@ export default function OrderCardActions({
                   else if (s.key === "done") onIssueOrder(o, issuedAt);
                   else onChangeStatus(o.id, s.key, { admin_note: ef.admin_note });
                 }}
-                disabled={saving || blocked}
-                title={blocked ? "Введите суммы закупки и выдачи" : undefined}
-                className={`font-roboto text-xs py-2.5 px-3 rounded-md border transition-all flex items-center justify-center gap-1.5 min-h-[44px] active:scale-95 ${
+                disabled={isLoading || blocked}
+                title={blocked ? "Введите суммы закупки и выдачи" : s.label}
+                className={`group relative overflow-hidden font-roboto text-[12px] py-2.5 px-3 rounded-lg border transition-all flex items-center gap-2 min-h-[48px] active:scale-95 ${
                   blocked
-                    ? "border-white/5 bg-[#0A0A0A] text-white/20 cursor-not-allowed"
-                    : saving
+                    ? "border-white/5 bg-black/40 text-white/25 cursor-not-allowed"
+                    : isLoading
                     ? "opacity-50 cursor-not-allowed border-white/10 text-white/30"
-                    : `${s.color} border-current/30 hover:ring-1 hover:ring-current/40 font-bold`
+                    : `${fx.bg} ${fx.border} ${fx.text} hover:bg-gradient-to-br hover:${fx.grad} hover:shadow-lg hover:${fx.glow} hover:border-current/50 font-bold`
                 }`}>
-                {blocked ? <Icon name="Lock" size={11} /> : <span className={`w-2 h-2 rounded-full shrink-0 ${s.dot} animate-pulse`} />}
-                {s.label}
+                {/* hover-блик */}
+                {!blocked && !isLoading && (
+                  <span className={`pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-br ${fx.grad}`} />
+                )}
+                {/* Иконка статуса */}
+                <span className="relative w-7 h-7 rounded-md bg-black/30 border border-white/10 flex items-center justify-center shrink-0">
+                  {blocked
+                    ? <Icon name="Lock" size={12} />
+                    : <Icon name={fx.icon} size={13} />}
+                </span>
+                <span className="relative flex-1 text-left leading-tight">{s.label}</span>
+                {!blocked && (
+                  <span className={`relative w-1.5 h-1.5 rounded-full shrink-0 ${fx.dot} animate-pulse`} />
+                )}
               </button>
             );
           })}
         </div>
+
         {financeBlocked && (
-          <div className="text-[10px] font-roboto text-white/40 flex items-center gap-1 bg-orange-500/5 border border-orange-500/15 rounded px-2 py-1.5">
-            <Icon name="Info" size={10} className="text-orange-400" />
-            Для статусов «Готово» и «Выдано» укажите суммы закупки и ремонта
+          <div className="relative mt-2 text-[10px] font-roboto text-orange-300/80 flex items-center gap-1.5 bg-gradient-to-r from-orange-500/10 to-transparent border border-orange-500/25 rounded-lg px-2.5 py-1.5">
+            <Icon name="Info" size={11} className="text-orange-400 shrink-0" />
+            Для «Готово» и «Выдано» укажите суммы закупки и ремонта
           </div>
         )}
       </div>
