@@ -406,11 +406,287 @@ def _proxy_call(method: str, path: str, params: dict, body: dict | None, base: s
         return 502, {'error': f'network: {e}'}
 
 
+# ============================================================================
+# Парсер «Касса и банк → Операции по датам» (online.smartlombard.ru, HTML)
+# Используется логин/пароль из SMARTLOMBARD_LOGIN/SMARTLOMBARD_PASSWORD.
+# Кассовый отчёт показывает реальные продажи (Iphone 15, Sony PS4 и т.д.)
+# которые НЕ возвращаются через REST API /operations.
+# ============================================================================
+
+KASSA_BASE = 'https://online.smartlombard.ru'
+KASSA_LOGIN_PAGE = f'{KASSA_BASE}/login'
+KASSA_LOGIN_POST = f'{KASSA_BASE}/login'
+KASSA_PERIOD_URL = f'{KASSA_BASE}/cash/period'  # «Операции по датам»
+KASSA_SESSION_KEY = '__kassa_session__'
+KASSA_SESSION_TTL = 25 * 60  # 25 минут
+
+
+def _kassa_session_get() -> dict | None:
+    try:
+        conn = _get_conn(); cur = conn.cursor()
+        cur.execute(
+            f"SELECT payload, EXTRACT(EPOCH FROM (NOW() - updated_at)) FROM {SCHEMA}.smartlombard_cache WHERE cache_key='{KASSA_SESSION_KEY}'"
+        )
+        row = cur.fetchone()
+        cur.close(); conn.close()
+        if not row:
+            return None
+        payload, age = row
+        if age is None or float(age) > KASSA_SESSION_TTL:
+            return None
+        if isinstance(payload, str):
+            payload = json.loads(payload)
+        return payload or None
+    except Exception:
+        return None
+
+
+def _kassa_session_set(cookies: dict) -> None:
+    try:
+        payload_safe = json.dumps({'cookies': cookies}, ensure_ascii=False).replace("'", "''")
+        conn = _get_conn(); cur = conn.cursor()
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.smartlombard_cache (cache_key, payload, updated_at) "
+            f"VALUES ('{KASSA_SESSION_KEY}', '{payload_safe}'::jsonb, NOW()) "
+            f"ON CONFLICT (cache_key) DO UPDATE SET payload=EXCLUDED.payload, updated_at=NOW()"
+        )
+        conn.commit(); cur.close(); conn.close()
+    except Exception:
+        pass
+
+
+def _kassa_login() -> tuple[requests.Session | None, str | None]:
+    login = os.environ.get('SMARTLOMBARD_LOGIN', '').strip()
+    password = os.environ.get('SMARTLOMBARD_PASSWORD', '').strip()
+    if not login or not password:
+        return None, 'SMARTLOMBARD_LOGIN/SMARTLOMBARD_PASSWORD не заданы'
+    s = requests.Session()
+    s.headers.update({
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'ru,en;q=0.9',
+    })
+    try:
+        from bs4 import BeautifulSoup
+    except Exception as e:
+        return None, f'kassa: bs4 not installed ({e})'
+    try:
+        # 1) GET страницы логина — получаем CSRF и cookies
+        r = s.get(KASSA_LOGIN_PAGE, timeout=20, allow_redirects=True)
+        if r.status_code >= 500:
+            return None, f'kassa: login page status {r.status_code}'
+        soup = BeautifulSoup(r.text, 'lxml')
+        # ищем форму логина и скрытые поля
+        form = soup.find('form')
+        payload = {}
+        if form:
+            for inp in form.find_all('input'):
+                name = inp.get('name')
+                if not name:
+                    continue
+                payload[name] = inp.get('value', '')
+        # подставляем логин/пароль (имена полей варьируются)
+        for k in list(payload.keys()):
+            kl = k.lower()
+            if 'login' in kl or 'email' in kl or 'user' in kl:
+                payload[k] = login
+            elif 'pass' in kl:
+                payload[k] = password
+        if 'login' not in payload and 'email' not in payload:
+            payload['login'] = login
+        if 'password' not in payload:
+            payload['password'] = password
+
+        # 2) POST логина
+        action = (form.get('action') if form else None) or KASSA_LOGIN_POST
+        if action and not action.startswith('http'):
+            action = KASSA_BASE + (action if action.startswith('/') else '/' + action)
+        r2 = s.post(action, data=payload, timeout=25, allow_redirects=True)
+        if r2.status_code >= 400:
+            return None, f'kassa: login post status {r2.status_code}'
+        # эвристика успеха: на странице после логина не должно быть формы логина
+        if 'name="password"' in r2.text.lower() and '/login' in r2.url:
+            return None, 'kassa: login failed (still on login page)'
+        # сохраняем cookies
+        cookies = requests.utils.dict_from_cookiejar(s.cookies)
+        if cookies:
+            _kassa_session_set(cookies)
+        return s, None
+    except Exception as e:
+        return None, f'kassa: login exception {e}'
+
+
+def _kassa_get_session() -> tuple[requests.Session | None, str | None]:
+    cached = _kassa_session_get()
+    if cached and isinstance(cached, dict) and cached.get('cookies'):
+        s = requests.Session()
+        s.headers.update({
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        })
+        for k, v in cached['cookies'].items():
+            s.cookies.set(k, v)
+        return s, None
+    return _kassa_login()
+
+
+def _kassa_dmy_to_iso(dmy: str) -> str:
+    # 'DD.MM.YYYY' -> 'YYYY-MM-DD'
+    parts = dmy.split('.')
+    if len(parts) == 3:
+        return f'{parts[2]}-{parts[1]}-{parts[0]}'
+    return dmy
+
+
+def _kassa_money(s: str) -> float:
+    if not s:
+        return 0.0
+    cleaned = s.replace('\xa0', '').replace(' ', '').replace('руб.', '').replace('₽', '').replace(',', '.').strip()
+    try:
+        return float(cleaned)
+    except Exception:
+        return 0.0
+
+
+def _kassa_fetch_period(date_from_dmy: str, date_to_dmy: str) -> tuple[dict | None, str | None]:
+    """Парсит «Касса и банк → Операции по датам» и возвращает суммы прихода/расхода
+    + список операций «Продажа товара» и «Скупка»."""
+    try:
+        from bs4 import BeautifulSoup
+    except Exception as e:
+        return None, f'kassa: bs4 not installed ({e})'
+
+    s, err = _kassa_get_session()
+    if err or not s:
+        return None, err
+
+    df_iso = _kassa_dmy_to_iso(date_from_dmy)
+    dt_iso = _kassa_dmy_to_iso(date_to_dmy)
+
+    # Разные варианты параметров — подбираем что-нибудь, что сработает
+    param_variants = [
+        {'from': df_iso, 'to': dt_iso},
+        {'date_from': df_iso, 'date_to': dt_iso},
+        {'date_begin': date_from_dmy, 'date_end': date_to_dmy},
+        {'period_from': df_iso, 'period_to': dt_iso},
+        {'beginDate': df_iso, 'endDate': dt_iso},
+    ]
+    html = ''
+    used_params = None
+    last_status = None
+    for params in param_variants:
+        try:
+            r = s.get(KASSA_PERIOD_URL, params=params, timeout=30, allow_redirects=True)
+        except Exception as e:
+            return None, f'kassa: period network {e}'
+        last_status = r.status_code
+        if r.status_code == 200 and ('Приход' in r.text or 'Расход' in r.text or 'period' in r.url):
+            html = r.text
+            used_params = params
+            break
+        # если редиректнуло на login — повторим логин один раз
+        if '/login' in r.url:
+            s2, err2 = _kassa_login()
+            if err2 or not s2:
+                return None, err2
+            s = s2
+            try:
+                r = s.get(KASSA_PERIOD_URL, params=params, timeout=30, allow_redirects=True)
+            except Exception as e:
+                return None, f'kassa: period network after relogin {e}'
+            if r.status_code == 200:
+                html = r.text; used_params = params; break
+
+    if not html:
+        return None, f'kassa: empty response (status {last_status})'
+
+    soup = BeautifulSoup(html, 'lxml')
+
+    # Извлекаем общие суммы
+    def _extract_sum_after(label: str) -> float:
+        # Ищем "Приход: 192 994.00 руб." как текст
+        import re
+        # Текст в html может быть в любом теге
+        for tag in soup.find_all(string=re.compile(label, re.IGNORECASE)):
+            txt = str(tag)
+            m = re.search(rf'{label}\s*:?\s*([\d\s.,\xa0]+)', txt, re.IGNORECASE)
+            if m:
+                return _kassa_money(m.group(1))
+        return 0.0
+
+    income_total = _extract_sum_after('Приход')
+    expense_total = _extract_sum_after('Расход')
+
+    # Извлекаем таблицы — обычно это две таблицы: приходные и расходные операции
+    sales_items: list = []   # «Продажа товара»
+    buyout_items: list = []  # «Скупка»
+
+    for table in soup.find_all('table'):
+        rows = table.find_all('tr')
+        if len(rows) < 2:
+            continue
+        # заголовки
+        header_cells = [c.get_text(strip=True).lower() for c in rows[0].find_all(['th', 'td'])]
+        if not header_cells or 'действие' not in ' '.join(header_cells):
+            continue
+        # ищем индексы колонок
+        try:
+            i_time = next(i for i, h in enumerate(header_cells) if 'врем' in h or 'дата' in h)
+        except StopIteration:
+            i_time = 0
+        try:
+            i_action = next(i for i, h in enumerate(header_cells) if 'действ' in h)
+        except StopIteration:
+            i_action = 1
+        try:
+            i_desc = next(i for i, h in enumerate(header_cells) if 'описан' in h)
+        except StopIteration:
+            i_desc = 2
+        try:
+            i_sum = next(i for i, h in enumerate(header_cells) if 'сумм' in h)
+        except StopIteration:
+            i_sum = 3
+
+        for tr in rows[1:]:
+            cells = [c.get_text(' ', strip=True) for c in tr.find_all(['td', 'th'])]
+            if len(cells) <= max(i_time, i_action, i_desc, i_sum):
+                continue
+            action_l = cells[i_action].lower()
+            item = {
+                'time': cells[i_time],
+                'action': cells[i_action],
+                'desc': cells[i_desc],
+                'sum': _kassa_money(cells[i_sum]),
+            }
+            if 'продаж' in action_l:
+                sales_items.append(item)
+            elif 'скупк' in action_l or 'покупк' in action_l:
+                buyout_items.append(item)
+
+    sales_sum = round(sum(x['sum'] for x in sales_items), 2)
+    buyout_sum = round(sum(x['sum'] for x in buyout_items), 2)
+
+    return {
+        'date_from': date_from_dmy,
+        'date_to': date_to_dmy,
+        'income_total': income_total,
+        'expense_total': expense_total,
+        'sales_total': sales_sum,
+        'sales_count': len(sales_items),
+        'buyout_total': buyout_sum,
+        'buyout_count': len(buyout_items),
+        'sales': sales_items[:200],
+        'buyouts': buyout_items[:200],
+        'used_params': used_params,
+    }, None
+
+
 def handler(event: dict, context) -> dict:
     """SmartLombard API proxy + статистика.
     actions:
       - stats (default): агрегированные приход/расход/прибыль за период (owner/admin).
       - proxy: универсальный proxy к smartlombard (любой staff). body={path,method,params,body}.
+      - kassa_period: парсинг «Касса и банк → Операции по датам» (HTML с online.smartlombard.ru).
       - operations_list, pawn_tickets, clients, goods, branches, categories — упрощённые обёртки.
     """
     if event.get('httpMethod') == 'OPTIONS':
@@ -459,6 +735,28 @@ def handler(event: dict, context) -> dict:
         base = GOODS_API_BASE if use_goods else API_BASE
         status, data = _proxy_call(target_method, target_path, target_params, target_body, base)
         return {'statusCode': status, 'headers': HEADERS, 'body': json.dumps(data, ensure_ascii=False)}
+
+    # ---------- KASSA_PERIOD: парсинг «Касса и банк → Операции по датам» ----------
+    if action == 'kassa_period':
+        ok, _r = _check_token(event, allow_all_staff=False)
+        if not ok:
+            return _err(401, 'Unauthorized')
+        df = _parse_date_param(params.get('date_from') or params.get('date') or '')
+        dt = _parse_date_param(params.get('date_to') or params.get('date') or '') if (params.get('date_to') or params.get('date')) else df
+        nocache_k = (params.get('nocache') or '').lower() in ('1', 'true', 'yes')
+        ck = f'kassa__{df}__{dt}'
+        if not nocache_k:
+            cached = _cache_get(ck)
+            if cached is not None:
+                cached['cached'] = True
+                return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps(cached, ensure_ascii=False)}
+        data, err = _kassa_fetch_period(df, dt)
+        if err or not data:
+            return {'statusCode': 502, 'headers': HEADERS,
+                    'body': json.dumps({'error': err or 'kassa parse failed', 'date_from': df, 'date_to': dt}, ensure_ascii=False)}
+        _cache_set(ck, data)
+        data['cached'] = False
+        return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps(data, ensure_ascii=False)}
 
     # ---------- STATS (owner/admin) ----------
     ok, _ = _check_token(event, allow_all_staff=False)
@@ -524,6 +822,35 @@ def handler(event: dict, context) -> dict:
         'by_type_count': agg['by_type_count'],
         'operations_total': len(operations),
     }
+
+    # Подмешиваем кассовые данные (HTML-парсер) — если REST API не отдал продажи,
+    # берём цифры из «Касса и банк → Операции по датам».
+    try:
+        kassa, kerr = _kassa_fetch_period(date_from, date_to)
+        if kassa and not kerr:
+            payload['kassa_income'] = kassa.get('income_total', 0)
+            payload['kassa_expense'] = kassa.get('expense_total', 0)
+            payload['kassa_sales_total'] = kassa.get('sales_total', 0)
+            payload['kassa_sales_count'] = kassa.get('sales_count', 0)
+            payload['kassa_buyout_total'] = kassa.get('buyout_total', 0)
+            payload['kassa_buyout_count'] = kassa.get('buyout_count', 0)
+            # Если REST API ничего не отдал — заменяем основные показатели кассой
+            if (payload.get('sales_total') or 0) == 0 and kassa.get('sales_total', 0) > 0:
+                payload['sales_total'] = int(round(kassa['sales_total']))
+                payload['sales_count'] = kassa.get('sales_count', 0)
+            if (payload.get('buyout_total') or 0) == 0 and kassa.get('buyout_total', 0) > 0:
+                payload['buyout_total'] = int(round(kassa['buyout_total']))
+                payload['buyout_count'] = kassa.get('buyout_count', 0)
+            if (payload.get('income') or 0) == 0 and kassa.get('income_total', 0) > 0:
+                payload['income'] = int(round(kassa['income_total']))
+            if (payload.get('expense') or 0) == 0 and kassa.get('expense_total', 0) > 0:
+                payload['expense'] = int(round(kassa['expense_total']))
+            payload['kassa_ok'] = True
+        elif kerr:
+            payload['kassa_error'] = kerr
+    except Exception as e:
+        payload['kassa_error'] = f'kassa exception: {e}'
+
     _cache_set(cache_key, payload)
     payload['cached'] = False
     return {

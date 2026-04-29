@@ -636,8 +636,8 @@ function StaffInner() {
     { k: "chat",         l: "Чат",          icon: "MessageCircle", badge: chatUnread },
     { k: "clients",      l: "Клиенты",      icon: "Users" },
     { k: "analytics",    l: "Статистика",   icon: "BarChart2" },
-    ...(isOwnerOrAdmin ? [{ k: "smartlombard" as Tab, l: "СмартЛомбард", icon: "Gem" }] : []),
-    ...(isOwnerOrAdmin ? [{ k: "gold" as Tab, l: "Золото", icon: "Coins" }] : []),
+    ...(isOwnerOrAdmin ? [{ k: "smartlombard" as Tab, l: "СмартЛомбард", icon: "Coins" }] : []),
+    ...(isOwnerOrAdmin ? [{ k: "gold" as Tab, l: "Золото", icon: "Gem" }] : []),
     ...(isOwnerOrAdmin ? [{ k: "employees" as Tab, l: "Команда", icon: "UserCog" }] : []),
   ];
 
