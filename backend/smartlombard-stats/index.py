@@ -483,7 +483,16 @@ def _fetch_all_pages(url: str, token: str, params: dict, max_pages: int = 50) ->
                     'request_url': full_url, 'request_headers': req_headers,
                     'response_status': r.status_code, 'response_raw': raw_body,
                 }
-            return items, f'ops: {data.get("message") or data.get("error") or "failed"} (status {r.status_code})', debug_first
+            # Расшифровка типичных ошибок SmartLombard
+            err_obj = data.get('error') or data.get('message') or 'failed'
+            err_msg = err_obj.get('message') if isinstance(err_obj, dict) else err_obj
+            err_msg_str = str(err_msg)
+            hint = ''
+            if r.status_code == 405 or 'нет прав' in err_msg_str.lower() or 'no permission' in err_msg_str.lower():
+                hint = ' [нет прав в SmartLombard — дать сотруднику доступ к операциям через API]'
+            elif r.status_code == 401 or r.status_code == 403:
+                hint = ' [авторизация отклонена — проверь secret_key]'
+            return items, f'ops: {err_msg_str} (status {r.status_code}){hint}', debug_first
         result = data.get('result') or {}
         ops = result.get('operations') or []
         if iteration == 0:
