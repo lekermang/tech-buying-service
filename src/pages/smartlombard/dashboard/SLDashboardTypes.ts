@@ -63,6 +63,8 @@ export const PRESETS: { k: string; l: string; from: () => string; to: () => stri
   { k: "yest",  l: "Вчера",   from: () => shiftDmy(-1), to: () => shiftDmy(-1) },
   { k: "w7",    l: "7 дней",  from: () => shiftDmy(-6), to: () => todayDmy() },
   { k: "m30",   l: "30 дней", from: () => shiftDmy(-29), to: () => todayDmy() },
+  { k: "y365",  l: "Год",     from: () => shiftDmy(-364), to: () => todayDmy() },
+  { k: "all",   l: "Всё время", from: () => "01.01.2020", to: () => todayDmy() },
 ];
 
 // dd.mm.yyyy ↔ yyyy-mm-dd для <input type="date">
