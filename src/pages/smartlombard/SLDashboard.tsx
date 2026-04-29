@@ -69,11 +69,26 @@ const PRESETS: { k: string; l: string; from: () => string; to: () => string }[] 
   { k: "m30",   l: "30 дней", from: () => shiftDmy(-29), to: () => todayDmy() },
 ];
 
+// dd.mm.yyyy ↔ yyyy-mm-dd для <input type="date">
+const dmyToIso = (s: string) => {
+  const m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : "";
+};
+const isoToDmy = (s: string) => {
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? `${m[3]}.${m[2]}.${m[1]}` : "";
+};
+
 export function SLDashboard({ token }: { token: string }) {
   const [preset, setPreset] = useState("today");
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // Произвольный диапазон дат (используется когда preset === "custom")
+  const [customFrom, setCustomFrom] = useState(todayDmy());
+  const [customTo, setCustomTo] = useState(todayDmy());
+  const [showCustom, setShowCustom] = useState(false);
 
   // Состояние токена SmartLombard (по доке: 1 запрос → 20 минут жизни)
   const [tokenAge, setTokenAge] = useState<number | null>(null);
@@ -85,11 +100,18 @@ export function SLDashboard({ token }: { token: string }) {
   const [diagData, setDiagData] = useState<Record<string, unknown> | null>(null);
   const [diagLoading, setDiagLoading] = useState(false);
 
+  // Возвращает {from, to} для текущего пресета (или кастомного диапазона)
+  const getRange = useCallback(() => {
+    if (preset === "custom") return { from: customFrom, to: customTo };
+    const p = PRESETS.find(x => x.k === preset) || PRESETS[0];
+    return { from: p.from(), to: p.to() };
+  }, [preset, customFrom, customTo]);
+
   const runDiag = useCallback(async () => {
     setDiagLoading(true);
     try {
-      const cur = PRESETS.find(p => p.k === preset) || PRESETS[0];
-      const url = `${SMARTLOMBARD_URL}?date_from=${cur.from()}&date_to=${cur.to()}&debug=1&nocache=1`;
+      const r = getRange();
+      const url = `${SMARTLOMBARD_URL}?date_from=${r.from}&date_to=${r.to}&debug=1&nocache=1`;
       const res = await fetch(url, { headers: { "X-Employee-Token": token } });
       const data = await res.json();
       setDiagData(data);
@@ -98,7 +120,7 @@ export function SLDashboard({ token }: { token: string }) {
     } finally {
       setDiagLoading(false);
     }
-  }, [preset, token]);
+  }, [getRange, token]);
 
   const checkToken = useCallback(async (force = false) => {
     setTokenChecking(true); setTokenError("");
@@ -122,8 +144,8 @@ export function SLDashboard({ token }: { token: string }) {
 
   const load = useCallback(async (force = false) => {
     setLoading(true); setError("");
-    const cur = PRESETS.find(p => p.k === preset) || PRESETS[0];
-    const url = `${SMARTLOMBARD_URL}?date_from=${cur.from()}&date_to=${cur.to()}${force ? "&nocache=1" : ""}`;
+    const r = getRange();
+    const url = `${SMARTLOMBARD_URL}?date_from=${r.from}&date_to=${r.to}${force ? "&nocache=1" : ""}`;
     try {
       const res = await fetch(url, { headers: { "X-Employee-Token": token } });
       const data = await res.json();
@@ -138,7 +160,7 @@ export function SLDashboard({ token }: { token: string }) {
     } finally {
       setLoading(false);
     }
-  }, [preset, token]);
+  }, [getRange, token]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { checkToken(false); }, [checkToken]);
@@ -150,12 +172,22 @@ export function SLDashboard({ token }: { token: string }) {
           {PRESETS.map(p => {
             const a = preset === p.k;
             return (
-              <button key={p.k} onClick={() => setPreset(p.k)}
+              <button key={p.k} onClick={() => { setPreset(p.k); setShowCustom(false); }}
                 className={`shrink-0 font-roboto text-[11px] px-3 py-1.5 rounded-full transition-all active:scale-95 ${
                   a ? "bg-[#FFD700] text-black font-bold" : "bg-[#141414] border border-[#1F1F1F] text-white/60 hover:text-white"
                 }`}>{p.l}</button>
             );
           })}
+          <button
+            onClick={() => { setPreset("custom"); setShowCustom(s => !s); }}
+            className={`shrink-0 font-roboto text-[11px] px-3 py-1.5 rounded-full transition-all active:scale-95 flex items-center gap-1 ${
+              preset === "custom" ? "bg-[#FFD700] text-black font-bold" : "bg-[#141414] border border-[#1F1F1F] text-white/60 hover:text-white"
+            }`}
+            title="Выбрать произвольные даты"
+          >
+            <Icon name="Calendar" size={11} />
+            {preset === "custom" ? `${customFrom} → ${customTo}` : "Свои даты"}
+          </button>
         </div>
         <button onClick={() => load(true)} disabled={loading}
           title="Обновить"
@@ -163,6 +195,61 @@ export function SLDashboard({ token }: { token: string }) {
           <Icon name={loading ? "Loader" : "RefreshCw"} size={14} className={loading ? "animate-spin" : ""} />
         </button>
       </div>
+
+      {/* Панель выбора произвольных дат */}
+      {(showCustom || preset === "custom") && (
+        <div className="bg-[#0A0A0A] border border-[#FFD700]/30 rounded-lg p-3 space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
+          <div className="font-oswald font-bold text-[#FFD700] text-[10px] uppercase flex items-center gap-1.5">
+            <Icon name="CalendarRange" size={12} />
+            Произвольный период
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block">
+              <div className="text-white/40 text-[9px] uppercase mb-1">С</div>
+              <input
+                type="date"
+                value={dmyToIso(customFrom)}
+                onChange={(e) => { setCustomFrom(isoToDmy(e.target.value)); setPreset("custom"); }}
+                className="w-full bg-[#141414] border border-[#1F1F1F] rounded-md px-2 py-2 text-white text-[12px] font-mono focus:outline-none focus:border-[#FFD700]/50"
+              />
+            </label>
+            <label className="block">
+              <div className="text-white/40 text-[9px] uppercase mb-1">По</div>
+              <input
+                type="date"
+                value={dmyToIso(customTo)}
+                onChange={(e) => { setCustomTo(isoToDmy(e.target.value)); setPreset("custom"); }}
+                className="w-full bg-[#141414] border border-[#1F1F1F] rounded-md px-2 py-2 text-white text-[12px] font-mono focus:outline-none focus:border-[#FFD700]/50"
+              />
+            </label>
+          </div>
+          <div className="flex gap-1.5 flex-wrap">
+            {[
+              { l: "Окт 2024", from: "01.10.2024", to: "31.10.2024" },
+              { l: "Ноя 2024", from: "01.11.2024", to: "30.11.2024" },
+              { l: "Дек 2024", from: "01.12.2024", to: "31.12.2024" },
+              { l: "Q4 2024",  from: "01.10.2024", to: "31.12.2024" },
+              { l: "2025",     from: "01.01.2025", to: "31.12.2025" },
+            ].map(q => (
+              <button
+                key={q.l}
+                onClick={() => { setCustomFrom(q.from); setCustomTo(q.to); setPreset("custom"); }}
+                className="text-[10px] px-2 py-1 rounded bg-[#141414] border border-[#1F1F1F] text-white/60 hover:text-[#FFD700] hover:border-[#FFD700]/40 transition-all"
+              >
+                {q.l}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => load(true)}
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-md bg-[#FFD700] text-black hover:brightness-110 active:scale-[0.98] transition-all font-oswald font-bold text-[11px] uppercase disabled:opacity-50"
+          >
+            <Icon name={loading ? "Loader" : "Search"} size={12} className={loading ? "animate-spin" : ""} />
+            Запросить за этот период
+          </button>
+        </div>
+      )}
 
       {/* Состояние токена SmartLombard */}
       <div className={`rounded-lg p-2.5 border flex items-center justify-between gap-2 ${

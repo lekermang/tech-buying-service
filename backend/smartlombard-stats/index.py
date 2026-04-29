@@ -384,9 +384,21 @@ def _get_access_token(force: bool = False) -> tuple[str | None, str | None]:
 
 
 def _is_no_data_error(data: dict) -> bool:
-    """Smartlombard на page=1 при отсутствии данных возвращает 412 со словом 'максимальное количество страниц: 0'."""
+    """SmartLombard сигналит «данных нет» по-разному:
+    - старый формат (page): 412 + «максимальное количество страниц: 0»
+    - новый формат (offset): HTTP 200 + {status:false, http_code:204, error:{message:"Данных по запросу не найдено"}}
+    Оба варианта — это НЕ ошибка, а пустой результат."""
+    if not isinstance(data, dict):
+        return False
+    # Новый формат: http_code=204
+    if data.get('http_code') == 204:
+        return True
     msg_blob = json.dumps(data, ensure_ascii=False).lower()
-    return 'максимальное количество страниц' in msg_blob or 'максимальное кол' in msg_blob
+    if 'максимальное количество страниц' in msg_blob or 'максимальное кол' in msg_blob:
+        return True
+    if 'данных по запросу не найдено' in msg_blob or 'данные не найдены' in msg_blob:
+        return True
+    return False
 
 
 def _fetch_all_pages_multi_account(url: str, params: dict) -> tuple[list, list[dict], list[dict]]:
@@ -454,8 +466,9 @@ def _fetch_all_pages(url: str, token: str, params: dict, max_pages: int = 50) ->
                     'response_status': r.status_code, 'response_raw': raw_body,
                 }
             return items, f'ops: bad json (status {r.status_code})', debug_first
-        # 412 "превышает максимальное количество" по offset = данных нет / offset за пределами
-        if r.status_code == 412 and _is_no_data_error(data):
+        # «Данных по запросу не найдено» = НЕ ошибка, просто пусто.
+        # Покрывает: 412 + «максимальное количество страниц», 200 + http_code:204.
+        if _is_no_data_error(data):
             if iteration == 0:
                 debug_first = {
                     'page1_count': 0, 'sample': [], 'pagination': {'total': 0}, 'no_data': True,
