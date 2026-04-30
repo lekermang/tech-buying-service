@@ -10,6 +10,7 @@ import { SLDateRangePicker } from "./dashboard/SLDateRangePicker";
 import { SLTokenStatusBar } from "./dashboard/SLTokenStatusBar";
 import { SLDiagnosticsPanel } from "./dashboard/SLDiagnosticsPanel";
 import { SLAccountCheckPanel } from "./dashboard/SLAccountCheckPanel";
+import { SLKassaDiagPanel } from "./dashboard/SLKassaDiagPanel";
 import { SLStatsGrid } from "./dashboard/SLStatsGrid";
 
 export function SLDashboard({ token }: { token: string }) {
@@ -37,6 +38,24 @@ export function SLDashboard({ token }: { token: string }) {
   // Проверка содержимого аккаунта (branches/employees/clients/pawn_tickets)
   const [accountData, setAccountData] = useState<Record<string, unknown> | null>(null);
   const [accountLoading, setAccountLoading] = useState(false);
+
+  // Тест логина в кассу (online.smartlombard.ru) — диагностика парсера
+  const [kassaDiagData, setKassaDiagData] = useState<Record<string, unknown> | null>(null);
+  const [kassaDiagLoading, setKassaDiagLoading] = useState(false);
+
+  const runKassaDiag = useCallback(async () => {
+    setKassaDiagLoading(true);
+    try {
+      const url = `${SMARTLOMBARD_URL}?action=kassa_diag`;
+      const res = await fetch(url, { headers: { "X-Employee-Token": token } });
+      const data = await res.json();
+      setKassaDiagData(data);
+    } catch (e) {
+      setKassaDiagData({ error: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setKassaDiagLoading(false);
+    }
+  }, [token]);
 
   const runAccountCheck = useCallback(async () => {
     setAccountLoading(true);
@@ -185,6 +204,13 @@ export function SLDashboard({ token }: { token: string }) {
         loading={accountLoading}
         onRun={runAccountCheck}
         onClose={() => setAccountData(null)}
+      />
+
+      <SLKassaDiagPanel
+        data={kassaDiagData as never}
+        loading={kassaDiagLoading}
+        onRun={runKassaDiag}
+        onClose={() => setKassaDiagData(null)}
       />
 
       <SLStatsGrid error={error} stats={stats} loading={loading} />

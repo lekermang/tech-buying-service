@@ -755,6 +755,175 @@ def _kassa_login() -> tuple[requests.Session | None, str | None]:
         return None, f'kassa: login exception {e}'
 
 
+def _kassa_diag_login() -> dict:
+    """Расширенная диагностика логина в online.smartlombard.ru.
+    Возвращает шаги: переменные окружения, GET страницы логина, найденные поля
+    формы, action URL, POST-запрос, цепочку редиректов и фрагмент финальной HTML.
+    Пароль и логин в ответе НЕ показываются — только маски.
+    """
+    out: dict = {
+        'ok': False,
+        'login_page': KASSA_LOGIN_PAGE,
+        'steps': [],
+        'env': {},
+        'form': {},
+        'final': {},
+        'verdict': '',
+    }
+    login = os.environ.get('SMARTLOMBARD_LOGIN', '').strip()
+    password = os.environ.get('SMARTLOMBARD_PASSWORD', '').strip()
+    out['env'] = {
+        'SMARTLOMBARD_LOGIN_present': bool(login),
+        'SMARTLOMBARD_LOGIN_len': len(login),
+        'SMARTLOMBARD_LOGIN_mask': (login[:2] + '***' + login[-2:]) if len(login) > 4 else ('***' if login else ''),
+        'SMARTLOMBARD_PASSWORD_present': bool(password),
+        'SMARTLOMBARD_PASSWORD_len': len(password),
+    }
+    if not login or not password:
+        out['verdict'] = 'Не заданы SMARTLOMBARD_LOGIN или SMARTLOMBARD_PASSWORD'
+        return out
+    try:
+        from bs4 import BeautifulSoup
+    except Exception as e:
+        out['verdict'] = f'bs4 не установлен: {e}'
+        return out
+
+    s = requests.Session()
+    s.headers.update({
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'ru,en;q=0.9',
+    })
+
+    # ШАГ 1: GET страницы логина
+    try:
+        r = s.get(KASSA_LOGIN_PAGE, timeout=20, allow_redirects=True)
+        out['steps'].append({
+            'stage': 'GET login page',
+            'url': KASSA_LOGIN_PAGE,
+            'status': r.status_code,
+            'final_url': r.url,
+            'redirects': [{'from': h.url, 'status': h.status_code, 'to': h.headers.get('Location')} for h in r.history],
+            'set_cookies': list(requests.utils.dict_from_cookiejar(s.cookies).keys()),
+            'html_len': len(r.text),
+            'html_preview': r.text[:500],
+        })
+    except Exception as e:
+        out['steps'].append({'stage': 'GET login page', 'error': str(e)})
+        out['verdict'] = f'Не удалось открыть страницу логина: {e}'
+        return out
+
+    # ШАГ 2: разбор формы логина
+    try:
+        soup = BeautifulSoup(r.text, 'lxml')
+        form = soup.find('form')
+        form_action = form.get('action') if form else None
+        form_method = (form.get('method') if form else None) or 'POST'
+        fields: list[dict] = []
+        payload: dict = {}
+        if form:
+            for inp in form.find_all('input'):
+                name = inp.get('name')
+                if not name:
+                    continue
+                itype = (inp.get('type') or 'text').lower()
+                val = inp.get('value', '')
+                fields.append({
+                    'name': name,
+                    'type': itype,
+                    'has_value': bool(val),
+                    'value_preview': '' if itype == 'password' else (val[:30] if val else ''),
+                })
+                payload[name] = val
+        # подставка
+        for k in list(payload.keys()):
+            kl = k.lower()
+            if 'login' in kl or 'email' in kl or 'user' in kl:
+                payload[k] = login
+            elif 'pass' in kl:
+                payload[k] = password
+        if 'login' not in payload and 'email' not in payload:
+            payload['login'] = login
+        if 'password' not in payload:
+            payload['password'] = password
+
+        action_url = form_action or KASSA_LOGIN_POST
+        if action_url and not action_url.startswith('http'):
+            action_url = KASSA_BASE + (action_url if action_url.startswith('/') else '/' + action_url)
+
+        # маскированный payload (не светим пароль)
+        payload_safe = {}
+        for k, v in payload.items():
+            kl = k.lower()
+            if 'pass' in kl:
+                payload_safe[k] = f'***({len(str(v))} chars)'
+            elif 'login' in kl or 'email' in kl or 'user' in kl:
+                sv = str(v)
+                payload_safe[k] = (sv[:2] + '***' + sv[-2:]) if len(sv) > 4 else '***'
+            else:
+                payload_safe[k] = str(v)[:60]
+
+        out['form'] = {
+            'found': bool(form),
+            'action_attr': form_action,
+            'method': form_method,
+            'resolved_action_url': action_url,
+            'fields': fields,
+            'csrf_like_fields': [f['name'] for f in fields if any(t in f['name'].lower() for t in ('csrf', 'token', '_token'))],
+            'payload_to_send': payload_safe,
+        }
+    except Exception as e:
+        out['steps'].append({'stage': 'parse form', 'error': str(e)})
+        out['verdict'] = f'Не удалось разобрать форму логина: {e}'
+        return out
+
+    # ШАГ 3: POST логина
+    try:
+        r2 = s.post(action_url, data=payload, timeout=25, allow_redirects=True)
+        final_html = r2.text or ''
+        still_login = ('name="password"' in final_html.lower()) and ('/login' in r2.url)
+        out['steps'].append({
+            'stage': 'POST login',
+            'url': action_url,
+            'status': r2.status_code,
+            'final_url': r2.url,
+            'redirects': [{'from': h.url, 'status': h.status_code, 'to': h.headers.get('Location')} for h in r2.history],
+            'set_cookies': list(requests.utils.dict_from_cookiejar(s.cookies).keys()),
+            'html_len': len(final_html),
+            'html_preview': final_html[:800],
+            'still_on_login_page': still_login,
+        })
+
+        out['final'] = {
+            'final_url': r2.url,
+            'still_on_login_page': still_login,
+            'cookies_after': list(requests.utils.dict_from_cookiejar(s.cookies).keys()),
+        }
+
+        if still_login:
+            # ищем сообщение об ошибке на странице
+            try:
+                soup2 = BeautifulSoup(final_html, 'lxml')
+                err_blocks = []
+                for sel in ['.alert', '.error', '.invalid-feedback', '[class*="error"]', '[class*="alert"]']:
+                    for el in soup2.select(sel):
+                        txt = (el.get_text() or '').strip()
+                        if txt and len(txt) < 300:
+                            err_blocks.append(txt)
+                out['final']['page_error_messages'] = err_blocks[:5]
+            except Exception:
+                pass
+            out['verdict'] = 'Логин не пустил: после POST по-прежнему страница логина. См. page_error_messages и html_preview шага POST.'
+        else:
+            out['ok'] = True
+            out['verdict'] = f'Успешный вход. Финальный URL: {r2.url}'
+    except Exception as e:
+        out['steps'].append({'stage': 'POST login', 'error': str(e)})
+        out['verdict'] = f'Ошибка при POST логина: {e}'
+
+    return out
+
+
 def _kassa_get_session() -> tuple[requests.Session | None, str | None]:
     cached = _kassa_session_get()
     if cached and isinstance(cached, dict) and cached.get('cookies'):
@@ -1150,6 +1319,14 @@ def handler(event: dict, context) -> dict:
                     })
             results.append(account_block)
         return _ok({'ok': True, 'accounts': results, 'env_diag': env_diag})
+
+    # ---------- KASSA_DIAG: тест логина в кассу с подробной диагностикой ----------
+    if action == 'kassa_diag':
+        ok, _r = _check_token(event, allow_all_staff=False)
+        if not ok:
+            return _err(401, 'Unauthorized')
+        result = _kassa_diag_login()
+        return _ok(result)
 
     # ---------- KASSA_PERIOD: парсинг «Касса и банк → Операции по датам» ----------
     if action == 'kassa_period':
