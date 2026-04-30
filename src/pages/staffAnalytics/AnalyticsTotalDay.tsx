@@ -25,12 +25,20 @@ type Props = {
   goldCosts: number;
   goldProfit: number;
   masterIncome: number;
+  // Б/У комиссионка (kassa_period)
+  slRevenue: number;
+  slExpense: number;
+  slSalesTotal: number;
+  slSalesCount: number;
+  slBuyoutTotal: number;
+  slBuyoutCount: number;
 };
 
 export default function AnalyticsTotalDay({
   period, data, repairData, goldData,
   repairNetProfit, goldForecastProfit, goldForecastPriceNum, slPeriodProfit,
   totalRevenue, totalProfit, repairRevenue, repairCosts, goldRevenue, goldCosts, goldProfit, masterIncome,
+  slRevenue, slExpense, slSalesTotal, slSalesCount, slBuyoutTotal, slBuyoutCount,
 }: Props) {
   const repairPart = repairNetProfit;
   const goldPart = goldForecastProfit;
@@ -71,10 +79,13 @@ export default function AnalyticsTotalDay({
             <div className="bg-black/40 border border-[#1F1F1F] rounded-lg p-2.5">
               <div className="font-roboto text-white/40 text-[9px] uppercase tracking-wide mb-0.5 flex items-center gap-1">📦 Б/У</div>
               <div className={`font-oswald font-bold text-base tabular-nums ${slPart >= 0 ? "text-green-400" : "text-red-400"}`}>
-                {(period === "today" || period === "yesterday")
-                  ? `${slPart >= 0 ? "+" : ""}${slPart.toLocaleString("ru-RU")}`
-                  : <span className="text-white/30 text-xs font-normal">—</span>}
+                {slPart >= 0 ? "+" : ""}{slPart.toLocaleString("ru-RU")}
               </div>
+              {(slSalesCount > 0 || slBuyoutCount > 0) && (
+                <div className="font-roboto text-white/30 text-[9px] tabular-nums mt-0.5">
+                  {slSalesCount} продаж · {slBuyoutCount} скупок
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -86,7 +97,7 @@ export default function AnalyticsTotalDay({
         <div className="relative">
           <div className="font-roboto text-[#FFD700]/80 text-[10px] uppercase tracking-wider mb-2 flex items-center gap-1.5">
             <Icon name="TrendingUp" size={12} />
-            Общий доход · Ремонт + Золото
+            Общий доход · Ремонт + Золото + Б/У
           </div>
           <div className="flex items-end justify-between gap-2 mb-3">
             <div>
@@ -102,7 +113,7 @@ export default function AnalyticsTotalDay({
           </div>
 
           {/* Разбивка */}
-          <div className="grid grid-cols-2 gap-2 pt-3 border-t border-[#FFD700]/20">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-3 border-t border-[#FFD700]/20">
             {/* Ремонт */}
             <div className="bg-black/40 backdrop-blur border border-[#1F1F1F] rounded-lg p-2.5 hover:border-[#FFD700]/30 transition-colors">
               <div className="font-roboto text-white/50 text-[9px] uppercase tracking-wide mb-1 flex items-center gap-1">
@@ -132,16 +143,34 @@ export default function AnalyticsTotalDay({
                 {goldData && goldData.total_weight > 0 && <div className="text-white/40">вес: <span className="text-white/60 font-bold tabular-nums">{goldData.total_weight.toFixed(2)} г</span></div>}
               </div>
             </div>
+
+            {/* Б/У техника (комиссионка) */}
+            <div className="bg-black/40 backdrop-blur border border-[#1F1F1F] rounded-lg p-2.5 hover:border-purple-400/40 transition-colors">
+              <div className="font-roboto text-white/50 text-[9px] uppercase tracking-wide mb-1 flex items-center gap-1">
+                <span>📦</span> Б/У техника
+              </div>
+              <div className={`font-oswald font-bold text-lg tabular-nums ${slPart >= 0 ? "text-green-400" : "text-red-400"}`}>
+                {slPart.toLocaleString("ru-RU")} ₽
+              </div>
+              <div className="font-roboto text-[9px] leading-tight mt-1 space-y-0.5">
+                <div className="text-white/40">приход: <span className="text-[#FFD700]/80 font-bold tabular-nums">{slRevenue.toLocaleString("ru-RU")}</span></div>
+                <div className="text-white/40">расход: <span className="text-orange-400/80 font-bold tabular-nums">{slExpense.toLocaleString("ru-RU")}</span></div>
+                {slSalesTotal > 0 && (
+                  <div className="text-white/40">продажи: <span className="text-purple-300/80 font-bold tabular-nums">{slSalesTotal.toLocaleString("ru-RU")}</span></div>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Количество сделок */}
           <div className="flex gap-3 mt-2.5 pt-2.5 border-t border-[#FFD700]/15 text-[10px] font-roboto flex-wrap">
             <span className="text-white/40 flex items-center gap-1">
               <Icon name="CheckCircle2" size={10} />
-              Всего: <span className="text-white font-bold tabular-nums">{(data?.total_deals || 0) + (repairData?.done || 0) + (goldData?.done || 0)}</span>
+              Всего: <span className="text-white font-bold tabular-nums">{(data?.total_deals || 0) + (repairData?.done || 0) + (goldData?.done || 0) + slSalesCount + slBuyoutCount}</span>
             </span>
             <span className="text-white/40">🔧 <span className="text-green-400 font-bold tabular-nums">{repairData?.done || 0}</span></span>
             <span className="text-white/40">🥇 <span className="text-green-400 font-bold tabular-nums">{goldData?.done || 0}</span></span>
+            <span className="text-white/40">📦 <span className="text-purple-300 font-bold tabular-nums">{slSalesCount + slBuyoutCount}</span></span>
           </div>
         </div>
       </div>

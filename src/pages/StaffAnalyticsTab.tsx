@@ -57,25 +57,51 @@ export function AnalyticsTab({ token }: { token: string }) {
 
   useEffect(() => { load(); }, [load]);
 
-  // smartlombard: подгружаем при сегодня/вчера (force=true — мимо кэша)
+  // smartlombard (комиссионка): тянем через парсер «Касса и банк» для ЛЮБОГО периода.
+  // REST API ломбарда у нас возвращает 0 (пустой профиль), поэтому используем kassa_period.
   const loadSmartlombard = useCallback(async (force = false) => {
-    if (period !== "today" && period !== "yesterday") {
-      setSlData(null);
-      setSlError(null);
-      return;
-    }
     setSlLoading(true);
     setSlError(null);
     try {
       const now = new Date();
       const msk = new Date(now.getTime() + (now.getTimezoneOffset() + 180) * 60000);
-      if (period === "yesterday") msk.setDate(msk.getDate() - 1);
-      const date = msk.toISOString().slice(0, 10);
-      const url = `${SMARTLOMBARD_URL}?date=${date}${force ? "&nocache=1" : ""}`;
+      const dmy = (d: Date) =>
+        `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
+      let from = msk;
+      const to = new Date(msk);
+      if (period === "today") from = msk;
+      else if (period === "yesterday") {
+        from = new Date(msk); from.setDate(from.getDate() - 1);
+        to.setDate(to.getDate() - 1);
+      } else if (period === "week") {
+        from = new Date(msk); from.setDate(from.getDate() - 6);
+      } else if (period === "month") {
+        from = new Date(msk); from.setDate(from.getDate() - 29);
+      }
+      const url = `${SMARTLOMBARD_URL}?action=kassa_period&date_from=${dmy(from)}&date_to=${dmy(to)}${force ? "&nocache=1" : ""}`;
       const res = await fetch(url, { headers: { "X-Employee-Token": token } });
       const d = await res.json();
-      if (d && !d.error) setSlData(d);
-      else setSlError(d?.error || "Ошибка загрузки smartlombard");
+      if (d && !d.error) {
+        // Маппинг ответа kassa_period → SmartlombardStats
+        const incomeNum = Number(d.income_total) || 0;
+        const expenseNum = Number(d.expense_total) || 0;
+        setSlData({
+          date_from: d.date_from || dmy(from),
+          date_to: d.date_to || dmy(to),
+          income: incomeNum,
+          expense: expenseNum,
+          period_income: incomeNum,
+          period_costs: expenseNum,
+          period_profit: incomeNum - expenseNum,
+          sales_total: Number(d.sales_total) || 0,
+          sales_count: Number(d.sales_count) || 0,
+          buyout_total: Number(d.buyout_total) || 0,
+          buyout_count: Number(d.buyout_count) || 0,
+          cached: !!d.cached,
+        });
+      } else {
+        setSlError(d?.error || "Ошибка загрузки smartlombard");
+      }
     } catch (e) {
       setSlError("Не удалось получить данные smartlombard");
       console.error("[smartlombard]", e);
@@ -113,8 +139,12 @@ export function AnalyticsTab({ token }: { token: string }) {
   const goldForecastRevenue = Math.round(periodWeight585 * goldForecastPriceNum);
   const goldForecastProfit = goldForecastRevenue - periodBuySum;
 
-  const totalRevenue = (data?.total_revenue || 0) + repairRevenue + goldRevenue;
-  const totalProfit = repairNetProfit + goldProfit;
+  // Продажа б/у (комиссионка): берём приход кассы как оборот, прибыль = приход - расход.
+  const slRevenue = slData?.income || 0;
+  const slProfit = slData?.period_profit || 0;
+
+  const totalRevenue = (data?.total_revenue || 0) + repairRevenue + goldRevenue + slRevenue;
+  const totalProfit = repairNetProfit + goldProfit + slProfit;
 
   return (
     <div className="p-3">
@@ -173,6 +203,12 @@ export function AnalyticsTab({ token }: { token: string }) {
             goldCosts={goldCosts}
             goldProfit={goldProfit}
             masterIncome={masterIncome}
+            slRevenue={slRevenue}
+            slExpense={slData?.expense || 0}
+            slSalesTotal={slData?.sales_total || 0}
+            slSalesCount={slData?.sales_count || 0}
+            slBuyoutTotal={slData?.buyout_total || 0}
+            slBuyoutCount={slData?.buyout_count || 0}
           />
 
           <AnalyticsGoldForecast

@@ -9,6 +9,11 @@ export type SmartlombardStats = {
   period_income: number;
   period_costs: number;
   period_profit: number;
+  sales_total?: number;
+  sales_count?: number;
+  buyout_total?: number;
+  buyout_count?: number;
+  cached?: boolean;
 };
 
 type Props = {
@@ -48,7 +53,7 @@ export default function AnalyticsSmartlombard({ period, slData, slLoading, slErr
     }
   };
 
-  if (period !== "today" && period !== "yesterday") return null;
+  // показываем для всех периодов (today/yesterday/week/month)
 
   return (
     <div className="relative bg-gradient-to-br from-purple-500/10 via-pink-500/5 to-transparent border border-purple-400/25 rounded-xl p-4 mb-3 overflow-hidden">
@@ -99,8 +104,13 @@ export default function AnalyticsSmartlombard({ period, slData, slLoading, slErr
               </div>
             </div>
             <div className="font-roboto text-white/30 text-[9px] flex flex-wrap gap-x-3 gap-y-0.5">
-              <span>Доход за период: <span className="text-white/60 tabular-nums">{slData.period_income.toLocaleString("ru-RU")} ₽</span></span>
-              <span>Затраты: <span className="text-white/60 tabular-nums">{slData.period_costs.toLocaleString("ru-RU")} ₽</span></span>
+              {!!slData.sales_total && (
+                <span>Продажи товара: <span className="text-purple-200/80 tabular-nums">{slData.sales_total.toLocaleString("ru-RU")} ₽</span> <span className="text-white/30">({slData.sales_count ?? 0})</span></span>
+              )}
+              {!!slData.buyout_total && (
+                <span>Скупка: <span className="text-orange-200/80 tabular-nums">{slData.buyout_total.toLocaleString("ru-RU")} ₽</span> <span className="text-white/30">({slData.buyout_count ?? 0})</span></span>
+              )}
+              <span className="text-white/30">{slData.date_from === slData.date_to ? `за ${slData.date_from}` : `${slData.date_from} — ${slData.date_to}`}</span>
             </div>
           </>
         )}
