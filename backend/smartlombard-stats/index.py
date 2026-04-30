@@ -653,8 +653,9 @@ def _proxy_call(method: str, path: str, params: dict, body: dict | None, base: s
 # ============================================================================
 
 KASSA_BASE = 'https://online.smartlombard.ru'
-KASSA_LOGIN_PAGE = f'{KASSA_BASE}/login'
-KASSA_LOGIN_POST = f'{KASSA_BASE}/login'
+KASSA_SITE = 'komissionka'  # профиль (важно: без site=komissionka сервер возвращает {"fail":""})
+KASSA_LOGIN_PAGE = f'{KASSA_BASE}/login/?site={KASSA_SITE}'
+KASSA_LOGIN_POST = f'{KASSA_BASE}/auth/login'  # реальный эндпоинт (найден через kassa_diag)
 KASSA_PERIOD_URL = f'{KASSA_BASE}/cash/period'  # «Операции по датам»
 KASSA_SESSION_KEY = '__kassa_session__'
 KASSA_SESSION_TTL = 25 * 60  # 25 минут
@@ -695,6 +696,11 @@ def _kassa_session_set(cookies: dict) -> None:
 
 
 def _kassa_login() -> tuple[requests.Session | None, str | None]:
+    """Логин в SmartLombard (профиль komissionka).
+    Сценарий: GET /login/?site=komissionka (получаем session cookie)
+    → POST /auth/login с form-data (login, password) в той же сессии.
+    Сервер возвращает JSON: {"ok":true,...} при успехе или {"fail":"..."} при ошибке.
+    """
     login = os.environ.get('SMARTLOMBARD_LOGIN', '').strip()
     password = os.environ.get('SMARTLOMBARD_PASSWORD', '').strip()
     if not login or not password:
@@ -702,68 +708,70 @@ def _kassa_login() -> tuple[requests.Session | None, str | None]:
     s = requests.Session()
     s.headers.update({
         'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'ru,en;q=0.9',
     })
     try:
-        from bs4 import BeautifulSoup
-    except Exception as e:
-        return None, f'kassa: bs4 not installed ({e})'
-    try:
-        # 1) GET страницы логина — получаем CSRF и cookies
+        # 1) GET страницы логина (с site=komissionka) — получаем session cookie
+        s.headers['Accept'] = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
         r = s.get(KASSA_LOGIN_PAGE, timeout=20, allow_redirects=True)
         if r.status_code >= 500:
             return None, f'kassa: login page status {r.status_code}'
-        soup = BeautifulSoup(r.text, 'lxml')
-        # ищем форму логина и скрытые поля
-        form = soup.find('form')
-        payload = {}
-        if form:
-            for inp in form.find_all('input'):
-                name = inp.get('name')
-                if not name:
-                    continue
-                payload[name] = inp.get('value', '')
-        # подставляем логин/пароль (имена полей варьируются)
-        for k in list(payload.keys()):
-            kl = k.lower()
-            if 'login' in kl or 'email' in kl or 'user' in kl:
-                payload[k] = login
-            elif 'pass' in kl:
-                payload[k] = password
-        if 'login' not in payload and 'email' not in payload:
-            payload['login'] = login
-        if 'password' not in payload:
-            payload['password'] = password
 
-        # 2) POST логина
-        action = (form.get('action') if form else None) or KASSA_LOGIN_POST
-        if action and not action.startswith('http'):
-            action = KASSA_BASE + (action if action.startswith('/') else '/' + action)
-        r2 = s.post(action, data=payload, timeout=25, allow_redirects=True)
-        if r2.status_code >= 400:
-            return None, f'kassa: login post status {r2.status_code}'
-        # эвристика успеха: на странице после логина не должно быть формы логина
-        if 'name="password"' in r2.text.lower() and '/login' in r2.url:
-            return None, 'kassa: login failed (still on login page)'
-        # сохраняем cookies
+        # 2) POST логина на /auth/login (form-data, в той же сессии)
+        post_headers = {
+            'Accept': 'application/json, text/javascript, */*; q=0.01',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Origin': KASSA_BASE,
+            'Referer': KASSA_LOGIN_PAGE,
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        }
+        payload = {'login': login, 'password': password, 'site': KASSA_SITE}
+        r2 = s.post(KASSA_LOGIN_POST, data=payload, headers=post_headers, timeout=25, allow_redirects=False)
+        if r2.status_code >= 500:
+            return None, f'kassa: auth/login status {r2.status_code}'
+
+        # Разбираем JSON-ответ
+        try:
+            j = r2.json()
+        except Exception:
+            j = None
+        if isinstance(j, dict):
+            if 'fail' in j and j.get('fail') != '':
+                return None, f"kassa: login fail ({j.get('fail')})"
+            if 'fail' in j and j.get('fail') == '':
+                # пустой fail — обычно означает «неверный логин/пароль» (без подсказки)
+                return None, 'kassa: login fail (пустой fail — неверный логин/пароль или нужен сайт komissionka)'
+
+        # Успех: cookies должны включать session/auth
         cookies = requests.utils.dict_from_cookiejar(s.cookies)
-        if cookies:
-            _kassa_session_set(cookies)
+        if not cookies:
+            return None, 'kassa: после логина нет cookies'
+        # Проверяем что больше не редиректит на /login/
+        try:
+            check = s.get(f'{KASSA_BASE}/?site={KASSA_SITE}', timeout=15, allow_redirects=False)
+            if check.status_code in (301, 302):
+                loc = check.headers.get('Location') or ''
+                if '/login' in loc.lower():
+                    return None, f'kassa: после логина редирект на {loc} (учётка не пустила в komissionka)'
+        except Exception:
+            pass
+
+        _kassa_session_set(cookies)
         return s, None
     except Exception as e:
         return None, f'kassa: login exception {e}'
 
 
 def _kassa_diag_login() -> dict:
-    """Расширенная диагностика логина в online.smartlombard.ru.
-    Возвращает шаги: переменные окружения, GET страницы логина, найденные поля
-    формы, action URL, POST-запрос, цепочку редиректов и фрагмент финальной HTML.
-    Пароль и логин в ответе НЕ показываются — только маски.
+    """Диагностика логина в SmartLombard (komissionka).
+    Сценарий = тот же, что и боевой _kassa_login:
+    GET /login/?site=komissionka → POST /auth/login (form-data, с session cookies).
     """
     out: dict = {
         'ok': False,
         'login_page': KASSA_LOGIN_PAGE,
+        'login_post_url': KASSA_LOGIN_POST,
+        'site': KASSA_SITE,
         'steps': [],
         'env': {},
         'form': {},
@@ -782,11 +790,6 @@ def _kassa_diag_login() -> dict:
     if not login or not password:
         out['verdict'] = 'Не заданы SMARTLOMBARD_LOGIN или SMARTLOMBARD_PASSWORD'
         return out
-    try:
-        from bs4 import BeautifulSoup
-    except Exception as e:
-        out['verdict'] = f'bs4 не установлен: {e}'
-        return out
 
     s = requests.Session()
     s.headers.update({
@@ -795,202 +798,118 @@ def _kassa_diag_login() -> dict:
         'Accept-Language': 'ru,en;q=0.9',
     })
 
-    # ШАГ 1: GET страницы логина
+    # ШАГ 1: GET страницы логина (с site=komissionka) — получаем session cookie
     try:
         r = s.get(KASSA_LOGIN_PAGE, timeout=20, allow_redirects=True)
         out['steps'].append({
-            'stage': 'GET login page',
+            'stage': 'GET login page (site=komissionka)',
             'url': KASSA_LOGIN_PAGE,
             'status': r.status_code,
             'final_url': r.url,
             'redirects': [{'from': h.url, 'status': h.status_code, 'to': h.headers.get('Location')} for h in r.history],
             'set_cookies': list(requests.utils.dict_from_cookiejar(s.cookies).keys()),
             'html_len': len(r.text),
-            'html_preview': r.text[:500],
+            'html_preview': r.text[:400],
         })
     except Exception as e:
         out['steps'].append({'stage': 'GET login page', 'error': str(e)})
         out['verdict'] = f'Не удалось открыть страницу логина: {e}'
         return out
 
-    # ШАГ 2: разбор формы логина
+    # ШАГ 2: POST на /auth/login (form-data, в той же сессии)
+    payload = {'login': login, 'password': password, 'site': KASSA_SITE}
+    payload_safe = {
+        'login': (login[:2] + '***' + login[-2:]) if len(login) > 4 else '***',
+        'password': f'***({len(password)} chars)',
+        'site': KASSA_SITE,
+    }
+    out['form'] = {
+        'login_post_url': KASSA_LOGIN_POST,
+        'method': 'POST',
+        'content_type': 'application/x-www-form-urlencoded',
+        'payload_to_send': payload_safe,
+    }
+
     try:
-        soup = BeautifulSoup(r.text, 'lxml')
-        form = soup.find('form')
-        form_action = form.get('action') if form else None
-        form_method = (form.get('method') if form else None) or 'POST'
-        fields: list[dict] = []
-        payload: dict = {}
-        if form:
-            for inp in form.find_all('input'):
-                name = inp.get('name')
-                if not name:
-                    continue
-                itype = (inp.get('type') or 'text').lower()
-                val = inp.get('value', '')
-                fields.append({
-                    'name': name,
-                    'type': itype,
-                    'has_value': bool(val),
-                    'value_preview': '' if itype == 'password' else (val[:30] if val else ''),
-                })
-                payload[name] = val
-        # подставка
-        for k in list(payload.keys()):
-            kl = k.lower()
-            if 'login' in kl or 'email' in kl or 'user' in kl:
-                payload[k] = login
-            elif 'pass' in kl:
-                payload[k] = password
-        if 'login' not in payload and 'email' not in payload:
-            payload['login'] = login
-        if 'password' not in payload:
-            payload['password'] = password
-
-        action_url = form_action or KASSA_LOGIN_POST
-        if action_url and not action_url.startswith('http'):
-            action_url = KASSA_BASE + (action_url if action_url.startswith('/') else '/' + action_url)
-
-        # маскированный payload (не светим пароль)
-        payload_safe = {}
-        for k, v in payload.items():
-            kl = k.lower()
-            if 'pass' in kl:
-                payload_safe[k] = f'***({len(str(v))} chars)'
-            elif 'login' in kl or 'email' in kl or 'user' in kl:
-                sv = str(v)
-                payload_safe[k] = (sv[:2] + '***' + sv[-2:]) if len(sv) > 4 else '***'
-            else:
-                payload_safe[k] = str(v)[:60]
-
-        out['form'] = {
-            'found': bool(form),
-            'action_attr': form_action,
-            'method': form_method,
-            'resolved_action_url': action_url,
-            'fields': fields,
-            'csrf_like_fields': [f['name'] for f in fields if any(t in f['name'].lower() for t in ('csrf', 'token', '_token'))],
-            'payload_to_send': payload_safe,
+        post_headers = {
+            'Accept': 'application/json, text/javascript, */*; q=0.01',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Origin': KASSA_BASE,
+            'Referer': KASSA_LOGIN_PAGE,
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
         }
-    except Exception as e:
-        out['steps'].append({'stage': 'parse form', 'error': str(e)})
-        out['verdict'] = f'Не удалось разобрать форму логина: {e}'
-        return out
+        r2 = s.post(KASSA_LOGIN_POST, data=payload, headers=post_headers, timeout=25, allow_redirects=False)
+        body_text = r2.text or ''
+        try:
+            body_json = r2.json()
+        except Exception:
+            body_json = None
 
-    # ШАГ 3: POST логина
-    try:
-        r2 = s.post(action_url, data=payload, timeout=25, allow_redirects=True)
-        final_html = r2.text or ''
-        still_login = ('name="password"' in final_html.lower()) and ('/login' in r2.url)
         out['steps'].append({
-            'stage': 'POST login',
-            'url': action_url,
+            'stage': 'POST /auth/login (form-data, x-www-form-urlencoded)',
+            'url': KASSA_LOGIN_POST,
             'status': r2.status_code,
             'final_url': r2.url,
-            'redirects': [{'from': h.url, 'status': h.status_code, 'to': h.headers.get('Location')} for h in r2.history],
+            'response_content_type': r2.headers.get('Content-Type'),
+            'response_json': body_json,
+            'response_preview': body_text[:600],
             'set_cookies': list(requests.utils.dict_from_cookiejar(s.cookies).keys()),
-            'html_len': len(final_html),
-            'html_preview': final_html[:800],
-            'still_on_login_page': still_login,
         })
 
+        # анализ JSON-ответа
+        if isinstance(body_json, dict):
+            if 'fail' in body_json and body_json.get('fail') != '':
+                out['verdict'] = f"Сервер вернул fail: «{body_json.get('fail')}» — сообщение от smartlombard."
+            elif 'fail' in body_json and body_json.get('fail') == '':
+                out['verdict'] = (
+                    'Сервер ответил {"fail":""} — пустая ошибка. Обычно это «неверный логин/пароль» '
+                    'или «учётка не привязана к профилю komissionka». Проверь в браузере: '
+                    'https://online.smartlombard.ru/login/?site=komissionka — заходит ли с теми же кредами.'
+                )
+            elif body_json.get('ok') or body_json.get('success') or body_json.get('redirect'):
+                # Успех — проверим следующий запрос
+                pass
+
+        # ШАГ 3: проверка авторизации — пробуем зайти на главную с site=komissionka
+        try:
+            check = s.get(f'{KASSA_BASE}/?site={KASSA_SITE}', timeout=15, allow_redirects=False)
+            check_loc = check.headers.get('Location') or ''
+            redirects_to_login = bool(check_loc) and '/login' in check_loc.lower()
+            out['steps'].append({
+                'stage': 'GET /?site=komissionka (проверка)',
+                'url': f'{KASSA_BASE}/?site={KASSA_SITE}',
+                'status': check.status_code,
+                'redirect_to': check_loc,
+                'still_redirects_to_login': redirects_to_login,
+                'html_preview': check.text[:300] if check.text else '',
+            })
+            if not redirects_to_login and check.status_code in (200, 301, 302):
+                # 200 без редиректа = вошли
+                if check.status_code == 200 or (check.status_code in (301, 302) and check_loc and '/login' not in check_loc.lower()):
+                    out['ok'] = True
+                    out['verdict'] = '✓ Успешный вход в komissionka. Парсер кассы готов работать.'
+        except Exception as e:
+            out['steps'].append({'stage': 'GET / check', 'error': str(e)})
+
         out['final'] = {
-            'final_url': r2.url,
-            'still_on_login_page': still_login,
             'cookies_after': list(requests.utils.dict_from_cookiejar(s.cookies).keys()),
+            'login_response': body_json,
         }
 
-        if still_login:
-            # ищем сообщение об ошибке на странице
-            try:
-                soup2 = BeautifulSoup(final_html, 'lxml')
-                err_blocks = []
-                for sel in ['.alert', '.error', '.invalid-feedback', '[class*="error"]', '[class*="alert"]']:
-                    for el in soup2.select(sel):
-                        txt = (el.get_text() or '').strip()
-                        if txt and len(txt) < 300:
-                            err_blocks.append(txt)
-                out['final']['page_error_messages'] = err_blocks[:5]
-            except Exception:
-                pass
-            out['verdict'] = 'Логин не пустил: после POST по-прежнему страница логина. См. page_error_messages и html_preview шага POST.'
-        else:
-            out['ok'] = True
-            out['verdict'] = f'Успешный вход. Финальный URL: {r2.url}'
     except Exception as e:
-        out['steps'].append({'stage': 'POST login', 'error': str(e)})
-        out['verdict'] = f'Ошибка при POST логина: {e}'
+        out['steps'].append({'stage': 'POST /auth/login', 'error': str(e)})
+        out['verdict'] = f'Ошибка при POST: {e}'
 
-    # ШАГ 4: перебор API-эндпоинтов (SPA) — ищем рабочий JSON-логин
-    api_candidates = [
-        '/api/auth/login', '/api/login', '/api/auth/sign_in', '/api/sign_in',
-        '/api/v1/auth/login', '/api/v1/login', '/api/v1/auth/sign_in',
-        '/auth/login', '/auth/sign_in',
-        '/api/users/sign_in', '/api/account/login', '/api/session',
-    ]
-    body_variants = [
-        {'login': login, 'password': password},
-        {'email': login, 'password': password},
-        {'username': login, 'password': password},
-        {'user': {'login': login, 'password': password}},
-        {'user': {'email': login, 'password': password}},
-    ]
-    api_results: list[dict] = []
-    for path in api_candidates:
-        url = KASSA_BASE + path
-        for bi, payload in enumerate(body_variants):
-            s2 = requests.Session()
-            s2.headers.update({
-                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
-                'Accept': 'application/json, text/plain, */*',
-                'Accept-Language': 'ru,en;q=0.9',
-                'Content-Type': 'application/json',
-                'Origin': KASSA_BASE,
-                'Referer': KASSA_LOGIN_PAGE,
-                'X-Requested-With': 'XMLHttpRequest',
-            })
-            try:
-                rr = s2.post(url, json=payload, timeout=12, allow_redirects=False)
-                ct = (rr.headers.get('Content-Type') or '').lower()
-                txt = rr.text or ''
-                preview = txt[:400]
-                cookies_set = list(requests.utils.dict_from_cookiejar(s2.cookies).keys())
-                # признаки успеха: 200/201 + JSON + token/auth/jwt в ответе или cookies
-                has_json = 'json' in ct
-                has_token = any(k in txt.lower() for k in ('"token"', '"access_token"', '"jwt"', '"auth_token"'))
-                has_auth_cookie = any(any(t in c.lower() for t in ('token', 'auth', 'session', 'jwt')) for c in cookies_set)
-                looks_ok = rr.status_code in (200, 201) and (has_json or has_token or has_auth_cookie)
-                api_results.append({
-                    'path': path,
-                    'body_variant': list(payload.keys()) if not (len(payload) == 1 and 'user' in payload) else f'user.{list(payload["user"].keys())}',
-                    'status': rr.status_code,
-                    'content_type': ct,
-                    'cookies_set': cookies_set,
-                    'response_preview': preview,
-                    'looks_ok': looks_ok,
-                })
-                # не тратим время если уже нашли рабочий
-                if looks_ok:
-                    break
-            except Exception as e:
-                api_results.append({
-                    'path': path,
-                    'body_variant': list(payload.keys()),
-                    'error': str(e),
-                })
-    # сортируем: успешные сверху
-    api_results_sorted = sorted(api_results, key=lambda x: (0 if x.get('looks_ok') else (1 if x.get('status') and x['status'] != 404 else 2)))
-    successful = [r for r in api_results if r.get('looks_ok')]
-    out['steps'].append({
-        'stage': 'API endpoints scan',
-        'tried': len(api_results),
-        'successful_count': len(successful),
-        'best_match': successful[0] if successful else None,
-        'all_results': api_results_sorted[:20],
-    })
-    if successful:
-        best = successful[0]
-        out['verdict'] = (out['verdict'] or '') + f"  |  ✓ Найден рабочий API-эндпоинт: POST {best['path']} (status {best['status']}). Парсер можно переписать на этот URL."
+    # помощь по решению
+    if not out['ok']:
+        if not out['verdict']:
+            out['verdict'] = 'Логин не удался. См. шаги.'
+        out['hint'] = (
+            'Если в браузере вход проходит, а тут нет — проверь, что в секретах '
+            'SMARTLOMBARD_LOGIN = lekermang@gmail.com и SMARTLOMBARD_PASSWORD = Mark2015N (без пробелов). '
+            'Если совпадает — возможно, у учётки включён 2FA/капча после неудачных попыток — '
+            'войди в браузере и через 5-10 минут попробуй снова.'
+        )
 
     return out
 
