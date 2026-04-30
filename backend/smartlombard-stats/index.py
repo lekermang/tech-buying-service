@@ -348,6 +348,42 @@ def _get_token_for_key(account_id: str, secret_key: str, force: bool = False) ->
     return None, err
 
 
+def _api_get_with_retry(
+    base: str,
+    path: str,
+    account_id: str,
+    secret_key: str,
+    params: dict | None = None,
+    timeout: int = 15,
+):
+    """GET к SmartLombard API с авто-перевыпуском токена при 401.
+    Возвращает (response, token, retried).
+    """
+    tok, terr = _get_token_for_key(account_id, secret_key)
+    if not tok:
+        return None, None, False, terr or 'no token'
+    url = f'{base}{path}'
+    r = requests.get(
+        url,
+        params=params or {},
+        headers={'Authorization': f'Bearer {tok}'},
+        timeout=timeout,
+    )
+    if r.status_code != 401:
+        return r, tok, False, None
+    # 401 — кэш протух с точки зрения сервера. Принудительно перевыпускаем.
+    tok2, terr2 = _get_token_for_key(account_id, secret_key, force=True)
+    if not tok2:
+        return r, tok, True, terr2 or 'reissue failed'
+    r2 = requests.get(
+        url,
+        params=params or {},
+        headers={'Authorization': f'Bearer {tok2}'},
+        timeout=timeout,
+    )
+    return r2, tok2, True, None
+
+
 def _request_new_token_verbose() -> dict:
     """Возвращает аудит-инфу о текущем кэшированном токене (без сетевого запроса).
     Чтобы не упереться в rate-limit, реальный POST не делаем."""
@@ -436,6 +472,15 @@ def _fetch_all_pages_multi_account(url: str, params: dict) -> tuple[list, list[d
             audit.append({'stage': f'auth[{aid}]', 'error': terr or 'no token'})
             continue
         items, ferr, dbg = _fetch_all_pages(url, token, params)
+        # Если кэшированный токен «протух» (401) — перевыпускаем и пробуем ещё раз.
+        retried = False
+        if ferr and ('401' in ferr or 'едопустимый токен' in ferr or 'время работы истекло' in ferr):
+            token2, terr2 = _get_token_for_key(aid, sk, force=True)
+            if token2:
+                items, ferr, dbg = _fetch_all_pages(url, token2, params)
+                retried = True
+            else:
+                ferr = f'{ferr} | reissue failed: {terr2}'
         # Дедупликация: операция могла вернуться у нескольких сотрудников
         added = 0
         for op in items:
@@ -445,9 +490,9 @@ def _fetch_all_pages_multi_account(url: str, params: dict) -> tuple[list, list[d
                     seen_ids.add(op_id)
                 all_items.append(op)
                 added += 1
-        per_account.append({'account_id': aid, 'count': len(items), 'added': added, 'error': ferr})
+        per_account.append({'account_id': aid, 'count': len(items), 'added': added, 'error': ferr, 'token_retried': retried})
         if dbg:
-            audit.append({'stage': f'operations[{aid}]', **dbg})
+            audit.append({'stage': f'operations[{aid}]', 'token_retried': retried, **dbg})
     return all_items, per_account, audit
 
 
@@ -1271,12 +1316,18 @@ def handler(event: dict, context) -> dict:
                 base_for_path = GOODS_API_BASE if base_override == 'goods' else API_BASE
                 url_path = f'{base_for_path}{path}'
                 try:
-                    r = requests.get(
-                        url_path,
+                    r, used_tok, retried, ferr = _api_get_with_retry(
+                        base_for_path, path, aid, sk,
                         params={'limit': 5, 'offset': 0},
-                        headers={'Authorization': f'Bearer {tok}'},
                         timeout=15,
                     )
+                    if r is None:
+                        account_block['paths'].append({
+                            'path': path, 'label': label,
+                            'error': ferr or 'request failed',
+                            'token_retried': retried,
+                        })
+                        continue
                     try:
                         data = r.json()
                     except Exception:
@@ -1316,6 +1367,7 @@ def handler(event: dict, context) -> dict:
                         'count': len(items) if isinstance(items, list) else 0,
                         'sample': items[:2] if isinstance(items, list) else [],
                         'message': msg,
+                        'token_retried': retried,
                         'raw_preview': (str(data)[:200]) if (not items and r.status_code != 200) else None,
                     })
                 except Exception as e:
