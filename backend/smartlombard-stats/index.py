@@ -1224,23 +1224,23 @@ def handler(event: dict, context) -> dict:
         if not ok:
             return _err(401, 'Unauthorized')
 
+        # SmartLombard: для комиссионки доступны методы с goods.api.smartlombard.ru
+        # (товары, договоры). Имущества/билеты/клиенты — только для ломбарда.
+        # Формат: (path, response_key, label, base_override)
+        # base_override=None → API_BASE (online.smartlombard.ru)
+        # base_override='goods' → GOODS_API_BASE (goods.api.smartlombard.ru)
         check_paths = [
-            # Ломбардные справочники
-            ('/branches', 'branches', 'Филиалы'),
-            ('/employees', 'employees', 'Сотрудники'),
-            ('/pawn_tickets', 'pawn_tickets', 'Билеты (залог)'),
-            ('/clients', 'clients', 'Клиенты'),
-            ('/categories', 'categories', 'Категории'),
-            # Зонд комиссионки (online.smartlombard.ru обслуживает оба профиля)
-            ('/operations', 'operations', 'Операции (без фильтра)'),
-            ('/sales', 'sales', 'Продажи товара'),
-            ('/buyouts', 'buyouts', 'Скупка'),
-            ('/realization', 'realization', 'Реализация'),
-            ('/goods', 'goods', 'Товары (комиссионка)'),
-            ('/products', 'products', 'Продукты'),
-            ('/shifts', 'shifts', 'Смены'),
-            ('/cash_operations', 'cash_operations', 'Кассовые операции'),
-            ('/profile', 'profile', 'Профиль'),
+            # Универсальные справочники (есть у всех профилей)
+            ('/categories', 'categories', 'Категории', None),
+            ('/operations', 'operations', 'Операции (без фильтра)', None),
+            # КОМИССИОНКА — goods.api.smartlombard.ru (по доке /methods_preview_goods)
+            ('/goods', 'goods', 'Товары (комиссионка)', 'goods'),
+            ('/contracts', 'contracts', 'Договоры клиентов (комиссионка)', 'goods'),
+            # Ломбардные методы — для комиссионки обычно 404, оставляем как индикатор профиля
+            ('/branches', 'branches', 'Филиалы (ломбард)', None),
+            ('/employees', 'employees', 'Сотрудники (ломбард)', None),
+            ('/pawn_tickets', 'pawn_tickets', 'Билеты залог (ломбард)', None),
+            ('/clients', 'clients', 'Клиенты (ломбард)', None),
         ]
         keys = _get_api_keys_list()
 
@@ -1267,8 +1267,9 @@ def handler(event: dict, context) -> dict:
                 account_block['auth_error'] = terr or 'no token'
                 results.append(account_block)
                 continue
-            for path, key, label in check_paths:
-                url_path = f'{API_BASE}{path}'
+            for path, key, label, base_override in check_paths:
+                base_for_path = GOODS_API_BASE if base_override == 'goods' else API_BASE
+                url_path = f'{base_for_path}{path}'
                 try:
                     r = requests.get(
                         url_path,
