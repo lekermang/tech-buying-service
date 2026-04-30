@@ -10,6 +10,56 @@ export type SLCategory = {
   color: string;
   sort_order: number;
   is_active: boolean;
+  parent_id?: number | null;
+  depth?: number;
+  path?: string | null;
+};
+
+export type SLDiscountRule = {
+  id: number;
+  name: string;
+  category_id?: number | null;
+  category_name?: string | null;
+  apply_to_all: boolean;
+  period_days: number;
+  percent: number | string;
+  use_market_price: boolean;
+  use_duplicates_dependency: boolean;
+  rounding: string;
+  is_active: boolean;
+  max_discount_percent?: number | string | null;
+  min_price?: number | string | null;
+};
+
+export type SLRevision = {
+  id: number;
+  name: string;
+  status: string;
+  category_id?: number | null;
+  scope_status?: string | null;
+  started_by?: string | null;
+  started_at: string;
+  finished_at?: string | null;
+  total_expected: number;
+  total_found: number;
+  total_missing: number;
+  total_extra: number;
+  note?: string | null;
+};
+
+export type SLRevisionItem = {
+  id: number;
+  revision_id: number;
+  item_id?: number | null;
+  scanned_code?: string | null;
+  state: "pending" | "found" | "missing" | "extra";
+  scanned_at?: string | null;
+  scanned_by?: string | null;
+  title?: string | null;
+  imei?: string | null;
+  sku?: string | null;
+  sell_price?: number | string;
+  note?: string | null;
 };
 
 export type SLClient = {

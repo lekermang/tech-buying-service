@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 import { slApi, fmt, type SLItem, type SLCategory, STATUS_LABEL, PAYMENT_METHODS } from "./types";
+import CategoryTreeSelect from "./CategoryTreeSelect";
 
 const STATUS_FILTERS = [
   { v: "", l: "Все" },
@@ -55,13 +56,13 @@ export default function SLItemsList({ token }: { token: string }) {
         ))}
       </div>
 
-      {/* Категории */}
+      {/* Категории — корневые быстрым доступом + дерево */}
       <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-2 mb-2">
         <button onClick={() => setCatFilter("")}
           className={`shrink-0 text-[10px] px-2 py-1 rounded-full ${
             catFilter === "" ? "bg-white/15 text-white" : "bg-[#141414] text-white/40"
           }`}>Все категории</button>
-        {cats.map(c => (
+        {cats.filter(c => !c.parent_id).map(c => (
           <button key={c.id} onClick={() => setCatFilter(c.id)}
             className={`shrink-0 inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded-full ${
               catFilter === c.id ? "bg-white/15 text-white" : "bg-[#141414] text-white/40"
@@ -69,6 +70,9 @@ export default function SLItemsList({ token }: { token: string }) {
             <Icon name={c.icon} size={10} />{c.name}
           </button>
         ))}
+      </div>
+      <div className="mb-2">
+        <CategoryTreeSelect categories={cats} value={catFilter} onChange={(id) => setCatFilter(id)} placeholder="Выбрать подкатегорию из дерева..." emptyLabel="Все категории" />
       </div>
 
       {loading && <div className="text-white/30 text-sm py-4 text-center"><Icon name="Loader" size={14} className="animate-spin inline mr-1" />Загрузка...</div>}

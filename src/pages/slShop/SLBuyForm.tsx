@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import Icon from "@/components/ui/icon";
 import { slApi, type SLCategory, type SLClient, CONDITION_OPTIONS } from "./types";
+import CategoryTreeSelect from "./CategoryTreeSelect";
 
 export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: () => void }) {
   const [cats, setCats] = useState<SLCategory[]>([]);
@@ -131,11 +132,7 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
 
       <Section title="Товар">
         <Field label="Категория">
-          <select value={categoryId} onChange={e => setCategoryId(e.target.value ? Number(e.target.value) : "")}
-            className="w-full bg-[#0A0A0A] border border-[#1F1F1F] rounded-lg px-3 py-2 text-sm">
-            <option value="">— выбрать —</option>
-            {cats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          <CategoryTreeSelect categories={cats} value={categoryId} onChange={(id) => setCategoryId(id)} />
         </Field>
 
         <Field label={<>Наименование {autofilled && <span className="text-emerald-400 text-[10px] ml-1">автозаполнено</span>}</>}>

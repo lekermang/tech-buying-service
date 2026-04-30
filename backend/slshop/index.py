@@ -73,7 +73,11 @@ def _norm_key(s: str) -> str:
 def list_categories():
     conn = get_conn()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    cur.execute(f"SELECT * FROM {SCHEMA}.slshop_categories WHERE is_active=true ORDER BY sort_order, name")
+    cur.execute(
+        f"SELECT id, name, slug, icon, color, sort_order, is_active, parent_id, depth, path "
+        f"FROM {SCHEMA}.slshop_categories WHERE is_active=true "
+        f"ORDER BY COALESCE(parent_id, id), depth, sort_order, name"
+    )
     rows = cur.fetchall()
     cur.close(); conn.close()
     return [dict(r) for r in rows]
@@ -84,17 +88,270 @@ def create_category(body):
     slug = (body.get('slug') or '').strip() or _norm_key(name).replace(' ', '_')
     icon = body.get('icon') or 'Package'
     sort_order = int(body.get('sort_order') or 100)
+    parent_id = body.get('parent_id')
     if not name:
         return _err(400, 'Имя обязательно')
+    depth = 0
+    path = name
+    if parent_id:
+        conn = get_conn(); cur = conn.cursor()
+        cur.execute(f"SELECT name, depth FROM {SCHEMA}.slshop_categories WHERE id={int(parent_id)}")
+        row = cur.fetchone()
+        if row:
+            depth = (row[1] or 0) + 1
+            path = (row[0] or '') + ' / ' + name
+        cur.close(); conn.close()
     conn = get_conn(); cur = conn.cursor()
     sql = (
-        f"INSERT INTO {SCHEMA}.slshop_categories (name, slug, icon, sort_order) "
-        f"VALUES ({_esc(name)}, {_esc(slug)}, {_esc(icon)}, {sort_order}) RETURNING id"
+        f"INSERT INTO {SCHEMA}.slshop_categories (name, slug, icon, sort_order, parent_id, depth, path) "
+        f"VALUES ({_esc(name)}, {_esc(slug)}, {_esc(icon)}, {sort_order}, {_esc(parent_id)}, {depth}, {_esc(path)}) RETURNING id"
     )
     cur.execute(sql)
     nid = cur.fetchone()[0]
     conn.commit(); cur.close(); conn.close()
     return _ok({'id': nid})
+
+
+# ============ Discount rules ============
+def list_discount_rules():
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        f"SELECT r.*, c.name AS category_name FROM {SCHEMA}.slshop_discount_rules r "
+        f"LEFT JOIN {SCHEMA}.slshop_categories c ON c.id=r.category_id ORDER BY r.id DESC"
+    )
+    rows = cur.fetchall()
+    cur.close(); conn.close()
+    return [dict(r) for r in rows]
+
+
+def save_discount_rule(body):
+    rid = body.get('id')
+    fields = {
+        'name': (body.get('name') or 'Уценка').strip(),
+        'category_id': body.get('category_id') or None,
+        'apply_to_all': bool(body.get('apply_to_all', False)),
+        'period_days': int(body.get('period_days') or 30),
+        'percent': float(body.get('percent') or 5),
+        'use_market_price': bool(body.get('use_market_price', False)),
+        'use_duplicates_dependency': bool(body.get('use_duplicates_dependency', False)),
+        'rounding': body.get('rounding') or 'one_decimal',
+        'is_active': bool(body.get('is_active', True)),
+        'max_discount_percent': body.get('max_discount_percent'),
+        'min_price': body.get('min_price'),
+    }
+    conn = get_conn(); cur = conn.cursor()
+    if rid:
+        sets = ', '.join([f"{k}={_esc(v)}" for k, v in fields.items()])
+        cur.execute(f"UPDATE {SCHEMA}.slshop_discount_rules SET {sets}, updated_at=NOW() WHERE id={int(rid)} RETURNING id")
+        row = cur.fetchone()
+        nid = row[0] if row else rid
+    else:
+        cols = ', '.join(fields.keys())
+        vals = ', '.join([_esc(v) for v in fields.values()])
+        cur.execute(f"INSERT INTO {SCHEMA}.slshop_discount_rules ({cols}) VALUES ({vals}) RETURNING id")
+        nid = cur.fetchone()[0]
+    conn.commit(); cur.close(); conn.close()
+    return _ok({'id': nid})
+
+
+def discount_rule_toggle(body):
+    rid = body.get('id')
+    if not rid:
+        return _err(400, 'id обязателен')
+    conn = get_conn(); cur = conn.cursor()
+    cur.execute(f"UPDATE {SCHEMA}.slshop_discount_rules SET is_active = NOT is_active WHERE id={int(rid)} RETURNING is_active")
+    row = cur.fetchone()
+    conn.commit(); cur.close(); conn.close()
+    return _ok({'is_active': row[0] if row else None})
+
+
+def _round_price(p, mode):
+    if p is None:
+        return p
+    p = float(p)
+    if mode == 'integer':
+        return round(p)
+    if mode == 'tens':
+        return round(p / 10) * 10
+    if mode == 'fifty':
+        return round(p / 50) * 50
+    if mode == 'hundred':
+        return round(p / 100) * 100
+    return round(p, 1)
+
+
+def discount_rule_apply(body):
+    """Применяет правило уценки ко всем подходящим товарам один раз. Возвращает список изменений."""
+    rid = body.get('id')
+    if not rid:
+        return _err(400, 'id обязателен')
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(f"SELECT * FROM {SCHEMA}.slshop_discount_rules WHERE id={int(rid)}")
+    rule = cur.fetchone()
+    if not rule:
+        cur.close(); conn.close(); return _err(404, 'Правило не найдено')
+    rule = dict(rule)
+    period = int(rule['period_days'])
+    pct = float(rule['percent'])
+    where = ["status IN ('stock','showcase','consignment')", "sell_price > 0"]
+    if not rule['apply_to_all'] and rule['category_id']:
+        where.append(f"category_id={int(rule['category_id'])}")
+    where.append(
+        f"(last_discount_at IS NULL AND buy_at IS NOT NULL AND buy_at < NOW() - INTERVAL '{period} days' "
+        f"OR last_discount_at IS NOT NULL AND last_discount_at < NOW() - INTERVAL '{period} days')"
+    )
+    if rule.get('min_price'):
+        where.append(f"sell_price > {float(rule['min_price'])}")
+    sql = f"SELECT id, sell_price, original_sell_price, discount_count FROM {SCHEMA}.slshop_items WHERE " + ' AND '.join(where) + ' LIMIT 500'
+    cur.execute(sql)
+    rows = cur.fetchall()
+    applied = 0
+    log = []
+    for r in rows:
+        old = float(r['sell_price'])
+        new_price = old * (1 - pct / 100.0)
+        new_price = _round_price(new_price, rule.get('rounding'))
+        if rule.get('min_price') and new_price < float(rule['min_price']):
+            new_price = float(rule['min_price'])
+        # max_discount_percent — общая просадка от исходной цены
+        orig = r['original_sell_price'] or old
+        if rule.get('max_discount_percent'):
+            min_allowed = float(orig) * (1 - float(rule['max_discount_percent']) / 100.0)
+            if new_price < min_allowed:
+                new_price = _round_price(min_allowed, rule.get('rounding'))
+        if abs(new_price - old) < 0.01:
+            continue
+        cur.execute(
+            f"UPDATE {SCHEMA}.slshop_items SET sell_price={new_price}, "
+            f"original_sell_price=COALESCE(original_sell_price, {old}), "
+            f"last_discount_at=NOW(), discount_count=COALESCE(discount_count,0)+1 WHERE id={int(r['id'])}"
+        )
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.slshop_discount_log (item_id, rule_id, price_before, price_after) "
+            f"VALUES ({int(r['id'])}, {int(rid)}, {old}, {new_price})"
+        )
+        log.append({'item_id': r['id'], 'old': old, 'new': new_price})
+        applied += 1
+    conn.commit(); cur.close(); conn.close()
+    return _ok({'applied': applied, 'log': log})
+
+
+# ============ Revisions ============
+def list_revisions():
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(f"SELECT * FROM {SCHEMA}.slshop_revisions ORDER BY id DESC LIMIT 50")
+    rows = cur.fetchall()
+    cur.close(); conn.close()
+    return [dict(r) for r in rows]
+
+
+def revision_create(body, employee):
+    name = (body.get('name') or f'Ревизия {datetime.now().strftime("%d.%m.%Y %H:%M")}').strip()
+    category_id = body.get('category_id')
+    scope_status = body.get('scope_status') or 'stock'
+    where = [f"status={_esc(scope_status)}"]
+    if category_id:
+        where.append(f"category_id={int(category_id)}")
+    wsql = ' AND '.join(where)
+    conn = get_conn(); cur = conn.cursor()
+    cur.execute(
+        f"INSERT INTO {SCHEMA}.slshop_revisions (name, category_id, scope_status, started_by) "
+        f"VALUES ({_esc(name)}, {_esc(category_id)}, {_esc(scope_status)}, {_esc(employee.get('full_name'))}) RETURNING id"
+    )
+    rev_id = cur.fetchone()[0]
+    cur.execute(f"SELECT id FROM {SCHEMA}.slshop_items WHERE {wsql}")
+    item_ids = [r[0] for r in cur.fetchall()]
+    for iid in item_ids:
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.slshop_revision_items (revision_id, item_id, state) "
+            f"VALUES ({rev_id}, {iid}, 'pending')"
+        )
+    cur.execute(f"UPDATE {SCHEMA}.slshop_revisions SET total_expected={len(item_ids)} WHERE id={rev_id}")
+    conn.commit(); cur.close(); conn.close()
+    return _ok({'id': rev_id, 'total': len(item_ids)})
+
+
+def revision_get(params):
+    rid = params.get('id')
+    if not rid:
+        return _err(400, 'id обязателен')
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(f"SELECT * FROM {SCHEMA}.slshop_revisions WHERE id={int(rid)}")
+    rev = cur.fetchone()
+    if not rev:
+        cur.close(); conn.close(); return _err(404, 'Ревизия не найдена')
+    cur.execute(
+        f"SELECT ri.*, i.title, i.imei, i.sku, i.sell_price FROM {SCHEMA}.slshop_revision_items ri "
+        f"LEFT JOIN {SCHEMA}.slshop_items i ON i.id=ri.item_id "
+        f"WHERE ri.revision_id={int(rid)} ORDER BY ri.state, i.title"
+    )
+    items = [dict(r) for r in cur.fetchall()]
+    cur.close(); conn.close()
+    return _ok({'revision': dict(rev), 'items': items})
+
+
+def revision_scan(body, employee):
+    rev_id = body.get('revision_id')
+    code = (body.get('code') or '').strip()
+    if not rev_id or not code:
+        return _err(400, 'revision_id и code обязательны')
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    # ищем товар по sku или imei
+    cur.execute(
+        f"SELECT id, title FROM {SCHEMA}.slshop_items WHERE sku={_esc(code)} OR imei={_esc(code)} OR external_id={_esc(code)} LIMIT 1"
+    )
+    item = cur.fetchone()
+    if not item:
+        # помечаем как extra
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.slshop_revision_items (revision_id, scanned_code, state, scanned_at, scanned_by) "
+            f"VALUES ({int(rev_id)}, {_esc(code)}, 'extra', NOW(), {_esc(employee.get('full_name'))})"
+        )
+        conn.commit(); cur.close(); conn.close()
+        return _ok({'state': 'extra', 'message': 'Товар не найден в базе — отмечен как лишний'})
+    iid = item['id']
+    cur.execute(
+        f"SELECT id, state FROM {SCHEMA}.slshop_revision_items WHERE revision_id={int(rev_id)} AND item_id={iid} LIMIT 1"
+    )
+    ri = cur.fetchone()
+    if ri:
+        cur.execute(
+            f"UPDATE {SCHEMA}.slshop_revision_items SET state='found', scanned_at=NOW(), scanned_by={_esc(employee.get('full_name'))}, scanned_code={_esc(code)} WHERE id={ri['id']}"
+        )
+        state = 'found'
+    else:
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.slshop_revision_items (revision_id, item_id, scanned_code, state, scanned_at, scanned_by) "
+            f"VALUES ({int(rev_id)}, {iid}, {_esc(code)}, 'extra', NOW(), {_esc(employee.get('full_name'))})"
+        )
+        state = 'extra'
+    conn.commit(); cur.close(); conn.close()
+    return _ok({'state': state, 'item_id': iid, 'title': item['title']})
+
+
+def revision_finish(body):
+    rev_id = body.get('id')
+    if not rev_id:
+        return _err(400, 'id обязателен')
+    conn = get_conn(); cur = conn.cursor()
+    cur.execute(
+        f"UPDATE {SCHEMA}.slshop_revision_items SET state='missing' "
+        f"WHERE revision_id={int(rev_id)} AND state='pending'"
+    )
+    cur.execute(
+        f"UPDATE {SCHEMA}.slshop_revisions SET "
+        f"total_found=(SELECT COUNT(*) FROM {SCHEMA}.slshop_revision_items WHERE revision_id={int(rev_id)} AND state='found'), "
+        f"total_missing=(SELECT COUNT(*) FROM {SCHEMA}.slshop_revision_items WHERE revision_id={int(rev_id)} AND state='missing'), "
+        f"total_extra=(SELECT COUNT(*) FROM {SCHEMA}.slshop_revision_items WHERE revision_id={int(rev_id)} AND state='extra'), "
+        f"status='closed', finished_at=NOW() WHERE id={int(rev_id)}"
+    )
+    conn.commit(); cur.close(); conn.close()
+    return _ok({'ok': True})
 
 
 # ============ Clients ============
@@ -685,6 +942,26 @@ def handler(event: dict, context) -> dict:
             return export_items(params)
         if action == 'import' and method == 'POST':
             return import_items(body, employee)
+        # уценка
+        if action == 'discount_rules':
+            return _ok(list_discount_rules())
+        if action == 'discount_rule_save' and method == 'POST':
+            return save_discount_rule(body)
+        if action == 'discount_rule_toggle' and method == 'POST':
+            return discount_rule_toggle(body)
+        if action == 'discount_rule_apply' and method == 'POST':
+            return discount_rule_apply(body)
+        # ревизия
+        if action == 'revisions':
+            return _ok(list_revisions())
+        if action == 'revision_create' and method == 'POST':
+            return revision_create(body, employee)
+        if action == 'revision_get':
+            return revision_get(params)
+        if action == 'revision_scan' and method == 'POST':
+            return revision_scan(body, employee)
+        if action == 'revision_finish' and method == 'POST':
+            return revision_finish(body)
         return _err(400, f'Неизвестный action: {action}')
     except Exception as e:
         return _err(500, f'Ошибка: {e}')

@@ -8,6 +8,8 @@ import SLClientsList from "./SLClientsList";
 import SLLabels from "./SLLabels";
 import SLImportExport from "./SLImportExport";
 import SLCategories from "./SLCategories";
+import SLDiscount from "./SLDiscount";
+import SLRevision from "./SLRevision";
 
 type SubTab =
   | "dashboard"
@@ -16,6 +18,8 @@ type SubTab =
   | "operations"
   | "clients"
   | "labels"
+  | "discount"
+  | "revision"
   | "import"
   | "categories";
 
@@ -26,6 +30,8 @@ const TABS: { k: SubTab; l: string; icon: string }[] = [
   { k: "operations", l: "Операции", icon: "Activity" },
   { k: "clients", l: "Клиенты", icon: "Users" },
   { k: "labels", l: "Ценники", icon: "Tag" },
+  { k: "discount", l: "Уценка", icon: "TrendingDown" },
+  { k: "revision", l: "Ревизия", icon: "ClipboardCheck" },
   { k: "import", l: "Импорт/Экспорт", icon: "ArrowUpDown" },
   { k: "categories", l: "Категории", icon: "Grid3x3" },
 ];
@@ -74,6 +80,8 @@ export default function SLShopTab({ token, myRole }: { token: string; myRole?: s
       {tab === "operations" && <SLOperations token={token} />}
       {tab === "clients"    && <SLClientsList token={token} />}
       {tab === "labels"     && <SLLabels token={token} />}
+      {tab === "discount"   && <SLDiscount token={token} />}
+      {tab === "revision"   && <SLRevision token={token} />}
       {tab === "import"     && <SLImportExport token={token} />}
       {tab === "categories" && <SLCategories token={token} />}
     </div>
