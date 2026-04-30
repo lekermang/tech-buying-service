@@ -1,5 +1,16 @@
 import Icon from "@/components/ui/icon";
 
+type ApiResult = {
+  path?: string;
+  body_variant?: unknown;
+  status?: number;
+  content_type?: string;
+  cookies_set?: string[];
+  response_preview?: string;
+  looks_ok?: boolean;
+  error?: string;
+};
+
 type Step = {
   stage?: string;
   url?: string;
@@ -11,6 +22,10 @@ type Step = {
   html_preview?: string;
   still_on_login_page?: boolean;
   error?: string;
+  tried?: number;
+  successful_count?: number;
+  best_match?: ApiResult | null;
+  all_results?: ApiResult[];
 };
 
 type FormInfo = {
@@ -198,6 +213,53 @@ export function SLKassaDiagPanel({ data, loading, onRun, onClose }: Props) {
                   <summary className="text-white/50 cursor-pointer uppercase text-[9px]">HTML preview ({s.html_len} симв.)</summary>
                   <pre className="font-mono text-[9px] text-white/60 mt-1 whitespace-pre-wrap break-all max-h-[200px] overflow-auto">{s.html_preview}</pre>
                 </details>
+              )}
+              {/* Шаг "API endpoints scan" */}
+              {s.tried !== undefined && (
+                <div className="space-y-1.5">
+                  <div className="font-mono text-[10px]">
+                    <span className="text-white/40">Проверено эндпоинтов: </span>
+                    <span className="text-white">{s.tried}</span>
+                    <span className="text-white/40"> · успешных: </span>
+                    <span className={s.successful_count ? "text-green-300 font-bold" : "text-red-300"}>{s.successful_count || 0}</span>
+                  </div>
+                  {s.best_match && (
+                    <div className="bg-green-500/10 border border-green-500/30 rounded-md p-2 space-y-1">
+                      <div className="text-green-300 uppercase text-[9px] font-bold">✓ Рабочий API логина найден!</div>
+                      <div className="font-mono text-[10px] text-white space-y-0.5">
+                        <div><span className="text-white/40">POST </span>{s.best_match.path}</div>
+                        <div><span className="text-white/40">status: </span>{s.best_match.status}</div>
+                        <div><span className="text-white/40">body: </span>{JSON.stringify(s.best_match.body_variant)}</div>
+                        {s.best_match.cookies_set && s.best_match.cookies_set.length > 0 && (
+                          <div><span className="text-white/40">cookies: </span>{s.best_match.cookies_set.join(", ")}</div>
+                        )}
+                      </div>
+                      {s.best_match.response_preview && (
+                        <pre className="font-mono text-[9px] text-white/70 whitespace-pre-wrap break-all max-h-[120px] overflow-auto">{s.best_match.response_preview}</pre>
+                      )}
+                    </div>
+                  )}
+                  {s.all_results && s.all_results.length > 0 && (
+                    <details>
+                      <summary className="text-white/50 cursor-pointer uppercase text-[9px]">Все попытки ({s.all_results.length})</summary>
+                      <div className="mt-1 space-y-1">
+                        {s.all_results.map((r, ri) => {
+                          const ok = r.looks_ok;
+                          const status = r.status;
+                          const color = ok ? "text-green-300" : status === 404 ? "text-white/40" : status && status >= 400 ? "text-red-300" : status && status >= 300 ? "text-yellow-300" : "text-white/60";
+                          return (
+                            <div key={ri} className="font-mono text-[9px] flex items-center gap-2 border border-[#1F1F1F] rounded px-1.5 py-1">
+                              <span className={`w-[40px] shrink-0 ${color}`}>{r.error ? "ERR" : status ?? "?"}</span>
+                              <span className="text-white/80 w-[150px] shrink-0 truncate">{r.path}</span>
+                              <span className="text-white/40 truncate">{Array.isArray(r.body_variant) ? r.body_variant.join("+") : String(r.body_variant)}</span>
+                              {ok && <span className="text-green-300 ml-auto">✓</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </details>
+                  )}
+                </div>
               )}
             </div>
           ))}

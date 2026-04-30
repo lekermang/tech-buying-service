@@ -921,6 +921,77 @@ def _kassa_diag_login() -> dict:
         out['steps'].append({'stage': 'POST login', 'error': str(e)})
         out['verdict'] = f'Ошибка при POST логина: {e}'
 
+    # ШАГ 4: перебор API-эндпоинтов (SPA) — ищем рабочий JSON-логин
+    api_candidates = [
+        '/api/auth/login', '/api/login', '/api/auth/sign_in', '/api/sign_in',
+        '/api/v1/auth/login', '/api/v1/login', '/api/v1/auth/sign_in',
+        '/auth/login', '/auth/sign_in',
+        '/api/users/sign_in', '/api/account/login', '/api/session',
+    ]
+    body_variants = [
+        {'login': login, 'password': password},
+        {'email': login, 'password': password},
+        {'username': login, 'password': password},
+        {'user': {'login': login, 'password': password}},
+        {'user': {'email': login, 'password': password}},
+    ]
+    api_results: list[dict] = []
+    for path in api_candidates:
+        url = KASSA_BASE + path
+        for bi, payload in enumerate(body_variants):
+            s2 = requests.Session()
+            s2.headers.update({
+                'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+                'Accept': 'application/json, text/plain, */*',
+                'Accept-Language': 'ru,en;q=0.9',
+                'Content-Type': 'application/json',
+                'Origin': KASSA_BASE,
+                'Referer': KASSA_LOGIN_PAGE,
+                'X-Requested-With': 'XMLHttpRequest',
+            })
+            try:
+                rr = s2.post(url, json=payload, timeout=12, allow_redirects=False)
+                ct = (rr.headers.get('Content-Type') or '').lower()
+                txt = rr.text or ''
+                preview = txt[:400]
+                cookies_set = list(requests.utils.dict_from_cookiejar(s2.cookies).keys())
+                # признаки успеха: 200/201 + JSON + token/auth/jwt в ответе или cookies
+                has_json = 'json' in ct
+                has_token = any(k in txt.lower() for k in ('"token"', '"access_token"', '"jwt"', '"auth_token"'))
+                has_auth_cookie = any(any(t in c.lower() for t in ('token', 'auth', 'session', 'jwt')) for c in cookies_set)
+                looks_ok = rr.status_code in (200, 201) and (has_json or has_token or has_auth_cookie)
+                api_results.append({
+                    'path': path,
+                    'body_variant': list(payload.keys()) if not (len(payload) == 1 and 'user' in payload) else f'user.{list(payload["user"].keys())}',
+                    'status': rr.status_code,
+                    'content_type': ct,
+                    'cookies_set': cookies_set,
+                    'response_preview': preview,
+                    'looks_ok': looks_ok,
+                })
+                # не тратим время если уже нашли рабочий
+                if looks_ok:
+                    break
+            except Exception as e:
+                api_results.append({
+                    'path': path,
+                    'body_variant': list(payload.keys()),
+                    'error': str(e),
+                })
+    # сортируем: успешные сверху
+    api_results_sorted = sorted(api_results, key=lambda x: (0 if x.get('looks_ok') else (1 if x.get('status') and x['status'] != 404 else 2)))
+    successful = [r for r in api_results if r.get('looks_ok')]
+    out['steps'].append({
+        'stage': 'API endpoints scan',
+        'tried': len(api_results),
+        'successful_count': len(successful),
+        'best_match': successful[0] if successful else None,
+        'all_results': api_results_sorted[:20],
+    })
+    if successful:
+        best = successful[0]
+        out['verdict'] = (out['verdict'] or '') + f"  |  ✓ Найден рабочий API-эндпоинт: POST {best['path']} (status {best['status']}). Парсер можно переписать на этот URL."
+
     return out
 
 
