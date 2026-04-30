@@ -1,0 +1,187 @@
+import { SLSHOP_URL } from "../staff.types";
+
+export { SLSHOP_URL };
+
+export type SLCategory = {
+  id: number;
+  name: string;
+  slug: string;
+  icon: string;
+  color: string;
+  sort_order: number;
+  is_active: boolean;
+};
+
+export type SLClient = {
+  id: number;
+  full_name: string;
+  phone?: string | null;
+  passport_series?: string | null;
+  passport_number?: string | null;
+  passport_issued_by?: string | null;
+  passport_issued_date?: string | null;
+  address?: string | null;
+  birth_date?: string | null;
+  notes?: string | null;
+};
+
+export type SLItemStatus = "stock" | "showcase" | "consignment" | "sold" | "returned" | "hidden";
+
+export type SLItem = {
+  id: number;
+  sku?: string | null;
+  category_id?: number | null;
+  category_name?: string | null;
+  category_icon?: string | null;
+  title: string;
+  brand?: string | null;
+  model?: string | null;
+  specs?: string | null;
+  specs_short?: string | null;
+  storage?: string | null;
+  color?: string | null;
+  condition?: string | null;
+  imei?: string | null;
+  serial_number?: string | null;
+  battery_health?: number | null;
+  has_box?: boolean;
+  has_charger?: boolean;
+  description?: string | null;
+  images?: string[];
+  buy_price?: number | string;
+  sell_price?: number | string;
+  min_price?: number | string;
+  status: SLItemStatus;
+  source?: string;
+  consignment_percent?: number | string | null;
+  consignment_owner_id?: number | null;
+  buy_client_id?: number | null;
+  buy_client_name?: string | null;
+  buy_at?: string | null;
+  sell_at?: string | null;
+  created_at?: string;
+};
+
+export type SLOperation = {
+  id: number;
+  op_type: "buy" | "sell" | "return" | "move" | "writeoff";
+  item_id?: number | null;
+  item_title?: string | null;
+  item_imei?: string | null;
+  client_id?: number | null;
+  client_name?: string | null;
+  amount?: number | string;
+  payment_method?: string;
+  contract_number?: string | null;
+  note?: string | null;
+  employee_name?: string | null;
+  status_from?: string | null;
+  status_to?: string | null;
+  created_at: string;
+};
+
+export type SLStats = {
+  period: string;
+  date_from: string;
+  date_to: string;
+  bought_count: number;
+  spent: number;
+  sold_count: number;
+  revenue: number;
+  profit: number;
+  returns_count: number;
+  by_status: Record<string, { count: number; sum: number }>;
+  by_category: { name: string | null; cnt: number; s: number }[];
+  top_models: { title: string; cnt: number; s: number }[];
+  daily: { d: string; op_type: string; cnt: number; s: number }[];
+};
+
+export type SLSpecsTemplate = {
+  id: number;
+  match_key: string;
+  brand?: string;
+  model?: string;
+  specs_short?: string;
+  specs_full?: string;
+  default_color?: string;
+  default_storage?: string;
+  popularity?: number;
+  is_builtin?: boolean;
+};
+
+export type SLLabelTemplate = {
+  id: number;
+  name: string;
+  width_mm: number;
+  height_mm: number;
+  layout: "classic" | "detailed" | "compact" | string;
+  show_brand: boolean;
+  show_specs: boolean;
+  show_imei: boolean;
+  show_qr: boolean;
+  show_barcode: boolean;
+  font_family: string;
+  is_default: boolean;
+  is_thermal: boolean;
+};
+
+export const STATUS_LABEL: Record<string, { l: string; color: string }> = {
+  stock: { l: "На складе", color: "bg-blue-500/15 text-blue-300 border-blue-500/30" },
+  showcase: { l: "На витрине", color: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" },
+  consignment: { l: "На реализации", color: "bg-purple-500/15 text-purple-300 border-purple-500/30" },
+  sold: { l: "Продан", color: "bg-[#FFD700]/15 text-[#FFD700] border-[#FFD700]/30" },
+  returned: { l: "Возврат", color: "bg-red-500/15 text-red-300 border-red-500/30" },
+  hidden: { l: "Скрыт", color: "bg-white/10 text-white/40 border-white/20" },
+};
+
+export const CONDITION_OPTIONS = ["Новое", "Отличное", "Хорошее", "Удовлетворительное", "Уценка"];
+export const PAYMENT_METHODS = [
+  { v: "cash", l: "Наличные" },
+  { v: "card", l: "Карта" },
+  { v: "transfer", l: "Перевод" },
+];
+
+export async function slApi<T = unknown>(
+  token: string,
+  action: string,
+  opts: {
+    method?: "GET" | "POST";
+    params?: Record<string, string | number | undefined | null>;
+    body?: unknown;
+    rawText?: boolean;
+  } = {}
+): Promise<{ ok: boolean; data: T | null; raw?: string; error?: string }> {
+  const method = opts.method || "GET";
+  const url = new URL(SLSHOP_URL);
+  url.searchParams.set("action", action);
+  Object.entries(opts.params || {}).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== "") url.searchParams.set(k, String(v));
+  });
+  try {
+    const init: RequestInit = {
+      method,
+      headers: {
+        "X-Employee-Token": token,
+        ...(method === "POST" ? { "Content-Type": "application/json" } : {}),
+      },
+    };
+    if (method === "POST") init.body = JSON.stringify(opts.body || {});
+    const res = await fetch(url.toString(), init);
+    if (opts.rawText) {
+      const text = await res.text();
+      return { ok: res.ok, data: null, raw: text };
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data?.error) {
+      return { ok: false, data: null, error: data?.error || `HTTP ${res.status}` };
+    }
+    return { ok: true, data: data as T };
+  } catch (e) {
+    return { ok: false, data: null, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+export function fmt(n: number | string | undefined | null): string {
+  const v = Number(n) || 0;
+  return v.toLocaleString("ru-RU");
+}

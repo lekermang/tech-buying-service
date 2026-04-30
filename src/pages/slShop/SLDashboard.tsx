@@ -1,0 +1,143 @@
+import { useEffect, useState, useCallback } from "react";
+import Icon from "@/components/ui/icon";
+import { slApi, fmt, type SLStats, STATUS_LABEL } from "./types";
+
+const PERIODS = [
+  { v: "today", l: "Сегодня" },
+  { v: "yesterday", l: "Вчера" },
+  { v: "7d", l: "7 дней" },
+  { v: "30d", l: "30 дней" },
+  { v: "year", l: "Год" },
+  { v: "all", l: "Всё время" },
+];
+
+export default function SLDashboard({ token, onNav }: { token: string; onNav: (k: string) => void }) {
+  const [period, setPeriod] = useState("30d");
+  const [data, setData] = useState<SLStats | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true); setErr(null);
+    const r = await slApi<SLStats>(token, "stats", { params: { period } });
+    if (r.ok && r.data) setData(r.data);
+    else setErr(r.error || "Ошибка");
+    setLoading(false);
+  }, [token, period]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const stockCount = (data?.by_status?.stock?.count || 0) + (data?.by_status?.showcase?.count || 0) + (data?.by_status?.consignment?.count || 0);
+  const stockSum = (data?.by_status?.stock?.sum || 0) + (data?.by_status?.showcase?.sum || 0) + (data?.by_status?.consignment?.sum || 0);
+
+  return (
+    <div>
+      {/* Период */}
+      <div className="flex gap-1.5 mb-3 flex-wrap items-center">
+        {PERIODS.map(p => {
+          const active = period === p.v;
+          return (
+            <button key={p.v} onClick={() => setPeriod(p.v)}
+              className={`text-[11px] px-3 py-1.5 rounded-full transition-all active:scale-95 ${
+                active ? "bg-[#FFD700] text-black font-bold shadow-md shadow-[#FFD700]/20"
+                  : "bg-[#141414] border border-[#1F1F1F] text-white/50 hover:text-white"
+              }`}>{p.l}</button>
+          );
+        })}
+        <button onClick={load} disabled={loading} className="ml-auto text-white/40 hover:text-[#FFD700] p-2 rounded-md hover:bg-white/5">
+          <Icon name={loading ? "Loader" : "RefreshCw"} size={14} className={loading ? "animate-spin" : ""} />
+        </button>
+      </div>
+
+      {err && <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-3 rounded-lg mb-3 text-sm">{err}</div>}
+
+      {/* Главные карточки */}
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        <Card title="Куплено" value={`${data?.bought_count || 0} шт.`} sub={`на ${fmt(data?.spent)} ₽`} icon="ShoppingCart" color="emerald" />
+        <Card title="Продано" value={`${data?.sold_count || 0} шт.`} sub={`на ${fmt(data?.revenue)} ₽`} icon="HandCoins" color="blue" />
+        <Card title="Прибыль" value={`${fmt(data?.profit)} ₽`} sub={`за период`} icon="TrendingUp" color="yellow" />
+        <Card title="На складе" value={`${stockCount} шт.`} sub={`${fmt(stockSum)} ₽`} icon="Package" color="white" />
+      </div>
+
+      {/* Разбивка по статусам */}
+      <div className="grid grid-cols-3 gap-2 mb-3">
+        {["stock", "showcase", "consignment"].map(s => {
+          const cfg = STATUS_LABEL[s];
+          const v = data?.by_status?.[s];
+          return (
+            <div key={s} className="bg-[#141414] border border-[#1F1F1F] rounded-lg p-2.5 text-center">
+              <div className="text-[10px] uppercase text-white/40 tracking-wide">{cfg.l}</div>
+              <div className="text-xl font-bold mt-1">{v?.count || 0}</div>
+              <div className="text-[10px] text-white/40 mt-0.5">{fmt(v?.sum || 0)} ₽</div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Топ моделей */}
+      <div className="bg-[#0F0F0F] border border-[#1F1F1F] rounded-xl p-3 mb-3">
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-[11px] uppercase text-white/50 font-bold tracking-wide">Топ продаж</div>
+          <button onClick={() => onNav("operations")} className="text-[10px] text-[#FFD700]/70 hover:text-[#FFD700]">все →</button>
+        </div>
+        {(!data?.top_models || data.top_models.length === 0) ? (
+          <div className="text-white/30 text-xs py-3 text-center">Нет продаж за период</div>
+        ) : (
+          <div className="space-y-1.5">
+            {data.top_models.map((m, i) => (
+              <div key={i} className="flex items-center gap-2 text-sm">
+                <div className="w-5 h-5 rounded bg-[#FFD700]/10 text-[#FFD700] text-[10px] font-bold flex items-center justify-center">{i + 1}</div>
+                <div className="flex-1 truncate">{m.title}</div>
+                <div className="text-white/40 text-[11px]">{m.cnt} шт</div>
+                <div className="text-[#FFD700] font-bold text-[12px] w-20 text-right">{fmt(m.s)} ₽</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Быстрые действия */}
+      <div className="grid grid-cols-2 gap-2">
+        <button onClick={() => onNav("buy")} className="bg-gradient-to-br from-emerald-500/20 to-emerald-500/5 border border-emerald-500/30 rounded-xl p-3 active:scale-95 transition-transform text-left">
+          <Icon name="Plus" size={20} className="text-emerald-300" />
+          <div className="font-bold text-sm mt-1">Принять товар</div>
+          <div className="text-[11px] text-white/50">скупка / комиссия</div>
+        </button>
+        <button onClick={() => onNav("stock")} className="bg-gradient-to-br from-blue-500/20 to-blue-500/5 border border-blue-500/30 rounded-xl p-3 active:scale-95 transition-transform text-left">
+          <Icon name="HandCoins" size={20} className="text-blue-300" />
+          <div className="font-bold text-sm mt-1">Продать товар</div>
+          <div className="text-[11px] text-white/50">из склада / витрины</div>
+        </button>
+        <button onClick={() => onNav("labels")} className="bg-gradient-to-br from-[#FFD700]/20 to-[#FFD700]/5 border border-[#FFD700]/30 rounded-xl p-3 active:scale-95 transition-transform text-left">
+          <Icon name="Tag" size={20} className="text-[#FFD700]" />
+          <div className="font-bold text-sm mt-1">Ценники</div>
+          <div className="text-[11px] text-white/50">печать на термопринтере</div>
+        </button>
+        <button onClick={() => onNav("import")} className="bg-gradient-to-br from-purple-500/20 to-purple-500/5 border border-purple-500/30 rounded-xl p-3 active:scale-95 transition-transform text-left">
+          <Icon name="ArrowUpDown" size={20} className="text-purple-300" />
+          <div className="font-bold text-sm mt-1">Импорт / Экспорт</div>
+          <div className="text-[11px] text-white/50">Excel / CSV / текст</div>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Card({ title, value, sub, icon, color }: { title: string; value: string; sub: string; icon: string; color: string }) {
+  const colors: Record<string, string> = {
+    emerald: "from-emerald-500/15 to-emerald-500/5 border-emerald-500/30 text-emerald-300",
+    blue: "from-blue-500/15 to-blue-500/5 border-blue-500/30 text-blue-300",
+    yellow: "from-[#FFD700]/15 to-[#FFD700]/5 border-[#FFD700]/30 text-[#FFD700]",
+    white: "from-white/10 to-white/5 border-white/20 text-white",
+  };
+  return (
+    <div className={`bg-gradient-to-br ${colors[color]} border rounded-xl p-3`}>
+      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide opacity-80">
+        <Icon name={icon} size={12} />
+        {title}
+      </div>
+      <div className="text-2xl font-bold mt-1">{value}</div>
+      <div className="text-[11px] opacity-60 mt-0.5">{sub}</div>
+    </div>
+  );
+}

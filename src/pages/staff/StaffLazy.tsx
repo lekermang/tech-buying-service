@@ -6,7 +6,7 @@ export const loadRepair        = () => import("../StaffRepairTab");
 export const loadGold          = () => import("../GoldTab");
 export const loadOtherTabs     = () => import("../StaffOtherTabs");
 export const loadVipChat       = () => import("../StaffVipChatTab");
-export const loadSmartLombard  = () => import("../smartlombard/SmartLombardTab");
+export const loadSmartLombard  = () => import("../slShop/SLShopTab");
 
 export const GoodsTab        = lazy(loadGoods);
 export const StaffRepairTab  = lazy(loadRepair);

@@ -1,0 +1,22 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Без токена возвращает 401",
+      "method": "GET",
+      "path": "/?action=items",
+      "expectedStatus": 401
+    },
+    {
+      "name": "Неизвестный action возвращает 401 без токена",
+      "method": "GET",
+      "path": "/?action=xxx",
+      "expectedStatus": 401
+    }
+  ]
+}
