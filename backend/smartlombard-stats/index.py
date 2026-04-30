@@ -10,7 +10,7 @@ import requests
 _BUILD_MARKER = '2026-04-29-redeploy-keys'
 
 CACHE_TTL_SECONDS = 60
-TOKEN_TTL_SECONDS = 19 * 60  # smartlombard: токен можно получать не чаще 1 раза в 20 мин
+TOKEN_TTL_SECONDS = 23 * 60 * 60  # smartlombard: токен живёт 24 часа (берём 23ч с запасом). Лимит 1 раз / 20 мин — это лимит на ПЕРЕвыпуск, не TTL.
 TOKEN_CACHE_KEY = '__access_token__'
 
 API_BASE = 'https://online.smartlombard.ru/api/exchange/v1'
