@@ -101,7 +101,10 @@ export function SLDashboard({ token }: { token: string }) {
   const load = useCallback(async (force = false) => {
     setLoading(true); setError("");
     const r = getRange();
-    const url = `${SMARTLOMBARD_URL}?date_from=${r.from}&date_to=${r.to}${force ? "&nocache=1" : ""}`;
+    // Используем парсер «Касса и банк» (HTML) — REST API ломбарда возвращает 0,
+    // т.к. ключи выписаны на пустой ломбардный профиль. Реальные данные
+    // (продажи айфонов, скупка) живут в комиссионке и доступны через парсер.
+    const url = `${SMARTLOMBARD_URL}?action=kassa_period&date_from=${r.from}&date_to=${r.to}${force ? "&nocache=1" : ""}`;
     try {
       const res = await fetch(url, { headers: { "X-Employee-Token": token } });
       const data = await res.json();
@@ -109,7 +112,35 @@ export function SLDashboard({ token }: { token: string }) {
         setError(errToText(data.error) || `Ошибка ${res.status}`);
         setStats(null);
       } else {
-        setStats(data);
+        // Маппим ответ kassa_period на стандартную структуру Stats:
+        // income_total → income (Приход)
+        // expense_total → expense (Расход)
+        // sales_total/sales_count → продажи товара
+        // buyout_total/buyout_count → скупка (= "Залоги" в нашей сетке)
+        // Прибыль считаем как income - expense (приход минус расход кассы).
+        const incomeNum = Number(data.income_total) || 0;
+        const expenseNum = Number(data.expense_total) || 0;
+        const salesNum = Number(data.sales_total) || 0;
+        const buyoutNum = Number(data.buyout_total) || 0;
+        const profit = incomeNum - expenseNum;
+        const opsCount = (Number(data.sales_count) || 0) + (Number(data.buyout_count) || 0);
+        setStats({
+          date_from: data.date_from || r.from,
+          date_to: data.date_to || r.to,
+          income: incomeNum,
+          expense: expenseNum,
+          period_income: 0,
+          period_costs: 0,
+          period_profit: profit,
+          sales_total: salesNum,
+          sales_count: Number(data.sales_count) || 0,
+          pledge_total: buyoutNum,
+          pledge_count: Number(data.buyout_count) || 0,
+          buyout_total: 0,
+          buyout_count: 0,
+          operations_total: opsCount,
+          cached: !!data.cached,
+        });
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

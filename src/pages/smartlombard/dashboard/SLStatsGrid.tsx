@@ -22,7 +22,7 @@ export function SLStatsGrid({ error, stats, loading }: Props) {
 
       {!error && stats && (
         <div className="grid grid-cols-2 gap-2">
-          {/* ВЫДЕЛЕННАЯ карточка ПРОДАЖИ ТОВАРА (sell_realization) */}
+          {/* ВЫДЕЛЕННАЯ карточка ПРОДАЖИ ТОВАРА */}
           <div className="col-span-2">
             <Card
               label="Продажи товара (Iphone, Sony и т.д.)"
@@ -35,12 +35,17 @@ export function SLStatsGrid({ error, stats, loading }: Props) {
           </div>
           <Card label="Приход" value={stats.income} icon="ArrowDownToLine" tint="green" />
           <Card label="Расход" value={stats.expense} icon="ArrowUpFromLine" tint="red" />
-          <Card label="Залоги" value={stats.pledge_total ?? 0} icon="ArrowDownToLine" tint="red" sub={`${stats.pledge_count ?? 0} операций`} />
-          <Card label="Выкупы" value={stats.buyout_total ?? 0} icon="ArrowUpFromLine" tint="green" sub={`${stats.buyout_count ?? 0} операций`} />
-          <Card label="Доход (%)" value={stats.period_income} icon="TrendingUp" tint="green" sub="проценты + сверх" />
-          <Card label="Издержки" value={stats.period_costs} icon="TrendingDown" tint="red" sub="убытки" />
           <div className="col-span-2">
-            <Card label="Прибыль" value={stats.period_profit}
+            <Card
+              label="Скупка (товары у клиентов)"
+              value={stats.pledge_total ?? 0}
+              icon="PackageOpen"
+              tint="red"
+              sub={`${stats.pledge_count ?? 0} операций`}
+            />
+          </div>
+          <div className="col-span-2">
+            <Card label="Прибыль (Приход − Расход)" value={stats.period_profit}
               icon={stats.period_profit >= 0 ? "Sparkles" : "AlertTriangle"}
               tint={stats.period_profit >= 0 ? "gold" : "red"} big />
           </div>
@@ -54,6 +59,7 @@ export function SLStatsGrid({ error, stats, loading }: Props) {
           <div className="col-span-2 text-center font-roboto text-white/30 text-[10px]">
             {stats.date_from === stats.date_to ? `за ${stats.date_from}` : `${stats.date_from} — ${stats.date_to}`}
             {stats.cached && <span className="ml-2 text-white/20">(из кэша)</span>}
+            <span className="ml-2 text-white/30">· источник: Касса и банк</span>
           </div>
         </div>
       )}
