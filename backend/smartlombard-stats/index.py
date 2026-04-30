@@ -1052,11 +1052,22 @@ def handler(event: dict, context) -> dict:
             return _err(401, 'Unauthorized')
 
         check_paths = [
+            # Ломбардные справочники
             ('/branches', 'branches', 'Филиалы'),
             ('/employees', 'employees', 'Сотрудники'),
-            ('/pawn_tickets', 'pawn_tickets', 'Билеты'),
+            ('/pawn_tickets', 'pawn_tickets', 'Билеты (залог)'),
             ('/clients', 'clients', 'Клиенты'),
             ('/categories', 'categories', 'Категории'),
+            # Зонд комиссионки (online.smartlombard.ru обслуживает оба профиля)
+            ('/operations', 'operations', 'Операции (без фильтра)'),
+            ('/sales', 'sales', 'Продажи товара'),
+            ('/buyouts', 'buyouts', 'Скупка'),
+            ('/realization', 'realization', 'Реализация'),
+            ('/goods', 'goods', 'Товары (комиссионка)'),
+            ('/products', 'products', 'Продукты'),
+            ('/shifts', 'shifts', 'Смены'),
+            ('/cash_operations', 'cash_operations', 'Кассовые операции'),
+            ('/profile', 'profile', 'Профиль'),
         ]
         keys = _get_api_keys_list()
 
@@ -1096,17 +1107,42 @@ def handler(event: dict, context) -> dict:
                         data = r.json()
                     except Exception:
                         data = {'_raw': r.text[:200]}
+                    # Гибкое извлечение items: result.{key} | result (если list) | data.{key} | data (если list)
                     items = []
+                    msg = None
                     if isinstance(data, dict):
-                        result = data.get('result') or {}
-                        if isinstance(result, dict):
-                            items = result.get(key) or []
+                        result = data.get('result')
+                        if isinstance(result, list):
+                            items = result
+                        elif isinstance(result, dict):
+                            cand = result.get(key)
+                            if isinstance(cand, list):
+                                items = cand
+                            else:
+                                # ищем первый list в result
+                                for v in result.values():
+                                    if isinstance(v, list):
+                                        items = v
+                                        break
+                        elif isinstance(data.get(key), list):
+                            items = data[key]
+                        # Сообщение об ошибке
+                        err_obj = data.get('error')
+                        if isinstance(err_obj, dict):
+                            msg = err_obj.get('message')
+                        elif isinstance(err_obj, str):
+                            msg = err_obj
+                        if not msg and data.get('message'):
+                            msg = data.get('message')
+                    elif isinstance(data, list):
+                        items = data
                     account_block['paths'].append({
                         'path': path, 'label': label,
                         'http_status': r.status_code,
                         'count': len(items) if isinstance(items, list) else 0,
                         'sample': items[:2] if isinstance(items, list) else [],
-                        'message': (data.get('error', {}) or {}).get('message') if isinstance(data, dict) else None,
+                        'message': msg,
+                        'raw_preview': (str(data)[:200]) if (not items and r.status_code != 200) else None,
                     })
                 except Exception as e:
                     account_block['paths'].append({
