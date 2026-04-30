@@ -15,8 +15,12 @@ TOKEN_CACHE_KEY = '__access_token__'
 
 API_BASE = 'https://online.smartlombard.ru/api/exchange/v1'
 GOODS_API_BASE = 'https://goods.api.smartlombard.ru/api/exchange/v1'
-AUTH_API_BASE = 'https://auth.api.smartlombard.ru/api/exchange/v1'
+# Согласно документации REST API: токен выдаётся на том же хосте online.smartlombard.ru
+# (не auth.api.* — это был неверный домен из старой документации).
+AUTH_API_BASE = 'https://online.smartlombard.ru/api/exchange/v1'
 AUTH_URL = f'{AUTH_API_BASE}/auth/access_token'
+# Старый (legacy) URL — оставлен как fallback для совместимости со старыми ключами
+AUTH_URL_LEGACY = 'https://auth.api.smartlombard.ru/api/exchange/v1/auth/access_token'
 OPS_URL = f'{API_BASE}/operations'
 ELEM_OPS_URL = f'{API_BASE}/elementary_operations'
 
@@ -227,39 +231,49 @@ def _get_api_keys_list() -> list[dict]:
 
 
 def _request_new_token_for(account_id_raw: str, secret_key: str) -> tuple[str | None, str | None]:
-    """POST /auth/access_token для конкретной пары account_id+secret_key."""
+    """POST /auth/access_token для конкретной пары account_id+secret_key.
+    Пробует основной URL (online.smartlombard.ru), при неудаче — legacy (auth.api.*).
+    """
     if not account_id_raw or not secret_key:
         return None, 'account_id/secret_key пусты'
     try:
         account_id_int = int(account_id_raw)
     except Exception:
         return None, f'auth: account_id должен быть числом, получено: "{account_id_raw}"'
-    try:
-        r = requests.post(
-            AUTH_URL,
-            files={
-                'account_id': (None, str(account_id_int)),
-                'secret_key': (None, secret_key),
-            },
-            timeout=20,
-        )
-    except Exception as e:
-        return None, f'auth: network error {e}'
-    try:
-        data = r.json()
-    except Exception:
-        return None, f'auth: bad json (status {r.status_code}, body={r.text[:200]})'
-    if not data.get('status'):
-        msg = data.get('message') or data.get('error') or data.get('errors') or 'failed'
-        msg_str = json.dumps(msg, ensure_ascii=False) if not isinstance(msg, str) else msg
-        return None, f'auth[{account_id_raw}]: {msg_str} (HTTP {r.status_code})'
-    res = data.get('result') or {}
-    token = res.get('access_token')
-    if isinstance(token, dict):
-        token = token.get('access_token') or token.get('token') or token.get('value')
-    if not token:
-        return None, f'auth[{account_id_raw}]: no access_token in response'
-    return str(token), None
+
+    last_err: str | None = None
+    for auth_endpoint in (AUTH_URL, AUTH_URL_LEGACY):
+        try:
+            r = requests.post(
+                auth_endpoint,
+                files={
+                    'account_id': (None, str(account_id_int)),
+                    'secret_key': (None, secret_key),
+                },
+                timeout=20,
+            )
+        except Exception as e:
+            last_err = f'auth: network error {e} (url={auth_endpoint})'
+            continue
+        try:
+            data = r.json()
+        except Exception:
+            last_err = f'auth: bad json (status {r.status_code}, body={r.text[:200]}, url={auth_endpoint})'
+            continue
+        if not data.get('status'):
+            msg = data.get('message') or data.get('error') or data.get('errors') or 'failed'
+            msg_str = json.dumps(msg, ensure_ascii=False) if not isinstance(msg, str) else msg
+            last_err = f'auth[{account_id_raw}]: {msg_str} (HTTP {r.status_code}, url={auth_endpoint})'
+            continue
+        res = data.get('result') or {}
+        token = res.get('access_token')
+        if isinstance(token, dict):
+            token = token.get('access_token') or token.get('token') or token.get('value')
+        if not token:
+            last_err = f'auth[{account_id_raw}]: no access_token in response (url={auth_endpoint})'
+            continue
+        return str(token), None
+    return None, last_err or f'auth[{account_id_raw}]: failed on both endpoints'
 
 
 def _request_new_token() -> tuple[str | None, str | None]:
