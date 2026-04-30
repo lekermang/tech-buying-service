@@ -1123,11 +1123,74 @@ def _kassa_fetch_period(date_from_dmy: str, date_to_dmy: str) -> tuple[dict | No
     sales_sum = round(sum(x['sum'] for x in sales_items), 2)
     buyout_sum = round(sum(x['sum'] for x in buyout_items), 2)
 
+    # Извлекаем итоговую таблицу «Доход/Затраты/Прибыль за период» по колонкам:
+    # Общие данные | Ломбард | Комиссионный магазин | Аксессуары | Ремонт
+    import re as _re
+    summary = {
+        'income': {'total': 0.0, 'lombard': 0.0, 'komissionka': 0.0, 'accessories': 0.0, 'repair': 0.0},
+        'costs':  {'total': 0.0, 'lombard': 0.0, 'komissionka': 0.0, 'accessories': 0.0, 'repair': 0.0},
+        'profit': {'total': 0.0, 'lombard': 0.0, 'komissionka': 0.0, 'accessories': 0.0, 'repair': 0.0},
+    }
+
+    def _col_key(h: str) -> str | None:
+        h = h.lower()
+        if 'общи' in h: return 'total'
+        if 'ломбард' in h: return 'lombard'
+        if 'комисс' in h: return 'komissionka'
+        if 'аксесс' in h: return 'accessories'
+        if 'ремонт' in h: return 'repair'
+        return None
+
+    for table in soup.find_all('table'):
+        rows = table.find_all('tr')
+        if len(rows) < 2:
+            continue
+        # Ищем таблицу-сводку: в заголовках есть «Общие данные» или «Комиссионный»
+        header_cells_raw = [c.get_text(' ', strip=True) for c in rows[0].find_all(['th', 'td'])]
+        header_join = ' '.join(h.lower() for h in header_cells_raw)
+        if ('общие данные' not in header_join) and ('комиссион' not in header_join):
+            continue
+        col_map: dict[int, str] = {}
+        for i, h in enumerate(header_cells_raw):
+            k = _col_key(h)
+            if k:
+                col_map[i] = k
+        if not col_map:
+            continue
+        for tr in rows[1:]:
+            cells = [c.get_text(' ', strip=True) for c in tr.find_all(['td', 'th'])]
+            if not cells:
+                continue
+            label = cells[0].lower()
+            if 'доход' in label:
+                key = 'income'
+            elif 'затрат' in label:
+                key = 'costs'
+            elif 'прибыл' in label:
+                key = 'profit'
+            else:
+                continue
+            for i, col in col_map.items():
+                if i < len(cells):
+                    summary[key][col] = _kassa_money(cells[i])
+
+    # Если в HTML «Доход/Прибыль за период» по колонке «Комиссионный магазин» есть —
+    # это и есть реальные цифры по б/у технике (комиссионке).
+    kom_income = summary['income']['komissionka']
+    kom_costs = summary['costs']['komissionka']
+    kom_profit = summary['profit']['komissionka']
+
     return {
         'date_from': date_from_dmy,
         'date_to': date_to_dmy,
+        # Старые поля — общая касса (всё вместе)
         'income_total': income_total,
         'expense_total': expense_total,
+        # Новые поля — отдельно по комиссионке (б/у техника)
+        'kom_income': kom_income,
+        'kom_costs': kom_costs,
+        'kom_profit': kom_profit,
+        'summary': summary,
         'sales_total': sales_sum,
         'sales_count': len(sales_items),
         'buyout_total': buyout_sum,

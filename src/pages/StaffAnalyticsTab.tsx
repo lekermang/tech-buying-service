@@ -85,6 +85,10 @@ export function AnalyticsTab({ token }: { token: string }) {
         // Маппинг ответа kassa_period → SmartlombardStats
         const incomeNum = Number(d.income_total) || 0;
         const expenseNum = Number(d.expense_total) || 0;
+        // Чистые цифры по комиссионке (Б/У техника) — из нижней сводной таблицы кассы
+        const komIncome = Number(d.kom_income) || 0;
+        const komCosts = Number(d.kom_costs) || 0;
+        const komProfit = Number(d.kom_profit) || (komIncome - komCosts);
         setSlData({
           date_from: d.date_from || dmy(from),
           date_to: d.date_to || dmy(to),
@@ -93,6 +97,9 @@ export function AnalyticsTab({ token }: { token: string }) {
           period_income: incomeNum,
           period_costs: expenseNum,
           period_profit: incomeNum - expenseNum,
+          kom_income: komIncome,
+          kom_costs: komCosts,
+          kom_profit: komProfit,
           sales_total: Number(d.sales_total) || 0,
           sales_count: Number(d.sales_count) || 0,
           buyout_total: Number(d.buyout_total) || 0,
@@ -139,9 +146,12 @@ export function AnalyticsTab({ token }: { token: string }) {
   const goldForecastRevenue = Math.round(periodWeight585 * goldForecastPriceNum);
   const goldForecastProfit = goldForecastRevenue - periodBuySum;
 
-  // Продажа б/у (комиссионка): берём приход кассы как оборот, прибыль = приход - расход.
-  const slRevenue = slData?.income || 0;
-  const slProfit = slData?.period_profit || 0;
+  // Продажа б/у (комиссионка): используем чистую колонку «Комиссионный магазин»
+  // из сводной таблицы кассы. Если её нет — fallback на общий приход/расход.
+  const hasKom = !!slData && (slData.kom_income !== undefined || slData.kom_profit !== undefined);
+  const slRevenue = hasKom ? (slData?.kom_income || 0) : (slData?.income || 0);
+  const slCosts = hasKom ? (slData?.kom_costs || 0) : (slData?.expense || 0);
+  const slProfit = hasKom ? (slData?.kom_profit || 0) : (slData?.period_profit || 0);
 
   const totalRevenue = (data?.total_revenue || 0) + repairRevenue + goldRevenue + slRevenue;
   const totalProfit = repairNetProfit + goldProfit + slProfit;
@@ -194,7 +204,7 @@ export function AnalyticsTab({ token }: { token: string }) {
             repairNetProfit={repairNetProfit}
             goldForecastProfit={goldForecastProfit}
             goldForecastPriceNum={goldForecastPriceNum}
-            slPeriodProfit={slData?.period_profit || 0}
+            slPeriodProfit={slProfit}
             totalRevenue={totalRevenue}
             totalProfit={totalProfit}
             repairRevenue={repairRevenue}
@@ -204,7 +214,7 @@ export function AnalyticsTab({ token }: { token: string }) {
             goldProfit={goldProfit}
             masterIncome={masterIncome}
             slRevenue={slRevenue}
-            slExpense={slData?.expense || 0}
+            slExpense={slCosts}
             slSalesTotal={slData?.sales_total || 0}
             slSalesCount={slData?.sales_count || 0}
             slBuyoutTotal={slData?.buyout_total || 0}
