@@ -13,6 +13,7 @@ import { SLAccountCheckPanel } from "./dashboard/SLAccountCheckPanel";
 import { SLKassaDiagPanel } from "./dashboard/SLKassaDiagPanel";
 import { SLApiKeyTestPanel } from "./dashboard/SLApiKeyTestPanel";
 import { SLStatsGrid } from "./dashboard/SLStatsGrid";
+import { SLGoodsStatsPanel } from "./dashboard/SLGoodsStatsPanel";
 
 export function SLDashboard({ token }: { token: string }) {
   const [preset, setPreset] = useState("m30");
@@ -185,6 +186,12 @@ export function SLDashboard({ token }: { token: string }) {
         setShowCustom={setShowCustom}
         loading={loading}
         onLoad={load}
+      />
+
+      <SLGoodsStatsPanel
+        token={token}
+        dateFrom={getRange().from}
+        dateTo={getRange().to}
       />
 
       <SLTokenStatusBar

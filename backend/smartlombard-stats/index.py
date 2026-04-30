@@ -1460,6 +1460,169 @@ def handler(event: dict, context) -> dict:
         data['cached'] = False
         return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps(data, ensure_ascii=False)}
 
+    # ---------- GOODS_STATS: статистика «Куплено / Продано» из /goods комиссионки ----------
+    # Источник: GET goods.api.smartlombard.ru/api/exchange/v1/goods
+    # Статусы товара (из доки):
+    #   1 - Скуплен                  → КУПЛЕНО (выкуп у клиента)
+    #   2 - Выведен из залога        → не считаем
+    #   3 - Продан                   → ПРОДАНО
+    #   4 - Возвращен                → возврат
+    #   5 - Принят на реализацию     → КУПЛЕНО (комиссия от клиента)
+    #   6 - Снят с реализации
+    #   7 - Продан (реализация)      → ПРОДАНО
+    #   8 - Возвращен (реализация)   → возврат
+    #   9 - Расчет (реализация)
+    #   10 - На предпродажной подготовке
+    #   11 - Списан / 12 - Изъят
+    if action == 'goods_stats':
+        ok, _r = _check_token(event, allow_all_staff=False)
+        if not ok:
+            return _err(401, 'Unauthorized')
+
+        # Период (опциональный) — пока отдаём все статусы, без фильтра по дате на стороне API,
+        # т.к. /goods не принимает date_from/date_to. Дату возьмём из самого товара (updated_at).
+        date_from = _parse_date_param(params.get('date_from') or '')
+        date_to = _parse_date_param(params.get('date_to') or '') if params.get('date_to') else date_from
+
+        # Парсим dd.mm.yyyy в datetime для фильтра по полю товара
+        def _to_dt(s: str):
+            try:
+                return datetime.strptime(s, '%d.%m.%Y')
+            except Exception:
+                return None
+        df_dt = _to_dt(date_from)
+        dt_dt = _to_dt(date_to)
+        if dt_dt:
+            dt_dt = dt_dt + timedelta(days=1)  # включительно по концу дня
+
+        BOUGHT_STATUSES = {1, 5}
+        SOLD_STATUSES = {3, 7}
+        RETURN_STATUSES = {4, 8}
+
+        keys = _get_api_keys_list()
+        results_per_account: list = []
+        agg = {
+            'bought_count': 0, 'bought_sum': 0.0,
+            'sold_count': 0, 'sold_sum': 0.0,
+            'returned_count': 0, 'returned_sum': 0.0,
+            'on_shelf_count': 0, 'on_shelf_sum': 0.0,
+            'on_realization_count': 0, 'on_realization_sum': 0.0,
+        }
+        seen_ids: set = set()
+
+        def _item_dt(item: dict):
+            for f in ('updated_at', 'sold_at', 'created_at', 'date'):
+                v = item.get(f)
+                if not v:
+                    continue
+                try:
+                    s = str(v).replace('Z', '+00:00')
+                    return datetime.fromisoformat(s).replace(tzinfo=None)
+                except Exception:
+                    try:
+                        return datetime.strptime(str(v)[:10], '%Y-%m-%d')
+                    except Exception:
+                        pass
+            return None
+
+        for k in keys:
+            aid = k['account_id']
+            sk = k['secret_key']
+            account_block = {'account_id': aid, 'fetched': 0, 'error': None}
+            offset = 0
+            limit = 100
+            max_pages = 100  # до 10 000 товаров на аккаунт
+            page = 0
+            had_auth_error = False
+            while page < max_pages:
+                r, _tok, retried, ferr = _api_get_with_retry(
+                    GOODS_API_BASE, '/goods', aid, sk,
+                    params={'limit': limit, 'offset': offset},
+                    timeout=20,
+                )
+                if r is None:
+                    account_block['error'] = ferr or 'request failed'
+                    break
+                try:
+                    data = r.json()
+                except Exception:
+                    account_block['error'] = f'bad json (status {r.status_code})'
+                    break
+                if r.status_code != 200 or not data.get('status'):
+                    err_obj = data.get('error') or {}
+                    msg = err_obj.get('message') if isinstance(err_obj, dict) else str(err_obj)
+                    account_block['error'] = f'{msg or "failed"} (HTTP {r.status_code})'
+                    had_auth_error = (r.status_code in (401, 403))
+                    break
+                result = data.get('result') or {}
+                items = result.get('goods') or []
+                if not items:
+                    break
+                for it in items:
+                    if not isinstance(it, dict):
+                        continue
+                    item_id = it.get('id') or it.get('article')
+                    if item_id is not None:
+                        if item_id in seen_ids:
+                            continue
+                        seen_ids.add(item_id)
+                    status = it.get('status')
+                    try:
+                        status_int = int(status) if status is not None else None
+                    except Exception:
+                        status_int = None
+                    # Цена
+                    price = it.get('sale_price') or it.get('price') or it.get('cost') or 0
+                    try:
+                        price_f = float(price)
+                    except Exception:
+                        price_f = 0.0
+                    # Дата для фильтра по периоду
+                    item_dt = _item_dt(it)
+                    in_period = True
+                    if df_dt and dt_dt and item_dt:
+                        in_period = (df_dt <= item_dt < dt_dt)
+                    if status_int in BOUGHT_STATUSES and in_period:
+                        agg['bought_count'] += 1
+                        agg['bought_sum'] += price_f
+                    elif status_int in SOLD_STATUSES and in_period:
+                        agg['sold_count'] += 1
+                        agg['sold_sum'] += price_f
+                    elif status_int in RETURN_STATUSES and in_period:
+                        agg['returned_count'] += 1
+                        agg['returned_sum'] += price_f
+                    # Остатки на витрине — без фильтра по дате (что сейчас лежит)
+                    if status_int == 1:
+                        agg['on_shelf_count'] += 1
+                        agg['on_shelf_sum'] += price_f
+                    elif status_int == 5:
+                        agg['on_realization_count'] += 1
+                        agg['on_realization_sum'] += price_f
+                account_block['fetched'] += len(items)
+                if len(items) < limit:
+                    break
+                offset += limit
+                page += 1
+            results_per_account.append(account_block)
+
+        return _ok({
+            'ok': True,
+            'date_from': date_from,
+            'date_to': date_to,
+            'bought_count': agg['bought_count'],
+            'bought_sum': round(agg['bought_sum'], 2),
+            'sold_count': agg['sold_count'],
+            'sold_sum': round(agg['sold_sum'], 2),
+            'returned_count': agg['returned_count'],
+            'returned_sum': round(agg['returned_sum'], 2),
+            'on_shelf_count': agg['on_shelf_count'],
+            'on_shelf_sum': round(agg['on_shelf_sum'], 2),
+            'on_realization_count': agg['on_realization_count'],
+            'on_realization_sum': round(agg['on_realization_sum'], 2),
+            'total_unique_items': len(seen_ids),
+            'per_account': results_per_account,
+        })
+
     # ---------- GOODS_DB: содержимое sl_goods (для сверки с API operations) ----------
     if action == 'goods_db':
         ok, _r = _check_token(event, allow_all_staff=False)
