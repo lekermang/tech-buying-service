@@ -11,6 +11,7 @@ import { SLTokenStatusBar } from "./dashboard/SLTokenStatusBar";
 import { SLDiagnosticsPanel } from "./dashboard/SLDiagnosticsPanel";
 import { SLAccountCheckPanel } from "./dashboard/SLAccountCheckPanel";
 import { SLKassaDiagPanel } from "./dashboard/SLKassaDiagPanel";
+import { SLApiKeyTestPanel } from "./dashboard/SLApiKeyTestPanel";
 import { SLStatsGrid } from "./dashboard/SLStatsGrid";
 
 export function SLDashboard({ token }: { token: string }) {
@@ -212,6 +213,8 @@ export function SLDashboard({ token }: { token: string }) {
         onRun={runKassaDiag}
         onClose={() => setKassaDiagData(null)}
       />
+
+      <SLApiKeyTestPanel token={token} />
 
       <SLStatsGrid error={error} stats={stats} loading={loading} />
     </div>

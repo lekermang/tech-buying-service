@@ -1332,6 +1332,59 @@ def handler(event: dict, context) -> dict:
         result = _kassa_diag_login()
         return _ok(result)
 
+    # ---------- TEST_API_KEY: ручной тест произвольного account_id+secret_key ----------
+    if action == 'test_api_key':
+        ok, _r = _check_token(event, allow_all_staff=False)
+        if not ok:
+            return _err(401, 'Unauthorized')
+        test_account = str(body.get('account_id') or params.get('account_id') or '').strip()
+        test_key = str(body.get('secret_key') or params.get('secret_key') or '').strip()
+        if not test_account or not test_key:
+            return _err(400, 'account_id и secret_key обязательны')
+        # Прямой POST на оба эндпоинта SmartLombard
+        results = []
+        for label, url in [('online.smartlombard.ru', AUTH_URL), ('auth.api.smartlombard.ru', AUTH_URL_LEGACY)]:
+            attempt = {'endpoint': label, 'url': url}
+            try:
+                rr = requests.post(
+                    url,
+                    files={
+                        'account_id': (None, test_account),
+                        'secret_key': (None, test_key),
+                    },
+                    timeout=20,
+                )
+                attempt['http_status'] = rr.status_code
+                attempt['content_type'] = rr.headers.get('Content-Type')
+                try:
+                    attempt['response'] = rr.json()
+                except Exception:
+                    attempt['response_raw'] = rr.text[:400]
+                # извлечём токен если есть
+                try:
+                    j = rr.json() if 'json' in (rr.headers.get('Content-Type') or '').lower() else None
+                    if j and j.get('status'):
+                        tok = (j.get('result') or {}).get('access_token')
+                        if isinstance(tok, dict):
+                            tok = tok.get('access_token') or tok.get('token') or tok.get('value')
+                        if tok:
+                            attempt['token_preview'] = str(tok)[:20] + '...'
+                            attempt['ok'] = True
+                except Exception:
+                    pass
+            except Exception as e:
+                attempt['error'] = str(e)
+            results.append(attempt)
+        any_ok = any(a.get('ok') for a in results)
+        return _ok({
+            'ok': any_ok,
+            'account_id': test_account,
+            'secret_key_len': len(test_key),
+            'secret_key_preview': test_key[:6] + '...' + test_key[-4:],
+            'endpoints': results,
+            'verdict': '✓ Ключ рабочий!' if any_ok else 'Ключ не подошёл ни на одном из эндпоинтов. См. response.',
+        })
+
     # ---------- KASSA_PERIOD: парсинг «Касса и банк → Операции по датам» ----------
     if action == 'kassa_period':
         ok, _r = _check_token(event, allow_all_staff=False)
