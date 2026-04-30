@@ -1,0 +1,24 @@
+{
+  "tests": [
+    {
+      "name": "Health ping",
+      "method": "GET",
+      "path": "/?action=ping",
+      "expectedStatus": 200,
+      "expectedBody": {"pong": true},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "OPTIONS CORS",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Auth required",
+      "method": "GET",
+      "path": "/?action=export_csv",
+      "expectedStatus": 401
+    }
+  ]
+}
