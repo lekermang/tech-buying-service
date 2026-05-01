@@ -615,6 +615,23 @@ def create_item(body, employee):
         )
         op_id = cur.fetchone()[0]
         cur.execute(f"UPDATE {SCHEMA}.slshop_items SET buy_operation_id={op_id} WHERE id={item_id}")
+        # Авто-расход по кассе при скупке
+        branch_id = data.get('branch_id')
+        if branch_id:
+            cur.execute(
+                f"SELECT id, balance FROM {SCHEMA}.slshop_cash_accounts WHERE branch_id={int(branch_id)} AND is_active=true LIMIT 1"
+            )
+            acc = cur.fetchone()
+            if acc:
+                acc_id, balance = acc[0], float(acc[1] or 0)
+                amt = float(data.get('buy_price') or 0)
+                new_balance = balance - amt
+                cur.execute(
+                    f"INSERT INTO {SCHEMA}.slshop_cash_movements (account_id, direction, amount, balance_after, category, reason, employee_name, related_op_id, related_item_id, is_auto, branch_id) "
+                    f"VALUES ({acc_id}, 'out', {amt}, {new_balance}, 'Скупка товара', "
+                    f"{_esc('Скупка №' + str(item_id))}, {_esc(employee.get('full_name') if employee else None)}, {op_id}, {item_id}, TRUE, {int(branch_id)})"
+                )
+                cur.execute(f"UPDATE {SCHEMA}.slshop_cash_accounts SET balance={new_balance} WHERE id={acc_id}")
     conn.commit(); cur.close(); conn.close()
     # Сохраняем шаблон характеристик для будущей автоподстановки
     if data.get('specs_short') or data.get('specs'):
@@ -630,21 +647,201 @@ def create_item(body, employee):
     return _ok({'id': item_id, 'sku': sku})
 
 
-def update_item(body):
+def update_item(body, employee=None):
     item_id = body.get('id')
     if not item_id:
         return _err(400, 'id обязателен')
     data = {k: body.get(k) for k in ITEM_FIELDS if k in body}
     if not data:
         return _err(400, 'нет полей для обновления')
-    sets = ', '.join([f"{k}={_esc(v)}" for k, v in data.items()])
     conn = get_conn(); cur = conn.cursor()
+    cur.execute(f"SELECT status FROM {SCHEMA}.slshop_items WHERE id={int(item_id)}")
+    row = cur.fetchone()
+    if not row:
+        cur.close(); conn.close(); return _err(404, 'Товар не найден')
+    cur_status = row[0]
+    is_owner = employee and employee.get('role') == 'owner'
+    if cur_status == 'sold' and not is_owner:
+        return _err(403, 'Редактировать проданный товар может только владелец')
+    if cur_status == 'sold' and 'sell_price' in data and not is_owner:
+        return _err(403, 'Менять цену продажи может только владелец')
+    sets = ', '.join([f"{k}={_esc(v)}" for k, v in data.items()])
     cur.execute(f"UPDATE {SCHEMA}.slshop_items SET {sets}, updated_at=NOW() WHERE id={int(item_id)} RETURNING id")
     row = cur.fetchone()
     conn.commit(); cur.close(); conn.close()
     if not row:
         return _err(404, 'Товар не найден')
     return _ok({'id': row[0]})
+
+
+def remove_item(body, employee):
+    """Удаление товара. Проданный — только владелец."""
+    if not employee:
+        return _err(401, 'Не авторизован')
+    item_id = body.get('id')
+    if not item_id:
+        return _err(400, 'id обязателен')
+    conn = get_conn(); cur = conn.cursor()
+    cur.execute(f"SELECT status FROM {SCHEMA}.slshop_items WHERE id={int(item_id)}")
+    row = cur.fetchone()
+    if not row:
+        cur.close(); conn.close(); return _err(404, 'Товар не найден')
+    cur_status = row[0]
+    is_owner = employee.get('role') == 'owner'
+    if cur_status == 'sold' and not is_owner:
+        cur.close(); conn.close()
+        return _err(403, 'Удалять проданный товар может только владелец')
+    # очищаем связанные операции и движения
+    cur.execute(f"UPDATE {SCHEMA}.slshop_operations SET item_id=NULL WHERE item_id={int(item_id)}")
+    cur.execute(f"UPDATE {SCHEMA}.slshop_cash_movements SET related_item_id=NULL WHERE related_item_id={int(item_id)}")
+    cur.execute(f"DELETE FROM {SCHEMA}.slshop_items WHERE id={int(item_id)}")
+    conn.commit(); cur.close(); conn.close()
+    return _ok({'ok': True})
+
+
+# ============ Roles & permissions ============
+def list_roles():
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(f"SELECT * FROM {SCHEMA}.slshop_roles ORDER BY sort_order, name")
+    rows = cur.fetchall()
+    cur.close(); conn.close()
+    return [dict(r) for r in rows]
+
+
+def save_role(body, employee):
+    if not employee or employee.get('role') != 'owner':
+        return _err(403, 'Изменять роли может только владелец')
+    rid = body.get('id')
+    code = (body.get('code') or '').strip().lower()
+    name = (body.get('name') or '').strip()
+    description = body.get('description') or ''
+    permissions = body.get('permissions') or {}
+    if not name:
+        return _err(400, 'Название обязательно')
+    if not isinstance(permissions, dict):
+        return _err(400, 'permissions должен быть объектом')
+    perms_json = json.dumps(permissions, ensure_ascii=False).replace("'", "''")
+    conn = get_conn(); cur = conn.cursor()
+    if rid:
+        cur.execute(
+            f"UPDATE {SCHEMA}.slshop_roles SET name={_esc(name)}, description={_esc(description)}, "
+            f"permissions='{perms_json}'::jsonb, updated_at=NOW() WHERE id={int(rid)} RETURNING id"
+        )
+        row = cur.fetchone()
+        nid = row[0] if row else rid
+    else:
+        if not code:
+            code = 'role_' + str(int(datetime.utcnow().timestamp()))
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.slshop_roles (code, name, description, permissions, is_system) "
+            f"VALUES ({_esc(code)}, {_esc(name)}, {_esc(description)}, '{perms_json}'::jsonb, FALSE) RETURNING id"
+        )
+        nid = cur.fetchone()[0]
+    conn.commit(); cur.close(); conn.close()
+    return _ok({'id': nid})
+
+
+def my_permissions(employee):
+    """Возвращает права текущего сотрудника на основе его роли"""
+    if not employee:
+        return _err(401, 'Не авторизован')
+    role_code = employee.get('role') or 'staff'
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(f"SELECT code, name, permissions FROM {SCHEMA}.slshop_roles WHERE code={_esc(role_code)} LIMIT 1")
+    row = cur.fetchone()
+    cur.close(); conn.close()
+    if not row:
+        return _ok({'role': role_code, 'name': role_code, 'permissions': {}, 'is_owner': role_code == 'owner'})
+    perms = row['permissions'] or {}
+    return _ok({'role': row['code'], 'name': row['name'], 'permissions': perms, 'is_owner': row['code'] == 'owner'})
+
+
+# ============ Cash accounts ============
+def list_cash_accounts():
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        f"SELECT a.*, b.name AS branch_name FROM {SCHEMA}.slshop_cash_accounts a "
+        f"LEFT JOIN {SCHEMA}.slshop_branches b ON b.id=a.branch_id "
+        f"WHERE a.is_active=true ORDER BY a.is_default DESC, a.id"
+    )
+    rows = cur.fetchall()
+    cur.close(); conn.close()
+    return [dict(r) for r in rows]
+
+
+def cash_movement_create(body, employee):
+    account_id = body.get('account_id')
+    direction = (body.get('direction') or '').strip()
+    amount = body.get('amount')
+    if not account_id or direction not in ('in', 'out') or amount in (None, ''):
+        return _err(400, 'account_id, direction (in/out), amount обязательны')
+    amount_f = float(amount)
+    if amount_f <= 0:
+        return _err(400, 'Сумма должна быть больше нуля')
+    category = body.get('category') or ('Поступление' if direction == 'in' else 'Расход')
+    reason = body.get('reason') or ''
+    taken_by = body.get('taken_by') or ''
+    conn = get_conn(); cur = conn.cursor()
+    cur.execute(f"SELECT balance, branch_id FROM {SCHEMA}.slshop_cash_accounts WHERE id={int(account_id)}")
+    row = cur.fetchone()
+    if not row:
+        cur.close(); conn.close(); return _err(404, 'Касса не найдена')
+    balance = float(row[0] or 0)
+    branch_id = row[1]
+    new_balance = balance + amount_f if direction == 'in' else balance - amount_f
+    cur.execute(
+        f"INSERT INTO {SCHEMA}.slshop_cash_movements (account_id, direction, amount, balance_after, category, reason, taken_by, employee_name, branch_id) "
+        f"VALUES ({int(account_id)}, {_esc(direction)}, {amount_f}, {new_balance}, {_esc(category)}, {_esc(reason)}, {_esc(taken_by)}, "
+        f"{_esc(employee.get('full_name') if employee else None)}, {_esc(branch_id)}) RETURNING id"
+    )
+    mid = cur.fetchone()[0]
+    cur.execute(f"UPDATE {SCHEMA}.slshop_cash_accounts SET balance={new_balance} WHERE id={int(account_id)}")
+    conn.commit(); cur.close(); conn.close()
+    return _ok({'id': mid, 'balance_after': new_balance})
+
+
+def cash_movements_list(params):
+    account_id = params.get('account_id')
+    date_from = params.get('date_from')
+    date_to = params.get('date_to')
+    where = []
+    if account_id:
+        where.append(f"m.account_id={int(account_id)}")
+    if date_from:
+        where.append(f"m.created_at >= {_esc(date_from)}")
+    if date_to:
+        where.append(f"m.created_at < {_esc(date_to)}::date + INTERVAL '1 day'")
+    wsql = (' WHERE ' + ' AND '.join(where)) if where else ''
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        f"SELECT m.*, a.name AS account_name, b.name AS branch_name "
+        f"FROM {SCHEMA}.slshop_cash_movements m "
+        f"LEFT JOIN {SCHEMA}.slshop_cash_accounts a ON a.id=m.account_id "
+        f"LEFT JOIN {SCHEMA}.slshop_branches b ON b.id=m.branch_id "
+        f"{wsql} ORDER BY m.created_at DESC LIMIT 300"
+    )
+    rows = cur.fetchall()
+    cur.close(); conn.close()
+    return [dict(r) for r in rows]
+
+
+def cash_summary():
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        f"SELECT a.id, a.name, a.balance, b.name AS branch_name, "
+        f"(SELECT COALESCE(SUM(amount),0) FROM {SCHEMA}.slshop_cash_movements WHERE account_id=a.id AND direction='in' AND created_at::date = CURRENT_DATE) AS today_in, "
+        f"(SELECT COALESCE(SUM(amount),0) FROM {SCHEMA}.slshop_cash_movements WHERE account_id=a.id AND direction='out' AND created_at::date = CURRENT_DATE) AS today_out "
+        f"FROM {SCHEMA}.slshop_cash_accounts a LEFT JOIN {SCHEMA}.slshop_branches b ON b.id=a.branch_id "
+        f"WHERE a.is_active=true ORDER BY a.is_default DESC, a.id"
+    )
+    rows = cur.fetchall()
+    cur.close(); conn.close()
+    return [dict(r) for r in rows]
 
 
 def sell_item(body, employee):
@@ -672,8 +869,25 @@ def sell_item(body, employee):
     )
     op_id = cur.fetchone()[0]
     cur.execute(
-        f"UPDATE {SCHEMA}.slshop_items SET status='sold', sell_price={_esc(amount)}, sell_operation_id={op_id}, sell_at=NOW(), updated_at=NOW() WHERE id={int(item_id)}"
+        f"UPDATE {SCHEMA}.slshop_items SET status='sold', sell_price={_esc(amount)}, sell_operation_id={op_id}, sell_at=NOW(), updated_at=NOW() WHERE id={int(item_id)} RETURNING branch_id"
     )
+    sold_row = cur.fetchone()
+    sold_branch = sold_row[0] if sold_row else None
+    # Автоматическое движение по кассе при оплате наличными
+    if (payment or 'cash') == 'cash' and sold_branch:
+        cur.execute(
+            f"SELECT id, balance FROM {SCHEMA}.slshop_cash_accounts WHERE branch_id={int(sold_branch)} AND is_active=true LIMIT 1"
+        )
+        acc = cur.fetchone()
+        if acc:
+            acc_id, balance = acc[0], float(acc[1] or 0)
+            new_balance = balance + float(amount)
+            cur.execute(
+                f"INSERT INTO {SCHEMA}.slshop_cash_movements (account_id, direction, amount, balance_after, category, reason, employee_name, related_op_id, related_item_id, is_auto, branch_id) "
+                f"VALUES ({acc_id}, 'in', {float(amount)}, {new_balance}, 'Продажа товара', "
+                f"{_esc('Продажа №' + str(item_id))}, {_esc(employee.get('full_name') if employee else None)}, {op_id}, {int(item_id)}, TRUE, {int(sold_branch)})"
+            )
+            cur.execute(f"UPDATE {SCHEMA}.slshop_cash_accounts SET balance={new_balance} WHERE id={acc_id}")
     conn.commit(); cur.close(); conn.close()
     return _ok({'op_id': op_id})
 
@@ -1002,7 +1216,9 @@ def handler(event: dict, context) -> dict:
         if action == 'item_create' and method == 'POST':
             return create_item(body, employee)
         if action == 'item_update' and method == 'POST':
-            return update_item(body)
+            return update_item(body, employee)
+        if action == 'item_remove' and method == 'POST':
+            return remove_item(body, employee)
         if action == 'item_sell' and method == 'POST':
             return sell_item(body, employee)
         if action == 'item_return' and method == 'POST':
@@ -1049,6 +1265,22 @@ def handler(event: dict, context) -> dict:
         # проданные товары для сводки и чеков
         if action == 'sold':
             return _ok(list_sold(params))
+        # роли и права
+        if action == 'roles':
+            return _ok(list_roles())
+        if action == 'role_save' and method == 'POST':
+            return save_role(body, employee)
+        if action == 'my_permissions':
+            return my_permissions(employee)
+        # касса наличных
+        if action == 'cash_accounts':
+            return _ok(list_cash_accounts())
+        if action == 'cash_summary':
+            return _ok(cash_summary())
+        if action == 'cash_movements':
+            return _ok(cash_movements_list(params))
+        if action == 'cash_movement_create' and method == 'POST':
+            return cash_movement_create(body, employee)
         return _err(400, f'Неизвестный action: {action}')
     except Exception as e:
         return _err(500, f'Ошибка: {e}')

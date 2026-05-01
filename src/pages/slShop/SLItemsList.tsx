@@ -12,7 +12,7 @@ const STATUS_FILTERS = [
   { v: "returned", l: "Возвраты" },
 ];
 
-export default function SLItemsList({ token, empName: _empName }: { token: string; empName?: string }) {
+export default function SLItemsList({ token, empName: _empName, isOwner = false }: { token: string; empName?: string; isOwner?: boolean }) {
   const [items, setItems] = useState<SLItem[]>([]);
   const [cats, setCats] = useState<SLCategory[]>([]);
   const [branches, setBranches] = useState<{ id: number; name: string }[]>([]);
@@ -137,13 +137,13 @@ export default function SLItemsList({ token, empName: _empName }: { token: strin
         })}
       </div>
 
-      {open && <ItemDetail token={token} item={open} onClose={() => setOpen(null)} onUpdated={() => { setOpen(null); load(); }} onSell={() => { setSellOpen(open); setOpen(null); }} />}
+      {open && <ItemDetail token={token} item={open} isOwner={isOwner} onClose={() => setOpen(null)} onUpdated={() => { setOpen(null); load(); }} onSell={() => { setSellOpen(open); setOpen(null); }} />}
       {sellOpen && <SellModal token={token} item={sellOpen} onClose={() => setSellOpen(null)} onDone={() => { setSellOpen(null); load(); }} />}
     </div>
   );
 }
 
-function ItemDetail({ token, item, onClose, onUpdated, onSell }: { token: string; item: SLItem; onClose: () => void; onUpdated: () => void; onSell: () => void }) {
+function ItemDetail({ token, item, isOwner, onClose, onUpdated, onSell }: { token: string; item: SLItem; isOwner?: boolean; onClose: () => void; onUpdated: () => void; onSell: () => void }) {
   const [editing, setEditing] = useState(false);
   const [data, setData] = useState({ ...item });
   const [cats, setCats] = useState<SLCategory[]>([]);
@@ -226,6 +226,23 @@ function ItemDetail({ token, item, onClose, onUpdated, onSell }: { token: string
                   <button onClick={onSell} className="flex-1 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 py-2 rounded-lg text-sm font-bold">Продать</button>
                 )}
               </div>
+              {(isOwner || item.status !== "sold") && (
+                <button
+                  onClick={async () => {
+                    const isSold = item.status === "sold";
+                    const txt = isSold
+                      ? "Удалить ПРОДАННЫЙ товар? Это действие необратимо."
+                      : "Удалить товар? Это действие необратимо.";
+                    if (!confirm(txt)) return;
+                    const r = await slApi(token, "item_remove", { method: "POST", body: { id: item.id } });
+                    if (r.ok) onUpdated();
+                    else alert(r.error || "Ошибка удаления");
+                  }}
+                  className="w-full mt-2 bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 py-2 rounded-lg text-sm font-bold">
+                  <Icon name="Trash2" size={13} className="inline mr-1" />
+                  Удалить товар{item.status === "sold" ? " (проданный)" : ""}
+                </button>
+              )}
             </>
           ) : (
             <>
@@ -263,7 +280,12 @@ function ItemDetail({ token, item, onClose, onUpdated, onSell }: { token: string
               </div>
               <div className="grid grid-cols-3 gap-2">
                 <Inp2 l="Закупка ₽" v={String(data.buy_price || "")} s={v => setData({ ...data, buy_price: v })} />
-                <Inp2 l="Продажа ₽" v={String(data.sell_price || "")} s={v => setData({ ...data, sell_price: v })} />
+                <Inp2
+                  l={`Продажа ₽${item.status === "sold" && !isOwner ? " (только владелец)" : ""}`}
+                  v={String(data.sell_price || "")}
+                  s={v => setData({ ...data, sell_price: v })}
+                  disabled={item.status === "sold" && !isOwner}
+                />
                 <Inp2 l="Мин. ₽" v={String(data.min_price || "")} s={v => setData({ ...data, min_price: v })} />
               </div>
               <div className="flex gap-2 sticky bottom-0 bg-[#0A0A0A] py-2 -mx-3 px-3">
@@ -343,12 +365,12 @@ function Row({ k, v }: { k: string; v: string }) {
   );
 }
 
-function Inp2({ l, v, s }: { l: string; v: string; s: (x: string) => void }) {
+function Inp2({ l, v, s, disabled }: { l: string; v: string; s: (x: string) => void; disabled?: boolean }) {
   return (
     <div>
       <div className="text-[11px] text-white/50 mb-0.5">{l}</div>
-      <input value={v} onChange={e => s(e.target.value)}
-        className="w-full bg-[#141414] border border-[#1F1F1F] rounded px-2 py-1.5 text-sm" />
+      <input value={v} onChange={e => s(e.target.value)} disabled={disabled}
+        className="w-full bg-[#141414] border border-[#1F1F1F] rounded px-2 py-1.5 text-sm disabled:opacity-50 disabled:cursor-not-allowed" />
     </div>
   );
 }

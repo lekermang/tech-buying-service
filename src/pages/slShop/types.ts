@@ -2,6 +2,63 @@ import { SLSHOP_URL } from "../staff.types";
 
 export { SLSHOP_URL };
 
+export type SLPermissions = Record<string, boolean | undefined> & { all?: boolean };
+
+export type SLRole = {
+  id: number;
+  code: string;
+  name: string;
+  description?: string | null;
+  is_system: boolean;
+  permissions: SLPermissions;
+  sort_order: number;
+};
+
+export type SLMyPermissions = {
+  role: string;
+  name: string;
+  permissions: SLPermissions;
+  is_owner: boolean;
+};
+
+export type SLCashAccount = {
+  id: number;
+  branch_id?: number | null;
+  branch_name?: string | null;
+  name: string;
+  kind: string;
+  balance: number | string;
+  is_default: boolean;
+  is_active: boolean;
+};
+
+export type SLCashSummary = SLCashAccount & {
+  today_in: number | string;
+  today_out: number | string;
+};
+
+export type SLCashMovement = {
+  id: number;
+  account_id: number;
+  account_name?: string | null;
+  branch_name?: string | null;
+  direction: "in" | "out";
+  amount: number | string;
+  balance_after?: number | string | null;
+  category?: string | null;
+  reason?: string | null;
+  taken_by?: string | null;
+  employee_name?: string | null;
+  is_auto: boolean;
+  created_at: string;
+};
+
+export function can(perms: SLPermissions | null | undefined, key: string): boolean {
+  if (!perms) return false;
+  if (perms.all) return true;
+  return perms[key] === true;
+}
+
 export type SLCategory = {
   id: number;
   name: string;

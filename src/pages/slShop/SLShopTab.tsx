@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import SLDashboard from "./SLDashboard";
 import SLItemsList from "./SLItemsList";
@@ -10,6 +10,9 @@ import SLImportExport from "./SLImportExport";
 import SLCategories from "./SLCategories";
 import SLDiscount from "./SLDiscount";
 import SLRevision from "./SLRevision";
+import SLRoles from "./SLRoles";
+import SLCash from "./SLCash";
+import { slApi, can, type SLMyPermissions } from "./types";
 
 type SubTab =
   | "dashboard"
@@ -20,25 +23,47 @@ type SubTab =
   | "labels"
   | "discount"
   | "revision"
+  | "cash"
   | "import"
-  | "categories";
+  | "categories"
+  | "roles";
 
-const TABS: { k: SubTab; l: string; icon: string }[] = [
+type TabDef = { k: SubTab; l: string; icon: string; perm?: string; ownerOnly?: boolean };
+
+const ALL_TABS: TabDef[] = [
   { k: "dashboard", l: "Сводка", icon: "LayoutDashboard" },
-  { k: "buy", l: "Скупка", icon: "Plus" },
-  { k: "stock", l: "Склад", icon: "Package" },
-  { k: "operations", l: "Операции", icon: "Activity" },
-  { k: "clients", l: "Клиенты", icon: "Users" },
-  { k: "labels", l: "Ценники", icon: "Tag" },
-  { k: "discount", l: "Уценка", icon: "TrendingDown" },
-  { k: "revision", l: "Ревизия", icon: "ClipboardCheck" },
-  { k: "import", l: "Импорт/Экспорт", icon: "ArrowUpDown" },
+  { k: "buy", l: "Скупка", icon: "Plus", perm: "shop_buy" },
+  { k: "stock", l: "Склад", icon: "Package", perm: "shop_view" },
+  { k: "cash", l: "Касса", icon: "Wallet", perm: "cashflow_view" },
+  { k: "operations", l: "Операции", icon: "Activity", perm: "shop_view" },
+  { k: "clients", l: "Клиенты", icon: "Users", perm: "clients" },
+  { k: "labels", l: "Ценники", icon: "Tag", perm: "labels" },
+  { k: "discount", l: "Уценка", icon: "TrendingDown", perm: "discount" },
+  { k: "revision", l: "Ревизия", icon: "ClipboardCheck", perm: "revision" },
+  { k: "import", l: "Импорт/Экспорт", icon: "ArrowUpDown", perm: "excel_export" },
   { k: "categories", l: "Категории", icon: "Grid3x3" },
+  { k: "roles", l: "Роли и права", icon: "ShieldCheck", ownerOnly: true },
 ];
 
 export default function SLShopTab({ token, myRole }: { token: string; myRole?: string }) {
   const [tab, setTab] = useState<SubTab>("dashboard");
+  const [perms, setPerms] = useState<SLMyPermissions | null>(null);
   const empName = typeof window !== "undefined" ? (localStorage.getItem("employee_name") || "") : "";
+
+  useEffect(() => {
+    slApi<SLMyPermissions>(token, "my_permissions").then(r => {
+      if (r.ok && r.data) setPerms(r.data);
+    });
+  }, [token]);
+
+  const isOwner = perms?.is_owner || myRole === "owner";
+  const visibleTabs = ALL_TABS.filter(t => {
+    if (t.ownerOnly) return isOwner;
+    if (!t.perm) return true;
+    if (isOwner) return true;
+    return can(perms?.permissions, t.perm);
+  });
+
   return (
     <div className="p-3">
       {/* Шапка раздела */}
@@ -48,13 +73,16 @@ export default function SLShopTab({ token, myRole }: { token: string; myRole?: s
         </div>
         <div className="flex-1 min-w-0">
           <div className="font-oswald font-bold uppercase text-base leading-tight">СмартЛомбард</div>
-          <div className="text-[11px] text-white/50">Скупка и продажа Б/У техники, антиквариата и прочих товаров</div>
+          <div className="text-[11px] text-white/50 truncate">
+            {perms?.name ? `${perms.name} · ` : ""}
+            Скупка и продажа Б/У техники, антиквариата и прочих товаров
+          </div>
         </div>
       </div>
 
       {/* Подвкладки */}
       <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-2 mb-3">
-        {TABS.map(t => {
+        {visibleTabs.map(t => {
           const active = tab === t.k;
           return (
             <button
@@ -76,7 +104,8 @@ export default function SLShopTab({ token, myRole }: { token: string; myRole?: s
       {/* Контент подвкладки */}
       {tab === "dashboard"  && <SLDashboard token={token} empName={empName} onNav={(k) => setTab(k as SubTab)} />}
       {tab === "buy"        && <SLBuyForm token={token} onSaved={() => setTab("stock")} />}
-      {tab === "stock"      && <SLItemsList token={token} empName={empName} />}
+      {tab === "stock"      && <SLItemsList token={token} empName={empName} isOwner={isOwner} />}
+      {tab === "cash"       && <SLCash token={token} isOwner={isOwner} />}
       {tab === "operations" && <SLOperations token={token} myRole={myRole} />}
       {tab === "clients"    && <SLClientsList token={token} />}
       {tab === "labels"     && <SLLabels token={token} empName={empName} />}
@@ -84,6 +113,7 @@ export default function SLShopTab({ token, myRole }: { token: string; myRole?: s
       {tab === "revision"   && <SLRevision token={token} />}
       {tab === "import"     && <SLImportExport token={token} />}
       {tab === "categories" && <SLCategories token={token} />}
+      {tab === "roles"      && <SLRoles token={token} isOwner={isOwner} />}
     </div>
   );
 }
