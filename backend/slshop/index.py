@@ -252,11 +252,14 @@ def revision_create(body, employee):
     name = (body.get('name') or f'Ревизия {datetime.now().strftime("%d.%m.%Y %H:%M")}').strip()
     category_id = body.get('category_id')
     scope_status = body.get('scope_status') or 'stock'
+    conn = get_conn(); cur = conn.cursor()
+    # Валидация category_id
+    ok_cat, cat_norm, _e = _validate_fk(cur, 'slshop_categories', category_id, 'category_id')
+    category_id = cat_norm if ok_cat else None
     where = [f"status={_esc(scope_status)}"]
     if category_id:
         where.append(f"category_id={int(category_id)}")
     wsql = ' AND '.join(where)
-    conn = get_conn(); cur = conn.cursor()
     cur.execute(
         f"INSERT INTO {SCHEMA}.slshop_revisions (name, category_id, scope_status, started_by) "
         f"VALUES ({_esc(name)}, {_esc(category_id)}, {_esc(scope_status)}, {_esc(employee.get('full_name'))}) RETURNING id"
@@ -344,12 +347,29 @@ def list_branches():
 
 
 def _log_event(cur, event_type, entity_type, entity_id, title, description=None, amount=None, branch_id=None, employee=None):
+    """Лог в отдельной savepoint, чтобы при ошибке не ломать основную транзакцию."""
     try:
         emp_name = employee.get('full_name') if employee else None
-        cur.execute(
-            f"INSERT INTO {SCHEMA}.slshop_events (event_type, entity_type, entity_id, title, description, amount, branch_id, employee_name) "
-            f"VALUES ({_esc(event_type)}, {_esc(entity_type)}, {_esc(entity_id)}, {_esc(title)}, {_esc(description)}, {_esc(amount)}, {_esc(branch_id)}, {_esc(emp_name)})"
-        )
+        # Проверим что branch существует
+        if branch_id:
+            try:
+                cur.execute(f"SELECT 1 FROM {SCHEMA}.slshop_branches WHERE id={int(branch_id)}")
+                if not cur.fetchone():
+                    branch_id = None
+            except Exception:
+                branch_id = None
+        cur.execute(f"SAVEPOINT log_event")
+        try:
+            cur.execute(
+                f"INSERT INTO {SCHEMA}.slshop_events (event_type, entity_type, entity_id, title, description, amount, branch_id, employee_name) "
+                f"VALUES ({_esc(event_type)}, {_esc(entity_type)}, {_esc(entity_id)}, {_esc(title)}, {_esc(description)}, {_esc(amount)}, {_esc(branch_id)}, {_esc(emp_name)})"
+            )
+            cur.execute(f"RELEASE SAVEPOINT log_event")
+        except Exception:
+            try:
+                cur.execute(f"ROLLBACK TO SAVEPOINT log_event")
+            except Exception:
+                pass
     except Exception:
         pass
 
@@ -1718,5 +1738,11 @@ def handler(event: dict, context) -> dict:
         if action == 'favorite_remove' and method == 'POST':
             return favorite_remove(body, employee)
         return _err(400, f'Неизвестный action: {action}')
+    except psycopg2.errors.ForeignKeyViolation as e:
+        # Извлекаем имя таблицы/колонки из текста, чтобы было понятно где упало
+        msg = str(e).split('\n')[0] if e else 'foreign key constraint violation'
+        return _err(400, f'Связанная запись не найдена. {msg} (action={action})')
     except Exception as e:
-        return _err(500, f'Ошибка: {e}')
+        import traceback
+        tb = traceback.format_exc().splitlines()[-1] if traceback else ''
+        return _err(500, f'Ошибка ({action}): {type(e).__name__}: {e} | {tb}')
