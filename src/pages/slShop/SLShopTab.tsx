@@ -13,6 +13,9 @@ import SLRevision from "./SLRevision";
 import SLRoles from "./SLRoles";
 import SLCash from "./SLCash";
 import SLDocuments from "./SLDocuments";
+import SLJournal from "./SLJournal";
+import SLAnalytics from "./SLAnalytics";
+import SLBookkeeping from "./SLBookkeeping";
 import { slApi, can, type SLMyPermissions } from "./types";
 
 type SubTab =
@@ -25,6 +28,9 @@ type SubTab =
   | "discount"
   | "revision"
   | "cash"
+  | "journal"
+  | "analytics"
+  | "bookkeeping"
   | "import"
   | "categories"
   | "documents"
@@ -42,6 +48,9 @@ const ALL_TABS: TabDef[] = [
   { k: "labels", l: "Ценники", icon: "Tag", perm: "labels" },
   { k: "discount", l: "Уценка", icon: "TrendingDown", perm: "discount" },
   { k: "revision", l: "Ревизия", icon: "ClipboardCheck", perm: "revision" },
+  { k: "journal", l: "Журнал", icon: "ScrollText" },
+  { k: "analytics", l: "Аналитика", icon: "BarChart3", perm: "shifts_view_profit" },
+  { k: "bookkeeping", l: "Бухгалтерия", icon: "Calculator", perm: "cashflow_view" },
   { k: "import", l: "Импорт/Экспорт", icon: "ArrowUpDown", perm: "excel_export" },
   { k: "documents", l: "Документы", icon: "FileText" },
   { k: "categories", l: "Категории", icon: "Grid3x3" },
@@ -114,6 +123,9 @@ export default function SLShopTab({ token, myRole }: { token: string; myRole?: s
       {tab === "labels"     && <SLLabels token={token} empName={empName} />}
       {tab === "discount"   && <SLDiscount token={token} />}
       {tab === "revision"   && <SLRevision token={token} />}
+      {tab === "journal"    && <SLJournal token={token} />}
+      {tab === "analytics"  && <SLAnalytics token={token} />}
+      {tab === "bookkeeping"&& <SLBookkeeping token={token} />}
       {tab === "import"     && <SLImportExport token={token} />}
       {tab === "documents"  && <SLDocuments token={token} isOwner={isOwner} />}
       {tab === "categories" && <SLCategories token={token} />}

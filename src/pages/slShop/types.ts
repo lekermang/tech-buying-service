@@ -99,6 +99,51 @@ export type SLDocContext = {
   requisites: Record<string, unknown> | null;
 };
 
+export type SLEvent = {
+  id: number;
+  event_type: string;
+  entity_type?: string | null;
+  entity_id?: number | null;
+  title?: string | null;
+  description?: string | null;
+  amount?: number | string | null;
+  branch_id?: number | null;
+  branch_name?: string | null;
+  employee_name?: string | null;
+  created_at: string;
+};
+
+export type SLAnalytics = {
+  period: string;
+  date_from: string;
+  by_employee: { employee: string; sold_count: number; sold_sum: number; bought_count: number; bought_sum: number }[];
+  by_branch: { branch: string | null; sold_count: number; sold_sum: number; bought_sum: number }[];
+  by_day: { d: string; sold_count: number; sold_sum: number; bought_sum: number }[];
+  by_category: { category: string | null; sold_count: number; sold_sum: number }[];
+};
+
+export type SLAccounting = {
+  period: string;
+  date_from: string;
+  revenue: number;
+  spent: number;
+  profit: number;
+  sales_count: number;
+  buys_count: number;
+  cash_by_branch: { branch: string | null; account: string; balance: number; in_sum: number; out_sum: number }[];
+  expenses_by_category: { category: string | null; cnt: number; sum: number }[];
+};
+
+export type SLFavorite = {
+  id: number;
+  kind: string;
+  ref_id?: number | null;
+  label: string;
+  url?: string | null;
+  icon: string;
+  sort_order: number;
+};
+
 export const OP_TYPE_LABELS: Record<string, string> = {
   buyout_individual: "Скупка (физлицо)",
   buyout_legal: "Скупка (юрлицо)",

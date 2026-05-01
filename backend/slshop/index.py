@@ -343,6 +343,213 @@ def list_branches():
     return [dict(r) for r in rows]
 
 
+def _log_event(cur, event_type, entity_type, entity_id, title, description=None, amount=None, branch_id=None, employee=None):
+    try:
+        emp_name = employee.get('full_name') if employee else None
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.slshop_events (event_type, entity_type, entity_id, title, description, amount, branch_id, employee_name) "
+            f"VALUES ({_esc(event_type)}, {_esc(entity_type)}, {_esc(entity_id)}, {_esc(title)}, {_esc(description)}, {_esc(amount)}, {_esc(branch_id)}, {_esc(emp_name)})"
+        )
+    except Exception:
+        pass
+
+
+def list_events(params):
+    """Журнал всех событий с фильтрами"""
+    event_type = (params.get('event_type') or '').strip()
+    date_from = (params.get('date_from') or '').strip()
+    date_to = (params.get('date_to') or '').strip()
+    branch_id = params.get('branch_id')
+    where = []
+    if event_type:
+        where.append(f"event_type={_esc(event_type)}")
+    if date_from:
+        where.append(f"created_at >= {_esc(date_from)}")
+    if date_to:
+        where.append(f"created_at < {_esc(date_to)}::date + INTERVAL '1 day'")
+    if branch_id:
+        where.append(f"branch_id={int(branch_id)}")
+    wsql = (' WHERE ' + ' AND '.join(where)) if where else ''
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        f"SELECT e.*, b.name AS branch_name FROM {SCHEMA}.slshop_events e "
+        f"LEFT JOIN {SCHEMA}.slshop_branches b ON b.id=e.branch_id "
+        f"{wsql} ORDER BY e.created_at DESC LIMIT 500"
+    )
+    rows = cur.fetchall()
+    cur.close(); conn.close()
+    return [dict(r) for r in rows]
+
+
+def analytics_full(params):
+    """Расширенная аналитика: периоды, разбивка по сотрудникам, филиалам, категориям, дням"""
+    period = (params.get('period') or '30d').strip()
+    now = datetime.utcnow()
+    if period == 'today':
+        date_from = now.strftime('%Y-%m-%d')
+    elif period == 'yesterday':
+        date_from = (now - timedelta(days=1)).strftime('%Y-%m-%d')
+    elif period == '7d':
+        date_from = (now - timedelta(days=7)).strftime('%Y-%m-%d')
+    elif period == '30d':
+        date_from = (now - timedelta(days=30)).strftime('%Y-%m-%d')
+    elif period == 'year':
+        date_from = (now - timedelta(days=365)).strftime('%Y-%m-%d')
+    else:
+        date_from = '2000-01-01'
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cond_op = f" WHERE o.created_at >= {_esc(date_from)}"
+    # По сотрудникам
+    cur.execute(
+        f"SELECT COALESCE(o.employee_name,'—') AS employee, "
+        f"COUNT(*) FILTER (WHERE o.op_type='sell') AS sold_count, "
+        f"COALESCE(SUM(o.amount) FILTER (WHERE o.op_type='sell'),0) AS sold_sum, "
+        f"COUNT(*) FILTER (WHERE o.op_type='buy') AS bought_count, "
+        f"COALESCE(SUM(o.amount) FILTER (WHERE o.op_type='buy'),0) AS bought_sum "
+        f"FROM {SCHEMA}.slshop_operations o {cond_op} GROUP BY o.employee_name ORDER BY sold_sum DESC"
+    )
+    by_employee = [dict(r) for r in cur.fetchall()]
+    # По филиалам
+    cur.execute(
+        f"SELECT b.name AS branch, "
+        f"COUNT(*) FILTER (WHERE o.op_type='sell') AS sold_count, "
+        f"COALESCE(SUM(o.amount) FILTER (WHERE o.op_type='sell'),0) AS sold_sum, "
+        f"COALESCE(SUM(o.amount) FILTER (WHERE o.op_type='buy'),0) AS bought_sum "
+        f"FROM {SCHEMA}.slshop_operations o "
+        f"LEFT JOIN {SCHEMA}.slshop_items i ON i.id=o.item_id "
+        f"LEFT JOIN {SCHEMA}.slshop_branches b ON b.id=i.branch_id "
+        f"{cond_op} GROUP BY b.name ORDER BY sold_sum DESC"
+    )
+    by_branch = [dict(r) for r in cur.fetchall()]
+    # По дням
+    cur.execute(
+        f"SELECT DATE(o.created_at) AS d, "
+        f"COUNT(*) FILTER (WHERE o.op_type='sell') AS sold_count, "
+        f"COALESCE(SUM(o.amount) FILTER (WHERE o.op_type='sell'),0) AS sold_sum, "
+        f"COALESCE(SUM(o.amount) FILTER (WHERE o.op_type='buy'),0) AS bought_sum "
+        f"FROM {SCHEMA}.slshop_operations o {cond_op} GROUP BY 1 ORDER BY 1"
+    )
+    by_day = [dict(r) for r in cur.fetchall()]
+    # Категории
+    cur.execute(
+        f"SELECT c.name AS category, COUNT(*) FILTER (WHERE o.op_type='sell') AS sold_count, "
+        f"COALESCE(SUM(o.amount) FILTER (WHERE o.op_type='sell'),0) AS sold_sum "
+        f"FROM {SCHEMA}.slshop_operations o "
+        f"LEFT JOIN {SCHEMA}.slshop_items i ON i.id=o.item_id "
+        f"LEFT JOIN {SCHEMA}.slshop_categories c ON c.id=i.category_id "
+        f"{cond_op} GROUP BY c.name ORDER BY sold_sum DESC LIMIT 20"
+    )
+    by_category = [dict(r) for r in cur.fetchall()]
+    cur.close(); conn.close()
+    return _ok({
+        'period': period, 'date_from': date_from,
+        'by_employee': by_employee,
+        'by_branch': by_branch,
+        'by_day': by_day,
+        'by_category': by_category,
+    })
+
+
+def accounting_summary(params):
+    """Бухгалтерия: оборот, прибыль, налоговая база за период по филиалам и кассам."""
+    period = (params.get('period') or '30d').strip()
+    now = datetime.utcnow()
+    if period == 'today':
+        date_from = now.strftime('%Y-%m-%d')
+    elif period == '7d':
+        date_from = (now - timedelta(days=7)).strftime('%Y-%m-%d')
+    elif period == 'year':
+        date_from = (now - timedelta(days=365)).strftime('%Y-%m-%d')
+    else:
+        date_from = (now - timedelta(days=30)).strftime('%Y-%m-%d')
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        f"SELECT "
+        f"COALESCE(SUM(amount) FILTER (WHERE op_type='sell'),0) AS revenue, "
+        f"COALESCE(SUM(amount) FILTER (WHERE op_type='buy'),0) AS spent, "
+        f"COUNT(*) FILTER (WHERE op_type='sell') AS sales_count, "
+        f"COUNT(*) FILTER (WHERE op_type='buy') AS buys_count "
+        f"FROM {SCHEMA}.slshop_operations WHERE created_at >= {_esc(date_from)}"
+    )
+    totals = dict(cur.fetchone() or {})
+    # Касса по филиалам
+    cur.execute(
+        f"SELECT b.name AS branch, a.name AS account, a.balance, "
+        f"COALESCE((SELECT SUM(amount) FROM {SCHEMA}.slshop_cash_movements m WHERE m.account_id=a.id AND m.direction='in' AND m.created_at >= {_esc(date_from)}),0) AS in_sum, "
+        f"COALESCE((SELECT SUM(amount) FROM {SCHEMA}.slshop_cash_movements m WHERE m.account_id=a.id AND m.direction='out' AND m.created_at >= {_esc(date_from)}),0) AS out_sum "
+        f"FROM {SCHEMA}.slshop_cash_accounts a LEFT JOIN {SCHEMA}.slshop_branches b ON b.id=a.branch_id "
+        f"WHERE a.is_active=true ORDER BY b.name"
+    )
+    cash = [dict(r) for r in cur.fetchall()]
+    # Расходы по категориям (из кассы)
+    cur.execute(
+        f"SELECT category, COUNT(*) AS cnt, COALESCE(SUM(amount),0) AS sum "
+        f"FROM {SCHEMA}.slshop_cash_movements "
+        f"WHERE direction='out' AND created_at >= {_esc(date_from)} "
+        f"GROUP BY category ORDER BY sum DESC"
+    )
+    expenses = [dict(r) for r in cur.fetchall()]
+    cur.close(); conn.close()
+    revenue = float(totals.get('revenue') or 0)
+    spent = float(totals.get('spent') or 0)
+    profit = revenue - spent
+    return _ok({
+        'period': period, 'date_from': date_from,
+        'revenue': revenue, 'spent': spent, 'profit': profit,
+        'sales_count': int(totals.get('sales_count') or 0),
+        'buys_count': int(totals.get('buys_count') or 0),
+        'cash_by_branch': cash,
+        'expenses_by_category': expenses,
+    })
+
+
+def list_favorites(employee):
+    if not employee:
+        return []
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        f"SELECT * FROM {SCHEMA}.slshop_favorites WHERE employee_id={int(employee['id'])} "
+        f"ORDER BY sort_order, id"
+    )
+    rows = cur.fetchall()
+    cur.close(); conn.close()
+    return [dict(r) for r in rows]
+
+
+def favorite_add(body, employee):
+    if not employee:
+        return _err(401, 'Не авторизован')
+    label = (body.get('label') or '').strip()
+    kind = body.get('kind') or 'page'
+    if not label:
+        return _err(400, 'label обязателен')
+    conn = get_conn(); cur = conn.cursor()
+    cur.execute(
+        f"INSERT INTO {SCHEMA}.slshop_favorites (employee_id, kind, ref_id, label, url, icon) "
+        f"VALUES ({int(employee['id'])}, {_esc(kind)}, {_esc(body.get('ref_id'))}, {_esc(label)}, "
+        f"{_esc(body.get('url'))}, {_esc(body.get('icon') or 'Star')}) RETURNING id"
+    )
+    nid = cur.fetchone()[0]
+    conn.commit(); cur.close(); conn.close()
+    return _ok({'id': nid})
+
+
+def favorite_remove(body, employee):
+    if not employee:
+        return _err(401, 'Не авторизован')
+    fid = body.get('id')
+    if not fid:
+        return _err(400, 'id обязателен')
+    conn = get_conn(); cur = conn.cursor()
+    cur.execute(f"DELETE FROM {SCHEMA}.slshop_favorites WHERE id={int(fid)} AND employee_id={int(employee['id'])}")
+    conn.commit(); cur.close(); conn.close()
+    return _ok({'ok': True})
+
+
 def operation_delete(body, employee):
     if not employee or employee.get('role') != 'owner':
         return _err(403, 'Удалять операции может только владелец')
@@ -546,7 +753,7 @@ ITEM_FIELDS = [
     'sku', 'category_id', 'title', 'brand', 'model', 'specs', 'specs_short', 'storage', 'color',
     'condition', 'imei', 'serial_number', 'battery_health', 'has_box', 'has_charger', 'description',
     'buy_price', 'sell_price', 'min_price', 'status', 'source', 'consignment_percent',
-    'consignment_owner_id', 'buy_client_id', 'branch_id'
+    'consignment_owner_id', 'buy_client_id', 'branch_id', 'warranty_days'
 ]
 
 
@@ -585,6 +792,20 @@ def list_items(params):
     return [dict(r) for r in rows]
 
 
+def _validate_fk(cur, table, value, label):
+    """Проверяет существование внешней записи. Возвращает (ok, normalized_value, err)."""
+    if value in (None, '', 0, '0'):
+        return True, None, None
+    try:
+        v = int(value)
+    except (TypeError, ValueError):
+        return False, None, f'{label}: некорректный id'
+    cur.execute(f"SELECT 1 FROM {SCHEMA}.{table} WHERE id={v} LIMIT 1")
+    if not cur.fetchone():
+        return False, None, f'{label}: запись с id={v} не найдена'
+    return True, v, None
+
+
 def create_item(body, employee):
     title = (body.get('title') or '').strip()
     if not title:
@@ -599,13 +820,25 @@ def create_item(body, employee):
         data['buy_price'] = 0
     if data.get('sell_price') in (None, ''):
         data['sell_price'] = 0
+    conn = get_conn(); cur = conn.cursor()
+    # Валидация FK — если ссылка битая, обнуляем (не падаем)
+    for fk_field, fk_table, fk_label in [
+        ('category_id', 'slshop_categories', 'category_id'),
+        ('branch_id', 'slshop_branches', 'branch_id'),
+        ('buy_client_id', 'slshop_clients', 'buy_client_id'),
+        ('consignment_owner_id', 'slshop_clients', 'consignment_owner_id'),
+    ]:
+        ok, norm, _err_msg = _validate_fk(cur, fk_table, data.get(fk_field), fk_label)
+        data[fk_field] = norm if ok else None
     cols = ', '.join(list(data.keys()) + ['created_by', 'buy_at'])
     vals = ', '.join([_esc(v) for v in data.values()] + [_esc(employee.get('full_name') if employee else None), 'NOW()'])
-    conn = get_conn(); cur = conn.cursor()
     cur.execute(f"INSERT INTO {SCHEMA}.slshop_items ({cols}) VALUES ({vals}) RETURNING id, sku")
     row = cur.fetchone()
     item_id = row[0]
     sku = row[1]
+    _log_event(cur, 'buy', 'item', item_id, f'Скупка: {title}',
+               f'Цена {data.get("buy_price") or 0} ₽',
+               float(data.get('buy_price') or 0), data.get('branch_id'), employee)
     # Если это скупка с ценой > 0 — создадим операцию buy
     if data.get('source', 'buyout') == 'buyout' and data.get('buy_price') and float(data['buy_price']) > 0:
         cur.execute(
@@ -665,6 +898,17 @@ def update_item(body, employee=None):
         return _err(403, 'Редактировать проданный товар может только владелец')
     if cur_status == 'sold' and 'sell_price' in data and not is_owner:
         return _err(403, 'Менять цену продажи может только владелец')
+    # Валидация FK
+    fk_check = [
+        ('category_id', 'slshop_categories'),
+        ('branch_id', 'slshop_branches'),
+        ('buy_client_id', 'slshop_clients'),
+        ('consignment_owner_id', 'slshop_clients'),
+    ]
+    for fk_field, fk_table in fk_check:
+        if fk_field in data:
+            ok, norm, _e = _validate_fk(cur, fk_table, data[fk_field], fk_field)
+            data[fk_field] = norm if ok else None
     sets = ', '.join([f"{k}={_esc(v)}" for k, v in data.items()])
     cur.execute(f"UPDATE {SCHEMA}.slshop_items SET {sets}, updated_at=NOW() WHERE id={int(item_id)} RETURNING id")
     row = cur.fetchone()
@@ -691,9 +935,11 @@ def remove_item(body, employee):
     if cur_status == 'sold' and not is_owner:
         cur.close(); conn.close()
         return _err(403, 'Удалять проданный товар может только владелец')
-    # очищаем связанные операции и движения
+    # очищаем все возможные FK-ссылки, чтобы DELETE не упал
     cur.execute(f"UPDATE {SCHEMA}.slshop_operations SET item_id=NULL WHERE item_id={int(item_id)}")
     cur.execute(f"UPDATE {SCHEMA}.slshop_cash_movements SET related_item_id=NULL WHERE related_item_id={int(item_id)}")
+    cur.execute(f"UPDATE {SCHEMA}.slshop_discount_log SET item_id=NULL WHERE item_id={int(item_id)}")
+    cur.execute(f"UPDATE {SCHEMA}.slshop_revision_items SET item_id=NULL WHERE item_id={int(item_id)}")
     cur.execute(f"DELETE FROM {SCHEMA}.slshop_items WHERE id={int(item_id)}")
     conn.commit(); cur.close(); conn.close()
     return _ok({'ok': True})
@@ -1022,16 +1268,23 @@ def sell_item(body, employee):
     cur_status = row[0]
     if cur_status == 'sold':
         cur.close(); conn.close(); return _err(400, 'Товар уже продан')
+    # Валидация client_id (если битый — обнулим, не падаем)
+    ok_cl, client_id_norm, _err_cl = _validate_fk(cur, 'slshop_clients', client_id, 'client_id')
+    client_id = client_id_norm if ok_cl else None
     cur.execute(
         f"INSERT INTO {SCHEMA}.slshop_operations (op_type, item_id, client_id, amount, payment_method, contract_number, note, employee_name, status_from, status_to) "
         f"VALUES ('sell', {int(item_id)}, {_esc(client_id)}, {_esc(amount)}, {_esc(payment)}, {_esc(contract)}, {_esc(note)}, {_esc(employee.get('full_name') if employee else None)}, {_esc(cur_status)}, 'sold') RETURNING id"
     )
     op_id = cur.fetchone()[0]
     cur.execute(
-        f"UPDATE {SCHEMA}.slshop_items SET status='sold', sell_price={_esc(amount)}, sell_operation_id={op_id}, sell_at=NOW(), updated_at=NOW() WHERE id={int(item_id)} RETURNING branch_id"
+        f"UPDATE {SCHEMA}.slshop_items SET status='sold', sell_price={_esc(amount)}, sell_operation_id={op_id}, "
+        f"sell_at=NOW(), warranty_until=(CURRENT_DATE + COALESCE(warranty_days, 365) * INTERVAL '1 day')::date, "
+        f"updated_at=NOW() WHERE id={int(item_id)} RETURNING branch_id, title"
     )
     sold_row = cur.fetchone()
     sold_branch = sold_row[0] if sold_row else None
+    sold_title = sold_row[1] if sold_row and len(sold_row) > 1 else ''
+    _log_event(cur, 'sale', 'item', int(item_id), f'Продажа: {sold_title}', f'Сумма {amount} ₽', float(amount), sold_branch, employee)
     # Автоматическое движение по кассе при оплате наличными
     if (payment or 'cash') == 'cash' and sold_branch:
         cur.execute(
@@ -1451,6 +1704,19 @@ def handler(event: dict, context) -> dict:
             return doc_template_toggle(body, employee)
         if action == 'doc_context':
             return doc_context(params)
+        # журнал, аналитика, бухгалтерия, избранное
+        if action == 'events':
+            return _ok(list_events(params))
+        if action == 'analytics_full':
+            return analytics_full(params)
+        if action == 'accounting':
+            return accounting_summary(params)
+        if action == 'favorites':
+            return _ok(list_favorites(employee))
+        if action == 'favorite_add' and method == 'POST':
+            return favorite_add(body, employee)
+        if action == 'favorite_remove' and method == 'POST':
+            return favorite_remove(body, employee)
         return _err(400, f'Неизвестный action: {action}')
     except Exception as e:
         return _err(500, f'Ошибка: {e}')

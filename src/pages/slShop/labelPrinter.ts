@@ -69,6 +69,9 @@ function labelHtml(item: SLItem, tmpl: SLLabelTemplate, opts: { empName?: string
         <span>Ответственное лицо:</span>
         <b>${escapeHtml(empName || "—")}</b>
       </div>
+      <div style="font-size:${tiny}mm;text-align:center;color:${accent}">
+        Гарантия: 1 год
+      </div>
     </div>
   `;
 }
@@ -211,7 +214,8 @@ export function printReceipt(item: {
     <div class="row"><span>Продавец</span><b>${escapeHtml(item.employee_name || "—")}</b></div>
     <div class="id">#${item.id}</div>
     <div class="footer">
-      Гарантия 14 дней.<br>
+      Гарантия: <b>1 год</b> с даты продажи.<br>
+      Действует до: <b>${new Date(Date.now() + 365 * 86400000).toLocaleDateString("ru-RU")}</b><br>
       Спасибо за покупку!<br>
       skupka24.ru
     </div>
