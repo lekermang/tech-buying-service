@@ -844,6 +844,165 @@ def cash_summary():
     return [dict(r) for r in rows]
 
 
+# ============ Requisites ============
+def list_requisites():
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        f"SELECT r.*, b.name AS branch_name FROM {SCHEMA}.slshop_requisites r "
+        f"LEFT JOIN {SCHEMA}.slshop_branches b ON b.id=r.branch_id "
+        f"WHERE r.is_active=true ORDER BY r.is_default DESC, r.id"
+    )
+    rows = cur.fetchall()
+    cur.close(); conn.close()
+    return [dict(r) for r in rows]
+
+
+def save_requisite(body, employee):
+    if not employee or employee.get('role') not in ('owner', 'manager'):
+        return _err(403, 'Изменять реквизиты может только владелец или руководитель')
+    rid = body.get('id')
+    fields = {
+        'branch_id': body.get('branch_id'),
+        'legal_name': (body.get('legal_name') or '').strip(),
+        'short_name': body.get('short_name'),
+        'inn': body.get('inn'),
+        'ogrn': body.get('ogrn'),
+        'kpp': body.get('kpp'),
+        'legal_address': body.get('legal_address'),
+        'actual_address': body.get('actual_address'),
+        'bank_name': body.get('bank_name'),
+        'bank_bic': body.get('bank_bic'),
+        'bank_account': body.get('bank_account'),
+        'corr_account': body.get('corr_account'),
+        'phone': body.get('phone'),
+        'email': body.get('email'),
+        'director_name': body.get('director_name'),
+        'director_position': body.get('director_position'),
+        'signatory_name': body.get('signatory_name'),
+        'warranty_days': int(body.get('warranty_days') or 365),
+        'is_default': bool(body.get('is_default', False)),
+    }
+    if not fields['legal_name']:
+        return _err(400, 'legal_name обязателен')
+    conn = get_conn(); cur = conn.cursor()
+    if rid:
+        sets = ', '.join([f"{k}={_esc(v)}" for k, v in fields.items()])
+        cur.execute(f"UPDATE {SCHEMA}.slshop_requisites SET {sets}, updated_at=NOW() WHERE id={int(rid)} RETURNING id")
+        row = cur.fetchone()
+        nid = row[0] if row else rid
+    else:
+        cols = ', '.join(fields.keys())
+        vals = ', '.join([_esc(v) for v in fields.values()])
+        cur.execute(f"INSERT INTO {SCHEMA}.slshop_requisites ({cols}) VALUES ({vals}) RETURNING id")
+        nid = cur.fetchone()[0]
+    conn.commit(); cur.close(); conn.close()
+    return _ok({'id': nid})
+
+
+# ============ Document templates ============
+def list_doc_templates(params):
+    op_type = (params.get('op_type') or '').strip()
+    only_active = params.get('only_active') == '1'
+    where = []
+    if only_active:
+        where.append("is_active=true")
+    if op_type:
+        where.append(f"({_esc(op_type)} = ANY(op_types))")
+    wsql = (' WHERE ' + ' AND '.join(where)) if where else ''
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(f"SELECT * FROM {SCHEMA}.slshop_doc_templates{wsql} ORDER BY sort_order, name")
+    rows = cur.fetchall()
+    cur.close(); conn.close()
+    return [dict(r) for r in rows]
+
+
+def doc_template_toggle(body, employee):
+    if not employee or employee.get('role') not in ('owner', 'manager'):
+        return _err(403, 'Менять шаблоны может только владелец или руководитель')
+    tid = body.get('id')
+    if not tid:
+        return _err(400, 'id обязателен')
+    conn = get_conn(); cur = conn.cursor()
+    cur.execute(f"UPDATE {SCHEMA}.slshop_doc_templates SET is_active = NOT is_active WHERE id={int(tid)} RETURNING is_active")
+    row = cur.fetchone()
+    conn.commit(); cur.close(); conn.close()
+    return _ok({'is_active': row[0] if row else None})
+
+
+def doc_context(params):
+    """Возвращает все данные для печати документа: товар, клиент, реквизиты, филиал, операция, сотрудник."""
+    item_id = params.get('item_id')
+    op_id = params.get('op_id')
+    client_id = params.get('client_id')
+    if not (item_id or op_id):
+        return _err(400, 'нужен item_id или op_id')
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    item = None; op = None; client = None; branch = None; req = None
+    if item_id:
+        cur.execute(
+            f"SELECT i.*, c.name AS category_name, c.path AS category_path, b.name AS branch_name, b.address AS branch_address "
+            f"FROM {SCHEMA}.slshop_items i "
+            f"LEFT JOIN {SCHEMA}.slshop_categories c ON c.id=i.category_id "
+            f"LEFT JOIN {SCHEMA}.slshop_branches b ON b.id=i.branch_id "
+            f"WHERE i.id={int(item_id)}"
+        )
+        r = cur.fetchone()
+        if r:
+            item = dict(r)
+            if item.get('branch_id') and not client_id:
+                client_id = item.get('buy_client_id')
+    if op_id:
+        cur.execute(
+            f"SELECT o.*, i.title AS item_title, i.imei AS item_imei, i.sku AS item_sku, "
+            f"i.specs_short, i.sell_price, i.buy_price, i.branch_id, "
+            f"b.name AS branch_name, b.address AS branch_address, "
+            f"c.full_name AS client_name, c.phone AS client_phone, c.passport_series, c.passport_number, "
+            f"c.passport_issued_by, c.passport_issued_date, c.address AS client_address, c.birth_date "
+            f"FROM {SCHEMA}.slshop_operations o "
+            f"LEFT JOIN {SCHEMA}.slshop_items i ON i.id=o.item_id "
+            f"LEFT JOIN {SCHEMA}.slshop_branches b ON b.id=i.branch_id "
+            f"LEFT JOIN {SCHEMA}.slshop_clients c ON c.id=o.client_id "
+            f"WHERE o.id={int(op_id)}"
+        )
+        r = cur.fetchone()
+        if r:
+            op = dict(r)
+            if not item_id and op.get('item_id'):
+                cur.execute(f"SELECT * FROM {SCHEMA}.slshop_items WHERE id={int(op['item_id'])}")
+                ir = cur.fetchone()
+                if ir:
+                    item = dict(ir)
+            if not client_id and op.get('client_id'):
+                client_id = op['client_id']
+    if client_id:
+        cur.execute(f"SELECT * FROM {SCHEMA}.slshop_clients WHERE id={int(client_id)}")
+        r = cur.fetchone()
+        if r:
+            client = dict(r)
+    branch_id = (item or {}).get('branch_id') or (op or {}).get('branch_id')
+    if branch_id:
+        cur.execute(f"SELECT * FROM {SCHEMA}.slshop_branches WHERE id={int(branch_id)}")
+        r = cur.fetchone()
+        if r:
+            branch = dict(r)
+        cur.execute(
+            f"SELECT * FROM {SCHEMA}.slshop_requisites WHERE branch_id={int(branch_id)} AND is_active=true LIMIT 1"
+        )
+        r = cur.fetchone()
+        if r:
+            req = dict(r)
+    if not req:
+        cur.execute(f"SELECT * FROM {SCHEMA}.slshop_requisites WHERE is_default=true AND is_active=true LIMIT 1")
+        r = cur.fetchone()
+        if r:
+            req = dict(r)
+    cur.close(); conn.close()
+    return _ok({'item': item, 'operation': op, 'client': client, 'branch': branch, 'requisites': req})
+
+
 def sell_item(body, employee):
     item_id = body.get('item_id')
     amount = body.get('amount')
@@ -1281,6 +1440,17 @@ def handler(event: dict, context) -> dict:
             return _ok(cash_movements_list(params))
         if action == 'cash_movement_create' and method == 'POST':
             return cash_movement_create(body, employee)
+        # реквизиты и документы
+        if action == 'requisites':
+            return _ok(list_requisites())
+        if action == 'requisite_save' and method == 'POST':
+            return save_requisite(body, employee)
+        if action == 'doc_templates':
+            return _ok(list_doc_templates(params))
+        if action == 'doc_template_toggle' and method == 'POST':
+            return doc_template_toggle(body, employee)
+        if action == 'doc_context':
+            return doc_context(params)
         return _err(400, f'Неизвестный action: {action}')
     except Exception as e:
         return _err(500, f'Ошибка: {e}')

@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 import { slApi, fmt, type SLItem, type SLCategory, STATUS_LABEL, PAYMENT_METHODS } from "./types";
 import CategoryTreeSelect from "./CategoryTreeSelect";
+import PrintDocsButton from "./PrintDocsButton";
 
 const STATUS_FILTERS = [
   { v: "", l: "Все" },
@@ -225,6 +226,11 @@ function ItemDetail({ token, item, isOwner, onClose, onUpdated, onSell }: { toke
                 {item.status !== "sold" && item.status !== "returned" && (
                   <button onClick={onSell} className="flex-1 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 py-2 rounded-lg text-sm font-bold">Продать</button>
                 )}
+              </div>
+              <div className="mt-2">
+                <PrintDocsButton token={token} itemId={item.id}
+                  opType={item.status === "sold" ? "sell" : (item.source === "consignment" ? "consignment_in" : "buyout_individual")}
+                  label="Документы по товару" />
               </div>
               {(isOwner || item.status !== "sold") && (
                 <button

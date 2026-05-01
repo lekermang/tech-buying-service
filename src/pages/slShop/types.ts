@@ -53,6 +53,67 @@ export type SLCashMovement = {
   created_at: string;
 };
 
+export type SLRequisite = {
+  id: number;
+  branch_id?: number | null;
+  branch_name?: string | null;
+  legal_name: string;
+  short_name?: string | null;
+  inn?: string | null;
+  ogrn?: string | null;
+  kpp?: string | null;
+  legal_address?: string | null;
+  actual_address?: string | null;
+  bank_name?: string | null;
+  bank_bic?: string | null;
+  bank_account?: string | null;
+  corr_account?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  director_name?: string | null;
+  director_position?: string | null;
+  signatory_name?: string | null;
+  warranty_days: number;
+  is_default: boolean;
+  is_active: boolean;
+};
+
+export type SLDocTemplate = {
+  id: number;
+  code: string;
+  name: string;
+  description?: string | null;
+  op_types: string[];
+  is_active: boolean;
+  is_system: boolean;
+  print_format: "a4" | "a5" | "thermal" | string;
+  copies: number;
+  sort_order: number;
+};
+
+export type SLDocContext = {
+  item: Record<string, unknown> | null;
+  operation: Record<string, unknown> | null;
+  client: Record<string, unknown> | null;
+  branch: Record<string, unknown> | null;
+  requisites: Record<string, unknown> | null;
+};
+
+export const OP_TYPE_LABELS: Record<string, string> = {
+  buyout_individual: "Скупка (физлицо)",
+  buyout_legal: "Скупка (юрлицо)",
+  sell: "Продажа товара",
+  sell_consignment: "Продажа (реализация)",
+  return: "Возврат товара",
+  return_consignment: "Возврат (реализация)",
+  consignment_in: "Приём на реализацию",
+  consignment_off: "Снятие с реализации",
+  consignment_settle: "Расчёт с клиентом (реализация)",
+  move_in: "Входящее перемещение",
+  move_out: "Исходящее перемещение",
+  writeoff: "Списание / изъятие",
+};
+
 export function can(perms: SLPermissions | null | undefined, key: string): boolean {
   if (!perms) return false;
   if (perms.all) return true;

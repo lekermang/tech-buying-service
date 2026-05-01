@@ -1,6 +1,15 @@
 import { useEffect, useState, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 import { slApi, fmt, type SLOperation } from "./types";
+import PrintDocsButton from "./PrintDocsButton";
+
+const OP_TO_DOC_TYPE: Record<string, string> = {
+  buy: "buyout_individual",
+  sell: "sell",
+  return: "return",
+  move: "move_out",
+  writeoff: "writeoff",
+};
 
 const TYPES = [
   { v: "", l: "Все" },
@@ -85,13 +94,17 @@ export default function SLOperations({ token, myRole }: { token: string; myRole?
               {o.amount && Number(o.amount) > 0 && (
                 <div className={`text-right shrink-0 font-bold text-sm ${cfg.color}`}>{fmt(o.amount)} ₽</div>
               )}
-              {isOwner && (
-                <button onClick={() => remove(o.id)} disabled={deleting === o.id}
-                  title="Удалить операцию (только владелец)"
-                  className="shrink-0 text-white/30 hover:text-red-400 p-1 rounded">
-                  <Icon name={deleting === o.id ? "Loader" : "Trash2"} size={13} className={deleting === o.id ? "animate-spin" : ""} />
-                </button>
-              )}
+              <div className="flex gap-1 shrink-0 items-center">
+                <PrintDocsButton token={token} opId={o.id} itemId={o.item_id || undefined}
+                  opType={OP_TO_DOC_TYPE[o.op_type]} variant="small" />
+                {isOwner && (
+                  <button onClick={() => remove(o.id)} disabled={deleting === o.id}
+                    title="Удалить операцию (только владелец)"
+                    className="text-white/30 hover:text-red-400 p-1 rounded">
+                    <Icon name={deleting === o.id ? "Loader" : "Trash2"} size={13} className={deleting === o.id ? "animate-spin" : ""} />
+                  </button>
+                )}
+              </div>
             </div>
           );
         })}
