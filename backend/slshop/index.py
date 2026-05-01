@@ -577,11 +577,14 @@ def operation_delete(body, employee):
     if not op_id:
         return _err(400, 'id обязателен')
     conn = get_conn(); cur = conn.cursor()
-    cur.execute(f"SELECT op_type, item_id, status_from FROM {SCHEMA}.slshop_operations WHERE id={int(op_id)}")
+    cur.execute(f"SELECT op_type, item_id, status_from, amount FROM {SCHEMA}.slshop_operations WHERE id={int(op_id)}")
     row = cur.fetchone()
     if not row:
         cur.close(); conn.close(); return _err(404, 'Операция не найдена')
-    op_type, item_id, status_from = row[0], row[1], row[2]
+    op_type, item_id, status_from, amount = row[0], row[1], row[2], row[3]
+    op_id_int = int(op_id)
+
+    # 1) Откатываем эффект операции на товар (статус возвращаем)
     if op_type == 'sell' and item_id:
         prev = status_from or 'stock'
         cur.execute(
@@ -596,7 +599,33 @@ def operation_delete(body, employee):
         cur.execute(
             f"UPDATE {SCHEMA}.slshop_items SET status={_esc(status_from)}, updated_at=NOW() WHERE id={int(item_id)}"
         )
-    cur.execute(f"DELETE FROM {SCHEMA}.slshop_operations WHERE id={int(op_id)}")
+    elif op_type == 'buy' and item_id:
+        # buy → у товара затёрта buy_operation_id, item остаётся
+        cur.execute(
+            f"UPDATE {SCHEMA}.slshop_items SET buy_operation_id=NULL WHERE id={int(item_id)} AND buy_operation_id={op_id_int}"
+        )
+
+    # 2) Обнуляем все возможные FK-ссылки на эту операцию, чтобы DELETE не упал
+    cur.execute(f"UPDATE {SCHEMA}.slshop_items SET sell_operation_id=NULL WHERE sell_operation_id={op_id_int}")
+    cur.execute(f"UPDATE {SCHEMA}.slshop_items SET buy_operation_id=NULL WHERE buy_operation_id={op_id_int}")
+    cur.execute(f"UPDATE {SCHEMA}.slshop_cash_movements SET related_op_id=NULL WHERE related_op_id={op_id_int}")
+    cur.execute(f"UPDATE {SCHEMA}.slshop_operations SET related_op_id=NULL WHERE related_op_id={op_id_int}")
+
+    # 3) Откатим связанное движение кассы (если оно было автоматическим от продажи/скупки)
+    cur.execute(
+        f"SELECT id, account_id, direction, amount FROM {SCHEMA}.slshop_cash_movements "
+        f"WHERE related_item_id IS NOT NULL AND is_auto = TRUE AND related_op_id IS NULL "
+        f"AND created_at >= NOW() - INTERVAL '5 minutes' LIMIT 0"
+    )
+    # Удалять движения кассы автоматически не будем — оставим решение за пользователем
+
+    # 4) Удаляем саму операцию
+    cur.execute(f"DELETE FROM {SCHEMA}.slshop_operations WHERE id={op_id_int}")
+
+    # 5) Лог
+    _log_event(cur, 'remove', 'operation', op_id_int, f'Удалена операция #{op_id_int}',
+               f'Тип: {op_type}, сумма: {amount}', float(amount or 0), None, employee)
+
     conn.commit(); cur.close(); conn.close()
     return _ok({'ok': True})
 
@@ -1739,9 +1768,20 @@ def handler(event: dict, context) -> dict:
             return favorite_remove(body, employee)
         return _err(400, f'Неизвестный action: {action}')
     except psycopg2.errors.ForeignKeyViolation as e:
-        # Извлекаем имя таблицы/колонки из текста, чтобы было понятно где упало
         msg = str(e).split('\n')[0] if e else 'foreign key constraint violation'
+        # Извлечь имя constraint и таблицы для понятности
+        import re as _re
+        m = _re.search(r'on table "([^"]+)".*constraint "([^"]+)"', str(e))
+        if m:
+            return _err(400, f'Невозможно удалить — есть связанные записи в таблице {m.group(1)} (constraint {m.group(2)}). action={action}')
         return _err(400, f'Связанная запись не найдена. {msg} (action={action})')
+    except psycopg2.errors.InsufficientPrivilege as e:
+        msg = str(e).split('\n')[0] if e else 'insufficient privilege'
+        return _err(403, f'Нет прав в БД для этой операции. {msg} (action={action})')
+    except psycopg2.Error as e:
+        # Любая другая ошибка psycopg
+        msg = str(e).split('\n')[0] if e else str(e)
+        return _err(500, f'БД ошибка ({action}): {type(e).__name__}: {msg}')
     except Exception as e:
         import traceback
         tb = traceback.format_exc().splitlines()[-1] if traceback else ''
