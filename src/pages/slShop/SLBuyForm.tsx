@@ -188,7 +188,12 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
         </Field>
 
         <Field label={<>Наименование {autofilled && <span className="text-emerald-400 text-[10px] ml-1">автозаполнено</span>}</>}>
-          <input value={title} onChange={e => setTitle(e.target.value)}
+          <input value={title} onChange={e => {
+            const v = e.target.value;
+            // если модель совпадала со старым title или пуста — синхронизируем
+            if (!model || model === title) setModel(v);
+            setTitle(v);
+          }}
             placeholder="iPhone 13 / Samsung Galaxy S22 / Антикварные часы..."
             className="w-full bg-[#0A0A0A] border border-[#1F1F1F] rounded-lg px-3 py-2 text-sm focus:border-[#FFD700]/50 outline-none" />
         </Field>

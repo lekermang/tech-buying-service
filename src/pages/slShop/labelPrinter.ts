@@ -14,14 +14,29 @@ function labelHtml(item: SLItem, tmpl: SLLabelTemplate, opts: { empName?: string
   const w = Number(tmpl.width_mm);
   const h = Number(tmpl.height_mm);
   const isThermal = tmpl.is_thermal;
-  const titleSize = (w / 16).toFixed(2);
-  const specsSize = (w / 24).toFixed(2);
-  const priceSize = (w / 7).toFixed(2);
-  const small = (w / 30).toFixed(2);
-  const tiny = (w / 36).toFixed(2);
+  const titleSize = (w / 14).toFixed(2);
+  const specsSize = (w / 20).toFixed(2);
+  const priceSize = (w / 6.5).toFixed(2);
+  const small = (w / 28).toFixed(2);
+  const tiny = (w / 34).toFixed(2);
 
-  const showSpecs = tmpl.show_specs && (item.specs_short || item.specs);
-  const specsText = item.specs_short || (item.specs || "").slice(0, 80);
+  // Собираем расширенные характеристики: краткие + память/АКБ/цвет/коробка/зарядка
+  const extraBits: string[] = [];
+  if (item.storage) extraBits.push(String(item.storage));
+  if (item.color) extraBits.push(String(item.color));
+  if (item.battery_health) extraBits.push(`АКБ ${item.battery_health}%`);
+  if (item.condition) extraBits.push(String(item.condition));
+  if (item.has_box) extraBits.push("коробка");
+  if (item.has_charger) extraBits.push("зарядка");
+
+  const baseSpecs = item.specs_short || (item.specs || "").slice(0, 100);
+  // Объединяем, удаляя дубликаты подстрок
+  const extraStr = extraBits
+    .filter(b => !baseSpecs.toLowerCase().includes(b.toLowerCase()))
+    .join(" • ");
+  const specsCombined = [baseSpecs, extraStr].filter(Boolean).join(" • ").slice(0, 140);
+
+  const showSpecs = tmpl.show_specs && specsCombined;
   const showImei = tmpl.show_imei && item.imei;
   const category = item.category_path || item.category_name || "";
   const branch = item.branch_name || "";
@@ -41,10 +56,9 @@ function labelHtml(item: SLItem, tmpl: SLLabelTemplate, opts: { empName?: string
       </div>
       ${category ? `<div class="cat" style="font-size:${tiny}mm;color:${accent}">${escapeHtml(category)}</div>` : ""}
       <div class="title" style="font-size:${titleSize}mm">${escapeHtml(item.title)}</div>
-      ${showSpecs ? `<div class="specs" style="font-size:${specsSize}mm">${escapeHtml(specsText)}</div>` : ""}
+      ${showSpecs ? `<div class="specs" style="font-size:${specsSize}mm">${escapeHtml(specsCombined)}</div>` : ""}
       ${showImei ? `<div class="imei" style="font-size:${tiny}mm">IMEI: ${escapeHtml(item.imei || "")}</div>` : ""}
       <div class="price" style="font-size:${priceSize}mm;color:${accent}">${fmtPrice(item.sell_price)}₽</div>
-      <div class="sku-id" style="font-size:${(w / 18).toFixed(2)}mm">${escapeHtml(item.sku || idStr)}</div>
       <div class="footer" style="font-size:${small}mm">
         <span>Ответственное лицо:</span>
         <b>${escapeHtml(empName || "—")}</b>
@@ -93,7 +107,7 @@ export function printLabels(items: SLItem[], tmpl: SLLabelTemplate, opts: { empN
       }
       .label .cat { text-align: center; font-style: italic; opacity: 0.85; line-height: 1; margin-top: 0.3mm; }
       .label .title { font-weight: 800; text-align: center; line-height: 1.05; width: 100%; }
-      .label .specs { text-align: center; line-height: 1.1; width: 100%; }
+      .label .specs { text-align: center; line-height: 1.15; width: 100%; font-weight: 600; color: #000; word-wrap: break-word; }
       .label .imei  { text-align: center; line-height: 1; width: 100%; color: #444; }
       .label .price { font-weight: 900; text-align: center; line-height: 1; width: 100%; }
       .label .sku-id { width: 100%; text-align: center; font-family: 'Courier New', monospace; font-weight: 800; letter-spacing: 0.4mm; line-height: 1; }
