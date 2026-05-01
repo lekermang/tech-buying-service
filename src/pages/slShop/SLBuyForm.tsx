@@ -205,10 +205,10 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
 
         <Field label="Краткие характеристики (для ценника)">
           <input value={specsShort} onChange={e => setSpecsShort(e.target.value)}
-            placeholder='6.1" 4/128GB, 90Hz'
-            maxLength={100}
+            placeholder='6.1" OLED 120Hz, 8/128GB, A16, 48+12MP, 3349mAh'
+            maxLength={200}
             className="w-full bg-[#0A0A0A] border border-[#1F1F1F] rounded-lg px-3 py-2 text-sm" />
-          <div className="text-[10px] text-white/30 mt-0.5">{specsShort.length}/100 — будет на ценнике</div>
+          <div className="text-[10px] text-white/30 mt-0.5">{specsShort.length}/200 — будет на ценнике</div>
         </Field>
 
         <Field label="Полные характеристики (опц.)">

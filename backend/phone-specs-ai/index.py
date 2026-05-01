@@ -35,7 +35,11 @@ PROMPT_TPL = (
     "- Каждая строка ≤ 90 символов.\n"
     "- Без заголовков, эмодзи, маркировок.\n"
     "- Только сами 4 строки в ответе, ничего больше.\n"
-    "- Также верни КРАТКОЕ описание одной строкой ≤ 60 символов в формате specs_short, например: '6.74\" 3/64GB 5000mAh'.\n\n"
+    "- Также верни РАЗВЁРНУТОЕ краткое описание одной строкой 80-150 символов в формате specs_short.\n"
+    "  Включи: диагональ, тип экрана, ОЗУ/ПЗУ, ёмкость АКБ, основную камеру, процессор/чип. Пример:\n"
+    "  '6.74\" IPS 90Hz, 3/64GB, 5000mAh, 50MP, Unisoc T612' (≈55 символов) или\n"
+    "  '6.1\" Super Retina XDR, 4/64GB, A14 Bionic, 5G, 12+12MP, 2815mAh'.\n"
+    "- specs_short должен быть НЕ КОРОЧЕ 50 символов и НЕ ДЛИННЕЕ 150.\n\n"
     "Верни строго JSON: {{\"specs\": \"...4 строки через \\\\n...\", \"specs_short\": \"...\"}}"
 )
 
@@ -77,7 +81,7 @@ def call_polza(prompt: str) -> dict:
     parsed = json.loads(raw)
     specs = (parsed.get('specs') or '').strip()
     short = (parsed.get('specs_short') or '').strip()
-    return {'specs': specs[:500], 'specs_short': short[:100]}
+    return {'specs': specs[:500], 'specs_short': short[:160]}
 
 
 def generate_for_item(item_id: int) -> dict:

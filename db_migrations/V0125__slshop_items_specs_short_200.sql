@@ -1,0 +1,1 @@
+ALTER TABLE t_p31606708_tech_buying_service.slshop_items ALTER COLUMN specs_short TYPE VARCHAR(200);

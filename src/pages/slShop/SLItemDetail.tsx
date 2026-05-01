@@ -7,9 +7,11 @@ import { Row, Inp2 } from "./SLItemsCommon";
 
 const PHONE_SPECS_AI_URL = "https://functions.poehali.dev/983744a8-1cfc-42d8-a566-bf31dfa328b2";
 
-export default function SLItemDetail({ token, item, isOwner, onClose, onUpdated, onSell }: { token: string; item: SLItem; isOwner?: boolean; onClose: () => void; onUpdated: () => void; onSell: () => void }) {
+export default function SLItemDetail({ token, item: itemProp, isOwner, onClose, onUpdated, onSell }: { token: string; item: SLItem; isOwner?: boolean; onClose: () => void; onUpdated: () => void; onSell: () => void }) {
   const [editing, setEditing] = useState(false);
-  const [data, setData] = useState({ ...item });
+  const [item, setItem] = useState<SLItem>(itemProp);
+  const [data, setData] = useState({ ...itemProp });
+  useEffect(() => { setItem(itemProp); setData({ ...itemProp }); }, [itemProp]);
   const [cats, setCats] = useState<SLCategory[]>([]);
   const [saving, setSaving] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
@@ -32,8 +34,12 @@ export default function SLItemDetail({ token, item, isOwner, onClose, onUpdated,
       });
       const j = await r.json();
       if (j.ok) {
+        // Сразу обновляем локальный state — пользователь видит результат мгновенно
+        setItem(prev => ({ ...prev, specs_short: j.specs_short ?? prev.specs_short, specs: j.specs ?? prev.specs }));
+        setData(prev => ({ ...prev, specs_short: j.specs_short ?? prev.specs_short, specs: j.specs ?? prev.specs }));
         setAiMsg("Характеристики обновлены");
-        setTimeout(() => onUpdated(), 600);
+        // И параллельно обновляем родительский список
+        onUpdated();
       } else {
         setAiMsg(j.error || "Ошибка генерации");
       }
