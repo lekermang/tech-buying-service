@@ -2,6 +2,8 @@ import { useEffect, useState, useRef } from "react";
 import Icon from "@/components/ui/icon";
 import { slApi, type SLCategory, type SLClient, type SLBranch, CONDITION_OPTIONS } from "./types";
 import CategoryTreeSelect from "./CategoryTreeSelect";
+import QuickClientForm from "./QuickClientForm";
+import PrintDocsButton from "./PrintDocsButton";
 
 export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: () => void }) {
   const [cats, setCats] = useState<SLCategory[]>([]);
@@ -35,6 +37,9 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
   const [autofilled, setAutofilled] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [showQuickClient, setShowQuickClient] = useState(false);
+  const [createdItemId, setCreatedItemId] = useState<number | null>(null);
+  const [autoPrint, setAutoPrint] = useState(true);
   const autofillTimer = useRef<number | null>(null);
 
   useEffect(() => {
@@ -110,9 +115,30 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
     };
     const r = await slApi<{ id: number; sku: string }>(token, "item_create", { method: "POST", body: payload });
     setSaving(false);
-    if (r.ok) {
-      setMsg(`Принято: ${r.data?.sku}`);
-      window.setTimeout(() => onSaved(), 800);
+    if (r.ok && r.data) {
+      setMsg(`Принято: ${r.data.sku}`);
+      setCreatedItemId(r.data.id);
+      // Автопечать договора и контрольной бирки сразу после скупки
+      if (autoPrint) {
+        setTimeout(async () => {
+          try {
+            const ctxRes = await slApi<{ item: unknown; client: unknown; branch: unknown; requisites: unknown; operation: unknown }>(
+              token, "doc_context", { params: { item_id: r.data!.id } }
+            );
+            const tplRes = await slApi<{ id: number; code: string; name: string }[]>(
+              token, "doc_templates", { params: { only_active: "1", op_type: source === "consignment" ? "consignment_in" : "buyout_individual" } }
+            );
+            if (ctxRes.ok && ctxRes.data && tplRes.ok && tplRes.data && tplRes.data.length > 0) {
+              const { printDoc } = await import("./docPrinter");
+              // Печатаем первый подходящий документ (договор)
+              const tpl = tplRes.data.find(t => t.code === "contract_purchase") || tplRes.data[0];
+              printDoc(tpl as never, ctxRes.data as never);
+            }
+          } catch (e) {
+            console.error("auto-print", e);
+          }
+        }, 300);
+      }
     } else {
       setMsg(r.error || "Ошибка");
     }
@@ -220,24 +246,48 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
       </Section>
 
       <Section title="Клиент (продавец)">
-        <div className="relative">
-          <input value={clientQuery} onChange={e => { setClientQuery(e.target.value); setClientId(""); setShowClientDrop(true); }}
-            onFocus={() => setShowClientDrop(true)}
-            placeholder="ФИО или телефон"
-            className="w-full bg-[#0A0A0A] border border-[#1F1F1F] rounded-lg px-3 py-2 text-sm" />
-          {showClientDrop && clientResults.length > 0 && (
-            <div className="absolute z-10 left-0 right-0 top-full mt-1 bg-[#141414] border border-[#1F1F1F] rounded-lg shadow-xl max-h-48 overflow-y-auto">
-              {clientResults.map(c => (
-                <button key={c.id} onClick={() => { setClientId(c.id); setClientQuery(c.full_name); setShowClientDrop(false); }}
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-white/5 border-b border-[#1F1F1F] last:border-0">
-                  <div className="font-medium">{c.full_name}</div>
-                  {c.phone && <div className="text-[11px] text-white/40">{c.phone}</div>}
-                </button>
-              ))}
+        {showQuickClient ? (
+          <QuickClientForm
+            token={token}
+            onCreated={(id, name) => {
+              setClientId(id);
+              setClientQuery(name);
+              setShowQuickClient(false);
+            }}
+            onCancel={() => setShowQuickClient(false)}
+          />
+        ) : (
+          <>
+            <div className="relative">
+              <input value={clientQuery} onChange={e => { setClientQuery(e.target.value); setClientId(""); setShowClientDrop(true); }}
+                onFocus={() => setShowClientDrop(true)}
+                placeholder="ФИО или телефон"
+                className="w-full bg-[#0A0A0A] border border-[#1F1F1F] rounded-lg px-3 py-2 text-sm" />
+              {showClientDrop && clientResults.length > 0 && (
+                <div className="absolute z-10 left-0 right-0 top-full mt-1 bg-[#141414] border border-[#1F1F1F] rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                  {clientResults.map(c => (
+                    <button key={c.id} onClick={() => { setClientId(c.id); setClientQuery(c.full_name); setShowClientDrop(false); }}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-white/5 border-b border-[#1F1F1F] last:border-0">
+                      <div className="font-medium">{c.full_name}</div>
+                      {c.phone && <div className="text-[11px] text-white/40">{c.phone}</div>}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-          <div className="text-[10px] text-white/30 mt-1">Если клиента нет — будет создан автоматически</div>
-        </div>
+            <button onClick={() => setShowQuickClient(true)}
+              className="w-full bg-gradient-to-br from-[#FFD700]/15 to-transparent border border-[#FFD700]/40 text-[#FFD700] rounded-lg py-2.5 text-sm font-bold flex items-center justify-center gap-2 hover:bg-[#FFD700]/20">
+              <Icon name="Camera" size={14} />
+              Новый клиент по фото паспорта
+            </button>
+            {clientId && (
+              <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 px-2.5 py-1.5 rounded text-[12px]">
+                <Icon name="UserCheck" size={11} className="inline mr-1" />
+                Клиент: {clientQuery} (ID #{clientId})
+              </div>
+            )}
+          </>
+        )}
       </Section>
 
       <Section title="Цены">
@@ -274,11 +324,38 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
           className="w-full bg-[#0A0A0A] border border-[#1F1F1F] rounded-lg px-3 py-2 text-sm resize-none" />
       </Field>
 
-      <button onClick={submit} disabled={saving}
-        className="w-full bg-gradient-to-br from-[#FFD700] to-yellow-600 text-black font-bold py-3 rounded-xl hover:shadow-lg hover:shadow-[#FFD700]/30 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2">
-        <Icon name={saving ? "Loader" : "Check"} size={16} className={saving ? "animate-spin" : ""} />
-        {saving ? "Сохраняю..." : "Принять товар"}
-      </button>
+      {!createdItemId ? (
+        <>
+          <label className="flex items-center justify-between bg-[#0F0F0F] border border-[#1F1F1F] rounded-lg p-2.5 cursor-pointer">
+            <div className="flex items-center gap-2">
+              <Icon name="Printer" size={14} className="text-[#FFD700]" />
+              <span className="text-sm">Печатать договор сразу после приёма</span>
+            </div>
+            <button onClick={() => setAutoPrint(!autoPrint)}
+              className={`w-9 h-5 rounded-full relative transition-colors ${autoPrint ? "bg-[#FFD700]" : "bg-[#1F1F1F]"}`}>
+              <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${autoPrint ? "left-4" : "left-0.5"}`} />
+            </button>
+          </label>
+          <button onClick={submit} disabled={saving}
+            className="w-full bg-gradient-to-br from-[#FFD700] to-yellow-600 text-black font-bold py-3 rounded-xl hover:shadow-lg hover:shadow-[#FFD700]/30 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2">
+            <Icon name={saving ? "Loader" : "Check"} size={16} className={saving ? "animate-spin" : ""} />
+            {saving ? "Сохраняю..." : "Принять товар"}
+          </button>
+        </>
+      ) : (
+        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 space-y-2">
+          <div className="flex items-center gap-2 text-emerald-300 font-bold">
+            <Icon name="CheckCircle2" size={18} />Товар принят #{createdItemId}
+          </div>
+          <PrintDocsButton token={token} itemId={createdItemId}
+            opType={source === "consignment" ? "consignment_in" : "buyout_individual"}
+            label="Печать документов" />
+          <button onClick={onSaved}
+            className="w-full bg-[#FFD700] text-black font-bold py-2.5 rounded-lg">
+            Готово, к складу
+          </button>
+        </div>
+      )}
     </div>
   );
 }

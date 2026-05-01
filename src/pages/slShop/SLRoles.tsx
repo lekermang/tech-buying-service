@@ -2,6 +2,19 @@ import { useEffect, useState, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 import { slApi, type SLRole, type SLPermissions } from "./types";
 
+type Employee = {
+  id: number;
+  full_name: string;
+  login: string;
+  role: string;
+  is_active: boolean;
+  created_at?: string;
+  last_seen_at?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  role_name?: string | null;
+};
+
 // Группировка прав по разделам — для удобства настройки
 const PERM_GROUPS: { title: string; perms: { key: string; label: string }[] }[] = [
   {
@@ -97,6 +110,7 @@ const PERM_GROUPS: { title: string; perms: { key: string; label: string }[] }[] 
 ];
 
 export default function SLRoles({ token, isOwner }: { token: string; isOwner: boolean }) {
+  const [tab, setTab] = useState<"roles" | "team">("team");
   const [roles, setRoles] = useState<SLRole[]>([]);
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState<SLRole | null>(null);
@@ -125,24 +139,139 @@ export default function SLRoles({ token, isOwner }: { token: string; isOwner: bo
 
   return (
     <div>
+      {/* Переключатель вкладок */}
+      <div className="flex gap-1.5 mb-3">
+        <button onClick={() => setTab("team")}
+          className={`flex-1 py-2 rounded-lg text-sm font-bold ${tab === "team" ? "bg-[#FFD700] text-black" : "bg-[#141414] border border-[#1F1F1F] text-white/60"}`}>
+          <Icon name="Users" size={13} className="inline mr-1" />Команда
+        </button>
+        <button onClick={() => setTab("roles")}
+          className={`flex-1 py-2 rounded-lg text-sm font-bold ${tab === "roles" ? "bg-[#FFD700] text-black" : "bg-[#141414] border border-[#1F1F1F] text-white/60"}`}>
+          <Icon name="ShieldCheck" size={13} className="inline mr-1" />Роли
+        </button>
+      </div>
+
       {msg && <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 p-2.5 rounded-lg mb-3 text-sm">{msg}</div>}
-      <div className="text-[11px] uppercase tracking-wide text-white/50 mb-2">Роли и права доступа</div>
+
+      {tab === "team" ? (
+        <TeamPanel token={token} roles={roles} onMsg={setMsg} />
+      ) : (
+        <>
+          <div className="text-[11px] uppercase tracking-wide text-white/50 mb-2">Роли и права доступа</div>
+          {loading && <div className="text-white/30 text-sm py-4 text-center">Загрузка...</div>}
+          <div className="space-y-2">
+            {roles.map(r => (
+              <button key={r.id} onClick={() => setEditing(r)}
+                className="w-full text-left bg-[#0F0F0F] border border-[#1F1F1F] rounded-lg p-3 hover:border-[#FFD700]/30">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="font-bold text-sm">{r.name}</div>
+                  {r.is_system && <span className="text-[10px] bg-[#141414] text-white/40 border border-[#1F1F1F] px-1.5 py-0.5 rounded">system</span>}
+                  {r.code === "owner" && <span className="text-[10px] bg-[#FFD700]/15 text-[#FFD700] border border-[#FFD700]/30 px-1.5 py-0.5 rounded">{"всё доступно"}</span>}
+                </div>
+                {r.description && <div className="text-[11px] text-white/50">{r.description}</div>}
+                <div className="text-[10px] text-white/30 mt-1.5">
+                  Прав включено: {Object.values(r.permissions || {}).filter(v => v === true).length}
+                </div>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function TeamPanel({ token, roles, onMsg }: { token: string; roles: SLRole[]; onMsg: (m: string) => void }) {
+  const [emps, setEmps] = useState<Employee[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [savingId, setSavingId] = useState<number | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const r = await slApi<Employee[]>(token, "employees_list");
+    if (r.ok && r.data) setEmps(r.data);
+    setLoading(false);
+  }, [token]);
+  useEffect(() => { load(); }, [load]);
+
+  const setRole = async (empId: number, role: string) => {
+    setSavingId(empId);
+    const r = await slApi(token, "employee_set_role", { method: "POST", body: { employee_id: empId, role } });
+    setSavingId(null);
+    if (r.ok) { onMsg("Роль обновлена"); load(); }
+    else onMsg(r.error || "Ошибка");
+  };
+
+  const initials = (name: string) => name.trim().split(/\s+/).map(s => s[0]).slice(0, 2).join("").toUpperCase();
+  const ROLE_BADGES: Record<string, { l: string; emoji: string; color: string }> = {
+    owner: { l: "Владелец", emoji: "👑", color: "bg-[#FFD700]/15 text-[#FFD700] border-[#FFD700]/30" },
+    manager: { l: "Руководитель", emoji: "🎯", color: "bg-purple-500/15 text-purple-300 border-purple-500/30" },
+    admin: { l: "Администратор", emoji: "🛡️", color: "bg-blue-500/15 text-blue-300 border-blue-500/30" },
+    master: { l: "Мастер", emoji: "🔧", color: "bg-orange-500/15 text-orange-300 border-orange-500/30" },
+    seller: { l: "Продавец", emoji: "🛒", color: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" },
+    accountant: { l: "Бухгалтер", emoji: "📊", color: "bg-cyan-500/15 text-cyan-300 border-cyan-500/30" },
+    investor: { l: "Инвестор", emoji: "💼", color: "bg-pink-500/15 text-pink-300 border-pink-500/30" },
+    staff: { l: "Сотрудник", emoji: "👤", color: "bg-white/10 text-white/60 border-white/15" },
+  };
+
+  return (
+    <div>
+      <div className="text-[11px] uppercase tracking-wide text-white/50 mb-2">Сотрудники и их роли</div>
+      <div className="text-[10px] text-white/40 mb-3">
+        Кликните на роль сотрудника, чтобы изменить. Права для каждой роли настраиваются на вкладке «Роли».
+      </div>
+
       {loading && <div className="text-white/30 text-sm py-4 text-center">Загрузка...</div>}
+
       <div className="space-y-2">
-        {roles.map(r => (
-          <button key={r.id} onClick={() => setEditing(r)}
-            className="w-full text-left bg-[#0F0F0F] border border-[#1F1F1F] rounded-lg p-3 hover:border-[#FFD700]/30">
-            <div className="flex items-center gap-2 mb-1">
-              <div className="font-bold text-sm">{r.name}</div>
-              {r.is_system && <span className="text-[10px] bg-[#141414] text-white/40 border border-[#1F1F1F] px-1.5 py-0.5 rounded">system</span>}
-              {r.code === "owner" && <span className="text-[10px] bg-[#FFD700]/15 text-[#FFD700] border border-[#FFD700]/30 px-1.5 py-0.5 rounded">{"всё доступно"}</span>}
+        {emps.map(e => {
+          const cfg = ROLE_BADGES[e.role] || ROLE_BADGES.staff;
+          return (
+            <div key={e.id}
+              className={`bg-[#0F0F0F] border rounded-lg p-3 ${e.is_active ? "border-[#1F1F1F]" : "border-red-500/30 opacity-70"}`}>
+              <div className="flex items-start gap-2">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${
+                  e.role === "owner" ? "bg-gradient-to-br from-[#FFD700] to-yellow-600 text-black" : "bg-[#141414] text-white/70 border border-white/10"
+                }`}>
+                  {initials(e.full_name)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-sm">{e.full_name}</div>
+                  <div className="text-[11px] text-white/40">
+                    {e.login}
+                    {!e.is_active && <span className="ml-2 text-red-300">неактивен</span>}
+                  </div>
+                  <div className="text-[10px] text-white/30 mt-0.5">
+                    {e.created_at && <>добавлен {new Date(e.created_at).toLocaleDateString("ru-RU")}</>}
+                  </div>
+                </div>
+                <span className={`text-[10px] px-2 py-1 rounded border ${cfg.color} shrink-0 whitespace-nowrap`}>
+                  {cfg.emoji} {cfg.l}
+                </span>
+              </div>
+              {/* Список ролей для смены */}
+              <div className="mt-2 pt-2 border-t border-[#1F1F1F]">
+                <div className="text-[10px] text-white/40 mb-1.5">Назначить роль:</div>
+                <div className="flex gap-1 flex-wrap">
+                  {roles.map(r => {
+                    const isCur = r.code === e.role;
+                    const badge = ROLE_BADGES[r.code] || ROLE_BADGES.staff;
+                    return (
+                      <button key={r.code}
+                        onClick={() => !isCur && setRole(e.id, r.code)}
+                        disabled={savingId === e.id || isCur}
+                        className={`text-[10px] px-2 py-1 rounded border transition-all ${
+                          isCur ? `${badge.color} font-bold ring-1 ring-white/20` : "bg-[#141414] border-[#1F1F1F] text-white/60 hover:border-[#FFD700]/40"
+                        } disabled:opacity-50`}>
+                        {savingId === e.id && !isCur ? "..." : `${badge.emoji} ${r.name}`}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
-            {r.description && <div className="text-[11px] text-white/50">{r.description}</div>}
-            <div className="text-[10px] text-white/30 mt-1.5">
-              Прав включено: {Object.values(r.permissions || {}).filter(v => v === true).length}
-            </div>
-          </button>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

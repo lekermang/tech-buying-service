@@ -346,6 +346,124 @@ def list_branches():
     return [dict(r) for r in rows]
 
 
+def items_move_branch(body, employee):
+    """Массовый/одиночный перенос товаров на другой филиал."""
+    if not employee:
+        return _err(401, 'Не авторизован')
+    item_ids = body.get('item_ids') or []
+    move_all = bool(body.get('move_all', False))
+    branch_id = body.get('branch_id')
+    if not branch_id:
+        return _err(400, 'branch_id обязателен')
+    conn = get_conn(); cur = conn.cursor()
+    cur.execute(f"SELECT id, name FROM {SCHEMA}.slshop_branches WHERE id={int(branch_id)}")
+    br = cur.fetchone()
+    if not br:
+        cur.close(); conn.close(); return _err(404, 'Филиал не найден')
+    branch_name = br[1]
+    if move_all:
+        cur.execute(
+            f"UPDATE {SCHEMA}.slshop_items SET branch_id={int(branch_id)}, updated_at=NOW() "
+            f"WHERE status IN ('stock','showcase','consignment')"
+        )
+        moved = cur.rowcount
+    else:
+        if not item_ids or not isinstance(item_ids, list):
+            cur.close(); conn.close(); return _err(400, 'item_ids должен быть непустым массивом')
+        ids_int = [int(x) for x in item_ids if x]
+        if not ids_int:
+            cur.close(); conn.close(); return _err(400, 'нет валидных id')
+        ids_csv = ','.join(str(x) for x in ids_int)
+        cur.execute(
+            f"UPDATE {SCHEMA}.slshop_items SET branch_id={int(branch_id)}, updated_at=NOW() "
+            f"WHERE id IN ({ids_csv})"
+        )
+        moved = cur.rowcount
+    _log_event(cur, 'move', 'items', None, f'Перенос {moved} товаров → {branch_name}',
+               'Массовый перенос' if move_all else f'Выбрано {len(item_ids)} шт',
+               None, int(branch_id), employee)
+    conn.commit(); cur.close(); conn.close()
+    return _ok({'moved': moved, 'branch_id': int(branch_id), 'branch_name': branch_name})
+
+
+def client_passport_upload(body, employee):
+    """Загрузка фото паспорта клиента (base64 → S3)."""
+    if not employee:
+        return _err(401, 'Не авторизован')
+    image_b64 = body.get('image_base64') or ''
+    field = (body.get('field') or 'passport_photo_url').strip()
+    if field not in ('passport_photo_url', 'passport_photo2_url', 'face_photo_url'):
+        return _err(400, 'field должен быть passport_photo_url|passport_photo2_url|face_photo_url')
+    client_id = body.get('client_id')
+    if not image_b64:
+        return _err(400, 'image_base64 обязателен')
+    try:
+        import boto3 as _boto3
+        import base64 as _b64
+        if ',' in image_b64:
+            image_b64 = image_b64.split(',', 1)[1]
+        raw = _b64.b64decode(image_b64)
+    except Exception as e:
+        return _err(400, f'Ошибка декодирования: {e}')
+    if len(raw) > 10 * 1024 * 1024:
+        return _err(400, 'Файл больше 10 МБ')
+    s3 = _boto3.client(
+        's3', endpoint_url='https://bucket.poehali.dev',
+        aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
+        aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
+    )
+    import uuid as _uuid
+    fname = f"slshop/passports/{_uuid.uuid4().hex}.jpg"
+    s3.put_object(Bucket='files', Key=fname, Body=raw, ContentType='image/jpeg')
+    cdn = f"https://cdn.poehali.dev/projects/{os.environ['AWS_ACCESS_KEY_ID']}/bucket/{fname}"
+    if client_id:
+        conn = get_conn(); cur = conn.cursor()
+        cur.execute(f"UPDATE {SCHEMA}.slshop_clients SET {field}={_esc(cdn)}, updated_at=NOW() WHERE id={int(client_id)}")
+        conn.commit(); cur.close(); conn.close()
+    return _ok({'url': cdn, 'field': field})
+
+
+def employee_set_role(body, employee):
+    """Назначить/изменить роль сотрудника. Только владелец."""
+    if not employee or employee.get('role') != 'owner':
+        return _err(403, 'Назначать роли может только владелец')
+    emp_id = body.get('employee_id')
+    role = (body.get('role') or '').strip().lower()
+    if not emp_id or not role:
+        return _err(400, 'employee_id и role обязательны')
+    conn = get_conn(); cur = conn.cursor()
+    cur.execute(f"SELECT 1 FROM {SCHEMA}.slshop_roles WHERE code={_esc(role)} LIMIT 1")
+    if not cur.fetchone():
+        cur.close(); conn.close(); return _err(400, f'Роль "{role}" не найдена')
+    cur.execute(f"UPDATE {SCHEMA}.employees SET role={_esc(role)} WHERE id={int(emp_id)} RETURNING id, full_name, role")
+    row = cur.fetchone()
+    if not row:
+        conn.rollback(); cur.close(); conn.close()
+        return _err(404, 'Сотрудник не найден')
+    _log_event(cur, 'role_change', 'employee', int(emp_id), f'Смена роли: {row[1]} → {role}',
+               None, None, None, employee)
+    conn.commit(); cur.close(); conn.close()
+    return _ok({'id': row[0], 'full_name': row[1], 'role': row[2]})
+
+
+def employees_list_full(employee):
+    """Список всех сотрудников с ролями."""
+    if not employee or employee.get('role') not in ('owner', 'manager', 'admin'):
+        return _err(403, 'Нет доступа')
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        f"SELECT e.id, e.full_name, e.login, e.role, e.is_active, e.created_at, e.last_seen_at, e.email, e.phone, "
+        f"r.name AS role_name, r.description AS role_description "
+        f"FROM {SCHEMA}.employees e "
+        f"LEFT JOIN {SCHEMA}.slshop_roles r ON r.code=e.role "
+        f"ORDER BY e.is_active DESC, e.id"
+    )
+    rows = cur.fetchall()
+    cur.close(); conn.close()
+    return _ok([dict(r) for r in rows])
+
+
 def _log_event(cur, event_type, entity_type, entity_id, title, description=None, amount=None, branch_id=None, employee=None):
     """Лог в отдельной savepoint, чтобы при ошибке не ломать основную транзакцию."""
     try:
@@ -1766,6 +1884,17 @@ def handler(event: dict, context) -> dict:
             return favorite_add(body, employee)
         if action == 'favorite_remove' and method == 'POST':
             return favorite_remove(body, employee)
+        # массовый перенос товаров между филиалами
+        if action == 'items_move_branch' and method == 'POST':
+            return items_move_branch(body, employee)
+        # фото паспорта клиента
+        if action == 'client_passport_upload' and method == 'POST':
+            return client_passport_upload(body, employee)
+        # сотрудники / роли
+        if action == 'employees_list':
+            return employees_list_full(employee)
+        if action == 'employee_set_role' and method == 'POST':
+            return employee_set_role(body, employee)
         return _err(400, f'Неизвестный action: {action}')
     except psycopg2.errors.ForeignKeyViolation as e:
         msg = str(e).split('\n')[0] if e else 'foreign key constraint violation'

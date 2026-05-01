@@ -24,6 +24,10 @@ export default function SLItemsList({ token, empName: _empName, isOwner = false 
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState<SLItem | null>(null);
   const [sellOpen, setSellOpen] = useState<SLItem | null>(null);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [movingTo, setMovingTo] = useState<number | "">("");
+  const [moveBusy, setMoveBusy] = useState(false);
+  const [moveMsg, setMoveMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -42,6 +46,34 @@ export default function SLItemsList({ token, empName: _empName, isOwner = false 
     slApi<{ id: number; name: string }[]>(token, "branches").then(r => { if (r.ok && r.data) setBranches(r.data); });
   }, [token]);
   useEffect(() => { load(); }, [load]);
+
+  const toggleSelect = (id: number) => {
+    setSelected(prev => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+  const selectAll = () => setSelected(new Set(items.map(i => i.id)));
+  const clearSelection = () => setSelected(new Set());
+
+  const moveSelected = async (moveAll: boolean) => {
+    if (!movingTo) { setMoveMsg("Выберите филиал"); return; }
+    if (!moveAll && selected.size === 0) { setMoveMsg("Выберите товары галочками или используйте «Перенести всё»"); return; }
+    setMoveBusy(true); setMoveMsg(null);
+    const r = await slApi<{ moved: number; branch_name: string }>(token, "items_move_branch", {
+      method: "POST",
+      body: moveAll ? { move_all: true, branch_id: movingTo } : { item_ids: Array.from(selected), branch_id: movingTo },
+    });
+    setMoveBusy(false);
+    if (r.ok && r.data) {
+      setMoveMsg(`Перенесено ${r.data.moved} → ${r.data.branch_name}`);
+      clearSelection();
+      load();
+    } else {
+      setMoveMsg(r.error || "Ошибка переноса");
+    }
+  };
 
   return (
     <div>
@@ -100,6 +132,40 @@ export default function SLItemsList({ token, empName: _empName, isOwner = false 
         <CategoryTreeSelect categories={cats} value={catFilter} onChange={(id) => setCatFilter(id)} placeholder="Выбрать подкатегорию из дерева..." emptyLabel="Все категории" />
       </div>
 
+      {/* Панель переноса между филиалами */}
+      <div className="bg-[#0F0F0F] border border-[#1F1F1F] rounded-xl p-2.5 mb-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Icon name="Truck" size={14} className="text-[#FFD700]" />
+          <span className="text-[11px] uppercase font-bold tracking-wide text-white/60">Перенос</span>
+          <select value={movingTo} onChange={e => setMovingTo(e.target.value ? Number(e.target.value) : "")}
+            className="bg-[#141414] border border-[#1F1F1F] rounded px-2 py-1 text-[12px]">
+            <option value="">Выбрать филиал →</option>
+            {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
+          {selected.size > 0 ? (
+            <>
+              <span className="text-[10px] text-[#FFD700]">{selected.size} выбрано</span>
+              <button onClick={() => moveSelected(false)} disabled={moveBusy || !movingTo}
+                className="bg-[#FFD700] text-black font-bold px-3 py-1 rounded text-[11px] disabled:opacity-50">
+                Перенести {selected.size}
+              </button>
+              <button onClick={clearSelection} className="text-[10px] text-white/40 underline">сброс</button>
+            </>
+          ) : (
+            <>
+              <button onClick={selectAll} className="bg-[#141414] border border-[#1F1F1F] px-2 py-1 rounded text-[10px] text-white/60">
+                Выбрать всё
+              </button>
+              <button onClick={() => moveSelected(true)} disabled={moveBusy || !movingTo}
+                className="bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-bold px-3 py-1 rounded text-[11px] disabled:opacity-50">
+                Перенести ВСЁ ({items.length})
+              </button>
+            </>
+          )}
+        </div>
+        {moveMsg && <div className="text-[11px] text-emerald-300 mt-1.5">{moveMsg}</div>}
+      </div>
+
       {loading && <div className="text-white/30 text-sm py-4 text-center"><Icon name="Loader" size={14} className="animate-spin inline mr-1" />Загрузка...</div>}
 
       {!loading && items.length === 0 && (
@@ -109,10 +175,15 @@ export default function SLItemsList({ token, empName: _empName, isOwner = false 
       <div className="space-y-1.5">
         {items.map(it => {
           const stCfg = STATUS_LABEL[it.status] || STATUS_LABEL.stock;
+          const isSel = selected.has(it.id);
           return (
             <div key={it.id}
-              className="bg-[#0F0F0F] border border-[#1F1F1F] rounded-lg p-2.5 hover:border-[#FFD700]/30 transition-colors">
+              className={`bg-[#0F0F0F] border rounded-lg p-2.5 hover:border-[#FFD700]/30 transition-colors ${isSel ? "border-[#FFD700]" : "border-[#1F1F1F]"}`}>
               <div className="flex items-start gap-2">
+                <button onClick={(e) => { e.stopPropagation(); toggleSelect(it.id); }}
+                  className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 mt-0.5 ${isSel ? "bg-[#FFD700] border-[#FFD700]" : "border-white/20"}`}>
+                  {isSel && <Icon name="Check" size={11} className="text-black" />}
+                </button>
                 <div className="flex-1 min-w-0" onClick={() => setOpen(it)} role="button">
                   <div className="font-bold text-sm truncate">{it.title}</div>
                   {it.specs_short && <div className="text-[11px] text-white/50 truncate">{it.specs_short}</div>}
@@ -315,6 +386,7 @@ function SellModal({ token, item, onClose, onDone }: { token: string; item: SLIt
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [autoPrint, setAutoPrint] = useState(true);
   const submit = async () => {
     if (!amount || Number(amount) <= 0) { setErr("Укажите сумму"); return; }
     setSaving(true); setErr(null);
@@ -322,8 +394,25 @@ function SellModal({ token, item, onClose, onDone }: { token: string; item: SLIt
       item_id: item.id, amount: Number(amount), payment_method: payment, contract_number: contract, note,
     }});
     setSaving(false);
-    if (r.ok) onDone();
-    else setErr(r.error || "Ошибка");
+    if (r.ok) {
+      // Автопечать товарного чека сразу после продажи
+      if (autoPrint) {
+        try {
+          const ctxRes = await slApi(token, "doc_context", { params: { item_id: item.id } });
+          const tplRes = await slApi<{ id: number; code: string; name: string }[]>(
+            token, "doc_templates", { params: { only_active: "1", op_type: "sell" } }
+          );
+          if (ctxRes.ok && tplRes.ok && tplRes.data && tplRes.data.length > 0) {
+            const { printDoc } = await import("./docPrinter");
+            const tpl = tplRes.data.find(t => t.code === "sales_receipt") || tplRes.data[0];
+            printDoc(tpl as never, ctxRes.data as never);
+          }
+        } catch (e) {
+          console.error("auto-print sale", e);
+        }
+      }
+      onDone();
+    } else setErr(r.error || "Ошибка");
   };
   return (
     <div className="fixed inset-0 z-50 bg-black/80 flex items-end sm:items-center justify-center p-2" onClick={onClose}>
@@ -351,6 +440,16 @@ function SellModal({ token, item, onClose, onDone }: { token: string; item: SLIt
           </div>
           <Inp2 l="Договор №" v={contract} s={setContract} />
           <Inp2 l="Примечание" v={note} s={setNote} />
+          <label className="flex items-center justify-between bg-[#141414] border border-[#1F1F1F] rounded-lg p-2 cursor-pointer">
+            <div className="flex items-center gap-1.5 text-[12px]">
+              <Icon name="Printer" size={12} className="text-[#FFD700]" />
+              Печатать чек сразу после продажи
+            </div>
+            <button type="button" onClick={() => setAutoPrint(!autoPrint)}
+              className={`w-9 h-5 rounded-full relative transition-colors ${autoPrint ? "bg-[#FFD700]" : "bg-[#1F1F1F]"}`}>
+              <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${autoPrint ? "left-4" : "left-0.5"}`} />
+            </button>
+          </label>
           {err && <div className="text-red-400 text-sm">{err}</div>}
           <button onClick={submit} disabled={saving}
             className="w-full bg-emerald-500 text-black font-bold py-2.5 rounded-lg disabled:opacity-50">
