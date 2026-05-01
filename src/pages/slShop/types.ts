@@ -363,6 +363,7 @@ export type SLStats = {
   date_to: string;
   bought_count: number;
   spent: number;
+  cogs?: number;
   sold_count: number;
   revenue: number;
   profit: number;

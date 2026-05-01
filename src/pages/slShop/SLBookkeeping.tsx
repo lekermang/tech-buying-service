@@ -78,13 +78,13 @@ export default function SLBookkeeping({ token }: { token: string }) {
           />
           <Stat
             l="Маржа (до расходов)"
-            v={fmt((data?.gross_profit ?? 0)) + " ₽"}
+            v={fmt(Math.max(0, Number(data?.gross_profit ?? 0))) + " ₽"}
             c="text-emerald-200"
             hint="Выручка − Себестоимость продаж"
           />
           <Stat
             l="Чистая прибыль"
-            v={fmt(data?.profit || 0) + " ₽"}
+            v={fmt(Math.max(0, Number(data?.profit ?? 0))) + " ₽"}
             c="text-[#FFD700]"
             hint="Маржа − Операционные расходы"
           />

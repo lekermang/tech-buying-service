@@ -1675,18 +1675,31 @@ def stats(params):
         f"GROUP BY 1, 2 ORDER BY 1"
     )
     daily = [dict(r) for r in cur.fetchall()]
+    # Себестоимость проданного за период (COGS) — для корректной прибыли
+    cur.execute(
+        f"SELECT COALESCE(SUM(COALESCE(i.buy_price, 0)), 0) AS cogs "
+        f"FROM {SCHEMA}.slshop_operations o "
+        f"LEFT JOIN {SCHEMA}.slshop_items i ON i.id = o.item_id "
+        f"WHERE o.op_type='sell' AND o.created_at>={_esc(date_from)} "
+        f"AND o.created_at<{_esc(date_to)}::date + INTERVAL '1 day'"
+    )
+    cogs_row = cur.fetchone() or {}
+    cogs = float(cogs_row.get('cogs') or 0)
     cur.close(); conn.close()
     revenue = float(sold['s'])
     spent = float(bought['s'])
+    # Прибыль = выручка − себестоимость проданного (а не все закупки за период)
+    profit = revenue - cogs
     return _ok({
         'period': period,
         'date_from': date_from,
         'date_to': date_to,
         'bought_count': int(bought['c']),
         'spent': spent,
+        'cogs': cogs,
         'sold_count': int(sold['c']),
         'revenue': revenue,
-        'profit': revenue - spent,
+        'profit': profit,
         'returns_count': int(returns['c']),
         'by_status': by_status,
         'by_category': by_category,

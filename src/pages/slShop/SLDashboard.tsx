@@ -65,7 +65,7 @@ export default function SLDashboard({ token, onNav, empName: _empName }: { token
       <div className="grid grid-cols-2 gap-2 mb-3">
         <Card title="Куплено" value={`${data?.bought_count || 0} шт.`} sub={`на ${fmt(data?.spent)} ₽`} icon="ShoppingCart" color="emerald" />
         <Card title="Продано" value={`${data?.sold_count || 0} шт.`} sub={`на ${fmt(data?.revenue)} ₽`} icon="HandCoins" color="blue" />
-        <Card title="Прибыль" value={`${fmt(data?.profit)} ₽`} sub={`за период`} icon="TrendingUp" color="yellow" />
+        <Card title="Прибыль" value={`${fmt(Math.max(0, Number(data?.profit ?? 0)))} ₽`} sub={`за период`} icon="TrendingUp" color="yellow" />
         <Card title="На складе" value={`${stockCount} шт.`} sub={`${fmt(stockSum)} ₽`} icon="Package" color="white" />
       </div>
 
