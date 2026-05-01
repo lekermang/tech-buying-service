@@ -784,6 +784,42 @@ def list_sold(params):
     return [dict(r) for r in rows]
 
 
+def list_bought(params):
+    period = (params.get('period') or '30d').strip()
+    now = datetime.utcnow()
+    if period == 'today':
+        date_from = now.strftime('%Y-%m-%d')
+    elif period == 'yesterday':
+        date_from = (now - timedelta(days=1)).strftime('%Y-%m-%d')
+    elif period == '7d':
+        date_from = (now - timedelta(days=7)).strftime('%Y-%m-%d')
+    elif period == '30d':
+        date_from = (now - timedelta(days=30)).strftime('%Y-%m-%d')
+    elif period == 'year':
+        date_from = (now - timedelta(days=365)).strftime('%Y-%m-%d')
+    else:
+        date_from = '2000-01-01'
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        f"SELECT i.id, i.title, i.specs_short, i.imei, i.sku, i.buy_price, i.sell_price, i.buy_at, i.status, "
+        f"i.category_id, c.name AS category_name, c.path AS category_path, "
+        f"o.id AS operation_id, o.amount, o.employee_name, "
+        f"o.client_id, cl.full_name AS client_name, cl.phone AS client_phone, "
+        f"b.name AS branch_name, b.address AS branch_address "
+        f"FROM {SCHEMA}.slshop_items i "
+        f"LEFT JOIN {SCHEMA}.slshop_operations o ON o.id=i.buy_operation_id "
+        f"LEFT JOIN {SCHEMA}.slshop_categories c ON c.id=i.category_id "
+        f"LEFT JOIN {SCHEMA}.slshop_clients cl ON cl.id=o.client_id "
+        f"LEFT JOIN {SCHEMA}.slshop_branches b ON b.id=i.branch_id "
+        f"WHERE i.buy_at IS NOT NULL AND i.buy_at >= {_esc(date_from)} "
+        f"ORDER BY i.buy_at DESC LIMIT 200"
+    )
+    rows = cur.fetchall()
+    cur.close(); conn.close()
+    return [dict(r) for r in rows]
+
+
 def revision_finish(body):
     rev_id = body.get('id')
     if not rev_id:
@@ -1844,6 +1880,9 @@ def handler(event: dict, context) -> dict:
         # проданные товары для сводки и чеков
         if action == 'sold':
             return _ok(list_sold(params))
+        # купленные товары (скупка) для сводки
+        if action == 'bought':
+            return _ok(list_bought(params))
         # роли и права
         if action == 'roles':
             return _ok(list_roles())

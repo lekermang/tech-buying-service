@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import Icon from "@/components/ui/icon";
-import { slApi, fmt, type SLStats, type SLSoldItem, STATUS_LABEL } from "./types";
+import { slApi, fmt, type SLStats, type SLSoldItem, type SLBoughtItem, STATUS_LABEL } from "./types";
 import { printReceipt } from "./labelPrinter";
 
 const PERIODS = [
@@ -16,18 +16,21 @@ export default function SLDashboard({ token, onNav, empName: _empName }: { token
   const [period, setPeriod] = useState("30d");
   const [data, setData] = useState<SLStats | null>(null);
   const [sold, setSold] = useState<SLSoldItem[]>([]);
+  const [bought, setBought] = useState<SLBoughtItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setErr(null);
-    const [r1, r2] = await Promise.all([
+    const [r1, r2, r3] = await Promise.all([
       slApi<SLStats>(token, "stats", { params: { period } }),
       slApi<SLSoldItem[]>(token, "sold", { params: { period } }),
+      slApi<SLBoughtItem[]>(token, "bought", { params: { period } }),
     ]);
     if (r1.ok && r1.data) setData(r1.data);
     else setErr(r1.error || "Ошибка");
     if (r2.ok && r2.data) setSold(r2.data);
+    if (r3.ok && r3.data) setBought(r3.data);
     setLoading(false);
   }, [token, period]);
 
@@ -114,24 +117,33 @@ export default function SLDashboard({ token, onNav, empName: _empName }: { token
         )}
       </div>
 
-      {/* Топ моделей */}
+      {/* Что куплено */}
       <div className="bg-[#0F0F0F] border border-[#1F1F1F] rounded-xl p-3 mb-3">
         <div className="flex items-center justify-between mb-2">
-          <div className="text-[11px] uppercase text-white/50 font-bold tracking-wide">Топ продаж</div>
+          <div className="text-[11px] uppercase text-white/50 font-bold tracking-wide">Что куплено</div>
           <button onClick={() => onNav("operations")} className="text-[10px] text-[#FFD700]/70 hover:text-[#FFD700]">все →</button>
         </div>
-        {(!data?.top_models || data.top_models.length === 0) ? (
-          <div className="text-white/30 text-xs py-3 text-center">Нет продаж за период</div>
+        {bought.length === 0 ? (
+          <div className="text-white/30 text-xs py-3 text-center">Нет скупок за период</div>
         ) : (
           <div className="space-y-1.5">
-            {data.top_models.map((m, i) => (
-              <div key={i} className="flex items-center gap-2 text-sm">
-                <div className="w-5 h-5 rounded bg-[#FFD700]/10 text-[#FFD700] text-[10px] font-bold flex items-center justify-center">{i + 1}</div>
-                <div className="flex-1 truncate">{m.title}</div>
-                <div className="text-white/40 text-[11px]">{m.cnt} шт</div>
-                <div className="text-[#FFD700] font-bold text-[12px] w-20 text-right">{fmt(m.s)} ₽</div>
+            {bought.slice(0, 15).map(b => (
+              <div key={b.id} className="flex items-center gap-2 bg-[#141414] rounded-lg p-2">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium truncate">{b.title}</div>
+                  <div className="text-[10px] text-white/40 truncate">
+                    {b.buy_at ? new Date(b.buy_at).toLocaleString("ru-RU") : "—"}
+                    {b.branch_name ? ` • ${b.branch_name}` : ""}
+                    {b.client_name ? ` • ${b.client_name}` : ""}
+                    {b.employee_name ? ` • ${b.employee_name}` : ""}
+                  </div>
+                </div>
+                <div className="text-emerald-400 font-bold text-[13px] shrink-0">{fmt(b.amount || b.buy_price)} ₽</div>
               </div>
             ))}
+            {bought.length > 15 && (
+              <div className="text-center text-[10px] text-white/30 pt-1">… и ещё {bought.length - 15}</div>
+            )}
           </div>
         )}
       </div>

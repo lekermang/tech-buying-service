@@ -312,6 +312,29 @@ export type SLSoldItem = {
   branch_address?: string | null;
 };
 
+export type SLBoughtItem = {
+  id: number;
+  title: string;
+  specs_short?: string | null;
+  imei?: string | null;
+  sku?: string | null;
+  buy_price?: number | string;
+  sell_price?: number | string;
+  buy_at?: string | null;
+  status?: string;
+  category_id?: number | null;
+  category_name?: string | null;
+  category_path?: string | null;
+  operation_id?: number;
+  amount?: number | string;
+  employee_name?: string | null;
+  client_id?: number | null;
+  client_name?: string | null;
+  client_phone?: string | null;
+  branch_name?: string | null;
+  branch_address?: string | null;
+};
+
 export type SLOperation = {
   id: number;
   op_type: "buy" | "sell" | "return" | "move" | "writeoff";
