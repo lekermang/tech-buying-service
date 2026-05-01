@@ -12,12 +12,14 @@ const STATUS_FILTERS = [
   { v: "returned", l: "Возвраты" },
 ];
 
-export default function SLItemsList({ token }: { token: string }) {
+export default function SLItemsList({ token, empName: _empName }: { token: string; empName?: string }) {
   const [items, setItems] = useState<SLItem[]>([]);
   const [cats, setCats] = useState<SLCategory[]>([]);
+  const [branches, setBranches] = useState<{ id: number; name: string }[]>([]);
   const [filter, setFilter] = useState("");
   const [q, setQ] = useState("");
   const [catFilter, setCatFilter] = useState<number | "">("");
+  const [branchFilter, setBranchFilter] = useState<number | "">("");
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState<SLItem | null>(null);
   const [sellOpen, setSellOpen] = useState<SLItem | null>(null);
@@ -27,12 +29,16 @@ export default function SLItemsList({ token }: { token: string }) {
     const r = await slApi<SLItem[]>(token, "items", {
       params: { status: filter, q, category_id: catFilter || undefined },
     });
-    if (r.ok && r.data) setItems(r.data);
+    if (r.ok && r.data) {
+      const filtered = branchFilter ? r.data.filter(i => i.branch_id === branchFilter) : r.data;
+      setItems(filtered);
+    }
     setLoading(false);
-  }, [token, filter, q, catFilter]);
+  }, [token, filter, q, catFilter, branchFilter]);
 
   useEffect(() => {
     slApi<SLCategory[]>(token, "categories").then(r => { if (r.ok && r.data) setCats(r.data); });
+    slApi<{ id: number; name: string }[]>(token, "branches").then(r => { if (r.ok && r.data) setBranches(r.data); });
   }, [token]);
   useEffect(() => { load(); }, [load]);
 
@@ -55,6 +61,24 @@ export default function SLItemsList({ token }: { token: string }) {
             }`}>{f.l}</button>
         ))}
       </div>
+
+      {/* Фильтр по филиалу */}
+      {branches.length > 1 && (
+        <div className="flex gap-1.5 mb-2">
+          <button onClick={() => setBranchFilter("")}
+            className={`text-[10px] px-2.5 py-1 rounded-full ${
+              branchFilter === "" ? "bg-white/15 text-white" : "bg-[#141414] text-white/40"
+            }`}>Все филиалы</button>
+          {branches.map(b => (
+            <button key={b.id} onClick={() => setBranchFilter(b.id)}
+              className={`text-[10px] px-2.5 py-1 rounded-full inline-flex items-center gap-1 ${
+                branchFilter === b.id ? "bg-white/15 text-white" : "bg-[#141414] text-white/40"
+              }`}>
+              <Icon name="MapPin" size={9} />{b.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Категории — корневые быстрым доступом + дерево */}
       <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-2 mb-2">
@@ -93,6 +117,7 @@ export default function SLItemsList({ token }: { token: string }) {
                   {it.specs_short && <div className="text-[11px] text-white/50 truncate">{it.specs_short}</div>}
                   <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                     <span className={`text-[9px] px-1.5 py-0.5 rounded border ${stCfg.color}`}>{stCfg.l}</span>
+                    {it.branch_name && <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#141414] border border-[#1F1F1F] text-white/50"><Icon name="MapPin" size={8} className="inline mr-0.5" />{it.branch_name}</span>}
                     {it.sku && <span className="text-[10px] text-white/30">{it.sku}</span>}
                     {it.imei && <span className="text-[10px] text-white/30">IMEI: {it.imei}</span>}
                   </div>
@@ -123,9 +148,13 @@ function ItemDetail({ token, item, onClose, onUpdated, onSell }: { token: string
   const [data, setData] = useState({ ...item });
   const [cats, setCats] = useState<SLCategory[]>([]);
   const [saving, setSaving] = useState(false);
+  const [branches, setBranches] = useState<{ id: number; name: string; address?: string | null }[]>([]);
 
   useEffect(() => {
     slApi<SLCategory[]>(token, "categories").then(r => { if (r.ok && r.data) setCats(r.data); });
+    slApi<{ id: number; name: string; address?: string | null }[]>(token, "branches").then(r => {
+      if (r.ok && r.data) setBranches(r.data);
+    });
   }, [token]);
 
   const save = async () => {
@@ -147,6 +176,7 @@ function ItemDetail({ token, item, onClose, onUpdated, onSell }: { token: string
       sell_price: data.sell_price,
       min_price: data.min_price,
       description: data.description,
+      branch_id: data.branch_id || null,
     }});
     setSaving(false);
     if (r.ok) onUpdated();
@@ -172,6 +202,7 @@ function ItemDetail({ token, item, onClose, onUpdated, onSell }: { token: string
           {!editing ? (
             <>
               <Row k="Категория" v={currentCat?.path || currentCat?.name || item.category_name || "— не указана —"} />
+              <Row k="Филиал" v={item.branch_name || "—"} />
               <Row k="Бренд / Модель" v={`${item.brand || "-"} ${item.model || ""}`} />
               <Row k="Характеристики" v={item.specs_short || "-"} />
               <Row k="Память / Цвет" v={`${item.storage || "-"} / ${item.color || "-"}`} />
@@ -199,6 +230,19 @@ function ItemDetail({ token, item, onClose, onUpdated, onSell }: { token: string
           ) : (
             <>
               <Inp2 l="Наименование" v={data.title} s={v => setData({ ...data, title: v })} />
+              <div>
+                <div className="text-[11px] text-white/50 mb-0.5">Филиал / склад</div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {branches.map(b => (
+                    <button key={b.id} onClick={() => setData({ ...data, branch_id: b.id })}
+                      className={`text-[11px] px-2 py-1.5 rounded border transition-all ${
+                        data.branch_id === b.id ? "bg-[#FFD700]/10 border-[#FFD700] text-[#FFD700]" : "bg-[#141414] border-[#1F1F1F] text-white/60"
+                      }`}>
+                      {b.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div>
                 <div className="text-[11px] text-white/50 mb-0.5">Категория</div>
                 <CategoryTreeSelect categories={cats} value={data.category_id ?? ""} onChange={(id) => setData({ ...data, category_id: id || null })} />

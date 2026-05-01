@@ -334,6 +334,82 @@ def revision_scan(body, employee):
     return _ok({'state': state, 'item_id': iid, 'title': item['title']})
 
 
+def list_branches():
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(f"SELECT * FROM {SCHEMA}.slshop_branches WHERE is_active=true ORDER BY sort_order, name")
+    rows = cur.fetchall()
+    cur.close(); conn.close()
+    return [dict(r) for r in rows]
+
+
+def operation_delete(body, employee):
+    if not employee or employee.get('role') != 'owner':
+        return _err(403, 'Удалять операции может только владелец')
+    op_id = body.get('id')
+    if not op_id:
+        return _err(400, 'id обязателен')
+    conn = get_conn(); cur = conn.cursor()
+    cur.execute(f"SELECT op_type, item_id, status_from FROM {SCHEMA}.slshop_operations WHERE id={int(op_id)}")
+    row = cur.fetchone()
+    if not row:
+        cur.close(); conn.close(); return _err(404, 'Операция не найдена')
+    op_type, item_id, status_from = row[0], row[1], row[2]
+    if op_type == 'sell' and item_id:
+        prev = status_from or 'stock'
+        cur.execute(
+            f"UPDATE {SCHEMA}.slshop_items SET status={_esc(prev)}, sell_at=NULL, sell_operation_id=NULL, updated_at=NOW() WHERE id={int(item_id)}"
+        )
+    elif op_type == 'return' and item_id:
+        prev = status_from or 'stock'
+        cur.execute(
+            f"UPDATE {SCHEMA}.slshop_items SET status={_esc(prev)}, updated_at=NOW() WHERE id={int(item_id)}"
+        )
+    elif op_type == 'move' and item_id and status_from:
+        cur.execute(
+            f"UPDATE {SCHEMA}.slshop_items SET status={_esc(status_from)}, updated_at=NOW() WHERE id={int(item_id)}"
+        )
+    cur.execute(f"DELETE FROM {SCHEMA}.slshop_operations WHERE id={int(op_id)}")
+    conn.commit(); cur.close(); conn.close()
+    return _ok({'ok': True})
+
+
+def list_sold(params):
+    period = (params.get('period') or '30d').strip()
+    now = datetime.utcnow()
+    if period == 'today':
+        date_from = now.strftime('%Y-%m-%d')
+    elif period == 'yesterday':
+        date_from = (now - timedelta(days=1)).strftime('%Y-%m-%d')
+    elif period == '7d':
+        date_from = (now - timedelta(days=7)).strftime('%Y-%m-%d')
+    elif period == '30d':
+        date_from = (now - timedelta(days=30)).strftime('%Y-%m-%d')
+    elif period == 'year':
+        date_from = (now - timedelta(days=365)).strftime('%Y-%m-%d')
+    else:
+        date_from = '2000-01-01'
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        f"SELECT i.id, i.title, i.specs_short, i.imei, i.sku, i.sell_price, i.buy_price, i.sell_at, "
+        f"i.category_id, c.name AS category_name, c.path AS category_path, "
+        f"o.id AS operation_id, o.amount, o.payment_method, o.contract_number, o.employee_name, "
+        f"o.client_id, cl.full_name AS client_name, cl.phone AS client_phone, "
+        f"b.name AS branch_name, b.address AS branch_address "
+        f"FROM {SCHEMA}.slshop_items i "
+        f"JOIN {SCHEMA}.slshop_operations o ON o.id=i.sell_operation_id "
+        f"LEFT JOIN {SCHEMA}.slshop_categories c ON c.id=i.category_id "
+        f"LEFT JOIN {SCHEMA}.slshop_clients cl ON cl.id=o.client_id "
+        f"LEFT JOIN {SCHEMA}.slshop_branches b ON b.id=i.branch_id "
+        f"WHERE i.status='sold' AND i.sell_at >= {_esc(date_from)} "
+        f"ORDER BY i.sell_at DESC LIMIT 200"
+    )
+    rows = cur.fetchall()
+    cur.close(); conn.close()
+    return [dict(r) for r in rows]
+
+
 def revision_finish(body):
     rev_id = body.get('id')
     if not rev_id:
@@ -470,7 +546,7 @@ ITEM_FIELDS = [
     'sku', 'category_id', 'title', 'brand', 'model', 'specs', 'specs_short', 'storage', 'color',
     'condition', 'imei', 'serial_number', 'battery_health', 'has_box', 'has_charger', 'description',
     'buy_price', 'sell_price', 'min_price', 'status', 'source', 'consignment_percent',
-    'consignment_owner_id', 'buy_client_id'
+    'consignment_owner_id', 'buy_client_id', 'branch_id'
 ]
 
 
@@ -495,11 +571,13 @@ def list_items(params):
     conn = get_conn()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cur.execute(
-        f"SELECT i.*, c.name AS category_name, c.icon AS category_icon, "
-        f"cl.full_name AS buy_client_name "
+        f"SELECT i.*, c.name AS category_name, c.icon AS category_icon, c.path AS category_path, "
+        f"cl.full_name AS buy_client_name, "
+        f"b.name AS branch_name, b.address AS branch_address "
         f"FROM {SCHEMA}.slshop_items i "
         f"LEFT JOIN {SCHEMA}.slshop_categories c ON c.id=i.category_id "
         f"LEFT JOIN {SCHEMA}.slshop_clients cl ON cl.id=i.buy_client_id "
+        f"LEFT JOIN {SCHEMA}.slshop_branches b ON b.id=i.branch_id "
         f"{wsql} ORDER BY i.created_at DESC LIMIT {limit}"
     )
     rows = cur.fetchall()
@@ -962,6 +1040,15 @@ def handler(event: dict, context) -> dict:
             return revision_scan(body, employee)
         if action == 'revision_finish' and method == 'POST':
             return revision_finish(body)
+        # филиалы
+        if action == 'branches':
+            return _ok(list_branches())
+        # удаление операций (только владелец)
+        if action == 'operation_delete' and method == 'POST':
+            return operation_delete(body, employee)
+        # проданные товары для сводки и чеков
+        if action == 'sold':
+            return _ok(list_sold(params))
         return _err(400, f'Неизвестный action: {action}')
     except Exception as e:
         return _err(500, f'Ошибка: {e}')

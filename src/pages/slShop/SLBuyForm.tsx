@@ -1,10 +1,12 @@
 import { useEffect, useState, useRef } from "react";
 import Icon from "@/components/ui/icon";
-import { slApi, type SLCategory, type SLClient, CONDITION_OPTIONS } from "./types";
+import { slApi, type SLCategory, type SLClient, type SLBranch, CONDITION_OPTIONS } from "./types";
 import CategoryTreeSelect from "./CategoryTreeSelect";
 
 export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: () => void }) {
   const [cats, setCats] = useState<SLCategory[]>([]);
+  const [branches, setBranches] = useState<SLBranch[]>([]);
+  const [branchId, setBranchId] = useState<number | "">("");
   const [title, setTitle] = useState("");
   const [categoryId, setCategoryId] = useState<number | "">("");
   const [brand, setBrand] = useState("");
@@ -37,6 +39,13 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
 
   useEffect(() => {
     slApi<SLCategory[]>(token, "categories").then(r => { if (r.ok && r.data) setCats(r.data); });
+    slApi<SLBranch[]>(token, "branches").then(r => {
+      if (r.ok && r.data) {
+        setBranches(r.data);
+        const def = r.data.find(b => b.is_default) || r.data[0];
+        if (def) setBranchId(def.id);
+      }
+    });
   }, [token]);
 
   // автоподстановка характеристик по названию
@@ -97,6 +106,7 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
       buy_client_id: buyClientId,
       consignment_percent: source === "consignment" ? (Number(consignmentPercent) || 0) : null,
       consignment_owner_id: source === "consignment" ? buyClientId : null,
+      branch_id: branchId || null,
     };
     const r = await slApi<{ id: number; sku: string }>(token, "item_create", { method: "POST", body: payload });
     setSaving(false);
@@ -111,6 +121,22 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
   return (
     <div className="space-y-3">
       {msg && <div className={`p-2.5 rounded-lg text-sm ${msg.startsWith("Принято") ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/30" : "bg-red-500/10 text-red-300 border border-red-500/30"}`}>{msg}</div>}
+
+      <Section title="Филиал / склад">
+        <div className="grid grid-cols-2 gap-2">
+          {branches.map(b => (
+            <button key={b.id} onClick={() => setBranchId(b.id)}
+              className={`p-2.5 rounded-lg border text-left transition-all ${
+                branchId === b.id ? "bg-[#FFD700]/10 border-[#FFD700] text-[#FFD700]" : "bg-[#141414] border-[#1F1F1F] text-white/60"
+              }`}>
+              <div className="font-bold text-sm flex items-center gap-1">
+                <Icon name="MapPin" size={12} />{b.name}
+              </div>
+              {b.address && <div className="text-[10px] opacity-70 truncate">{b.address}</div>}
+            </button>
+          ))}
+        </div>
+      </Section>
 
       <Section title="Тип приёма">
         <div className="grid grid-cols-2 gap-2">

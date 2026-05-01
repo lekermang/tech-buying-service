@@ -18,10 +18,14 @@ const TYPE_CFG: Record<string, { l: string; icon: string; color: string }> = {
   writeoff: { l: "Списание", icon: "Trash2", color: "text-orange-300" },
 };
 
-export default function SLOperations({ token }: { token: string }) {
+export default function SLOperations({ token, myRole }: { token: string; myRole?: string }) {
   const [ops, setOps] = useState<SLOperation[]>([]);
   const [type, setType] = useState("");
   const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState<number | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const isOwner = myRole === "owner";
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -31,6 +35,15 @@ export default function SLOperations({ token }: { token: string }) {
   }, [token, type]);
 
   useEffect(() => { load(); }, [load]);
+
+  const remove = async (id: number) => {
+    if (!confirm("Удалить операцию? Изменения товара будут отменены (товар вернётся в прежний статус).")) return;
+    setDeleting(id); setMsg(null);
+    const r = await slApi(token, "operation_delete", { method: "POST", body: { id } });
+    setDeleting(null);
+    if (r.ok) { setMsg("Операция удалена"); load(); }
+    else setMsg(r.error || "Ошибка удаления");
+  };
 
   return (
     <div>
@@ -46,6 +59,7 @@ export default function SLOperations({ token }: { token: string }) {
         </button>
       </div>
 
+      {msg && <div className="bg-[#141414] border border-[#1F1F1F] text-white/70 text-sm p-2.5 rounded-lg mb-2">{msg}</div>}
       {!loading && ops.length === 0 && <div className="text-white/30 text-sm py-8 text-center">Нет операций</div>}
 
       <div className="space-y-1.5">
@@ -70,6 +84,13 @@ export default function SLOperations({ token }: { token: string }) {
               </div>
               {o.amount && Number(o.amount) > 0 && (
                 <div className={`text-right shrink-0 font-bold text-sm ${cfg.color}`}>{fmt(o.amount)} ₽</div>
+              )}
+              {isOwner && (
+                <button onClick={() => remove(o.id)} disabled={deleting === o.id}
+                  title="Удалить операцию (только владелец)"
+                  className="shrink-0 text-white/30 hover:text-red-400 p-1 rounded">
+                  <Icon name={deleting === o.id ? "Loader" : "Trash2"} size={13} className={deleting === o.id ? "animate-spin" : ""} />
+                </button>
               )}
             </div>
           );

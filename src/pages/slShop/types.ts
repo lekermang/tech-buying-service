@@ -83,6 +83,7 @@ export type SLItem = {
   category_id?: number | null;
   category_name?: string | null;
   category_icon?: string | null;
+  category_path?: string | null;
   title: string;
   brand?: string | null;
   model?: string | null;
@@ -110,6 +111,42 @@ export type SLItem = {
   buy_at?: string | null;
   sell_at?: string | null;
   created_at?: string;
+  branch_id?: number | null;
+  branch_name?: string | null;
+  branch_address?: string | null;
+};
+
+export type SLBranch = {
+  id: number;
+  name: string;
+  address?: string | null;
+  phone?: string | null;
+  is_default: boolean;
+  is_active: boolean;
+};
+
+export type SLSoldItem = {
+  id: number;
+  title: string;
+  specs_short?: string | null;
+  imei?: string | null;
+  sku?: string | null;
+  sell_price?: number | string;
+  buy_price?: number | string;
+  sell_at?: string | null;
+  category_id?: number | null;
+  category_name?: string | null;
+  category_path?: string | null;
+  operation_id?: number;
+  amount?: number | string;
+  payment_method?: string;
+  contract_number?: string | null;
+  employee_name?: string | null;
+  client_id?: number | null;
+  client_name?: string | null;
+  client_phone?: string | null;
+  branch_name?: string | null;
+  branch_address?: string | null;
 };
 
 export type SLOperation = {

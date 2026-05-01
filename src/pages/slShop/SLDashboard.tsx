@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Icon from "@/components/ui/icon";
-import { slApi, fmt, type SLStats, STATUS_LABEL } from "./types";
+import { slApi, fmt, type SLStats, type SLSoldItem, STATUS_LABEL } from "./types";
+import { printReceipt } from "./labelPrinter";
 
 const PERIODS = [
   { v: "today", l: "Сегодня" },
@@ -11,17 +12,22 @@ const PERIODS = [
   { v: "all", l: "Всё время" },
 ];
 
-export default function SLDashboard({ token, onNav }: { token: string; onNav: (k: string) => void }) {
+export default function SLDashboard({ token, onNav, empName: _empName }: { token: string; onNav: (k: string) => void; empName?: string }) {
   const [period, setPeriod] = useState("30d");
   const [data, setData] = useState<SLStats | null>(null);
+  const [sold, setSold] = useState<SLSoldItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setErr(null);
-    const r = await slApi<SLStats>(token, "stats", { params: { period } });
-    if (r.ok && r.data) setData(r.data);
-    else setErr(r.error || "Ошибка");
+    const [r1, r2] = await Promise.all([
+      slApi<SLStats>(token, "stats", { params: { period } }),
+      slApi<SLSoldItem[]>(token, "sold", { params: { period } }),
+    ]);
+    if (r1.ok && r1.data) setData(r1.data);
+    else setErr(r1.error || "Ошибка");
+    if (r2.ok && r2.data) setSold(r2.data);
     setLoading(false);
   }, [token, period]);
 
@@ -72,6 +78,40 @@ export default function SLDashboard({ token, onNav }: { token: string; onNav: (k
             </div>
           );
         })}
+      </div>
+
+      {/* Проданные товары с датой и кнопкой чека */}
+      <div className="bg-[#0F0F0F] border border-[#1F1F1F] rounded-xl p-3 mb-3">
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-[11px] uppercase text-white/50 font-bold tracking-wide">Что продано</div>
+          <button onClick={() => onNav("operations")} className="text-[10px] text-[#FFD700]/70 hover:text-[#FFD700]">все →</button>
+        </div>
+        {sold.length === 0 ? (
+          <div className="text-white/30 text-xs py-3 text-center">Нет продаж за период</div>
+        ) : (
+          <div className="space-y-1.5">
+            {sold.slice(0, 15).map(s => (
+              <div key={s.id} className="flex items-center gap-2 bg-[#141414] rounded-lg p-2">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium truncate">{s.title}</div>
+                  <div className="text-[10px] text-white/40 truncate">
+                    {s.sell_at ? new Date(s.sell_at).toLocaleString("ru-RU") : "—"}
+                    {s.branch_name ? ` • ${s.branch_name}` : ""}
+                    {s.client_name ? ` • ${s.client_name}` : ""}
+                  </div>
+                </div>
+                <div className="text-[#FFD700] font-bold text-[13px] shrink-0">{fmt(s.amount || s.sell_price)} ₽</div>
+                <button onClick={() => printReceipt(s)} title="Распечатать чек"
+                  className="bg-[#FFD700]/10 border border-[#FFD700]/30 text-[#FFD700] hover:bg-[#FFD700]/20 px-2 py-1 rounded shrink-0">
+                  <Icon name="Receipt" size={12} />
+                </button>
+              </div>
+            ))}
+            {sold.length > 15 && (
+              <div className="text-center text-[10px] text-white/30 pt-1">… и ещё {sold.length - 15}</div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Топ моделей */}

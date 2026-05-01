@@ -38,7 +38,7 @@ const TABS: { k: SubTab; l: string; icon: string }[] = [
 
 export default function SLShopTab({ token, myRole }: { token: string; myRole?: string }) {
   const [tab, setTab] = useState<SubTab>("dashboard");
-  void myRole;
+  const empName = typeof window !== "undefined" ? (localStorage.getItem("employee_name") || "") : "";
   return (
     <div className="p-3">
       {/* Шапка раздела */}
@@ -74,12 +74,12 @@ export default function SLShopTab({ token, myRole }: { token: string; myRole?: s
       </div>
 
       {/* Контент подвкладки */}
-      {tab === "dashboard"  && <SLDashboard token={token} onNav={(k) => setTab(k as SubTab)} />}
+      {tab === "dashboard"  && <SLDashboard token={token} empName={empName} onNav={(k) => setTab(k as SubTab)} />}
       {tab === "buy"        && <SLBuyForm token={token} onSaved={() => setTab("stock")} />}
-      {tab === "stock"      && <SLItemsList token={token} />}
-      {tab === "operations" && <SLOperations token={token} />}
+      {tab === "stock"      && <SLItemsList token={token} empName={empName} />}
+      {tab === "operations" && <SLOperations token={token} myRole={myRole} />}
       {tab === "clients"    && <SLClientsList token={token} />}
-      {tab === "labels"     && <SLLabels token={token} />}
+      {tab === "labels"     && <SLLabels token={token} empName={empName} />}
       {tab === "discount"   && <SLDiscount token={token} />}
       {tab === "revision"   && <SLRevision token={token} />}
       {tab === "import"     && <SLImportExport token={token} />}

@@ -3,7 +3,7 @@ import Icon from "@/components/ui/icon";
 import { slApi, fmt, type SLItem, type SLLabelTemplate } from "./types";
 import { printLabels } from "./labelPrinter";
 
-export default function SLLabels({ token }: { token: string }) {
+export default function SLLabels({ token, empName }: { token: string; empName?: string }) {
   const [items, setItems] = useState<SLItem[]>([]);
   const [tmpls, setTmpls] = useState<SLLabelTemplate[]>([]);
   const [tmplId, setTmplId] = useState<number | null>(null);
@@ -43,7 +43,7 @@ export default function SLLabels({ token }: { token: string }) {
     if (!tmpl) return;
     const list = single ? [single] : items.filter(i => selected.has(i.id));
     if (list.length === 0) return;
-    printLabels(list, tmpl);
+    printLabels(list, tmpl, { empName });
   };
 
   return (
