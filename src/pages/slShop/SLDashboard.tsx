@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 import { slApi, fmt, type SLStats, type SLSoldItem, type SLBoughtItem, STATUS_LABEL } from "./types";
 import { printReceipt } from "./labelPrinter";
+import { useSharedPeriod } from "./useSharedPeriod";
 
 const PERIODS = [
   { v: "today", l: "Сегодня" },
@@ -13,7 +14,7 @@ const PERIODS = [
 ];
 
 export default function SLDashboard({ token, onNav, empName: _empName }: { token: string; onNav: (k: string) => void; empName?: string }) {
-  const [period, setPeriod] = useState("30d");
+  const [period, setPeriod] = useSharedPeriod();
   const [data, setData] = useState<SLStats | null>(null);
   const [sold, setSold] = useState<SLSoldItem[]>([]);
   const [bought, setBought] = useState<SLBoughtItem[]>([]);

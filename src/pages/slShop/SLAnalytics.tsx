@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 import { slApi, fmt, type SLAnalytics } from "./types";
+import { useSharedPeriod } from "./useSharedPeriod";
 
 const PERIODS = [
   { v: "today", l: "Сегодня" },
@@ -12,7 +13,7 @@ const PERIODS = [
 ];
 
 export default function SLAnalytics({ token }: { token: string }) {
-  const [period, setPeriod] = useState("30d");
+  const [period, setPeriod] = useSharedPeriod();
   const [data, setData] = useState<SLAnalytics | null>(null);
   const [loading, setLoading] = useState(false);
 

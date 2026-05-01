@@ -596,10 +596,16 @@ def accounting_summary(params):
     now = datetime.utcnow()
     if period == 'today':
         date_from = now.strftime('%Y-%m-%d')
+    elif period == 'yesterday':
+        date_from = (now - timedelta(days=1)).strftime('%Y-%m-%d')
     elif period == '7d':
         date_from = (now - timedelta(days=7)).strftime('%Y-%m-%d')
+    elif period == '30d':
+        date_from = (now - timedelta(days=30)).strftime('%Y-%m-%d')
     elif period == 'year':
         date_from = (now - timedelta(days=365)).strftime('%Y-%m-%d')
+    elif period == 'all':
+        date_from = '2000-01-01'
     else:
         date_from = (now - timedelta(days=30)).strftime('%Y-%m-%d')
     conn = get_conn()

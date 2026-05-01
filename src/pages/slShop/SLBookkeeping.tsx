@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 import { slApi, fmt, type SLAccounting, type SLCashSummary, SLSHOP_URL } from "./types";
+import { useSharedPeriod } from "./useSharedPeriod";
 
 export default function SLBookkeeping({ token }: { token: string }) {
-  const [period, setPeriod] = useState("30d");
+  const [period, setPeriod] = useSharedPeriod();
   const [data, setData] = useState<SLAccounting | null>(null);
   const [accounts, setAccounts] = useState<SLCashSummary[]>([]);
   const [loading, setLoading] = useState(false);
@@ -36,10 +37,12 @@ export default function SLBookkeeping({ token }: { token: string }) {
     <div className="space-y-3">
       <div className="flex gap-1.5 flex-wrap">
         {[
+          { v: "today", l: "Сегодня" },
+          { v: "yesterday", l: "Вчера" },
           { v: "7d", l: "7 дней" },
-          { v: "30d", l: "Месяц" },
+          { v: "30d", l: "30 дней" },
           { v: "year", l: "Год" },
-          { v: "all", l: "Всё" },
+          { v: "all", l: "Всё время" },
         ].map(p => (
           <button key={p.v} onClick={() => setPeriod(p.v)}
             className={`text-[11px] px-3 py-1.5 rounded-full ${period === p.v ? "bg-[#FFD700] text-black font-bold" : "bg-[#141414] border border-[#1F1F1F] text-white/50"}`}>
