@@ -10,23 +10,6 @@ function escapeHtml(s: string | undefined | null): string {
   }[ch] as string));
 }
 
-function barcodeBars(value: string): string {
-  const chars = String(value || "0").split("");
-  const widths = ["1px", "2px", "3px", "1px"];
-  let bars = "";
-  for (const ch of chars) {
-    const code = ch.charCodeAt(0);
-    for (let i = 0; i < 4; i++) {
-      const isBlack = ((code >> i) & 1) === 1;
-      bars += `<span style="display:inline-block;width:${widths[i]};height:100%;background:${isBlack ? "#000" : "#fff"}"></span>`;
-    }
-  }
-  bars += `<span style="display:inline-block;width:2px;height:100%;background:#000"></span>`;
-  bars += `<span style="display:inline-block;width:1px;height:100%;background:#fff"></span>`;
-  bars += `<span style="display:inline-block;width:3px;height:100%;background:#000"></span>`;
-  return bars;
-}
-
 function labelHtml(item: SLItem, tmpl: SLLabelTemplate, opts: { empName?: string }): string {
   const w = Number(tmpl.width_mm);
   const h = Number(tmpl.height_mm);
@@ -54,17 +37,14 @@ function labelHtml(item: SLItem, tmpl: SLLabelTemplate, opts: { empName?: string
       <div class="hdr" style="background:${headerBg};color:${headerColor};font-size:${tiny}mm;">
         <span style="font-weight:900;letter-spacing:0.4mm">СКУПКА24</span>
         ${branch ? `<span style="opacity:0.85">${escapeHtml(branch)}</span>` : ""}
-        <span style="font-weight:700">#${escapeHtml(idStr)}</span>
+        <span style="font-weight:700">#${escapeHtml(item.sku || idStr)}</span>
       </div>
       ${category ? `<div class="cat" style="font-size:${tiny}mm;color:${accent}">${escapeHtml(category)}</div>` : ""}
       <div class="title" style="font-size:${titleSize}mm">${escapeHtml(item.title)}</div>
       ${showSpecs ? `<div class="specs" style="font-size:${specsSize}mm">${escapeHtml(specsText)}</div>` : ""}
       ${showImei ? `<div class="imei" style="font-size:${tiny}mm">IMEI: ${escapeHtml(item.imei || "")}</div>` : ""}
       <div class="price" style="font-size:${priceSize}mm;color:${accent}">${fmtPrice(item.sell_price)}₽</div>
-      <div class="barcode-wrap">
-        <div class="barcode" style="height:${(h * 0.12).toFixed(2)}mm">${barcodeBars(idStr)}</div>
-        <div class="barcode-id" style="font-size:${tiny}mm">ID ${escapeHtml(idStr)}${item.sku ? ` · ${escapeHtml(item.sku)}` : ""}</div>
-      </div>
+      <div class="sku-id" style="font-size:${(w / 18).toFixed(2)}mm">${escapeHtml(item.sku || idStr)}</div>
       <div class="footer" style="font-size:${small}mm">
         <span>Ответственное лицо:</span>
         <b>${escapeHtml(empName || "—")}</b>
@@ -116,9 +96,7 @@ export function printLabels(items: SLItem[], tmpl: SLLabelTemplate, opts: { empN
       .label .specs { text-align: center; line-height: 1.1; width: 100%; }
       .label .imei  { text-align: center; line-height: 1; width: 100%; color: #444; }
       .label .price { font-weight: 900; text-align: center; line-height: 1; width: 100%; }
-      .label .barcode-wrap { width: 100%; text-align: center; }
-      .label .barcode { display: inline-flex; align-items: stretch; gap: 0; }
-      .label .barcode-id { font-family: 'Courier New', monospace; letter-spacing: 0.3mm; line-height: 1; margin-top: 0.2mm; }
+      .label .sku-id { width: 100%; text-align: center; font-family: 'Courier New', monospace; font-weight: 800; letter-spacing: 0.4mm; line-height: 1; }
       .label .footer { display: flex; justify-content: space-between; gap: 1mm; line-height: 1.1; border-top: 0.2mm dashed #000; padding-top: 0.3mm; }
       @media screen {
         body { padding: 12px; background: #f3f3f3; }
