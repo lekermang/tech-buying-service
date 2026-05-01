@@ -35,9 +35,10 @@ def get_employee_by_token(token: str):
     if not token:
         return None
     conn = get_conn(); cur = conn.cursor()
-    cur.execute(f"SELECT id, full_name, login, role FROM {SCHEMA}.employees WHERE auth_token=%s AND token_expires_at>NOW() AND is_active=true", (token,))
+    cur.execute(f"SELECT id, full_name, login, role, avatar_url, email, phone FROM {SCHEMA}.employees WHERE auth_token=%s AND token_expires_at>NOW() AND is_active=true", (token,))
     row = cur.fetchone(); cur.close(); conn.close()
-    return {'id': row[0], 'full_name': row[1], 'login': row[2], 'role': row[3]} if row else None
+    return {'id': row[0], 'full_name': row[1], 'login': row[2], 'role': row[3],
+            'avatar_url': row[4], 'email': row[5], 'phone': row[6]} if row else None
 
 
 def handler(event: dict, context) -> dict:
@@ -269,6 +270,114 @@ def handler(event: dict, context) -> dict:
             'role': role,
             'first_pin': not bool(pin_hash),
         })
+
+    # POST /me_update — сотрудник правит СВОЙ профиль (любой авторизованный)
+    if method == 'POST' and body.get('action') == 'me_update':
+        emp = get_employee_by_token(emp_token)
+        if not emp:
+            return _err(401, 'Требуется авторизация')
+        fields, values = [], []
+        if 'full_name' in body and (body.get('full_name') or '').strip():
+            fields.append("full_name=%s"); values.append(body['full_name'].strip())
+        if 'login' in body and (body.get('login') or '').strip():
+            new_login = body['login'].strip()
+            conn0 = get_conn(); cur0 = conn0.cursor()
+            cur0.execute(f"SELECT id FROM {SCHEMA}.employees WHERE login=%s AND id<>%s", (new_login, emp['id']))
+            if cur0.fetchone():
+                cur0.close(); conn0.close()
+                return _err(409, 'Такой логин уже занят')
+            cur0.close(); conn0.close()
+            fields.append("login=%s"); values.append(new_login)
+        if 'email' in body:
+            fields.append("email=%s"); values.append((body.get('email') or '').strip() or None)
+        if 'phone' in body:
+            fields.append("phone=%s"); values.append((body.get('phone') or '').strip() or None)
+        if 'avatar_url' in body:
+            fields.append("avatar_url=%s"); values.append((body.get('avatar_url') or '').strip() or None)
+        if 'position' in body:
+            fields.append("position=%s"); values.append((body.get('position') or '').strip() or None)
+        # Смена пароля (требует текущий)
+        if body.get('new_password'):
+            cur_pw = (body.get('current_password') or '').strip()
+            if not cur_pw:
+                return _err(400, 'Текущий пароль обязателен')
+            conn0 = get_conn(); cur0 = conn0.cursor()
+            cur0.execute(f"SELECT password_hash FROM {SCHEMA}.employees WHERE id=%s", (emp['id'],))
+            row = cur0.fetchone(); cur0.close(); conn0.close()
+            if not row or row[0] != hash_pw(cur_pw):
+                return _err(401, 'Текущий пароль неверен')
+            new_pw = body['new_password'].strip()
+            if len(new_pw) < 4:
+                return _err(400, 'Пароль слишком короткий (минимум 4 символа)')
+            fields.append("password_hash=%s"); values.append(hash_pw(new_pw))
+        if not fields:
+            return _err(400, 'Нечего обновлять')
+        conn = get_conn(); cur = conn.cursor()
+        values.append(emp['id'])
+        cur.execute(f"UPDATE {SCHEMA}.employees SET {', '.join(fields)} WHERE id=%s", values)
+        conn.commit(); cur.close(); conn.close()
+        return _ok({'ok': True})
+
+    # POST /me_change_pin — смена своего PIN-кода (требует текущий)
+    if method == 'POST' and body.get('action') == 'me_change_pin':
+        emp = get_employee_by_token(emp_token)
+        if not emp:
+            return _err(401, 'Требуется авторизация')
+        cur_pin = (body.get('current_pin') or '').strip()
+        new_pin = (body.get('new_pin') or '').strip()
+        if not new_pin.isdigit() or not (4 <= len(new_pin) <= 8):
+            return _err(400, 'Новый PIN должен быть 4–8 цифр')
+        # Владелец обязан иметь PIN 231189
+        if emp['role'] == 'owner' and new_pin != OWNER_REQUIRED_PIN:
+            return _err(400, 'PIN владельца зафиксирован системой')
+        conn = get_conn(); cur = conn.cursor()
+        cur.execute(f"SELECT pin_hash FROM {SCHEMA}.employees WHERE id=%s", (emp['id'],))
+        row = cur.fetchone()
+        if not row:
+            cur.close(); conn.close(); return _err(404, 'Сотрудник не найден')
+        existing = row[0]
+        # Если PIN уже задан — требуем текущий
+        if existing:
+            if not cur_pin or hash_pin(cur_pin) != existing:
+                cur.close(); conn.close(); return _err(401, 'Текущий PIN неверен')
+        cur.execute(
+            f"UPDATE {SCHEMA}.employees SET pin_hash=%s, pin_failed_count=0, pin_locked_until=NULL WHERE id=%s",
+            (hash_pin(new_pin), emp['id']),
+        )
+        conn.commit(); cur.close(); conn.close()
+        return _ok({'ok': True})
+
+    # POST /me_upload_avatar — загрузка фото профиля в S3 (любой сотрудник)
+    if method == 'POST' and body.get('action') == 'me_upload_avatar':
+        emp = get_employee_by_token(emp_token)
+        if not emp:
+            return _err(401, 'Требуется авторизация')
+        image_b64 = body.get('image_base64') or ''
+        if not image_b64:
+            return _err(400, 'image_base64 обязателен')
+        try:
+            import base64 as _b64
+            import boto3 as _boto3
+            import uuid as _uuid
+            if ',' in image_b64:
+                image_b64 = image_b64.split(',', 1)[1]
+            raw = _b64.b64decode(image_b64)
+            if len(raw) > 5 * 1024 * 1024:
+                return _err(400, 'Файл больше 5 МБ')
+            s3 = _boto3.client(
+                's3', endpoint_url='https://bucket.poehali.dev',
+                aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
+                aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
+            )
+            fname = f"avatars/{emp['id']}_{_uuid.uuid4().hex}.jpg"
+            s3.put_object(Bucket='files', Key=fname, Body=raw, ContentType='image/jpeg')
+            cdn = f"https://cdn.poehali.dev/projects/{os.environ['AWS_ACCESS_KEY_ID']}/bucket/{fname}"
+        except Exception as e:
+            return _err(500, f'Ошибка загрузки: {e}')
+        conn = get_conn(); cur = conn.cursor()
+        cur.execute(f"UPDATE {SCHEMA}.employees SET avatar_url=%s WHERE id=%s", (cdn, emp['id']))
+        conn.commit(); cur.close(); conn.close()
+        return _ok({'avatar_url': cdn})
 
     # POST /create — создать сотрудника (owner/admin)
     if method == 'POST' and body.get('action') == 'create':

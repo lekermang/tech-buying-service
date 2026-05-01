@@ -19,7 +19,7 @@ export const VIP_CHAT_URL =
 export const SECRET_PW = "Mark2015N";
 
 // Какие вкладки требуют доп. пароль (для НЕ-владельца)
-export const PROTECTED_TABS: ReadonlyArray<StaffTab> = ["gold", "analytics", "employees", "smartlombard"];
+export const PROTECTED_TABS: ReadonlyArray<StaffTab> = ["gold", "analytics", "employees"];
 
 // Тип записи табов в нижней панели
 export type TabConfig = {

@@ -12,6 +12,7 @@ import {
   GoodsTab, StaffRepairTab, GoldTab, SalesTab, ClientsTab, AnalyticsTab,
   EmployeesTab, VipChatTab, SmartLombardTab, prefetchTab,
 } from "./StaffLazy";
+import MyProfileModal from "./MyProfileModal";
 
 type Tab = StaffTab;
 
@@ -50,6 +51,17 @@ export function StaffMainLayout({
   sending, sendResult, sendReminderNow, logout,
   chatUnread, setChatUnread,
 }: Props) {
+  const [profileOpen, setProfileOpen] = React.useState(false);
+  const [myAvatar, setMyAvatar] = React.useState<string | null>(null);
+  const [myName, setMyName] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    // Подтянем avatar_url из профиля, чтобы показать в шапке
+    fetch("https://functions.poehali.dev/29210248-0b73-4c54-9b9f-acd13668dfea", {
+      headers: { "X-Employee-Token": token },
+    }).then(r => r.json()).then(j => {
+      if (j && j.avatar_url) setMyAvatar(j.avatar_url);
+    }).catch(() => {});
+  }, [token]);
   const requestTab = (t: Tab) => {
     if (isOwner || unlocked[t]) { setTab(t); return; }
     if ((PROTECTED_TABS as readonly string[]).includes(t)) {
@@ -64,7 +76,7 @@ export function StaffMainLayout({
     { k: "chat",         l: "Чат",          icon: "MessageCircle", badge: chatUnread },
     { k: "clients",      l: "Клиенты",      icon: "Users" },
     { k: "analytics",    l: "Статистика",   icon: "BarChart2" },
-    ...(isOwnerOrAdmin ? [{ k: "smartlombard" as Tab, l: "СмартЛомбард", icon: "Coins" }] : []),
+    { k: "smartlombard", l: "СмартЛомбард", icon: "Coins" },
     ...(isOwnerOrAdmin ? [{ k: "gold" as Tab, l: "Золото", icon: "Gem" }] : []),
     ...(isOwnerOrAdmin ? [{ k: "employees" as Tab, l: "Команда", icon: "UserCog" }] : []),
   ];
@@ -78,6 +90,16 @@ export function StaffMainLayout({
       <CursorEffects />
       <AnimeMascot onOpenSettings={() => setThemeOpen(true)} />
       {themeOpen && <StaffThemeSettings onClose={() => setThemeOpen(false)} />}
+      {profileOpen && (
+        <MyProfileModal
+          token={token}
+          onClose={() => setProfileOpen(false)}
+          onUpdated={({ avatar_url, full_name }) => {
+            if (avatar_url !== undefined) setMyAvatar(avatar_url || null);
+            if (full_name) setMyName(full_name);
+          }}
+        />
+      )}
       {/* Системный баннер офлайн (постоянный, пока нет сети) */}
       <OfflineBanner />
       {/* Баннер темы */}
@@ -87,25 +109,29 @@ export function StaffMainLayout({
         <div className="absolute inset-0 bg-gradient-to-br from-[#FFD700]/[0.04] via-transparent to-blue-500/[0.03] pointer-events-none" />
         <div className="relative px-3 py-2.5 flex items-center justify-between gap-2">
           {/* Аватар + имя */}
-          <div className="flex items-center gap-2 min-w-0 flex-1">
+          <button onClick={() => setProfileOpen(true)} className="flex items-center gap-2 min-w-0 flex-1 text-left active:scale-95 transition" title="Мой профиль">
             <div className="relative shrink-0">
-              <div className={`w-9 h-9 rounded-full flex items-center justify-center font-oswald font-bold text-sm ${
-                empRole === "owner" ? "bg-gradient-to-br from-[#FFD700] to-yellow-600 text-black" :
-                empRole === "admin" ? "bg-gradient-to-br from-blue-500 to-blue-700 text-white" :
-                "bg-gradient-to-br from-[#333] to-[#1a1a1a] text-white/70 border border-white/10"
-              }`}>
-                {initials}
-              </div>
+              {myAvatar ? (
+                <img src={myAvatar} alt="ava" className="w-9 h-9 rounded-full object-cover border border-[#FFD700]/40" />
+              ) : (
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center font-oswald font-bold text-sm ${
+                  empRole === "owner" ? "bg-gradient-to-br from-[#FFD700] to-yellow-600 text-black" :
+                  empRole === "admin" ? "bg-gradient-to-br from-blue-500 to-blue-700 text-white" :
+                  "bg-gradient-to-br from-[#333] to-[#1a1a1a] text-white/70 border border-white/10"
+                }`}>
+                  {initials}
+                </div>
+              )}
               <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-400 border-2 border-[#0A0A0A] rounded-full" />
             </div>
             <div className="min-w-0">
-              <div className="font-oswald font-bold uppercase text-sm truncate leading-tight">{empName}</div>
+              <div className="font-oswald font-bold uppercase text-sm truncate leading-tight">{myName || empName}</div>
               <span className={`font-roboto text-[9px] px-1.5 py-0.5 rounded-sm inline-flex items-center gap-1 mt-0.5 ${ROLE_BADGE[empRole] || "bg-white/10 text-white/50"}`}>
                 {empRole === "owner" && <span>👑</span>}
                 {ROLE_LABEL[empRole] || empRole}
               </span>
             </div>
-          </div>
+          </button>
 
           <MskClock />
 
@@ -126,6 +152,10 @@ export function StaffMainLayout({
               </button>
             )}
             <InstallPwaButton />
+            <button onClick={() => setProfileOpen(true)} title="Мой профиль"
+              className="text-white/30 hover:text-[#FFD700] active:text-[#FFD700] transition-colors p-2 rounded-sm hover:bg-[#FFD700]/10">
+              <Icon name="UserCog" size={16} />
+            </button>
             <button onClick={() => setThemeOpen(true)} title="Моя тема"
               className="text-white/30 hover:text-[#FFD700] active:text-[#FFD700] transition-colors p-2 rounded-sm hover:bg-[#FFD700]/10">
               <Icon name="Sparkles" size={16} />
@@ -149,7 +179,7 @@ export function StaffMainLayout({
             {tab === "analytics" && <AnalyticsTab token={token} />}
             {tab === "gold"      && isOwnerOrAdmin && <GoldTab token={token} />}
             {tab === "employees" && isOwnerOrAdmin && <EmployeesTab token={token} myRole={empRole} />}
-            {tab === "smartlombard" && isOwnerOrAdmin && <SmartLombardTab token={token} myRole={empRole} />}
+            {tab === "smartlombard" && <SmartLombardTab token={token} myRole={empRole} />}
             {tab === "chat"      && <VipChatTab token={token} onUnread={setChatUnread} />}
           </React.Suspense>
         </TabErrorBoundary>
