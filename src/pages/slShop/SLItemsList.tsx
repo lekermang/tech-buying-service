@@ -6,6 +6,8 @@ import SLItemsMovePanel from "./SLItemsMovePanel";
 import SLItemDetail from "./SLItemDetail";
 import SLItemSellModal from "./SLItemSellModal";
 
+const PHONE_SPECS_AI_URL = "https://functions.poehali.dev/983744a8-1cfc-42d8-a566-bf31dfa328b2";
+
 export default function SLItemsList({ token, empName: _empName, isOwner = false }: { token: string; empName?: string; isOwner?: boolean }) {
   const [items, setItems] = useState<SLItem[]>([]);
   const [cats, setCats] = useState<SLCategory[]>([]);
@@ -26,6 +28,9 @@ export default function SLItemsList({ token, empName: _empName, isOwner = false 
   const [priceMax, setPriceMax] = useState<string>("");
   const [allItems, setAllItems] = useState<SLItem[]>([]);
   const [moreFilters, setMoreFilters] = useState(false);
+  const [aiStatus, setAiStatus] = useState<{ total: number; empty: number; short: number } | null>(null);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiMsg, setAiMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -60,6 +65,60 @@ export default function SLItemsList({ token, empName: _empName, isOwner = false 
     slApi<{ id: number; name: string }[]>(token, "branches").then(r => { if (r.ok && r.data) setBranches(r.data); });
   }, [token]);
   useEffect(() => { load(); }, [load]);
+
+  const loadAiStatus = useCallback(async () => {
+    try {
+      const r = await fetch(`${PHONE_SPECS_AI_URL}?action=status&t=${Date.now()}`);
+      const j = await r.json();
+      if (j.ok) setAiStatus({ total: j.total, empty: j.empty, short: j.short ?? 0 });
+    } catch {
+      // тихо
+    }
+  }, []);
+  useEffect(() => { loadAiStatus(); }, [loadAiStatus]);
+
+  const fillSpecsAi = async () => {
+    if (aiBusy) return;
+    const total = (aiStatus?.empty ?? 0) + (aiStatus?.short ?? 0);
+    if (!total) {
+      setAiMsg("Все телефоны уже заполнены");
+      setTimeout(() => setAiMsg(null), 2500);
+      return;
+    }
+    if (!confirm(`Сгенерировать характеристики ИИ для ${total} телефонов? Это займёт ~${Math.ceil(total * 4)} сек.`)) return;
+    setAiBusy(true);
+    let done = 0;
+    let attempts = 0;
+    const CHUNK = 5;
+    const MAX_ATTEMPTS = Math.ceil(total / CHUNK) + 5;
+    try {
+      // обрабатываем порциями по 5 (укладываемся в таймаут функции)
+      while (attempts < MAX_ATTEMPTS) {
+        attempts++;
+        setAiMsg(`Обрабатываю... (${done} из ${total})`);
+        let processed = 0;
+        try {
+          const r = await fetch(`${PHONE_SPECS_AI_URL}?action=generate_batch&t=${Date.now()}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ limit: CHUNK, only_empty: false, only_short: true }),
+          });
+          const j = await r.json();
+          if (j.ok) processed = j.processed || 0;
+        } catch {
+          // таймаут одной порции — продолжим
+        }
+        done += processed;
+        if (processed === 0) break; // нечего обрабатывать
+      }
+      setAiMsg(`Готово: обработано ${done} товаров`);
+      await loadAiStatus();
+      await load();
+    } finally {
+      setAiBusy(false);
+      setTimeout(() => setAiMsg(null), 6000);
+    }
+  };
 
   const toggleSelect = (id: number) => {
     setSelected(prev => {
@@ -117,6 +176,27 @@ export default function SLItemsList({ token, empName: _empName, isOwner = false 
         onSelectAll={selectAll}
         onClearSelection={clearSelection}
       />
+
+      {aiStatus && (aiStatus.empty > 0 || aiStatus.short > 0) && (
+        <div className="mb-2 bg-gradient-to-br from-[#FFD700]/10 to-transparent border border-[#FFD700]/30 rounded-lg p-2.5 flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <div className="text-[#FFD700] text-sm font-bold flex items-center gap-1">
+              <Icon name="Sparkles" size={13} />
+              Заполнить характеристики ИИ
+            </div>
+            <div className="text-[10px] text-white/50 mt-0.5 truncate">
+              Без описания: {aiStatus.empty} · Кратко: {aiStatus.short} из {aiStatus.total}
+            </div>
+            {aiMsg && <div className="text-[10px] text-emerald-300 mt-0.5">{aiMsg}</div>}
+          </div>
+          <button onClick={fillSpecsAi} disabled={aiBusy}
+            className="shrink-0 bg-[#FFD700] text-black font-bold text-xs px-3 py-2 rounded-lg disabled:opacity-50 flex items-center gap-1">
+            {aiBusy
+              ? <><Icon name="Loader" size={12} className="animate-spin" />Обработка...</>
+              : <><Icon name="Wand2" size={12} />Заполнить ({aiStatus.empty + aiStatus.short})</>}
+          </button>
+        </div>
+      )}
 
       {loading && <div className="text-white/30 text-sm py-4 text-center"><Icon name="Loader" size={14} className="animate-spin inline mr-1" />Загрузка...</div>}
 

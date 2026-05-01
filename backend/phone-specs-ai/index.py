@@ -115,16 +115,22 @@ def generate_for_item(item_id: int) -> dict:
     return {'ok': True, 'item_id': iid, 'specs': result['specs'], 'specs_short': result['specs_short']}
 
 
-def generate_batch(limit: int = 20, only_empty: bool = True) -> dict:
+def generate_batch(limit: int = 20, only_empty: bool = True, only_short: bool = False) -> dict:
     conn = get_conn()
     cur = conn.cursor()
-    where_empty = "AND (i.specs IS NULL OR i.specs = '')" if only_empty else ""
+    if only_short:
+        where_clause = "AND (i.specs_short IS NULL OR LENGTH(i.specs_short) < 50 OR i.specs IS NULL OR i.specs = '')"
+    elif only_empty:
+        where_clause = "AND (i.specs IS NULL OR i.specs = '')"
+    else:
+        where_clause = ""
     cur.execute(
         f"""
         SELECT i.id FROM {SCHEMA}.slshop_items i
         LEFT JOIN {SCHEMA}.slshop_categories c ON c.id = i.category_id
         WHERE (c.slug IN ('mob_phones','techno_spark') OR c.name IN ('Мобильные телефоны','Смартфоны'))
-        {where_empty}
+          AND i.status NOT IN ('sold','returned')
+        {where_clause}
         ORDER BY i.id
         LIMIT %s
         """,
@@ -151,15 +157,17 @@ def get_status() -> dict:
         f"""
         SELECT
           COUNT(*) AS total,
-          COUNT(*) FILTER (WHERE i.specs IS NULL OR i.specs = '') AS empty
+          COUNT(*) FILTER (WHERE i.specs IS NULL OR i.specs = '') AS empty,
+          COUNT(*) FILTER (WHERE i.specs_short IS NULL OR LENGTH(i.specs_short) < 50) AS short
         FROM {SCHEMA}.slshop_items i
         LEFT JOIN {SCHEMA}.slshop_categories c ON c.id = i.category_id
-        WHERE c.slug IN ('mob_phones','techno_spark') OR c.name IN ('Мобильные телефоны','Смартфоны')
+        WHERE (c.slug IN ('mob_phones','techno_spark') OR c.name IN ('Мобильные телефоны','Смартфоны'))
+          AND i.status NOT IN ('sold','returned')
         """
     )
-    total, empty = cur.fetchone()
+    total, empty, short = cur.fetchone()
     cur.close(); conn.close()
-    return {'ok': True, 'total': total, 'empty': empty, 'filled': total - empty}
+    return {'ok': True, 'total': total, 'empty': empty, 'short': short, 'filled': total - empty}
 
 
 def handler(event, context):
@@ -193,8 +201,9 @@ def handler(event, context):
         if action == 'generate_batch':
             limit = int(body.get('limit') or 20)
             only_empty = bool(body.get('only_empty', True))
+            only_short = bool(body.get('only_short', False))
             return {'statusCode': 200, 'headers': HEADERS,
-                    'body': json.dumps(generate_batch(limit, only_empty), ensure_ascii=False)}
+                    'body': json.dumps(generate_batch(limit, only_empty, only_short), ensure_ascii=False)}
 
         return {'statusCode': 400, 'headers': HEADERS,
                 'body': json.dumps({'ok': False, 'error': 'unknown action'})}
