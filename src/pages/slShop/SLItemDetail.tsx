@@ -5,12 +5,44 @@ import CategoryTreeSelect from "./CategoryTreeSelect";
 import PrintDocsButton from "./PrintDocsButton";
 import { Row, Inp2 } from "./SLItemsCommon";
 
+const PHONE_SPECS_AI_URL = "https://functions.poehali.dev/983744a8-1cfc-42d8-a566-bf31dfa328b2";
+
 export default function SLItemDetail({ token, item, isOwner, onClose, onUpdated, onSell }: { token: string; item: SLItem; isOwner?: boolean; onClose: () => void; onUpdated: () => void; onSell: () => void }) {
   const [editing, setEditing] = useState(false);
   const [data, setData] = useState({ ...item });
   const [cats, setCats] = useState<SLCategory[]>([]);
   const [saving, setSaving] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiMsg, setAiMsg] = useState<string | null>(null);
   const [branches, setBranches] = useState<{ id: number; name: string; address?: string | null }[]>([]);
+
+  const isPhone = (() => {
+    const t = `${item.category_path || ""} ${item.category_name || ""} ${item.title || ""}`.toLowerCase();
+    return t.includes("телефон") || t.includes("смартфон") || t.includes("phone") || t.includes("iphone");
+  })();
+
+  const generateSpecs = async () => {
+    setAiBusy(true);
+    setAiMsg(null);
+    try {
+      const r = await fetch(`${PHONE_SPECS_AI_URL}?action=generate_one&t=${Date.now()}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ item_id: item.id }),
+      });
+      const j = await r.json();
+      if (j.ok) {
+        setAiMsg("Характеристики обновлены");
+        setTimeout(() => onUpdated(), 600);
+      } else {
+        setAiMsg(j.error || "Ошибка генерации");
+      }
+    } catch (e) {
+      setAiMsg("Ошибка сети");
+    } finally {
+      setAiBusy(false);
+    }
+  };
 
   useEffect(() => {
     slApi<SLCategory[]>(token, "categories").then(r => { if (r.ok && r.data) setCats(r.data); });
@@ -88,6 +120,15 @@ export default function SLItemDetail({ token, item, isOwner, onClose, onUpdated,
                   <button onClick={onSell} className="flex-1 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 py-2 rounded-lg text-sm font-bold">Продать</button>
                 )}
               </div>
+              {isPhone && (
+                <button onClick={generateSpecs} disabled={aiBusy}
+                  className="w-full mt-2 bg-[#FFD700]/10 border border-[#FFD700]/30 text-[#FFD700] hover:bg-[#FFD700]/20 py-2 rounded-lg text-sm font-bold disabled:opacity-50">
+                  {aiBusy
+                    ? <><Icon name="Loader" size={13} className="inline mr-1 animate-spin" />Генерирую...</>
+                    : <><Icon name="Sparkles" size={13} className="inline mr-1" />Сгенерировать характеристики ИИ</>}
+                </button>
+              )}
+              {aiMsg && <div className="text-[11px] text-center text-white/60 mt-1">{aiMsg}</div>}
               <div className="mt-2">
                 <PrintDocsButton token={token} itemId={item.id}
                   opType={item.status === "sold" ? "sell" : (item.source === "consignment" ? "consignment_in" : "buyout_individual")}

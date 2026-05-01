@@ -137,11 +137,8 @@ export default function SLItemsList({ token, empName: _empName, isOwner = false 
                   {isSel && <Icon name="Check" size={11} className="text-black" />}
                 </button>
                 <div className="flex-1 min-w-0" onClick={() => setOpen(it)} role="button">
-                  <div className="flex items-center gap-2">
-                    {it.sku && <span className="text-[10px] font-mono font-bold text-[#FFD700] bg-[#FFD700]/10 border border-[#FFD700]/30 px-1.5 py-0.5 rounded shrink-0">{it.sku}</span>}
-                    <div className="font-bold text-sm truncate">{it.title}</div>
-                  </div>
-                  {it.specs_short && <div className="text-[11px] text-white/50 truncate mt-0.5">{it.specs_short}</div>}
+                  <div className="font-bold text-sm truncate">{it.title}</div>
+                  {it.specs_short && <div className="text-[11px] text-white/50 truncate">{it.specs_short}</div>}
                   <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                     <span className={`text-[9px] px-1.5 py-0.5 rounded border ${stCfg.color}`}>{stCfg.l}</span>
                     {it.branch_name && <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#141414] border border-[#1F1F1F] text-white/50"><Icon name="MapPin" size={8} className="inline mr-0.5" />{it.branch_name}</span>}
@@ -149,6 +146,7 @@ export default function SLItemsList({ token, empName: _empName, isOwner = false 
                   </div>
                 </div>
                 <div className="text-right shrink-0">
+                  {it.sku && <div className="text-[9px] font-mono text-[#FFD700]/70 mb-0.5">{it.sku}</div>}
                   <div className="text-[#FFD700] font-bold text-sm">{fmt(it.sell_price)} ₽</div>
                   {it.status !== "sold" && it.status !== "returned" && (
                     <button onClick={() => setSellOpen(it)}
