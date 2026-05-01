@@ -54,13 +54,34 @@ export function StaffMainLayout({
   const [profileOpen, setProfileOpen] = React.useState(false);
   const [myAvatar, setMyAvatar] = React.useState<string | null>(null);
   const [myName, setMyName] = React.useState<string | null>(null);
+  // Мобильный режим: на узких экранах отключаем тяжёлые эффекты и компактим UI
+  const [isMobile, setIsMobile] = React.useState<boolean>(() =>
+    typeof window !== "undefined" && window.matchMedia("(max-width: 480px)").matches
+  );
   React.useEffect(() => {
-    // Подтянем avatar_url из профиля, чтобы показать в шапке
-    fetch("https://functions.poehali.dev/29210248-0b73-4c54-9b9f-acd13668dfea", {
-      headers: { "X-Employee-Token": token },
-    }).then(r => r.json()).then(j => {
-      if (j && j.avatar_url) setMyAvatar(j.avatar_url);
-    }).catch(() => {});
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 480px)");
+    const onChange = () => setIsMobile(mq.matches);
+    mq.addEventListener?.("change", onChange);
+    return () => mq.removeEventListener?.("change", onChange);
+  }, []);
+  React.useEffect(() => {
+    // Подтянем avatar_url из профиля — откладываем до простоя браузера
+    let cancelled = false;
+    type IdleWin = Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number };
+    const w = window as IdleWin;
+    const run = () => {
+      if (cancelled) return;
+      fetch("https://functions.poehali.dev/29210248-0b73-4c54-9b9f-acd13668dfea", {
+        headers: { "X-Employee-Token": token },
+      }).then(r => r.json()).then(j => {
+        if (cancelled) return;
+        if (j && j.avatar_url) setMyAvatar(j.avatar_url);
+      }).catch(() => {});
+    };
+    if (w.requestIdleCallback) w.requestIdleCallback(run, { timeout: 3000 });
+    else setTimeout(run, 1500);
+    return () => { cancelled = true; };
   }, [token]);
   const requestTab = (t: Tab) => {
     if (isOwner || unlocked[t]) { setTab(t); return; }
@@ -86,9 +107,10 @@ export function StaffMainLayout({
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-white flex flex-col relative" style={{ fontFamily: "var(--staff-font, inherit)" }}>
       <FontApplier />
-      <BackgroundFx />
-      <CursorEffects />
-      <AnimeMascot onOpenSettings={() => setThemeOpen(true)} />
+      {/* На мобильных отключаем тяжёлые GPU-эффекты ради скорости */}
+      {!isMobile && <BackgroundFx />}
+      {!isMobile && <CursorEffects />}
+      {!isMobile && <AnimeMascot onOpenSettings={() => setThemeOpen(true)} />}
       {themeOpen && <StaffThemeSettings onClose={() => setThemeOpen(false)} />}
       {profileOpen && (
         <MyProfileModal
@@ -107,7 +129,7 @@ export function StaffMainLayout({
       {/* Шапка — премиальная с градиентом */}
       <div className="relative shrink-0 safe-top border-b border-[#222]">
         <div className="absolute inset-0 bg-gradient-to-br from-[#FFD700]/[0.04] via-transparent to-blue-500/[0.03] pointer-events-none" />
-        <div className="relative px-3 py-2.5 flex items-center justify-between gap-2">
+        <div className={`relative flex items-center justify-between gap-2 ${isMobile ? "px-2.5 py-1.5" : "px-3 py-2.5"}`}>
           {/* Аватар + имя */}
           <button onClick={() => setProfileOpen(true)} className="flex items-center gap-2 min-w-0 flex-1 text-left active:scale-95 transition" title="Мой профиль">
             <div className="relative shrink-0">
@@ -133,10 +155,12 @@ export function StaffMainLayout({
             </div>
           </button>
 
-          <MskClock />
+          <div className={isMobile ? "hidden" : "block"}>
+            <MskClock />
+          </div>
 
           <div className="flex items-center gap-1 shrink-0">
-            {isOwnerOrAdmin && (
+            {isOwnerOrAdmin && !isMobile && (
               <button
                 onClick={sendReminderNow}
                 disabled={sending}
@@ -169,7 +193,7 @@ export function StaffMainLayout({
       </div>
 
       {/* Контент — растягивается, с паддингом под нижнюю панель */}
-      <div className="flex-1 overflow-y-auto" style={{ paddingBottom: 'calc(62px + env(safe-area-inset-bottom, 16px))' }}>
+      <div className="flex-1 overflow-y-auto" style={{ paddingBottom: 'calc(56px + env(safe-area-inset-bottom, 12px))' }}>
         <TabErrorBoundary key={tab}>
           <React.Suspense fallback={<div className="flex items-center justify-center py-16 text-white/20 font-roboto text-sm"><Icon name="Loader" size={16} className="animate-spin mr-2" />Загружаю...</div>}>
             {tab === "repair"    && <StaffRepairTab token={token} isOwner={empRole === "owner"} />}
@@ -203,7 +227,7 @@ export function StaffMainLayout({
                   onTouchStart={() => prefetchTab(t.k)}
                   aria-label={t.l}
                   aria-current={active ? "page" : undefined}
-                  className={`flex-1 min-w-[64px] flex flex-col items-center justify-center gap-1 pt-2.5 pb-2 min-h-[58px] transition-all duration-300 active:scale-95 relative group ${
+                  className={`flex-1 min-w-[56px] flex flex-col items-center justify-center gap-0.5 pt-2 pb-1.5 min-h-[54px] transition-all duration-300 active:scale-95 relative group ${
                     active ? "text-[#FFD700]" : "text-white/40 hover:text-white/70"
                   }`}
                 >
@@ -214,7 +238,7 @@ export function StaffMainLayout({
                   </>}
 
                   <div className={`relative transition-transform duration-300 ${active ? "scale-110" : "group-active:scale-90"}`}>
-                    <Icon name={t.icon} size={20} />
+                    <Icon name={t.icon} size={18} />
                     {locked && (
                       <span className="absolute -top-1.5 -right-2 text-[9px] bg-[#0A0A0A] rounded-full px-0.5">🔒</span>
                     )}
@@ -224,7 +248,7 @@ export function StaffMainLayout({
                       </span>
                     )}
                   </div>
-                  <span className={`font-roboto text-[10px] tracking-tight ${active ? "font-bold" : ""}`}>
+                  <span className={`font-roboto text-[9px] leading-none tracking-tight ${active ? "font-bold" : ""}`}>
                     {t.l}
                   </span>
                 </button>

@@ -67,10 +67,11 @@ function StaffInner() {
     return () => ctrl.abort();
   }, [token]);
 
-  // Тост при появлении новой версии PWA
+  // Тост при появлении новой версии PWA — откладываем до простоя
   useEffect(() => {
     if (!authed || !("serviceWorker" in navigator)) return;
     let shown = false;
+    let cancelled = false;
     const showOnce = (sw: ServiceWorker) => {
       if (shown) return;
       shown = true;
@@ -86,17 +87,25 @@ function StaffInner() {
         },
       });
     };
-    navigator.serviceWorker.getRegistration("/staff").then((reg) => {
-      if (!reg) return;
-      if (reg.waiting) showOnce(reg.waiting);
-      reg.addEventListener("updatefound", () => {
-        const sw = reg.installing;
-        if (!sw) return;
-        sw.addEventListener("statechange", () => {
-          if (sw.state === "installed" && navigator.serviceWorker.controller) showOnce(sw);
+    const checkSw = () => {
+      if (cancelled) return;
+      navigator.serviceWorker.getRegistration("/staff").then((reg) => {
+        if (!reg || cancelled) return;
+        if (reg.waiting) showOnce(reg.waiting);
+        reg.addEventListener("updatefound", () => {
+          const sw = reg.installing;
+          if (!sw) return;
+          sw.addEventListener("statechange", () => {
+            if (sw.state === "installed" && navigator.serviceWorker.controller) showOnce(sw);
+          });
         });
       });
-    });
+    };
+    type IdleWin = Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number };
+    const w = window as IdleWin;
+    if (w.requestIdleCallback) w.requestIdleCallback(checkSw, { timeout: 3000 });
+    else setTimeout(checkSw, 2000);
+    return () => { cancelled = true; };
   }, [authed, toast]);
 
   // Тосты при потере/восстановлении сети
@@ -112,12 +121,26 @@ function StaffInner() {
     };
   }, [authed, toast]);
 
-  // Прогрев соседних чанков после авторизации
+  // Прогрев соседних чанков после авторизации — откладываем до простоя браузера,
+  // чтобы не конкурировать с загрузкой основного контента
   useEffect(() => {
     if (!authed) return;
+    type IdleWin = Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number };
+    const w = window as IdleWin;
+    const schedule = (cb: () => void, delay: number) => {
+      if (w.requestIdleCallback) {
+        w.requestIdleCallback(cb, { timeout: 2000 });
+      } else {
+        setTimeout(cb, delay);
+      }
+    };
+    // Текущий таб — сразу (нужен для рендера)
     prefetchTab(tab);
-    if (tab !== "chat") prefetchTab("chat");
-    if (tab !== "repair") prefetchTab("repair");
+    // Соседние — лениво, после основной отрисовки
+    schedule(() => {
+      if (tab !== "chat") prefetchTab("chat");
+      if (tab !== "repair") prefetchTab("repair");
+    }, 800);
   }, [authed, tab]);
 
   // Хоткеи 1–7 на десктопе
@@ -144,7 +167,7 @@ function StaffInner() {
     return () => window.removeEventListener("keydown", onKey);
   }, [authed, empRole, unlocked, setTab]);
 
-  // Фоновый polling счётчика непрочитанных в чате (каждые 15 сек, когда чат не открыт и вкладка видима)
+  // Фоновый polling счётчика непрочитанных в чате (каждые 30 сек, когда чат не открыт и вкладка видима)
   useEffect(() => {
     if (!authed || !token || tab === "chat") return;
     let cancelled = false;
@@ -159,11 +182,22 @@ function StaffInner() {
         .then(d => { if (!cancelled && typeof d.unread === "number") setChatUnread(d.unread); })
         .catch(() => {});
     };
-    fetchUnread();
-    const t = setInterval(fetchUnread, 15000);
+    // Первый запрос отложим до простоя браузера, чтобы не конкурировать с рендером
+    type IdleWin = Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number };
+    const w = window as IdleWin;
+    const startTimer = setTimeout(() => {
+      if (!cancelled) fetchUnread();
+    }, 1500);
+    if (w.requestIdleCallback) {
+      w.requestIdleCallback(() => { if (!cancelled) fetchUnread(); }, { timeout: 3000 });
+    }
+    const t = setInterval(fetchUnread, 30000);
     const onVisible = () => { if (!document.hidden) fetchUnread(); };
     document.addEventListener("visibilitychange", onVisible);
-    return () => { cancelled = true; clearInterval(t); document.removeEventListener("visibilitychange", onVisible); };
+    return () => {
+      cancelled = true; clearTimeout(startTimer); clearInterval(t);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [authed, token, tab]);
 
   const [loginLoading, setLoginLoading] = useState(false);
