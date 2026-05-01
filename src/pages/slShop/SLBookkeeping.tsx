@@ -57,10 +57,42 @@ export default function SLBookkeeping({ token }: { token: string }) {
       <div className="bg-gradient-to-br from-[#FFD700]/10 to-transparent border border-[#FFD700]/30 rounded-xl p-3">
         <div className="text-[11px] uppercase font-bold tracking-wide text-[#FFD700] mb-2">Денежная сводка</div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <Stat l="Доход (период)" v={fmt(data?.revenue || 0) + " ₽"} c="text-emerald-300" />
-          <Stat l="Расход (период)" v={fmt(data?.spent || 0) + " ₽"} c="text-red-300" />
-          <Stat l="Прибыль" v={fmt(data?.profit || 0) + " ₽"} c="text-[#FFD700]" />
+          <Stat l="Выручка с продаж" v={fmt(data?.revenue || 0) + " ₽"} c="text-emerald-300" />
+          <Stat
+            l="Закупка товаров"
+            v={"−" + fmt((data?.purchases ?? 0)) + " ₽"}
+            c="text-orange-300"
+            hint="Сколько потратили на скупку техники за период (включая ещё не проданное)"
+          />
+          <Stat
+            l="Себестоимость продаж"
+            v={"−" + fmt((data?.cogs ?? 0)) + " ₽"}
+            c="text-amber-300"
+            hint="Закупочная цена именно того, что продали в этом периоде"
+          />
+          <Stat
+            l="Операционные расходы"
+            v={"−" + fmt((data?.opex ?? 0)) + " ₽"}
+            c="text-red-300"
+            hint="Зарплаты, аренда, прочие платежи из кассы"
+          />
+          <Stat
+            l="Маржа (до расходов)"
+            v={fmt((data?.gross_profit ?? 0)) + " ₽"}
+            c="text-emerald-200"
+            hint="Выручка − Себестоимость продаж"
+          />
+          <Stat
+            l="Чистая прибыль"
+            v={fmt(data?.profit || 0) + " ₽"}
+            c="text-[#FFD700]"
+            hint="Маржа − Операционные расходы"
+          />
           <Stat l="Касса (сейчас)" v={fmt(totalCash) + " ₽"} c="text-blue-300" />
+          <Stat l="Сделок (прод/закуп)" v={`${data?.sales_count || 0} / ${data?.buys_count || 0}`} c="text-white/70" />
+        </div>
+        <div className="text-[10px] text-white/40 mt-2 leading-relaxed">
+          «Закупка товаров» — это инвестиции в склад, не вычитаются из прибыли. В прибыль вычитается только себестоимость уже проданного.
         </div>
       </div>
 
@@ -139,10 +171,13 @@ export default function SLBookkeeping({ token }: { token: string }) {
   );
 }
 
-function Stat({ l, v, c }: { l: string; v: string; c: string }) {
+function Stat({ l, v, c, hint }: { l: string; v: string; c: string; hint?: string }) {
   return (
-    <div className="bg-[#0A0A0A] rounded-lg p-2">
-      <div className="text-[9px] uppercase text-white/40 tracking-wide">{l}</div>
+    <div className="bg-[#0A0A0A] rounded-lg p-2" title={hint}>
+      <div className="text-[9px] uppercase text-white/40 tracking-wide flex items-center gap-1">
+        {l}
+        {hint && <Icon name="Info" size={9} className="text-white/30" />}
+      </div>
       <div className={`text-base font-bold mt-0.5 ${c}`}>{v}</div>
     </div>
   );

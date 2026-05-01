@@ -126,8 +126,12 @@ export type SLAccounting = {
   period: string;
   date_from: string;
   revenue: number;
-  spent: number;
-  profit: number;
+  spent: number;            // обратная совместимость: закупки + операционные
+  purchases?: number;       // сколько потратили на закупку товаров за период
+  cogs?: number;            // себестоимость проданных за период
+  opex?: number;            // операционные расходы (касса out)
+  gross_profit?: number;    // маржа = revenue - cogs
+  profit: number;           // чистая прибыль = gross_profit - opex
   sales_count: number;
   buys_count: number;
   cash_by_branch: { branch: string | null; account: string; balance: number; in_sum: number; out_sum: number }[];

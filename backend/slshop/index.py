@@ -610,16 +610,35 @@ def accounting_summary(params):
         date_from = (now - timedelta(days=30)).strftime('%Y-%m-%d')
     conn = get_conn()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    # 1) Выручка от продаж и общий объём закупок товаров за период
     cur.execute(
         f"SELECT "
         f"COALESCE(SUM(amount) FILTER (WHERE op_type='sell'),0) AS revenue, "
-        f"COALESCE(SUM(amount) FILTER (WHERE op_type='buy'),0) AS spent, "
+        f"COALESCE(SUM(amount) FILTER (WHERE op_type='buy'),0) AS purchases, "
         f"COUNT(*) FILTER (WHERE op_type='sell') AS sales_count, "
         f"COUNT(*) FILTER (WHERE op_type='buy') AS buys_count "
         f"FROM {SCHEMA}.slshop_operations WHERE created_at >= {_esc(date_from)}"
     )
     totals = dict(cur.fetchone() or {})
-    # Касса по филиалам
+    # 2) Себестоимость проданных за период (COGS): для каждой 'sell'-операции
+    # берём buy_price связанного товара. Это отдельно от закупочного оборота.
+    cur.execute(
+        f"SELECT COALESCE(SUM(COALESCE(i.buy_price, 0)), 0) AS cogs "
+        f"FROM {SCHEMA}.slshop_operations o "
+        f"LEFT JOIN {SCHEMA}.slshop_items i ON i.id = o.item_id "
+        f"WHERE o.op_type='sell' AND o.created_at >= {_esc(date_from)}"
+    )
+    cogs_row = cur.fetchone() or {}
+    cogs = float(cogs_row.get('cogs') or 0)
+    # 3) Операционные расходы (зарплаты, аренда и т.п. — кассовые out-движения)
+    cur.execute(
+        f"SELECT COALESCE(SUM(amount), 0) AS opex "
+        f"FROM {SCHEMA}.slshop_cash_movements "
+        f"WHERE direction='out' AND created_at >= {_esc(date_from)}"
+    )
+    opex_row = cur.fetchone() or {}
+    opex = float(opex_row.get('opex') or 0)
+    # 4) Касса по филиалам (текущий баланс + движение за период)
     cur.execute(
         f"SELECT b.name AS branch, a.name AS account, a.balance, "
         f"COALESCE((SELECT SUM(amount) FROM {SCHEMA}.slshop_cash_movements m WHERE m.account_id=a.id AND m.direction='in' AND m.created_at >= {_esc(date_from)}),0) AS in_sum, "
@@ -628,7 +647,7 @@ def accounting_summary(params):
         f"WHERE a.is_active=true ORDER BY b.name"
     )
     cash = [dict(r) for r in cur.fetchall()]
-    # Расходы по категориям (из кассы)
+    # 5) Операционные расходы по категориям (из кассы)
     cur.execute(
         f"SELECT category, COUNT(*) AS cnt, COALESCE(SUM(amount),0) AS sum "
         f"FROM {SCHEMA}.slshop_cash_movements "
@@ -638,11 +657,22 @@ def accounting_summary(params):
     expenses = [dict(r) for r in cur.fetchall()]
     cur.close(); conn.close()
     revenue = float(totals.get('revenue') or 0)
-    spent = float(totals.get('spent') or 0)
-    profit = revenue - spent
+    purchases = float(totals.get('purchases') or 0)
+    # Маржа (прибыль с продаж до операционных расходов)
+    gross_profit = revenue - cogs
+    # Чистая прибыль с учётом расходов кассы
+    net_profit = gross_profit - opex
+    # Полные затраты периода (для совместимости со старым полем spent)
+    spent = purchases + opex
     return _ok({
         'period': period, 'date_from': date_from,
-        'revenue': revenue, 'spent': spent, 'profit': profit,
+        'revenue': revenue,
+        'purchases': purchases,         # сколько потратили на закупку товаров
+        'cogs': cogs,                   # себестоимость проданных за период
+        'opex': opex,                   # операционные расходы (касса out)
+        'gross_profit': gross_profit,   # маржа: revenue - cogs
+        'profit': net_profit,           # чистая прибыль: маржа - opex
+        'spent': spent,                 # обратная совместимость: закупки + расходы
         'sales_count': int(totals.get('sales_count') or 0),
         'buys_count': int(totals.get('buys_count') or 0),
         'cash_by_branch': cash,
