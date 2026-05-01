@@ -1195,7 +1195,7 @@ def handler(event: dict, context) -> dict:
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'is_active': row[0] if row else False}, ensure_ascii=False)}
 
         # Создать заявку
-        if action == 'create':
+        if action in ('create', 'new_order'):
             name = (body.get('name') or '').strip()
             phone = (body.get('phone') or '').strip()
             if not name or not phone:
@@ -1251,7 +1251,7 @@ def handler(event: dict, context) -> dict:
                     send_tg_document(tg_token, cid, html_bytes, filename, caption=f'📋 Акт приёмки №{new_id} — открыть и распечатать')
             # SMS при создании НЕ отправляем — только Telegram
             cur.close(); conn.close()
-            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'id': new_id}, ensure_ascii=False)}
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'id': new_id, 'order_id': new_id}, ensure_ascii=False)}
 
         # Отправить акт в Telegram
         if action == 'send_act':
@@ -1296,6 +1296,9 @@ def handler(event: dict, context) -> dict:
 
         # Обновить статус / поля заявки
         order_id = int(body.get('id', 0))
+        if not order_id:
+            cur.close(); conn.close()
+            return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': f'Неизвестное действие: {action or "(пусто)"}'}, ensure_ascii=False)}
         new_status = body.get('status', '')
         admin_note = body.get('admin_note')
         purchase_amount = body.get('purchase_amount')
