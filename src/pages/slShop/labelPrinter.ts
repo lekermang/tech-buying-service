@@ -10,74 +10,111 @@ function escapeHtml(s: string | undefined | null): string {
   }[ch] as string));
 }
 
+/** Code128-подобный штрих-код через div'ы (рендерится прямо в HTML без зависимостей).
+ *  Это упрощённый visual barcode под номер товара (для считывания внутри магазина).
+ */
+function barcodeBars(text: string, heightMm: number): string {
+  // Простая псевдо-кодировка: каждый символ → 4 чёрные/белые полосы переменной ширины.
+  const widths = [0.25, 0.5, 0.35, 0.6];
+  const chars = text.replace(/[^0-9A-Za-z]/g, "").slice(0, 14) || "00000000";
+  let bars = "";
+  // стартовая полоса
+  bars += `<div style="display:inline-block;width:0.6mm;height:${heightMm}mm;background:#000;"></div>`;
+  bars += `<div style="display:inline-block;width:0.3mm;height:${heightMm}mm;background:#fff;"></div>`;
+  for (let i = 0; i < chars.length; i++) {
+    const code = chars.charCodeAt(i);
+    for (let j = 0; j < 4; j++) {
+      const isBar = (code >> j) & 1;
+      const w = widths[(code + j) % widths.length];
+      bars += `<div style="display:inline-block;width:${w}mm;height:${heightMm}mm;background:${isBar ? "#000" : "#fff"};"></div>`;
+    }
+    bars += `<div style="display:inline-block;width:0.3mm;height:${heightMm}mm;background:#fff;"></div>`;
+  }
+  bars += `<div style="display:inline-block;width:0.6mm;height:${heightMm}mm;background:#000;"></div>`;
+  return bars;
+}
+
 function labelHtml(item: SLItem, tmpl: SLLabelTemplate, opts: { empName?: string }): string {
   const w = Number(tmpl.width_mm);
   const h = Number(tmpl.height_mm);
-  const isThermal = tmpl.is_thermal;
-  const titleSize = (w / 14).toFixed(2);
-  const specsSize = (w / 20).toFixed(2);
-  const priceSize = (w / 6.5).toFixed(2);
+
+  // Адаптивные размеры под формат ценника (типовой 58×40 / 80×50)
+  const titleSize = (w / 11).toFixed(2);
+  const specsSize = (w / 22).toFixed(2);
+  const priceSize = (w / 5).toFixed(2);
   const small = (w / 28).toFixed(2);
-  const tiny = (w / 34).toFixed(2);
+  const tiny = (w / 32).toFixed(2);
 
-  // Формат памяти: "4/128GB" если есть оба поля, иначе fallback на storage
   const ramStorage = (item.ram_gb && item.storage_gb)
-    ? `${item.ram_gb}/${item.storage_gb}GB`
-    : (item.storage_gb ? `${item.storage_gb}GB` : (item.storage ? String(item.storage) : ""));
+    ? `${item.ram_gb}/${item.storage_gb}`
+    : (item.storage_gb ? `${item.storage_gb}` : "");
 
-  // Собираем расширенные характеристики: краткие + память/АКБ/цвет/коробка/зарядка
-  const extraBits: string[] = [];
-  if (ramStorage) extraBits.push(ramStorage);
-  if (item.color) extraBits.push(String(item.color));
-  if (item.battery_health) extraBits.push(`АКБ ${item.battery_health}%`);
-  if (item.condition) extraBits.push(String(item.condition));
-  if (item.has_box) extraBits.push("коробка");
-  if (item.has_charger) extraBits.push("зарядка");
+  const titleHasRam = !!String(item.title).match(/\d+\s*\/\s*\d+/);
+  const titleWithRam = ramStorage && !titleHasRam ? `${item.title} ${ramStorage}` : item.title;
 
-  // Заголовок с памятью: "Honor 9X 4/128"
-  const titleWithRam = ramStorage && !String(item.title).match(/\d+\/\d+/)
-    ? `${item.title} ${ramStorage.replace(/GB$/i, "")}`
-    : item.title;
+  // Характеристики: только полный текст (без дублирования формата 4/128)
+  const baseSpecs = (item.specs || item.specs_short || "").trim();
+  const extra: string[] = [];
+  if (item.color) extra.push(String(item.color));
+  if (item.battery_health) extra.push(`АКБ ${item.battery_health}%`);
+  if (item.condition) extra.push(String(item.condition));
+  if (item.has_box) extra.push("коробка");
+  if (item.has_charger) extra.push("зарядка");
+  const extraStr = extra.filter(b => !baseSpecs.toLowerCase().includes(b.toLowerCase())).join(" • ");
+  const specsCombined = [baseSpecs, extraStr].filter(Boolean).join(" • ").slice(0, 240);
 
-  const baseSpecs = item.specs_short || (item.specs || "").slice(0, 100);
-  // Объединяем, удаляя дубликаты подстрок
-  const extraStr = extraBits
-    .filter(b => !baseSpecs.toLowerCase().includes(b.toLowerCase()))
-    .join(" • ");
-  const specsCombined = [baseSpecs, extraStr].filter(Boolean).join(" • ").slice(0, 140);
-
-  const showSpecs = tmpl.show_specs && specsCombined;
-  const showImei = tmpl.show_imei && item.imei;
-  const category = item.category_path || item.category_name || "";
-  const branch = item.branch_name || "";
+  const showSpecs = tmpl.show_specs !== false && specsCombined;
+  const sn = item.serial_number || item.imei || "";
   const empName = opts.empName || "";
-  const idStr = String(item.id);
+  const idStr = item.sku || `ID${item.id}`;
 
-  const accent = isThermal ? "#000" : "#C8A14B";
-  const headerBg = isThermal ? "#000" : "linear-gradient(180deg, #FFD700 0%, #C8A14B 100%)";
-  const headerColor = isThermal ? "#fff" : "#000";
+  const today = new Date();
+  const dateStr = today.toLocaleDateString("ru-RU");
+  const barcodeText = String(item.sku || item.id || "");
 
   return `
-    <div class="label" style="width:${w}mm;height:${h}mm;font-family:${tmpl.font_family || "Arial"},sans-serif">
-      <div class="hdr" style="background:${headerBg};color:${headerColor};font-size:${tiny}mm;">
-        <span style="font-weight:900;letter-spacing:0.4mm">СКУПКА24</span>
-        ${branch ? `<span style="opacity:0.85">${escapeHtml(branch)}</span>` : ""}
-        <span style="font-weight:700">#${escapeHtml(item.sku || idStr)}</span>
+    <div class="label" style="width:${w}mm;height:${h}mm;font-family:Arial,sans-serif">
+      <div class="hdr" style="font-size:${tiny}mm;">
+        <span class="hdr-l">${escapeHtml(dateStr)} &nbsp; <b>${escapeHtml(idStr)}</b></span>
+        <span class="hdr-r"><b>Скупка24</b></span>
       </div>
-      ${category ? `<div class="cat" style="font-size:${tiny}mm;color:${accent}">${escapeHtml(category)}</div>` : ""}
       <div class="title" style="font-size:${titleSize}mm">${escapeHtml(titleWithRam)}</div>
-      ${showSpecs ? `<div class="specs" style="font-size:${specsSize}mm">${escapeHtml(specsCombined)}</div>` : ""}
-      ${showImei ? `<div class="imei" style="font-size:${tiny}mm">IMEI: ${escapeHtml(item.imei || "")}</div>` : ""}
-      <div class="price" style="font-size:${priceSize}mm;color:${accent}">${fmtPrice(item.sell_price)}₽</div>
-      <div class="footer" style="font-size:${small}mm">
-        <span>Ответственное лицо:</span>
-        <b>${escapeHtml(empName || "—")}</b>
+      ${showSpecs ? `<div class="specs" style="font-size:${specsSize}mm"><b>Характеристики:</b> ${escapeHtml(specsCombined)}</div>` : ""}
+      ${sn ? `<div class="sn" style="font-size:${specsSize}mm"><b>Описание:</b> с/н ${escapeHtml(sn)}</div>` : ""}
+      <div class="barcode-wrap" style="height:${(h / 7).toFixed(2)}mm">
+        <div class="barcode-bars">${barcodeBars(barcodeText, h / 8)}</div>
+        <div class="barcode-text" style="font-size:${tiny}mm">${escapeHtml(barcodeText)}</div>
       </div>
-      <div style="font-size:${tiny}mm;text-align:center;color:${accent}">
-        Гарантия: 1 год
+      <div class="price" style="font-size:${priceSize}mm">Цена: ${fmtPrice(item.sell_price)} руб.</div>
+      <div class="footer" style="font-size:${small}mm">
+        <span>Цена за 1 шт.</span>
+        <span>Отв. лицо: <b>${escapeHtml(empName || "—")}</b></span>
       </div>
     </div>
   `;
+}
+
+/** Шаблон ценника по умолчанию для быстрой печати из карточки товара. */
+export const DEFAULT_LABEL_TMPL: SLLabelTemplate = {
+  id: 0,
+  name: "Стандарт 80×50",
+  width_mm: 80,
+  height_mm: 50,
+  layout: "classic",
+  show_brand: true,
+  show_specs: true,
+  show_imei: true,
+  show_qr: false,
+  show_barcode: true,
+  font_family: "Arial",
+  is_default: true,
+  is_thermal: true,
+};
+
+/** Быстрая печать одного ценника по товару без выбора шаблона. */
+export function printLabelQuick(item: SLItem, opts: { empName?: string; tmpl?: SLLabelTemplate } = {}): void {
+  const tmpl = opts.tmpl || DEFAULT_LABEL_TMPL;
+  printLabels([item], tmpl, { empName: opts.empName });
 }
 
 export function printLabels(items: SLItem[], tmpl: SLLabelTemplate, opts: { empName?: string } = {}): void {
@@ -106,22 +143,21 @@ export function printLabels(items: SLItem[], tmpl: SLLabelTemplate, opts: { empN
       ${layoutCss}
       .label {
         border: 0.4mm solid #000;
-        display: flex; flex-direction: column; align-items: stretch; justify-content: space-between;
-        padding: 1mm 1.5mm; overflow: hidden; gap: 0.5mm;
+        display: flex; flex-direction: column; align-items: stretch;
+        padding: 1mm 1.5mm; overflow: hidden; gap: 0.6mm; color: #000; background: #fff;
       }
       .label .hdr {
         display: flex; justify-content: space-between; align-items: center;
-        padding: 0.4mm 1mm; border-radius: 0.6mm;
-        text-transform: uppercase; letter-spacing: 0.1mm;
-        gap: 1mm;
+        padding-bottom: 0.6mm; border-bottom: 0.2mm solid #000;
       }
-      .label .cat { text-align: center; font-style: italic; opacity: 0.85; line-height: 1; margin-top: 0.3mm; }
-      .label .title { font-weight: 800; text-align: center; line-height: 1.05; width: 100%; }
-      .label .specs { text-align: center; line-height: 1.15; width: 100%; font-weight: 600; color: #000; word-wrap: break-word; }
-      .label .imei  { text-align: center; line-height: 1; width: 100%; color: #444; }
-      .label .price { font-weight: 900; text-align: center; line-height: 1; width: 100%; }
-      .label .sku-id { width: 100%; text-align: center; font-family: 'Courier New', monospace; font-weight: 800; letter-spacing: 0.4mm; line-height: 1; }
-      .label .footer { display: flex; justify-content: space-between; gap: 1mm; line-height: 1.1; border-top: 0.2mm dashed #000; padding-top: 0.3mm; }
+      .label .title { font-weight: 800; text-align: center; line-height: 1.1; width: 100%; padding: 0.5mm 0; }
+      .label .specs { line-height: 1.2; width: 100%; word-wrap: break-word; padding: 0 0.5mm; }
+      .label .sn { line-height: 1.2; width: 100%; padding: 0 0.5mm; }
+      .label .barcode-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.3mm 0; }
+      .label .barcode-bars { display: flex; align-items: center; }
+      .label .barcode-text { font-family: 'Courier New', monospace; letter-spacing: 0.3mm; }
+      .label .price { font-weight: 900; text-align: left; line-height: 1; width: 100%; padding: 0.5mm; border-top: 0.2mm solid #000; padding-top: 1mm; }
+      .label .footer { display: flex; justify-content: space-between; gap: 1mm; line-height: 1.1; border-top: 0.2mm solid #000; padding-top: 0.5mm; }
       @media screen {
         body { padding: 12px; background: #f3f3f3; }
         .label { background: #fff; margin: 4mm; }

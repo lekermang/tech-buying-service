@@ -5,6 +5,8 @@ import SLItemsFilters from "./SLItemsFilters";
 import SLItemsMovePanel from "./SLItemsMovePanel";
 import SLItemDetail from "./SLItemDetail";
 import SLItemSellModal from "./SLItemSellModal";
+import SLItemsTable from "./SLItemsTable";
+import { printLabelQuick } from "./labelPrinter";
 
 const PHONE_SPECS_AI_URL = "https://functions.poehali.dev/983744a8-1cfc-42d8-a566-bf31dfa328b2";
 
@@ -36,6 +38,14 @@ export default function SLItemsList({ token, empName: _empName, isOwner = false 
   const needRecogCount = allItems.filter(i =>
     i.storage && (!i.ram_gb || !i.storage_gb)
   ).length;
+  const [viewMode, setViewMode] = useState<"cards" | "table">(() => {
+    if (typeof window === "undefined") return "cards";
+    return (window.localStorage.getItem("sl_items_view") as "cards" | "table") || "cards";
+  });
+  const setView = (m: "cards" | "table") => {
+    setViewMode(m);
+    try { window.localStorage.setItem("sl_items_view", m); } catch { /* noop */ }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -242,58 +252,91 @@ export default function SLItemsList({ token, empName: _empName, isOwner = false 
         </div>
       )}
 
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-[11px] text-white/40">
+          Найдено: <span className="text-white font-bold">{items.length}</span>
+        </div>
+        <div className="flex items-center gap-1 bg-[#0F0F0F] border border-[#1F1F1F] rounded-lg p-0.5">
+          <button onClick={() => setView("cards")}
+            className={`text-[11px] px-2.5 py-1 rounded font-bold flex items-center gap-1 ${viewMode === "cards" ? "bg-[#FFD700] text-black" : "text-white/50 hover:text-white"}`}>
+            <Icon name="LayoutGrid" size={11} /> Карточки
+          </button>
+          <button onClick={() => setView("table")}
+            className={`text-[11px] px-2.5 py-1 rounded font-bold flex items-center gap-1 ${viewMode === "table" ? "bg-[#FFD700] text-black" : "text-white/50 hover:text-white"}`}>
+            <Icon name="Table" size={11} /> Таблица
+          </button>
+        </div>
+      </div>
+
       {loading && <div className="text-white/30 text-sm py-4 text-center"><Icon name="Loader" size={14} className="animate-spin inline mr-1" />Загрузка...</div>}
 
-      {!loading && items.length === 0 && (
+      {!loading && items.length === 0 && viewMode === "cards" && (
         <div className="text-white/30 text-sm py-8 text-center">Нет товаров</div>
       )}
 
-      <div className="space-y-1.5">
-        {items.map(it => {
-          const stCfg = STATUS_LABEL[it.status] || STATUS_LABEL.stock;
-          const isSel = selected.has(it.id);
-          return (
-            <div key={it.id}
-              className={`bg-[#0F0F0F] border rounded-lg p-2.5 hover:border-[#FFD700]/30 transition-colors ${isSel ? "border-[#FFD700]" : "border-[#1F1F1F]"}`}>
-              <div className="flex items-start gap-2">
-                <button onClick={(e) => { e.stopPropagation(); toggleSelect(it.id); }}
-                  className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 mt-0.5 ${isSel ? "bg-[#FFD700] border-[#FFD700]" : "border-white/20"}`}>
-                  {isSel && <Icon name="Check" size={11} className="text-black" />}
-                </button>
-                <div className="flex-1 min-w-0" onClick={() => setOpen(it)} role="button">
-                  <div className="font-bold text-sm truncate">
-                    {it.title}
-                    {(it.ram_gb || it.storage_gb) && (
-                      <span className="ml-1.5 text-[#FFD700] font-bold text-[11px]">
-                        {it.ram_gb && it.storage_gb ? `${it.ram_gb}/${it.storage_gb}` : (it.storage_gb || it.ram_gb)}GB
-                      </span>
+      {viewMode === "table" ? (
+        <SLItemsTable
+          items={items}
+          selected={selected}
+          toggleSelect={toggleSelect}
+          onOpen={setOpen}
+          onSell={setSellOpen}
+        />
+      ) : (
+        <div className="space-y-1.5">
+          {items.map(it => {
+            const stCfg = STATUS_LABEL[it.status] || STATUS_LABEL.stock;
+            const isSel = selected.has(it.id);
+            return (
+              <div key={it.id}
+                className={`bg-[#0F0F0F] border rounded-lg p-2.5 hover:border-[#FFD700]/30 transition-colors ${isSel ? "border-[#FFD700]" : "border-[#1F1F1F]"}`}>
+                <div className="flex items-start gap-2">
+                  <button onClick={(e) => { e.stopPropagation(); toggleSelect(it.id); }}
+                    className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 mt-0.5 ${isSel ? "bg-[#FFD700] border-[#FFD700]" : "border-white/20"}`}>
+                    {isSel && <Icon name="Check" size={11} className="text-black" />}
+                  </button>
+                  <div className="flex-1 min-w-0" onClick={() => setOpen(it)} role="button">
+                    <div className="font-bold text-sm truncate">
+                      {it.title}
+                      {(it.ram_gb || it.storage_gb) && !String(it.title || "").match(/\d+\s*\/\s*\d+/) && (
+                        <span className="ml-1.5 text-[#FFD700] font-bold text-[11px]">
+                          {it.ram_gb && it.storage_gb ? `${it.ram_gb}/${it.storage_gb}` : (it.storage_gb || it.ram_gb)}
+                        </span>
+                      )}
+                    </div>
+                    {it.specs_short && <div className="text-[11px] text-white/50 truncate">{it.specs_short}</div>}
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded border ${stCfg.color}`}>{stCfg.l}</span>
+                      {it.branch_name && <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#141414] border border-[#1F1F1F] text-white/50"><Icon name="MapPin" size={8} className="inline mr-0.5" />{it.branch_name}</span>}
+                      {it.imei && <span className="text-[10px] text-white/30">IMEI: {it.imei}</span>}
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    {it.sku && <div className="text-[9px] font-mono text-[#FFD700]/70 mb-0.5">{it.sku}</div>}
+                    <div className="text-[#FFD700] font-bold text-sm">{fmt(it.sell_price)} ₽</div>
+                    {Number(it.buy_price) > 0 && (
+                      <div className="text-[9px] text-white/40 mt-0.5">закуп {fmt(it.buy_price)} ₽</div>
                     )}
+                    <div className="flex items-center gap-1 mt-1 justify-end">
+                      <button onClick={(e) => { e.stopPropagation(); printLabelQuick(it); }}
+                        title="Печать ценника"
+                        className="text-white/40 hover:text-[#FFD700] p-1 rounded hover:bg-[#FFD700]/10">
+                        <Icon name="Printer" size={11} />
+                      </button>
+                      {it.status !== "sold" && it.status !== "returned" && (
+                        <button onClick={(e) => { e.stopPropagation(); setSellOpen(it); }}
+                          className="text-[10px] bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded">
+                          Продать
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  {it.specs_short && <div className="text-[11px] text-white/50 truncate">{it.specs_short}</div>}
-                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                    <span className={`text-[9px] px-1.5 py-0.5 rounded border ${stCfg.color}`}>{stCfg.l}</span>
-                    {it.branch_name && <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#141414] border border-[#1F1F1F] text-white/50"><Icon name="MapPin" size={8} className="inline mr-0.5" />{it.branch_name}</span>}
-                    {it.imei && <span className="text-[10px] text-white/30">IMEI: {it.imei}</span>}
-                  </div>
-                </div>
-                <div className="text-right shrink-0">
-                  {it.sku && <div className="text-[9px] font-mono text-[#FFD700]/70 mb-0.5">{it.sku}</div>}
-                  <div className="text-[#FFD700] font-bold text-sm">{fmt(it.sell_price)} ₽</div>
-                  {Number(it.buy_price) > 0 && (
-                    <div className="text-[9px] text-white/40 mt-0.5">закуп {fmt(it.buy_price)} ₽</div>
-                  )}
-                  {it.status !== "sold" && it.status !== "returned" && (
-                    <button onClick={() => setSellOpen(it)}
-                      className="mt-1 text-[10px] bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded">
-                      Продать
-                    </button>
-                  )}
                 </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {open && <SLItemDetail token={token} item={open} isOwner={isOwner} onClose={() => setOpen(null)} onUpdated={() => { setOpen(null); load(); }} onSell={() => { setSellOpen(open); setOpen(null); }} />}
       {sellOpen && <SLItemSellModal token={token} item={sellOpen} onClose={() => setSellOpen(null)} onDone={() => { setSellOpen(null); load(); }} />}

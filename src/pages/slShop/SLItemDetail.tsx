@@ -4,6 +4,7 @@ import { slApi, fmt, type SLItem, type SLCategory, STATUS_LABEL } from "./types"
 import CategoryTreeSelect from "./CategoryTreeSelect";
 import PrintDocsButton from "./PrintDocsButton";
 import { Row, Inp2, fmtRamStorage, parseStorageStr } from "./SLItemsCommon";
+import { printLabelQuick } from "./labelPrinter";
 
 const PHONE_SPECS_AI_URL = "https://functions.poehali.dev/983744a8-1cfc-42d8-a566-bf31dfa328b2";
 
@@ -100,8 +101,23 @@ export default function SLItemDetail({ token, item: itemProp, isOwner, onClose, 
     <div className="fixed inset-0 z-50 bg-black/80 flex items-end sm:items-center justify-center p-2" onClick={onClose}>
       <div className="bg-[#0A0A0A] border border-[#1F1F1F] rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="sticky top-0 bg-[#0A0A0A] border-b border-[#1F1F1F] p-3 flex items-center justify-between z-10">
-          <div className="font-bold text-sm truncate">{item.title}</div>
-          <button onClick={onClose} className="text-white/40 p-1"><Icon name="X" size={16} /></button>
+          <div className="font-bold text-sm truncate">
+            {item.title}
+            {(item.ram_gb || item.storage_gb) && (
+              <span className="ml-1.5 text-[#FFD700]">
+                {item.ram_gb && item.storage_gb ? `${item.ram_gb}/${item.storage_gb}` : (item.storage_gb || item.ram_gb)}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => printLabelQuick(item)}
+              title="Печать ценника"
+              className="text-white/60 hover:text-[#FFD700] p-1.5 rounded hover:bg-[#FFD700]/10">
+              <Icon name="Printer" size={16} />
+            </button>
+            <button onClick={onClose} className="text-white/40 p-1"><Icon name="X" size={16} /></button>
+          </div>
         </div>
         <div className="p-3 space-y-2">
           <div className="flex items-center gap-2 mb-2">
@@ -145,6 +161,11 @@ export default function SLItemDetail({ token, item: itemProp, isOwner, onClose, 
                 </button>
               )}
               {aiMsg && <div className="text-[11px] text-center text-white/60 mt-1">{aiMsg}</div>}
+              <button
+                onClick={() => printLabelQuick(item)}
+                className="w-full mt-2 bg-[#141414] border border-[#1F1F1F] hover:border-[#FFD700]/50 text-white py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-1.5">
+                <Icon name="Printer" size={14} /> Печать ценника
+              </button>
               <div className="mt-2">
                 <PrintDocsButton token={token} itemId={item.id}
                   opType={item.status === "sold" ? "sell" : (item.source === "consignment" ? "consignment_in" : "buyout_individual")}
