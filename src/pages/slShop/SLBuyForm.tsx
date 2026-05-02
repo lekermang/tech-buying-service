@@ -43,7 +43,47 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
   const [showQuickClient, setShowQuickClient] = useState(false);
   const [createdItemId, setCreatedItemId] = useState<number | null>(null);
   const [autoPrint, setAutoPrint] = useState(true);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiMsg, setAiMsg] = useState<string | null>(null);
   const autofillTimer = useRef<number | null>(null);
+
+  const PHONE_SPECS_AI_URL = "https://functions.poehali.dev/983744a8-1cfc-42d8-a566-bf31dfa328b2";
+
+  const generateSpecsAI = async () => {
+    if (aiBusy) return;
+    if (!title.trim() && !brand && !model) {
+      setAiMsg("Заполните наименование или бренд/модель");
+      setTimeout(() => setAiMsg(null), 2500);
+      return;
+    }
+    setAiBusy(true); setAiMsg(null);
+    try {
+      const res = await fetch(`${PHONE_SPECS_AI_URL}?action=generate_draft&t=${Date.now()}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: title.trim(),
+          brand: brand.trim(),
+          model: model.trim(),
+          ram_gb: ramGb ? Number(ramGb) : null,
+          storage_gb: storageGb ? Number(storageGb) : null,
+        }),
+      });
+      const j = await res.json();
+      if (j.ok) {
+        if (j.specs_short) setSpecsShort(j.specs_short);
+        if (j.specs) setSpecs(j.specs);
+        setAiMsg(j.source === "catalog" ? "Из справочника" : "Сгенерировано ИИ");
+        setTimeout(() => setAiMsg(null), 2500);
+      } else {
+        setAiMsg(j.error || "Ошибка генерации");
+      }
+    } catch {
+      setAiMsg("Ошибка сети");
+    } finally {
+      setAiBusy(false);
+    }
+  };
 
   useEffect(() => {
     slApi<SLCategory[]>(token, "categories").then(r => { if (r.ok && r.data) setCats(r.data); });
@@ -300,6 +340,14 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
           <textarea value={specs} onChange={e => setSpecs(e.target.value)} rows={2}
             className="w-full bg-[#0A0A0A] border border-[#1F1F1F] rounded-lg px-3 py-2 text-sm resize-none" />
         </Field>
+
+        <button type="button" onClick={generateSpecsAI} disabled={aiBusy}
+          className="w-full bg-[#FFD700]/10 border border-[#FFD700]/30 text-[#FFD700] hover:bg-[#FFD700]/20 py-2 rounded-lg text-sm font-bold disabled:opacity-50 transition-all">
+          {aiBusy
+            ? <><Icon name="Loader" size={13} className="inline mr-1 animate-spin" />Генерирую...</>
+            : <><Icon name="Sparkles" size={13} className="inline mr-1" />Заполнить характеристики ИИ</>}
+        </button>
+        {aiMsg && <div className="text-[11px] text-center text-white/60 -mt-1">{aiMsg}</div>}
 
         <div className="grid grid-cols-4 gap-2">
           <Field label={<>ОЗУ ГБ{isPhoneCategory && <span className="text-red-400 ml-0.5">*</span>}</>}>

@@ -252,6 +252,54 @@ def generate_for_item(item_id: int) -> dict:
     }
 
 
+def generate_draft(title: str, brand: str = '', model: str = '',
+                   ram_gb: int = None, storage_gb: int = None) -> dict:
+    """Генерация specs/specs_short без записи в БД (для формы приёмки)."""
+    conn = get_conn()
+    cur = conn.cursor()
+
+    text = title or f"{brand or ''} {model or ''}".strip()
+    if (brand or model) and storage_gb:
+        text = f"{brand or ''} {model or ''}".strip()
+        if ram_gb and storage_gb:
+            text += f" {ram_gb}/{storage_gb}GB"
+        elif storage_gb:
+            text += f" {storage_gb}GB"
+        if title and title not in text:
+            text += f' — {title}'
+
+    cat = find_in_catalog(cur, brand or '', model or '', title or text)
+    used_source = 'catalog' if cat else 'ai'
+    result = None
+    if cat:
+        try:
+            result = build_from_catalog(cat, ram_gb, storage_gb)
+        except Exception:
+            result = None
+
+    if not result:
+        ram_storage = ''
+        if ram_gb and storage_gb:
+            ram_storage = f"{ram_gb}/{storage_gb}GB"
+        elif storage_gb:
+            ram_storage = f"{storage_gb}GB"
+        hint = f"Память (точно): {ram_storage}.\n" if ram_storage else ''
+        prompt = PROMPT_TPL.format(title=text, hint=hint, ram_storage=ram_storage or '4/128GB')
+        try:
+            result = call_polza(prompt)
+        except Exception as e:
+            cur.close(); conn.close()
+            return {'ok': False, 'error': f'AI error: {e}'}
+
+    cur.close(); conn.close()
+    return {
+        'ok': True,
+        'specs': result['specs'],
+        'specs_short': result['specs_short'],
+        'source': used_source,
+    }
+
+
 def generate_batch(limit: int = 20, only_empty: bool = True, only_short: bool = False) -> dict:
     conn = get_conn()
     cur = conn.cursor()
@@ -337,6 +385,26 @@ def handler(event, context):
                         'body': json.dumps({'ok': False, 'error': 'item_id required'})}
             return {'statusCode': 200, 'headers': HEADERS,
                     'body': json.dumps(generate_for_item(iid), ensure_ascii=False)}
+
+        if action == 'generate_draft':
+            t = (body.get('title') or '').strip()
+            b = (body.get('brand') or '').strip()
+            m = (body.get('model') or '').strip()
+            if not t and not (b or m):
+                return {'statusCode': 400, 'headers': HEADERS,
+                        'body': json.dumps({'ok': False, 'error': 'title required'})}
+            ram = body.get('ram_gb')
+            stg = body.get('storage_gb')
+            try:
+                ram = int(ram) if ram not in (None, '', 0, '0') else None
+            except Exception:
+                ram = None
+            try:
+                stg = int(stg) if stg not in (None, '', 0, '0') else None
+            except Exception:
+                stg = None
+            return {'statusCode': 200, 'headers': HEADERS,
+                    'body': json.dumps(generate_draft(t, b, m, ram, stg), ensure_ascii=False)}
 
         if action == 'generate_batch':
             limit = int(body.get('limit') or 20)
