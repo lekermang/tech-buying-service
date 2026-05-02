@@ -25,6 +25,10 @@ export default function SLItemDetail({ token, item: itemProp, isOwner, onClose, 
     const t = `${item.category_path || ""} ${item.category_name || ""} ${item.title || ""}`.toLowerCase();
     return t.includes("телефон") || t.includes("смартфон") || t.includes("phone") || t.includes("iphone");
   })();
+  const isAppleDevice = (() => {
+    const t = `${data.brand || ""} ${data.model || ""} ${data.title || item.title || ""}`.toLowerCase();
+    return t.includes("iphone") || t.includes("apple");
+  })();
 
   const generateSpecs = async () => {
     setAiBusy(true);
@@ -62,7 +66,12 @@ export default function SLItemDetail({ token, item: itemProp, isOwner, onClose, 
 
   const save = async () => {
     if (isPhone) {
-      if (!data.ram_gb || !data.storage_gb) {
+      if (isAppleDevice) {
+        if (!data.storage_gb) {
+          alert("Для iPhone обязательна Память (ГБ)");
+          return;
+        }
+      } else if (!data.ram_gb || !data.storage_gb) {
         alert("Для смартфона обязательны ОЗУ и Память (ГБ)");
         return;
       }
@@ -256,7 +265,7 @@ export default function SLItemDetail({ token, item: itemProp, isOwner, onClose, 
               <div className="grid grid-cols-4 gap-2">
                 <Inp2 l="ОЗУ ГБ" v={data.ram_gb ? String(data.ram_gb) : ""}
                   s={v => setData({ ...data, ram_gb: v ? Number(v.replace(/\D/g, "")) || null : null })}
-                  required={isPhone} invalid={isPhone && !data.ram_gb} />
+                  required={isPhone && !isAppleDevice} invalid={isPhone && !isAppleDevice && !data.ram_gb} />
                 <Inp2 l="Память ГБ" v={data.storage_gb ? String(data.storage_gb) : ""}
                   s={v => {
                     const n = v ? Number(v.replace(/\D/g, "")) || null : null;
