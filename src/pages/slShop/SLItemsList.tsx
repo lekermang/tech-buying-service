@@ -217,7 +217,14 @@ export default function SLItemsList({ token, empName: _empName, isOwner = false 
                   {isSel && <Icon name="Check" size={11} className="text-black" />}
                 </button>
                 <div className="flex-1 min-w-0" onClick={() => setOpen(it)} role="button">
-                  <div className="font-bold text-sm truncate">{it.title}</div>
+                  <div className="font-bold text-sm truncate">
+                    {it.title}
+                    {(it.ram_gb || it.storage_gb) && (
+                      <span className="ml-1.5 text-[#FFD700] font-bold text-[11px]">
+                        {it.ram_gb && it.storage_gb ? `${it.ram_gb}/${it.storage_gb}` : (it.storage_gb || it.ram_gb)}GB
+                      </span>
+                    )}
+                  </div>
                   {it.specs_short && <div className="text-[11px] text-white/50 truncate">{it.specs_short}</div>}
                   <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                     <span className={`text-[9px] px-1.5 py-0.5 rounded border ${stCfg.color}`}>{stCfg.l}</span>
@@ -228,6 +235,9 @@ export default function SLItemsList({ token, empName: _empName, isOwner = false 
                 <div className="text-right shrink-0">
                   {it.sku && <div className="text-[9px] font-mono text-[#FFD700]/70 mb-0.5">{it.sku}</div>}
                   <div className="text-[#FFD700] font-bold text-sm">{fmt(it.sell_price)} ₽</div>
+                  {Number(it.buy_price) > 0 && (
+                    <div className="text-[9px] text-white/40 mt-0.5">закуп {fmt(it.buy_price)} ₽</div>
+                  )}
                   {it.status !== "sold" && it.status !== "returned" && (
                     <button onClick={() => setSellOpen(it)}
                       className="mt-1 text-[10px] bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded">

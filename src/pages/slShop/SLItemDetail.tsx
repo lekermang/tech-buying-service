@@ -3,7 +3,7 @@ import Icon from "@/components/ui/icon";
 import { slApi, fmt, type SLItem, type SLCategory, STATUS_LABEL } from "./types";
 import CategoryTreeSelect from "./CategoryTreeSelect";
 import PrintDocsButton from "./PrintDocsButton";
-import { Row, Inp2 } from "./SLItemsCommon";
+import { Row, Inp2, fmtRamStorage, parseStorageStr } from "./SLItemsCommon";
 
 const PHONE_SPECS_AI_URL = "https://functions.poehali.dev/983744a8-1cfc-42d8-a566-bf31dfa328b2";
 
@@ -58,6 +58,13 @@ export default function SLItemDetail({ token, item: itemProp, isOwner, onClose, 
   }, [token]);
 
   const save = async () => {
+    if (isPhone) {
+      if (!data.ram_gb || !data.storage_gb) {
+        alert("Для смартфона обязательны ОЗУ и Память (ГБ)");
+        return;
+      }
+    }
+    const ramStr = fmtRamStorage(data.ram_gb, data.storage_gb, null);
     setSaving(true);
     const r = await slApi(token, "item_update", { method: "POST", body: {
       id: item.id,
@@ -67,7 +74,9 @@ export default function SLItemDetail({ token, item: itemProp, isOwner, onClose, 
       model: data.model,
       specs_short: data.specs_short,
       specs: data.specs,
-      storage: data.storage,
+      storage: ramStr || data.storage,
+      ram_gb: data.ram_gb || null,
+      storage_gb: data.storage_gb || null,
       color: data.color,
       condition: data.condition,
       imei: data.imei,
@@ -105,7 +114,8 @@ export default function SLItemDetail({ token, item: itemProp, isOwner, onClose, 
               <Row k="Филиал" v={item.branch_name || "—"} />
               <Row k="Бренд / Модель" v={`${item.brand || "-"} ${item.model || ""}`} />
               <Row k="Характеристики" v={item.specs_short || "-"} />
-              <Row k="Память / Цвет" v={`${item.storage || "-"} / ${item.color || "-"}`} />
+              <Row k="ОЗУ / Память" v={fmtRamStorage(item.ram_gb, item.storage_gb, item.storage) || "—"} />
+              <Row k="Цвет" v={item.color || "—"} />
               <Row k="Состояние" v={item.condition || "-"} />
               <Row k="IMEI" v={item.imei || "-"} />
               <Row k="Закупка" v={`${fmt(item.buy_price)} ₽`} />
@@ -183,11 +193,29 @@ export default function SLItemDetail({ token, item: itemProp, isOwner, onClose, 
                 <Inp2 l="Модель" v={data.model || ""} s={v => setData({ ...data, model: v })} />
               </div>
               <Inp2 l="Краткие характеристики" v={data.specs_short || ""} s={v => setData({ ...data, specs_short: v })} />
-              <div className="grid grid-cols-3 gap-2">
-                <Inp2 l="Память" v={data.storage || ""} s={v => setData({ ...data, storage: v })} />
+              <div className="grid grid-cols-4 gap-2">
+                <Inp2 l="ОЗУ ГБ" v={data.ram_gb ? String(data.ram_gb) : ""}
+                  s={v => setData({ ...data, ram_gb: v ? Number(v.replace(/\D/g, "")) || null : null })}
+                  required={isPhone} invalid={isPhone && !data.ram_gb} />
+                <Inp2 l="Память ГБ" v={data.storage_gb ? String(data.storage_gb) : ""}
+                  s={v => {
+                    const n = v ? Number(v.replace(/\D/g, "")) || null : null;
+                    setData({ ...data, storage_gb: n, storage: fmtRamStorage(data.ram_gb, n, null) || data.storage });
+                  }}
+                  required={isPhone} invalid={isPhone && !data.storage_gb} />
                 <Inp2 l="Цвет" v={data.color || ""} s={v => setData({ ...data, color: v })} />
                 <Inp2 l="Состояние" v={data.condition || ""} s={v => setData({ ...data, condition: v })} />
               </div>
+              {data.storage && !data.ram_gb && !data.storage_gb && (
+                <button type="button"
+                  onClick={() => {
+                    const p = parseStorageStr(data.storage);
+                    setData({ ...data, ram_gb: p.ram ?? null, storage_gb: p.storage ?? null });
+                  }}
+                  className="text-[11px] text-[#FFD700]/70 hover:text-[#FFD700] underline">
+                  Распознать «{data.storage}» → ОЗУ/Память
+                </button>
+              )}
               <div className="grid grid-cols-2 gap-2">
                 <Inp2 l="IMEI" v={data.imei || ""} s={v => setData({ ...data, imei: v })} />
                 <Inp2 l="Серийный №" v={data.serial_number || ""} s={v => setData({ ...data, serial_number: v })} />

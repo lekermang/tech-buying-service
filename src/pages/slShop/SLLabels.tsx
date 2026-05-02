@@ -137,8 +137,14 @@ export default function SLLabels({ token, empName }: { token: string; empName?: 
 
 function LabelPreview({ tmpl, item }: { tmpl: SLLabelTemplate; item?: SLItem }) {
   const sample: SLItem = item || {
-    id: 0, title: "iPhone 13", specs_short: '6.1" 4/128GB', sell_price: 25000, status: "stock", brand: "Apple", model: "iPhone 13",
+    id: 0, title: "iPhone 13", specs_short: '6.1" Super Retina XDR, 4/128GB, A15 Bionic, 3240mAh', sell_price: 25000, status: "stock", brand: "Apple", model: "iPhone 13", ram_gb: 4, storage_gb: 128,
   };
+  const ramStorage = (sample.ram_gb && sample.storage_gb)
+    ? `${sample.ram_gb}/${sample.storage_gb}`
+    : (sample.storage_gb ? `${sample.storage_gb}` : "");
+  const titleWithRam = ramStorage && !String(sample.title).match(/\d+\/\d+/)
+    ? `${sample.title} ${ramStorage}`
+    : sample.title;
   // 1мм ≈ 3.78px, увеличим в 2 раза для превью
   const scale = 3.78 * 2;
   const w = Number(tmpl.width_mm) * scale;
@@ -148,7 +154,7 @@ function LabelPreview({ tmpl, item }: { tmpl: SLLabelTemplate; item?: SLItem }) 
       className="border-2 border-black bg-white text-black flex flex-col items-center justify-between p-1 overflow-hidden"
       >
       <div className="text-center font-bold leading-tight w-full" style={{ fontSize: w / 14 }}>
-        {sample.title}
+        {titleWithRam}
       </div>
       {tmpl.show_specs && sample.specs_short && (
         <div className="text-center leading-tight w-full px-1" style={{ fontSize: w / 22 }}>

@@ -257,6 +257,8 @@ export type SLItem = {
   specs?: string | null;
   specs_short?: string | null;
   storage?: string | null;
+  ram_gb?: number | null;
+  storage_gb?: number | null;
   color?: string | null;
   condition?: string | null;
   imei?: string | null;

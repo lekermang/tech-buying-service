@@ -16,6 +16,8 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
   const [specsShort, setSpecsShort] = useState("");
   const [specs, setSpecs] = useState("");
   const [storage, setStorage] = useState("");
+  const [ramGb, setRamGb] = useState("");
+  const [storageGb, setStorageGb] = useState("");
   const [color, setColor] = useState("");
   const [condition, setCondition] = useState("");
   const [imei, setImei] = useState("");
@@ -67,7 +69,17 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
         if (!model && t.model) setModel(t.model);
         if (!specsShort && t.specs_short) setSpecsShort(t.specs_short);
         if (!specs && t.specs_full) setSpecs(t.specs_full);
-        if (!storage && t.default_storage) setStorage(t.default_storage);
+        if (!storage && t.default_storage) {
+          setStorage(t.default_storage);
+          const m = String(t.default_storage).match(/(\d{1,3})\s*\/\s*(\d{2,4})/);
+          if (m) {
+            if (!ramGb) setRamGb(m[1]);
+            if (!storageGb) setStorageGb(m[2]);
+          } else {
+            const m2 = String(t.default_storage).match(/(\d{2,4})/);
+            if (m2 && !storageGb) setStorageGb(m2[1]);
+          }
+        }
         if (!color && t.default_color) setColor(t.default_color);
         setAutofilled(true);
         window.setTimeout(() => setAutofilled(false), 1500);
@@ -86,8 +98,18 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
     return () => window.clearTimeout(t);
   }, [clientQuery, token]);
 
+  const isPhoneCategory = (() => {
+    const cat = cats.find(c => c.id === categoryId);
+    const t = `${cat?.path || ""} ${cat?.name || ""} ${title}`.toLowerCase();
+    return t.includes("телефон") || t.includes("смартфон") || t.includes("phone") || t.includes("iphone");
+  })();
+
   const submit = async () => {
     if (!title.trim()) { setMsg("Введите наименование"); return; }
+    if (isPhoneCategory && (!ramGb || !storageGb)) {
+      setMsg("Для смартфона обязательны ОЗУ и Память (ГБ)");
+      return;
+    }
     setSaving(true); setMsg(null);
     let buyClientId: number | null = clientId === "" ? null : Number(clientId);
     // если ввели имя клиента, но не выбрали из списка — создадим
@@ -100,7 +122,10 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
       title: title.trim(),
       category_id: categoryId || null,
       brand, model, specs_short: specsShort, specs,
-      storage, color, condition, imei, serial_number: serial,
+      storage: (ramGb && storageGb) ? `${ramGb}/${storageGb}` : storage,
+      ram_gb: ramGb ? Number(ramGb) : null,
+      storage_gb: storageGb ? Number(storageGb) : null,
+      color, condition, imei, serial_number: serial,
       battery_health: battery ? Number(battery) : null,
       has_box: hasBox, has_charger: hasCharger,
       description, source,
@@ -216,8 +241,13 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
             className="w-full bg-[#0A0A0A] border border-[#1F1F1F] rounded-lg px-3 py-2 text-sm resize-none" />
         </Field>
 
-        <div className="grid grid-cols-3 gap-2">
-          <Field label="Память"><Inp v={storage} s={setStorage} ph="128GB" /></Field>
+        <div className="grid grid-cols-4 gap-2">
+          <Field label={<>ОЗУ ГБ{isPhoneCategory && <span className="text-red-400 ml-0.5">*</span>}</>}>
+            <Inp v={ramGb} s={(v) => setRamGb(v.replace(/\D/g, ""))} ph="4" />
+          </Field>
+          <Field label={<>Память ГБ{isPhoneCategory && <span className="text-red-400 ml-0.5">*</span>}</>}>
+            <Inp v={storageGb} s={(v) => setStorageGb(v.replace(/\D/g, ""))} ph="128" />
+          </Field>
           <Field label="Цвет"><Inp v={color} s={setColor} ph="Чёрный" /></Field>
           <Field label="АКБ %"><Inp v={battery} s={setBattery} ph="100" /></Field>
         </div>

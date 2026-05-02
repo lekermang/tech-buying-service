@@ -990,6 +990,7 @@ def save_specs_template(body):
 # ============ Items ============
 ITEM_FIELDS = [
     'sku', 'category_id', 'title', 'brand', 'model', 'specs', 'specs_short', 'storage', 'color',
+    'ram_gb', 'storage_gb',
     'condition', 'imei', 'serial_number', 'battery_health', 'has_box', 'has_charger', 'description',
     'buy_price', 'sell_price', 'min_price', 'status', 'source', 'consignment_percent',
     'consignment_owner_id', 'buy_client_id', 'branch_id', 'warranty_days'

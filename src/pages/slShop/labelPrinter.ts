@@ -20,14 +20,24 @@ function labelHtml(item: SLItem, tmpl: SLLabelTemplate, opts: { empName?: string
   const small = (w / 28).toFixed(2);
   const tiny = (w / 34).toFixed(2);
 
+  // Формат памяти: "4/128GB" если есть оба поля, иначе fallback на storage
+  const ramStorage = (item.ram_gb && item.storage_gb)
+    ? `${item.ram_gb}/${item.storage_gb}GB`
+    : (item.storage_gb ? `${item.storage_gb}GB` : (item.storage ? String(item.storage) : ""));
+
   // Собираем расширенные характеристики: краткие + память/АКБ/цвет/коробка/зарядка
   const extraBits: string[] = [];
-  if (item.storage) extraBits.push(String(item.storage));
+  if (ramStorage) extraBits.push(ramStorage);
   if (item.color) extraBits.push(String(item.color));
   if (item.battery_health) extraBits.push(`АКБ ${item.battery_health}%`);
   if (item.condition) extraBits.push(String(item.condition));
   if (item.has_box) extraBits.push("коробка");
   if (item.has_charger) extraBits.push("зарядка");
+
+  // Заголовок с памятью: "Honor 9X 4/128"
+  const titleWithRam = ramStorage && !String(item.title).match(/\d+\/\d+/)
+    ? `${item.title} ${ramStorage.replace(/GB$/i, "")}`
+    : item.title;
 
   const baseSpecs = item.specs_short || (item.specs || "").slice(0, 100);
   // Объединяем, удаляя дубликаты подстрок
@@ -55,7 +65,7 @@ function labelHtml(item: SLItem, tmpl: SLLabelTemplate, opts: { empName?: string
         <span style="font-weight:700">#${escapeHtml(item.sku || idStr)}</span>
       </div>
       ${category ? `<div class="cat" style="font-size:${tiny}mm;color:${accent}">${escapeHtml(category)}</div>` : ""}
-      <div class="title" style="font-size:${titleSize}mm">${escapeHtml(item.title)}</div>
+      <div class="title" style="font-size:${titleSize}mm">${escapeHtml(titleWithRam)}</div>
       ${showSpecs ? `<div class="specs" style="font-size:${specsSize}mm">${escapeHtml(specsCombined)}</div>` : ""}
       ${showImei ? `<div class="imei" style="font-size:${tiny}mm">IMEI: ${escapeHtml(item.imei || "")}</div>` : ""}
       <div class="price" style="font-size:${priceSize}mm;color:${accent}">${fmtPrice(item.sell_price)}₽</div>

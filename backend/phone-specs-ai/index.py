@@ -1,5 +1,7 @@
 """
 Генерация подробных характеристик смартфонов через ИИ (Polza.ai GPT-4o).
+Сначала пробуем найти модель в локальном справочнике phone_specs_catalog (smarfony.ru).
+Если нашли — используем её данные, ИИ только дополняет/форматирует.
 Формат — компактный, под термоэтикетку 58×40 мм (5–6 строк).
 - POST /?action=generate_one  body={item_id} — сгенерировать для одного товара
 - POST /?action=generate_batch body={limit:30, only_empty:true} — пакетная генерация
@@ -8,6 +10,7 @@
 
 import json
 import os
+import re
 import urllib.request
 import urllib.error
 import psycopg2
@@ -22,8 +25,9 @@ HEADERS = {
 
 PROMPT_TPL = (
     "Сгенерируй РЕАЛЬНЫЕ подробные характеристики смартфона компактно для термоэтикетки 58×40 мм.\n"
-    "Модель: {title}\n\n"
-    "Формат — РОВНО 4 строки, каждая — категория и параметры через запятую. Пример:\n"
+    "Модель: {title}\n"
+    "{hint}"
+    "\nФормат — РОВНО 4 строки, каждая — категория и параметры через запятую. Пример:\n"
     "Экран: 6,74″, IPS, 720×1600 пикс, 90 Гц.\n"
     "Память: 3 ГБ ОЗУ, 64 ГБ ПЗУ + слот для microSD (до 1 ТБ).\n"
     "Аккумулятор: 5000 мАч, зарядка 10 Вт; процессор: Unisoc Tiger T612 (8 ядер, 1,82 ГГц), ОС: Android 13.\n"
@@ -36,9 +40,9 @@ PROMPT_TPL = (
     "- Без заголовков, эмодзи, маркировок.\n"
     "- Только сами 4 строки в ответе, ничего больше.\n"
     "- Также верни РАЗВЁРНУТОЕ краткое описание одной строкой 80-150 символов в формате specs_short.\n"
-    "  Включи: диагональ, тип экрана, ОЗУ/ПЗУ, ёмкость АКБ, основную камеру, процессор/чип. Пример:\n"
-    "  '6.74\" IPS 90Hz, 3/64GB, 5000mAh, 50MP, Unisoc T612' (≈55 символов) или\n"
-    "  '6.1\" Super Retina XDR, 4/64GB, A14 Bionic, 5G, 12+12MP, 2815mAh'.\n"
+    "  ОБЯЗАТЕЛЬНО НАЧНИ specs_short с диагонали и формата ОЗУ/ПЗУ '{ram_storage}', далее аккумулятор/процессор/камера.\n"
+    "  Пример: '6.74\" IPS 90Hz, {ram_storage}, 5000mAh, 50MP, Unisoc T612' или\n"
+    "  '6.1\" Super Retina XDR, {ram_storage}, A14 Bionic, 5G, 12+12MP, 2815mAh'.\n"
     "- specs_short должен быть НЕ КОРОЧЕ 50 символов и НЕ ДЛИННЕЕ 150.\n\n"
     "Верни строго JSON: {{\"specs\": \"...4 строки через \\\\n...\", \"specs_short\": \"...\"}}"
 )
@@ -46,6 +50,47 @@ PROMPT_TPL = (
 
 def get_conn():
     return psycopg2.connect(os.environ['DATABASE_URL'])
+
+
+def parse_storage(storage_str: str):
+    """Парсит '4/128' '4/128GB' '128' в (ram_gb, storage_gb)."""
+    if not storage_str:
+        return None, None
+    m = re.search(r'(\d{1,3})\s*/\s*(\d{2,4})', storage_str)
+    if m:
+        return int(m.group(1)), int(m.group(2))
+    m = re.search(r'(\d{2,4})', storage_str)
+    if m:
+        return None, int(m.group(1))
+    return None, None
+
+
+def find_in_catalog(cur, brand: str, model: str, title: str):
+    """Ищем модель в справочнике: точный матч brand+model, потом по ILIKE на title."""
+    if brand and model:
+        cur.execute(
+            f"SELECT display, ram, battery, processor, camera, short_text "
+            f"FROM {SCHEMA}.phone_specs_catalog "
+            f"WHERE LOWER(brand)=LOWER(%s) AND LOWER(model)=LOWER(%s) LIMIT 1",
+            (brand.strip(), model.strip()),
+        )
+        r = cur.fetchone()
+        if r:
+            return r
+    needle = (title or f"{brand} {model}").strip()
+    if not needle:
+        return None
+    cur.execute(
+        f"SELECT display, ram, battery, processor, camera, short_text, "
+        f"LENGTH(brand || ' ' || model) AS l "
+        f"FROM {SCHEMA}.phone_specs_catalog "
+        f"WHERE %s ILIKE '%%' || brand || ' ' || model || '%%' "
+        f"   OR %s ILIKE '%%' || model || '%%' "
+        f"ORDER BY l DESC LIMIT 1",
+        (needle, needle),
+    )
+    r = cur.fetchone()
+    return r[:6] if r else None
 
 
 def call_polza(prompt: str) -> dict:
@@ -72,7 +117,6 @@ def call_polza(prompt: str) -> dict:
     with urllib.request.urlopen(req, timeout=45) as resp:
         data = json.loads(resp.read())
     raw = data['choices'][0]['message']['content'].strip()
-    # вычистить возможные ```json ... ```
     if raw.startswith('```'):
         raw = raw.strip('`')
         if raw.startswith('json'):
@@ -84,35 +128,128 @@ def call_polza(prompt: str) -> dict:
     return {'specs': specs[:500], 'specs_short': short[:160]}
 
 
+def build_from_catalog(cat_row, ram_gb, storage_gb) -> dict:
+    """Собирает specs/specs_short из строки справочника + памяти товара."""
+    display, ram, battery, processor, camera, short_text = cat_row
+    ram_storage = ''
+    if ram_gb and storage_gb:
+        ram_storage = f"{ram_gb}/{storage_gb}GB"
+    elif storage_gb:
+        ram_storage = f"{storage_gb}GB"
+
+    # 4 строки для specs
+    lines = []
+    lines.append(f"Экран: {display or '—'}.")
+    mem_parts = []
+    if ram_storage:
+        mem_parts.append(ram_storage)
+    elif ram:
+        mem_parts.append(f"{ram} ОЗУ")
+    if storage_gb and not ram_storage.endswith('GB'):
+        mem_parts.append(f"{storage_gb} ГБ ПЗУ")
+    lines.append(f"Память: {', '.join(mem_parts) if mem_parts else (ram or '—')}.")
+    lines.append(f"Аккумулятор: {battery or '—'}; процессор: {processor or '—'}.")
+    lines.append(f"Камера: {camera or '—'}.")
+    specs = '\n'.join(lines)[:500]
+
+    # specs_short: подставляем фактический объём памяти товара
+    if short_text:
+        if ram_storage:
+            short = re.sub(r'\d{1,2}[\-/]\d{1,2}\s*GB', ram_storage, short_text, count=1, flags=re.IGNORECASE)
+            if ram_storage not in short:
+                short = re.sub(r'\d{2,4}\s*GB', ram_storage, short, count=1, flags=re.IGNORECASE)
+            if ram_storage not in short:
+                parts = short.split(',', 1)
+                short = parts[0] + ', ' + ram_storage + (',' + parts[1] if len(parts) > 1 else '')
+        else:
+            short = short_text
+    else:
+        bits = []
+        if display:
+            bits.append(display)
+        if ram_storage:
+            bits.append(ram_storage)
+        if processor:
+            bits.append(processor)
+        if battery:
+            bits.append(battery)
+        if camera:
+            bits.append(camera)
+        short = ', '.join(bits)
+
+    short = short.strip()[:160]
+    return {'specs': specs, 'specs_short': short}
+
+
 def generate_for_item(item_id: int) -> dict:
     conn = get_conn()
     cur = conn.cursor()
     cur.execute(
-        f"SELECT id, title, brand, model, storage FROM {SCHEMA}.slshop_items WHERE id=%s",
+        f"SELECT id, title, brand, model, storage, ram_gb, storage_gb FROM {SCHEMA}.slshop_items WHERE id=%s",
         (item_id,),
     )
     row = cur.fetchone()
     if not row:
         cur.close(); conn.close()
         return {'ok': False, 'error': 'item not found'}
-    iid, title, brand, model, storage = row
+    iid, title, brand, model, storage, ram_gb, storage_gb = row
+
+    # Если ram_gb/storage_gb не заданы — пробуем парсить из storage
+    if not ram_gb or not storage_gb:
+        p_ram, p_st = parse_storage(storage or '')
+        ram_gb = ram_gb or p_ram
+        storage_gb = storage_gb or p_st
+
     text = title or ''
     if brand or model:
-        text = f"{brand or ''} {model or ''} {storage or ''}".strip() + (f' — {title}' if title else '')
+        text = f"{brand or ''} {model or ''}".strip()
+        if storage_gb and ram_gb:
+            text += f" {ram_gb}/{storage_gb}GB"
+        elif storage_gb:
+            text += f" {storage_gb}GB"
+        if title and title not in text:
+            text += f' — {title}'
 
-    try:
-        result = call_polza(PROMPT_TPL.format(title=text))
-    except Exception as e:
-        cur.close(); conn.close()
-        return {'ok': False, 'error': f'AI error: {e}'}
+    # 1) Пробуем найти в справочнике
+    cat = find_in_catalog(cur, brand or '', model or '', title or text)
+    used_source = 'catalog' if cat else 'ai'
+    if cat:
+        try:
+            result = build_from_catalog(cat, ram_gb, storage_gb)
+        except Exception:
+            result = None
+    else:
+        result = None
+
+    # 2) Если в справочнике нет или сборка не удалась — идём в ИИ с подсказкой
+    if not result:
+        ram_storage = ''
+        if ram_gb and storage_gb:
+            ram_storage = f"{ram_gb}/{storage_gb}GB"
+        elif storage_gb:
+            ram_storage = f"{storage_gb}GB"
+        hint = ''
+        if ram_storage:
+            hint = f"Память (точно): {ram_storage}.\n"
+        prompt = PROMPT_TPL.format(title=text, hint=hint, ram_storage=ram_storage or '4/128GB')
+        try:
+            result = call_polza(prompt)
+        except Exception as e:
+            cur.close(); conn.close()
+            return {'ok': False, 'error': f'AI error: {e}'}
 
     cur.execute(
-        f"UPDATE {SCHEMA}.slshop_items SET specs=%s, specs_short=%s, updated_at=NOW() WHERE id=%s",
-        (result['specs'], result['specs_short'], iid),
+        f"UPDATE {SCHEMA}.slshop_items SET specs=%s, specs_short=%s, "
+        f"ram_gb=COALESCE(ram_gb, %s), storage_gb=COALESCE(storage_gb, %s), updated_at=NOW() WHERE id=%s",
+        (result['specs'], result['specs_short'], ram_gb, storage_gb, iid),
     )
     conn.commit()
     cur.close(); conn.close()
-    return {'ok': True, 'item_id': iid, 'specs': result['specs'], 'specs_short': result['specs_short']}
+    return {
+        'ok': True, 'item_id': iid,
+        'specs': result['specs'], 'specs_short': result['specs_short'],
+        'source': used_source,
+    }
 
 
 def generate_batch(limit: int = 20, only_empty: bool = True, only_short: bool = False) -> dict:
@@ -166,12 +303,15 @@ def get_status() -> dict:
         """
     )
     total, empty, short = cur.fetchone()
+    cur.execute(f"SELECT COUNT(*) FROM {SCHEMA}.phone_specs_catalog")
+    catalog_size = cur.fetchone()[0]
     cur.close(); conn.close()
-    return {'ok': True, 'total': total, 'empty': empty, 'short': short, 'filled': total - empty}
+    return {'ok': True, 'total': total, 'empty': empty, 'short': short,
+            'filled': total - empty, 'catalog_size': catalog_size}
 
 
 def handler(event, context):
-    """Генерация характеристик смартфонов через ИИ для термоэтикетки."""
+    """Генерация характеристик смартфонов через ИИ + справочник smarfony.ru."""
     method = event.get('httpMethod', 'GET')
     if method == 'OPTIONS':
         return {'statusCode': 200, 'headers': HEADERS, 'body': ''}
