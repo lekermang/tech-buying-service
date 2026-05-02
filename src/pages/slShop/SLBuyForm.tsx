@@ -1,10 +1,12 @@
 import { useEffect, useState, useRef } from "react";
 import Icon from "@/components/ui/icon";
-import { slApi, type SLCategory, type SLClient, type SLBranch, type SLItem, CONDITION_OPTIONS } from "./types";
-import CategoryTreeSelect from "./CategoryTreeSelect";
-import QuickClientForm from "./QuickClientForm";
+import { slApi, type SLCategory, type SLClient, type SLBranch, type SLItem } from "./types";
 import PrintDocsButton from "./PrintDocsButton";
 import { printLabelQuick } from "./labelPrinter";
+import { Section, Field } from "./SLBuyFormParts";
+import SLBuyFormItemSection from "./SLBuyFormItemSection";
+import SLBuyFormClientSection from "./SLBuyFormClientSection";
+import SLBuyFormPricesAndPlace from "./SLBuyFormPricesAndPlace";
 
 export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: () => void }) {
   const [cats, setCats] = useState<SLCategory[]>([]);
@@ -137,7 +139,6 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
     const memStr = ram && stor ? `${ram}/${stor}` : (stor || ram);
     if (!memStr) return;
 
-    // Название: заменяем существующий "X/Y" или дописываем
     if (title.trim()) {
       const reFull = /(\d{1,3})\s*\/\s*(\d{2,4})\s*(GB|ГБ|gb|гб)?/;
       const reTail = /\s+(\d{2,4})\s*(GB|ГБ|gb|гб)?\s*$/;
@@ -152,7 +153,6 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
       if (next !== title) setTitle(next);
     }
 
-    // Краткое описание: подставляем/обновляем X/Y GB
     setSpecsShort(prev => {
       if (!ram || !stor) return prev;
       const target = `${ram}/${stor}GB`;
@@ -165,7 +165,6 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
       return prev.includes(target) ? prev : `${prev.trim()} • ${target}`;
     });
 
-    // Полное описание: то же самое
     setSpecs(prev => {
       if (!ram || !stor) return prev;
       const target = `${ram}/${stor}GB`;
@@ -204,7 +203,6 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
     }
     setSaving(true); setMsg(null);
     let buyClientId: number | null = clientId === "" ? null : Number(clientId);
-    // если ввели имя клиента, но не выбрали из списка — создадим
     if (!buyClientId && clientQuery.trim()) {
       const r = await slApi<{ id: number }>(token, "client_save", { method: "POST", body: { full_name: clientQuery.trim() } });
       if (r.ok && r.data) buyClientId = r.data.id;
@@ -235,7 +233,6 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
     if (r.ok && r.data) {
       setMsg(`Принято: ${r.data.sku}`);
       setCreatedItemId(r.data.id);
-      // Автопечать договора и контрольной бирки сразу после скупки
       if (autoPrint) {
         setTimeout(async () => {
           try {
@@ -247,11 +244,9 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
             );
             if (ctxRes.ok && ctxRes.data && tplRes.ok && tplRes.data && tplRes.data.length > 0) {
               const { printDoc } = await import("./docPrinter");
-              // Печатаем первый подходящий документ (договор)
               const tpl = tplRes.data.find(t => t.code === "contract_purchase") || tplRes.data[0];
               printDoc(tpl as never, ctxRes.data as never);
             }
-            // Автопечать ценника термо 58×40 после приёмки
             if (ctxRes.ok && ctxRes.data && (ctxRes.data as { item?: SLItem }).item) {
               const item = (ctxRes.data as { item: SLItem }).item;
               setTimeout(() => {
@@ -307,160 +302,46 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
         </div>
       </Section>
 
-      <Section title="Товар">
-        <Field label="Категория">
-          <CategoryTreeSelect categories={cats} value={categoryId} onChange={(id) => setCategoryId(id)} />
-        </Field>
+      <SLBuyFormItemSection
+        cats={cats}
+        categoryId={categoryId} setCategoryId={setCategoryId}
+        title={title} setTitle={setTitle}
+        model={model} setModel={setModel}
+        brand={brand} setBrand={setBrand}
+        specsShort={specsShort} setSpecsShort={setSpecsShort}
+        specs={specs} setSpecs={setSpecs}
+        ramGb={ramGb} setRamGb={setRamGb}
+        storageGb={storageGb} setStorageGb={setStorageGb}
+        color={color} setColor={setColor}
+        battery={battery} setBattery={setBattery}
+        condition={condition} setCondition={setCondition}
+        imei={imei} setImei={setImei}
+        serial={serial} setSerial={setSerial}
+        hasBox={hasBox} setHasBox={setHasBox}
+        hasCharger={hasCharger} setHasCharger={setHasCharger}
+        autofilled={autofilled}
+        isPhoneCategory={isPhoneCategory}
+        aiBusy={aiBusy} aiMsg={aiMsg}
+        generateSpecsAI={generateSpecsAI}
+      />
 
-        <Field label={<>Наименование {autofilled && <span className="text-emerald-400 text-[10px] ml-1">автозаполнено</span>}</>}>
-          <input value={title} onChange={e => {
-            const v = e.target.value;
-            // если модель совпадала со старым title или пуста — синхронизируем
-            if (!model || model === title) setModel(v);
-            setTitle(v);
-          }}
-            placeholder="iPhone 13 / Samsung Galaxy S22 / Антикварные часы..."
-            className="w-full bg-[#0A0A0A] border border-[#1F1F1F] rounded-lg px-3 py-2 text-sm focus:border-[#FFD700]/50 outline-none" />
-        </Field>
+      <SLBuyFormClientSection
+        token={token}
+        clientQuery={clientQuery} setClientQuery={setClientQuery}
+        clientId={clientId} setClientId={setClientId}
+        clientResults={clientResults}
+        showClientDrop={showClientDrop} setShowClientDrop={setShowClientDrop}
+        showQuickClient={showQuickClient} setShowQuickClient={setShowQuickClient}
+      />
 
-        <div className="grid grid-cols-2 gap-2">
-          <Field label="Бренд"><Inp v={brand} s={setBrand} /></Field>
-          <Field label="Модель"><Inp v={model} s={setModel} /></Field>
-        </div>
-
-        <Field label="Краткие характеристики (для ценника)">
-          <input value={specsShort} onChange={e => setSpecsShort(e.target.value)}
-            placeholder='6.1" OLED 120Hz, 8/128GB, A16, 48+12MP, 3349mAh'
-            maxLength={200}
-            className="w-full bg-[#0A0A0A] border border-[#1F1F1F] rounded-lg px-3 py-2 text-sm" />
-          <div className="text-[10px] text-white/30 mt-0.5">{specsShort.length}/200 — будет на ценнике</div>
-        </Field>
-
-        <Field label="Полные характеристики (опц.)">
-          <textarea value={specs} onChange={e => setSpecs(e.target.value)} rows={2}
-            className="w-full bg-[#0A0A0A] border border-[#1F1F1F] rounded-lg px-3 py-2 text-sm resize-none" />
-        </Field>
-
-        <button type="button" onClick={generateSpecsAI} disabled={aiBusy}
-          className="w-full bg-[#FFD700]/10 border border-[#FFD700]/30 text-[#FFD700] hover:bg-[#FFD700]/20 py-2 rounded-lg text-sm font-bold disabled:opacity-50 transition-all">
-          {aiBusy
-            ? <><Icon name="Loader" size={13} className="inline mr-1 animate-spin" />Генерирую...</>
-            : <><Icon name="Sparkles" size={13} className="inline mr-1" />Заполнить характеристики ИИ</>}
-        </button>
-        {aiMsg && <div className="text-[11px] text-center text-white/60 -mt-1">{aiMsg}</div>}
-
-        <div className="grid grid-cols-4 gap-2">
-          <Field label={<>ОЗУ ГБ{isPhoneCategory && <span className="text-red-400 ml-0.5">*</span>}</>}>
-            <Inp v={ramGb} s={(v) => setRamGb(v.replace(/\D/g, ""))} ph="4" />
-          </Field>
-          <Field label={<>Память ГБ{isPhoneCategory && <span className="text-red-400 ml-0.5">*</span>}</>}>
-            <Inp v={storageGb} s={(v) => setStorageGb(v.replace(/\D/g, ""))} ph="128" />
-          </Field>
-          <Field label="Цвет"><Inp v={color} s={setColor} ph="Чёрный" /></Field>
-          <Field label="АКБ %"><Inp v={battery} s={setBattery} ph="100" /></Field>
-        </div>
-
-        <Field label="Состояние">
-          <div className="flex gap-1 flex-wrap">
-            {CONDITION_OPTIONS.map(c => (
-              <button key={c} onClick={() => setCondition(c)}
-                className={`text-[11px] px-2.5 py-1 rounded-full transition-all ${
-                  condition === c ? "bg-[#FFD700] text-black font-bold" : "bg-[#141414] border border-[#1F1F1F] text-white/60"
-                }`}>{c}</button>
-            ))}
-          </div>
-        </Field>
-
-        <div className="grid grid-cols-2 gap-2">
-          <Field label="IMEI"><Inp v={imei} s={setImei} /></Field>
-          <Field label="Серийный номер"><Inp v={serial} s={setSerial} /></Field>
-        </div>
-
-        <div className="flex gap-3 text-sm">
-          <label className="flex items-center gap-1.5 cursor-pointer">
-            <input type="checkbox" checked={hasBox} onChange={e => setHasBox(e.target.checked)} />
-            <span>Коробка</span>
-          </label>
-          <label className="flex items-center gap-1.5 cursor-pointer">
-            <input type="checkbox" checked={hasCharger} onChange={e => setHasCharger(e.target.checked)} />
-            <span>Зарядка</span>
-          </label>
-        </div>
-      </Section>
-
-      <Section title="Клиент (продавец)">
-        {showQuickClient ? (
-          <QuickClientForm
-            token={token}
-            onCreated={(id, name) => {
-              setClientId(id);
-              setClientQuery(name);
-              setShowQuickClient(false);
-            }}
-            onCancel={() => setShowQuickClient(false)}
-          />
-        ) : (
-          <>
-            <div className="relative">
-              <input value={clientQuery} onChange={e => { setClientQuery(e.target.value); setClientId(""); setShowClientDrop(true); }}
-                onFocus={() => setShowClientDrop(true)}
-                placeholder="ФИО или телефон"
-                className="w-full bg-[#0A0A0A] border border-[#1F1F1F] rounded-lg px-3 py-2 text-sm" />
-              {showClientDrop && clientResults.length > 0 && (
-                <div className="absolute z-10 left-0 right-0 top-full mt-1 bg-[#141414] border border-[#1F1F1F] rounded-lg shadow-xl max-h-48 overflow-y-auto">
-                  {clientResults.map(c => (
-                    <button key={c.id} onClick={() => { setClientId(c.id); setClientQuery(c.full_name); setShowClientDrop(false); }}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-white/5 border-b border-[#1F1F1F] last:border-0">
-                      <div className="font-medium">{c.full_name}</div>
-                      {c.phone && <div className="text-[11px] text-white/40">{c.phone}</div>}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <button onClick={() => setShowQuickClient(true)}
-              className="w-full bg-gradient-to-br from-[#FFD700]/15 to-transparent border border-[#FFD700]/40 text-[#FFD700] rounded-lg py-2.5 text-sm font-bold flex items-center justify-center gap-2 hover:bg-[#FFD700]/20">
-              <Icon name="Camera" size={14} />
-              Новый клиент по фото паспорта
-            </button>
-            {clientId && (
-              <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 px-2.5 py-1.5 rounded text-[12px]">
-                <Icon name="UserCheck" size={11} className="inline mr-1" />
-                Клиент: {clientQuery} (ID #{clientId})
-              </div>
-            )}
-          </>
-        )}
-      </Section>
-
-      <Section title="Цены">
-        <div className="grid grid-cols-3 gap-2">
-          {source === "buyout" && (
-            <Field label="Закупка ₽"><Inp v={buyPrice} s={setBuyPrice} ph="0" /></Field>
-          )}
-          <Field label="Продажа ₽"><Inp v={sellPrice} s={setSellPrice} ph="0" /></Field>
-          <Field label="Мин. цена ₽"><Inp v={minPrice} s={setMinPrice} ph="0" /></Field>
-          {source === "consignment" && (
-            <Field label="Комиссия %"><Inp v={consignmentPercent} s={setConsignmentPercent} ph="20" /></Field>
-          )}
-        </div>
-      </Section>
-
-      {source === "buyout" && (
-        <Section title="Куда поставить">
-          <div className="grid grid-cols-2 gap-2">
-            {[
-              { v: "stock", l: "На склад" },
-              { v: "showcase", l: "На витрину" },
-            ].map(o => (
-              <button key={o.v} onClick={() => setStatus(o.v as "stock" | "showcase")}
-                className={`p-2 rounded-lg border text-sm font-bold transition-all ${
-                  status === o.v ? "bg-[#FFD700]/10 border-[#FFD700] text-[#FFD700]" : "bg-[#141414] border-[#1F1F1F] text-white/60"
-                }`}>{o.l}</button>
-            ))}
-          </div>
-        </Section>
-      )}
+      <SLBuyFormPricesAndPlace
+        source={source}
+        buyPrice={buyPrice} setBuyPrice={setBuyPrice}
+        sellPrice={sellPrice} setSellPrice={setSellPrice}
+        minPrice={minPrice} setMinPrice={setMinPrice}
+        consignmentPercent={consignmentPercent} setConsignmentPercent={setConsignmentPercent}
+        status={status} setStatus={setStatus}
+      />
 
       <Field label="Описание / заметки">
         <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2}
@@ -500,30 +381,5 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
         </div>
       )}
     </div>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="bg-[#0F0F0F] border border-[#1F1F1F] rounded-xl p-3">
-      <div className="text-[10px] uppercase font-bold tracking-wide text-white/40 mb-2">{title}</div>
-      <div className="space-y-2">{children}</div>
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <div>
-      <div className="text-[11px] text-white/50 mb-1">{label}</div>
-      {children}
-    </div>
-  );
-}
-
-function Inp({ v, s, ph }: { v: string; s: (x: string) => void; ph?: string }) {
-  return (
-    <input value={v} onChange={e => s(e.target.value)} placeholder={ph}
-      className="w-full bg-[#0A0A0A] border border-[#1F1F1F] rounded-lg px-3 py-2 text-sm focus:border-[#FFD700]/50 outline-none" />
   );
 }
