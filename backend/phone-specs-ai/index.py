@@ -38,14 +38,22 @@ PROMPT_TPL = (
     "- Категории строго: Экран, Память, Аккумулятор, Камера.\n"
     "- Каждая строка ≤ 90 символов.\n"
     "- Без заголовков, эмодзи, маркировок.\n"
+    "- ВАЖНО: Для устройств Apple / iPhone НЕ указывай ОЗУ вообще (ни в specs, ни в specs_short). "
+    "В строке 'Память' для iPhone пиши только встроенную память (ПЗУ): например 'Память: 128 ГБ.'.\n"
     "- Только сами 4 строки в ответе, ничего больше.\n"
     "- Также верни РАЗВЁРНУТОЕ краткое описание одной строкой 80-150 символов в формате specs_short.\n"
-    "  ОБЯЗАТЕЛЬНО НАЧНИ specs_short с диагонали и формата ОЗУ/ПЗУ '{ram_storage}', далее аккумулятор/процессор/камера.\n"
-    "  Пример: '6.74\" IPS 90Hz, {ram_storage}, 5000mAh, 50MP, Unisoc T612' или\n"
-    "  '6.1\" Super Retina XDR, {ram_storage}, A14 Bionic, 5G, 12+12MP, 2815mAh'.\n"
+    "  ОБЯЗАТЕЛЬНО НАЧНИ specs_short с диагонали и формата памяти '{ram_storage}', далее аккумулятор/процессор/камера.\n"
+    "  Для iPhone/Apple память — ТОЛЬКО ПЗУ, например '128GB' (без ОЗУ).\n"
+    "  Пример Android: '6.74\" IPS 90Hz, 4/128GB, 5000mAh, 50MP, Unisoc T612'.\n"
+    "  Пример iPhone:  '6.1\" Super Retina XDR, 128GB, A14 Bionic, 5G, 12+12MP, 2815mAh'.\n"
     "- specs_short должен быть НЕ КОРОЧЕ 50 символов и НЕ ДЛИННЕЕ 150.\n\n"
     "Верни строго JSON: {{\"specs\": \"...4 строки через \\\\n...\", \"specs_short\": \"...\"}}"
 )
+
+
+def is_apple_device(title: str = '', brand: str = '', model: str = '') -> bool:
+    t = f"{title} {brand} {model}".lower()
+    return 'iphone' in t or 'apple' in t
 
 
 def get_conn():
@@ -128,25 +136,33 @@ def call_polza(prompt: str) -> dict:
     return {'specs': specs[:500], 'specs_short': short[:160]}
 
 
-def build_from_catalog(cat_row, ram_gb, storage_gb) -> dict:
+def build_from_catalog(cat_row, ram_gb, storage_gb, is_apple: bool = False) -> dict:
     """Собирает specs/specs_short из строки справочника + памяти товара."""
     display, ram, battery, processor, camera, short_text = cat_row
     ram_storage = ''
-    if ram_gb and storage_gb:
-        ram_storage = f"{ram_gb}/{storage_gb}GB"
-    elif storage_gb:
-        ram_storage = f"{storage_gb}GB"
+    if is_apple:
+        if storage_gb:
+            ram_storage = f"{storage_gb}GB"
+    else:
+        if ram_gb and storage_gb:
+            ram_storage = f"{ram_gb}/{storage_gb}GB"
+        elif storage_gb:
+            ram_storage = f"{storage_gb}GB"
 
     # 4 строки для specs
     lines = []
     lines.append(f"Экран: {display or '—'}.")
     mem_parts = []
-    if ram_storage:
-        mem_parts.append(ram_storage)
-    elif ram:
-        mem_parts.append(f"{ram} ОЗУ")
-    if storage_gb and not ram_storage.endswith('GB'):
-        mem_parts.append(f"{storage_gb} ГБ ПЗУ")
+    if is_apple:
+        if storage_gb:
+            mem_parts.append(f"{storage_gb} ГБ")
+    else:
+        if ram_storage:
+            mem_parts.append(ram_storage)
+        elif ram:
+            mem_parts.append(f"{ram} ОЗУ")
+        if storage_gb and not ram_storage.endswith('GB'):
+            mem_parts.append(f"{storage_gb} ГБ ПЗУ")
     lines.append(f"Память: {', '.join(mem_parts) if mem_parts else (ram or '—')}.")
     lines.append(f"Аккумулятор: {battery or '—'}; процессор: {processor or '—'}.")
     lines.append(f"Камера: {camera or '—'}.")
@@ -155,12 +171,14 @@ def build_from_catalog(cat_row, ram_gb, storage_gb) -> dict:
     # specs_short: подставляем фактический объём памяти товара
     if short_text:
         if ram_storage:
-            short = re.sub(r'\d{1,2}[\-/]\d{1,2}\s*GB', ram_storage, short_text, count=1, flags=re.IGNORECASE)
+            short = re.sub(r'\d{1,3}\s*[\-/]\s*\d{2,4}\s*GB', ram_storage, short_text, count=1, flags=re.IGNORECASE)
             if ram_storage not in short:
                 short = re.sub(r'\d{2,4}\s*GB', ram_storage, short, count=1, flags=re.IGNORECASE)
             if ram_storage not in short:
                 parts = short.split(',', 1)
                 short = parts[0] + ', ' + ram_storage + (',' + parts[1] if len(parts) > 1 else '')
+        elif is_apple:
+            short = re.sub(r'\d{1,3}\s*[\-/]\s*(\d{2,4})\s*GB', r'\1GB', short_text, flags=re.IGNORECASE)
         else:
             short = short_text
     else:
@@ -210,12 +228,14 @@ def generate_for_item(item_id: int) -> dict:
         if title and title not in text:
             text += f' — {title}'
 
+    is_apple = is_apple_device(title or '', brand or '', model or '')
+
     # 1) Пробуем найти в справочнике
     cat = find_in_catalog(cur, brand or '', model or '', title or text)
     used_source = 'catalog' if cat else 'ai'
     if cat:
         try:
-            result = build_from_catalog(cat, ram_gb, storage_gb)
+            result = build_from_catalog(cat, ram_gb, storage_gb, is_apple=is_apple)
         except Exception:
             result = None
     else:
@@ -224,14 +244,21 @@ def generate_for_item(item_id: int) -> dict:
     # 2) Если в справочнике нет или сборка не удалась — идём в ИИ с подсказкой
     if not result:
         ram_storage = ''
-        if ram_gb and storage_gb:
-            ram_storage = f"{ram_gb}/{storage_gb}GB"
-        elif storage_gb:
-            ram_storage = f"{storage_gb}GB"
+        if is_apple:
+            if storage_gb:
+                ram_storage = f"{storage_gb}GB"
+        else:
+            if ram_gb and storage_gb:
+                ram_storage = f"{ram_gb}/{storage_gb}GB"
+            elif storage_gb:
+                ram_storage = f"{storage_gb}GB"
         hint = ''
         if ram_storage:
             hint = f"Память (точно): {ram_storage}.\n"
-        prompt = PROMPT_TPL.format(title=text, hint=hint, ram_storage=ram_storage or '4/128GB')
+        if is_apple:
+            hint += "Это устройство Apple/iPhone — НЕ указывай ОЗУ нигде, только встроенную память.\n"
+        default_short = '128GB' if is_apple else '4/128GB'
+        prompt = PROMPT_TPL.format(title=text, hint=hint, ram_storage=ram_storage or default_short)
         try:
             result = call_polza(prompt)
         except Exception as e:
@@ -268,23 +295,32 @@ def generate_draft(title: str, brand: str = '', model: str = '',
         if title and title not in text:
             text += f' — {title}'
 
+    is_apple = is_apple_device(title or '', brand or '', model or '')
+
     cat = find_in_catalog(cur, brand or '', model or '', title or text)
     used_source = 'catalog' if cat else 'ai'
     result = None
     if cat:
         try:
-            result = build_from_catalog(cat, ram_gb, storage_gb)
+            result = build_from_catalog(cat, ram_gb, storage_gb, is_apple=is_apple)
         except Exception:
             result = None
 
     if not result:
         ram_storage = ''
-        if ram_gb and storage_gb:
-            ram_storage = f"{ram_gb}/{storage_gb}GB"
-        elif storage_gb:
-            ram_storage = f"{storage_gb}GB"
+        if is_apple:
+            if storage_gb:
+                ram_storage = f"{storage_gb}GB"
+        else:
+            if ram_gb and storage_gb:
+                ram_storage = f"{ram_gb}/{storage_gb}GB"
+            elif storage_gb:
+                ram_storage = f"{storage_gb}GB"
         hint = f"Память (точно): {ram_storage}.\n" if ram_storage else ''
-        prompt = PROMPT_TPL.format(title=text, hint=hint, ram_storage=ram_storage or '4/128GB')
+        if is_apple:
+            hint += "Это устройство Apple/iPhone — НЕ указывай ОЗУ нигде, только встроенную память.\n"
+        default_short = '128GB' if is_apple else '4/128GB'
+        prompt = PROMPT_TPL.format(title=text, hint=hint, ram_storage=ram_storage or default_short)
         try:
             result = call_polza(prompt)
         except Exception as e:
