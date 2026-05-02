@@ -195,11 +195,21 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
     return t.includes("телефон") || t.includes("смартфон") || t.includes("phone") || t.includes("iphone");
   })();
 
+  const isAppleDevice = (() => {
+    const t = `${brand} ${model} ${title}`.toLowerCase();
+    return t.includes("iphone") || t.includes("apple");
+  })();
+
   const submit = async () => {
     if (!title.trim()) { setMsg("Введите наименование"); return; }
-    if (isPhoneCategory && (!ramGb || !storageGb)) {
-      setMsg("Для смартфона обязательны ОЗУ и Память (ГБ)");
-      return;
+    if (isPhoneCategory) {
+      if (isAppleDevice) {
+        if (!storageGb) { setMsg("Для iPhone обязательна Память (ГБ)"); return; }
+        if (!battery) { setMsg("Для iPhone обязателен процент аккумулятора"); return; }
+      } else if (!ramGb || !storageGb) {
+        setMsg("Для смартфона обязательны ОЗУ и Память (ГБ)");
+        return;
+      }
     }
     setSaving(true); setMsg(null);
     let buyClientId: number | null = clientId === "" ? null : Number(clientId);
@@ -321,6 +331,7 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
         hasCharger={hasCharger} setHasCharger={setHasCharger}
         autofilled={autofilled}
         isPhoneCategory={isPhoneCategory}
+        isAppleDevice={isAppleDevice}
         aiBusy={aiBusy} aiMsg={aiMsg}
         generateSpecsAI={generateSpecsAI}
       />

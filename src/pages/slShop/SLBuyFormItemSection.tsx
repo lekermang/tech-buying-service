@@ -37,6 +37,7 @@ type Props = {
   setHasCharger: (v: boolean) => void;
   autofilled: boolean;
   isPhoneCategory: boolean;
+  isAppleDevice: boolean;
   aiBusy: boolean;
   aiMsg: string | null;
   generateSpecsAI: () => void;
@@ -86,14 +87,16 @@ export default function SLBuyFormItemSection(p: Props) {
       {p.aiMsg && <div className="text-[11px] text-center text-white/60 -mt-1">{p.aiMsg}</div>}
 
       <div className="grid grid-cols-4 gap-2">
-        <Field label={<>ОЗУ ГБ{p.isPhoneCategory && <span className="text-red-400 ml-0.5">*</span>}</>}>
-          <Inp v={p.ramGb} s={(v) => p.setRamGb(v.replace(/\D/g, ""))} ph="4" />
+        <Field label={<>ОЗУ ГБ{p.isPhoneCategory && !p.isAppleDevice && <span className="text-red-400 ml-0.5">*</span>}</>}>
+          <Inp v={p.ramGb} s={(v) => p.setRamGb(v.replace(/\D/g, ""))} ph={p.isAppleDevice ? "—" : "4"} />
         </Field>
         <Field label={<>Память ГБ{p.isPhoneCategory && <span className="text-red-400 ml-0.5">*</span>}</>}>
           <Inp v={p.storageGb} s={(v) => p.setStorageGb(v.replace(/\D/g, ""))} ph="128" />
         </Field>
         <Field label="Цвет"><Inp v={p.color} s={p.setColor} ph="Чёрный" /></Field>
-        <Field label="АКБ %"><Inp v={p.battery} s={p.setBattery} ph="100" /></Field>
+        <Field label={<>АКБ %{p.isAppleDevice && <span className="text-red-400 ml-0.5">*</span>}</>}>
+          <Inp v={p.battery} s={p.setBattery} ph="100" />
+        </Field>
       </div>
 
       <Field label="Состояние">
