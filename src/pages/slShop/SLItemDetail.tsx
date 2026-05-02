@@ -4,7 +4,7 @@ import { slApi, fmt, type SLItem, type SLCategory, STATUS_LABEL } from "./types"
 import CategoryTreeSelect from "./CategoryTreeSelect";
 import PrintDocsButton from "./PrintDocsButton";
 import { Row, Inp2, fmtRamStorage, parseStorageStr } from "./SLItemsCommon";
-import { printLabelQuick } from "./labelPrinter";
+import { printLabelQuick, LABEL_SIZES, getLastLabelSize, setLastLabelSize } from "./labelPrinter";
 
 const PHONE_SPECS_AI_URL = "https://functions.poehali.dev/983744a8-1cfc-42d8-a566-bf31dfa328b2";
 
@@ -17,6 +17,8 @@ export default function SLItemDetail({ token, item: itemProp, isOwner, onClose, 
   const [saving, setSaving] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiMsg, setAiMsg] = useState<string | null>(null);
+  const [labelMenu, setLabelMenu] = useState(false);
+  const [labelSize, setLabelSize] = useState<string>(() => getLastLabelSize());
   const [branches, setBranches] = useState<{ id: number; name: string; address?: string | null }[]>([]);
 
   const isPhone = (() => {
@@ -111,8 +113,8 @@ export default function SLItemDetail({ token, item: itemProp, isOwner, onClose, 
           </div>
           <div className="flex items-center gap-1">
             <button
-              onClick={() => printLabelQuick(item)}
-              title="Печать ценника"
+              onClick={() => printLabelQuick(item, { size: labelSize })}
+              title={`Печать ценника (${LABEL_SIZES.find(s => s.code === labelSize)?.name || labelSize})`}
               className="text-white/60 hover:text-[#FFD700] p-1.5 rounded hover:bg-[#FFD700]/10">
               <Icon name="Printer" size={16} />
             </button>
@@ -161,11 +163,48 @@ export default function SLItemDetail({ token, item: itemProp, isOwner, onClose, 
                 </button>
               )}
               {aiMsg && <div className="text-[11px] text-center text-white/60 mt-1">{aiMsg}</div>}
-              <button
-                onClick={() => printLabelQuick(item)}
-                className="w-full mt-2 bg-[#141414] border border-[#1F1F1F] hover:border-[#FFD700]/50 text-white py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-1.5">
-                <Icon name="Printer" size={14} /> Печать ценника
-              </button>
+              <div className="relative mt-2">
+                <div className="flex gap-0">
+                  <button
+                    onClick={() => printLabelQuick(item, { size: labelSize })}
+                    className="flex-1 bg-[#141414] border border-[#1F1F1F] hover:border-[#FFD700]/50 text-white py-2 rounded-l-lg text-sm font-bold flex items-center justify-center gap-1.5">
+                    <Icon name="Printer" size={14} /> Печать ценника
+                    <span className="text-[10px] text-[#FFD700]/80 ml-1">
+                      {LABEL_SIZES.find(s => s.code === labelSize)?.name || labelSize}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => setLabelMenu(v => !v)}
+                    title="Выбрать размер ценника"
+                    className="bg-[#141414] border border-l-0 border-[#1F1F1F] hover:border-[#FFD700]/50 text-white px-3 py-2 rounded-r-lg">
+                    <Icon name={labelMenu ? "ChevronUp" : "ChevronDown"} size={14} />
+                  </button>
+                </div>
+                {labelMenu && (
+                  <div className="absolute z-20 left-0 right-0 mt-1 bg-[#0F0F0F] border border-[#1F1F1F] rounded-lg shadow-xl overflow-hidden">
+                    <div className="text-[10px] uppercase font-bold text-white/40 px-3 py-1.5 border-b border-[#1F1F1F]">
+                      Размер ценника
+                    </div>
+                    {LABEL_SIZES.map(s => (
+                      <button
+                        key={s.code}
+                        onClick={() => {
+                          setLabelSize(s.code);
+                          setLastLabelSize(s.code);
+                          setLabelMenu(false);
+                          printLabelQuick(item, { size: s.code });
+                        }}
+                        className={`w-full text-left px-3 py-2 text-sm hover:bg-[#FFD700]/10 flex items-center justify-between border-b border-[#1F1F1F]/50 last:border-0 ${labelSize === s.code ? "text-[#FFD700]" : "text-white"}`}>
+                        <span>{s.name}</span>
+                        <span className="text-[10px] text-white/40">
+                          {s.w}×{s.h} мм
+                          {labelSize === s.code && <Icon name="Check" size={11} className="inline ml-1" />}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <div className="mt-2">
                 <PrintDocsButton token={token} itemId={item.id}
                   opType={item.status === "sold" ? "sell" : (item.source === "consignment" ? "consignment_in" : "buyout_individual")}
