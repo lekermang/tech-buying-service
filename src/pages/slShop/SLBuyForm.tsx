@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef } from "react";
 import Icon from "@/components/ui/icon";
-import { slApi, type SLCategory, type SLClient, type SLBranch, CONDITION_OPTIONS } from "./types";
+import { slApi, type SLCategory, type SLClient, type SLBranch, type SLItem, CONDITION_OPTIONS } from "./types";
 import CategoryTreeSelect from "./CategoryTreeSelect";
 import QuickClientForm from "./QuickClientForm";
 import PrintDocsButton from "./PrintDocsButton";
+import { printLabelQuick } from "./labelPrinter";
 
 export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: () => void }) {
   const [cats, setCats] = useState<SLCategory[]>([]);
@@ -158,6 +159,14 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
               // Печатаем первый подходящий документ (договор)
               const tpl = tplRes.data.find(t => t.code === "contract_purchase") || tplRes.data[0];
               printDoc(tpl as never, ctxRes.data as never);
+            }
+            // Автопечать ценника термо 58×40 после приёмки
+            if (ctxRes.ok && ctxRes.data && (ctxRes.data as { item?: SLItem }).item) {
+              const item = (ctxRes.data as { item: SLItem }).item;
+              setTimeout(() => {
+                try { printLabelQuick(item, { size: "58x40" }); }
+                catch (err) { console.error("label-print", err); }
+              }, 600);
             }
           } catch (e) {
             console.error("auto-print", e);
