@@ -3,8 +3,48 @@ import Icon from "@/components/ui/icon";
 import { ymGoal, Goals } from "@/lib/ym";
 import { formatPhone } from "@/lib/phoneFormat";
 
-const AVITO_PRICE_URL = "https://functions.poehali.dev/5c99f770-dbe8-42ad-b8df-adea87477627";
 const SEND_LEAD_URL = "https://functions.poehali.dev/52666ff7-db52-4b6a-a90e-d60aeed699de";
+
+const APPLE_PRICES: { match: RegExp; avito: number; skupka: number; model: string }[] = [
+  { match: /iphone\s*16\s*pro\s*max/i, avito: 135000, skupka: 115000, model: "iPhone 16 Pro Max" },
+  { match: /iphone\s*16\s*pro/i, avito: 105000, skupka: 89000, model: "iPhone 16 Pro" },
+  { match: /iphone\s*16\s*plus/i, avito: 85000, skupka: 72000, model: "iPhone 16 Plus" },
+  { match: /iphone\s*16/i, avito: 75000, skupka: 64000, model: "iPhone 16" },
+  { match: /iphone\s*15\s*pro\s*max/i, avito: 105000, skupka: 89000, model: "iPhone 15 Pro Max" },
+  { match: /iphone\s*15\s*pro/i, avito: 80000, skupka: 68000, model: "iPhone 15 Pro" },
+  { match: /iphone\s*15\s*plus/i, avito: 65000, skupka: 55000, model: "iPhone 15 Plus" },
+  { match: /iphone\s*15/i, avito: 55000, skupka: 47000, model: "iPhone 15" },
+  { match: /iphone\s*14\s*pro\s*max/i, avito: 75000, skupka: 64000, model: "iPhone 14 Pro Max" },
+  { match: /iphone\s*14\s*pro/i, avito: 60000, skupka: 51000, model: "iPhone 14 Pro" },
+  { match: /iphone\s*14\s*plus/i, avito: 48000, skupka: 41000, model: "iPhone 14 Plus" },
+  { match: /iphone\s*14/i, avito: 40000, skupka: 34000, model: "iPhone 14" },
+  { match: /iphone\s*13\s*pro\s*max/i, avito: 55000, skupka: 47000, model: "iPhone 13 Pro Max" },
+  { match: /iphone\s*13\s*pro/i, avito: 45000, skupka: 38000, model: "iPhone 13 Pro" },
+  { match: /iphone\s*13/i, avito: 32000, skupka: 27000, model: "iPhone 13" },
+  { match: /iphone\s*12/i, avito: 25000, skupka: 21000, model: "iPhone 12" },
+  { match: /iphone\s*11/i, avito: 18000, skupka: 15000, model: "iPhone 11" },
+  { match: /macbook\s*pro/i, avito: 110000, skupka: 90000, model: "MacBook Pro" },
+  { match: /macbook\s*air\s*m3/i, avito: 95000, skupka: 80000, model: "MacBook Air M3" },
+  { match: /macbook\s*air\s*m2/i, avito: 75000, skupka: 63000, model: "MacBook Air M2" },
+  { match: /macbook\s*air/i, avito: 55000, skupka: 46000, model: "MacBook Air" },
+  { match: /ipad\s*pro/i, avito: 60000, skupka: 50000, model: "iPad Pro" },
+  { match: /ipad\s*air/i, avito: 40000, skupka: 33000, model: "iPad Air" },
+  { match: /ipad/i, avito: 25000, skupka: 21000, model: "iPad" },
+  { match: /airpods\s*pro\s*2/i, avito: 18000, skupka: 14000, model: "AirPods Pro 2" },
+  { match: /airpods\s*pro/i, avito: 12000, skupka: 9000, model: "AirPods Pro" },
+  { match: /airpods\s*max/i, avito: 35000, skupka: 28000, model: "AirPods Max" },
+  { match: /airpods/i, avito: 8000, skupka: 6000, model: "AirPods" },
+  { match: /apple\s*watch\s*ultra/i, avito: 65000, skupka: 54000, model: "Apple Watch Ultra" },
+  { match: /apple\s*watch/i, avito: 25000, skupka: 20000, model: "Apple Watch" },
+];
+
+const estimateApplePrice = (q: string): PriceResult => {
+  const found = APPLE_PRICES.find(p => p.match.test(q));
+  if (found) {
+    return { model: found.model, avito_avg: found.avito, skupka_price: found.skupka };
+  }
+  return { model: q.trim(), avito_avg: null, skupka_price: null, unknown: true };
+};
 
 const POPULAR = [
   "iPhone 16 Pro", "iPhone 15 Pro", "iPhone 14 Pro",
@@ -44,20 +84,9 @@ const useAppleWidget = () => {
     setError(null);
     setResult(null);
     setSent(false);
-    try {
-      const res = await fetch(AVITO_PRICE_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: searchQuery }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Ошибка");
-      setResult(data);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Ошибка");
-    } finally {
-      setLoading(false);
-    }
+    await new Promise(r => setTimeout(r, 250));
+    setResult(estimateApplePrice(searchQuery));
+    setLoading(false);
   };
 
   const handleSell = async () => {
