@@ -89,6 +89,57 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, token]);
 
+  // автоподстановка ОЗУ/Память в название и описание
+  useEffect(() => {
+    if (!ramGb && !storageGb) return;
+    const ram = ramGb ? String(ramGb).trim() : "";
+    const stor = storageGb ? String(storageGb).trim() : "";
+    const memStr = ram && stor ? `${ram}/${stor}` : (stor || ram);
+    if (!memStr) return;
+
+    // Название: заменяем существующий "X/Y" или дописываем
+    if (title.trim()) {
+      const reFull = /(\d{1,3})\s*\/\s*(\d{2,4})\s*(GB|ГБ|gb|гб)?/;
+      const reTail = /\s+(\d{2,4})\s*(GB|ГБ|gb|гб)?\s*$/;
+      let next = title;
+      if (reFull.test(next)) {
+        next = next.replace(reFull, memStr);
+      } else if (ram && stor && reTail.test(next)) {
+        next = next.replace(reTail, ` ${memStr}`);
+      } else if (!next.includes(memStr)) {
+        next = `${next.trim()} ${memStr}`;
+      }
+      if (next !== title) setTitle(next);
+    }
+
+    // Краткое описание: подставляем/обновляем X/Y GB
+    setSpecsShort(prev => {
+      if (!ram || !stor) return prev;
+      const target = `${ram}/${stor}GB`;
+      const re = /(\d{1,3})\s*\/\s*(\d{2,4})\s*(GB|ГБ)?/i;
+      if (!prev || !prev.trim()) return target;
+      if (re.test(prev)) {
+        const upd = prev.replace(re, target);
+        return upd === prev ? prev : upd;
+      }
+      return prev.includes(target) ? prev : `${prev.trim()} • ${target}`;
+    });
+
+    // Полное описание: то же самое
+    setSpecs(prev => {
+      if (!ram || !stor) return prev;
+      const target = `${ram}/${stor}GB`;
+      const re = /(\d{1,3})\s*\/\s*(\d{2,4})\s*(GB|ГБ)?/i;
+      if (!prev || !prev.trim()) return prev;
+      if (re.test(prev)) {
+        const upd = prev.replace(re, target);
+        return upd === prev ? prev : upd;
+      }
+      return prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ramGb, storageGb]);
+
   // поиск клиента
   useEffect(() => {
     if (!clientQuery.trim() || clientQuery.trim().length < 2) { setClientResults([]); return; }
