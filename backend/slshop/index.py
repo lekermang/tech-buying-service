@@ -1158,6 +1158,75 @@ def update_item(body, employee=None):
     return _ok({'id': row[0]})
 
 
+def items_recognize_storage(body, employee):
+    """Массовое распознавание ОЗУ/Памяти из текстового поля storage у товаров.
+    Парсит '4/128', '4/128GB', '128GB', '128' и заполняет ram_gb/storage_gb там, где они NULL.
+    Возвращает количество обновлённых записей и примеры.
+    """
+    if not employee:
+        return _err(401, 'Не авторизован')
+    only_phones = bool(body.get('only_phones', True))
+    dry_run = bool(body.get('dry_run', False))
+    conn = get_conn(); cur = conn.cursor()
+    where_phone = ""
+    if only_phones:
+        where_phone = (
+            f" AND (c.slug IN ('mob_phones','techno_spark') "
+            f"OR LOWER(c.name) LIKE '%телефон%' OR LOWER(c.name) LIKE '%смартфон%' "
+            f"OR LOWER(i.title) LIKE '%iphone%' OR LOWER(i.title) LIKE '%phone%')"
+        )
+    cur.execute(
+        f"""
+        SELECT i.id, i.title, i.storage
+        FROM {SCHEMA}.slshop_items i
+        LEFT JOIN {SCHEMA}.slshop_categories c ON c.id = i.category_id
+        WHERE i.storage IS NOT NULL AND i.storage <> ''
+          AND (i.ram_gb IS NULL OR i.storage_gb IS NULL)
+          {where_phone}
+        ORDER BY i.id DESC
+        LIMIT 5000
+        """
+    )
+    rows = cur.fetchall()
+    updated = 0
+    samples = []
+    for iid, title, storage in rows:
+        s = str(storage or '')
+        m = re.search(r'(\d{1,3})\s*/\s*(\d{2,4})', s)
+        ram = int(m.group(1)) if m else None
+        st = int(m.group(2)) if m else None
+        if not st:
+            m2 = re.search(r'(\d{2,4})', s)
+            if m2:
+                st = int(m2.group(1))
+        if not ram and not st:
+            continue
+        if dry_run:
+            updated += 1
+            if len(samples) < 10:
+                samples.append({'id': iid, 'title': title, 'storage': s, 'ram_gb': ram, 'storage_gb': st})
+            continue
+        sets = []
+        if ram:
+            sets.append(f"ram_gb=COALESCE(ram_gb, {ram})")
+        if st:
+            sets.append(f"storage_gb=COALESCE(storage_gb, {st})")
+        if not sets:
+            continue
+        cur.execute(
+            f"UPDATE {SCHEMA}.slshop_items SET {', '.join(sets)}, updated_at=NOW() "
+            f"WHERE id={int(iid)} AND (ram_gb IS NULL OR storage_gb IS NULL)"
+        )
+        if cur.rowcount > 0:
+            updated += 1
+            if len(samples) < 10:
+                samples.append({'id': iid, 'title': title, 'storage': s, 'ram_gb': ram, 'storage_gb': st})
+    if not dry_run:
+        conn.commit()
+    cur.close(); conn.close()
+    return _ok({'updated': updated, 'scanned': len(rows), 'dry_run': dry_run, 'samples': samples})
+
+
 def remove_item(body, employee):
     """Удаление товара. Проданный — только владелец."""
     if not employee:
@@ -1884,6 +1953,8 @@ def handler(event: dict, context) -> dict:
             return update_item(body, employee)
         if action == 'item_remove' and method == 'POST':
             return remove_item(body, employee)
+        if action == 'items_recognize_storage' and method == 'POST':
+            return items_recognize_storage(body, employee)
         if action == 'item_sell' and method == 'POST':
             return sell_item(body, employee)
         if action == 'item_return' and method == 'POST':

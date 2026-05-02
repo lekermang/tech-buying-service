@@ -31,6 +31,11 @@ export default function SLItemsList({ token, empName: _empName, isOwner = false 
   const [aiStatus, setAiStatus] = useState<{ total: number; empty: number; short: number } | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiMsg, setAiMsg] = useState<string | null>(null);
+  const [recogBusy, setRecogBusy] = useState(false);
+  const [recogMsg, setRecogMsg] = useState<string | null>(null);
+  const needRecogCount = allItems.filter(i =>
+    i.storage && (!i.ram_gb || !i.storage_gb)
+  ).length;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -120,6 +125,24 @@ export default function SLItemsList({ token, empName: _empName, isOwner = false 
     }
   };
 
+  const recognizeStorage = async () => {
+    if (recogBusy) return;
+    if (!confirm("Распознать ОЗУ и Память для всех старых товаров из текстового поля? Будут заполнены только пустые значения, существующие не меняются.")) return;
+    setRecogBusy(true);
+    setRecogMsg("Распознаю...");
+    const r = await slApi<{ updated: number; scanned: number; samples: { title: string; storage: string; ram_gb: number | null; storage_gb: number | null }[] }>(
+      token, "items_recognize_storage", { method: "POST", body: { only_phones: true } }
+    );
+    setRecogBusy(false);
+    if (r.ok && r.data) {
+      setRecogMsg(`Готово: распознано ${r.data.updated} из ${r.data.scanned} проверенных`);
+      load();
+    } else {
+      setRecogMsg(r.error || "Ошибка");
+    }
+    setTimeout(() => setRecogMsg(null), 6000);
+  };
+
   const toggleSelect = (id: number) => {
     setSelected(prev => {
       const n = new Set(prev);
@@ -176,6 +199,27 @@ export default function SLItemsList({ token, empName: _empName, isOwner = false 
         onSelectAll={selectAll}
         onClearSelection={clearSelection}
       />
+
+      {needRecogCount > 0 && (
+        <div className="mb-2 bg-gradient-to-br from-blue-500/10 to-transparent border border-blue-500/30 rounded-lg p-2.5 flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <div className="text-blue-300 text-sm font-bold flex items-center gap-1">
+              <Icon name="ScanLine" size={13} />
+              Распознать ОЗУ / Память
+            </div>
+            <div className="text-[10px] text-white/50 mt-0.5 truncate">
+              У {needRecogCount} товаров не заполнены ОЗУ или Память — распознать из текста
+            </div>
+            {recogMsg && <div className="text-[10px] text-emerald-300 mt-0.5">{recogMsg}</div>}
+          </div>
+          <button onClick={recognizeStorage} disabled={recogBusy}
+            className="shrink-0 bg-blue-500 text-white font-bold text-xs px-3 py-2 rounded-lg disabled:opacity-50 flex items-center gap-1">
+            {recogBusy
+              ? <><Icon name="Loader" size={12} className="animate-spin" />Обработка...</>
+              : <><Icon name="Wand2" size={12} />Распознать ({needRecogCount})</>}
+          </button>
+        </div>
+      )}
 
       {aiStatus && (aiStatus.empty > 0 || aiStatus.short > 0) && (
         <div className="mb-2 bg-gradient-to-br from-[#FFD700]/10 to-transparent border border-[#FFD700]/30 rounded-lg p-2.5 flex items-center justify-between gap-2">
