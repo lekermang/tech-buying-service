@@ -1,5 +1,5 @@
 
-import { Suspense, lazy, useEffect } from "react";
+import { Suspense, lazy, useEffect, type ComponentType } from "react";
 import { getSavedThemeId, saveAndApplyTheme, applyTheme } from "@/lib/theme";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -7,17 +7,42 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
-const Index = lazy(() => import("./pages/Index"));
-const Admin = lazy(() => import("./pages/Admin"));
-const Cabinet = lazy(() => import("./pages/Cabinet"));
-const Staff = lazy(() => import("./pages/Staff"));
-const Catalog = lazy(() => import("./pages/Catalog"));
-const Tools = lazy(() => import("./pages/Tools"));
-const ToolsSync = lazy(() => import("./pages/ToolsSync"));
-const NotFound = lazy(() => import("./pages/NotFound"));
-const RepairDiscount = lazy(() => import("./pages/RepairDiscount"));
-const Requisites = lazy(() => import("./pages/Requisites"));
-const Act = lazy(() => import("./pages/Act"));
+/**
+ * Безопасный lazy-импорт: если после деплоя браузер запросил старый chunk,
+ * который больше не существует ("Importing a module script failed" / "Failed to fetch dynamically imported module"),
+ * мы один раз сбрасываем кэш Service Worker и перезагружаем страницу.
+ */
+const RELOAD_KEY = "__chunk_reload__";
+const safeLazy = <T extends ComponentType<unknown>>(factory: () => Promise<{ default: T }>) =>
+  lazy(() =>
+    factory().catch((err: unknown) => {
+      const msg = String((err as Error)?.message || err);
+      const isChunkErr = /Importing a module script failed|Failed to fetch dynamically imported module|Loading chunk|ChunkLoadError/i.test(msg);
+      if (isChunkErr && !sessionStorage.getItem(RELOAD_KEY)) {
+        sessionStorage.setItem(RELOAD_KEY, "1");
+        if ("serviceWorker" in navigator) {
+          navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())).catch(() => { /* ignore */ });
+        }
+        if ("caches" in window) {
+          caches.keys().then(keys => keys.forEach(k => caches.delete(k))).catch(() => { /* ignore */ });
+        }
+        setTimeout(() => window.location.reload(), 100);
+      }
+      throw err;
+    })
+  );
+
+const Index = safeLazy(() => import("./pages/Index"));
+const Admin = safeLazy(() => import("./pages/Admin"));
+const Cabinet = safeLazy(() => import("./pages/Cabinet"));
+const Staff = safeLazy(() => import("./pages/Staff"));
+const Catalog = safeLazy(() => import("./pages/Catalog"));
+const Tools = safeLazy(() => import("./pages/Tools"));
+const ToolsSync = safeLazy(() => import("./pages/ToolsSync"));
+const NotFound = safeLazy(() => import("./pages/NotFound"));
+const RepairDiscount = safeLazy(() => import("./pages/RepairDiscount"));
+const Requisites = safeLazy(() => import("./pages/Requisites"));
+const Act = safeLazy(() => import("./pages/Act"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -40,6 +65,7 @@ const fetchWithTimeout = (url: string, ms: number) => {
 
 const App = () => {
   useEffect(() => {
+    sessionStorage.removeItem(RELOAD_KEY);
     saveAndApplyTheme(getSavedThemeId());
     const idle = (cb: () => void) => {
       const w = window as unknown as { requestIdleCallback?: (cb: () => void) => void };

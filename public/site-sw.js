@@ -1,4 +1,4 @@
-const CACHE = 'site-v1';
+const CACHE = 'site-v3';
 const PRECACHE = ['/'];
 
 self.addEventListener('install', e => {
@@ -39,7 +39,21 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  if (['script', 'style', 'font', 'image'].includes(request.destination)) {
+  // JS/CSS — ВСЕГДА network-first: иначе после деплоя ломаются lazy-чанки.
+  if (['script', 'style'].includes(request.destination)) {
+    e.respondWith(
+      fetch(request)
+        .then(r => {
+          if (r.ok) caches.open(CACHE).then(c => c.put(request, r.clone()));
+          return r;
+        })
+        .catch(() => caches.match(request))
+    );
+    return;
+  }
+
+  // Шрифты и картинки — cache-first ок (они стабильнее).
+  if (['font', 'image'].includes(request.destination)) {
     e.respondWith(
       caches.match(request).then(cached => {
         const fetchPromise = fetch(request).then(r => {
