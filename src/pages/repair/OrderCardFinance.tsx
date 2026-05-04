@@ -16,10 +16,17 @@ type Props = {
 
 export default function OrderCardFinance({ orderId, ef, onEditFormChange }: Props) {
   return (
-    <div className="bg-gradient-to-br from-[#141414] to-[#0A0A0A] border border-[#1F1F1F] rounded-lg p-3 space-y-2.5">
-      <div className="font-oswald font-bold text-[#FFD700]/70 text-[10px] uppercase tracking-widest flex items-center gap-1.5">
-        <Icon name="Wallet" size={11} />
-        Финансы заказа
+    <div className="relative bg-gradient-to-br from-[#1A1A1A] via-[#141414] to-[#0E0E0E] border border-[#FFD700]/20 rounded-xl p-3 space-y-2.5 shadow-[0_4px_18px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,215,0,0.05)] overflow-hidden">
+      <span aria-hidden className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#FFD700]/55 to-transparent pointer-events-none" />
+      <span aria-hidden className="absolute -top-10 -left-10 w-28 h-28 rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(255,215,0,0.10)" }} />
+      <div className="relative font-oswald font-bold text-[10px] uppercase tracking-widest flex items-center gap-1.5">
+        <span className="relative inline-flex">
+          <span className="absolute inset-0 rounded-full bg-[#FFD700]/30 blur-sm" />
+          <Icon name="Wallet" size={12} className="relative text-[#FFD700] drop-shadow-[0_0_4px_rgba(255,215,0,0.7)]" />
+        </span>
+        <span className="bg-gradient-to-r from-[#FFD700] via-[#fff3a0] to-[#FFD700] bg-clip-text text-transparent animate-shimmer">
+          Финансы заказа
+        </span>
       </div>
 
       <div>
@@ -65,27 +72,28 @@ export default function OrderCardFinance({ orderId, ef, onEditFormChange }: Prop
         const master = Math.max(0, Math.round(profit * 0.5));
         const clean = profit - master;
         return (
-          <div className="bg-gradient-to-r from-[#FFD700]/10 via-green-500/5 to-transparent border border-[#FFD700]/20 rounded-md px-3 py-2.5 animate-in fade-in duration-300">
-            <div className="font-roboto text-[9px] text-white/40 uppercase tracking-wide mb-1.5 flex items-center gap-1">
-              <Icon name="Calculator" size={10} className="text-[#FFD700]/60" />
+          <div className="relative bg-gradient-to-r from-[#FFD700]/15 via-emerald-500/8 to-transparent border border-[#FFD700]/30 rounded-lg px-3 py-2.5 animate-in fade-in duration-300 shadow-[0_2px_12px_rgba(255,215,0,0.15)] overflow-hidden">
+            <span aria-hidden className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#FFD700]/55 to-transparent" />
+            <div className="relative font-roboto text-[9px] text-[#FFD700]/80 uppercase tracking-[0.08em] font-bold mb-1.5 flex items-center gap-1">
+              <Icon name="Calculator" size={10} className="text-[#FFD700] drop-shadow-[0_0_3px_rgba(255,215,0,0.6)]" />
               Расчёт прибыли
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="relative grid grid-cols-3 gap-2">
               <div>
-                <div className="font-roboto text-[9px] text-white/40">Прибыль</div>
-                <div className={`font-oswald font-bold text-sm tabular-nums ${profit >= 0 ? "text-[#FFD700]" : "text-red-400"}`}>
+                <div className="font-roboto text-[9px] text-white/50 uppercase tracking-wider">Прибыль</div>
+                <div className={`font-oswald font-bold text-base tabular-nums ${profit >= 0 ? "text-[#FFD700] drop-shadow-[0_0_4px_rgba(255,215,0,0.4)]" : "text-red-400"}`}>
                   {profit.toLocaleString("ru-RU")} ₽
                 </div>
               </div>
               <div>
-                <div className="font-roboto text-[9px] text-blue-400/70">Мастер 50%</div>
-                <div className="font-oswald font-bold text-sm text-blue-400 tabular-nums">
+                <div className="font-roboto text-[9px] text-blue-400/80 uppercase tracking-wider">Мастер 50%</div>
+                <div className="font-oswald font-bold text-base text-blue-300 tabular-nums drop-shadow-[0_0_4px_rgba(59,130,246,0.35)]">
                   {master.toLocaleString("ru-RU")} ₽
                 </div>
               </div>
               <div>
-                <div className="font-roboto text-[9px] text-green-400/70">Чистая</div>
-                <div className={`font-oswald font-bold text-sm tabular-nums ${clean >= 0 ? "text-green-400" : "text-red-400"}`}>
+                <div className="font-roboto text-[9px] text-emerald-400/80 uppercase tracking-wider">Чистая</div>
+                <div className={`font-oswald font-bold text-base tabular-nums ${clean >= 0 ? "text-emerald-300 drop-shadow-[0_0_4px_rgba(16,185,129,0.4)]" : "text-red-400"}`}>
                   {clean.toLocaleString("ru-RU")} ₽
                 </div>
               </div>
@@ -126,13 +134,15 @@ export default function OrderCardFinance({ orderId, ef, onEditFormChange }: Prop
               return (
                 <button key={opt.v} type="button"
                   onClick={() => onEditFormChange(orderId, { ...ef, payment_method: opt.v, is_paid: opt.v !== "" })}
-                  className={`font-roboto text-[11px] py-2 rounded-md transition-all active:scale-95 flex flex-col items-center gap-0.5 ${
+                  title={opt.label}
+                  className={`relative font-roboto text-[11px] py-2 rounded-md transition-all active:scale-95 flex flex-col items-center gap-0.5 overflow-hidden ${
                     active
-                      ? "bg-gradient-to-b from-[#FFD700] to-yellow-500 text-black font-bold shadow-md shadow-[#FFD700]/20"
-                      : `${opt.color} border border-[#1F1F1F] text-white/60 hover:text-white hover:border-[#333]`
+                      ? "bg-gradient-to-b from-[#FFE34D] via-[#FFD700] to-[#d4a017] text-black font-bold shadow-[0_3px_12px_rgba(255,215,0,0.45),inset_0_1px_0_rgba(255,255,255,0.55)]"
+                      : `${opt.color} border border-[#1F1F1F] text-white/65 hover:text-white hover:border-[#FFD700]/30 hover:shadow-[0_0_10px_rgba(255,215,0,0.15)]`
                   }`}>
-                  <span className="text-sm leading-none">{opt.emoji}</span>
-                  <span className="leading-none text-[10px]">{opt.label}</span>
+                  {active && <span aria-hidden className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/35 to-transparent rounded-t-md pointer-events-none" />}
+                  <span className="relative text-sm leading-none">{opt.emoji}</span>
+                  <span className="relative leading-none text-[10px]">{opt.label}</span>
                 </button>
               );
             })}

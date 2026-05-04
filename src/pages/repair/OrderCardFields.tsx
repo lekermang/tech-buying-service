@@ -22,12 +22,13 @@ export default function OrderCardFields({ o, ef, saving, saveError, onEditFormCh
   return (
     <>
       {/* Поля заявки — премиум блок */}
-      <div className="bg-gradient-to-br from-[#141414] to-[#0A0A0A] border border-[#1F1F1F] rounded-lg p-3 space-y-2.5">
-        <div className="font-oswald font-bold text-white/50 text-[10px] uppercase tracking-widest flex items-center gap-1.5">
-          <Icon name="FileEdit" size={11} />
-          Данные заявки
+      <div className="relative bg-gradient-to-br from-[#1A1A1A] via-[#141414] to-[#0E0E0E] border border-[#1F1F1F] rounded-xl p-3 space-y-2.5 shadow-[0_4px_18px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,215,0,0.04)] overflow-hidden">
+        <span aria-hidden className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#FFD700]/30 to-transparent pointer-events-none" />
+        <div className="relative font-oswald font-bold text-[10px] uppercase tracking-widest flex items-center gap-1.5">
+          <Icon name="FileEdit" size={12} className="text-[#FFD700] drop-shadow-[0_0_4px_rgba(255,215,0,0.5)]" />
+          <span className="text-[#FFD700]/85">Данные заявки</span>
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="relative grid grid-cols-2 gap-2">
           {[
             { key: "name", label: "Имя", ph: "Иван", icon: "User", value: ef.name, set: (v: string) => onEditFormChange(o.id, { ...ef, name: v }) },
             { key: "phone", label: "Телефон", ph: "+7...", icon: "Phone", type: "tel", value: ef.phone, set: (v: string) => onEditFormChange(o.id, { ...ef, phone: formatPhone(v) }) },
@@ -36,35 +37,43 @@ export default function OrderCardFields({ o, ef, saving, saveError, onEditFormCh
           ].map(f => (
             <div key={f.key}>
               <label className={LBL + " flex items-center gap-1"}>
-                <Icon name={f.icon} size={9} className="opacity-50" />{f.label}
+                <Icon name={f.icon} size={9} className="text-[#FFD700]/70" />{f.label}
               </label>
               <input type={f.type || "text"} value={f.value}
                 onChange={e => f.set(e.target.value)}
                 placeholder={f.ph}
-                className="w-full bg-[#0A0A0A] border border-[#1F1F1F] text-white px-3 py-2 font-roboto text-xs rounded-md focus:outline-none focus:border-[#FFD700]/50 placeholder:text-white/20 transition-colors" />
+                className="w-full bg-gradient-to-br from-[#0E0E0E] to-[#0A0A0A] border border-[#1F1F1F] hover:border-[#262626] focus:border-[#FFD700]/60 focus:bg-[#101010] focus:shadow-[0_0_0_3px_rgba(255,215,0,0.08)] text-white px-3 py-2 font-roboto text-xs rounded-md focus:outline-none placeholder:text-white/25 transition-all" />
             </div>
           ))}
         </div>
-        <div>
+        <div className="relative">
           <label className={LBL + " flex items-center gap-1"}>
-            <Icon name="StickyNote" size={9} className="opacity-50" />Заметка
+            <Icon name="StickyNote" size={9} className="text-[#FFD700]/70" />Заметка
           </label>
           <textarea value={ef.admin_note}
             onChange={e => onEditFormChange(o.id, { ...ef, admin_note: e.target.value })}
             rows={2} placeholder="Внутренняя заметка..."
-            className="w-full bg-[#0A0A0A] border border-[#1F1F1F] text-white px-3 py-2 font-roboto text-xs rounded-md focus:outline-none focus:border-[#FFD700]/50 placeholder:text-white/20 resize-none transition-colors" />
+            className="w-full bg-gradient-to-br from-[#0E0E0E] to-[#0A0A0A] border border-[#1F1F1F] hover:border-[#262626] focus:border-[#FFD700]/60 focus:bg-[#101010] focus:shadow-[0_0_0_3px_rgba(255,215,0,0.08)] text-white px-3 py-2 font-roboto text-xs rounded-md focus:outline-none placeholder:text-white/25 resize-none transition-all" />
         </div>
       </div>
 
       {saveError && (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-md px-3 py-2 flex items-center gap-1.5 text-red-400 font-roboto text-xs">
-          <Icon name="AlertCircle" size={12} />{saveError}
+        <div className="relative bg-gradient-to-r from-red-500/15 to-red-500/5 border border-red-500/40 rounded-md px-3 py-2 flex items-center gap-1.5 text-red-300 font-roboto text-xs shadow-[0_0_12px_rgba(239,68,68,0.2)]">
+          <span className="relative">
+            <span className="absolute inset-0 rounded-full bg-red-400/40 blur-sm animate-pulse" />
+            <Icon name="AlertCircle" size={12} className="relative" />
+          </span>
+          {saveError}
         </div>
       )}
 
-      {/* Кнопка сохранить */}
-      <button onClick={() => onSaveCard(o)} disabled={saving}
-        className="w-full bg-gradient-to-b from-[#FFD700] to-yellow-500 text-black font-oswald font-bold py-3 uppercase text-sm rounded-md shadow-lg shadow-[#FFD700]/20 hover:shadow-[#FFD700]/40 active:scale-[0.98] transition-all disabled:opacity-40 flex items-center justify-center gap-2">
+      {/* Кнопка сохранить — премиум */}
+      <button
+        onClick={() => onSaveCard(o)}
+        disabled={saving}
+        title="Сохранить изменения в заявке"
+        className="w-full btn-gold-premium !py-3 disabled:opacity-40 disabled:cursor-not-allowed"
+      >
         <Icon name={saving ? "Loader" : "Save"} size={15} className={saving ? "animate-spin" : ""} />
         {saving ? "Сохраняю..." : "Сохранить изменения"}
       </button>
