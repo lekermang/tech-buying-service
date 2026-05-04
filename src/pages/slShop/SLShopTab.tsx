@@ -19,7 +19,7 @@ import SLAnalytics from "./SLAnalytics";
 import SLBookkeeping from "./SLBookkeeping";
 import C14dTab from "./c14d/C14dTab";
 import { slApi, can, type SLMyPermissions } from "./types";
-import { SLTabs } from "./slUI";
+import { SLTabsGrid } from "./slUI";
 
 type SubTab =
   | "dashboard"
@@ -116,10 +116,10 @@ export default function SLShopTab({ token, myRole }: { token: string; myRole?: s
         </div>
       </div>
 
-      {/* Подвкладки — премиум сегмент с подсказками */}
+      {/* Подвкладки — премиум сетка-плитки с подсказками */}
       <div className="mb-2">
-        <SLTabs
-          items={visibleTabs.map(t => ({ v: t.k, l: t.l, icon: t.icon, featured: t.featured, tooltip: t.tip ? `${t.l} — ${t.tip}` : t.l }))}
+        <SLTabsGrid
+          items={visibleTabs.map(t => ({ v: t.k, l: t.l, icon: t.icon, featured: t.featured, tooltip: t.tip }))}
           value={tab}
           onChange={(v) => setTab(v as SubTab)}
         />
