@@ -81,23 +81,22 @@ export default function SLShopTab({ token, myRole }: { token: string; myRole?: s
   });
 
   return (
-    <div className="p-3">
-      {/* Шапка раздела */}
-      <div className="rounded-xl bg-gradient-to-br from-[#FFD700]/10 via-[#FFD700]/5 to-transparent border border-[#FFD700]/20 p-3 mb-3 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#FFD700] to-yellow-600 flex items-center justify-center shadow-lg shadow-[#FFD700]/20">
-          <Icon name="Gem" size={20} className="text-black" />
+    <div className="p-2 sm:p-2.5">
+      {/* Премиум-шапка — компактная */}
+      <div className="rounded-xl bg-gradient-to-br from-[#FFD700]/10 via-[#FFD700]/3 to-transparent border border-[#FFD700]/20 px-2.5 py-2 mb-2 flex items-center gap-2 shadow-[0_0_24px_rgba(255,215,0,0.05)]">
+        <div className="w-7 h-7 rounded-md bg-gradient-to-br from-[#FFD700] to-[#b8860b] flex items-center justify-center shrink-0 shadow-[0_2px_8px_rgba(255,215,0,0.3)]">
+          <Icon name="Gem" size={14} className="text-black" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="font-oswald font-bold uppercase text-base leading-tight">СмартЛомбард</div>
-          <div className="text-[11px] text-white/50 truncate">
-            {perms?.name ? `${perms.name} · ` : ""}
-            Скупка и продажа Б/У техники, антиквариата и прочих товаров
+          <div className="font-oswald font-bold uppercase text-[13px] tracking-wide leading-tight">СмартЛомбард</div>
+          <div className="text-[10px] text-white/45 truncate leading-tight">
+            {perms?.name ? `${perms.name} · ` : ""}Б/У техника, антиквариат и др.
           </div>
         </div>
       </div>
 
-      {/* Подвкладки */}
-      <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-2 mb-3">
+      {/* Подвкладки — компактнее */}
+      <div className="flex gap-1 overflow-x-auto no-scrollbar pb-1.5 mb-2 -mx-1 px-1">
         {visibleTabs.map(t => {
           const active = tab === t.k;
           const isFeatured = t.featured && !active;
@@ -105,20 +104,20 @@ export default function SLShopTab({ token, myRole }: { token: string; myRole?: s
             <button
               key={t.k}
               onClick={() => setTab(t.k)}
-              className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wide transition-all active:scale-95 ${
+              className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-[0.06em] transition-all active:scale-[0.97] ${
                 active
-                  ? "bg-[#FFD700] text-black shadow-md shadow-[#FFD700]/20"
+                  ? "bg-[#FFD700] text-black shadow-[0_2px_8px_rgba(255,215,0,0.25)]"
                   : isFeatured
-                    ? "bg-gradient-to-br from-[#FFD700]/20 via-[#FFD700]/10 to-transparent border border-[#FFD700]/50 text-[#FFD700] hover:bg-[#FFD700]/20 shadow-[0_0_14px_rgba(255,215,0,0.25)]"
-                    : "bg-[#141414] border border-[#1F1F1F] text-white/60 hover:text-white hover:border-[#333]"
+                    ? "bg-gradient-to-br from-[#FFD700]/20 via-[#FFD700]/10 to-transparent border border-[#FFD700]/50 text-[#FFD700] hover:bg-[#FFD700]/20 shadow-[0_0_12px_rgba(255,215,0,0.2)]"
+                    : "bg-[#101010] border border-[#1A1A1A] text-white/55 hover:text-white hover:border-[#2A2A2A]"
               }`}
             >
-              <Icon name={t.icon} size={13} />
+              <Icon name={t.icon} size={11} />
               {t.l}
               {isFeatured && (
-                <span className="relative inline-flex h-1.5 w-1.5 ml-0.5">
+                <span className="relative inline-flex h-1 w-1 ml-0.5">
                   <span className="absolute inline-flex h-full w-full rounded-full bg-[#FFD700] opacity-75 animate-ping" />
-                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#FFD700]" />
+                  <span className="relative inline-flex rounded-full h-1 w-1 bg-[#FFD700]" />
                 </span>
               )}
             </button>
