@@ -84,6 +84,8 @@ const useAppleWidget = () => {
     setError(null);
     setResult(null);
     setSent(false);
+    // Цель: пользователь искал модель в Apple-виджете
+    ymGoal(Goals.APPLE_SEARCH, { query: searchQuery.slice(0, 60) });
     await new Promise(r => setTimeout(r, 250));
     setResult(estimateApplePrice(searchQuery));
     setLoading(false);
@@ -104,7 +106,11 @@ const useAppleWidget = () => {
         }),
       });
       setSent(true);
-      ymGoal(Goals.FORM_SUCCESS, { source: "apple_widget" });
+      // Главная цель: успешная заявка через Apple-виджет ★
+      ymGoal(Goals.APPLE_SUBMIT, {
+        model: result?.model,
+        price: result?.skupka_price ?? null,
+      });
     } finally {
       setSending(false);
     }

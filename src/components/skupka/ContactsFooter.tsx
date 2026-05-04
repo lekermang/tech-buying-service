@@ -123,7 +123,7 @@ const ContactsFooter = ({ scrollTo }: ContactsFooterProps) => {
             </a>
 
             <a href="https://wa.me/79929990333" target="_blank" rel="noopener noreferrer"
-              onClick={() => ymGoal(Goals.TELEGRAM_CLICK, { place: "footer_wa" })}
+              onClick={() => ymGoal(Goals.WHATSAPP_CLICK, { place: "footer" })}
               className="group relative overflow-hidden flex items-center gap-3 bg-gradient-to-br from-[#25D366]/15 to-[#25D366]/5 border border-[#25D366]/40 hover:border-[#25D366] rounded-md px-4 py-4 transition-all">
               <div className="absolute -inset-1 bg-gradient-to-br from-[#25D366]/20 to-transparent blur-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
               <div className="relative w-11 h-11 rounded-full bg-[#25D366] flex items-center justify-center shrink-0 shadow-[0_4px_14px_rgba(37,211,102,0.4)]">

@@ -57,13 +57,13 @@ const ExitPopup = ({ onOpenEval }: ExitPopupProps) => {
 
   const show = () => {
     setVisible(true);
-    ymGoal("exit_popup_show");
+    ymGoal(Goals.EXIT_POPUP_SHOW);
     localStorage.setItem(STORAGE_KEY, String(Date.now()));
   };
 
   const close = () => {
     setVisible(false);
-    ymGoal("exit_popup_close");
+    ymGoal(Goals.EXIT_POPUP_CLOSE);
   };
 
   const handleEval = () => {
@@ -85,7 +85,8 @@ const ExitPopup = ({ onOpenEval }: ExitPopupProps) => {
       });
       if (!res.ok) throw new Error();
       setSent(true);
-      ymGoal(Goals.FORM_SUCCESS, { place: "exit_popup" });
+      // Главная цель: пользователь оставил номер в поп-апе ★
+      ymGoal(Goals.EXIT_POPUP_SUBMIT);
     } catch {
       setError("Не удалось отправить. Позвоните нам.");
     } finally {

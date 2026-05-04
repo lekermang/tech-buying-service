@@ -18,6 +18,12 @@ export function useRepairSubmit() {
   const submit = async ({ form, selectedPart, extraWorks, extraWorksList, grandTotal }: SubmitParams) => {
     if (!form.name || !form.phone || !form.model || !form.fault) return;
     setSending(true);
+    // Цель: попытка отправки заявки на ремонт (микроконверсия)
+    ymGoal(Goals.REPAIR_SUBMIT, {
+      model: form.model,
+      has_part: !!selectedPart,
+      total: selectedPart ? grandTotal : null,
+    });
     const extraLabels = extraWorksList.filter(w => extraWorks.includes(String(w.id))).map(w => w.label);
     const staticExtraLabels = STATIC_EXTRAS.filter(w => extraWorks.includes(w.id)).map(w => w.label);
     const staticExtraTotal = STATIC_EXTRAS.filter(w => extraWorks.includes(w.id)).reduce((s, w) => s + w.price, 0);
@@ -49,7 +55,12 @@ export function useRepairSubmit() {
       const data = await res.json();
       if (data.order_id) {
         setOrderId(data.order_id);
-        ymGoal(Goals.FORM_SUCCESS, { source: "repair_widget" });
+        // Главная цель: успешная заявка на ремонт (макроконверсия) ★
+        ymGoal(Goals.REPAIR_SUCCESS, {
+          order_id: data.order_id,
+          model: form.model,
+          total: selectedPart ? grandTotal : null,
+        });
       }
     } catch (_e) { /* ignore */ }
     setSending(false);
