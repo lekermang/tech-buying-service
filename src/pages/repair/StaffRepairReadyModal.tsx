@@ -15,17 +15,31 @@ type Props = {
 
 export default function StaffRepairReadyModal({ order, form, error, saving, onFormChange, onSubmit, onClose }: Props) {
   return (
-    <div className="fixed inset-0 z-[200] bg-black/80 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-[#1A1A1A] border border-[#FFD700]/40 w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center gap-2 mb-4">
-          <div className="w-1 h-7 bg-[#FFD700]" />
-          <div>
-            <div className="font-oswald font-bold text-base uppercase">Перевод в «Готово»</div>
-            <div className="font-roboto text-white/40 text-xs">#{order.id} · {order.name}</div>
-          </div>
-        </div>
+    <div className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={onClose}>
+      {/* Внешний золотой HALO */}
+      <div className="relative w-full max-w-sm" onClick={e => e.stopPropagation()}>
+        <span aria-hidden className="absolute -inset-3 rounded-3xl pointer-events-none" style={{ background: "radial-gradient(closest-side,rgba(255,215,0,0.30),transparent 75%)", filter: "blur(20px)" }} />
+        {/* Conic-gradient рамка */}
+        <div className="relative p-[1.5px] rounded-2xl bg-[conic-gradient(from_180deg_at_50%_50%,rgba(255,215,0,0.7)_0deg,rgba(255,215,0,0.15)_180deg,rgba(255,243,160,0.7)_360deg)] shadow-[0_12px_40px_rgba(255,215,0,0.25)]">
+          <div className="relative bg-gradient-to-br from-[#1A1A1A] via-[#141414] to-[#0E0E0E] p-5 rounded-2xl overflow-hidden">
+            <div className="absolute -top-16 -left-16 w-40 h-40 rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(255,215,0,0.10)" }} />
+            <div className="absolute -bottom-16 -right-16 w-40 h-40 rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(255,215,0,0.06)" }} />
+            <span aria-hidden className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#FFD700]/60 to-transparent" />
 
-        <div className="space-y-3">
+            <div className="relative flex items-center gap-3 mb-4">
+              {/* Conic-медальон */}
+              <div className="relative w-10 h-10 rounded-full p-[1.5px] bg-[conic-gradient(from_0deg,#b8860b,#ffd700,#fff3a0,#ffd700,#b8860b)] shadow-[0_0_18px_rgba(255,215,0,0.5)] shrink-0">
+                <div className="w-full h-full rounded-full bg-gradient-to-br from-[#1A1A1A] to-[#0A0A0A] flex items-center justify-center">
+                  <Icon name="CheckCircle2" size={16} className="text-[#FFD700] drop-shadow-[0_0_5px_rgba(255,215,0,0.8)]" />
+                </div>
+              </div>
+              <div>
+                <div className="font-oswald font-bold text-base uppercase bg-gradient-to-r from-[#FFD700] via-[#fff3a0] to-[#FFD700] bg-clip-text text-transparent animate-shimmer">Перевод в «Готово»</div>
+                <div className="font-roboto text-white/55 text-xs">#{order.id} · {order.name}</div>
+              </div>
+            </div>
+
+        <div className="relative space-y-3">
           <div>
             <label className={LBL + " text-orange-400/80"}>🛒 Купленная запчасть</label>
             <input value={form.parts_name}
@@ -55,13 +69,14 @@ export default function StaffRepairReadyModal({ order, form, error, saving, onFo
           </div>
 
           {form.repair_amount && form.purchase_amount && (
-            <div className="bg-green-500/10 border border-green-500/20 p-3 font-roboto text-sm text-center">
-              <div className="text-white/40 text-[10px] mb-0.5">Доход мастера (50% от прибыли)</div>
-              <div className="text-green-400 font-bold text-xl">
+            <div className="relative bg-gradient-to-r from-emerald-500/15 via-[#FFD700]/8 to-transparent border border-emerald-500/40 rounded-lg p-3 font-roboto text-sm text-center shadow-[0_0_18px_rgba(16,185,129,0.20)] overflow-hidden">
+              <span aria-hidden className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-400/60 to-transparent" />
+              <div className="relative text-white/55 text-[10px] uppercase tracking-wider font-bold mb-0.5">Доход мастера (50% от прибыли)</div>
+              <div className="relative text-emerald-300 font-oswald font-bold text-2xl drop-shadow-[0_0_6px_rgba(16,185,129,0.5)]">
                 {Math.max(0, Math.round((parseInt(form.repair_amount) - parseInt(form.purchase_amount)) * 0.5)).toLocaleString("ru-RU")} ₽
               </div>
-              <div className="text-white/30 text-[10px] mt-0.5">
-                прибыль: {(parseInt(form.repair_amount) - parseInt(form.purchase_amount)).toLocaleString("ru-RU")} ₽
+              <div className="relative text-[#FFD700]/70 text-[10px] mt-0.5">
+                прибыль: <span className="font-bold">{(parseInt(form.repair_amount) - parseInt(form.purchase_amount)).toLocaleString("ru-RU")} ₽</span>
               </div>
             </div>
           )}
@@ -73,18 +88,25 @@ export default function StaffRepairReadyModal({ order, form, error, saving, onFo
               rows={2} placeholder="Внутренняя заметка..." className={INP + " resize-none"} />
           </div>
 
-          {error && <div className="text-red-400 font-roboto text-xs">{error}</div>}
+          {error && (
+            <div className="relative bg-gradient-to-r from-red-500/15 to-red-500/5 border border-red-500/40 rounded-md px-3 py-2 flex items-center gap-1.5 text-red-300 font-roboto text-xs shadow-[0_0_12px_rgba(239,68,68,0.2)]">
+              <Icon name="AlertCircle" size={12} />{error}
+            </div>
+          )}
         </div>
 
-        <div className="flex gap-2 mt-4">
+        <div className="relative flex gap-2 mt-4">
           <button onClick={onSubmit} disabled={saving}
-            className="flex-1 bg-[#FFD700] text-black font-oswald font-bold py-2.5 uppercase text-sm hover:bg-yellow-400 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-            <Icon name="Check" size={15} />{saving ? "Сохраняю..." : "Подтвердить"}
+            className="btn-gold-premium flex-1 !py-2.5 disabled:opacity-50 disabled:cursor-not-allowed">
+            <Icon name={saving ? "Loader" : "Check"} size={15} className={saving ? "animate-spin" : ""} />
+            {saving ? "Сохраняю..." : "Подтвердить"}
           </button>
           <button onClick={onClose}
-            className="px-4 text-white/30 font-roboto text-xs hover:text-white transition-colors">
+            className="px-4 py-2.5 rounded-md bg-gradient-to-b from-[#2A2A2A] to-[#1A1A1A] border border-[#333] hover:border-red-500/40 text-white/70 hover:text-red-300 font-roboto text-xs transition-all active:scale-95">
             Отмена
           </button>
+        </div>
+          </div>
         </div>
       </div>
     </div>

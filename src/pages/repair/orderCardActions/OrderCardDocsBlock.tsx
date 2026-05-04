@@ -79,16 +79,14 @@ export default function OrderCardDocsBlock({ o, isOwner, token, authHeader, onDe
           <DropdownMenuTrigger asChild>
             <button
               disabled={actSending}
-              className="group relative flex-1 overflow-hidden font-roboto text-[12px] py-3 px-4 rounded-lg border border-[#FFD700]/40 bg-gradient-to-br from-[#FFD700]/15 via-[#FFD700]/5 to-transparent text-[#FFD700] hover:from-[#FFD700]/25 hover:via-[#FFD700]/10 hover:border-[#FFD700]/60 hover:shadow-lg hover:shadow-[#FFD700]/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 min-h-[48px] font-bold uppercase tracking-wider">
-              {/* блик */}
-              <span className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-t from-white/5 to-transparent" />
+              className="btn-gold-premium flex-1 !py-3 disabled:opacity-50 disabled:cursor-not-allowed">
               <Icon
                 name={actSending ? "Loader" : "FileText"}
                 size={15}
                 className={actSending ? "animate-spin" : ""}
               />
               <span className="relative">{actSending ? "Отправка..." : "Документы"}</span>
-              <Icon name="ChevronDown" size={13} className="relative opacity-60 group-hover:opacity-100 transition-opacity" />
+              <Icon name="ChevronDown" size={13} className="relative opacity-70" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent
@@ -185,14 +183,15 @@ export default function OrderCardDocsBlock({ o, isOwner, token, authHeader, onDe
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Быстрая кнопка «Чек» — частое действие */}
+        {/* Быстрая кнопка «Чек» — премиум */}
         <button
           onClick={() => printReceipt(o)}
-          title="Распечатать чек"
-          className="font-roboto text-[11px] py-3 px-4 rounded-lg border border-emerald-500/25 bg-emerald-500/5 text-emerald-300 hover:bg-emerald-500/15 hover:border-emerald-500/50 hover:shadow-lg hover:shadow-emerald-500/10 active:scale-95 transition-all flex items-center justify-center gap-1.5 min-h-[48px] shrink-0"
+          title="Распечатать чек / квитанцию для клиента"
+          className="relative font-roboto text-[11px] py-3 px-4 rounded-lg border border-emerald-500/40 bg-gradient-to-br from-emerald-500/15 via-emerald-500/5 to-transparent text-emerald-200 hover:from-emerald-500/25 hover:via-emerald-500/10 hover:border-emerald-500/70 hover:shadow-[0_0_18px_rgba(16,185,129,0.35)] active:scale-95 transition-all inline-flex items-center justify-center gap-1.5 min-h-[48px] shrink-0 overflow-hidden group"
         >
-          <Icon name="Receipt" size={14} />
-          <span className="hidden sm:inline font-bold">Чек</span>
+          <span aria-hidden className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-400/60 to-transparent" />
+          <Icon name="Receipt" size={14} className="drop-shadow-[0_0_4px_rgba(16,185,129,0.7)]" />
+          <span className="hidden sm:inline font-bold relative">Чек</span>
         </button>
       </div>
     </div>

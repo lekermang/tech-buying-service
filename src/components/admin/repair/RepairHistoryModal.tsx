@@ -44,29 +44,44 @@ export default function RepairHistoryModal({ token, onClose }: { token: string; 
   }, [token]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70" onClick={onClose}>
-      <div className="bg-[#111] border border-[#2A2A2A] w-full max-w-lg max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/85 backdrop-blur-md animate-in fade-in duration-200" onClick={onClose}>
+      <div className="relative w-full max-w-lg max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <span aria-hidden className="absolute -inset-2 rounded-2xl pointer-events-none hidden sm:block" style={{ background: "radial-gradient(closest-side,rgba(255,215,0,0.20),transparent 75%)", filter: "blur(18px)" }} />
+        <div className="relative p-[1.5px] sm:rounded-2xl bg-[conic-gradient(from_180deg_at_50%_50%,rgba(255,215,0,0.6)_0deg,rgba(255,215,0,0.15)_180deg,rgba(255,243,160,0.6)_360deg)] shadow-[0_12px_40px_rgba(255,215,0,0.20)] flex flex-col min-h-0 max-h-full">
+        <div className="bg-gradient-to-br from-[#1A1A1A] via-[#0F0F0F] to-[#0A0A0A] sm:rounded-2xl flex-1 flex flex-col min-h-0 overflow-hidden">
+
         {/* Шапка */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[#222]">
+        <div className="relative flex items-center justify-between px-4 py-3 border-b border-[#FFD700]/15">
+          <span aria-hidden className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#FFD700]/55 to-transparent pointer-events-none" />
           <div className="flex items-center gap-2">
-            <Icon name="History" size={15} className="text-[#FFD700]" />
-            <span className="font-oswald font-bold text-white text-sm uppercase tracking-wide">Последние действия</span>
+            <div className="relative w-7 h-7 rounded-full p-[1.5px] bg-[conic-gradient(from_0deg,#b8860b,#ffd700,#fff3a0,#ffd700,#b8860b)] shadow-[0_0_12px_rgba(255,215,0,0.4)] shrink-0">
+              <div className="w-full h-full rounded-full bg-gradient-to-br from-[#1A1A1A] to-[#0A0A0A] flex items-center justify-center">
+                <Icon name="History" size={12} className="text-[#FFD700] drop-shadow-[0_0_4px_rgba(255,215,0,0.7)]" />
+              </div>
+            </div>
+            <span className="font-oswald font-bold text-sm uppercase tracking-wide bg-gradient-to-r from-[#FFD700] via-[#fff3a0] to-[#FFD700] bg-clip-text text-transparent animate-shimmer">Последние действия</span>
           </div>
-          <button onClick={onClose} className="text-white/30 hover:text-white transition-colors p-1">
+          <button onClick={onClose} title="Закрыть" className="text-white/50 hover:text-red-300 hover:bg-red-500/10 rounded-md transition-colors p-1.5 active:scale-95">
             <Icon name="X" size={16} />
           </button>
         </div>
 
         {/* Список */}
-        <div className="overflow-y-auto flex-1">
+        <div className="overflow-y-auto flex-1 min-h-0">
           {loading && (
-            <div className="flex items-center justify-center py-12 text-white/30">
-              <Icon name="Loader" size={18} className="animate-spin mr-2" />
-              <span className="font-roboto text-sm">Загружаю...</span>
+            <div className="flex flex-col items-center justify-center py-12 text-white/40">
+              <div className="relative">
+                <span className="absolute inset-0 rounded-full bg-[#FFD700]/30 blur-md animate-pulse" />
+                <Icon name="Loader" size={22} className="relative animate-spin text-[#FFD700] drop-shadow-[0_0_8px_rgba(255,215,0,0.7)]" />
+              </div>
+              <span className="font-roboto text-sm mt-2">Загружаю историю…</span>
             </div>
           )}
           {!loading && history.length === 0 && (
-            <div className="text-center py-12 text-white/30 font-roboto text-sm">Действий пока нет</div>
+            <div className="text-center py-12 text-white/40 font-roboto text-sm">
+              <Icon name="Inbox" size={28} className="mx-auto mb-2 text-[#FFD700]/40" />
+              Действий пока нет
+            </div>
           )}
           {!loading && history.map((h) => (
             <div key={h.id} className="px-4 py-3 border-b border-[#1A1A1A] hover:bg-white/[0.02]">
@@ -95,6 +110,8 @@ export default function RepairHistoryModal({ token, onClose }: { token: string; 
               )}
             </div>
           ))}
+        </div>
+        </div>
         </div>
       </div>
     </div>

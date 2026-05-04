@@ -111,70 +111,85 @@ export default function StatusOrdersModal({ token, period, statuses, title, acce
   };
 
   return (
-    <div className="fixed inset-0 z-[200] bg-black/80 flex items-end sm:items-center justify-center" onClick={onClose}>
+    <div className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-md flex items-end sm:items-center justify-center animate-in fade-in duration-200" onClick={onClose}>
       <div
-        className="bg-[#0F0F0F] border border-[#2A2A2A] w-full sm:max-w-2xl max-h-[90vh] sm:max-h-[85vh] flex flex-col"
+        className="relative w-full sm:max-w-2xl max-h-[90vh] sm:max-h-[85vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* HALO + conic-gradient рамка */}
+        <span aria-hidden className="absolute -inset-2 rounded-2xl pointer-events-none hidden sm:block" style={{ background: "radial-gradient(closest-side,rgba(255,215,0,0.20),transparent 75%)", filter: "blur(18px)" }} />
+        <div className="relative p-[1.5px] sm:rounded-2xl bg-[conic-gradient(from_180deg_at_50%_50%,rgba(255,215,0,0.6)_0deg,rgba(255,215,0,0.15)_180deg,rgba(255,243,160,0.6)_360deg)] shadow-[0_12px_40px_rgba(255,215,0,0.20)] flex flex-col min-h-0 max-h-full">
+        <div className="bg-gradient-to-br from-[#1A1A1A] via-[#0F0F0F] to-[#0A0A0A] sm:rounded-2xl flex-1 flex flex-col min-h-0 overflow-hidden">
+
         {/* Шапка */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[#2A2A2A] shrink-0 gap-2">
-          <div className="min-w-0">
-            <div className="font-oswald font-bold text-white text-base truncate">{title}</div>
-            <div className="font-roboto text-white/40 text-[10px] mt-0.5">
-              {periodLabel(period)} · {orders.length} {orders.length === 1 ? "заказ" : "заказов"}
+        <div className="relative flex items-center justify-between px-4 py-3 border-b border-[#FFD700]/15 shrink-0 gap-2">
+          <span aria-hidden className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#FFD700]/55 to-transparent pointer-events-none" />
+          <div className="min-w-0 flex items-center gap-2">
+            <div className="relative w-8 h-8 rounded-full p-[1.5px] bg-[conic-gradient(from_0deg,#b8860b,#ffd700,#fff3a0,#ffd700,#b8860b)] shadow-[0_0_12px_rgba(255,215,0,0.4)] shrink-0">
+              <div className="w-full h-full rounded-full bg-gradient-to-br from-[#1A1A1A] to-[#0A0A0A] flex items-center justify-center">
+                <Icon name="ListOrdered" size={14} className="text-[#FFD700] drop-shadow-[0_0_4px_rgba(255,215,0,0.7)]" />
+              </div>
+            </div>
+            <div>
+              <div className="font-oswald font-bold text-base truncate bg-gradient-to-r from-[#FFD700] via-[#fff3a0] to-[#FFD700] bg-clip-text text-transparent animate-shimmer">{title}</div>
+              <div className="font-roboto text-white/55 text-[10px] mt-0.5">
+                {periodLabel(period)} · {orders.length} {orders.length === 1 ? "заказ" : "заказов"}
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
               onClick={exportCsv}
               disabled={!orders.length || exporting}
-              className="flex items-center gap-1 text-[#FFD700] hover:bg-[#FFD700]/10 disabled:opacity-30 disabled:hover:bg-transparent px-2 py-1.5 font-roboto text-[11px] border border-[#FFD700]/30 transition-colors"
               title="Выгрузить в Excel"
+              className="relative inline-flex items-center gap-1 text-[#FFD700] bg-gradient-to-br from-[#FFD700]/15 to-transparent border border-[#FFD700]/40 hover:border-[#FFD700]/70 hover:shadow-[0_0_14px_rgba(255,215,0,0.30)] disabled:opacity-30 disabled:hover:shadow-none px-2.5 py-1.5 font-roboto text-[11px] rounded-md transition-all active:scale-95"
             >
               <Icon name={exporting ? "Loader" : "Download"} size={12} className={exporting ? "animate-spin" : ""} />
-              Excel
+              <span className="font-bold">Excel</span>
             </button>
-            <button onClick={onClose} className="text-white/40 hover:text-white p-1">
+            <button onClick={onClose}
+              title="Закрыть"
+              className="text-white/50 hover:text-red-300 hover:bg-red-500/10 p-1.5 rounded-md transition-colors active:scale-95">
               <Icon name="X" size={20} />
             </button>
           </div>
         </div>
 
-        {/* Итого */}
+        {/* Итого — премиум-карточки */}
         {!loading && orders.length > 0 && (
-          <div className="grid grid-cols-4 gap-2 px-4 py-3 border-b border-[#2A2A2A] bg-[#151515] shrink-0">
-            <div>
-              <div className="font-roboto text-white/30 text-[9px] uppercase">Выручка</div>
-              <div className={`font-oswald font-bold text-sm ${accent === "revenue" ? "text-[#FFD700]" : "text-white/80"}`}>
-                {money(totals.revenue)}
-              </div>
-            </div>
-            <div>
-              <div className="font-roboto text-white/30 text-[9px] uppercase">Закупка</div>
-              <div className={`font-oswald font-bold text-sm ${accent === "costs" ? "text-orange-400" : "text-white/80"}`}>
-                {money(totals.costs)}
-              </div>
-            </div>
-            <div>
-              <div className="font-roboto text-white/30 text-[9px] uppercase">Мастеру</div>
-              <div className={`font-oswald font-bold text-sm ${accent === "master" ? "text-blue-400" : "text-white/80"}`}>
-                {money(totals.master)}
-              </div>
-            </div>
-            <div>
-              <div className="font-roboto text-white/30 text-[9px] uppercase">Прибыль</div>
-              <div className={`font-oswald font-bold text-sm ${profit >= 0 ? "text-green-400" : "text-red-400"}`}>
-                {money(profit - totals.master)}
-              </div>
-            </div>
+          <div className="grid grid-cols-4 gap-2 px-4 py-3 border-b border-[#FFD700]/10 shrink-0 bg-black/20">
+            {[
+              { label: "Выручка", val: money(totals.revenue), col: "revenue", accentCol: "text-[#FFD700] drop-shadow-[0_0_4px_rgba(255,215,0,0.4)]" },
+              { label: "Закупка", val: money(totals.costs), col: "costs", accentCol: "text-orange-300 drop-shadow-[0_0_4px_rgba(251,146,60,0.4)]" },
+              { label: "Мастеру", val: money(totals.master), col: "master", accentCol: "text-blue-300 drop-shadow-[0_0_4px_rgba(59,130,246,0.4)]" },
+              { label: "Прибыль", val: money(profit - totals.master), col: "profit", accentCol: profit - totals.master >= 0 ? "text-emerald-300 drop-shadow-[0_0_4px_rgba(16,185,129,0.4)]" : "text-red-400" },
+            ].map((c) => {
+              const isAccent = accent === c.col || (c.col === "profit");
+              return (
+                <div key={c.label} className="relative bg-gradient-to-br from-[#141414] to-[#0A0A0A] border border-[#1F1F1F] rounded-md px-2 py-1.5 overflow-hidden">
+                  {isAccent && <span aria-hidden className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-current/30 to-transparent" />}
+                  <div className="font-roboto text-white/40 text-[9px] uppercase tracking-wider">{c.label}</div>
+                  <div className={`font-oswald font-bold text-sm ${isAccent ? c.accentCol : "text-white/80"}`}>{c.val}</div>
+                </div>
+              );
+            })}
           </div>
         )}
 
         {/* Список */}
-        <div className="flex-1 overflow-y-auto">
-          {loading && <div className="text-center py-12 text-white/30 font-roboto text-sm">Загружаю...</div>}
+        <div className="flex-1 overflow-y-auto min-h-0">
+          {loading && (
+            <div className="text-center py-12">
+              <div className="relative inline-block">
+                <span className="absolute inset-0 rounded-full bg-[#FFD700]/30 blur-md animate-pulse" />
+                <Icon name="Loader" size={22} className="relative animate-spin text-[#FFD700] drop-shadow-[0_0_8px_rgba(255,215,0,0.7)]" />
+              </div>
+              <div className="font-roboto text-white/40 text-sm mt-2">Загружаю заказы…</div>
+            </div>
+          )}
           {!loading && orders.length === 0 && (
-            <div className="text-center py-12 text-white/30 font-roboto text-sm">
+            <div className="text-center py-12 text-white/40 font-roboto text-sm">
+              <Icon name="Inbox" size={32} className="mx-auto mb-2 text-[#FFD700]/40" />
               Нет заказов {periodLabel(period)}
             </div>
           )}
@@ -247,6 +262,8 @@ export default function StatusOrdersModal({ token, period, statuses, title, acce
                 </div>
               );
             })}
+        </div>
+        </div>
         </div>
       </div>
     </div>

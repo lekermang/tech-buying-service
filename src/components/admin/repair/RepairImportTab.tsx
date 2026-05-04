@@ -151,41 +151,52 @@ export default function RepairImportTab({ token }: Props) {
   return (
     <div className="flex-1 overflow-y-auto px-4 py-5 space-y-5 max-w-xl">
       <div>
-        <p className="font-roboto text-white/50 text-xs mb-3">
+        <div className="font-oswald font-bold text-base uppercase mb-1 bg-gradient-to-r from-[#FFD700] via-[#fff3a0] to-[#FFD700] bg-clip-text text-transparent animate-shimmer flex items-center gap-1.5">
+          <Icon name="FileUp" size={14} className="text-[#FFD700] drop-shadow-[0_0_4px_rgba(255,215,0,0.5)]" />
+          Импорт прайса
+        </div>
+        <p className="font-roboto text-white/55 text-xs mb-3">
           Загрузи прайс-лист поставщика в формате .xlsx или .xls (до {MAX_MB} МБ). Большие файлы автоматически загружаются через облако. Система определит колонки с названием, ценой, остатком и качеством.
         </p>
-        <label className="flex flex-col items-center justify-center border-2 border-dashed border-[#333] hover:border-[#FFD700]/50 transition-colors cursor-pointer py-8 px-4 text-center">
-          <Icon name="FileUp" size={28} className="text-white/20 mb-2" />
-          <span className="font-roboto text-white/50 text-xs">
-            {importFile ? `${importFile.name} · ${(importFile.size / 1024 / 1024).toFixed(2)} МБ` : 'Нажми или перетащи файл Excel (.xlsx)'}
+        <label className="relative flex flex-col items-center justify-center border-2 border-dashed border-[#FFD700]/30 hover:border-[#FFD700]/70 hover:bg-[#FFD700]/[0.03] transition-all cursor-pointer py-10 px-4 text-center rounded-xl bg-gradient-to-br from-[#141414] via-[#0E0E0E] to-[#0A0A0A] hover:shadow-[0_0_24px_rgba(255,215,0,0.15)] group overflow-hidden">
+          <span aria-hidden className="absolute -top-12 -left-12 w-32 h-32 rounded-full blur-3xl pointer-events-none opacity-50 group-hover:opacity-100 transition" style={{ background: "rgba(255,215,0,0.10)" }} />
+          <span aria-hidden className="absolute -bottom-12 -right-12 w-32 h-32 rounded-full blur-3xl pointer-events-none opacity-50 group-hover:opacity-100 transition" style={{ background: "rgba(255,215,0,0.06)" }} />
+          <div className="relative w-14 h-14 rounded-full p-[1.5px] mb-3 bg-[conic-gradient(from_0deg,#b8860b,#ffd700,#fff3a0,#ffd700,#b8860b)] shadow-[0_0_18px_rgba(255,215,0,0.4)]">
+            <div className="w-full h-full rounded-full bg-gradient-to-br from-[#1A1A1A] to-[#0A0A0A] flex items-center justify-center">
+              <Icon name="FileUp" size={24} className="text-[#FFD700] drop-shadow-[0_0_5px_rgba(255,215,0,0.7)] group-hover:scale-110 transition-transform" />
+            </div>
+          </div>
+          <span className="relative font-roboto text-white/70 text-xs">
+            {importFile ? <span className="text-[#FFD700] font-bold">{importFile.name} · {(importFile.size / 1024 / 1024).toFixed(2)} МБ</span> : 'Нажми или перетащи файл Excel (.xlsx)'}
           </span>
           <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImportFileChange} />
         </label>
       </div>
 
       {importPreview && (
-        <div className="border border-[#222] p-3 space-y-3">
-          <p className="font-roboto text-xs text-white/60">
-            Найдено строк с товаром: <span className="text-[#FFD700] font-bold">{importPreview.parts_found}</span>
+        <div className="relative bg-gradient-to-br from-[#1A1A1A] via-[#141414] to-[#0E0E0E] border border-[#FFD700]/25 rounded-xl p-3 space-y-3 shadow-[0_4px_18px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,215,0,0.05)] overflow-hidden">
+          <span aria-hidden className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#FFD700]/55 to-transparent" />
+          <p className="relative font-roboto text-xs text-white/70">
+            Найдено строк с товаром: <span className="text-[#FFD700] font-oswald font-bold text-base drop-shadow-[0_0_4px_rgba(255,215,0,0.4)]">{importPreview.parts_found}</span>
           </p>
           {importPreview.sample.length > 0 && (
-            <div className="overflow-x-auto">
+            <div className="relative overflow-x-auto rounded-md border border-[#1F1F1F]">
               <table className="w-full text-[10px] font-roboto">
                 <thead>
-                  <tr className="text-white/30 border-b border-[#222]">
-                    <th className="text-left py-1 pr-3">Название</th>
-                    <th className="text-left py-1 pr-3">Категория</th>
-                    <th className="text-right py-1 pr-3">Цена</th>
-                    <th className="text-left py-1">Качество</th>
+                  <tr className="text-[#FFD700]/70 border-b border-[#FFD700]/15 bg-black/30 uppercase tracking-wider">
+                    <th className="text-left py-1.5 px-2 font-bold">Название</th>
+                    <th className="text-left py-1.5 px-2 font-bold">Категория</th>
+                    <th className="text-right py-1.5 px-2 font-bold">Цена</th>
+                    <th className="text-left py-1.5 px-2 font-bold">Качество</th>
                   </tr>
                 </thead>
                 <tbody>
                   {importPreview.sample.map((p, i) => (
-                    <tr key={i} className="border-b border-[#111] text-white/70">
-                      <td className="py-1 pr-3 max-w-[180px] truncate">{p.name}</td>
-                      <td className="py-1 pr-3 text-white/40">{p.category || '—'}</td>
-                      <td className="py-1 pr-3 text-right">{p.price} ₽</td>
-                      <td className="py-1">{p.quality}</td>
+                    <tr key={i} className="border-b border-[#1A1A1A] last:border-0 text-white/75 hover:bg-[#FFD700]/[0.04] transition-colors">
+                      <td className="py-1.5 px-2 max-w-[180px] truncate">{p.name}</td>
+                      <td className="py-1.5 px-2 text-white/45">{p.category || '—'}</td>
+                      <td className="py-1.5 px-2 text-right text-[#FFD700] font-bold tabular-nums">{p.price} ₽</td>
+                      <td className="py-1.5 px-2">{p.quality}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -195,7 +206,8 @@ export default function RepairImportTab({ token }: Props) {
           <button
             onClick={handleImport}
             disabled={importing}
-            className="flex items-center gap-2 bg-[#FFD700] text-black font-oswald font-bold px-5 py-2 text-xs uppercase hover:bg-yellow-400 transition-colors disabled:opacity-50"
+            title="Загрузить позиции в базу данных"
+            className="btn-gold-premium !py-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Icon name={importing ? "Loader" : "Upload"} size={13} className={importing ? "animate-spin" : ""} />
             {importing ? "Загружаю..." : `Загрузить ${importPreview.parts_found} позиций`}
@@ -204,9 +216,14 @@ export default function RepairImportTab({ token }: Props) {
       )}
 
       {importResult && (
-        <p className={`font-roboto text-xs ${importResult.startsWith('Ошибка') ? 'text-red-400' : 'text-green-400'}`}>
-          {importResult}
-        </p>
+        <div className={`relative font-roboto text-xs flex items-start gap-2 px-3 py-2 rounded-md border ${
+          importResult.startsWith('Ошибка')
+            ? 'bg-gradient-to-r from-red-500/15 to-red-500/5 border-red-500/40 text-red-300 shadow-[0_0_12px_rgba(239,68,68,0.20)]'
+            : 'bg-gradient-to-r from-emerald-500/15 to-emerald-500/5 border-emerald-500/40 text-emerald-200 shadow-[0_0_12px_rgba(16,185,129,0.20)]'
+        }`}>
+          <Icon name={importResult.startsWith('Ошибка') ? 'AlertCircle' : 'CheckCircle2'} size={13} className="shrink-0 mt-0.5" />
+          <span>{importResult}</span>
+        </div>
       )}
     </div>
   );
