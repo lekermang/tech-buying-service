@@ -1,0 +1,24 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS CORS",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Auth required",
+      "method": "GET",
+      "path": "/?action=list",
+      "expectedStatus": 401,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Calculate without auth",
+      "method": "GET",
+      "path": "/?action=calculate&amount=25000&days=14&rate=4",
+      "expectedStatus": 401
+    }
+  ]
+}

@@ -17,6 +17,7 @@ import SLDocuments from "./SLDocuments";
 import SLJournal from "./SLJournal";
 import SLAnalytics from "./SLAnalytics";
 import SLBookkeeping from "./SLBookkeeping";
+import C14dTab from "./c14d/C14dTab";
 import { slApi, can, type SLMyPermissions } from "./types";
 
 type SubTab =
@@ -35,13 +36,15 @@ type SubTab =
   | "import"
   | "categories"
   | "documents"
+  | "contracts14d"
   | "roles";
 
-type TabDef = { k: SubTab; l: string; icon: string; perm?: string; ownerOnly?: boolean };
+type TabDef = { k: SubTab; l: string; icon: string; perm?: string; ownerOnly?: boolean; featured?: boolean };
 
 const ALL_TABS: TabDef[] = [
   { k: "dashboard", l: "Сводка", icon: "LayoutDashboard" },
   { k: "buy", l: "Скупка", icon: "Plus", perm: "shop_buy" },
+  { k: "contracts14d", l: "Договор продажи 14 дней", icon: "Handshake", featured: true },
   { k: "stock", l: "Склад", icon: "Package", perm: "shop_view" },
   { k: "cash", l: "Касса", icon: "Wallet", perm: "cashflow_view" },
   { k: "operations", l: "Операции", icon: "Activity", perm: "shop_view" },
@@ -97,6 +100,7 @@ export default function SLShopTab({ token, myRole }: { token: string; myRole?: s
       <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-2 mb-3">
         {visibleTabs.map(t => {
           const active = tab === t.k;
+          const isFeatured = t.featured && !active;
           return (
             <button
               key={t.k}
@@ -104,11 +108,19 @@ export default function SLShopTab({ token, myRole }: { token: string; myRole?: s
               className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wide transition-all active:scale-95 ${
                 active
                   ? "bg-[#FFD700] text-black shadow-md shadow-[#FFD700]/20"
-                  : "bg-[#141414] border border-[#1F1F1F] text-white/60 hover:text-white hover:border-[#333]"
+                  : isFeatured
+                    ? "bg-gradient-to-br from-[#FFD700]/20 via-[#FFD700]/10 to-transparent border border-[#FFD700]/50 text-[#FFD700] hover:bg-[#FFD700]/20 shadow-[0_0_14px_rgba(255,215,0,0.25)]"
+                    : "bg-[#141414] border border-[#1F1F1F] text-white/60 hover:text-white hover:border-[#333]"
               }`}
             >
               <Icon name={t.icon} size={13} />
               {t.l}
+              {isFeatured && (
+                <span className="relative inline-flex h-1.5 w-1.5 ml-0.5">
+                  <span className="absolute inline-flex h-full w-full rounded-full bg-[#FFD700] opacity-75 animate-ping" />
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#FFD700]" />
+                </span>
+              )}
             </button>
           );
         })}
@@ -129,6 +141,7 @@ export default function SLShopTab({ token, myRole }: { token: string; myRole?: s
       {tab === "bookkeeping"&& <SLBookkeeping token={token} />}
       {tab === "import"     && <SLImportExport token={token} />}
       {tab === "documents"  && <SLDocuments token={token} isOwner={isOwner} />}
+      {tab === "contracts14d" && <C14dTab token={token} />}
       {tab === "categories" && <SLCategories token={token} />}
       {tab === "roles"      && <SLRoles token={token} isOwner={isOwner} />}
     </div>

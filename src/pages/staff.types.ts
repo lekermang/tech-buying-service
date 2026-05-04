@@ -3,6 +3,7 @@ export const GOODS_URL = "https://functions.poehali.dev/de4c1e8e-0c7b-4f25-a3fd-
 export const SALES_URL = "https://functions.poehali.dev/1610b50a-9d00-450f-a2ca-6311f04eafe7";
 export const AUTH_CLIENT_URL = "https://functions.poehali.dev/58edd0bc-cce3-4ece-acca-a003e2260758";
 export const SLSHOP_URL = "https://functions.poehali.dev/538a5bbf-3062-45fa-a438-c5ecdb11965e";
+export const SL_C14D_URL = "https://functions.poehali.dev/03ebbc37-291d-4868-9d2a-d24a261399ae";
 
 export type Good = { id: number; title: string; category: string; brand: string; model: string; condition: string; color: string; storage: string; imei: string; sell_price: number; purchase_price: number; status: string; description: string };
 export type Sale = { id: number; type: string; amount: number; payment: string; contract: string; date: string; client: string; phone: string; employee: string };
