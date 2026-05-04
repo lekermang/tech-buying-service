@@ -3,42 +3,11 @@ import Icon from "@/components/ui/icon";
 import { EMPLOYEE_AUTH_URL } from "./staff.types";
 import { useStaffToast } from "./staff/StaffToast";
 import useDebouncedValue from "@/hooks/useDebouncedValue";
-
-type Employee = {
-  id: number;
-  full_name: string;
-  login: string;
-  role: string;
-  is_active: boolean;
-  created_at: string;
-  position?: string | null;
-  email?: string | null;
-  phone?: string | null;
-  note?: string | null;
-};
-
-const ROLE_LABELS: Record<string, string> = { owner: "Владелец", admin: "Администратор", staff: "Сотрудник", master: "Мастер" };
-const ROLE_STYLES: Record<string, { badge: string; avatar: string; icon: string; emoji: string }> = {
-  owner: { badge: "bg-gradient-to-r from-[#FFD700] to-yellow-500 text-black", avatar: "from-[#FFD700] to-yellow-600 text-black", icon: "Crown", emoji: "👑" },
-  admin: { badge: "bg-gradient-to-r from-blue-500/30 to-blue-600/20 text-blue-300 border border-blue-400/30", avatar: "from-blue-500 to-blue-700 text-white", icon: "Shield", emoji: "🛡️" },
-  master: { badge: "bg-gradient-to-r from-purple-500/30 to-purple-600/20 text-purple-300 border border-purple-400/30", avatar: "from-purple-500 to-purple-700 text-white", icon: "Wrench", emoji: "🔧" },
-  staff: { badge: "bg-white/10 text-white/70 border border-white/10", avatar: "from-[#333] to-[#1a1a1a] text-white/70", icon: "User", emoji: "👤" },
-};
-
-const POSITION_SUGGESTIONS = ["Приёмщик", "Мастер по ремонту", "Оценщик золота", "Управляющий", "Курьер"];
-
-type FormFields = {
-  full_name: string;
-  login: string;
-  password: string;
-  role: string;
-  position: string;
-  email: string;
-  phone: string;
-  note: string;
-};
-
-const EMPTY_FORM: FormFields = { full_name: "", login: "", password: "", role: "staff", position: "", email: "", phone: "", note: "" };
+import { Employee, FormFields, EMPTY_FORM } from "./employeesTab/employeesTabTypes";
+import EmployeesHeader from "./employeesTab/EmployeesHeader";
+import EmployeesFilters from "./employeesTab/EmployeesFilters";
+import EmployeesAddForm from "./employeesTab/EmployeesAddForm";
+import EmployeeCard from "./employeesTab/EmployeeCard";
 
 export function EmployeesTab({ token, myRole }: { token: string; myRole: string }) {
   const toast = useStaffToast();
@@ -163,163 +132,31 @@ export function EmployeesTab({ token, myRole }: { token: string; myRole: string 
 
   return (
     <div className="p-3 space-y-3">
-      {/* Премиум-шапка со статами */}
-      <div className="relative rounded-xl overflow-hidden">
-        <div className="absolute -inset-1 rounded-xl pointer-events-none opacity-60" style={{ background: "radial-gradient(closest-side,rgba(255,215,0,0.15),transparent 70%)", filter: "blur(14px)" }} />
-        <div className="relative bg-gradient-to-br from-[#1A1A1A] via-[#141414] to-[#0E0E0E] border border-[#FFD700]/25 p-4 rounded-xl shadow-[0_4px_18px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,215,0,0.05)] overflow-hidden">
-          <span aria-hidden className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#FFD700]/55 to-transparent pointer-events-none" />
-          <span aria-hidden className="absolute -top-12 -left-12 w-36 h-36 rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(255,215,0,0.10)" }} />
-          <span aria-hidden className="absolute -bottom-12 -right-12 w-36 h-36 rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(59,130,246,0.06)" }} />
+      <EmployeesHeader
+        total={employees.length}
+        active={active}
+        inactive={inactive}
+        showAdd={showAdd}
+        setShowAdd={setShowAdd}
+      />
 
-          <div className="relative flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
-              {/* Conic-медальон команды */}
-              <div className="relative w-11 h-11 rounded-full p-[1.5px] bg-[conic-gradient(from_0deg,#b8860b,#ffd700,#fff3a0,#ffd700,#b8860b)] shadow-[0_0_16px_rgba(255,215,0,0.4)] shrink-0">
-                <div className="w-full h-full rounded-full bg-gradient-to-br from-[#1A1A1A] to-[#0A0A0A] flex items-center justify-center">
-                  <Icon name="Users" size={17} className="text-[#FFD700] drop-shadow-[0_0_5px_rgba(255,215,0,0.7)]" />
-                </div>
-              </div>
-              <div>
-                <div className="font-oswald font-bold uppercase text-base bg-gradient-to-r from-[#FFD700] via-[#fff3a0] to-[#FFD700] bg-clip-text text-transparent animate-shimmer leading-tight">
-                  Команда
-                </div>
-                <div className="font-oswald font-bold text-white text-2xl tabular-nums leading-tight drop-shadow-[0_0_4px_rgba(255,215,0,0.3)]">
-                  {employees.length}
-                  <span className="font-roboto text-white/40 text-[10px] uppercase tracking-wider ml-1.5">сотрудников</span>
-                </div>
-              </div>
-            </div>
-            <button onClick={() => setShowAdd(v => !v)}
-              title={showAdd ? "Отменить добавление" : "Добавить нового сотрудника"}
-              className={`relative inline-flex items-center gap-1.5 font-oswald font-bold px-3.5 py-2.5 text-xs uppercase rounded-md transition-all active:scale-95 overflow-hidden ${
-                showAdd
-                  ? "bg-gradient-to-b from-[#2A2A2A] to-[#1A1A1A] text-white/70 border border-[#333] hover:border-red-500/40 hover:text-red-300"
-                  : "btn-gold-premium !py-2.5 !px-3.5"
-              }`}>
-              <Icon name={showAdd ? "X" : "UserPlus"} size={14} />
-              {showAdd ? "Отмена" : "Добавить"}
-            </button>
-          </div>
-          <div className="relative flex gap-2 text-[10px] font-roboto flex-wrap">
-            <div className="inline-flex items-center gap-1 bg-emerald-500/15 border border-emerald-500/40 px-2 py-1 rounded-md shadow-[0_0_10px_rgba(16,185,129,0.20)]">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_4px_currentColor]" />
-              <span className="text-emerald-300 font-bold tabular-nums">{active}</span>
-              <span className="text-emerald-400/80 uppercase tracking-wider">активны</span>
-            </div>
-            {inactive > 0 && (
-              <div className="inline-flex items-center gap-1 bg-red-500/15 border border-red-500/40 px-2 py-1 rounded-md shadow-[0_0_10px_rgba(239,68,68,0.18)]">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-400 shadow-[0_0_4px_currentColor]" />
-                <span className="text-red-300 font-bold tabular-nums">{inactive}</span>
-                <span className="text-red-400/80 uppercase tracking-wider">неактивны</span>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      <EmployeesFilters
+        search={search}
+        setSearch={setSearch}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
+        roleFilter={roleFilter}
+        setRoleFilter={setRoleFilter}
+      />
 
-      {/* Поиск + фильтры */}
-      <div className="space-y-2">
-        <div className="relative">
-          <Icon name="Search" size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
-          <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Поиск по ФИО, логину, email, телефону, должности"
-            className="w-full bg-[#0A0A0A] border border-[#1F1F1F] text-white pl-9 pr-3 py-2.5 font-roboto text-sm rounded-md focus:outline-none focus:border-[#FFD700]/50 placeholder:text-white/25" />
-        </div>
-        <div className="flex gap-1.5 flex-wrap">
-          {[
-            { v: "all", l: "Все" },
-            { v: "active", l: "Активные" },
-            { v: "inactive", l: "Неактивные" },
-          ].map(s => {
-            const a = statusFilter === s.v;
-            return (
-              <button key={s.v} onClick={() => setStatusFilter(s.v as "all" | "active" | "inactive")}
-                className={`font-roboto text-[11px] px-3 py-1 rounded-full transition-all active:scale-95 ${
-                  a ? "bg-[#FFD700] text-black font-bold" : "bg-[#141414] border border-[#1F1F1F] text-white/50 hover:text-white"
-                }`}>{s.l}</button>
-            );
-          })}
-          <span className="text-white/15">|</span>
-          {[
-            { v: "all", l: "Все роли" },
-            { v: "owner", l: "👑" },
-            { v: "admin", l: "🛡️" },
-            { v: "master", l: "🔧" },
-            { v: "staff", l: "👤" },
-          ].map(s => {
-            const a = roleFilter === s.v;
-            return (
-              <button key={s.v} onClick={() => setRoleFilter(s.v)}
-                className={`font-roboto text-[11px] px-3 py-1 rounded-full transition-all active:scale-95 ${
-                  a ? "bg-blue-500/30 border border-blue-400 text-blue-200 font-bold" : "bg-[#141414] border border-[#1F1F1F] text-white/50 hover:text-white"
-                }`}>{s.l}</button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Форма добавления */}
       {showAdd && (
-        <div className="bg-gradient-to-br from-[#1A1A1A] to-[#141414] border border-[#FFD700]/30 rounded-lg p-4 shadow-xl shadow-[#FFD700]/5 animate-in slide-in-from-top-2 duration-300">
-          <div className="font-oswald font-bold text-[#FFD700] text-xs uppercase tracking-widest mb-3 flex items-center gap-1.5">
-            <Icon name="UserPlus" size={12} /> Новый сотрудник
-          </div>
-          <div className="space-y-2.5">
-            {[
-              { key: "full_name", label: "ФИО *", placeholder: "Иванов Иван Сергеевич", icon: "User" },
-              { key: "login", label: "Логин *", placeholder: "ivanov", icon: "AtSign" },
-              { key: "password", label: "Пароль *", placeholder: "••••••••", type: "password", icon: "Lock" },
-              { key: "position", label: "Должность", placeholder: "Приёмщик", icon: "Briefcase", list: "positions" },
-              { key: "email", label: "Email", placeholder: "ivanov@mail.ru", icon: "Mail", type: "email" },
-              { key: "phone", label: "Телефон", placeholder: "+7 ...", icon: "Phone", type: "tel" },
-            ].map(f => (
-              <div key={f.key}>
-                <label className="font-roboto text-white/40 text-[10px] block mb-1 uppercase tracking-wide">{f.label}</label>
-                <div className="relative">
-                  <Icon name={f.icon} size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
-                  <input type={f.type || "text"} value={(addForm as unknown as Record<string,string>)[f.key]}
-                    list={f.list}
-                    onChange={e => setAddForm(p => ({ ...p, [f.key]: e.target.value }))}
-                    placeholder={f.placeholder}
-                    className="w-full bg-[#0A0A0A] border border-[#1F1F1F] text-white pl-9 pr-3 py-2.5 font-roboto text-sm rounded-md focus:outline-none focus:border-[#FFD700]/50 focus:bg-[#141414] placeholder:text-white/25 transition-all" />
-                </div>
-              </div>
-            ))}
-            <datalist id="positions">
-              {POSITION_SUGGESTIONS.map(p => <option key={p} value={p} />)}
-            </datalist>
-            <div>
-              <label className="font-roboto text-white/40 text-[10px] block mb-1 uppercase tracking-wide">Заметка</label>
-              <textarea value={addForm.note} onChange={e => setAddForm(p => ({ ...p, note: e.target.value }))}
-                placeholder="Любая внутренняя информация"
-                rows={2}
-                className="w-full bg-[#0A0A0A] border border-[#1F1F1F] text-white px-3 py-2 font-roboto text-sm rounded-md focus:outline-none focus:border-[#FFD700]/50 placeholder:text-white/25 resize-none" />
-            </div>
-            <div>
-              <label className="font-roboto text-white/40 text-[10px] block mb-1 uppercase tracking-wide">Роль</label>
-              <div className="grid grid-cols-3 gap-2">
-                {ROLES_AVAILABLE.map(r => {
-                  const a = addForm.role === r.v;
-                  return (
-                    <button key={r.v} onClick={() => setAddForm(p => ({ ...p, role: r.v }))}
-                      className={`py-2.5 px-2 rounded-md font-roboto text-xs transition-all active:scale-95 flex items-center justify-center gap-1 ${
-                        a
-                          ? "bg-[#FFD700]/15 border border-[#FFD700] text-[#FFD700] font-bold"
-                          : "bg-[#0A0A0A] border border-[#1F1F1F] text-white/50 hover:text-white hover:border-[#333]"
-                      }`}>
-                      <span>{r.emoji}</span><span className="truncate">{r.l}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            <button onClick={createEmployee} disabled={saving}
-              className="w-full bg-gradient-to-b from-[#FFD700] to-yellow-500 text-black font-oswald font-bold py-3 uppercase text-xs rounded-md shadow-md shadow-[#FFD700]/20 hover:shadow-[#FFD700]/40 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-1.5">
-              {saving ? <Icon name="Loader" size={13} className="animate-spin" /> : <Icon name="Check" size={13} />}
-              Создать сотрудника
-            </button>
-          </div>
-        </div>
+        <EmployeesAddForm
+          addForm={addForm}
+          setAddForm={setAddForm}
+          saving={saving}
+          rolesAvailable={ROLES_AVAILABLE}
+          createEmployee={createEmployee}
+        />
       )}
 
       {/* Список сотрудников */}
@@ -330,155 +167,19 @@ export function EmployeesTab({ token, myRole }: { token: string; myRole: string 
         </div>
       ) : (
         <div className="space-y-2">
-          {filtered.map(emp => {
-            const style = ROLE_STYLES[emp.role] || ROLE_STYLES.staff;
-            const initials = emp.full_name.trim().split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase() || "?";
-            const isEditing = editId === emp.id;
-            return (
-              <div key={emp.id}
-                className={`border rounded-lg transition-all overflow-hidden ${
-                  isEditing
-                    ? "bg-gradient-to-br from-[#1A1A1A] to-[#141414] border-[#FFD700]/40 shadow-lg shadow-[#FFD700]/5"
-                    : emp.is_active
-                      ? "bg-[#141414] border-[#1F1F1F] hover:border-[#2A2A2A]"
-                      : "bg-[#0F0F0F] border-[#1A1A1A] opacity-60"
-                }`}>
-                {isEditing ? (
-                  <div className="p-3 space-y-2.5">
-                    <div className="flex items-center gap-2 pb-2 border-b border-[#1F1F1F]">
-                      <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${style.avatar} flex items-center justify-center font-oswald font-bold text-sm`}>
-                        {initials}
-                      </div>
-                      <div>
-                        <div className="font-oswald font-bold text-white text-sm">{emp.full_name}</div>
-                        <div className="font-roboto text-white/40 text-[10px]">@{emp.login}</div>
-                      </div>
-                    </div>
-                    {[
-                      { key: "full_name", label: "ФИО", placeholder: emp.full_name, icon: "User" },
-                      { key: "position", label: "Должность", placeholder: "Приёмщик", icon: "Briefcase", list: "positions" },
-                      { key: "email", label: "Email", placeholder: "ivanov@mail.ru", icon: "Mail", type: "email" },
-                      { key: "phone", label: "Телефон", placeholder: "+7 ...", icon: "Phone", type: "tel" },
-                      { key: "password", label: "Новый пароль (пусто — не менять)", placeholder: "••••••••", type: "password", icon: "Lock" },
-                    ].map(f => (
-                      <div key={f.key}>
-                        <label className="font-roboto text-white/40 text-[10px] block mb-1 uppercase tracking-wide">{f.label}</label>
-                        <div className="relative">
-                          <Icon name={f.icon} size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
-                          <input type={f.type || "text"} value={(editForm as unknown as Record<string,string>)[f.key]}
-                            list={f.list}
-                            onChange={e => setEditForm(p => ({ ...p, [f.key]: e.target.value }))}
-                            placeholder={f.placeholder}
-                            className="w-full bg-[#0A0A0A] border border-[#1F1F1F] text-white pl-9 pr-3 py-2 font-roboto text-sm rounded-md focus:outline-none focus:border-[#FFD700]/50" />
-                        </div>
-                      </div>
-                    ))}
-                    <div>
-                      <label className="font-roboto text-white/40 text-[10px] block mb-1 uppercase tracking-wide">Заметка</label>
-                      <textarea value={editForm.note} onChange={e => setEditForm(p => ({ ...p, note: e.target.value }))}
-                        rows={2} placeholder="Внутренняя заметка"
-                        className="w-full bg-[#0A0A0A] border border-[#1F1F1F] text-white px-3 py-2 font-roboto text-sm rounded-md focus:outline-none focus:border-[#FFD700]/50 placeholder:text-white/25 resize-none" />
-                    </div>
-                    {myRole === "owner" && emp.role !== "owner" && (
-                      <div>
-                        <label className="font-roboto text-white/40 text-[10px] block mb-1 uppercase tracking-wide">Роль</label>
-                        <div className="grid grid-cols-3 gap-2">
-                          {[
-                            { v: "staff", l: "Сотрудник", emoji: "👤" },
-                            { v: "master", l: "Мастер", emoji: "🔧" },
-                            { v: "admin", l: "Администратор", emoji: "🛡️" },
-                          ].map(r => {
-                            const a = editForm.role === r.v;
-                            return (
-                              <button key={r.v} onClick={() => setEditForm(p => ({ ...p, role: r.v }))}
-                                className={`py-2 px-2 rounded-md font-roboto text-xs transition-all active:scale-95 flex items-center justify-center gap-1 ${
-                                  a
-                                    ? "bg-[#FFD700]/15 border border-[#FFD700] text-[#FFD700] font-bold"
-                                    : "bg-[#0A0A0A] border border-[#1F1F1F] text-white/50 hover:text-white"
-                                }`}>
-                                <span>{r.emoji}</span><span className="truncate">{r.l}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                    <div className="flex gap-2 pt-1 flex-wrap">
-                      <button onClick={() => updateEmployee(emp.id, {
-                        full_name: editForm.full_name || undefined,
-                        password: editForm.password || undefined,
-                        role: editForm.role || undefined,
-                        position: editForm.position,
-                        email: editForm.email,
-                        phone: editForm.phone,
-                        note: editForm.note,
-                      })}
-                        className="flex-1 bg-gradient-to-b from-[#FFD700] to-yellow-500 text-black font-oswald font-bold px-3 py-2 uppercase text-xs rounded-md shadow-md shadow-[#FFD700]/20 active:scale-95 transition-all flex items-center justify-center gap-1">
-                        <Icon name="Save" size={12} />Сохранить
-                      </button>
-                      {emp.role !== "owner" && (
-                        <button onClick={() => updateEmployee(emp.id, { is_active: !emp.is_active })}
-                          className={`font-roboto text-xs px-3 py-2 border rounded-md transition-all active:scale-95 flex items-center gap-1 ${
-                            emp.is_active
-                              ? "border-red-400/40 text-red-400 hover:bg-red-400/10"
-                              : "border-green-400/40 text-green-400 hover:bg-green-400/10"
-                          }`}>
-                          <Icon name={emp.is_active ? "UserX" : "UserCheck"} size={12} />
-                          {emp.is_active ? "Деактивировать" : "Активировать"}
-                        </button>
-                      )}
-                      <button onClick={() => setEditId(null)}
-                        className="text-white/40 hover:text-white font-roboto text-xs px-3 py-2 rounded-md border border-[#2A2A2A] transition-colors">
-                        Отмена
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-3 flex items-start gap-3">
-                    <div className={`w-11 h-11 rounded-full bg-gradient-to-br ${style.avatar} flex items-center justify-center font-oswald font-bold text-sm shrink-0 relative`}>
-                      {initials}
-                      {emp.is_active && (
-                        <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 border-2 border-[#141414] rounded-full" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <span className="font-oswald font-bold text-white text-sm uppercase truncate">{emp.full_name}</span>
-                        <span className={`font-roboto text-[9px] px-2 py-0.5 rounded-full shrink-0 ${style.badge}`}>
-                          {style.emoji} {ROLE_LABELS[emp.role] || emp.role}
-                        </span>
-                      </div>
-                      {emp.position && (
-                        <div className="font-roboto text-[11px] text-white/60 mb-0.5 flex items-center gap-1">
-                          <Icon name="Briefcase" size={9} />{emp.position}
-                        </div>
-                      )}
-                      <div className="flex items-center gap-2 font-roboto text-[10px] text-white/40 flex-wrap">
-                        <span className="flex items-center gap-1"><Icon name="AtSign" size={9} />{emp.login}</span>
-                        {emp.email && <span className="flex items-center gap-1"><Icon name="Mail" size={9} />{emp.email}</span>}
-                        {emp.phone && <span className="flex items-center gap-1"><Icon name="Phone" size={9} />{emp.phone}</span>}
-                        {!emp.is_active && (
-                          <span className="bg-red-500/10 text-red-400 px-1.5 py-0.5 rounded">неактивен</span>
-                        )}
-                      </div>
-                      {emp.created_at && (
-                        <div className="font-roboto text-[9px] text-white/25 mt-1 flex items-center gap-1">
-                          <Icon name="Calendar" size={9} />
-                          добавлен {new Date(emp.created_at).toLocaleDateString("ru-RU")}
-                        </div>
-                      )}
-                    </div>
-                    {emp.role !== "owner" && (
-                      <button onClick={() => startEdit(emp)}
-                        className="text-white/30 hover:text-[#FFD700] hover:bg-[#FFD700]/10 active:scale-90 transition-all p-2 rounded-md shrink-0">
-                        <Icon name="Pencil" size={14} />
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {filtered.map(emp => (
+            <EmployeeCard
+              key={emp.id}
+              emp={emp}
+              isEditing={editId === emp.id}
+              editForm={editForm}
+              setEditForm={setEditForm}
+              myRole={myRole}
+              startEdit={startEdit}
+              cancelEdit={() => setEditId(null)}
+              updateEmployee={updateEmployee}
+            />
+          ))}
 
           {filtered.length === 0 && (
             <div className="text-center py-14">
