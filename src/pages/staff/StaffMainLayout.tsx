@@ -92,14 +92,14 @@ export function StaffMainLayout({
     setTab(t);
   };
 
-  const TABS: { k: Tab; l: string; icon: string; badge?: number }[] = [
-    { k: "repair",       l: "Ремонт",       icon: "Wrench" },
-    { k: "chat",         l: "Чат",          icon: "MessageCircle", badge: chatUnread },
-    { k: "clients",      l: "Клиенты",      icon: "Users" },
-    { k: "analytics",    l: "Статистика",   icon: "BarChart2" },
-    { k: "smartlombard", l: "СмартЛомбард", icon: "Coins" },
-    ...(isOwnerOrAdmin ? [{ k: "gold" as Tab, l: "Золото", icon: "Gem" }] : []),
-    ...(isOwnerOrAdmin ? [{ k: "employees" as Tab, l: "Команда", icon: "UserCog" }] : []),
+  const TABS: { k: Tab; l: string; icon: string; badge?: number; tip?: string }[] = [
+    { k: "repair",       l: "Ремонт",       icon: "Wrench",        tip: "Заявки на ремонт техники: новые, в работе, готовые. Поиск, фото, статусы." },
+    { k: "chat",         l: "Чат",          icon: "MessageCircle", tip: "Внутренний чат сотрудников и общение с VIP-клиентами.", badge: chatUnread },
+    { k: "clients",      l: "Клиенты",      icon: "Users",         tip: "База клиентов, скидки, СМС-рассылки." },
+    { k: "analytics",    l: "Статистика",   icon: "BarChart2",     tip: "Аналитика по продажам, ремонтам и сотрудникам." },
+    { k: "smartlombard", l: "СмартЛомбард", icon: "Coins",         tip: "Скупка и продажа Б/У техники, касса, договоры на 14 дней." },
+    ...(isOwnerOrAdmin ? [{ k: "gold" as Tab, l: "Золото", icon: "Gem", tip: "Учёт ювелирных изделий и драгметаллов." }] : []),
+    ...(isOwnerOrAdmin ? [{ k: "employees" as Tab, l: "Команда", icon: "UserCog", tip: "Управление сотрудниками, роли, графики." }] : []),
   ];
 
   const initials = getInitials(empName);
@@ -176,16 +176,16 @@ export function StaffMainLayout({
               </button>
             )}
             <InstallPwaButton />
-            <button onClick={() => setProfileOpen(true)} title="Мой профиль"
-              className="text-white/30 hover:text-[#FFD700] active:text-[#FFD700] transition-colors p-2 rounded-sm hover:bg-[#FFD700]/10">
+            <button onClick={() => setProfileOpen(true)} title="Мой профиль — изменить аватар, имя, пин-код"
+              className="text-white/40 hover:text-[#FFD700] active:text-[#FFD700] transition-all p-2 rounded-md hover:bg-[#FFD700]/10 hover:shadow-[0_0_10px_rgba(255,215,0,0.15)]">
               <Icon name="UserCog" size={16} />
             </button>
-            <button onClick={() => setThemeOpen(true)} title="Моя тема"
-              className="text-white/30 hover:text-[#FFD700] active:text-[#FFD700] transition-colors p-2 rounded-sm hover:bg-[#FFD700]/10">
+            <button onClick={() => setThemeOpen(true)} title="Оформление — выбрать тему, цвета, эффекты"
+              className="text-white/40 hover:text-[#FFD700] active:text-[#FFD700] transition-all p-2 rounded-md hover:bg-[#FFD700]/10 hover:shadow-[0_0_10px_rgba(255,215,0,0.15)]">
               <Icon name="Sparkles" size={16} />
             </button>
-            <button onClick={logout} title="Выйти"
-              className="text-white/30 hover:text-red-400 active:text-red-500 transition-colors p-2 rounded-sm hover:bg-red-500/10">
+            <button onClick={logout} title="Выйти из аккаунта"
+              className="text-white/40 hover:text-red-400 active:text-red-500 transition-all p-2 rounded-md hover:bg-red-500/10 hover:shadow-[0_0_10px_rgba(239,68,68,0.15)]">
               <Icon name="LogOut" size={16} />
             </button>
           </div>
@@ -227,23 +227,24 @@ export function StaffMainLayout({
                   onTouchStart={() => prefetchTab(t.k)}
                   aria-label={t.l}
                   aria-current={active ? "page" : undefined}
-                  className={`flex-1 min-w-[56px] flex flex-col items-center justify-center gap-0.5 pt-2 pb-1.5 min-h-[54px] transition-all duration-300 active:scale-95 relative group ${
-                    active ? "text-[#FFD700]" : "text-white/40 hover:text-white/70"
+                  title={t.tip ? `${t.l} — ${t.tip}${locked ? "\nТребуется пароль владельца." : ""}` : t.l}
+                  className={`flex-1 min-w-[56px] flex flex-col items-center justify-center gap-0.5 pt-2 pb-1.5 min-h-[56px] transition-all duration-300 active:scale-95 relative group ${
+                    active ? "text-[#FFD700]" : "text-white/45 hover:text-white/85"
                   }`}
                 >
-                  {/* Активная подсветка */}
+                  {/* Активная подсветка — премиум */}
                   {active && <>
-                    <span className="absolute top-0 left-1/2 -translate-x-1/2 w-10 h-[2px] bg-gradient-to-r from-transparent via-[#FFD700] to-transparent rounded-b-full" />
-                    <span className="absolute inset-x-3 top-2 bottom-2 bg-gradient-to-b from-[#FFD700]/10 to-transparent rounded-xl -z-10" />
+                    <span className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-[2px] bg-gradient-to-r from-transparent via-[#FFD700] to-transparent rounded-b-full shadow-[0_0_10px_rgba(255,215,0,0.6)]" />
+                    <span className="absolute inset-x-2 top-1.5 bottom-1.5 bg-gradient-to-b from-[#FFD700]/14 via-[#FFD700]/4 to-transparent rounded-xl -z-10 shadow-[inset_0_1px_0_rgba(255,215,0,0.15)]" />
                   </>}
 
-                  <div className={`relative transition-transform duration-300 ${active ? "scale-110" : "group-active:scale-90"}`}>
+                  <div className={`relative transition-transform duration-300 ${active ? "scale-110 drop-shadow-[0_0_6px_rgba(255,215,0,0.5)]" : "group-active:scale-90"}`}>
                     <Icon name={t.icon} size={18} />
                     {locked && (
                       <span className="absolute -top-1.5 -right-2 text-[9px] bg-[#0A0A0A] rounded-full px-0.5">🔒</span>
                     )}
                     {("badge" in t) && typeof t.badge === "number" && t.badge > 0 && (
-                      <span className="absolute -top-2 -right-2 min-w-[16px] h-[16px] px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center animate-pulse">
+                      <span className="absolute -top-2 -right-2 min-w-[16px] h-[16px] px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.6)]">
                         {t.badge > 99 ? "99+" : t.badge}
                       </span>
                     )}

@@ -266,6 +266,25 @@ export function SLGrid({
   return <div className={`grid ${map} gap-2 ${className}`}>{children}</div>;
 }
 
+// ============ Адаптивный контейнер для страниц/форм ============
+export function SLPageWrap({
+  children, max = "md", className = "",
+}: {
+  children: ReactNode;
+  /** sm = 640, md = 768 (по умолчанию для форм), lg = 960, xl = 1200, full */
+  max?: "sm" | "md" | "lg" | "xl" | "full";
+  className?: string;
+}) {
+  const w = {
+    sm: "max-w-[640px]",
+    md: "max-w-[760px]",
+    lg: "max-w-[960px]",
+    xl: "max-w-[1200px]",
+    full: "max-w-full",
+  }[max];
+  return <div className={`mx-auto w-full ${w} ${className}`}>{children}</div>;
+}
+
 // ============ Премиум-сегмент-таб (для табов и периодов) ============
 export type SLTabItem = {
   v: string;
@@ -273,6 +292,7 @@ export type SLTabItem = {
   icon?: string;
   badge?: number | string;
   featured?: boolean;
+  tooltip?: string;
 };
 
 export function SLTabs({
@@ -300,6 +320,8 @@ export function SLTabs({
               key={t.v}
               type="button"
               onClick={() => onChange(t.v)}
+              title={t.tooltip || t.l}
+              aria-label={t.tooltip || t.l}
               className={`shrink-0 inline-flex items-center gap-1 rounded-md font-bold uppercase tracking-[0.06em] transition-all active:scale-[0.96] ${sizeCls} ${
                 active
                   ? "bg-gradient-to-b from-[#FFE34D] to-[#FFD700] text-black shadow-[0_2px_10px_rgba(255,215,0,0.35),inset_0_1px_0_rgba(255,255,255,0.5)]"

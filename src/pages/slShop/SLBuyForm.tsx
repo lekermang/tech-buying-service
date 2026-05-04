@@ -7,6 +7,7 @@ import { Section, Field } from "./SLBuyFormParts";
 import SLBuyFormItemSection from "./SLBuyFormItemSection";
 import SLBuyFormClientSection from "./SLBuyFormClientSection";
 import SLBuyFormPricesAndPlace from "./SLBuyFormPricesAndPlace";
+import { SLPageWrap } from "./slUI";
 
 export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: () => void }) {
   const [cats, setCats] = useState<SLCategory[]>([]);
@@ -275,38 +276,50 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
   };
 
   return (
-    <div className="space-y-3">
-      {msg && <div className={`p-2.5 rounded-lg text-sm ${msg.startsWith("Принято") ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/30" : "bg-red-500/10 text-red-300 border border-red-500/30"}`}>{msg}</div>}
+    <SLPageWrap max="md">
+    <div className="space-y-2">
+      {msg && (
+        <div className={`px-2.5 py-1.5 rounded-md text-[12px] flex items-center gap-1.5 ${msg.startsWith("Принято") ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/30" : "bg-red-500/10 text-red-300 border border-red-500/30"}`}>
+          <Icon name={msg.startsWith("Принято") ? "CheckCircle2" : "AlertTriangle"} size={12} />
+          {msg}
+        </div>
+      )}
 
       <Section title="Филиал / склад">
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-1.5">
           {branches.map(b => (
             <button key={b.id} onClick={() => setBranchId(b.id)}
-              className={`p-2.5 rounded-lg border text-left transition-all ${
-                branchId === b.id ? "bg-[#FFD700]/10 border-[#FFD700] text-[#FFD700]" : "bg-[#141414] border-[#1F1F1F] text-white/60"
+              title={`Принять товар в филиал «${b.name}»${b.address ? ` (${b.address})` : ""}`}
+              className={`px-2.5 py-2 rounded-md border text-left transition-all active:scale-[0.98] ${
+                branchId === b.id
+                  ? "bg-gradient-to-br from-[#FFD700]/15 via-[#FFD700]/5 to-transparent border-[#FFD700] text-[#FFD700] shadow-[0_2px_10px_rgba(255,215,0,0.18)]"
+                  : "bg-[#0E0E0E] border-[#1A1A1A] text-white/60 hover:border-[#FFD700]/30 hover:bg-[#131313]"
               }`}>
-              <div className="font-bold text-sm flex items-center gap-1">
-                <Icon name="MapPin" size={12} />{b.name}
+              <div className="font-bold text-[12px] flex items-center gap-1 leading-tight">
+                <Icon name="MapPin" size={11} />{b.name}
               </div>
-              {b.address && <div className="text-[10px] opacity-70 truncate">{b.address}</div>}
+              {b.address && <div className="text-[10px] opacity-70 truncate mt-0.5">{b.address}</div>}
             </button>
           ))}
         </div>
       </Section>
 
       <Section title="Тип приёма">
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-1.5">
           {[
-            { v: "buyout", l: "Скупка", d: "купили навсегда", icon: "ShoppingCart" },
-            { v: "consignment", l: "Комиссия", d: "на реализацию", icon: "Handshake" },
+            { v: "buyout", l: "Скупка", d: "купили навсегда", icon: "ShoppingCart", t: "Покупаем у клиента навсегда — товар становится нашим" },
+            { v: "consignment", l: "Комиссия", d: "на реализацию", icon: "Handshake", t: "Берём на реализацию — клиент получает деньги после продажи" },
           ].map(o => (
             <button key={o.v} onClick={() => setSource(o.v as "buyout" | "consignment")}
-              className={`p-2.5 rounded-lg border text-left transition-all ${
-                source === o.v ? "bg-[#FFD700]/10 border-[#FFD700] text-[#FFD700]" : "bg-[#141414] border-[#1F1F1F] text-white/60"
+              title={o.t}
+              className={`px-2.5 py-2 rounded-md border text-left transition-all active:scale-[0.98] ${
+                source === o.v
+                  ? "bg-gradient-to-br from-[#FFD700]/15 via-[#FFD700]/5 to-transparent border-[#FFD700] text-[#FFD700] shadow-[0_2px_10px_rgba(255,215,0,0.18)]"
+                  : "bg-[#0E0E0E] border-[#1A1A1A] text-white/60 hover:border-[#FFD700]/30 hover:bg-[#131313]"
               }`}>
-              <Icon name={o.icon} size={16} />
-              <div className="font-bold text-sm mt-1">{o.l}</div>
-              <div className="text-[10px] opacity-70">{o.d}</div>
+              <Icon name={o.icon} size={14} />
+              <div className="font-bold text-[12px] mt-0.5 leading-tight">{o.l}</div>
+              <div className="text-[10px] opacity-70 leading-tight">{o.d}</div>
             </button>
           ))}
         </div>
@@ -361,36 +374,49 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
 
       {!createdItemId ? (
         <>
-          <label className="flex items-center justify-between bg-[#0F0F0F] border border-[#1F1F1F] rounded-lg p-2.5 cursor-pointer">
-            <div className="flex items-center gap-2">
-              <Icon name="Printer" size={14} className="text-[#FFD700]" />
-              <span className="text-sm">Печатать договор сразу после приёма</span>
+          <label
+            className="flex items-center justify-between bg-[#101010] border border-[#1A1A1A] hover:border-[#FFD700]/30 rounded-md px-2.5 py-1.5 cursor-pointer transition"
+            title="Откроется окно печати договора в новой вкладке сразу после успешного сохранения"
+          >
+            <div className="flex items-center gap-1.5">
+              <Icon name="Printer" size={12} className="text-[#FFD700]" />
+              <span className="text-[12px]">Печатать договор сразу после приёма</span>
             </div>
             <button onClick={() => setAutoPrint(!autoPrint)}
-              className={`w-9 h-5 rounded-full relative transition-colors ${autoPrint ? "bg-[#FFD700]" : "bg-[#1F1F1F]"}`}>
-              <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${autoPrint ? "left-4" : "left-0.5"}`} />
+              className={`w-8 h-4 rounded-full relative transition-colors shrink-0 ${autoPrint ? "bg-[#FFD700]" : "bg-[#1A1A1A]"}`}>
+              <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${autoPrint ? "left-4" : "left-0.5"}`} />
             </button>
           </label>
-          <button onClick={submit} disabled={saving}
-            className="w-full bg-gradient-to-br from-[#FFD700] to-yellow-600 text-black font-bold py-3 rounded-xl hover:shadow-lg hover:shadow-[#FFD700]/30 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2">
-            <Icon name={saving ? "Loader" : "Check"} size={16} className={saving ? "animate-spin" : ""} />
-            {saving ? "Сохраняю..." : "Принять товар"}
-          </button>
+          <div className="sticky bottom-0 bg-gradient-to-t from-[#0D0D0D] via-[#0D0D0D]/95 to-transparent pt-2 pb-1 -mx-1 px-1">
+            <button
+              onClick={submit}
+              disabled={saving}
+              title={saving ? "Сохранение..." : "Принять товар на склад и завершить операцию (Ctrl+Enter)"}
+              className="w-full bg-gradient-to-b from-[#FFE34D] to-[#FFD700] text-black font-oswald font-bold uppercase tracking-wider text-[13px] py-3 rounded-lg shadow-[0_4px_18px_rgba(255,215,0,0.35),inset_0_1px_0_rgba(255,255,255,0.5)] hover:shadow-[0_6px_24px_rgba(255,215,0,0.5),inset_0_1px_0_rgba(255,255,255,0.6)] transition-all active:scale-[0.97] disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              <Icon name={saving ? "Loader2" : "Check"} size={15} className={saving ? "animate-spin" : ""} />
+              {saving ? "Сохраняю…" : "Принять товар"}
+            </button>
+          </div>
         </>
       ) : (
-        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 space-y-2">
-          <div className="flex items-center gap-2 text-emerald-300 font-bold">
-            <Icon name="CheckCircle2" size={18} />Товар принят #{createdItemId}
+        <div className="bg-gradient-to-br from-emerald-500/15 via-emerald-500/5 to-transparent border border-emerald-500/40 rounded-xl p-2.5 space-y-1.5 shadow-[0_0_24px_rgba(16,185,129,0.12)]">
+          <div className="flex items-center gap-1.5 text-emerald-300 font-bold text-[13px]">
+            <Icon name="CheckCircle2" size={16} />Товар принят #{createdItemId}
           </div>
           <PrintDocsButton token={token} itemId={createdItemId}
             opType={source === "consignment" ? "consignment_in" : "buyout_individual"}
             label="Печать документов" />
-          <button onClick={onSaved}
-            className="w-full bg-[#FFD700] text-black font-bold py-2.5 rounded-lg">
+          <button
+            onClick={onSaved}
+            title="Перейти на вкладку «Склад» и увидеть товар"
+            className="w-full bg-gradient-to-b from-[#FFE34D] to-[#FFD700] text-black font-bold py-2 rounded-md uppercase tracking-wider text-[12px] shadow-[0_2px_10px_rgba(255,215,0,0.3),inset_0_1px_0_rgba(255,255,255,0.5)] hover:shadow-[0_4px_18px_rgba(255,215,0,0.45)] transition active:scale-[0.97]"
+          >
             Готово, к складу
           </button>
         </div>
       )}
     </div>
+    </SLPageWrap>
   );
 }

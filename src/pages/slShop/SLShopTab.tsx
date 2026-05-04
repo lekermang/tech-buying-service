@@ -40,26 +40,26 @@ type SubTab =
   | "contracts14d"
   | "roles";
 
-type TabDef = { k: SubTab; l: string; icon: string; perm?: string; ownerOnly?: boolean; featured?: boolean };
+type TabDef = { k: SubTab; l: string; icon: string; perm?: string; ownerOnly?: boolean; featured?: boolean; tip?: string };
 
 const ALL_TABS: TabDef[] = [
-  { k: "dashboard", l: "Сводка", icon: "LayoutDashboard" },
-  { k: "buy", l: "Скупка", icon: "Plus", perm: "shop_buy" },
-  { k: "contracts14d", l: "Договор 14 дн.", icon: "Handshake", featured: true },
-  { k: "stock", l: "Склад", icon: "Package", perm: "shop_view" },
-  { k: "cash", l: "Касса", icon: "Wallet", perm: "cashflow_view" },
-  { k: "operations", l: "Операции", icon: "Activity", perm: "shop_view" },
-  { k: "clients", l: "Клиенты", icon: "Users", perm: "clients" },
-  { k: "labels", l: "Ценники", icon: "Tag", perm: "labels" },
-  { k: "discount", l: "Уценка", icon: "TrendingDown", perm: "discount" },
-  { k: "revision", l: "Ревизия", icon: "ClipboardCheck", perm: "revision" },
-  { k: "journal", l: "Журнал", icon: "ScrollText" },
-  { k: "analytics", l: "Аналитика", icon: "BarChart3", perm: "shifts_view_profit" },
-  { k: "bookkeeping", l: "Бухгалтерия", icon: "Calculator", perm: "cashflow_view" },
-  { k: "import", l: "Импорт", icon: "ArrowUpDown", perm: "excel_export" },
-  { k: "documents", l: "Документы", icon: "FileText" },
-  { k: "categories", l: "Категории", icon: "Grid3x3" },
-  { k: "roles", l: "Роли", icon: "ShieldCheck", ownerOnly: true },
+  { k: "dashboard",     l: "Сводка",         icon: "LayoutDashboard", tip: "Главная сводка: купили, продали, прибыль, склад за выбранный период." },
+  { k: "buy",           l: "Скупка",         icon: "Plus", perm: "shop_buy", tip: "Принять Б/У товар у клиента — скупка или комиссия с печатью договора." },
+  { k: "contracts14d",  l: "Договор 14 дн.", icon: "Handshake", featured: true, tip: "Скупка с правом обратного выкупа. Ставка 4 % в день, срок 14 дней." },
+  { k: "stock",         l: "Склад",          icon: "Package", perm: "shop_view", tip: "Товары на складе и витрине: фильтры, поиск, ценники, продажа." },
+  { k: "cash",          l: "Касса",          icon: "Wallet", perm: "cashflow_view", tip: "Кассы наличных по филиалам, приход/расход, история движений." },
+  { k: "operations",    l: "Операции",       icon: "Activity", perm: "shop_view", tip: "Журнал всех операций: скупка, продажа, возврат, перемещение, списание." },
+  { k: "clients",       l: "Клиенты",        icon: "Users", perm: "clients", tip: "База клиентов комиссионки — поиск, паспортные данные, история." },
+  { k: "labels",        l: "Ценники",        icon: "Tag", perm: "labels", tip: "Шаблоны ценников и печать: A4, термопринтер, QR-код." },
+  { k: "discount",      l: "Уценка",         icon: "TrendingDown", perm: "discount", tip: "Правила автоматической уценки залежавшихся товаров." },
+  { k: "revision",      l: "Ревизия",        icon: "ClipboardCheck", perm: "revision", tip: "Инвентаризация склада: сканирование, пересчёт, отчёты." },
+  { k: "journal",       l: "Журнал",         icon: "ScrollText", tip: "Лог событий и действий сотрудников по СмартЛомбарду." },
+  { k: "analytics",     l: "Аналитика",      icon: "BarChart3", perm: "shifts_view_profit", tip: "Аналитика по дням, сотрудникам, филиалам, категориям, моделям." },
+  { k: "bookkeeping",   l: "Бухгалтерия",    icon: "Calculator", perm: "cashflow_view", tip: "Денежная сводка: выручка, себестоимость, ОПЭКС, прибыль, экспорт CSV." },
+  { k: "import",        l: "Импорт",         icon: "ArrowUpDown", perm: "excel_export", tip: "Импорт/экспорт товаров и операций (Excel, CSV)." },
+  { k: "documents",     l: "Документы",      icon: "FileText", tip: "Шаблоны печатных документов и реквизиты ИП/филиалов." },
+  { k: "categories",    l: "Категории",      icon: "Grid3x3", tip: "Иерархия категорий товаров (телефоны, ноутбуки, ювелирка и т.д.)." },
+  { k: "roles",         l: "Роли",           icon: "ShieldCheck", ownerOnly: true, tip: "Управление ролями и правами доступа сотрудников." },
 ];
 
 export default function SLShopTab({ token, myRole }: { token: string; myRole?: string }) {
@@ -82,24 +82,44 @@ export default function SLShopTab({ token, myRole }: { token: string; myRole?: s
   });
 
   return (
-    <div className="p-2 sm:p-2.5">
-      {/* Премиум-шапка — компактная */}
-      <div className="rounded-xl bg-gradient-to-br from-[#FFD700]/10 via-[#FFD700]/3 to-transparent border border-[#FFD700]/20 px-2.5 py-2 mb-2 flex items-center gap-2 shadow-[0_0_24px_rgba(255,215,0,0.05)]">
-        <div className="w-7 h-7 rounded-md bg-gradient-to-br from-[#FFD700] to-[#b8860b] flex items-center justify-center shrink-0 shadow-[0_2px_8px_rgba(255,215,0,0.3)]">
-          <Icon name="Gem" size={14} className="text-black" />
+    <div className="p-2 sm:p-3 max-w-[1400px] mx-auto w-full">
+      {/* Премиум-шапка с золотым glow */}
+      <div className="relative rounded-xl bg-gradient-to-br from-[#FFD700]/12 via-[#FFD700]/4 to-transparent border border-[#FFD700]/30 px-2.5 py-2 mb-2 flex items-center gap-2.5 shadow-[0_0_24px_rgba(255,215,0,0.08),inset_0_1px_0_rgba(255,215,0,0.1)] overflow-hidden">
+        {/* Световой блик */}
+        <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-[#FFD700]/8 blur-2xl pointer-events-none" />
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#FFD700]/40 to-transparent" />
+
+        <div
+          className="relative w-8 h-8 rounded-lg bg-gradient-to-br from-[#FFE34D] via-[#FFD700] to-[#b8860b] flex items-center justify-center shrink-0 shadow-[0_3px_10px_rgba(255,215,0,0.4),inset_0_1px_0_rgba(255,255,255,0.4)]"
+          title="СмартЛомбард — модуль скупки и продажи Б/У"
+        >
+          <Icon name="Gem" size={16} className="text-black drop-shadow" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="font-oswald font-bold uppercase text-[13px] tracking-wide leading-tight">СмартЛомбард</div>
-          <div className="text-[10px] text-white/45 truncate leading-tight">
-            {perms?.name ? `${perms.name} · ` : ""}Б/У техника, антиквариат и др.
+          <div className="font-oswald font-bold uppercase text-[14px] tracking-[0.06em] leading-tight bg-gradient-to-r from-[#FFD700] via-[#FFE34D] to-[#FFD700] bg-clip-text text-transparent">
+            СмартЛомбард
           </div>
+          <div className="text-[10px] text-white/50 truncate leading-tight">
+            {perms?.name ? `${perms.name} · ` : ""}Скупка, склад, касса, договоры
+          </div>
+        </div>
+        {/* Premium индикатор */}
+        <div
+          className="hidden sm:flex items-center gap-1 px-2 py-1 rounded-full bg-[#FFD700]/10 border border-[#FFD700]/30 shrink-0"
+          title="Премиум-модуль с расширенным функционалом"
+        >
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
+            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
+          </span>
+          <span className="text-[9px] uppercase tracking-wider font-bold text-[#FFD700]">Premium</span>
         </div>
       </div>
 
-      {/* Подвкладки — премиум сегмент */}
+      {/* Подвкладки — премиум сегмент с подсказками */}
       <div className="mb-2">
         <SLTabs
-          items={visibleTabs.map(t => ({ v: t.k, l: t.l, icon: t.icon, featured: t.featured }))}
+          items={visibleTabs.map(t => ({ v: t.k, l: t.l, icon: t.icon, featured: t.featured, tooltip: t.tip ? `${t.l} — ${t.tip}` : t.l }))}
           value={tab}
           onChange={(v) => setTab(v as SubTab)}
         />
