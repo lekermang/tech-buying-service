@@ -17,6 +17,17 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
   const toast = useStaffToast();
   const [view, setView] = useState<View>("list");
 
+  // Режим отображения карточек (сетка / список) — сохраняется в localStorage
+  const [cardsView, setCardsViewState] = useState<"grid" | "list">(() => {
+    if (typeof window === "undefined") return "list";
+    const saved = window.localStorage.getItem("staffRepair.cardsView");
+    return saved === "grid" || saved === "list" ? saved : "list";
+  });
+  const setCardsView = useCallback((v: "grid" | "list") => {
+    setCardsViewState(v);
+    try { window.localStorage.setItem("staffRepair.cardsView", v); } catch { /* ignore */ }
+  }, []);
+
   // Список заявок
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
@@ -358,6 +369,8 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
         showForm={showForm}
         setShowForm={setShowForm}
         setForm={setForm}
+        cardsView={cardsView}
+        setCardsView={setCardsView}
       />
 
       {/* ── Поиск + период ── */}
@@ -440,6 +453,7 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
           issueOrder={issueOrder}
           saveCard={saveCard}
           deleteOrder={deleteOrder}
+          cardsView={cardsView}
         />
       )}
 

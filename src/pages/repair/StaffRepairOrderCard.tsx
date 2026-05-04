@@ -37,9 +37,10 @@ export default function StaffRepairOrderCard({
   const hasAmount = ef.repair_amount !== "" && ef.repair_amount != null;
   const hasPurchase = ef.purchase_amount !== "" && ef.purchase_amount != null;
   const financeBlocked = !hasAmount || !hasPurchase;
+  const isNew = o.status === "new";
 
   return (
-    <div id={`order-${o.id}`} className="relative scroll-mt-24">
+    <div id={`order-${o.id}`} className="relative scroll-mt-24 h-full">
       {/* HALO — внешний золотой ореол вокруг раскрытой карточки */}
       {isExpanded && (
         <span
@@ -49,14 +50,29 @@ export default function StaffRepairOrderCard({
         />
       )}
 
-      {/* Conic-gradient рамка для раскрытой / простая для свёрнутой */}
-      <div className={`relative rounded-xl transition-all duration-300 overflow-hidden ${
+      {/* Подсветка для НОВЫХ заявок (status === "new") — пульсирующий ореол */}
+      {!isExpanded && isNew && (
+        <span
+          aria-hidden
+          className="absolute -inset-1 rounded-2xl pointer-events-none animate-pulse"
+          style={{ background: "radial-gradient(closest-side,rgba(255,165,0,0.30),rgba(255,165,0,0.05) 60%,transparent 85%)", filter: "blur(10px)" }}
+        />
+      )}
+
+      {/* Conic-gradient рамка для раскрытой / премиум для НОВОЙ / простая для свёрнутой */}
+      <div className={`relative rounded-xl transition-all duration-300 overflow-hidden h-full ${
         isExpanded
           ? "p-[1.5px] bg-[conic-gradient(from_180deg_at_50%_50%,rgba(255,215,0,0.7)_0deg,rgba(255,215,0,0.15)_180deg,rgba(255,243,160,0.7)_360deg)] shadow-[0_8px_28px_rgba(255,215,0,0.18)]"
-          : "border border-[#1F1F1F] bg-gradient-to-br from-[#141414] to-[#0E0E0E] hover:border-[#FFD700]/30 hover:shadow-[0_0_14px_rgba(255,215,0,0.15)]"
+          : isNew
+            ? "p-[1.5px] bg-[conic-gradient(from_180deg_at_50%_50%,rgba(255,165,0,0.85)_0deg,rgba(255,215,0,0.45)_120deg,rgba(255,243,160,0.85)_240deg,rgba(255,165,0,0.85)_360deg)] shadow-[0_4px_18px_rgba(255,140,0,0.35)] hover:shadow-[0_6px_24px_rgba(255,140,0,0.55)]"
+            : "border border-[#1F1F1F] bg-gradient-to-br from-[#141414] to-[#0E0E0E] hover:border-[#FFD700]/30 hover:shadow-[0_0_14px_rgba(255,215,0,0.15)]"
       }`}>
-        <div className={`relative rounded-[10px] overflow-hidden ${
-          isExpanded ? "bg-gradient-to-br from-[#1A1A1A] via-[#141414] to-[#0E0E0E]" : ""
+        <div className={`relative rounded-[10px] overflow-hidden h-full ${
+          isExpanded
+            ? "bg-gradient-to-br from-[#1A1A1A] via-[#141414] to-[#0E0E0E]"
+            : isNew
+              ? "bg-gradient-to-br from-[#1A1410] via-[#0F0C08] to-[#0A0806]"
+              : ""
         }`}>
           {/* Декор раскрытой */}
           {isExpanded && (

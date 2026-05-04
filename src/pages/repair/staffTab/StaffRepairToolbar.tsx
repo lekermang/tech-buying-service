@@ -10,6 +10,8 @@ type Props = {
   showForm: boolean;
   setShowForm: (v: boolean | ((prev: boolean) => boolean)) => void;
   setForm: (f: typeof EMPTY_FORM) => void;
+  cardsView?: "grid" | "list";
+  setCardsView?: (v: "grid" | "list") => void;
 };
 
 const VIEW_TIPS: Record<string, string> = {
@@ -19,7 +21,7 @@ const VIEW_TIPS: Record<string, string> = {
   import_parts: "Импорт — массовая загрузка позиций из Excel",
 };
 
-export default function StaffRepairToolbar({ view, setView, isOwner, showForm, setShowForm, setForm }: Props) {
+export default function StaffRepairToolbar({ view, setView, isOwner, showForm, setShowForm, setForm, cardsView, setCardsView }: Props) {
   return (
     <div className="relative px-3 pt-3 pb-2.5">
       {/* Премиум-фон с золотыми свечениями */}
@@ -61,6 +63,35 @@ export default function StaffRepairToolbar({ view, setView, isOwner, showForm, s
             );
           })}
         </div>
+
+        {/* Переключатель вида карточек: Сетка / Список — только в режиме "list" */}
+        {view === "list" && cardsView && setCardsView && (
+          <div className="hidden md:flex shrink-0 bg-gradient-to-br from-[#141414] via-[#0F0F0F] to-[#0A0A0A] border border-[#1F1F1F] rounded-md p-0.5 shadow-[inset_0_1px_0_rgba(255,215,0,0.04)]">
+            {([
+              { k: "list" as const, icon: "Rows3", label: "Список" },
+              { k: "grid" as const, icon: "LayoutGrid", label: "Сетка" },
+            ]).map(opt => {
+              const active = cardsView === opt.k;
+              return (
+                <SLTooltip key={opt.k} content={`Показывать карточки ${opt.label.toLowerCase()}ом`} placement="bottom" delay={300}>
+                  <button
+                    onClick={() => setCardsView(opt.k)}
+                    aria-label={opt.label}
+                    aria-pressed={active}
+                    className={`relative inline-flex items-center gap-1 px-2.5 py-1.5 rounded-[5px] font-roboto text-[11px] transition-all active:scale-95 ${
+                      active
+                        ? "bg-gradient-to-b from-[#FFE34D] via-[#FFD700] to-[#d4a017] text-black font-bold shadow-[0_2px_8px_rgba(255,215,0,0.4),inset_0_1px_0_rgba(255,255,255,0.5)]"
+                        : "text-white/55 hover:text-[#FFD700] hover:bg-[#FFD700]/5"
+                    }`}
+                  >
+                    <Icon name={opt.icon} size={13} />
+                    <span className="whitespace-nowrap">{opt.label}</span>
+                  </button>
+                </SLTooltip>
+              );
+            })}
+          </div>
+        )}
 
         {/* Премиум-кнопка "Заявка" */}
         {view === "list" && (

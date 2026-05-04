@@ -33,9 +33,13 @@ export default function OrderCardHeader({ o, isExpanded, onToggle }: Props) {
       }`}
       onClick={onToggle}
     >
-      {/* Левая статус-полоса с glow */}
+      {/* Левая статус-полоса с glow (для новой — оранжевая, пульсирующая) */}
       <span
-        className={`absolute left-0 top-2.5 bottom-2.5 w-[3px] rounded-r-full ${st.dot} ${
+        className={`absolute left-0 top-2.5 bottom-2.5 w-[3px] rounded-r-full ${
+          o.status === "new"
+            ? "bg-orange-400 shadow-[0_0_12px_rgba(251,146,60,0.9)] animate-pulse"
+            : st.dot
+        } ${
           isExpanded ? "shadow-[0_0_10px_currentColor]" : "shadow-[0_0_6px_currentColor]"
         }`}
       />
@@ -80,19 +84,29 @@ export default function OrderCardHeader({ o, isExpanded, onToggle }: Props) {
               </span>
             </div>
             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-              {/* Чип статуса */}
-              <span
-                className={`relative font-roboto text-[10px] px-2 py-0.5 inline-flex items-center gap-1 rounded-full ${st.color} ${
-                  isExpanded ? "ring-1 ring-current shadow-[0_0_8px_currentColor]" : ""
-                }`}
-              >
+              {/* НОВАЯ заявка — приоритетный бейдж "взять в работу" */}
+              {o.status === "new" ? (
                 <span
-                  className={`w-1.5 h-1.5 rounded-full ${st.dot} ${
-                    isExpanded ? "animate-pulse shadow-[0_0_4px_currentColor]" : ""
+                  title="Новая заявка — нужно взять в работу"
+                  className="relative font-oswald font-bold text-[10px] uppercase tracking-wider px-2 py-0.5 inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-orange-500/35 via-amber-400/35 to-orange-500/35 text-amber-100 border border-orange-400/60 shadow-[0_0_10px_rgba(251,146,60,0.5),inset_0_1px_0_rgba(255,255,255,0.15)] animate-pulse"
+                >
+                  <span aria-hidden className="text-[11px] leading-none">🔥</span>
+                  Новая
+                </span>
+              ) : (
+                <span
+                  className={`relative font-roboto text-[10px] px-2 py-0.5 inline-flex items-center gap-1 rounded-full ${st.color} ${
+                    isExpanded ? "ring-1 ring-current shadow-[0_0_8px_currentColor]" : ""
                   }`}
-                />
-                {st.label}
-              </span>
+                >
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${st.dot} ${
+                      isExpanded ? "animate-pulse shadow-[0_0_4px_currentColor]" : ""
+                    }`}
+                  />
+                  {st.label}
+                </span>
+              )}
               {/* Pending — нужно заполнить суммы */}
               {needsAmounts && (
                 <span

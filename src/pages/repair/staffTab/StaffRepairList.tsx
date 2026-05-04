@@ -29,6 +29,7 @@ type Props = {
   issueOrder: (o: Order, issuedAt?: string) => void;
   saveCard: (o: Order) => void;
   deleteOrder: (id: number) => void;
+  cardsView?: "grid" | "list";
 };
 
 export default function StaffRepairList({
@@ -37,7 +38,12 @@ export default function StaffRepairList({
   expandedId, setExpandedId, editForm, setEditForm, initEditForm,
   saving, saveError, setSaveError, isOwner, token,
   changeStatus, openReadyModal, issueOrder, saveCard, deleteOrder,
+  cardsView = "list",
 }: Props) {
+  // На мобильном (md и ниже) всегда 1 колонка, на десктопе — зависит от cardsView
+  const containerCls = cardsView === "grid"
+    ? "px-3 py-3 grid gap-2.5 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
+    : "px-3 py-3 space-y-2.5";
   return (
     <>
       {/* Фильтры статуса — премиум chips с свечениями */}
@@ -131,10 +137,10 @@ export default function StaffRepairList({
         </div>
       )}
 
-      {/* Карточки — премиум-сетка для iPhone 15 Pro Max */}
-      <div className="px-3 py-3 space-y-2.5">
+      {/* Карточки — премиум-список или сетка (адаптивно по cardsView) */}
+      <div className={containerCls}>
         {loading && (
-          <div className="flex items-center justify-center py-14 gap-2 text-white/50">
+          <div className="col-span-full flex items-center justify-center py-14 gap-2 text-white/50">
             <div className="relative">
               <span className="absolute inset-0 rounded-full bg-[#FFD700]/30 blur-md animate-pulse" />
               <Icon name="Loader" size={20} className="relative animate-spin text-[#FFD700] drop-shadow-[0_0_8px_rgba(255,215,0,0.7)]" />
@@ -143,7 +149,7 @@ export default function StaffRepairList({
           </div>
         )}
         {!loading && orders.length === 0 && (
-          <div className="text-center py-14 px-4">
+          <div className="col-span-full text-center py-14 px-4">
             <div className="relative inline-block">
               <span className="absolute inset-0 rounded-full bg-[#FFD700]/15 blur-2xl pointer-events-none" />
               <div className="relative w-16 h-16 mx-auto mb-3 rounded-full p-[1.5px] bg-[conic-gradient(from_0deg,#b8860b,#ffd700,#fff3a0,#ffd700,#b8860b)] shadow-[0_0_18px_rgba(255,215,0,0.3)]">
@@ -161,33 +167,36 @@ export default function StaffRepairList({
         {orders.map(o => {
           const isExpanded = expandedId === o.id;
           const ef = editForm[o.id] || initEditForm(o);
+          // В режиме сетки раскрытая карточка занимает всю ширину строки
+          const wrapCls = cardsView === "grid" && isExpanded ? "md:col-span-full" : "";
           return (
-            <StaffRepairOrderCard
-              key={o.id}
-              o={o}
-              isExpanded={isExpanded}
-              ef={ef}
-              saving={saving}
-              saveError={saveError}
-              isOwner={isOwner}
-              token={token}
-              authHeader="X-Employee-Token"
-              onToggle={() => {
-                const opening = expandedId !== o.id;
-                setExpandedId(opening ? o.id : null);
-                setSaveError(null);
-                if (opening) setEditForm(prev => ({ ...prev, [o.id]: initEditForm(o) }));
-              }}
-              onEditFormChange={(id, newEf) => setEditForm(prev => ({ ...prev, [id]: newEf }))}
-              onChangeStatus={(id, status, extra) => {
-                changeStatus(id, status, extra);
-                setExpandedId(null);
-              }}
-              onOpenReadyModal={openReadyModal}
-              onIssueOrder={issueOrder}
-              onSaveCard={saveCard}
-              onDelete={deleteOrder}
-            />
+            <div key={o.id} className={wrapCls}>
+              <StaffRepairOrderCard
+                o={o}
+                isExpanded={isExpanded}
+                ef={ef}
+                saving={saving}
+                saveError={saveError}
+                isOwner={isOwner}
+                token={token}
+                authHeader="X-Employee-Token"
+                onToggle={() => {
+                  const opening = expandedId !== o.id;
+                  setExpandedId(opening ? o.id : null);
+                  setSaveError(null);
+                  if (opening) setEditForm(prev => ({ ...prev, [o.id]: initEditForm(o) }));
+                }}
+                onEditFormChange={(id, newEf) => setEditForm(prev => ({ ...prev, [id]: newEf }))}
+                onChangeStatus={(id, status, extra) => {
+                  changeStatus(id, status, extra);
+                  setExpandedId(null);
+                }}
+                onOpenReadyModal={openReadyModal}
+                onIssueOrder={issueOrder}
+                onSaveCard={saveCard}
+                onDelete={deleteOrder}
+              />
+            </div>
           );
         })}
       </div>
