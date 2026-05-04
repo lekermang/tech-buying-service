@@ -295,29 +295,34 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
   };
 
   // ─── Подтвердить «Готово» ────────────────────────────────────────────────────
+  // Цены НЕ обязательны: можно нажать «Готов» без закупки/выдачи —
+  // клиенту автоматически уйдёт СМС о готовности (бэкенд решает шаблон).
+  // Финальные суммы вводятся уже при выдаче (статус «Выдано»).
   const submitReady = async () => {
     if (!readyModal) return;
-    const repairNum = parseInt(readyForm.repair_amount);
-    if (!readyForm.repair_amount || Number.isNaN(repairNum) || repairNum <= 0) {
-      setReadyError("Укажите сумму выдачи за ремонт (больше 0)");
-      toast.warning("Укажите сумму выдачи за ремонт (больше 0)");
-      return;
-    }
-    const purchaseStr = readyForm.purchase_amount;
-    if (purchaseStr === "" || purchaseStr == null || Number.isNaN(parseInt(purchaseStr))) {
-      setReadyError("Укажите сумму закупки (можно 0)");
-      toast.warning("Укажите сумму закупки (можно 0)");
-      return;
-    }
     setReadySaving(true);
-    const ok = await changeStatus(readyModal.id, "ready", {
-      purchase_amount: parseInt(readyForm.purchase_amount),
-      repair_amount: parseInt(readyForm.repair_amount),
-      parts_name: readyForm.parts_name,
-      admin_note: readyForm.admin_note,
-    });
+    const extra: Record<string, unknown> = { admin_note: readyForm.admin_note };
+    const purchaseNum = parseInt(readyForm.purchase_amount);
+    const repairNum = parseInt(readyForm.repair_amount);
+    if (readyForm.purchase_amount !== "" && !Number.isNaN(purchaseNum)) {
+      extra.purchase_amount = purchaseNum;
+    }
+    if (readyForm.repair_amount !== "" && !Number.isNaN(repairNum)) {
+      extra.repair_amount = repairNum;
+    }
+    if (readyForm.parts_name) {
+      extra.parts_name = readyForm.parts_name;
+    }
+    const ok = await changeStatus(readyModal.id, "ready", extra);
     setReadySaving(false);
     if (ok) {
+      const hasAmount = extra.repair_amount != null;
+      toast.success(
+        hasAmount
+          ? `📲 Клиенту отправлено СМС о готовности${extra.repair_amount ? ` (${extra.repair_amount} ₽)` : ""}`
+          : "📲 Клиенту отправлено СМС о готовности",
+        { duration: 4000 },
+      );
       setReadyModal(null);
       setExpandedId(null);
     } else {

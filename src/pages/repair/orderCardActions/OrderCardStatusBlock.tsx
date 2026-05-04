@@ -69,8 +69,9 @@ export default function OrderCardStatusBlock({
       <div className="relative grid grid-cols-2 gap-2">
         {STATUSES.filter(s => s.key !== o.status).map(s => {
           const fx = STATUS_FX[s.key] || STATUS_FX.new;
-          const needsFinance = s.key === "ready" || s.key === "done";
-          const blocked = needsFinance && financeBlocked;
+          // «Готов» — можно нажать без сумм (СМС уйдёт автоматически).
+          // «Выдано» — только при заполненных закупке + цене выдачи.
+          const blocked = s.key === "done" && financeBlocked;
           const isLoading = saving;
           return (
             <button key={s.key}
@@ -110,7 +111,7 @@ export default function OrderCardStatusBlock({
       {financeBlocked && (
         <div className="relative mt-2 text-[10px] font-roboto text-orange-300/80 flex items-center gap-1.5 bg-gradient-to-r from-orange-500/10 to-transparent border border-orange-500/25 rounded-lg px-2.5 py-1.5">
           <Icon name="Info" size={11} className="text-orange-400 shrink-0" />
-          Для «Готово» и «Выдано» укажите суммы закупки и ремонта
+          Для «Выдано» укажите закупку и цену выдачи. «Готов» можно нажать без них — СМС уйдёт клиенту.
         </div>
       )}
     </div>

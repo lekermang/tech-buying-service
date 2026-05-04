@@ -1318,17 +1318,16 @@ def handler(event: dict, context) -> dict:
             cur.close(); conn.close()
             return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'Неверный статус'}, ensure_ascii=False)}
 
-        # При переводе в ready — обязательные поля
-        if new_status == 'ready':
+        # При переводе в ready — суммы НЕ обязательны (нужны только при выдаче 'done').
+        # Это позволяет быстро уведомить клиента СМС-кой о готовности,
+        # а финальные суммы внести позже — при выдаче.
+        if new_status == 'done':
             if not purchase_amount and purchase_amount != 0:
                 cur.close(); conn.close()
                 return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'Укажите сумму закупки запчасти', 'field': 'purchase_amount'}, ensure_ascii=False)}
             if not repair_amount and repair_amount != 0:
                 cur.close(); conn.close()
                 return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'Укажите выданную сумму за ремонт', 'field': 'repair_amount'}, ensure_ascii=False)}
-            if not parts_name:
-                cur.close(); conn.close()
-                return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'Укажите купленную запчасть', 'field': 'parts_name'}, ensure_ascii=False)}
 
         # Рассчитываем доход мастера = 50% от (repair_amount - purchase_amount)
         master_income_val = 'NULL'
@@ -1450,12 +1449,18 @@ def handler(event: dict, context) -> dict:
             main_chat_id = os.environ['TELEGRAM_CHAT_ID']
             send_tg_all(token, main_chat_id, conn, tg_msg)
 
-            # SMS клиенту ТОЛЬКО при статусе "ready" (Готово к выдаче)
+            # SMS клиенту ТОЛЬКО при статусе "ready" (Готово к выдаче).
+            # Сумма не обязательна: если её нет — отправляем шаблон без цены.
             if new_status == 'ready' and client_phone:
                 dev = device_model or 'устройство'
-                default_ready_tpl = 'Скупка24: {device} готов! Стоимость: {amount} руб. Ждём вас. Skypka24.com'
+                if r_amount:
+                    default_ready_tpl = 'Скупка24: {device} готов! Стоимость: {amount} руб. Ждём вас. Skypka24.com'
+                    settings_key = 'sms_tpl_ready'
+                else:
+                    default_ready_tpl = 'Скупка24: {device} готов к выдаче! Ждём вас. Skypka24.com'
+                    settings_key = 'sms_tpl_ready_no_price'
                 cur2 = conn.cursor()
-                cur2.execute(f"SELECT value FROM {SCHEMA}.settings WHERE key = 'sms_tpl_ready'")
+                cur2.execute(f"SELECT value FROM {SCHEMA}.settings WHERE key = '{settings_key}'")
                 row2 = cur2.fetchone()
                 cur2.close()
                 tpl = (row2[0] if row2 and row2[0] else default_ready_tpl)

@@ -131,8 +131,8 @@ export default function StaffRepairList({
         </div>
       )}
 
-      {/* Карточки */}
-      <div className="px-3 py-3 space-y-2">
+      {/* Карточки — премиум-сетка для iPhone 15 Pro Max */}
+      <div className="px-3 py-3 space-y-2.5">
         {loading && (
           <div className="flex items-center justify-center py-14 gap-2 text-white/50">
             <div className="relative">

@@ -39,19 +39,28 @@ export default function StaffRepairReadyModal({ order, form, error, saving, onFo
               </div>
             </div>
 
+        {/* Подсказка: суммы можно ввести позже — при выдаче */}
+        <div className="relative mb-3 px-3 py-2 rounded-lg bg-gradient-to-r from-emerald-500/12 via-emerald-500/5 to-transparent border border-emerald-500/30 shadow-[0_0_12px_rgba(16,185,129,0.18)] flex items-start gap-2">
+          <span aria-hidden className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-400/50 to-transparent" />
+          <Icon name="MessageSquareText" size={14} className="text-emerald-300 shrink-0 mt-0.5 drop-shadow-[0_0_4px_rgba(16,185,129,0.6)]" />
+          <div className="font-roboto text-[11px] text-emerald-100/85 leading-snug">
+            Клиенту автоматически уйдёт <b className="text-emerald-200">СМС о готовности</b>. Цену и закупку можно заполнить позже — при <b className="text-emerald-200">выдаче</b>.
+          </div>
+        </div>
+
         <div className="relative space-y-3">
           <div>
-            <label className={LBL + " text-orange-400/80"}>🛒 Купленная запчасть</label>
+            <label className={LBL + " text-orange-400/80"}>🛒 Купленная запчасть <span className="text-white/30 normal-case font-normal">— необязательно</span></label>
             <input value={form.parts_name}
               onChange={e => onFormChange({ ...form, parts_name: e.target.value })}
               placeholder="Дисплей iPhone 14, аккумулятор..." className={INP} />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className={LBL + " text-orange-400/80"}>💸 Закупка (₽)</label>
+              <label className={LBL + " text-orange-400/80"}>💸 Закупка (₽) <span className="text-white/30 normal-case font-normal">— позже</span></label>
               <input type="number" value={form.purchase_amount}
                 onChange={e => onFormChange({ ...form, purchase_amount: e.target.value })}
-                placeholder="0" className={INP} />
+                placeholder="—" className={INP} />
               <label className="flex items-center gap-1.5 mt-1 cursor-pointer"
                 onClick={() => onFormChange({ ...form, purchase_amount: "0", parts_name: form.parts_name || "Нет" })}>
                 <div className={`w-3 h-3 border flex items-center justify-center transition-colors ${form.purchase_amount === "0" ? "bg-[#FFD700] border-[#FFD700]" : "border-white/30"}`}>
@@ -61,10 +70,10 @@ export default function StaffRepairReadyModal({ order, form, error, saving, onFo
               </label>
             </div>
             <div>
-              <label className={LBL + " text-green-400/80"}>💰 Выдано за ремонт (₽) *</label>
+              <label className={LBL + " text-green-400/80"}>💰 Выдано за ремонт (₽) <span className="text-white/30 normal-case font-normal">— позже</span></label>
               <input type="number" value={form.repair_amount}
                 onChange={e => onFormChange({ ...form, repair_amount: e.target.value })}
-                placeholder="1500" className={INP} />
+                placeholder="—" className={INP} />
             </div>
           </div>
 
@@ -97,9 +106,10 @@ export default function StaffRepairReadyModal({ order, form, error, saving, onFo
 
         <div className="relative flex gap-2 mt-4">
           <button onClick={onSubmit} disabled={saving}
+            title="Перевести в «Готово» и отправить клиенту СМС"
             className="btn-gold-premium flex-1 !py-2.5 disabled:opacity-50 disabled:cursor-not-allowed">
-            <Icon name={saving ? "Loader" : "Check"} size={15} className={saving ? "animate-spin" : ""} />
-            {saving ? "Сохраняю..." : "Подтвердить"}
+            <Icon name={saving ? "Loader" : "Send"} size={15} className={saving ? "animate-spin" : ""} />
+            {saving ? "Отправляю..." : "Готов · отправить СМС"}
           </button>
           <button onClick={onClose}
             className="px-4 py-2.5 rounded-md bg-gradient-to-b from-[#2A2A2A] to-[#1A1A1A] border border-[#333] hover:border-red-500/40 text-white/70 hover:text-red-300 font-roboto text-xs transition-all active:scale-95">
