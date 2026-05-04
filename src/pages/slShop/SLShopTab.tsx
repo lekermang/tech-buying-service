@@ -19,6 +19,7 @@ import SLAnalytics from "./SLAnalytics";
 import SLBookkeeping from "./SLBookkeeping";
 import C14dTab from "./c14d/C14dTab";
 import { slApi, can, type SLMyPermissions } from "./types";
+import { SLTabs } from "./slUI";
 
 type SubTab =
   | "dashboard"
@@ -44,7 +45,7 @@ type TabDef = { k: SubTab; l: string; icon: string; perm?: string; ownerOnly?: b
 const ALL_TABS: TabDef[] = [
   { k: "dashboard", l: "Сводка", icon: "LayoutDashboard" },
   { k: "buy", l: "Скупка", icon: "Plus", perm: "shop_buy" },
-  { k: "contracts14d", l: "Договор продажи 14 дней", icon: "Handshake", featured: true },
+  { k: "contracts14d", l: "Договор 14 дн.", icon: "Handshake", featured: true },
   { k: "stock", l: "Склад", icon: "Package", perm: "shop_view" },
   { k: "cash", l: "Касса", icon: "Wallet", perm: "cashflow_view" },
   { k: "operations", l: "Операции", icon: "Activity", perm: "shop_view" },
@@ -55,10 +56,10 @@ const ALL_TABS: TabDef[] = [
   { k: "journal", l: "Журнал", icon: "ScrollText" },
   { k: "analytics", l: "Аналитика", icon: "BarChart3", perm: "shifts_view_profit" },
   { k: "bookkeeping", l: "Бухгалтерия", icon: "Calculator", perm: "cashflow_view" },
-  { k: "import", l: "Импорт/Экспорт", icon: "ArrowUpDown", perm: "excel_export" },
+  { k: "import", l: "Импорт", icon: "ArrowUpDown", perm: "excel_export" },
   { k: "documents", l: "Документы", icon: "FileText" },
   { k: "categories", l: "Категории", icon: "Grid3x3" },
-  { k: "roles", l: "Роли и права", icon: "ShieldCheck", ownerOnly: true },
+  { k: "roles", l: "Роли", icon: "ShieldCheck", ownerOnly: true },
 ];
 
 export default function SLShopTab({ token, myRole }: { token: string; myRole?: string }) {
@@ -95,34 +96,13 @@ export default function SLShopTab({ token, myRole }: { token: string; myRole?: s
         </div>
       </div>
 
-      {/* Подвкладки — компактнее */}
-      <div className="flex gap-1 overflow-x-auto no-scrollbar pb-1.5 mb-2 -mx-1 px-1">
-        {visibleTabs.map(t => {
-          const active = tab === t.k;
-          const isFeatured = t.featured && !active;
-          return (
-            <button
-              key={t.k}
-              onClick={() => setTab(t.k)}
-              className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-[0.06em] transition-all active:scale-[0.97] ${
-                active
-                  ? "bg-[#FFD700] text-black shadow-[0_2px_8px_rgba(255,215,0,0.25)]"
-                  : isFeatured
-                    ? "bg-gradient-to-br from-[#FFD700]/20 via-[#FFD700]/10 to-transparent border border-[#FFD700]/50 text-[#FFD700] hover:bg-[#FFD700]/20 shadow-[0_0_12px_rgba(255,215,0,0.2)]"
-                    : "bg-[#101010] border border-[#1A1A1A] text-white/55 hover:text-white hover:border-[#2A2A2A]"
-              }`}
-            >
-              <Icon name={t.icon} size={11} />
-              {t.l}
-              {isFeatured && (
-                <span className="relative inline-flex h-1 w-1 ml-0.5">
-                  <span className="absolute inline-flex h-full w-full rounded-full bg-[#FFD700] opacity-75 animate-ping" />
-                  <span className="relative inline-flex rounded-full h-1 w-1 bg-[#FFD700]" />
-                </span>
-              )}
-            </button>
-          );
-        })}
+      {/* Подвкладки — премиум сегмент */}
+      <div className="mb-2">
+        <SLTabs
+          items={visibleTabs.map(t => ({ v: t.k, l: t.l, icon: t.icon, featured: t.featured }))}
+          value={tab}
+          onChange={(v) => setTab(v as SubTab)}
+        />
       </div>
 
       {/* Контент подвкладки */}

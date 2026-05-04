@@ -2,12 +2,13 @@ import { useEffect, useState, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 import { slApi, fmt, type SLAnalytics } from "./types";
 import { useSharedPeriod } from "./useSharedPeriod";
+import { SLTabs } from "./slUI";
 
 const PERIODS = [
   { v: "today", l: "Сегодня" },
   { v: "yesterday", l: "Вчера" },
-  { v: "7d", l: "7 дней" },
-  { v: "30d", l: "30 дней" },
+  { v: "7d", l: "7 дн." },
+  { v: "30d", l: "30 дн." },
   { v: "year", l: "Год" },
   { v: "all", l: "Всё время" },
 ];
@@ -43,17 +44,17 @@ export default function SLAnalytics({ token }: { token: string }) {
   return (
     <div className="space-y-3">
       {/* Период */}
-      <div className="flex gap-1.5 flex-wrap items-center">
-        {PERIODS.map(p => (
-          <button key={p.v} onClick={() => setPeriod(p.v)}
-            className={`text-[11px] px-3 py-1.5 rounded-full ${period === p.v ? "bg-[#FFD700] text-black font-bold" : "bg-[#141414] border border-[#1F1F1F] text-white/50"}`}>
-            {p.l}
+      <SLTabs
+        size="sm"
+        items={PERIODS.map(p => ({ v: p.v, l: p.l }))}
+        value={period}
+        onChange={setPeriod}
+        right={
+          <button onClick={load} className="text-white/45 hover:text-[#FFD700] p-1.5 rounded-md hover:bg-white/5 transition">
+            <Icon name={loading ? "Loader2" : "RefreshCw"} size={12} className={loading ? "animate-spin" : ""} />
           </button>
-        ))}
-        <button onClick={load} className="ml-auto text-white/40 hover:text-[#FFD700] p-2">
-          <Icon name={loading ? "Loader" : "RefreshCw"} size={14} className={loading ? "animate-spin" : ""} />
-        </button>
-      </div>
+        }
+      />
 
       {/* Главные метрики */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">

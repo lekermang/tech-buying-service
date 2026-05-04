@@ -2,6 +2,16 @@ import { useEffect, useState, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 import { slApi, fmt, type SLAccounting, type SLCashSummary, SLSHOP_URL } from "./types";
 import { useSharedPeriod } from "./useSharedPeriod";
+import { SLTabs } from "./slUI";
+
+const PERIODS = [
+  { v: "today", l: "Сегодня" },
+  { v: "yesterday", l: "Вчера" },
+  { v: "7d", l: "7 дн." },
+  { v: "30d", l: "30 дн." },
+  { v: "year", l: "Год" },
+  { v: "all", l: "Всё время" },
+];
 
 export default function SLBookkeeping({ token }: { token: string }) {
   const [period, setPeriod] = useSharedPeriod();
@@ -35,24 +45,17 @@ export default function SLBookkeeping({ token }: { token: string }) {
 
   return (
     <div className="space-y-3">
-      <div className="flex gap-1.5 flex-wrap">
-        {[
-          { v: "today", l: "Сегодня" },
-          { v: "yesterday", l: "Вчера" },
-          { v: "7d", l: "7 дней" },
-          { v: "30d", l: "30 дней" },
-          { v: "year", l: "Год" },
-          { v: "all", l: "Всё время" },
-        ].map(p => (
-          <button key={p.v} onClick={() => setPeriod(p.v)}
-            className={`text-[11px] px-3 py-1.5 rounded-full ${period === p.v ? "bg-[#FFD700] text-black font-bold" : "bg-[#141414] border border-[#1F1F1F] text-white/50"}`}>
-            {p.l}
+      <SLTabs
+        size="sm"
+        items={PERIODS.map(p => ({ v: p.v, l: p.l }))}
+        value={period}
+        onChange={setPeriod}
+        right={
+          <button onClick={downloadExport} className="inline-flex items-center gap-1 bg-emerald-500/12 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-md transition active:scale-[0.97]">
+            <Icon name="Download" size={10} />Excel
           </button>
-        ))}
-        <button onClick={downloadExport} className="ml-auto bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[11px] px-3 py-1.5 rounded-lg flex items-center gap-1">
-          <Icon name="Download" size={11} />Excel/CSV
-        </button>
-      </div>
+        }
+      />
 
       <div className="bg-gradient-to-br from-[#FFD700]/10 to-transparent border border-[#FFD700]/30 rounded-xl p-3">
         <div className="text-[11px] uppercase font-bold tracking-wide text-[#FFD700] mb-2">Денежная сводка</div>

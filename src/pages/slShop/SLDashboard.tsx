@@ -3,12 +3,13 @@ import Icon from "@/components/ui/icon";
 import { slApi, fmt, type SLStats, type SLSoldItem, type SLBoughtItem, STATUS_LABEL } from "./types";
 import { printReceipt } from "./labelPrinter";
 import { useSharedPeriod } from "./useSharedPeriod";
+import { SLTabs } from "./slUI";
 
 const PERIODS = [
   { v: "today", l: "Сегодня" },
   { v: "yesterday", l: "Вчера" },
-  { v: "7d", l: "7 дней" },
-  { v: "30d", l: "30 дней" },
+  { v: "7d", l: "7 дн." },
+  { v: "30d", l: "30 дн." },
   { v: "year", l: "Год" },
   { v: "all", l: "Всё время" },
 ];
@@ -43,20 +44,18 @@ export default function SLDashboard({ token, onNav, empName: _empName }: { token
   return (
     <div>
       {/* Период */}
-      <div className="flex gap-1.5 mb-3 flex-wrap items-center">
-        {PERIODS.map(p => {
-          const active = period === p.v;
-          return (
-            <button key={p.v} onClick={() => setPeriod(p.v)}
-              className={`text-[11px] px-3 py-1.5 rounded-full transition-all active:scale-95 ${
-                active ? "bg-[#FFD700] text-black font-bold shadow-md shadow-[#FFD700]/20"
-                  : "bg-[#141414] border border-[#1F1F1F] text-white/50 hover:text-white"
-              }`}>{p.l}</button>
-          );
-        })}
-        <button onClick={load} disabled={loading} className="ml-auto text-white/40 hover:text-[#FFD700] p-2 rounded-md hover:bg-white/5">
-          <Icon name={loading ? "Loader" : "RefreshCw"} size={14} className={loading ? "animate-spin" : ""} />
-        </button>
+      <div className="mb-2">
+        <SLTabs
+          size="sm"
+          items={PERIODS.map(p => ({ v: p.v, l: p.l }))}
+          value={period}
+          onChange={setPeriod}
+          right={
+            <button onClick={load} disabled={loading} className="text-white/45 hover:text-[#FFD700] p-1.5 rounded-md hover:bg-white/5 transition">
+              <Icon name={loading ? "Loader2" : "RefreshCw"} size={12} className={loading ? "animate-spin" : ""} />
+            </button>
+          }
+        />
       </div>
 
       {err && <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-3 rounded-lg mb-3 text-sm">{err}</div>}

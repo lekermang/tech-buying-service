@@ -7,7 +7,7 @@ import {
 import C14dCreateForm from "./C14dCreateForm";
 import C14dDetailView from "./C14dDetailView";
 import C14dReportTab from "./C14dReportTab";
-import { SLStat, SLPill, SLInput, SLButton, SLGrid } from "../slUI";
+import { SLStat, SLPill, SLInput, SLButton, SLGrid, SLTabs } from "../slUI";
 
 type View = "active" | "archive" | "create" | "search" | "reports";
 type Props = { token: string };
@@ -88,28 +88,11 @@ export default function C14dTab({ token }: Props) {
       </div>
 
       {/* Табы */}
-      <div className="flex gap-1 overflow-x-auto no-scrollbar -mx-1 px-1">
-        {subTabs.map(t => {
-          const active = view === t.k;
-          return (
-            <button
-              key={t.k}
-              onClick={() => setView(t.k)}
-              className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-[0.06em] transition-all active:scale-[0.97] ${
-                active
-                  ? "bg-[#FFD700] text-black shadow-[0_2px_8px_rgba(255,215,0,0.25)]"
-                  : "bg-[#101010] border border-[#1A1A1A] text-white/55 hover:text-white hover:border-[#2A2A2A]"
-              }`}
-            >
-              <Icon name={t.icon} size={11} />
-              {t.l}
-              {typeof t.badge === "number" && t.badge > 0 && (
-                <span className={`text-[8px] px-1 py-0 rounded-full font-bold ${active ? "bg-black/20 text-black" : "bg-[#FFD700]/15 text-[#FFD700]"}`}>{t.badge}</span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+      <SLTabs
+        items={subTabs.map(t => ({ v: t.k, l: t.l, icon: t.icon, badge: t.badge }))}
+        value={view}
+        onChange={(v) => setView(v as View)}
+      />
 
       {view === "create" && (
         <C14dCreateForm

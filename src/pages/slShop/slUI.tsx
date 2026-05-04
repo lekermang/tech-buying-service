@@ -265,3 +265,67 @@ export function SLGrid({
   }[cols];
   return <div className={`grid ${map} gap-2 ${className}`}>{children}</div>;
 }
+
+// ============ Премиум-сегмент-таб (для табов и периодов) ============
+export type SLTabItem = {
+  v: string;
+  l: string;
+  icon?: string;
+  badge?: number | string;
+  featured?: boolean;
+};
+
+export function SLTabs({
+  items, value, onChange, className = "", size = "md", right,
+}: {
+  items: SLTabItem[];
+  value: string;
+  onChange: (v: string) => void;
+  className?: string;
+  size?: "sm" | "md";
+  right?: ReactNode;
+}) {
+  const sizeCls = size === "sm"
+    ? "px-2 py-1 text-[10px]"
+    : "px-2.5 py-1.5 text-[11px]";
+  const iconSize = size === "sm" ? 10 : 11;
+  return (
+    <div className={`flex items-center gap-1 ${className}`}>
+      <div className="flex gap-1 overflow-x-auto no-scrollbar -mx-1 px-1 flex-1">
+        {items.map(t => {
+          const active = value === t.v;
+          const featured = t.featured && !active;
+          return (
+            <button
+              key={t.v}
+              type="button"
+              onClick={() => onChange(t.v)}
+              className={`shrink-0 inline-flex items-center gap-1 rounded-md font-bold uppercase tracking-[0.06em] transition-all active:scale-[0.96] ${sizeCls} ${
+                active
+                  ? "bg-gradient-to-b from-[#FFE34D] to-[#FFD700] text-black shadow-[0_2px_10px_rgba(255,215,0,0.35),inset_0_1px_0_rgba(255,255,255,0.5)]"
+                  : featured
+                    ? "bg-gradient-to-br from-[#FFD700]/22 via-[#FFD700]/8 to-transparent border border-[#FFD700]/55 text-[#FFD700] hover:bg-[#FFD700]/18 shadow-[0_0_12px_rgba(255,215,0,0.22)]"
+                    : "bg-[#0E0E0E] border border-[#1A1A1A] text-white/55 hover:text-white hover:border-[#FFD700]/30 hover:bg-[#131313]"
+              }`}
+            >
+              {t.icon && <Icon name={t.icon} size={iconSize} />}
+              {t.l}
+              {(typeof t.badge === "number" && t.badge > 0) || (typeof t.badge === "string" && t.badge) ? (
+                <span className={`text-[8px] leading-none px-1 py-0.5 rounded-full font-bold ml-0.5 ${active ? "bg-black/20 text-black" : "bg-[#FFD700]/15 text-[#FFD700]"}`}>
+                  {t.badge}
+                </span>
+              ) : null}
+              {featured && (
+                <span className="relative inline-flex h-1 w-1 ml-0.5">
+                  <span className="absolute inline-flex h-full w-full rounded-full bg-[#FFD700] opacity-75 animate-ping" />
+                  <span className="relative inline-flex rounded-full h-1 w-1 bg-[#FFD700]" />
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      {right && <div className="shrink-0">{right}</div>}
+    </div>
+  );
+}
