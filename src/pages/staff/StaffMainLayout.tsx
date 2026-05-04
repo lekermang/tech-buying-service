@@ -13,6 +13,7 @@ import {
   EmployeesTab, VipChatTab, SmartLombardTab, prefetchTab,
 } from "./StaffLazy";
 import MyProfileModal from "./MyProfileModal";
+import { SLTooltip } from "../slShop/slUI";
 
 type Tab = StaffTab;
 
@@ -131,7 +132,8 @@ export function StaffMainLayout({
         <div className="absolute inset-0 bg-gradient-to-br from-[#FFD700]/[0.04] via-transparent to-blue-500/[0.03] pointer-events-none" />
         <div className={`relative flex items-center justify-between gap-2 ${isMobile ? "px-2.5 py-1.5" : "px-3 py-2.5"}`}>
           {/* Аватар + имя */}
-          <button onClick={() => setProfileOpen(true)} className="flex items-center gap-2 min-w-0 flex-1 text-left active:scale-95 transition" title="Мой профиль">
+          <SLTooltip as="flex" content={<><b>{myName || empName}</b><br/>{ROLE_LABEL[empRole] || empRole} · нажми, чтобы открыть профиль</>} placement="bottom">
+          <button onClick={() => setProfileOpen(true)} className="flex items-center gap-2 min-w-0 flex-1 text-left active:scale-95 transition">
             <div className="relative shrink-0">
               {myAvatar ? (
                 <img src={myAvatar} alt="ava" className="w-9 h-9 rounded-full object-cover border border-[#FFD700]/40" />
@@ -154,6 +156,7 @@ export function StaffMainLayout({
               </span>
             </div>
           </button>
+          </SLTooltip>
 
           <div className={isMobile ? "hidden" : "block"}>
             <MskClock />
@@ -176,18 +179,24 @@ export function StaffMainLayout({
               </button>
             )}
             <InstallPwaButton />
-            <button onClick={() => setProfileOpen(true)} title="Мой профиль — изменить аватар, имя, пин-код"
-              className="text-white/40 hover:text-[#FFD700] active:text-[#FFD700] transition-all p-2 rounded-md hover:bg-[#FFD700]/10 hover:shadow-[0_0_10px_rgba(255,215,0,0.15)]">
-              <Icon name="UserCog" size={16} />
-            </button>
-            <button onClick={() => setThemeOpen(true)} title="Оформление — выбрать тему, цвета, эффекты"
-              className="text-white/40 hover:text-[#FFD700] active:text-[#FFD700] transition-all p-2 rounded-md hover:bg-[#FFD700]/10 hover:shadow-[0_0_10px_rgba(255,215,0,0.15)]">
-              <Icon name="Sparkles" size={16} />
-            </button>
-            <button onClick={logout} title="Выйти из аккаунта"
-              className="text-white/40 hover:text-red-400 active:text-red-500 transition-all p-2 rounded-md hover:bg-red-500/10 hover:shadow-[0_0_10px_rgba(239,68,68,0.15)]">
-              <Icon name="LogOut" size={16} />
-            </button>
+            <SLTooltip content={<><b>Мой профиль</b><br/>Изменить аватар, имя, пин-код</>} placement="bottom">
+              <button onClick={() => setProfileOpen(true)}
+                className="text-white/40 hover:text-[#FFD700] active:text-[#FFD700] transition-all p-2 rounded-md hover:bg-[#FFD700]/10 hover:shadow-[0_0_10px_rgba(255,215,0,0.15)]">
+                <Icon name="UserCog" size={16} />
+              </button>
+            </SLTooltip>
+            <SLTooltip content={<><b>Оформление</b><br/>Выбрать тему, цвета, эффекты курсора</>} placement="bottom">
+              <button onClick={() => setThemeOpen(true)}
+                className="text-white/40 hover:text-[#FFD700] active:text-[#FFD700] transition-all p-2 rounded-md hover:bg-[#FFD700]/10 hover:shadow-[0_0_10px_rgba(255,215,0,0.15)]">
+                <Icon name="Sparkles" size={16} />
+              </button>
+            </SLTooltip>
+            <SLTooltip content={<><b>Выйти</b><br/>Завершить сессию</>} placement="bottom">
+              <button onClick={logout}
+                className="text-white/40 hover:text-red-400 active:text-red-500 transition-all p-2 rounded-md hover:bg-red-500/10 hover:shadow-[0_0_10px_rgba(239,68,68,0.15)]">
+                <Icon name="LogOut" size={16} />
+              </button>
+            </SLTooltip>
           </div>
         </div>
       </div>
@@ -220,15 +229,26 @@ export function StaffMainLayout({
               const locked = !isOwner && !unlocked[t.k] && (PROTECTED_TABS as readonly string[]).includes(t.k);
               const active = tab === t.k;
               return (
-                <button
+                <SLTooltip
                   key={t.k}
+                  placement="top"
+                  delay={400}
+                  as="flex"
+                  content={
+                    <>
+                      <b className="text-[#FFD700]">{t.l}</b>
+                      {t.tip && <><br/>{t.tip}</>}
+                      {locked && <><br/><span className="text-red-300">🔒 Требуется пароль владельца</span></>}
+                    </>
+                  }
+                >
+                <button
                   onClick={() => requestTab(t.k as Tab)}
                   onMouseEnter={() => prefetchTab(t.k)}
                   onTouchStart={() => prefetchTab(t.k)}
                   aria-label={t.l}
                   aria-current={active ? "page" : undefined}
-                  title={t.tip ? `${t.l} — ${t.tip}${locked ? "\nТребуется пароль владельца." : ""}` : t.l}
-                  className={`flex-1 min-w-[56px] flex flex-col items-center justify-center gap-0.5 pt-2 pb-1.5 min-h-[56px] transition-all duration-300 active:scale-95 relative group ${
+                  className={`w-full min-w-[56px] flex flex-col items-center justify-center gap-0.5 pt-2 pb-1.5 min-h-[56px] transition-all duration-300 active:scale-95 relative group ${
                     active ? "text-[#FFD700]" : "text-white/45 hover:text-white/85"
                   }`}
                 >
@@ -253,6 +273,7 @@ export function StaffMainLayout({
                     {t.l}
                   </span>
                 </button>
+                </SLTooltip>
               );
             })}
           </div>
