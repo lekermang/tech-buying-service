@@ -18,6 +18,59 @@ export type C14dPayment = {
   comment?: string | null;
   paid_at: string;
   recorded_by?: string | null;
+  income_type?: "principal" | "interest" | "mixed" | "penalty";
+  cash_account_id?: number | null;
+  cash_movement_id?: number | null;
+};
+
+export type C14dCashAccount = {
+  id: number;
+  name: string;
+  kind: string;
+  balance: number | string;
+  is_default: boolean;
+  is_active: boolean;
+};
+
+export type C14dIncomeReport = {
+  period: { start_date: string; end_date: string };
+  summary: {
+    total_income: number;
+    principal_income: number;
+    interest_income: number;
+    mixed_income: number;
+    contract_count: number;
+    payments_count: number;
+    avg_income_per_contract: number;
+  };
+  daily: { date: string; amount: number }[];
+  details: {
+    id: number;
+    paid_at: string;
+    amount: number | string;
+    payment_type: string;
+    income_type: string;
+    comment?: string | null;
+    recorded_by?: string | null;
+    contract_id: number;
+    contract_number: string;
+    contract_status: string;
+    client_name: string;
+  }[];
+};
+
+export type C14dLateItem = {
+  id: number;
+  contract_number: string;
+  amount: number | string;
+  start_date: string;
+  end_date: string;
+  status: C14dStatus;
+  created_at: string;
+  client_name: string;
+  client_phone?: string | null;
+  item_brand?: string | null;
+  item_model?: string | null;
 };
 
 export type C14dListItem = {

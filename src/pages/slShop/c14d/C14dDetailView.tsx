@@ -6,6 +6,7 @@ import {
   fmtDate,
   STATUS_BADGE,
   type C14dDetail,
+  type C14dCashAccount,
 } from "./types";
 import { printContract14d } from "./printContract14d";
 
@@ -29,6 +30,19 @@ export default function C14dDetailView({ token, contractId, onBack }: Props) {
   const [payType, setPayType] = useState<"partial" | "full">("partial");
   const [payComment, setPayComment] = useState("");
   const [paySaving, setPaySaving] = useState(false);
+  const [accounts, setAccounts] = useState<C14dCashAccount[]>([]);
+  const [payAccountId, setPayAccountId] = useState<string>("");
+  const [paySkipCash, setPaySkipCash] = useState(false);
+
+  useEffect(() => {
+    c14dApi<{ accounts: C14dCashAccount[] }>(token, "cash_accounts").then(r => {
+      if (r.ok && r.data) {
+        setAccounts(r.data.accounts);
+        const def = r.data.accounts.find(a => a.is_default) || r.data.accounts[0];
+        if (def) setPayAccountId(String(def.id));
+      }
+    });
+  }, [token]);
 
   // photo modal
   const [photoSrc, setPhotoSrc] = useState<string | null>(null);
@@ -58,11 +72,18 @@ export default function C14dDetailView({ token, contractId, onBack }: Props) {
     setPaySaving(true);
     const r = await c14dApi(token, "payment", {
       method: "POST",
-      body: { contract_id: c.id, amount: a, payment_type: payType, comment: payComment || null },
+      body: {
+        contract_id: c.id,
+        amount: a,
+        payment_type: payType,
+        comment: payComment || null,
+        cash_account_id: payAccountId ? Number(payAccountId) : null,
+        skip_cash: paySkipCash,
+      },
     });
     setPaySaving(false);
     if (!r.ok) { setErr(r.error || "Ошибка платежа"); return; }
-    setPayOpen(false); setPaySum(""); setPayComment(""); setPayType("partial");
+    setPayOpen(false); setPaySum(""); setPayComment(""); setPayType("partial"); setPaySkipCash(false);
     reload();
   };
 
@@ -245,18 +266,34 @@ export default function C14dDetailView({ token, contractId, onBack }: Props) {
                   <th className="text-left p-1.5">Дата</th>
                   <th className="text-right p-1.5">Сумма</th>
                   <th className="text-left p-1.5">Тип</th>
+                  <th className="text-left p-1.5">Доход</th>
+                  <th className="text-left p-1.5">Касса</th>
                   <th className="text-left p-1.5">Принял</th>
                 </tr>
               </thead>
               <tbody>
-                {c.payments.map(p => (
-                  <tr key={p.id} className="border-t border-[#1F1F1F]">
-                    <td className="p-1.5 text-white/70">{fmtDate(p.paid_at)}</td>
-                    <td className="p-1.5 text-right text-emerald-300 font-semibold">{fmt(p.amount)} ₽</td>
-                    <td className="p-1.5 text-white/60">{p.payment_type === "full" ? "Полный" : "Частичный"}</td>
-                    <td className="p-1.5 text-white/60">{p.recorded_by || "—"}</td>
-                  </tr>
-                ))}
+                {c.payments.map(p => {
+                  const incomeLbl = p.income_type === "interest" ? "Проценты" :
+                    p.income_type === "principal" ? "Тело" :
+                    p.income_type === "mixed" ? "Смешанный" :
+                    p.income_type === "penalty" ? "Пеня" : "—";
+                  return (
+                    <tr key={p.id} className="border-t border-[#1F1F1F]">
+                      <td className="p-1.5 text-white/70">{fmtDate(p.paid_at)}</td>
+                      <td className="p-1.5 text-right text-emerald-300 font-semibold">{fmt(p.amount)} ₽</td>
+                      <td className="p-1.5 text-white/60">{p.payment_type === "full" ? "Полный" : "Частичный"}</td>
+                      <td className="p-1.5 text-white/60">{incomeLbl}</td>
+                      <td className="p-1.5 text-white/60">
+                        {p.cash_movement_id ? (
+                          <span className="inline-flex items-center gap-1 text-emerald-300/80">
+                            <Icon name="Wallet" size={11} /> в кассу
+                          </span>
+                        ) : <span className="text-white/30">не в кассу</span>}
+                      </td>
+                      <td className="p-1.5 text-white/60">{p.recorded_by || "—"}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -302,6 +339,26 @@ export default function C14dDetailView({ token, contractId, onBack }: Props) {
                   <option value="partial">Частичный платёж</option>
                   <option value="full">Полный расчёт</option>
                 </select>
+              </div>
+              <div>
+                <label className={lbl}>Касса прихода</label>
+                <select
+                  className="w-full rounded-lg bg-[#0F0F0F] border border-[#222] focus:border-[#FFD700] outline-none px-3 py-2 text-sm text-white"
+                  value={payAccountId}
+                  onChange={e => setPayAccountId(e.target.value)}
+                  disabled={paySkipCash}
+                >
+                  {accounts.length === 0 && <option value="">Нет активных касс</option>}
+                  {accounts.map(a => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} ({fmt(a.balance)} ₽){a.is_default ? " ★" : ""}
+                    </option>
+                  ))}
+                </select>
+                <label className="flex items-center gap-2 text-[11px] text-white/60 mt-1.5 cursor-pointer">
+                  <input type="checkbox" checked={paySkipCash} onChange={e => setPaySkipCash(e.target.checked)} className="accent-[#FFD700]" />
+                  Не вносить в кассу (только зафиксировать платёж)
+                </label>
               </div>
               <div>
                 <label className={lbl}>Комментарий</label>

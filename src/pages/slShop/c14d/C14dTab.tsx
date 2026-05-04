@@ -10,8 +10,9 @@ import {
 } from "./types";
 import C14dCreateForm from "./C14dCreateForm";
 import C14dDetailView from "./C14dDetailView";
+import C14dReportTab from "./C14dReportTab";
 
-type View = "active" | "archive" | "create" | "search";
+type View = "active" | "archive" | "create" | "search" | "reports";
 type Props = { token: string };
 
 export default function C14dTab({ token }: Props) {
@@ -57,7 +58,7 @@ export default function C14dTab({ token }: Props) {
 
   useEffect(() => { fetchStats(); }, [fetchStats]);
   useEffect(() => {
-    if (view !== "create") load();
+    if (view === "active" || view === "archive" || view === "search") load();
   }, [load, view]);
 
   const subTabs: { k: View; l: string; icon: string; badge?: number }[] = [
@@ -65,6 +66,7 @@ export default function C14dTab({ token }: Props) {
     { k: "archive", l: "Архив",      icon: "Archive", badge: stats?.archive_count },
     { k: "create",  l: "Создать",    icon: "Plus" },
     { k: "search",  l: "Поиск",      icon: "Search" },
+    { k: "reports", l: "Отчёты",     icon: "BarChart3" },
   ];
 
   if (openId != null) {
@@ -150,6 +152,8 @@ export default function C14dTab({ token }: Props) {
       {(view === "active" || view === "archive" || view === "search") && (
         <ContractsList items={items} loading={loading} err={err} onOpen={setOpenId} />
       )}
+
+      {view === "reports" && <C14dReportTab token={token} />}
     </div>
   );
 }

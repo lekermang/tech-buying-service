@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import {
   c14dApi,
@@ -8,29 +8,33 @@ import {
   ACCESSORIES_OPTIONS,
   CONDITION_OPTIONS,
   type C14dPhoto,
+  type C14dCashAccount,
 } from "./types";
 
 type Props = {
   token: string;
   onCreated: (id: number) => void;
   onCancel: () => void;
+  prefill?: { full_name?: string; phone?: string; amount?: number; start_date?: string } | null;
 };
+
+const todayISO = () => new Date().toISOString().slice(0, 10);
 
 const inp = "w-full rounded-lg bg-[#0F0F0F] border border-[#222] focus:border-[#FFD700] outline-none px-3 py-2 text-sm text-white placeholder:text-white/30 transition";
 const lbl = "block text-[11px] uppercase tracking-wider font-semibold text-white/60 mb-1";
 
-export default function C14dCreateForm({ token, onCreated, onCancel }: Props) {
+export default function C14dCreateForm({ token, onCreated, onCancel, prefill }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Клиент
-  const [fullName, setFullName] = useState("");
+  const [fullName, setFullName] = useState(prefill?.full_name || "");
   const [birthDate, setBirthDate] = useState("");
   const [passSeries, setPassSeries] = useState("");
   const [passNumber, setPassNumber] = useState("");
   const [passIssuedBy, setPassIssuedBy] = useState("");
   const [passIssueDate, setPassIssueDate] = useState("");
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState(prefill?.phone || "");
   const [email, setEmail] = useState("");
 
   // Имущество
@@ -42,11 +46,40 @@ export default function C14dCreateForm({ token, onCreated, onCancel }: Props) {
   const [accessories, setAccessories] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
 
-  // Условия
-  const [amount, setAmount] = useState<string>("");
+  // Условия + дата
+  const [amount, setAmount] = useState<string>(prefill?.amount ? String(prefill.amount) : "");
   const interest_rate = 4;
   const term_days = 14;
   const [agreed, setAgreed] = useState(false);
+  const [isLate, setIsLate] = useState<boolean>(!!prefill?.start_date);
+  const [startDate, setStartDate] = useState<string>(prefill?.start_date || todayISO());
+
+  // Кассы
+  const [accounts, setAccounts] = useState<C14dCashAccount[]>([]);
+  const [cashAccountId, setCashAccountId] = useState<string>("");
+  const [skipCash, setSkipCash] = useState(false);
+
+  useEffect(() => {
+    c14dApi<{ accounts: C14dCashAccount[] }>(token, "cash_accounts").then(r => {
+      if (r.ok && r.data) {
+        setAccounts(r.data.accounts);
+        const def = r.data.accounts.find(a => a.is_default) || r.data.accounts[0];
+        if (def) setCashAccountId(String(def.id));
+      }
+    });
+  }, [token]);
+
+  // При late-договоре по умолчанию не списываем из кассы (деньги уже выданы)
+  useEffect(() => {
+    if (isLate) setSkipCash(true);
+  }, [isLate]);
+
+  const endDateISO = useMemo(() => {
+    const d = new Date(startDate);
+    if (isNaN(d.getTime())) return "";
+    d.setDate(d.getDate() + term_days);
+    return d.toISOString().slice(0, 10);
+  }, [startDate]);
 
   // Фото
   const [photos, setPhotos] = useState<C14dPhoto[]>([]);
@@ -102,6 +135,8 @@ export default function C14dCreateForm({ token, onCreated, onCancel }: Props) {
     const a = Number(amount);
     if (!a || a <= 0) { setError("Укажите сумму выдачи"); return; }
     if (!asDraft && !agreed) { setError("Подтвердите ознакомление клиента"); return; }
+    if (isLate && !startDate) { setError("Укажите дату заключения договора"); return; }
+    if (startDate && startDate > todayISO()) { setError("Дата заключения не может быть в будущем"); return; }
     setSaving(true);
     const r = await c14dApi<{ id: number; contract_number: string }>(token, "create", {
       method: "POST",
@@ -130,6 +165,9 @@ export default function C14dCreateForm({ token, onCreated, onCancel }: Props) {
         term_days,
         status: asDraft ? "draft" : "active",
         photos,
+        start_date: startDate || todayISO(),
+        cash_account_id: cashAccountId ? Number(cashAccountId) : null,
+        skip_cash: skipCash,
       },
     });
     setSaving(false);
@@ -335,6 +373,64 @@ export default function C14dCreateForm({ token, onCreated, onCancel }: Props) {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* Дата заключения и касса */}
+      <section className="rounded-xl bg-[#141414] border border-[#1F1F1F] p-3 sm:p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Icon name="CalendarClock" size={16} className="text-[#FFD700]" />
+          <h3 className="font-oswald uppercase text-sm tracking-wide">Дата и касса</h3>
+        </div>
+
+        <label className="flex items-start gap-2 text-sm text-white/80 cursor-pointer select-none mb-3">
+          <input type="checkbox" checked={isLate} onChange={e => { setIsLate(e.target.checked); if (!e.target.checked) setStartDate(todayISO()); }} className="mt-1 accent-[#FFD700]" />
+          <span>
+            <b>Добавить договор задним числом</b>
+            <div className="text-[11px] text-white/50">Используйте, если договор был заключён ранее, но не внесён в систему. Деньги по умолчанию не списываются из кассы.</div>
+          </span>
+        </label>
+
+        <div className="grid sm:grid-cols-3 gap-3 mb-2">
+          <div>
+            <label className={lbl}>Дата заключения {isLate && <span className="text-red-300">*</span>}</label>
+            <input
+              className={inp}
+              type="date"
+              value={startDate}
+              max={todayISO()}
+              onChange={e => setStartDate(e.target.value)}
+              disabled={!isLate}
+            />
+          </div>
+          <div>
+            <label className={lbl}>Дата окончания</label>
+            <div className="px-3 py-2 rounded-lg bg-[#0F0F0F] border border-[#222] text-sm text-[#FFD700] font-semibold">{endDateISO || "—"}</div>
+          </div>
+          <div>
+            <label className={lbl}>Касса (выдача наличных)</label>
+            <select
+              className={inp}
+              value={cashAccountId}
+              onChange={e => setCashAccountId(e.target.value)}
+              disabled={skipCash}
+            >
+              {accounts.length === 0 && <option value="">Нет активных касс</option>}
+              {accounts.map(a => (
+                <option key={a.id} value={a.id}>
+                  {a.name} ({fmt(a.balance)} ₽){a.is_default ? " ★" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <label className="flex items-start gap-2 text-[12px] text-white/70 cursor-pointer select-none">
+          <input type="checkbox" checked={skipCash} onChange={e => setSkipCash(e.target.checked)} className="mt-1 accent-[#FFD700]" />
+          <span>
+            Не списывать сумму с кассы (только зарегистрировать договор)
+            {isLate && <span className="text-[#FFD700]/70"> · по умолчанию для договоров задним числом</span>}
+          </span>
+        </label>
       </section>
 
       <label className="flex items-start gap-2 text-sm text-white/80 cursor-pointer select-none">

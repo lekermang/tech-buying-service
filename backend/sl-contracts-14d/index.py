@@ -100,6 +100,60 @@ def _log(cur, contract_id, action, details, actor):
     )
 
 
+def _parse_date(s, default=None):
+    if not s:
+        return default
+    try:
+        return datetime.strptime(str(s)[:10], '%Y-%m-%d').date()
+    except Exception:
+        return default
+
+
+def _resolve_cash_account(cur, account_id):
+    """Возвращает id активного счёта. Если account_id не задан — берёт is_default или первый активный."""
+    if account_id:
+        cur.execute(
+            f"SELECT id FROM {SCHEMA}.slshop_cash_accounts WHERE id=%s AND is_active=true",
+            (int(account_id),)
+        )
+        row = cur.fetchone()
+        return row[0] if row else None
+    cur.execute(
+        f"SELECT id FROM {SCHEMA}.slshop_cash_accounts WHERE is_active=true "
+        f"ORDER BY is_default DESC, id ASC LIMIT 1"
+    )
+    row = cur.fetchone()
+    return row[0] if row else None
+
+
+def _cash_movement(cur, account_id, direction, amount, category, reason, actor, branch_id=None):
+    """Создаёт движение в кассе и обновляет баланс. Возвращает id движения."""
+    amt = Decimal(str(amount))
+    if amt <= 0:
+        return None
+    cur.execute(
+        f"SELECT balance FROM {SCHEMA}.slshop_cash_accounts WHERE id=%s FOR UPDATE",
+        (account_id,)
+    )
+    row = cur.fetchone()
+    if not row:
+        return None
+    balance = Decimal(str(row[0] or 0))
+    new_balance = balance + amt if direction == 'in' else balance - amt
+    cur.execute(
+        f"UPDATE {SCHEMA}.slshop_cash_accounts SET balance=%s WHERE id=%s",
+        (new_balance, account_id)
+    )
+    cur.execute(
+        f"INSERT INTO {SCHEMA}.slshop_cash_movements "
+        f"(account_id, direction, amount, balance_after, category, reason, employee_name, is_auto, branch_id) "
+        f"VALUES (%s, %s, %s, %s, %s, %s, %s, TRUE, %s) RETURNING id",
+        (account_id, direction, amt, new_balance, category, reason,
+         (actor or {}).get('full_name'), branch_id)
+    )
+    return cur.fetchone()[0]
+
+
 # ============ Calculate ============
 def action_calculate(params):
     try:
@@ -161,6 +215,14 @@ def action_create(body, actor):
     interest_rate = Decimal(str(body.get('interest_rate') or '4'))
     term_days = int(body.get('term_days') or 14)
     status = (body.get('status') or 'active').strip()  # active | draft
+    cash_account_id = body.get('cash_account_id')
+    skip_cash = bool(body.get('skip_cash'))  # для late-договоров (внесены задним числом)
+
+    # Дата заключения договора (можно указать прошлую, нельзя будущую)
+    today = date.today()
+    requested_start = _parse_date(body.get('start_date'), today)
+    if requested_start > today:
+        return _err(400, 'Дата заключения не может быть в будущем')
 
     if not (client.get('full_name') or '').strip():
         return _err(400, 'ФИО клиента обязательно')
@@ -211,20 +273,43 @@ def action_create(body, actor):
 
         # Договор
         contract_number = _next_contract_number(cur)
-        start_date = date.today()
+        start_date = requested_start
         end_date = start_date + timedelta(days=term_days)
+        is_late = start_date < today
+
+        # Касса (для активных, не черновиков, и не late с пометкой skip_cash)
+        resolved_cash_id = None
+        payout_movement_id = None
+        if status == 'active' and not skip_cash:
+            resolved_cash_id = _resolve_cash_account(cur, cash_account_id)
+
         cur.execute(
             f"INSERT INTO {SCHEMA}.contracts_14d "
             f"(contract_number, client_id, item_id, amount, interest_rate, term_days, total_due, "
-            f"remaining_debt, start_date, end_date, status, created_by) "
-            f"VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+            f"remaining_debt, start_date, end_date, status, created_by, cash_account_id) "
+            f"VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
             (
                 contract_number, client_id, item_id, amount, interest_rate, term_days,
                 total_due, total_due, start_date, end_date, status,
                 (actor or {}).get('full_name'),
+                resolved_cash_id,
             )
         )
         contract_id = cur.fetchone()[0]
+
+        # Движение по кассе — выдача наличных клиенту (списание)
+        if resolved_cash_id:
+            payout_movement_id = _cash_movement(
+                cur, resolved_cash_id, 'out', amount,
+                'contracts_14d_payout',
+                f'Выдача по договору {contract_number} ({client.get("full_name", "").strip()})',
+                actor
+            )
+            if payout_movement_id:
+                cur.execute(
+                    f"UPDATE {SCHEMA}.contracts_14d SET payout_movement_id=%s WHERE id=%s",
+                    (payout_movement_id, contract_id)
+                )
 
         # Фото
         for p in photos:
@@ -240,10 +325,15 @@ def action_create(body, actor):
                 (contract_id, ptype, url, p.get('s3_key'))
             )
 
-        _log(cur, contract_id, 'create', {
+        log_action = 'add_late_contract' if is_late and status == 'active' else 'create'
+        _log(cur, contract_id, log_action, {
             'contract_number': contract_number,
             'amount': float(amount),
             'status': status,
+            'start_date': start_date.isoformat(),
+            'is_late': is_late,
+            'cash_account_id': resolved_cash_id,
+            'payout_movement_id': payout_movement_id,
         }, actor)
         conn.commit()
         return _ok({
@@ -251,8 +341,11 @@ def action_create(body, actor):
             'contract_number': contract_number,
             'total_due': float(total_due),
             'remaining_debt': float(total_due),
+            'start_date': start_date.isoformat(),
             'end_date': end_date.isoformat(),
             'status': status,
+            'cash_account_id': resolved_cash_id,
+            'payout_movement_id': payout_movement_id,
         }, status=201)
     except Exception as e:
         conn.rollback()
@@ -392,17 +485,24 @@ def action_payment(body, actor):
     if payment_type not in ('partial', 'full'):
         payment_type = 'partial'
     comment = body.get('comment') or None
+    cash_account_id = body.get('cash_account_id')
+    skip_cash = bool(body.get('skip_cash'))
 
     conn = get_conn(); cur = conn.cursor()
     try:
         cur.execute(
-            f"SELECT total_due, paid_total, status FROM {SCHEMA}.contracts_14d WHERE id=%s FOR UPDATE",
+            f"SELECT total_due, paid_total, status, amount, contract_number "
+            f"FROM {SCHEMA}.contracts_14d WHERE id=%s FOR UPDATE",
             (cid,)
         )
         row = cur.fetchone()
         if not row:
             return _err(404, 'Договор не найден')
-        total_due, paid_total, status = Decimal(str(row[0])), Decimal(str(row[1])), row[2]
+        total_due = Decimal(str(row[0]))
+        paid_total = Decimal(str(row[1]))
+        status = row[2]
+        principal = Decimal(str(row[3]))
+        contract_number = row[4]
         if status != 'active':
             return _err(400, 'Платёж можно вносить только по активному договору')
 
@@ -416,14 +516,41 @@ def action_payment(body, actor):
         if new_remaining < Decimal('0.01'):
             new_remaining = Decimal('0')
 
+        # Классификация типа дохода: principal / interest / mixed
+        # Сначала гасится тело (amount), потом проценты
+        prev_principal_paid = paid_total if paid_total < principal else principal
+        principal_left = principal - prev_principal_paid
+        if principal_left >= amount:
+            income_type = 'principal'
+        elif principal_left <= 0:
+            income_type = 'interest'
+        else:
+            income_type = 'mixed'
+
+        # Касса
+        cash_id = None
+        movement_id = None
+        if not skip_cash:
+            cash_id = _resolve_cash_account(cur, cash_account_id)
+            if cash_id:
+                movement_id = _cash_movement(
+                    cur, cash_id, 'in', amount,
+                    'contracts_14d_payment',
+                    f'Платёж по договору {contract_number}' + (f' · {comment}' if comment else ''),
+                    actor
+                )
+
         cur.execute(
             f"INSERT INTO {SCHEMA}.contracts_14d_payments "
-            f"(contract_id, amount, payment_type, comment, recorded_by) VALUES (%s, %s, %s, %s, %s)",
-            (cid, amount, payment_type, comment, (actor or {}).get('full_name'))
+            f"(contract_id, amount, payment_type, comment, recorded_by, "
+            f"cash_account_id, cash_movement_id, income_type) "
+            f"VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+            (cid, amount, payment_type, comment, (actor or {}).get('full_name'),
+             cash_id, movement_id, income_type)
         )
+        payment_id = cur.fetchone()[0]
 
         new_status = 'closed' if new_remaining <= 0 else 'active'
-        closed_at_sql = "NOW()" if new_status == 'closed' else "NULL"
         cur.execute(
             f"UPDATE {SCHEMA}.contracts_14d SET paid_total=%s, remaining_debt=%s, status=%s, "
             f"closed_at=CASE WHEN %s='closed' THEN NOW() ELSE closed_at END, updated_at=NOW() WHERE id=%s",
@@ -431,16 +558,22 @@ def action_payment(body, actor):
         )
 
         _log(cur, cid, 'payment', {
+            'payment_id': payment_id,
             'amount': float(amount),
             'payment_type': payment_type,
+            'income_type': income_type,
             'remaining_debt': float(new_remaining),
             'auto_closed': new_status == 'closed',
+            'cash_account_id': cash_id,
+            'cash_movement_id': movement_id,
         }, actor)
         conn.commit()
         return _ok({
             'remaining_debt': float(new_remaining),
             'paid_total': float(new_paid),
             'status': new_status,
+            'income_type': income_type,
+            'cash_movement_id': movement_id,
         })
     except Exception as e:
         conn.rollback()
@@ -504,6 +637,120 @@ def action_close(body, actor):
         cur.close(); conn.close()
 
 
+# ============ Cash accounts list ============
+def action_cash_accounts():
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        f"SELECT id, name, kind, balance, is_default, is_active "
+        f"FROM {SCHEMA}.slshop_cash_accounts WHERE is_active=true "
+        f"ORDER BY is_default DESC, id ASC"
+    )
+    rows = [dict(r) for r in cur.fetchall()]
+    cur.close(); conn.close()
+    return _ok({'accounts': rows})
+
+
+# ============ Income report ============
+def action_income_report(params):
+    """
+    GET /?action=income_report&start_date=YYYY-MM-DD&end_date=YYYY-MM-DD
+        &income_type=all|principal|interest|mixed
+        &contract_status=all|active|closed|terminated
+    """
+    today = date.today()
+    sd = _parse_date(params.get('start_date'), today.replace(day=1))
+    ed = _parse_date(params.get('end_date'), today)
+    income_type = (params.get('income_type') or 'all').strip()
+    contract_status = (params.get('contract_status') or 'all').strip()
+
+    where = [f"p.paid_at::date >= {_esc(sd.isoformat())}",
+             f"p.paid_at::date <= {_esc(ed.isoformat())}"]
+    if income_type in ('principal', 'interest', 'mixed'):
+        where.append(f"p.income_type = {_esc(income_type)}")
+    if contract_status in ('active', 'closed', 'terminated'):
+        where.append(f"c.status = {_esc(contract_status)}")
+    where_sql = 'WHERE ' + ' AND '.join(where)
+
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        f"SELECT p.id, p.paid_at, p.amount, p.payment_type, p.income_type, p.comment, p.recorded_by, "
+        f"c.id AS contract_id, c.contract_number, c.status AS contract_status, "
+        f"cl.full_name AS client_name "
+        f"FROM {SCHEMA}.contracts_14d_payments p "
+        f"JOIN {SCHEMA}.contracts_14d c ON c.id = p.contract_id "
+        f"JOIN {SCHEMA}.contracts_14d_clients cl ON cl.id = c.client_id "
+        f"{where_sql} "
+        f"ORDER BY p.paid_at DESC LIMIT 5000"
+    )
+    details = [dict(r) for r in cur.fetchall()]
+
+    # сводка
+    total = sum(Decimal(str(r['amount'] or 0)) for r in details)
+    contracts = {r['contract_id'] for r in details}
+    interest_sum = sum(Decimal(str(r['amount'] or 0)) for r in details if r.get('income_type') == 'interest')
+    principal_sum = sum(Decimal(str(r['amount'] or 0)) for r in details if r.get('income_type') == 'principal')
+    mixed_sum = sum(Decimal(str(r['amount'] or 0)) for r in details if r.get('income_type') == 'mixed')
+
+    # помесячная разбивка
+    by_day = {}
+    for r in details:
+        pa = r.get('paid_at')
+        if pa:
+            d = pa.date() if hasattr(pa, 'date') else _parse_date(str(pa)[:10])
+            key = d.isoformat() if d else None
+            if key:
+                by_day[key] = float(Decimal(str(by_day.get(key, 0))) + Decimal(str(r['amount'] or 0)))
+    daily = [{'date': k, 'amount': v} for k, v in sorted(by_day.items())]
+
+    cur.close(); conn.close()
+
+    avg = float(total / len(contracts)) if contracts else 0.0
+    actor_name = None  # лог пишем в handler — здесь только данные
+
+    return _ok({
+        'period': {'start_date': sd.isoformat(), 'end_date': ed.isoformat()},
+        'summary': {
+            'total_income': float(total),
+            'principal_income': float(principal_sum),
+            'interest_income': float(interest_sum),
+            'mixed_income': float(mixed_sum),
+            'contract_count': len(contracts),
+            'payments_count': len(details),
+            'avg_income_per_contract': round(avg, 2),
+        },
+        'daily': daily,
+        'details': details,
+    })
+
+
+# ============ Late contracts (созданные задним числом) ============
+def action_late(params):
+    date_from = (params.get('date_from') or '').strip()
+    date_to = (params.get('date_to') or '').strip()
+    where = ["c.start_date < c.created_at::date"]
+    if date_from:
+        where.append(f"c.start_date >= {_esc(date_from)}")
+    if date_to:
+        where.append(f"c.start_date <= {_esc(date_to)}")
+    where_sql = 'WHERE ' + ' AND '.join(where)
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        f"SELECT c.id, c.contract_number, c.amount, c.start_date, c.end_date, c.status, c.created_at, "
+        f"cl.full_name AS client_name, cl.phone AS client_phone, "
+        f"i.brand AS item_brand, i.model AS item_model "
+        f"FROM {SCHEMA}.contracts_14d c "
+        f"JOIN {SCHEMA}.contracts_14d_clients cl ON cl.id = c.client_id "
+        f"JOIN {SCHEMA}.contracts_14d_items i ON i.id = c.item_id "
+        f"{where_sql} ORDER BY c.start_date DESC LIMIT 500"
+    )
+    rows = [dict(r) for r in cur.fetchall()]
+    cur.close(); conn.close()
+    return _ok({'items': rows, 'count': len(rows)})
+
+
 # ============ Stats ============
 def action_stats():
     conn = get_conn()
@@ -558,6 +805,12 @@ def handler(event: dict, context) -> dict:
             return action_calculate(qs)
         if action == 'stats':
             return action_stats()
+        if action == 'cash_accounts':
+            return action_cash_accounts()
+        if action == 'income_report':
+            return action_income_report(qs)
+        if action == 'late':
+            return action_late(qs)
         return _err(400, f'Unknown GET action: {action}')
 
     if method == 'POST':
