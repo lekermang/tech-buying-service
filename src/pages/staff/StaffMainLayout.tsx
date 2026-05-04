@@ -13,6 +13,7 @@ import {
   EmployeesTab, VipChatTab, SmartLombardTab, prefetchTab,
 } from "./StaffLazy";
 import MyProfileModal from "./MyProfileModal";
+import StaffSectionBanner from "./StaffSectionBanner";
 import { SLTooltip } from "../slShop/slUI";
 
 type Tab = StaffTab;
@@ -241,6 +242,7 @@ export function StaffMainLayout({
 
       {/* Контент — растягивается, с паддингом под нижнюю панель */}
       <div className="flex-1 overflow-y-auto relative z-10" style={{ paddingBottom: 'calc(56px + env(safe-area-inset-bottom, 12px))' }}>
+        <StaffSectionBanner tab={tab} />
         <TabErrorBoundary key={tab}>
           <React.Suspense fallback={<div className="flex items-center justify-center py-16 text-white/20 font-roboto text-sm"><Icon name="Loader" size={16} className="animate-spin mr-2" />Загружаю...</div>}>
             {tab === "repair"    && <StaffRepairTab token={token} isOwner={empRole === "owner"} />}
