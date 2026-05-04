@@ -52,8 +52,8 @@ export const fmtDay = (day: string) => {
   return d.toLocaleDateString("ru-RU", { day: "2-digit", month: "short", weekday: "short" });
 };
 
-export const INP = "w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-2 font-roboto text-xs focus:outline-none focus:border-[#FFD700] transition-colors placeholder:text-white/20";
-export const LBL = "font-roboto text-white/40 text-[10px] block mb-1";
+export const INP = "w-full bg-gradient-to-br from-[#0E0E0E] to-[#0A0A0A] border border-[#1F1F1F] hover:border-[#262626] focus:border-[#FFD700]/60 focus:bg-[#101010] focus:shadow-[0_0_0_3px_rgba(255,215,0,0.08),inset_0_1px_0_rgba(255,215,0,0.04)] text-white px-3 py-2 font-roboto text-[13px] rounded-md focus:outline-none transition-all placeholder:text-white/25";
+export const LBL = "font-roboto text-white/55 text-[10px] uppercase tracking-[0.06em] font-bold block mb-1";
 
 export const printAct = async (o: Order) => {
   const { Document, Packer, Paragraph, TextRun, AlignmentType, BorderStyle, Table, TableRow, TableCell, WidthType, VerticalAlign, ImageRun } = await import("docx");
