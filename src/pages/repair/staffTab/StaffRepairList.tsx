@@ -1,7 +1,28 @@
+import { useMemo } from "react";
 import Icon from "@/components/ui/icon";
 import { STATUSES, Order, EMPTY_FORM, INP, LBL } from "../types";
 import StaffRepairOrderCard from "../StaffRepairOrderCard";
 import { EditForm } from "./staffTabTypes";
+
+// Возраст принятой заявки в часах (от created_at)
+function ageHours(o: Order): number {
+  if (o.status !== "new" || !o.created_at) return -1;
+  const t = new Date(o.created_at).getTime();
+  if (!Number.isFinite(t)) return -1;
+  return (Date.now() - t) / 3_600_000;
+}
+
+// Уровень срочности: 0..5 (5 — критично, 48ч+). Не-новые → -1.
+function urgencyLevel(o: Order): number {
+  const h = ageHours(o);
+  if (h < 0) return -1;
+  if (h >= 48) return 5;
+  if (h >= 24) return 4;
+  if (h >= 12) return 3;
+  if (h >= 6) return 2;
+  if (h >= 3) return 1;
+  return 0;
+}
 
 type Props = {
   orders: Order[];
@@ -44,6 +65,31 @@ export default function StaffRepairList({
   const containerCls = cardsView === "grid"
     ? "px-3 py-3 grid gap-2.5 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
     : "px-3 py-3 space-y-2.5";
+
+  // Сортировка: сначала "Принята" по убыванию срочности (старше → выше),
+  // затем остальные по дате создания (свежие выше). Стабильно через index.
+  const sortedOrders = useMemo(() => {
+    return orders
+      .map((o, i) => ({ o, i }))
+      .sort((a, b) => {
+        const la = urgencyLevel(a.o);
+        const lb = urgencyLevel(b.o);
+        const aIsNew = la >= 0;
+        const bIsNew = lb >= 0;
+        if (aIsNew && bIsNew) {
+          if (lb !== la) return lb - la; // выше уровень срочности — выше в списке
+          return ageHours(b.o) - ageHours(a.o); // внутри одного уровня — старше выше
+        }
+        if (aIsNew) return -1;
+        if (bIsNew) return 1;
+        // обе не "Принята" — по дате (свежие выше)
+        const ta = a.o.created_at ? new Date(a.o.created_at).getTime() : 0;
+        const tb = b.o.created_at ? new Date(b.o.created_at).getTime() : 0;
+        if (tb !== ta) return tb - ta;
+        return a.i - b.i; // стабильность
+      })
+      .map(x => x.o);
+  }, [orders]);
   return (
     <>
       {/* Фильтры статуса — премиум chips с свечениями */}
@@ -164,7 +210,7 @@ export default function StaffRepairList({
             <div className="font-roboto text-white/40 text-xs">Попробуйте изменить фильтры или создать новую заявку</div>
           </div>
         )}
-        {orders.map(o => {
+        {sortedOrders.map(o => {
           const isExpanded = expandedId === o.id;
           const ef = editForm[o.id] || initEditForm(o);
           // В режиме сетки раскрытая карточка занимает всю ширину строки
