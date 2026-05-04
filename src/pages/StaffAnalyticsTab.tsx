@@ -139,39 +139,49 @@ export function AnalyticsTab({ token }: { token: string }) {
 
   return (
     <div className="p-3">
-      {/* Premium переключатель периода */}
+      {/* Премиум переключатель периода */}
       <div className="flex gap-1.5 mb-3 flex-wrap items-center">
         {PERIODS.map(p => {
           const active = period === p.v;
           return (
             <button key={p.v} onClick={() => setPeriod(p.v)}
-              className={`font-roboto text-[11px] px-3 py-1.5 rounded-full transition-all active:scale-95 ${
+              title={`Период: ${p.l}`}
+              className={`relative font-roboto text-[11px] px-3 py-1.5 rounded-full transition-all active:scale-95 inline-flex items-center overflow-hidden group ${
                 active
-                  ? "bg-[#FFD700] text-black font-bold shadow-md shadow-[#FFD700]/20"
-                  : "bg-[#141414] border border-[#1F1F1F] text-white/50 hover:text-white hover:border-[#333]"
+                  ? "bg-gradient-to-b from-[#FFE34D] via-[#FFD700] to-[#d4a017] text-black font-bold shadow-[0_3px_12px_rgba(255,215,0,0.45),inset_0_1px_0_rgba(255,255,255,0.55)]"
+                  : "bg-gradient-to-br from-[#141414] to-[#0E0E0E] border border-[#1F1F1F] text-white/55 hover:text-[#FFD700] hover:border-[#FFD700]/40 hover:shadow-[0_0_10px_rgba(255,215,0,0.18)]"
               }`}>
-              {p.l}
+              {active && <span aria-hidden className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/35 to-transparent rounded-t-full pointer-events-none" />}
+              <span className="relative">{p.l}</span>
             </button>
           );
         })}
         <button onClick={load} disabled={loading}
-          className="ml-auto text-white/40 hover:text-[#FFD700] active:scale-90 p-2 rounded-md transition-all hover:bg-white/5">
-          <Icon name={loading ? "Loader" : "RefreshCw"} size={14} className={loading ? "animate-spin" : ""} />
+          title="Обновить данные"
+          className="ml-auto text-white/45 hover:text-[#FFD700] active:scale-90 p-2 rounded-md transition-all bg-gradient-to-br from-[#141414] to-[#0E0E0E] border border-[#1F1F1F] hover:border-[#FFD700]/40 hover:shadow-[0_0_12px_rgba(255,215,0,0.18)] group">
+          <Icon name={loading ? "Loader" : "RefreshCw"} size={14} className={`${loading ? "animate-spin text-[#FFD700]" : "group-hover:rotate-180 transition-transform duration-500"}`} />
         </button>
       </div>
 
       {error && (
-        <div className="bg-red-500/10 border border-red-500/30 text-red-400 font-roboto text-sm p-3 mb-4 rounded-lg flex items-center gap-2">
-          <Icon name="AlertCircle" size={14} />
-          {error}
-          <button onClick={load} className="ml-auto underline text-red-400/70 hover:text-red-400">Повторить</button>
+        <div className="relative bg-gradient-to-r from-red-500/15 to-red-500/5 border border-red-500/40 text-red-300 font-roboto text-sm p-3 mb-4 rounded-lg flex items-center gap-2 shadow-[0_0_14px_rgba(239,68,68,0.20)]">
+          <span aria-hidden className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-red-400/60 to-transparent" />
+          <span className="relative">
+            <span className="absolute inset-0 rounded-full bg-red-400/40 blur-sm animate-pulse" />
+            <Icon name="AlertCircle" size={14} className="relative" />
+          </span>
+          <span className="relative">{error}</span>
+          <button onClick={load} className="relative ml-auto underline text-red-300 hover:text-white transition-colors">Повторить</button>
         </div>
       )}
 
       {loading && (
-        <div className="flex items-center justify-center py-14 gap-2 text-white/40">
-          <Icon name="Loader" size={18} className="animate-spin text-[#FFD700]" />
-          <span className="font-roboto text-sm">Загружаю аналитику...</span>
+        <div className="flex flex-col items-center justify-center py-14 gap-2 text-white/40">
+          <div className="relative">
+            <span className="absolute inset-0 rounded-full bg-[#FFD700]/30 blur-md animate-pulse" />
+            <Icon name="Loader" size={22} className="relative animate-spin text-[#FFD700] drop-shadow-[0_0_8px_rgba(255,215,0,0.7)]" />
+          </div>
+          <span className="font-roboto text-sm">Загружаю аналитику…</span>
         </div>
       )}
 
