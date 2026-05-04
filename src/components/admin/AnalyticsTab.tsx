@@ -9,12 +9,13 @@ import {
 } from "./analytics.shared";
 import { OverviewSection, GoalsSection, SourcesSection, BehaviorSection } from "./AnalyticsSections";
 import { GeoSection, WebvisorSection, HeatmapSection, SeoSection } from "./AnalyticsIframeSections";
+import HealthCheckSection from "./HealthCheckSection";
 
 const XLSX_URL = "https://functions.poehali.dev/13db4dbd-0d2b-47d4-8e09-c6f82483ffde";
 const ADMIN_TOKEN = localStorage.getItem("adminToken") || "";
 
 // ── Секции навигации ──────────────────────────────────────────────
-type Section = "overview" | "goals" | "sources" | "behavior" | "geo" | "webvisor" | "heatmap" | "seo";
+type Section = "overview" | "goals" | "sources" | "behavior" | "geo" | "webvisor" | "heatmap" | "seo" | "health";
 
 const SECTIONS: { key: Section; label: string; icon: string }[] = [
   { key: "overview",  label: "Сводка",       icon: "LayoutDashboard" },
@@ -25,6 +26,7 @@ const SECTIONS: { key: Section; label: string; icon: string }[] = [
   { key: "webvisor",  label: "Вебвизор",     icon: "Play" },
   { key: "heatmap",   label: "Карта кликов", icon: "Flame" },
   { key: "seo",       label: "SEO & Топ",    icon: "TrendingUp" },
+  { key: "health",    label: "Здоровье",     icon: "Activity" },
 ];
 
 // ── Компонент ─────────────────────────────────────────────────────
@@ -106,6 +108,8 @@ const AnalyticsTab = () => {
         return <HeatmapSection />;
       case "seo":
         return <SeoSection />;
+      case "health":
+        return <HealthCheckSection />;
       default:
         return null;
     }

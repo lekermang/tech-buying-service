@@ -704,6 +704,147 @@ def notify_yandex_token_expired(error_body: str, http_status: int):
         print(f"[yandex_alert] error: {e}")
 
 
+def _check_telegram_bot(env_var: str) -> dict:
+    """Проверка TG-бота через getMe — возвращает username бота."""
+    token = os.environ.get(env_var, '').strip()
+    if not token:
+        return {'ok': False, 'error': f'{env_var} не задан', 'severity': 'error'}
+    try:
+        req = urllib.request.Request(f'https://api.telegram.org/bot{token}/getMe')
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read())
+        if data.get('ok'):
+            r = data.get('result', {})
+            return {'ok': True, 'username': r.get('username'), 'name': r.get('first_name')}
+        return {'ok': False, 'error': data.get('description', 'unknown'), 'severity': 'error'}
+    except Exception as e:
+        return {'ok': False, 'error': str(e)[:120], 'severity': 'error'}
+
+
+def _check_yandex_token() -> dict:
+    """Проверка валидности OAuth-токена Яндекс.Вебмастера."""
+    token = os.environ.get('YANDEX_WEBMASTER_TOKEN', '').strip()
+    if not token:
+        return {'ok': False, 'error': 'YANDEX_WEBMASTER_TOKEN не задан', 'severity': 'warning'}
+    try:
+        user_id = ym_get_user_id(token)
+        return {'ok': True, 'user_id': user_id}
+    except urllib.error.HTTPError as e:
+        body = e.read().decode('utf-8', errors='replace')
+        if e.code in (401, 403) or 'INVALID_OAUTH_TOKEN' in body:
+            return {'ok': False, 'error': 'Токен протух — обновите на oauth.yandex.ru', 'severity': 'error'}
+        return {'ok': False, 'error': f'HTTP {e.code}', 'severity': 'error'}
+    except Exception as e:
+        return {'ok': False, 'error': str(e)[:120], 'severity': 'error'}
+
+
+def _check_database() -> dict:
+    """Проверка соединения с БД."""
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute('SELECT 1')
+        cur.fetchone()
+        cur.close(); conn.close()
+        return {'ok': True}
+    except Exception as e:
+        return {'ok': False, 'error': str(e)[:120], 'severity': 'critical'}
+
+
+def _check_s3() -> dict:
+    """Наличие ключей S3."""
+    has_id = bool(os.environ.get('AWS_ACCESS_KEY_ID', '').strip())
+    has_secret = bool(os.environ.get('AWS_SECRET_ACCESS_KEY', '').strip())
+    if has_id and has_secret:
+        return {'ok': True}
+    return {'ok': False, 'error': 'Не заданы AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY', 'severity': 'warning'}
+
+
+def _check_secret(env_var: str, severity: str = 'warning') -> dict:
+    """Просто проверяем наличие секрета (значение не светим)."""
+    val = os.environ.get(env_var, '').strip()
+    if val:
+        return {'ok': True, 'masked': val[:4] + '***' + val[-2:] if len(val) > 8 else '***'}
+    return {'ok': False, 'error': f'{env_var} не задан', 'severity': severity}
+
+
+def _last_event_msk(table: str, ts_col: str, where: str = '') -> dict:
+    """Когда последний раз было событие в таблице (МСК).
+    Возвращает {ago_seconds, last_at_iso} или {error}.
+    """
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+        sql = f"SELECT MAX({ts_col}) FROM {SCHEMA}.{table}"
+        if where:
+            sql += f" WHERE {where}"
+        cur.execute(sql)
+        row = cur.fetchone()
+        cur.close(); conn.close()
+        if not row or not row[0]:
+            return {'ok': False, 'never': True}
+        last_at = row[0]
+        if last_at.tzinfo is None:
+            last_at = last_at.replace(tzinfo=timezone.utc)
+        ago = int((datetime.now(timezone.utc) - last_at).total_seconds())
+        return {'ok': True, 'last_at': last_at.astimezone(MSK).isoformat(), 'ago_seconds': ago}
+    except Exception as e:
+        return {'ok': False, 'error': str(e)[:120]}
+
+
+def health_check_all() -> dict:
+    """Полный отчёт о здоровье сайта — все интеграции и автозадачи."""
+    now_msk = datetime.now(MSK)
+    checks = {
+        # ── Критичные ───────────────────────────────────────────────
+        'database':         _check_database(),
+        'telegram_main':    _check_telegram_bot('TELEGRAM_BOT_TOKEN'),
+        'telegram_catalog': _check_telegram_bot('CATALOG_BOT_TOKEN'),
+        'yandex_webmaster': _check_yandex_token(),
+        # ── Хранилище ───────────────────────────────────────────────
+        's3_storage':       _check_s3(),
+        # ── API ключи ───────────────────────────────────────────────
+        'sms_ru':           _check_secret('SMSRU_API_ID', 'warning'),
+        'polza_ai':         _check_secret('POLZA_AI_API_KEY', 'info'),
+        'instrument_ru':    _check_secret('INSTRUMENT_API_TOKEN', 'info'),
+        'moba_ru':          _check_secret('MOBA_COOKIES', 'info'),
+        'smartlombard':     _check_secret('SMARTLOMBARD_API_KEYS', 'info'),
+        'yandex_smtp':      _check_secret('YANDEX_SMTP_PASSWORD', 'info'),
+    }
+
+    # ── Автозадачи: когда последний раз срабатывало ──────────────────
+    last_events = {
+        'price_sent':      _last_event_msk('price_scheduler_log', 'sent_at'),
+        'news_post':       _last_event_msk('news_post_log', 'posted_at', 'error IS NULL'),
+        'master_report':   _last_event_msk('repair_daily_master_income', 'sent_at'),
+    }
+
+    # ── Подсчёт здоровья ─────────────────────────────────────────────
+    summary = {'critical': 0, 'error': 0, 'warning': 0, 'ok': 0}
+    for c in checks.values():
+        if c.get('ok'):
+            summary['ok'] += 1
+        else:
+            sev = c.get('severity', 'warning')
+            summary[sev] = summary.get(sev, 0) + 1
+
+    overall = 'healthy'
+    if summary['critical'] > 0:
+        overall = 'critical'
+    elif summary['error'] > 0:
+        overall = 'degraded'
+    elif summary['warning'] > 0:
+        overall = 'warnings'
+
+    return {
+        'overall': overall,
+        'now_msk': now_msk.isoformat(),
+        'summary': summary,
+        'checks': checks,
+        'last_events': last_events,
+    }
+
+
 def ping_sitemap_to_yandex():
     """Полный флоу: получить user_id → host_id → отправить sitemap.
     Все ошибки перехватываются — функция никогда не падает из-за YM.
@@ -1290,6 +1431,9 @@ def handler(event: dict, context) -> dict:
     if action == 'ping_sitemap':
         result = ping_sitemap_to_yandex()
         return ok(result)
+
+    if action == 'health_check':
+        return ok(health_check_all())
 
     if action == 'post_news_now':
         result = do_post_news()
