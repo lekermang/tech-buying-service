@@ -3,6 +3,66 @@ import { Order, STATUSES, fmt } from "./types";
 
 const statusInfo = (key: string) => STATUSES.find(s => s.key === key) || STATUSES[0];
 
+// ─── Уровень срочности для НОВЫХ заявок ──────────────────────────────────────
+// Считаем от created_at: 0 (свежая) → 5 (более 48ч, критично).
+type UrgencyLevel = 0 | 1 | 2 | 3 | 4 | 5;
+function getUrgencyLevel(createdAt: string | null | undefined): UrgencyLevel {
+  if (!createdAt) return 0;
+  const created = new Date(createdAt).getTime();
+  if (!Number.isFinite(created)) return 0;
+  const hours = (Date.now() - created) / 3_600_000;
+  if (hours >= 48) return 5;
+  if (hours >= 24) return 4;
+  if (hours >= 12) return 3;
+  if (hours >= 6) return 2;
+  if (hours >= 3) return 1;
+  return 0;
+}
+
+const URGENCY_TITLES: Record<UrgencyLevel, string> = {
+  0: "Только что",
+  1: "Принята более 3 часов назад — пора брать в работу",
+  2: "Принята более 6 часов назад — обратите внимание",
+  3: "Принята более 12 часов назад — задерживается",
+  4: "Принята более суток назад — критично",
+  5: "Принята более 48 часов назад — СРОЧНО, максимальное внимание!",
+};
+
+// Индикатор-«огоньки»: 4 точки + критическая 🚨
+function UrgencyDots({ level }: { level: UrgencyLevel }) {
+  if (level === 0) return null;
+  const isCritical = level === 5;
+  // Цвета по уровням: 1-2 жёлтый, 3 оранжевый, 4 красный
+  const dot = (idx: number) => {
+    const lit = idx <= Math.min(level, 4);
+    if (!lit) return "bg-white/8 shadow-none";
+    if (level >= 4) return "bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.85)] animate-pulse";
+    if (level === 3) return "bg-orange-400 shadow-[0_0_6px_rgba(251,146,60,0.85)] animate-pulse";
+    return "bg-yellow-300 shadow-[0_0_5px_rgba(253,224,71,0.75)]";
+  };
+  return (
+    <span
+      title={URGENCY_TITLES[level]}
+      className={`relative inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border ${
+        isCritical
+          ? "bg-red-500/25 border-red-500/70 shadow-[0_0_14px_rgba(239,68,68,0.7)] animate-pulse"
+          : level >= 4
+            ? "bg-red-500/15 border-red-500/45"
+            : level === 3
+              ? "bg-orange-500/15 border-orange-500/45"
+              : "bg-yellow-400/12 border-yellow-400/45"
+      }`}
+    >
+      {isCritical && <span aria-hidden className="text-[11px] leading-none">🚨</span>}
+      <span className="inline-flex items-center gap-[3px]">
+        {[1, 2, 3, 4].map(i => (
+          <span key={i} className={`w-1.5 h-1.5 rounded-full transition-colors ${dot(i)}`} />
+        ))}
+      </span>
+    </span>
+  );
+}
+
 type Props = {
   o: Order;
   isExpanded: boolean;
@@ -25,6 +85,8 @@ export default function OrderCardHeader({ o, isExpanded, onToggle }: Props) {
       ? o.repair_amount - o.purchase_amount
       : null;
   const masterCalc = profit != null ? Math.max(0, Math.round(profit * 0.5)) : null;
+  // Уровень срочности — только для статуса "Принята" (new)
+  const urgency: UrgencyLevel = o.status === "new" ? getUrgencyLevel(o.created_at) : 0;
 
   return (
     <div
@@ -86,13 +148,26 @@ export default function OrderCardHeader({ o, isExpanded, onToggle }: Props) {
             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
               {/* НОВАЯ заявка — приоритетный бейдж "взять в работу" */}
               {o.status === "new" ? (
-                <span
-                  title="Новая заявка — нужно взять в работу"
-                  className="relative font-oswald font-bold text-[10px] uppercase tracking-wider px-2 py-0.5 inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-orange-500/35 via-amber-400/35 to-orange-500/35 text-amber-100 border border-orange-400/60 shadow-[0_0_10px_rgba(251,146,60,0.5),inset_0_1px_0_rgba(255,255,255,0.15)] animate-pulse"
-                >
-                  <span aria-hidden className="text-[11px] leading-none">🔥</span>
-                  Новая
-                </span>
+                <>
+                  {urgency === 5 ? (
+                    <span
+                      title={URGENCY_TITLES[5]}
+                      className="relative font-oswald font-bold text-[10px] uppercase tracking-wider px-2 py-0.5 inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-red-600/55 via-red-500/55 to-red-600/55 text-white border border-red-400/80 shadow-[0_0_14px_rgba(239,68,68,0.85),inset_0_1px_0_rgba(255,255,255,0.2)] animate-pulse"
+                    >
+                      <span aria-hidden className="text-[11px] leading-none">🚨</span>
+                      Срочно
+                    </span>
+                  ) : (
+                    <span
+                      title="Новая заявка — нужно взять в работу"
+                      className="relative font-oswald font-bold text-[10px] uppercase tracking-wider px-2 py-0.5 inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-orange-500/35 via-amber-400/35 to-orange-500/35 text-amber-100 border border-orange-400/60 shadow-[0_0_10px_rgba(251,146,60,0.5),inset_0_1px_0_rgba(255,255,255,0.15)] animate-pulse"
+                    >
+                      <span aria-hidden className="text-[11px] leading-none">🔥</span>
+                      Новая
+                    </span>
+                  )}
+                  <UrgencyDots level={urgency} />
+                </>
               ) : (
                 <span
                   className={`relative font-roboto text-[10px] px-2 py-0.5 inline-flex items-center gap-1 rounded-full ${st.color} ${
