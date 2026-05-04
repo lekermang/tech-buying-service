@@ -94,6 +94,17 @@ export type C14dListItem = {
   overdue_days?: number;
 };
 
+export type C14dTodayCalc = {
+  days_passed: number;
+  days_passed_raw: number;
+  is_early: boolean;
+  interest_today: number;
+  today_due_full: number;
+  today_remaining: number;
+  full_due: number;
+  saving: number;
+};
+
 export type C14dDetail = C14dListItem & {
   client_id: number;
   item_id: number;
@@ -111,6 +122,7 @@ export type C14dDetail = C14dListItem & {
   term_days: number;
   closed_at?: string | null;
   terminate_reason?: string | null;
+  today_calc?: C14dTodayCalc;
   photos: C14dPhoto[];
   payments: C14dPayment[];
   log: { id: number; action: string; details: Record<string, unknown>; actor_name?: string | null; actor_role?: string | null; created_at: string }[];

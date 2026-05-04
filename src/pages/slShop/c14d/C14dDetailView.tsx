@@ -170,7 +170,7 @@ export default function C14dDetailView({ token, contractId, onBack }: Props) {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {[
           { l: "Сумма выдачи", v: c.amount, c: "text-white" },
-          { l: "К возврату", v: c.total_due, c: "text-[#FFD700]" },
+          { l: "К возврату (макс)", v: c.total_due, c: "text-[#FFD700]" },
           { l: "Оплачено", v: c.paid_total, c: "text-emerald-300" },
           { l: "Остаток", v: c.remaining_debt, c: Number(c.remaining_debt) > 0 ? "text-red-300" : "text-emerald-300" },
         ].map(x => (
@@ -180,6 +180,46 @@ export default function C14dDetailView({ token, contractId, onBack }: Props) {
           </div>
         ))}
       </div>
+
+      {/* Сумма на сегодня (досрочный выкуп) */}
+      {c.status === "active" && c.today_calc && (
+        <div className="rounded-xl bg-gradient-to-br from-emerald-500/15 via-[#FFD700]/8 to-transparent border border-emerald-500/30 p-3 sm:p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Icon name="Zap" size={16} className="text-emerald-300" />
+            <h3 className="font-oswald uppercase text-sm tracking-wide text-emerald-300">
+              {c.today_calc.is_early ? "Досрочный выкуп · сумма на сегодня" : "Сумма на сегодня"}
+            </h3>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="rounded-lg bg-black/30 border border-white/5 p-2.5">
+              <div className={lbl}>Прошло дней</div>
+              <div className="font-oswald text-base font-bold text-white">
+                {c.today_calc.days_passed_raw < 0 ? 0 : c.today_calc.days_passed_raw} <span className="text-white/40 text-sm">из {c.term_days}</span>
+              </div>
+            </div>
+            <div className="rounded-lg bg-black/30 border border-white/5 p-2.5">
+              <div className={lbl}>% за фактич. дни</div>
+              <div className="font-oswald text-base font-bold text-orange-300">{fmt(c.today_calc.interest_today)} ₽</div>
+            </div>
+            <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 p-2.5">
+              <div className={lbl + " text-emerald-300/80"}>К возврату сегодня</div>
+              <div className="font-oswald text-lg font-bold text-emerald-300">{fmt(c.today_calc.today_due_full)} ₽</div>
+            </div>
+            <div className="rounded-lg bg-black/30 border border-white/5 p-2.5">
+              <div className={lbl}>Доплатить сейчас</div>
+              <div className={`font-oswald text-lg font-bold ${Number(c.today_calc.today_remaining) > 0 ? "text-[#FFD700]" : "text-emerald-300"}`}>
+                {fmt(c.today_calc.today_remaining)} ₽
+              </div>
+            </div>
+          </div>
+          {c.today_calc.is_early && c.today_calc.saving > 0 && (
+            <div className="mt-2 text-[12px] text-emerald-300/90 flex items-center gap-1.5">
+              <Icon name="Sparkles" size={12} />
+              Клиент сэкономит <b>{fmt(c.today_calc.saving)} ₽</b> по сравнению с полным сроком ({fmt(c.today_calc.full_due)} ₽).
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Клиент */}
       <div className={card}>
@@ -327,11 +367,34 @@ export default function C14dDetailView({ token, contractId, onBack }: Props) {
               <h3 className="font-oswald uppercase text-base tracking-wide">Внести платёж</h3>
               <button onClick={() => setPayOpen(false)} className="text-white/40 hover:text-white"><Icon name="X" size={16} /></button>
             </div>
-            <div className="text-[12px] text-white/60 mb-3">Остаток долга: <b className="text-red-300">{fmt(c.remaining_debt)} ₽</b></div>
+            <div className="text-[12px] text-white/60 mb-2">
+              Остаток долга: <b className="text-red-300">{fmt(c.remaining_debt)} ₽</b>
+            </div>
+            {c.today_calc && c.today_calc.is_early && Number(c.today_calc.today_remaining) > 0 && (
+              <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 p-2.5 mb-3 text-[12px] text-emerald-300/90">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Icon name="Zap" size={12} /> <b>Досрочный выкуп · {c.today_calc.days_passed_raw < 0 ? 0 : c.today_calc.days_passed_raw} дн. из {c.term_days}</b>
+                </div>
+                <div>К возврату сегодня: <b className="text-emerald-300">{fmt(c.today_calc.today_due_full)} ₽</b></div>
+                <div>Доплатить: <b className="text-[#FFD700]">{fmt(c.today_calc.today_remaining)} ₽</b> {c.today_calc.saving > 0 && <span className="text-emerald-300/80">(экономия {fmt(c.today_calc.saving)} ₽)</span>}</div>
+                <button
+                  type="button"
+                  onClick={() => { setPaySum(String(c.today_calc!.today_remaining)); setPayType("full"); }}
+                  className="mt-2 w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-200 text-[11px] font-bold uppercase tracking-wide"
+                >
+                  <Icon name="ChevronsRight" size={12} /> Подставить досрочный выкуп
+                </button>
+              </div>
+            )}
             <div className="space-y-3">
               <div>
                 <label className={lbl}>Сумма платежа, ₽</label>
                 <input className="w-full rounded-lg bg-[#0F0F0F] border border-[#222] focus:border-[#FFD700] outline-none px-3 py-2 text-base font-bold text-white" type="number" value={paySum} onChange={e => setPaySum(e.target.value)} />
+                {payType === "full" && c.today_calc && (
+                  <div className="text-[10px] text-emerald-300/70 mt-1">
+                    При «полный расчёт» сумма будет автоматически приведена к {fmt(c.today_calc.today_remaining)} ₽ (на сегодня)
+                  </div>
+                )}
               </div>
               <div>
                 <label className={lbl}>Тип платежа</label>

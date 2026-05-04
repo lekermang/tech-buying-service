@@ -90,6 +90,45 @@ def _calc(amount: Decimal, rate: Decimal, days: int):
     }
 
 
+def _calc_today(amount, rate, term_days, start_date, paid_total, on_date=None):
+    """
+    Сумма к возврату на текущую дату (для досрочного выкупа).
+    Проценты — только за фактически прошедшие дни (минимум 1 день),
+    но не больше term_days (после срока — полная сумма).
+    """
+    amount = Decimal(str(amount))
+    rate = Decimal(str(rate))
+    paid_total = Decimal(str(paid_total or 0))
+    today = on_date or date.today()
+    if isinstance(start_date, str):
+        start_date = _parse_date(start_date) or today
+    days_passed_raw = (today - start_date).days
+    days_passed = max(1, min(int(term_days), days_passed_raw + 1)) if days_passed_raw >= 0 else 1
+    is_early = days_passed_raw < int(term_days)
+    interest_today = (amount * rate * Decimal(days_passed) / Decimal(100)).quantize(Decimal('0.01'))
+    full_due = (amount * (Decimal(1) + rate * Decimal(term_days) / Decimal(100))).quantize(Decimal('0.01'))
+    today_due_full = (amount + interest_today).quantize(Decimal('0.01'))
+    # После истечения срока — фиксируем полную сумму договора
+    if not is_early:
+        today_due_full = full_due
+    today_remaining = today_due_full - paid_total
+    if today_remaining < Decimal('0'):
+        today_remaining = Decimal('0')
+    saving = full_due - today_due_full
+    if saving < Decimal('0'):
+        saving = Decimal('0')
+    return {
+        'days_passed': int(days_passed),
+        'days_passed_raw': int(days_passed_raw),
+        'is_early': bool(is_early),
+        'interest_today': float(interest_today),
+        'today_due_full': float(today_due_full),
+        'today_remaining': float(today_remaining),
+        'full_due': float(full_due),
+        'saving': float(saving),
+    }
+
+
 def _log(cur, contract_id, action, details, actor):
     cur.execute(
         f"INSERT INTO {SCHEMA}.contracts_14d_log (contract_id, action, details, actor_name, actor_role) "
@@ -465,6 +504,17 @@ def action_get(params):
     ed = contract.get('end_date')
     contract['overdue'] = bool(contract['status'] == 'active' and ed and ed < today)
     contract['overdue_days'] = (today - ed).days if (ed and ed < today) else 0
+
+    # Расчёт суммы на сегодня (досрочный выкуп)
+    if contract['status'] == 'active':
+        today_calc = _calc_today(
+            contract.get('amount'),
+            contract.get('interest_rate'),
+            contract.get('term_days') or 14,
+            contract.get('start_date'),
+            contract.get('paid_total'),
+        )
+        contract['today_calc'] = today_calc
     cur.close(); conn.close()
     return _ok(contract)
 
@@ -491,7 +541,8 @@ def action_payment(body, actor):
     conn = get_conn(); cur = conn.cursor()
     try:
         cur.execute(
-            f"SELECT total_due, paid_total, status, amount, contract_number "
+            f"SELECT total_due, paid_total, status, amount, contract_number, "
+            f"interest_rate, term_days, start_date "
             f"FROM {SCHEMA}.contracts_14d WHERE id=%s FOR UPDATE",
             (cid,)
         )
@@ -503,16 +554,34 @@ def action_payment(body, actor):
         status = row[2]
         principal = Decimal(str(row[3]))
         contract_number = row[4]
+        rate = Decimal(str(row[5]))
+        term_days = int(row[6])
+        sd = row[7]
         if status != 'active':
             return _err(400, 'Платёж можно вносить только по активному договору')
 
+        # При досрочном выкупе считаем сумму к возврату на сегодня
+        today_calc = _calc_today(principal, rate, term_days, sd, paid_total)
+        today_due_full = Decimal(str(today_calc['today_due_full']))
+        is_early = bool(today_calc['is_early'])
+
+        # При полном расчёте подменяем сумму на актуальную сегодня
+        if payment_type == 'full':
+            target_amount = today_due_full - paid_total
+            if target_amount <= 0:
+                return _err(400, 'Договор уже полностью погашен')
+            # если клиент сам ввёл сумму — округляем к target
+            amount = target_amount
+
+        # Эффективный «потолок» долга — на сегодня (для досрочки) или total_due (после срока)
+        effective_due = today_due_full if is_early else total_due
         new_paid = paid_total + amount
-        if new_paid > total_due + Decimal('0.01'):
-            new_paid = total_due
-            amount = total_due - paid_total
+        if new_paid > effective_due + Decimal('0.01'):
+            new_paid = effective_due
+            amount = effective_due - paid_total
             if amount <= 0:
                 return _err(400, 'Договор уже полностью погашен')
-        new_remaining = total_due - new_paid
+        new_remaining = effective_due - new_paid
         if new_remaining < Decimal('0.01'):
             new_remaining = Decimal('0')
 
@@ -551,10 +620,13 @@ def action_payment(body, actor):
         payment_id = cur.fetchone()[0]
 
         new_status = 'closed' if new_remaining <= 0 else 'active'
+        # При досрочном выкупе обновляем total_due на актуальную сумму на сегодня,
+        # чтобы остаток и сумма к возврату везде показывались корректно.
+        new_total_due = effective_due if is_early else total_due
         cur.execute(
-            f"UPDATE {SCHEMA}.contracts_14d SET paid_total=%s, remaining_debt=%s, status=%s, "
+            f"UPDATE {SCHEMA}.contracts_14d SET total_due=%s, paid_total=%s, remaining_debt=%s, status=%s, "
             f"closed_at=CASE WHEN %s='closed' THEN NOW() ELSE closed_at END, updated_at=NOW() WHERE id=%s",
-            (new_paid, new_remaining, new_status, new_status, cid)
+            (new_total_due, new_paid, new_remaining, new_status, new_status, cid)
         )
 
         _log(cur, cid, 'payment', {
@@ -564,6 +636,9 @@ def action_payment(body, actor):
             'income_type': income_type,
             'remaining_debt': float(new_remaining),
             'auto_closed': new_status == 'closed',
+            'is_early_redemption': bool(is_early and payment_type == 'full'),
+            'days_passed': today_calc.get('days_passed'),
+            'saving': today_calc.get('saving'),
             'cash_account_id': cash_id,
             'cash_movement_id': movement_id,
         }, actor)
@@ -571,9 +646,13 @@ def action_payment(body, actor):
         return _ok({
             'remaining_debt': float(new_remaining),
             'paid_total': float(new_paid),
+            'total_due': float(new_total_due),
             'status': new_status,
             'income_type': income_type,
             'cash_movement_id': movement_id,
+            'is_early_redemption': bool(is_early and payment_type == 'full'),
+            'days_passed': today_calc.get('days_passed'),
+            'saving': today_calc.get('saving'),
         })
     except Exception as e:
         conn.rollback()
