@@ -70,10 +70,12 @@ export const HeatmapSection = () => (
 const PingSitemapButton = () => {
   const [status, setStatus] = useState<"idle"|"loading"|"ok"|"error">("idle");
   const [info, setInfo] = useState("");
+  const [tokenExpired, setTokenExpired] = useState(false);
 
   const ping = async () => {
     setStatus("loading");
     setInfo("");
+    setTokenExpired(false);
     try {
       const res = await fetch(`${SCHEDULER_URL}?action=ping_sitemap`);
       const data = await res.json();
@@ -82,7 +84,12 @@ const PingSitemapButton = () => {
         setInfo(`task_id: ${data.response?.task_id ?? "—"} · quota: ${data.response?.quota_remainder ?? "—"}`);
       } else {
         setStatus("error");
-        setInfo(data.error || JSON.stringify(data));
+        const errStr = typeof data.error === "string" ? data.error : JSON.stringify(data);
+        setInfo(errStr);
+        // Распознаём протухший OAuth-токен — показываем понятную инструкцию
+        const isExpired = /INVALID_OAUTH_TOKEN|invalid or expired|YANDEX_WEBMASTER_TOKEN not set/i.test(errStr)
+          || data.http_status === 401 || data.http_status === 403;
+        setTokenExpired(isExpired);
       }
     } catch (e) {
       setStatus("error");
@@ -110,11 +117,71 @@ const PingSitemapButton = () => {
           }
         </button>
       </div>
-      {info && (
+      {info && !tokenExpired && (
         <p className={`text-xs font-mono px-2 py-1.5 rounded ${status === "ok" ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
           {status === "ok" ? "✓ " : "✗ "}{info}
         </p>
       )}
+
+      {/* Премиум-предупреждение о протухшем OAuth-токене */}
+      {tokenExpired && (
+        <div className="mt-1 relative bg-gradient-to-br from-red-500/15 via-orange-500/10 to-amber-500/10 border border-red-500/40 rounded-lg p-4 shadow-[0_0_24px_rgba(239,68,68,0.18)] overflow-hidden">
+          <span aria-hidden className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-red-400/60 to-transparent" />
+          <div className="flex items-start gap-3 mb-3">
+            <div className="relative shrink-0 mt-0.5">
+              <span className="absolute inset-0 rounded-full bg-red-400/40 blur-md animate-pulse" />
+              <Icon name="ShieldAlert" size={20} className="relative text-red-300 drop-shadow-[0_0_4px_rgba(239,68,68,0.7)]" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-oswald font-bold text-red-200 text-sm uppercase tracking-wide">Токен Яндекс.Вебмастера протух</p>
+              <p className="text-red-100/80 text-xs leading-snug mt-0.5">
+                OAuth-токен истёк или отозван. Sitemap не отправляется в Яндекс.
+                Уведомление о проблеме уже ушло в Telegram (раз в сутки).
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-1.5 text-xs text-white/80 font-roboto">
+            <p className="font-bold text-amber-200 mb-1 uppercase text-[10px] tracking-wider">Как починить (5 минут):</p>
+            <ol className="space-y-1 pl-1 list-none">
+              <li className="flex gap-2"><span className="text-amber-300 font-bold shrink-0">1.</span><span>Открой <a href="https://oauth.yandex.ru" target="_blank" rel="noopener noreferrer" className="text-amber-300 underline hover:text-amber-200">oauth.yandex.ru</a> и создай приложение</span></li>
+              <li className="flex gap-2"><span className="text-amber-300 font-bold shrink-0">2.</span><span>Дай права (scope): <code className="bg-black/40 px-1.5 py-0.5 rounded text-amber-200">webmaster:hostinfo</code> + <code className="bg-black/40 px-1.5 py-0.5 rounded text-amber-200">webmaster:verify</code></span></li>
+              <li className="flex gap-2"><span className="text-amber-300 font-bold shrink-0">3.</span><span>Получи токен: <code className="bg-black/40 px-1.5 py-0.5 rounded text-amber-200 break-all">oauth.yandex.ru/authorize?response_type=token&amp;client_id=...</code></span></li>
+              <li className="flex gap-2"><span className="text-amber-300 font-bold shrink-0">4.</span><span>В кабинете проекта → <b className="text-white">Секреты</b> → обнови <code className="bg-black/40 px-1.5 py-0.5 rounded text-amber-200">YANDEX_WEBMASTER_TOKEN</code></span></li>
+              <li className="flex gap-2"><span className="text-amber-300 font-bold shrink-0">5.</span><span>Вернись и нажми <b className="text-white">Ping sitemap</b> ещё раз</span></li>
+            </ol>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <a
+              href="https://oauth.yandex.ru/client/new"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 rounded-md text-amber-200 text-[11px] font-bold uppercase tracking-wide transition"
+            >
+              <Icon name="ExternalLink" size={11} />
+              Создать приложение
+            </a>
+            <a
+              href="https://webmaster.yandex.ru/sites/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/15 rounded-md text-white/70 text-[11px] font-bold uppercase tracking-wide transition"
+            >
+              <Icon name="ExternalLink" size={11} />
+              Кабинет Вебмастера
+            </a>
+          </div>
+
+          {info && (
+            <details className="mt-3">
+              <summary className="text-white/35 text-[10px] cursor-pointer hover:text-white/50">Технический ответ Яндекса</summary>
+              <pre className="mt-1 text-[10px] font-mono bg-black/40 p-2 rounded text-red-300/70 overflow-x-auto">{info}</pre>
+            </details>
+          )}
+        </div>
+      )}
+
       <p className="text-white/20 text-[10px] mt-2">Автоматически — каждый день в 10:00 МСК</p>
     </div>
   );

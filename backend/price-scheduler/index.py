@@ -636,18 +636,91 @@ def ym_add_sitemap(token, user_id, host_id, sitemap_url):
         return {'ok': False, 'method': 'recrawl', 'status': e.code, 'error': body}
 
 
+def yandex_alert_already_sent_today() -> bool:
+    """Чтобы не спамить уведомлениями о протухшем токене — шлём не чаще раза в сутки."""
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute(f"""
+            SELECT 1 FROM {SCHEMA}.settings
+            WHERE key = 'yandex_token_alert_date'
+            AND value = (NOW() AT TIME ZONE 'Europe/Moscow')::date::text
+        """)
+        row = cur.fetchone()
+        cur.close(); conn.close()
+        return row is not None
+    except Exception:
+        return False
+
+
+def mark_yandex_alert_sent():
+    try:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute(f"""
+            INSERT INTO {SCHEMA}.settings (key, value, description)
+            VALUES ('yandex_token_alert_date', (NOW() AT TIME ZONE 'Europe/Moscow')::date::text, 'Дата последнего алерта о протухшем YANDEX_WEBMASTER_TOKEN')
+            ON CONFLICT (key) DO UPDATE SET value = (NOW() AT TIME ZONE 'Europe/Moscow')::date::text, updated_at = NOW()
+        """)
+        conn.commit()
+        cur.close(); conn.close()
+    except Exception:
+        pass
+
+
+def notify_yandex_token_expired(error_body: str, http_status: int):
+    """Уведомить владельца в Telegram о протухшем YANDEX_WEBMASTER_TOKEN.
+    Шлём только раз в сутки, чтобы не спамить."""
+    if yandex_alert_already_sent_today():
+        return
+    try:
+        msg = (
+            "⚠️ <b>Яндекс.Вебмастер: токен протух</b>\n\n"
+            "Sitemap не отправлен в Яндекс — поисковик не получит обновления сайта.\n\n"
+            f"<b>Код:</b> {http_status}\n"
+            f"<b>Ответ:</b> <code>{(error_body or '')[:300]}</code>\n\n"
+            "<b>Как починить (5 минут):</b>\n"
+            "1️⃣ Открой <a href='https://oauth.yandex.ru'>oauth.yandex.ru</a>\n"
+            "2️⃣ Создай приложение со scope: <code>webmaster:hostinfo</code> + <code>webmaster:verify</code>\n"
+            "3️⃣ Получи токен через <code>/authorize?response_type=token&amp;client_id=...</code>\n"
+            "4️⃣ Обнови секрет <b>YANDEX_WEBMASTER_TOKEN</b> в кабинете проекта\n"
+            "5️⃣ Зайди в Аналитика → SEO &amp; Топ → нажми «PING SITEMAP»\n\n"
+            "🔁 Это сообщение придёт снова завтра, если токен не обновить."
+        )
+        recipients = []
+        main_chat = os.environ.get('TELEGRAM_CHAT_ID', '').strip()
+        if main_chat:
+            recipients.append(main_chat)
+        pluxan = os.environ.get('PLUXAN4IK_CHAT_ID', '').strip()
+        if pluxan and pluxan not in recipients:
+            recipients.append(pluxan)
+        for chat_id in recipients:
+            try:
+                send_tg_message_repair(chat_id, msg)
+            except Exception as e:
+                print(f"[yandex_alert] failed to notify {chat_id}: {e}")
+        mark_yandex_alert_sent()
+    except Exception as e:
+        print(f"[yandex_alert] error: {e}")
+
+
 def ping_sitemap_to_yandex():
     """Полный флоу: получить user_id → host_id → отправить sitemap.
     Все ошибки перехватываются — функция никогда не падает из-за YM.
+    При INVALID_OAUTH_TOKEN / 401 / 403 — шлём уведомление в Telegram (раз в сутки).
     """
     token = os.environ.get('YANDEX_WEBMASTER_TOKEN', '').strip()
     if not token:
+        notify_yandex_token_expired('YANDEX_WEBMASTER_TOKEN not set', 0)
         return {'ok': False, 'error': 'YANDEX_WEBMASTER_TOKEN not set'}
 
     try:
         user_id = ym_get_user_id(token)
     except urllib.error.HTTPError as e:
         body = e.read().decode('utf-8', errors='replace')
+        # Токен протух / отозван / невалиден — уведомляем владельца в Telegram
+        if e.code in (401, 403) or 'INVALID_OAUTH_TOKEN' in body:
+            notify_yandex_token_expired(body, e.code)
         return {
             'ok': False,
             'step': 'get_user_id',
