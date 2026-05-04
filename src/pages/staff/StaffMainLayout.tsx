@@ -106,8 +106,22 @@ export function StaffMainLayout({
   const initials = getInitials(empName);
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] text-white flex flex-col relative" style={{ fontFamily: "var(--staff-font, inherit)" }}>
+    <div className="min-h-screen bg-[#0D0D0D] text-white flex flex-col relative overflow-x-hidden" style={{ fontFamily: "var(--staff-font, inherit)" }}>
       <FontApplier />
+      {/* Премиум фон — как на главной (hero-grid + золотые blur-свечения) */}
+      <div
+        className="fixed inset-0 pointer-events-none z-0"
+        style={{
+          backgroundImage: "linear-gradient(rgba(255,215,0,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,215,0,0.04) 1px, transparent 1px)",
+          backgroundSize: "60px 60px",
+          maskImage: "radial-gradient(ellipse at center, #000 30%, transparent 85%)",
+          WebkitMaskImage: "radial-gradient(ellipse at center, #000 30%, transparent 85%)",
+        }}
+      />
+      <div className="fixed -top-32 -left-32 w-[420px] h-[420px] rounded-full blur-3xl pointer-events-none z-0" style={{ background: "rgba(255,215,0,0.07)" }} />
+      <div className="fixed -bottom-32 -right-32 w-[420px] h-[420px] rounded-full blur-3xl pointer-events-none z-0" style={{ background: "rgba(255,184,0,0.04)" }} />
+      <div className="fixed top-1/3 -right-24 w-[320px] h-[320px] rounded-full blur-3xl pointer-events-none z-0" style={{ background: "rgba(255,215,0,0.04)" }} />
+
       {/* На мобильных отключаем тяжёлые GPU-эффекты ради скорости */}
       {!isMobile && <BackgroundFx />}
       {!isMobile && <CursorEffects />}
@@ -127,29 +141,51 @@ export function StaffMainLayout({
       <OfflineBanner />
       {/* Баннер темы */}
       <ThemeBanner onOpen={() => setThemeOpen(true)} />
-      {/* Шапка — премиальная с градиентом */}
-      <div className="relative shrink-0 safe-top border-b border-[#222]">
-        <div className="absolute inset-0 bg-gradient-to-br from-[#FFD700]/[0.04] via-transparent to-blue-500/[0.03] pointer-events-none" />
-        <div className={`relative flex items-center justify-between gap-2 ${isMobile ? "px-2.5 py-1.5" : "px-3 py-2.5"}`}>
-          {/* Аватар + имя */}
+      {/* Шапка — премиальная как на главной */}
+      <div className="relative shrink-0 safe-top z-10">
+        {/* Градиент-фон шапки */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: "linear-gradient(180deg, rgba(13,13,13,0.95) 0%, rgba(13,13,13,0.8) 100%)",
+            backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
+          }}
+        />
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{ background: "linear-gradient(90deg, rgba(255,215,0,0.05) 0%, transparent 30%, transparent 70%, rgba(255,215,0,0.05) 100%)" }}
+        />
+        {/* Угловые blur-свечения */}
+        <div className="absolute -top-12 left-8 w-44 h-44 rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(255,215,0,0.08)" }} />
+        <div className="absolute -bottom-12 right-8 w-44 h-44 rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(255,184,0,0.05)" }} />
+
+        <div className={`relative flex items-center justify-between gap-2 ${isMobile ? "px-2.5 py-2" : "px-3 py-2.5"}`}>
+          {/* Аватар + имя — премиум-медальон как лого на главной */}
           <SLTooltip as="flex" content={<><b>{myName || empName}</b><br/>{ROLE_LABEL[empRole] || empRole} · нажми, чтобы открыть профиль</>} placement="bottom">
-          <button onClick={() => setProfileOpen(true)} className="flex items-center gap-2 min-w-0 flex-1 text-left active:scale-95 transition">
+          <button onClick={() => setProfileOpen(true)} className="flex items-center gap-2.5 min-w-0 flex-1 text-left active:scale-95 transition group">
             <div className="relative shrink-0">
-              {myAvatar ? (
-                <img src={myAvatar} alt="ava" className="w-9 h-9 rounded-full object-cover border border-[#FFD700]/40" />
-              ) : (
-                <div className={`w-9 h-9 rounded-full flex items-center justify-center font-oswald font-bold text-sm ${
-                  empRole === "owner" ? "bg-gradient-to-br from-[#FFD700] to-yellow-600 text-black" :
-                  empRole === "admin" ? "bg-gradient-to-br from-blue-500 to-blue-700 text-white" :
-                  "bg-gradient-to-br from-[#333] to-[#1a1a1a] text-white/70 border border-white/10"
-                }`}>
-                  {initials}
-                </div>
-              )}
-              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-400 border-2 border-[#0A0A0A] rounded-full" />
+              {/* Премиум-кольцо: conic-gradient как лого на главной */}
+              <div className="relative w-10 h-10 rounded-full p-[1.5px] bg-[conic-gradient(from_0deg,#b8860b,#ffd700,#fff3a0,#ffd700,#b8860b)] shadow-[0_0_14px_rgba(255,215,0,0.3)]">
+                {myAvatar ? (
+                  <img src={myAvatar} alt="ava" className="w-full h-full rounded-full object-cover bg-black" />
+                ) : (
+                  <div className={`w-full h-full rounded-full flex items-center justify-center font-oswald font-bold text-sm ${
+                    empRole === "owner" ? "bg-gradient-to-br from-[#FFD700] to-[#b8860b] text-black" :
+                    empRole === "admin" ? "bg-gradient-to-br from-blue-500 to-blue-700 text-white" :
+                    "bg-gradient-to-br from-[#1a1a1a] to-[#0d0d0d] text-white/80"
+                  }`}>
+                    {initials}
+                  </div>
+                )}
+              </div>
+              {/* Зелёная точка статуса */}
+              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-400 border-2 border-[#0D0D0D] rounded-full shadow-[0_0_6px_rgba(34,197,94,0.6)]" />
             </div>
             <div className="min-w-0">
-              <div className="font-oswald font-bold uppercase text-sm truncate leading-tight">{myName || empName}</div>
+              <div className="font-oswald font-bold uppercase text-sm truncate leading-tight bg-gradient-to-r from-[#FFD700] via-[#fff3a0] to-[#FFD700] bg-clip-text text-transparent animate-shimmer">
+                {myName || empName}
+              </div>
               <span className={`font-roboto text-[9px] px-1.5 py-0.5 rounded-sm inline-flex items-center gap-1 mt-0.5 ${ROLE_BADGE[empRole] || "bg-white/10 text-white/50"}`}>
                 {empRole === "owner" && <span>👑</span>}
                 {ROLE_LABEL[empRole] || empRole}
@@ -199,10 +235,12 @@ export function StaffMainLayout({
             </SLTooltip>
           </div>
         </div>
+        {/* Золотая нижняя линия с shimmer — как на главной */}
+        <div className="absolute bottom-0 left-0 right-0 h-px bg-[linear-gradient(90deg,transparent,rgba(255,215,0,0.45),transparent)] pointer-events-none" />
       </div>
 
       {/* Контент — растягивается, с паддингом под нижнюю панель */}
-      <div className="flex-1 overflow-y-auto" style={{ paddingBottom: 'calc(56px + env(safe-area-inset-bottom, 12px))' }}>
+      <div className="flex-1 overflow-y-auto relative z-10" style={{ paddingBottom: 'calc(56px + env(safe-area-inset-bottom, 12px))' }}>
         <TabErrorBoundary key={tab}>
           <React.Suspense fallback={<div className="flex items-center justify-center py-16 text-white/20 font-roboto text-sm"><Icon name="Loader" size={16} className="animate-spin mr-2" />Загружаю...</div>}>
             {tab === "repair"    && <StaffRepairTab token={token} isOwner={empRole === "owner"} />}
@@ -218,13 +256,18 @@ export function StaffMainLayout({
         </TabErrorBoundary>
       </div>
 
-      {/* Нижняя навигация — premium glassmorphism */}
+      {/* Нижняя навигация — premium glassmorphism как на главной */}
       <nav className="fixed bottom-0 left-0 right-0 z-50"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         {/* Glow сверху */}
-        <div className="absolute -top-4 left-0 right-0 h-4 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
-        <div className="relative bg-[#0A0A0A]/90 backdrop-blur-xl border-t border-white/[0.06]">
-          <div className="flex overflow-x-auto no-scrollbar">
+        <div className="absolute -top-6 left-0 right-0 h-6 bg-gradient-to-t from-black/95 to-transparent pointer-events-none" />
+        {/* Золотая shimmer-линия сверху */}
+        <div className="absolute top-0 left-0 right-0 h-px bg-[linear-gradient(90deg,transparent,rgba(255,215,0,0.45),transparent)] pointer-events-none z-10" />
+        <div className="relative bg-[#0D0D0D]/92 backdrop-blur-xl border-t border-[#FFD700]/15">
+          {/* Угловые золотые свечения */}
+          <div className="absolute -top-8 left-1/4 w-40 h-16 rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(255,215,0,0.06)" }} />
+          <div className="absolute -top-8 right-1/4 w-40 h-16 rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(255,184,0,0.05)" }} />
+          <div className="relative flex overflow-x-auto no-scrollbar">
             {TABS.map(t => {
               const locked = !isOwner && !unlocked[t.k] && (PROTECTED_TABS as readonly string[]).includes(t.k);
               const active = tab === t.k;
@@ -284,17 +327,23 @@ export function StaffMainLayout({
       {pwModal && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setPwModal(null)}>
           <div onClick={e => e.stopPropagation()}
-            className="relative bg-gradient-to-br from-[#1A1A1A] to-[#111] border border-[#FFD700]/30 w-full max-w-sm p-6 rounded-lg shadow-2xl shadow-[#FFD700]/10">
-            <div className="absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-[#FFD700]/50 to-transparent" />
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#FFD700]/20 to-[#FFD700]/5 border border-[#FFD700]/40 flex items-center justify-center shrink-0">
-                <Icon name="Lock" size={18} className="text-[#FFD700]" />
+            className="relative bg-gradient-to-br from-[#1A1A1A] to-[#0D0D0D] border border-[#FFD700]/30 w-full max-w-sm p-6 rounded-xl shadow-[0_24px_60px_rgba(0,0,0,0.6),0_0_30px_rgba(255,215,0,0.15)] overflow-hidden">
+            {/* Угловые свечения */}
+            <div className="absolute -top-16 -left-16 w-48 h-48 rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(255,215,0,0.1)" }} />
+            <div className="absolute -bottom-16 -right-16 w-48 h-48 rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(255,184,0,0.06)" }} />
+            <div className="absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-[#FFD700]/60 to-transparent" />
+            <div className="relative z-10 flex items-center gap-3 mb-4">
+              {/* Премиум-медальон с conic-gradient */}
+              <div className="relative w-11 h-11 rounded-full p-[1.5px] bg-[conic-gradient(from_0deg,#b8860b,#ffd700,#fff3a0,#ffd700,#b8860b)] shadow-[0_0_18px_rgba(255,215,0,0.35)] shrink-0">
+                <div className="w-full h-full rounded-full bg-gradient-to-br from-[#FFD700]/20 to-black flex items-center justify-center">
+                  <Icon name="Lock" size={16} className="text-[#FFD700]" />
+                </div>
               </div>
               <div className="flex-1 min-w-0">
-                <div className="font-oswald font-bold text-white uppercase text-base leading-tight">
+                <div className="font-oswald font-bold uppercase text-base leading-tight bg-gradient-to-r from-[#FFD700] via-[#fff3a0] to-[#FFD700] bg-clip-text text-transparent animate-shimmer">
                   {pwModal === "gold" ? "Доступ к золоту" : pwModal === "employees" ? "Доступ к команде" : "Доступ к статистике"}
                 </div>
-                <div className="font-roboto text-white/40 text-[11px] mt-0.5">Требуется пароль владельца</div>
+                <div className="font-roboto text-white/45 text-[11px] mt-0.5">Требуется пароль владельца</div>
               </div>
               <button onClick={() => setPwModal(null)} className="text-white/30 hover:text-white transition-colors -mr-1">
                 <Icon name="X" size={18} />
@@ -307,22 +356,22 @@ export function StaffMainLayout({
               onChange={e => { setPwInput(e.target.value); setPwError(""); }}
               onKeyDown={e => { if (e.key === "Enter") submitPw(); if (e.key === "Escape") setPwModal(null); }}
               placeholder="••••••••"
-              className={`w-full bg-[#0A0A0A] border-2 text-white px-4 py-3.5 font-roboto text-base focus:outline-none transition-all mb-3 rounded-md tracking-widest ${
+              className={`relative z-10 w-full bg-[#0A0A0A] border-2 text-white px-4 py-3.5 font-roboto text-base focus:outline-none transition-all mb-3 rounded-md tracking-widest ${
                 pwError ? "border-red-500/50 focus:border-red-400" : "border-[#333] focus:border-[#FFD700]"
               }`}
             />
             {pwError && (
-              <div className="text-red-400 font-roboto text-xs mb-3 flex items-center gap-1.5 bg-red-500/10 border border-red-500/20 px-2.5 py-2 rounded">
+              <div className="relative z-10 text-red-400 font-roboto text-xs mb-3 flex items-center gap-1.5 bg-red-500/10 border border-red-500/20 px-2.5 py-2 rounded">
                 <Icon name="AlertCircle" size={12} />{pwError}
               </div>
             )}
-            <div className="flex gap-2">
+            <div className="relative z-10 flex gap-2">
               <button onClick={() => setPwModal(null)}
                 className="flex-1 border border-[#333] text-white/60 font-roboto text-sm py-3 rounded-md hover:text-white hover:border-white/20 transition-colors">
                 Отмена
               </button>
               <button onClick={submitPw}
-                className="flex-1 bg-gradient-to-r from-[#FFD700] to-yellow-500 text-black font-oswald font-bold uppercase text-sm py-3 rounded-md hover:shadow-lg hover:shadow-[#FFD700]/30 active:scale-95 transition-all">
+                className="flex-1 btn-gold-premium py-3 text-sm">
                 Войти
               </button>
             </div>
