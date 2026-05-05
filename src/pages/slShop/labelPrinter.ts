@@ -10,13 +10,27 @@ function escapeHtml(s: string | undefined | null): string {
   }[ch] as string));
 }
 
-function labelHtml(item: SLItem, tmpl: SLLabelTemplate, opts: { empName?: string }): string {
+/** Опции скидки для ценника: старая зачёркнутая + новая жирная. */
+export type DiscountOpts = {
+  enabled?: boolean;        // включить отображение скидки
+  oldPrice?: number | string; // старая цена (зачёркивается)
+  newPrice?: number | string; // новая цена (жирная, основная)
+};
+
+function labelHtml(
+  item: SLItem,
+  tmpl: SLLabelTemplate,
+  opts: { empName?: string; discount?: DiscountOpts },
+): string {
   const w = Number(tmpl.width_mm);
   const h = Number(tmpl.height_mm);
   const isThermal = tmpl.is_thermal;
   const titleSize = (w / 14).toFixed(2);
   const specsSize = (w / 20).toFixed(2);
   const priceSize = (w / 6.5).toFixed(2);
+  // Цены при скидке: старая чуть меньше, новая — основная (жирная)
+  const oldPriceSize = (w / 11).toFixed(2);
+  const newPriceSize = (w / 6).toFixed(2);
   const small = (w / 28).toFixed(2);
   const tiny = (w / 34).toFixed(2);
 
@@ -57,6 +71,29 @@ function labelHtml(item: SLItem, tmpl: SLLabelTemplate, opts: { empName?: string
   const headerBg = isThermal ? "#000" : "linear-gradient(180deg, #FFD700 0%, #C8A14B 100%)";
   const headerColor = isThermal ? "#fff" : "#000";
 
+  // ─── Блок цены: со скидкой или обычный ────────────────────────────────────
+  const dc = opts.discount;
+  const dcOldRaw = dc?.oldPrice !== undefined && dc?.oldPrice !== "" && dc?.oldPrice !== null
+    ? Number(dc.oldPrice)
+    : Number(item.sell_price) || 0;
+  const dcNewRaw = dc?.newPrice !== undefined && dc?.newPrice !== "" && dc?.newPrice !== null
+    ? Number(dc.newPrice)
+    : 0;
+  const showDiscount = !!(dc?.enabled && dcOldRaw > 0 && dcNewRaw > 0 && dcNewRaw < dcOldRaw);
+  const discountPct = showDiscount ? Math.round((1 - dcNewRaw / dcOldRaw) * 100) : 0;
+
+  const priceBlock = showDiscount
+    ? `
+      <div class="price-block">
+        <div class="price-old" style="font-size:${oldPriceSize}mm;color:#777">
+          <span class="strike">${fmtPrice(dcOldRaw)}₽</span>
+          ${discountPct > 0 ? `<span class="badge" style="font-size:${small}mm">−${discountPct}%</span>` : ""}
+        </div>
+        <div class="price price-new" style="font-size:${newPriceSize}mm;color:#c00">${fmtPrice(dcNewRaw)}₽</div>
+      </div>
+    `
+    : `<div class="price" style="font-size:${priceSize}mm;color:${accent}">${fmtPrice(item.sell_price)}₽</div>`;
+
   return `
     <div class="label" style="width:${w}mm;height:${h}mm;font-family:${tmpl.font_family || "Arial"},sans-serif">
       <div class="hdr" style="background:${headerBg};color:${headerColor};font-size:${tiny}mm;">
@@ -68,7 +105,7 @@ function labelHtml(item: SLItem, tmpl: SLLabelTemplate, opts: { empName?: string
       <div class="title" style="font-size:${titleSize}mm">${escapeHtml(titleWithRam)}</div>
       ${showSpecs ? `<div class="specs" style="font-size:${specsSize}mm">${escapeHtml(specsCombined)}</div>` : ""}
       ${showImei ? `<div class="imei" style="font-size:${tiny}mm">IMEI: ${escapeHtml(item.imei || "")}</div>` : ""}
-      <div class="price" style="font-size:${priceSize}mm;color:${accent}">${fmtPrice(item.sell_price)}₽</div>
+      ${priceBlock}
       <div class="footer" style="font-size:${small}mm">
         <span>Ответственное лицо:</span>
         <b>${escapeHtml(empName || "—")}</b>
@@ -124,18 +161,18 @@ export function setLastLabelSize(code: string): void {
 }
 
 /** Быстрая печать одного ценника. Если передан size — печатает в нём, иначе в последнем выбранном. */
-export function printLabelQuick(item: SLItem, opts: { empName?: string; size?: string; tmpl?: SLLabelTemplate } = {}): void {
+export function printLabelQuick(item: SLItem, opts: { empName?: string; size?: string; tmpl?: SLLabelTemplate; discount?: DiscountOpts } = {}): void {
   if (opts.tmpl) {
-    printLabels([item], opts.tmpl, { empName: opts.empName });
+    printLabels([item], opts.tmpl, { empName: opts.empName, discount: opts.discount });
     return;
   }
   const code = opts.size || getLastLabelSize();
   const sz = LABEL_SIZES.find(s => s.code === code) || LABEL_SIZES[0];
   setLastLabelSize(sz.code);
-  printLabels([item], makeTmpl(sz.w, sz.h, sz.thermal), { empName: opts.empName });
+  printLabels([item], makeTmpl(sz.w, sz.h, sz.thermal), { empName: opts.empName, discount: opts.discount });
 }
 
-export function printLabels(items: SLItem[], tmpl: SLLabelTemplate, opts: { empName?: string } = {}): void {
+export function printLabels(items: SLItem[], tmpl: SLLabelTemplate, opts: { empName?: string; discount?: DiscountOpts } = {}): void {
   if (!items.length) return;
   const w = window.open("", "_blank", "width=600,height=800");
   if (!w) return;
@@ -175,6 +212,12 @@ export function printLabels(items: SLItem[], tmpl: SLLabelTemplate, opts: { empN
       .label .specs { text-align: center; line-height: 1.15; width: 100%; font-weight: 600; color: #000; word-wrap: break-word; }
       .label .imei  { text-align: center; line-height: 1; width: 100%; color: #444; }
       .label .price { font-weight: 900; text-align: center; line-height: 1; width: 100%; }
+      .label .price-block { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 0.3mm; }
+      .label .price-old { width: 100%; text-align: center; line-height: 1; font-weight: 700; display: flex; gap: 1.2mm; align-items: center; justify-content: center; }
+      .label .price-old .strike { position: relative; display: inline-block; }
+      .label .price-old .strike::after { content: ""; position: absolute; left: -0.4mm; right: -0.4mm; top: 50%; height: 0.6mm; background: #c00; transform: rotate(-8deg); border-radius: 0.3mm; }
+      .label .price-old .badge { background: #c00; color: #fff; font-weight: 900; padding: 0.1mm 0.8mm; border-radius: 0.6mm; line-height: 1; letter-spacing: 0.2mm; }
+      .label .price-new { font-weight: 900 !important; letter-spacing: 0.1mm; }
       .label .sku-id { width: 100%; text-align: center; font-family: 'Courier New', monospace; font-weight: 800; letter-spacing: 0.4mm; line-height: 1; }
       .label .footer { display: flex; justify-content: space-between; gap: 1mm; line-height: 1.1; border-top: 0.2mm dashed #000; padding-top: 0.3mm; }
       @media screen {

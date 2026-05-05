@@ -14,20 +14,35 @@ export const CATEGORIES = ["Смартфон", "Ноутбук", "Планшет
 export const CONDITIONS = ["отличное", "хорошее", "удовлетворительное"];
 export const PAYMENT_METHODS = [{ v: "cash", l: "Наличные" }, { v: "card", l: "Карта" }, { v: "transfer", l: "Перевод" }];
 
-export function printPriceTag(item: Good) {
+export type PriceTagDiscount = { enabled?: boolean; oldPrice?: number; newPrice?: number };
+
+export function printPriceTag(item: Good, discount?: PriceTagDiscount) {
   const w = window.open("", "_blank", "width=400,height=300");
   if (!w) return;
+  const oldP = Number(discount?.oldPrice ?? item.sell_price) || 0;
+  const newP = Number(discount?.newPrice) || 0;
+  const showDiscount = !!(discount?.enabled && oldP > 0 && newP > 0 && newP < oldP);
+  const pct = showDiscount ? Math.round((1 - newP / oldP) * 100) : 0;
+  const priceHtml = showDiscount
+    ? `<div class="price-old"><span class="strike">${oldP.toLocaleString("ru-RU")} ₽</span>${pct > 0 ? `<span class="badge">−${pct}%</span>` : ""}</div>
+       <div class="price price-new">${newP.toLocaleString("ru-RU")} ₽</div>`
+    : `<div class="price">${item.sell_price.toLocaleString("ru-RU")} ₽</div>`;
   w.document.write(`<!DOCTYPE html><html><head><title>Ценник</title><style>
     body{font-family:Arial,sans-serif;margin:0;padding:20px}
     .tag{width:280px;border:3px solid #000;padding:20px;text-align:center;margin:0 auto}
     h2{margin:0 0 10px;font-size:16px;line-height:1.3}
     .price{font-size:42px;font-weight:bold;margin:10px 0}
+    .price-old{font-size:22px;font-weight:700;color:#777;margin:6px 0;display:flex;gap:8px;align-items:center;justify-content:center}
+    .price-old .strike{position:relative;display:inline-block}
+    .price-old .strike::after{content:"";position:absolute;left:-2px;right:-2px;top:50%;height:3px;background:#c00;transform:rotate(-8deg);border-radius:2px}
+    .price-old .badge{background:#c00;color:#fff;font-weight:900;padding:1px 6px;border-radius:4px;font-size:14px;letter-spacing:0.5px}
+    .price-new{color:#c00;font-size:48px}
     .info{font-size:13px;color:#555;margin:4px 0}
     .footer{font-size:11px;margin-top:12px;border-top:1px solid #ccc;padding-top:8px;color:#888}
     @media print{body{margin:0}}
   </style></head><body><div class="tag">
     <h2>${item.title}</h2>
-    <div class="price">${item.sell_price.toLocaleString("ru-RU")} ₽</div>
+    ${priceHtml}
     <div class="info">Состояние: <b>${item.condition}</b></div>
     ${item.storage ? `<div class="info">Память: ${item.storage}</div>` : ""}
     ${item.imei ? `<div class="info">IMEI: ${item.imei}</div>` : ""}

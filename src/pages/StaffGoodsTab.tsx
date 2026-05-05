@@ -240,6 +240,28 @@ export default function GoodsTab({ token }: { token: string }) {
                   className="text-white/40 hover:text-[#FFD700] p-1.5 rounded-md hover:bg-[#FFD700]/10 hover:shadow-[0_0_8px_rgba(255,215,0,0.25)] active:scale-90 transition-all">
                   <Icon name="Printer" size={14} />
                 </button>
+                <button
+                  onClick={() => {
+                    const raw = window.prompt(
+                      `Печать со скидкой\n\nТовар: ${g.title}\nСтарая цена: ${g.sell_price.toLocaleString("ru-RU")} ₽\n\nВведите новую цену (₽):`,
+                      "",
+                    );
+                    if (!raw) return;
+                    const newP = parseInt(String(raw).replace(/[^\d]/g, ""), 10);
+                    if (!Number.isFinite(newP) || newP <= 0) {
+                      alert("Введите корректную сумму, например 9990");
+                      return;
+                    }
+                    if (newP >= g.sell_price) {
+                      alert("Новая цена должна быть меньше старой.");
+                      return;
+                    }
+                    printPriceTag(g, { enabled: true, oldPrice: g.sell_price, newPrice: newP });
+                  }}
+                  title="Распечатать ценник со скидкой (старая зачёркнута)"
+                  className="text-white/40 hover:text-red-300 p-1.5 rounded-md hover:bg-red-500/10 hover:shadow-[0_0_8px_rgba(239,68,68,0.25)] active:scale-90 transition-all">
+                  <Icon name="Tag" size={14} />
+                </button>
                 <button onClick={() => { setSellModal(g); setSellResult(null); setSellForm({ client_phone: "", discount_pct: "0", payment_method: "cash" }); setClientFound(null); setPassport({ series: "", number: "", issued_by: "", issued_date: "", address: "" }); setShowPassport(false); }}
                   title="Оформить продажу"
                   className="text-white/40 hover:text-emerald-300 p-1.5 rounded-md hover:bg-emerald-500/10 hover:shadow-[0_0_8px_rgba(16,185,129,0.25)] active:scale-90 transition-all">

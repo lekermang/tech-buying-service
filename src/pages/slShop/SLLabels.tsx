@@ -12,6 +12,11 @@ export default function SLLabels({ token, empName }: { token: string; empName?: 
   const [editTmpl, setEditTmpl] = useState<SLLabelTemplate | null>(null);
   const [creating, setCreating] = useState(false);
 
+  // ── Скидка для массовой/одиночной печати ────────────────────────────────────
+  const [discountOn, setDiscountOn] = useState(false);
+  const [discountPct, setDiscountPct] = useState<string>("10");
+  const [discountFix, setDiscountFix] = useState<string>(""); // фикс. новая цена для одиночной печати
+
   const load = useCallback(async () => {
     const [it, tp] = await Promise.all([
       slApi<SLItem[]>(token, "items", { params: { q, status: "" } }),
@@ -43,6 +48,25 @@ export default function SLLabels({ token, empName }: { token: string; empName?: 
     if (!tmpl) return;
     const list = single ? [single] : items.filter(i => selected.has(i.id));
     if (list.length === 0) return;
+
+    if (discountOn) {
+      // Если включена скидка — печатаем каждый ценник со своими старой/новой ценой
+      const pct = Math.max(0, Math.min(99, Number(discountPct) || 0));
+      const fix = single && discountFix !== "" ? Number(discountFix) : 0;
+      list.forEach(it => {
+        const oldPrice = Number(it.sell_price) || 0;
+        const newPrice = single && fix > 0
+          ? fix
+          : Math.round(oldPrice * (1 - pct / 100));
+        if (oldPrice > 0 && newPrice > 0 && newPrice < oldPrice) {
+          printLabels([it], tmpl, { empName, discount: { enabled: true, oldPrice, newPrice } });
+        } else {
+          printLabels([it], tmpl, { empName });
+        }
+      });
+      return;
+    }
+
     printLabels(list, tmpl, { empName });
   };
 
@@ -79,10 +103,55 @@ export default function SLLabels({ token, empName }: { token: string; empName?: 
         <div className="bg-[#0F0F0F] border border-[#1F1F1F] rounded-xl p-3 mb-3">
           <div className="text-[11px] uppercase font-bold tracking-wide text-white/50 mb-2">Превью</div>
           <div className="flex justify-center bg-white rounded-lg p-3">
-            <LabelPreview tmpl={tmpl} item={items[0]} />
+            <LabelPreview tmpl={tmpl} item={items[0]} discountPct={discountOn ? Number(discountPct) || 0 : 0} />
           </div>
         </div>
       )}
+
+      {/* Скидка для печати */}
+      <div className="bg-[#0F0F0F] border border-[#1F1F1F] rounded-xl p-3 mb-3">
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={discountOn}
+            onChange={e => setDiscountOn(e.target.checked)}
+            className="accent-[#FFD700] w-3.5 h-3.5"
+          />
+          <span className="text-[12px] font-bold text-white">Печатать со скидкой</span>
+          <span className="text-[10px] text-white/40">старая цена будет зачёркнута</span>
+        </label>
+        {discountOn && (
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <label className="block">
+              <div className="text-[10px] uppercase text-white/40 mb-0.5">Скидка, %</div>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={99}
+                value={discountPct}
+                onChange={e => setDiscountPct(e.target.value)}
+                placeholder="10"
+                className="w-full bg-[#141414] border border-[#FFD700]/40 rounded px-2 py-1.5 text-sm font-bold text-[#FFD700]"
+              />
+            </label>
+            <label className="block">
+              <div className="text-[10px] uppercase text-white/40 mb-0.5">или фикс. цена (1 товар)</div>
+              <input
+                type="number"
+                inputMode="numeric"
+                value={discountFix}
+                onChange={e => setDiscountFix(e.target.value)}
+                placeholder="напр. 9 990"
+                className="w-full bg-[#141414] border border-[#1F1F1F] rounded px-2 py-1.5 text-sm text-white"
+              />
+            </label>
+            <div className="col-span-2 text-[10px] text-white/50">
+              При массовой печати — у каждого товара пересчитается своя цена со скидкой −{Number(discountPct) || 0}%.
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Поиск товаров */}
       <div className="relative mb-2">
@@ -135,7 +204,7 @@ export default function SLLabels({ token, empName }: { token: string; empName?: 
   );
 }
 
-function LabelPreview({ tmpl, item }: { tmpl: SLLabelTemplate; item?: SLItem }) {
+function LabelPreview({ tmpl, item, discountPct = 0 }: { tmpl: SLLabelTemplate; item?: SLItem; discountPct?: number }) {
   const sample: SLItem = item || {
     id: 0, title: "iPhone 13", specs_short: '6.1" Super Retina XDR, 4/128GB, A15 Bionic, 3240mAh', sell_price: 25000, status: "stock", brand: "Apple", model: "iPhone 13", ram_gb: 4, storage_gb: 128,
   };
@@ -149,6 +218,9 @@ function LabelPreview({ tmpl, item }: { tmpl: SLLabelTemplate; item?: SLItem }) 
   const scale = 3.78 * 2;
   const w = Number(tmpl.width_mm) * scale;
   const h = Number(tmpl.height_mm) * scale;
+  const oldP = Number(sample.sell_price) || 0;
+  const showDiscount = discountPct > 0 && discountPct < 100 && oldP > 0;
+  const newP = showDiscount ? Math.round(oldP * (1 - discountPct / 100)) : 0;
   return (
     <div style={{ width: w, height: h }}
       className="border-2 border-black bg-white text-black flex flex-col items-center justify-between p-1 overflow-hidden"
@@ -161,9 +233,25 @@ function LabelPreview({ tmpl, item }: { tmpl: SLLabelTemplate; item?: SLItem }) 
           {sample.specs_short}
         </div>
       )}
-      <div className="text-center font-extrabold w-full" style={{ fontSize: w / 7 }}>
-        {fmt(sample.sell_price)}₽
-      </div>
+      {showDiscount ? (
+        <div className="w-full flex flex-col items-center" style={{ gap: w / 80 }}>
+          <div className="flex items-center justify-center gap-1.5">
+            <span className="line-through decoration-red-600 decoration-[2px] font-bold text-gray-500" style={{ fontSize: w / 11 }}>
+              {fmt(oldP)}₽
+            </span>
+            <span className="bg-red-600 text-white font-extrabold px-1 rounded" style={{ fontSize: w / 28 }}>
+              −{discountPct}%
+            </span>
+          </div>
+          <div className="text-center font-extrabold w-full text-red-600" style={{ fontSize: w / 6 }}>
+            {fmt(newP)}₽
+          </div>
+        </div>
+      ) : (
+        <div className="text-center font-extrabold w-full" style={{ fontSize: w / 7 }}>
+          {fmt(sample.sell_price)}₽
+        </div>
+      )}
     </div>
   );
 }

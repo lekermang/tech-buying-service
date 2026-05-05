@@ -19,6 +19,18 @@ export default function SLItemDetail({ token, item: itemProp, isOwner, onClose, 
   const [aiMsg, setAiMsg] = useState<string | null>(null);
   const [labelMenu, setLabelMenu] = useState(false);
   const [labelSize, setLabelSize] = useState<string>(() => getLastLabelSize());
+
+  // ── Скидка на ценнике: чекбокс + старая/новая цена ─────────────────────────
+  const [discountOn, setDiscountOn] = useState(false);
+  const [oldPrice, setOldPrice] = useState<string>("");
+  const [newPrice, setNewPrice] = useState<string>("");
+  const discountOpts = discountOn
+    ? {
+        enabled: true,
+        oldPrice: oldPrice !== "" ? Number(oldPrice) : Number(item.sell_price) || 0,
+        newPrice: newPrice !== "" ? Number(newPrice) : 0,
+      }
+    : undefined;
   const [branches, setBranches] = useState<{ id: number; name: string; address?: string | null }[]>([]);
 
   const isPhone = (() => {
@@ -122,7 +134,7 @@ export default function SLItemDetail({ token, item: itemProp, isOwner, onClose, 
           </div>
           <div className="flex items-center gap-1">
             <button
-              onClick={() => printLabelQuick(item, { size: labelSize })}
+              onClick={() => printLabelQuick(item, { size: labelSize, discount: discountOpts })}
               title={`Печать ценника (${LABEL_SIZES.find(s => s.code === labelSize)?.name || labelSize})`}
               className="text-white/60 hover:text-[#FFD700] p-1.5 rounded hover:bg-[#FFD700]/10">
               <Icon name="Printer" size={16} />
@@ -172,10 +184,61 @@ export default function SLItemDetail({ token, item: itemProp, isOwner, onClose, 
                 </button>
               )}
               {aiMsg && <div className="text-[11px] text-center text-white/60 mt-1">{aiMsg}</div>}
+
+              {/* ── Скидка на ценнике ─────────────────────────────── */}
+              <div className="mt-2 bg-[#0F0F0F] border border-[#1F1F1F] rounded-lg p-2">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={discountOn}
+                    onChange={e => {
+                      const on = e.target.checked;
+                      setDiscountOn(on);
+                      if (on && oldPrice === "") setOldPrice(String(item.sell_price || ""));
+                    }}
+                    className="accent-[#FFD700] w-3.5 h-3.5"
+                  />
+                  <span className="text-[12px] font-bold text-white">Печатать со скидкой</span>
+                  <span className="text-[10px] text-white/40">старая цена будет зачёркнута</span>
+                </label>
+                {discountOn && (
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    <label className="block">
+                      <div className="text-[10px] uppercase text-white/40 mb-0.5">Старая цена</div>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={oldPrice}
+                        onChange={e => setOldPrice(e.target.value)}
+                        placeholder={String(item.sell_price || "")}
+                        className="w-full bg-[#141414] border border-[#1F1F1F] rounded px-2 py-1.5 text-sm text-white/80 line-through decoration-red-500"
+                      />
+                    </label>
+                    <label className="block">
+                      <div className="text-[10px] uppercase text-[#FFD700] mb-0.5">Новая цена</div>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={newPrice}
+                        onChange={e => setNewPrice(e.target.value)}
+                        placeholder="напр. 9 990"
+                        autoFocus
+                        className="w-full bg-[#141414] border border-[#FFD700]/40 rounded px-2 py-1.5 text-sm font-bold text-[#FFD700]"
+                      />
+                    </label>
+                    {oldPrice && newPrice && Number(newPrice) > 0 && Number(newPrice) < Number(oldPrice) && (
+                      <div className="col-span-2 text-[10px] text-emerald-400 text-center">
+                        Скидка {Math.round((1 - Number(newPrice) / Number(oldPrice)) * 100)}% — экономия {(Number(oldPrice) - Number(newPrice)).toLocaleString("ru-RU")}₽
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <div className="relative mt-2">
                 <div className="flex gap-0">
                   <button
-                    onClick={() => printLabelQuick(item, { size: labelSize })}
+                    onClick={() => printLabelQuick(item, { size: labelSize, discount: discountOpts })}
                     className="flex-1 bg-[#141414] border border-[#1F1F1F] hover:border-[#FFD700]/50 text-white py-2 rounded-l-lg text-sm font-bold flex items-center justify-center gap-1.5">
                     <Icon name="Printer" size={14} /> Печать ценника
                     <span className="text-[10px] text-[#FFD700]/80 ml-1">
@@ -201,7 +264,7 @@ export default function SLItemDetail({ token, item: itemProp, isOwner, onClose, 
                           setLabelSize(s.code);
                           setLastLabelSize(s.code);
                           setLabelMenu(false);
-                          printLabelQuick(item, { size: s.code });
+                          printLabelQuick(item, { size: s.code, discount: discountOpts });
                         }}
                         className={`w-full text-left px-3 py-2 text-sm hover:bg-[#FFD700]/10 flex items-center justify-between border-b border-[#1F1F1F]/50 last:border-0 ${labelSize === s.code ? "text-[#FFD700]" : "text-white"}`}>
                         <span>{s.name}</span>
