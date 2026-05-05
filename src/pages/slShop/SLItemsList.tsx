@@ -270,6 +270,41 @@ export default function SLItemsList({ token, empName: _empName, isOwner = false 
 
       {loading && <div className="text-white/30 text-sm py-4 text-center"><Icon name="Loader" size={14} className="animate-spin inline mr-1" />Загрузка...</div>}
 
+      {!loading && items.length > 0 && (() => {
+        // Итоги по списку: позиций / штук всего / сумма закупки / сумма розницы.
+        // Помогает сверяться с бумажной накладной.
+        const totals = items.reduce(
+          (acc, it) => {
+            const q = Number(it.quantity ?? 1) || 1;
+            acc.qty += q;
+            acc.buy += (Number(it.buy_price) || 0) * q;
+            acc.sell += (Number(it.sell_price) || 0) * q;
+            return acc;
+          },
+          { qty: 0, buy: 0, sell: 0 },
+        );
+        return (
+          <div className="mb-2 grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[11px]">
+            <div className="bg-[#0F0F0F] border border-[#1F1F1F] rounded-md px-2 py-1">
+              <div className="text-[9px] text-white/45 uppercase tracking-wide">Позиций</div>
+              <div className="font-bold text-white tabular-nums">{items.length}</div>
+            </div>
+            <div className="bg-[#0F0F0F] border border-[#FFD700]/30 rounded-md px-2 py-1">
+              <div className="text-[9px] text-[#FFD700]/70 uppercase tracking-wide">Штук всего</div>
+              <div className="font-bold text-[#FFD700] tabular-nums">{totals.qty}</div>
+            </div>
+            <div className="bg-[#0F0F0F] border border-[#1F1F1F] rounded-md px-2 py-1">
+              <div className="text-[9px] text-white/45 uppercase tracking-wide">Закупка ∑</div>
+              <div className="font-bold text-white tabular-nums">{Math.round(totals.buy).toLocaleString("ru-RU")} ₽</div>
+            </div>
+            <div className="bg-[#0F0F0F] border border-emerald-500/30 rounded-md px-2 py-1">
+              <div className="text-[9px] text-emerald-300/80 uppercase tracking-wide">Розница ∑</div>
+              <div className="font-bold text-emerald-300 tabular-nums">{Math.round(totals.sell).toLocaleString("ru-RU")} ₽</div>
+            </div>
+          </div>
+        );
+      })()}
+
       {!loading && items.length === 0 && viewMode === "cards" && (
         <div className="text-white/30 text-sm py-8 text-center">Нет товаров</div>
       )}
@@ -318,9 +353,17 @@ export default function SLItemsList({ token, empName: _empName, isOwner = false 
                   </div>
                   <div className="text-right shrink-0">
                     {it.sku && <div className="text-[9px] font-mono text-[#FFD700]/70 mb-0.5">{it.sku}</div>}
-                    <div className="text-[#FFD700] font-bold text-sm">{fmt(it.sell_price)} ₽</div>
+                    {(it.quantity ?? 1) > 1 && (
+                      <div className="text-[10px] text-[#FFD700] font-bold mb-0.5 tabular-nums">× {it.quantity} шт</div>
+                    )}
+                    <div className="text-[#FFD700] font-bold text-sm tabular-nums">{fmt(it.sell_price)} ₽</div>
                     {Number(it.buy_price) > 0 && (
-                      <div className="text-[9px] text-white/40 mt-0.5">закуп {fmt(it.buy_price)} ₽</div>
+                      <div className="text-[9px] text-white/40 mt-0.5 tabular-nums">
+                        закуп {fmt(it.buy_price)} ₽
+                        {(it.quantity ?? 1) > 1 && (
+                          <span className="text-white/55"> · итог {fmt(Number(it.buy_price) * Number(it.quantity || 1))} ₽</span>
+                        )}
+                      </div>
                     )}
                     <div className="flex items-center gap-1 mt-1 justify-end">
                       <button onClick={(e) => { e.stopPropagation(); printLabelQuick(it); }}
