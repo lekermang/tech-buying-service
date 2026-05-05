@@ -993,7 +993,8 @@ ITEM_FIELDS = [
     'ram_gb', 'storage_gb',
     'condition', 'imei', 'serial_number', 'battery_health', 'has_box', 'has_charger', 'description',
     'buy_price', 'sell_price', 'min_price', 'status', 'source', 'consignment_percent',
-    'consignment_owner_id', 'buy_client_id', 'branch_id', 'warranty_days'
+    'consignment_owner_id', 'buy_client_id', 'branch_id', 'warranty_days',
+    'quantity'
 ]
 
 
@@ -1060,6 +1061,14 @@ def create_item(body, employee):
         data['buy_price'] = 0
     if data.get('sell_price') in (None, ''):
         data['sell_price'] = 0
+    # Количество единиц в позиции (партия аксессуаров: чехлы, стёкла и т.п.)
+    try:
+        qty = int(data.get('quantity') or 1)
+    except (TypeError, ValueError):
+        qty = 1
+    if qty < 1:
+        qty = 1
+    data['quantity'] = qty
     conn = get_conn(); cur = conn.cursor()
     # Валидация FK — если ссылка битая, обнуляем (не падаем)
     for fk_field, fk_table, fk_label in [
@@ -1076,19 +1085,22 @@ def create_item(body, employee):
     row = cur.fetchone()
     item_id = row[0]
     sku = row[1]
-    _log_event(cur, 'buy', 'item', item_id, f'Скупка: {title}',
-               f'Цена {data.get("buy_price") or 0} ₽',
-               float(data.get('buy_price') or 0), data.get('branch_id'), employee)
+    # Сумма закупки = цена за штуку × количество (для партий аксессуаров)
+    unit_buy_price = float(data.get('buy_price') or 0)
+    total_buy = unit_buy_price * qty
+    log_note = f'Цена {unit_buy_price:g} ₽' + (f' × {qty} шт = {total_buy:g} ₽' if qty > 1 else '')
+    _log_event(cur, 'buy', 'item', item_id, f'Скупка: {title}' + (f' ({qty} шт)' if qty > 1 else ''),
+               log_note, total_buy, data.get('branch_id'), employee)
     # Если это скупка с ценой > 0 — создадим операцию buy
-    if data.get('source', 'buyout') == 'buyout' and data.get('buy_price') and float(data['buy_price']) > 0:
+    if data.get('source', 'buyout') == 'buyout' and unit_buy_price > 0:
         cur.execute(
             f"INSERT INTO {SCHEMA}.slshop_operations (op_type, item_id, client_id, amount, employee_name, status_to) "
-            f"VALUES ('buy', {item_id}, {_esc(data.get('buy_client_id'))}, {_esc(data.get('buy_price'))}, "
+            f"VALUES ('buy', {item_id}, {_esc(data.get('buy_client_id'))}, {_esc(total_buy)}, "
             f"{_esc(employee.get('full_name') if employee else None)}, 'stock') RETURNING id"
         )
         op_id = cur.fetchone()[0]
         cur.execute(f"UPDATE {SCHEMA}.slshop_items SET buy_operation_id={op_id} WHERE id={item_id}")
-        # Авто-расход по кассе при скупке
+        # Авто-расход по кассе при скупке (на полную сумму партии)
         branch_id = data.get('branch_id')
         if branch_id:
             cur.execute(
@@ -1097,12 +1109,13 @@ def create_item(body, employee):
             acc = cur.fetchone()
             if acc:
                 acc_id, balance = acc[0], float(acc[1] or 0)
-                amt = float(data.get('buy_price') or 0)
+                amt = total_buy
                 new_balance = balance - amt
+                reason_text = ('Скупка №' + str(item_id)) + (f' ({qty} шт × {unit_buy_price:g}₽)' if qty > 1 else '')
                 cur.execute(
                     f"INSERT INTO {SCHEMA}.slshop_cash_movements (account_id, direction, amount, balance_after, category, reason, employee_name, related_op_id, related_item_id, is_auto, branch_id) "
                     f"VALUES ({acc_id}, 'out', {amt}, {new_balance}, 'Скупка товара', "
-                    f"{_esc('Скупка №' + str(item_id))}, {_esc(employee.get('full_name') if employee else None)}, {op_id}, {item_id}, TRUE, {int(branch_id)})"
+                    f"{_esc(reason_text)}, {_esc(employee.get('full_name') if employee else None)}, {op_id}, {item_id}, TRUE, {int(branch_id)})"
                 )
                 cur.execute(f"UPDATE {SCHEMA}.slshop_cash_accounts SET balance={new_balance} WHERE id={acc_id}")
     conn.commit(); cur.close(); conn.close()
@@ -1565,35 +1578,57 @@ def sell_item(body, employee):
     client_id = body.get('client_id')
     contract = body.get('contract_number')
     note = body.get('note')
+    # Сколько штук продаём за один раз (для партий аксессуаров). По умолчанию 1.
+    try:
+        sell_qty = int(body.get('quantity') or 1)
+    except (TypeError, ValueError):
+        sell_qty = 1
+    if sell_qty < 1:
+        sell_qty = 1
     if not item_id:
         return _err(400, 'item_id обязателен')
     if amount in (None, ''):
         return _err(400, 'amount обязателен')
     conn = get_conn(); cur = conn.cursor()
-    cur.execute(f"SELECT status FROM {SCHEMA}.slshop_items WHERE id={int(item_id)}")
+    cur.execute(f"SELECT status, COALESCE(quantity, 1) FROM {SCHEMA}.slshop_items WHERE id={int(item_id)}")
     row = cur.fetchone()
     if not row:
         cur.close(); conn.close(); return _err(404, 'Товар не найден')
     cur_status = row[0]
-    if cur_status == 'sold':
+    cur_qty = int(row[1] or 1)
+    if cur_status == 'sold' or cur_qty <= 0:
         cur.close(); conn.close(); return _err(400, 'Товар уже продан')
+    if sell_qty > cur_qty:
+        cur.close(); conn.close()
+        return _err(400, f'На складе осталось {cur_qty} шт, нельзя продать {sell_qty}')
+    new_qty = cur_qty - sell_qty
+    final_status = 'sold' if new_qty <= 0 else cur_status
     # Валидация client_id (если битый — обнулим, не падаем)
     ok_cl, client_id_norm, _err_cl = _validate_fk(cur, 'slshop_clients', client_id, 'client_id')
     client_id = client_id_norm if ok_cl else None
     cur.execute(
         f"INSERT INTO {SCHEMA}.slshop_operations (op_type, item_id, client_id, amount, payment_method, contract_number, note, employee_name, status_from, status_to) "
-        f"VALUES ('sell', {int(item_id)}, {_esc(client_id)}, {_esc(amount)}, {_esc(payment)}, {_esc(contract)}, {_esc(note)}, {_esc(employee.get('full_name') if employee else None)}, {_esc(cur_status)}, 'sold') RETURNING id"
+        f"VALUES ('sell', {int(item_id)}, {_esc(client_id)}, {_esc(amount)}, {_esc(payment)}, {_esc(contract)}, {_esc(note)}, {_esc(employee.get('full_name') if employee else None)}, {_esc(cur_status)}, {_esc(final_status)}) RETURNING id"
     )
     op_id = cur.fetchone()[0]
-    cur.execute(
-        f"UPDATE {SCHEMA}.slshop_items SET status='sold', sell_price={_esc(amount)}, sell_operation_id={op_id}, "
-        f"sell_at=NOW(), warranty_until=(CURRENT_DATE + COALESCE(warranty_days, 365) * INTERVAL '1 day')::date, "
-        f"updated_at=NOW() WHERE id={int(item_id)} RETURNING branch_id, title"
-    )
+    if new_qty <= 0:
+        # Партия закрыта (или это был штучный товар) — переводим в sold
+        cur.execute(
+            f"UPDATE {SCHEMA}.slshop_items SET status='sold', sell_price={_esc(amount)}, sell_operation_id={op_id}, "
+            f"sell_at=NOW(), warranty_until=(CURRENT_DATE + COALESCE(warranty_days, 365) * INTERVAL '1 day')::date, "
+            f"quantity=0, updated_at=NOW() WHERE id={int(item_id)} RETURNING branch_id, title"
+        )
+    else:
+        # Партия частично продана — статус оставляем, уменьшаем quantity
+        cur.execute(
+            f"UPDATE {SCHEMA}.slshop_items SET quantity={new_qty}, sell_price={_esc(amount)}, "
+            f"updated_at=NOW() WHERE id={int(item_id)} RETURNING branch_id, title"
+        )
     sold_row = cur.fetchone()
     sold_branch = sold_row[0] if sold_row else None
     sold_title = sold_row[1] if sold_row and len(sold_row) > 1 else ''
-    _log_event(cur, 'sale', 'item', int(item_id), f'Продажа: {sold_title}', f'Сумма {amount} ₽', float(amount), sold_branch, employee)
+    qty_note = f' ({sell_qty} шт)' if sell_qty > 1 else ''
+    _log_event(cur, 'sale', 'item', int(item_id), f'Продажа: {sold_title}{qty_note}', f'Сумма {amount} ₽', float(amount), sold_branch, employee)
     # Автоматическое движение по кассе при оплате наличными
     if (payment or 'cash') == 'cash' and sold_branch:
         cur.execute(

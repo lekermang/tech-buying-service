@@ -283,6 +283,7 @@ export type SLItem = {
   branch_id?: number | null;
   branch_name?: string | null;
   branch_address?: string | null;
+  quantity?: number | null;
 };
 
 export type SLBranch = {

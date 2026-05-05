@@ -105,7 +105,14 @@ export default function SLItemsTable({ items, selected, toggleSelect, onOpen, on
                   </button>
                 </td>
                 <td className="px-2 py-1.5 cursor-pointer" onClick={() => onOpen(it)}>
-                  <div className="font-bold text-white truncate max-w-[260px]">{titleWithRam(it)}</div>
+                  <div className="font-bold text-white truncate max-w-[260px] flex items-center gap-1.5">
+                    <span className="truncate">{titleWithRam(it)}</span>
+                    {(it.quantity ?? 1) > 1 && (
+                      <span className="shrink-0 text-[9px] px-1.5 py-0.5 rounded bg-[#FFD700]/15 border border-[#FFD700]/40 text-[#FFD700] font-bold">
+                        × {it.quantity} шт
+                      </span>
+                    )}
+                  </div>
                   {it.specs_short && <div className="text-[10px] text-white/40 truncate max-w-[260px]">{it.specs_short}</div>}
                 </td>
                 <td className="px-2 py-1.5 font-mono text-[10px] text-[#FFD700]/80">

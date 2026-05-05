@@ -4,18 +4,28 @@ import { slApi, type SLItem, PAYMENT_METHODS } from "./types";
 import { Inp2 } from "./SLItemsCommon";
 
 export default function SLItemSellModal({ token, item, onClose, onDone }: { token: string; item: SLItem; onClose: () => void; onDone: () => void }) {
-  const [amount, setAmount] = useState(String(item.sell_price || ""));
+  const stockQty = Math.max(1, Number(item.quantity ?? 1) || 1);
+  const isBatch = stockQty > 1;
+  const unitPrice = Number(item.sell_price || 0);
+  const [sellQty, setSellQty] = useState<string>("1");
+  const [amount, setAmount] = useState(String(unitPrice || ""));
   const [payment, setPayment] = useState("cash");
   const [contract, setContract] = useState("");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [autoPrint, setAutoPrint] = useState(true);
+  const sellQtyNum = Math.max(1, Math.min(stockQty, parseInt(sellQty, 10) || 1));
   const submit = async () => {
     if (!amount || Number(amount) <= 0) { setErr("Укажите сумму"); return; }
+    if (sellQtyNum > stockQty) {
+      setErr(`На складе только ${stockQty} шт`);
+      return;
+    }
     setSaving(true); setErr(null);
     const r = await slApi(token, "item_sell", { method: "POST", body: {
       item_id: item.id, amount: Number(amount), payment_method: payment, contract_number: contract, note,
+      quantity: sellQtyNum,
     }});
     setSaving(false);
     if (r.ok) {
@@ -47,10 +57,72 @@ export default function SLItemSellModal({ token, item, onClose, onDone }: { toke
         </div>
         <div className="p-3 space-y-2">
           <div className="bg-[#141414] rounded-lg p-2.5 text-sm">
-            <div className="font-bold">{item.title}</div>
+            <div className="font-bold flex items-center gap-1.5">
+              <span className="truncate">{item.title}</span>
+              {isBatch && (
+                <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-[#FFD700]/15 border border-[#FFD700]/40 text-[#FFD700] font-bold">
+                  на складе {stockQty} шт
+                </span>
+              )}
+            </div>
             <div className="text-white/40 text-xs">{item.specs_short}</div>
           </div>
-          <Inp2 l="Сумма ₽" v={amount} s={setAmount} />
+
+          {isBatch && (
+            <div>
+              <div className="text-[11px] text-white/50 mb-1">Сколько штук продаём</div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const n = Math.max(1, sellQtyNum - 1);
+                    setSellQty(String(n));
+                    if (unitPrice > 0) setAmount(String(unitPrice * n));
+                  }}
+                  className="w-9 h-9 rounded-md bg-[#0E0E0E] border border-[#1F1F1F] hover:border-[#FFD700]/40 text-white/80 active:scale-95"
+                >
+                  <Icon name="Minus" size={14} className="mx-auto" />
+                </button>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={stockQty}
+                  value={sellQty}
+                  onChange={e => {
+                    const raw = e.target.value.replace(/[^\d]/g, "");
+                    setSellQty(raw);
+                    const n = Math.max(1, Math.min(stockQty, parseInt(raw, 10) || 1));
+                    if (unitPrice > 0) setAmount(String(unitPrice * n));
+                  }}
+                  onBlur={() => {
+                    if (!sellQty || sellQtyNum < 1) setSellQty("1");
+                    else if (sellQtyNum > stockQty) setSellQty(String(stockQty));
+                  }}
+                  className="flex-1 bg-[#0A0A0A] border border-[#FFD700]/40 rounded-lg px-3 py-2 text-center font-bold tabular-nums text-lg text-[#FFD700]"
+                />
+                <span className="text-white/50 text-sm w-10 text-center">из {stockQty}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const n = Math.min(stockQty, sellQtyNum + 1);
+                    setSellQty(String(n));
+                    if (unitPrice > 0) setAmount(String(unitPrice * n));
+                  }}
+                  className="w-9 h-9 rounded-md bg-[#0E0E0E] border border-[#1F1F1F] hover:border-[#FFD700]/40 text-white/80 active:scale-95"
+                >
+                  <Icon name="Plus" size={14} className="mx-auto" />
+                </button>
+              </div>
+              {unitPrice > 0 && (
+                <div className="text-[10px] text-white/40 mt-1">
+                  Цена за шт: {unitPrice.toLocaleString("ru-RU")} ₽ — сумма обновляется автоматически
+                </div>
+              )}
+            </div>
+          )}
+
+          <Inp2 l={isBatch ? `Сумма за ${sellQtyNum} шт, ₽` : "Сумма ₽"} v={amount} s={setAmount} />
           <div>
             <div className="text-[11px] text-white/50 mb-1">Способ оплаты</div>
             <div className="flex gap-1">

@@ -307,6 +307,11 @@ export default function SLItemsList({ token, empName: _empName, isOwner = false 
                     {it.specs_short && <div className="text-[11px] text-white/50 truncate">{it.specs_short}</div>}
                     <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                       <span className={`text-[9px] px-1.5 py-0.5 rounded border ${stCfg.color}`}>{stCfg.l}</span>
+                      {(it.quantity ?? 1) > 1 && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#FFD700]/15 border border-[#FFD700]/40 text-[#FFD700] font-bold">
+                          × {it.quantity} шт
+                        </span>
+                      )}
                       {it.branch_name && <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#141414] border border-[#1F1F1F] text-white/50"><Icon name="MapPin" size={8} className="inline mr-0.5" />{it.branch_name}</span>}
                       {it.imei && <span className="text-[10px] text-white/30">IMEI: {it.imei}</span>}
                     </div>

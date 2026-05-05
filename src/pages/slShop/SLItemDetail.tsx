@@ -160,6 +160,9 @@ export default function SLItemDetail({ token, item: itemProp, isOwner, onClose, 
               <Row k="Закупка" v={`${fmt(item.buy_price)} ₽`} />
               <Row k="Продажа" v={`${fmt(item.sell_price)} ₽`} />
               <Row k="Мин. цена" v={`${fmt(item.min_price)} ₽`} />
+              {(item.quantity ?? 1) > 1 && (
+                <Row k="Остаток на складе" v={`${item.quantity} шт`} />
+              )}
               <Row k="Клиент" v={item.buy_client_name || "-"} />
               <div className="grid grid-cols-3 gap-1 mt-3">
                 {["stock", "showcase", "consignment", "hidden"].map(s => (

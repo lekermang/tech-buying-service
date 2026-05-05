@@ -32,6 +32,7 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
   const [buyPrice, setBuyPrice] = useState("");
   const [sellPrice, setSellPrice] = useState("");
   const [minPrice, setMinPrice] = useState("");
+  const [quantity, setQuantity] = useState<string>("1");
   const [source, setSource] = useState<"buyout" | "consignment">("buyout");
   const [consignmentPercent, setConsignmentPercent] = useState("");
   const [status, setStatus] = useState<"stock" | "showcase" | "consignment">("stock");
@@ -201,6 +202,16 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
     return t.includes("iphone") || t.includes("apple");
   })();
 
+  // Аксессуары — обычно принимают партиями (5, 10 шт): чехлы, стёкла, зарядки.
+  // Для них показываем подсказку и крупное поле количества.
+  const isAccessoryCategory = (() => {
+    const cat = cats.find(c => c.id === categoryId);
+    const t = `${cat?.path || ""} ${cat?.name || ""}`.toLowerCase();
+    return /аксес|чехл|стекл|заряд|кабел|power\s*bank|держател|переходник|карты пам/i.test(t);
+  })();
+  const qtyNum = Math.max(1, parseInt(quantity, 10) || 1);
+  const buyPriceNum = Number(buyPrice) || 0;
+
   const submit = async () => {
     if (!title.trim()) { setMsg("Введите наименование"); return; }
     if (isPhoneCategory) {
@@ -233,6 +244,7 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
       buy_price: source === "consignment" ? 0 : (Number(buyPrice) || 0),
       sell_price: Number(sellPrice) || 0,
       min_price: Number(minPrice) || 0,
+      quantity: Math.max(1, parseInt(quantity, 10) || 1),
       status: finalStatus,
       buy_client_id: buyClientId,
       consignment_percent: source === "consignment" ? (Number(consignmentPercent) || 0) : null,
@@ -366,6 +378,79 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
         consignmentPercent={consignmentPercent} setConsignmentPercent={setConsignmentPercent}
         status={status} setStatus={setStatus}
       />
+
+      {/* Количество единиц в партии (чехлы, стёкла, зарядки и т.п.) */}
+      <Section
+        title={isAccessoryCategory ? "Количество (партия)" : "Количество"}
+        icon="Hash"
+        tooltip={isAccessoryCategory ? "Укажи, сколько штук принимаешь — например 5 чехлов или 10 стёкол" : "Сколько штук в позиции"}
+      >
+        {isAccessoryCategory && (
+          <div className="text-[10px] text-[#FFD700]/80 -mt-0.5 mb-0.5">
+            Укажи, сколько штук принимаешь — это партия аксессуаров
+          </div>
+        )}
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setQuantity(String(Math.max(1, qtyNum - 1)))}
+            className="w-9 h-9 rounded-md bg-[#0E0E0E] border border-[#1F1F1F] hover:border-[#FFD700]/40 text-white/80 active:scale-95"
+            title="Убрать одну штуку"
+          >
+            <Icon name="Minus" size={14} className="mx-auto" />
+          </button>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            value={quantity}
+            onChange={e => setQuantity(e.target.value.replace(/[^\d]/g, ""))}
+            onBlur={() => { if (!quantity || qtyNum < 1) setQuantity("1"); }}
+            className={`flex-1 bg-[#0A0A0A] border rounded-lg px-3 py-2 text-center font-bold tabular-nums text-lg transition-all ${
+              isAccessoryCategory
+                ? "border-[#FFD700]/50 text-[#FFD700] shadow-[0_0_10px_rgba(255,215,0,0.15)]"
+                : "border-[#1F1F1F] text-white"
+            }`}
+          />
+          <span className="text-white/50 text-sm w-7 text-center">шт</span>
+          <button
+            type="button"
+            onClick={() => setQuantity(String(qtyNum + 1))}
+            className="w-9 h-9 rounded-md bg-[#0E0E0E] border border-[#1F1F1F] hover:border-[#FFD700]/40 text-white/80 active:scale-95"
+            title="Добавить одну штуку"
+          >
+            <Icon name="Plus" size={14} className="mx-auto" />
+          </button>
+        </div>
+
+        {/* Быстрые пресеты для аксессуаров */}
+        {isAccessoryCategory && (
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {[5, 10, 20, 50, 100].map(n => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setQuantity(String(n))}
+                className={`px-2.5 py-1 text-[11px] rounded-md border transition-all active:scale-95 ${
+                  qtyNum === n
+                    ? "bg-[#FFD700]/15 border-[#FFD700]/60 text-[#FFD700]"
+                    : "bg-[#0E0E0E] border-[#1F1F1F] text-white/60 hover:border-[#FFD700]/30"
+                }`}
+              >
+                {n} шт
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Подсказка по сумме партии */}
+        {qtyNum > 1 && buyPriceNum > 0 && source === "buyout" && (
+          <div className="mt-1.5 text-[11px] text-white/60">
+            Итого закупка: <b className="text-[#FFD700]">{(buyPriceNum * qtyNum).toLocaleString("ru-RU")} ₽</b>
+            {" "}<span className="text-white/40">({buyPriceNum.toLocaleString("ru-RU")} ₽ × {qtyNum} шт)</span>
+          </div>
+        )}
+      </Section>
 
       <Field label="Описание / заметки">
         <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2}
