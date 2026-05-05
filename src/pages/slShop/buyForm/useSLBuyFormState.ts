@@ -43,6 +43,7 @@ export function useSLBuyFormState() {
   const [showQuickClient, setShowQuickClient] = useState(false);
   const [createdItemId, setCreatedItemId] = useState<number | null>(null);
   const [autoPrint, setAutoPrint] = useState(true);
+  const [autoPrintLabel, setAutoPrintLabel] = useState(true);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiMsg, setAiMsg] = useState<string | null>(null);
   const autofillTimer = useRef<number | null>(null);
@@ -113,6 +114,7 @@ export function useSLBuyFormState() {
     msg, setMsg,
     createdItemId, setCreatedItemId,
     autoPrint, setAutoPrint,
+    autoPrintLabel, setAutoPrintLabel,
     aiBusy, setAiBusy,
     aiMsg, setAiMsg,
     autofillTimer,

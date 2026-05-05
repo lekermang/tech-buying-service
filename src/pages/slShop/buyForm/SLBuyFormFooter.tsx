@@ -23,7 +23,9 @@ export default function SLBuyFormFooter({
     isAccessoryCategory, qtyNum, buyPriceNum,
     quantity, setQuantity,
     description, setDescription,
-    source, autoPrint, setAutoPrint,
+    source,
+    autoPrint, setAutoPrint,
+    autoPrintLabel, setAutoPrintLabel,
     saving,
     createdItemId,
   } = st;
@@ -110,19 +112,41 @@ export default function SLBuyFormFooter({
 
       {!createdItemId ? (
         <>
-          <label
-            className="flex items-center justify-between bg-[#101010] border border-[#1A1A1A] hover:border-[#FFD700]/30 rounded-md px-2.5 py-1.5 cursor-pointer transition"
-            title="Откроется окно печати договора в новой вкладке сразу после успешного сохранения"
-          >
-            <div className="flex items-center gap-1.5">
-              <Icon name="Printer" size={12} className="text-[#FFD700]" />
-              <span className="text-[12px]">Печатать договор сразу после приёма</span>
-            </div>
-            <button onClick={() => setAutoPrint(!autoPrint)}
-              className={`w-8 h-4 rounded-full relative transition-colors shrink-0 ${autoPrint ? "bg-[#FFD700]" : "bg-[#1A1A1A]"}`}>
-              <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${autoPrint ? "left-4" : "left-0.5"}`} />
-            </button>
-          </label>
+          <div className="space-y-1">
+            <label
+              className="flex items-center justify-between bg-[#101010] border border-[#1A1A1A] hover:border-[#FFD700]/30 rounded-md px-2.5 py-1.5 cursor-pointer transition"
+              title="Откроется окно печати договора купли-продажи сразу после успешного приёма"
+            >
+              <div className="flex items-center gap-1.5">
+                <Icon name="FileText" size={12} className="text-[#FFD700]" />
+                <span className="text-[12px]">Печатать договор сразу после приёма</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAutoPrint(!autoPrint)}
+                aria-label={autoPrint ? "Выключить автопечать договора" : "Включить автопечать договора"}
+                className={`w-8 h-4 rounded-full relative transition-colors shrink-0 ${autoPrint ? "bg-[#FFD700]" : "bg-[#1A1A1A]"}`}>
+                <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${autoPrint ? "left-4" : "left-0.5"}`} />
+              </button>
+            </label>
+
+            <label
+              className="flex items-center justify-between bg-[#101010] border border-[#1A1A1A] hover:border-[#FFD700]/30 rounded-md px-2.5 py-1.5 cursor-pointer transition"
+              title="Сразу после приёма откроется окно печати ценника 58×40 мм для термопринтера"
+            >
+              <div className="flex items-center gap-1.5">
+                <Icon name="Tag" size={12} className="text-[#FFD700]" />
+                <span className="text-[12px]">Печатать ценник сразу после приёма</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAutoPrintLabel(!autoPrintLabel)}
+                aria-label={autoPrintLabel ? "Выключить автопечать ценника" : "Включить автопечать ценника"}
+                className={`w-8 h-4 rounded-full relative transition-colors shrink-0 ${autoPrintLabel ? "bg-[#FFD700]" : "bg-[#1A1A1A]"}`}>
+                <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${autoPrintLabel ? "left-4" : "left-0.5"}`} />
+              </button>
+            </label>
+          </div>
           <div
             className="sticky bottom-0 bg-gradient-to-t from-[#0D0D0D] via-[#0D0D0D]/95 to-transparent pt-2 -mx-1 px-1 z-10"
             style={{ paddingBottom: 'calc(0.25rem + env(safe-area-inset-bottom, 0px))' }}

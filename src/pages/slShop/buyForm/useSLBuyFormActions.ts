@@ -31,13 +31,14 @@ export function useSLBuyFormActions(token: string, st: SLBuyFormState) {
     description,
     categoryId,
     branchId,
-    clientQuery, setClientQuery,
+    clientQuery,
     clientId,
     setClientResults,
     setAutofilled,
     setSaving, setMsg,
     setCreatedItemId,
     autoPrint,
+    autoPrintLabel,
     aiBusy, setAiBusy, setAiMsg,
     autofillTimer,
     isPhoneCategory, isAppleDevice,
@@ -227,26 +228,31 @@ export function useSLBuyFormActions(token: string, st: SLBuyFormState) {
     if (r.ok && r.data) {
       setMsg(`Принято: ${r.data.sku}`);
       setCreatedItemId(r.data.id);
-      if (autoPrint) {
+      // Автопечать: договор и/или ценник — каждое под своим флагом
+      if (autoPrint || autoPrintLabel) {
         setTimeout(async () => {
           try {
             const ctxRes = await slApi<{ item: unknown; client: unknown; branch: unknown; requisites: unknown; operation: unknown }>(
               token, "doc_context", { params: { item_id: r.data!.id } }
             );
-            const tplRes = await slApi<{ id: number; code: string; name: string }[]>(
-              token, "doc_templates", { params: { only_active: "1", op_type: source === "consignment" ? "consignment_in" : "buyout_individual" } }
-            );
-            if (ctxRes.ok && ctxRes.data && tplRes.ok && tplRes.data && tplRes.data.length > 0) {
-              const { printDoc } = await import("../docPrinter");
-              const tpl = tplRes.data.find(t => t.code === "contract_purchase") || tplRes.data[0];
-              printDoc(tpl as never, ctxRes.data as never);
+            // 1) Договор — если включён autoPrint
+            if (autoPrint && ctxRes.ok && ctxRes.data) {
+              const tplRes = await slApi<{ id: number; code: string; name: string }[]>(
+                token, "doc_templates", { params: { only_active: "1", op_type: source === "consignment" ? "consignment_in" : "buyout_individual" } }
+              );
+              if (tplRes.ok && tplRes.data && tplRes.data.length > 0) {
+                const { printDoc } = await import("../docPrinter");
+                const tpl = tplRes.data.find(t => t.code === "contract_purchase") || tplRes.data[0];
+                printDoc(tpl as never, ctxRes.data as never);
+              }
             }
-            if (ctxRes.ok && ctxRes.data && (ctxRes.data as { item?: SLItem }).item) {
+            // 2) Ценник — если включён autoPrintLabel
+            if (autoPrintLabel && ctxRes.ok && ctxRes.data && (ctxRes.data as { item?: SLItem }).item) {
               const item = (ctxRes.data as { item: SLItem }).item;
               setTimeout(() => {
                 try { printLabelQuick(item, { size: "58x40" }); }
                 catch (err) { console.error("label-print", err); }
-              }, 600);
+              }, autoPrint ? 600 : 0);
             }
           } catch (e) {
             console.error("auto-print", e);
