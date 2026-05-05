@@ -246,13 +246,11 @@ export function useSLBuyFormActions(token: string, st: SLBuyFormState) {
                 printDoc(tpl as never, ctxRes.data as never);
               }
             }
-            // 2) Ценник — если включён autoPrintLabel
+            // 2) Ценник — печатаем 1 шт сразу, без задержки
             if (autoPrintLabel && ctxRes.ok && ctxRes.data && (ctxRes.data as { item?: SLItem }).item) {
               const item = (ctxRes.data as { item: SLItem }).item;
-              setTimeout(() => {
-                try { printLabelQuick(item, { size: "58x40" }); }
-                catch (err) { console.error("label-print", err); }
-              }, autoPrint ? 600 : 0);
+              try { printLabelQuick(item, { size: "58x40" }); }
+              catch (err) { console.error("label-print", err); }
             }
           } catch (e) {
             console.error("auto-print", e);

@@ -1,5 +1,27 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { SLCategory, SLClient, SLBranch } from "../types";
+
+/**
+ * Чтение булевой настройки из localStorage с дефолтом.
+ * Используется для сохранения переключателей автопечати между сессиями.
+ */
+function readPersistedBool(key: string, def: boolean): boolean {
+  if (typeof window === "undefined") return def;
+  try {
+    const v = window.localStorage.getItem(key);
+    if (v === "1" || v === "true") return true;
+    if (v === "0" || v === "false") return false;
+  } catch { /* ignore */ }
+  return def;
+}
+
+function writePersistedBool(key: string, value: boolean): void {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.setItem(key, value ? "1" : "0"); } catch { /* ignore */ }
+}
+
+const LS_AUTOPRINT_CONTRACT = "sl.buyForm.autoPrint";
+const LS_AUTOPRINT_LABEL = "sl.buyForm.autoPrintLabel";
 
 /**
  * Полный набор состояний формы скупки.
@@ -42,8 +64,12 @@ export function useSLBuyFormState() {
   const [msg, setMsg] = useState<string | null>(null);
   const [showQuickClient, setShowQuickClient] = useState(false);
   const [createdItemId, setCreatedItemId] = useState<number | null>(null);
-  const [autoPrint, setAutoPrint] = useState(true);
-  const [autoPrintLabel, setAutoPrintLabel] = useState(true);
+  // Переключатели автопечати — запоминаем выбор сотрудника между сессиями
+  // (если выключил договор — он останется выключенным при следующих приёмах).
+  const [autoPrint, setAutoPrint] = useState<boolean>(() => readPersistedBool(LS_AUTOPRINT_CONTRACT, true));
+  const [autoPrintLabel, setAutoPrintLabel] = useState<boolean>(() => readPersistedBool(LS_AUTOPRINT_LABEL, true));
+  useEffect(() => { writePersistedBool(LS_AUTOPRINT_CONTRACT, autoPrint); }, [autoPrint]);
+  useEffect(() => { writePersistedBool(LS_AUTOPRINT_LABEL, autoPrintLabel); }, [autoPrintLabel]);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiMsg, setAiMsg] = useState<string | null>(null);
   const autofillTimer = useRef<number | null>(null);
