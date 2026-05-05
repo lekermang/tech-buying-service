@@ -3,6 +3,10 @@ import os
 import csv
 import io
 import re
+import base64
+import uuid
+import urllib.request
+import urllib.error
 from datetime import datetime, timedelta
 from decimal import Decimal
 
@@ -908,6 +912,11 @@ def upsert_client(body):
         'birth_date': body.get('birth_date') or None,
         'notes': body.get('notes'),
     }
+    # Фото паспорта (опциональные поля). Не пишем None, чтобы не затирать
+    # существующие фото при обновлении только текстовых полей.
+    for fkey in ('passport_photo_url', 'passport_photo2_url', 'face_photo_url'):
+        if fkey in body and body.get(fkey):
+            fields[fkey] = body.get(fkey)
     conn = get_conn(); cur = conn.cursor()
     if cid:
         sets = ', '.join([f"{k}={_esc(v)}" for k, v in fields.items()])
@@ -922,6 +931,154 @@ def upsert_client(body):
         nid = cur.fetchone()[0]
         conn.commit(); cur.close(); conn.close()
         return _ok({'id': nid})
+
+
+# ============ Client passport photo upload + AI OCR ============
+PASSPORT_OCR_PROMPT = (
+    "Ты — помощник по распознаванию российского паспорта. На фото — страница с фотографией владельца "
+    "(2-3 разворот) или страница регистрации. Извлеки текстовые данные и верни СТРОГО JSON без комментариев.\n\n"
+    "Поля:\n"
+    "- full_name: ФИО полностью одной строкой в формате 'Фамилия Имя Отчество' (с заглавных букв)\n"
+    "- series: серия паспорта (4 цифры, можно с пробелом, например '12 34')\n"
+    "- number: номер паспорта (6 цифр)\n"
+    "- issued_by: кем выдан, как написано в паспорте, одной строкой\n"
+    "- issued_date: дата выдачи в формате YYYY-MM-DD (если видна)\n"
+    "- birth_date: дата рождения в формате YYYY-MM-DD (если видна)\n"
+    "- address: адрес регистрации одной строкой (если виден на странице с пропиской)\n\n"
+    "Если поле не видно на фото — верни пустую строку для строк или null для дат. "
+    "Не выдумывай данные, верни только то, что реально читается на фото."
+)
+
+
+def _get_s3():
+    import boto3
+    return boto3.client(
+        's3',
+        endpoint_url='https://bucket.poehali.dev',
+        aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
+        aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
+    )
+
+
+def _cdn_url(key: str) -> str:
+    return f"https://cdn.poehali.dev/projects/{os.environ['AWS_ACCESS_KEY_ID']}/bucket/{key}"
+
+
+def _ocr_passport_via_ai(data_url: str) -> dict:
+    """Распознаёт паспорт через GPT-4o (Polza.ai). Возвращает dict с полями (можно пустыми).
+    Если ключа нет или распознавание упало — возвращает пустой словарь, не падает."""
+    api_key = os.environ.get('POLZA_AI_API_KEY', '')
+    if not api_key:
+        return {}
+    try:
+        payload = json.dumps({
+            "model": "gpt-4o-mini",
+            "messages": [{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": PASSPORT_OCR_PROMPT},
+                    {"type": "image_url", "image_url": {"url": data_url}},
+                ],
+            }],
+            "max_tokens": 600,
+            "temperature": 0.1,
+            "response_format": {"type": "json_object"},
+        }).encode('utf-8')
+        req = urllib.request.Request(
+            'https://api.polza.ai/v1/chat/completions',
+            data=payload,
+            headers={
+                'Content-Type': 'application/json',
+                'Authorization': f'Bearer {api_key}',
+            },
+        )
+        with urllib.request.urlopen(req, timeout=40) as resp:
+            data = json.loads(resp.read())
+        raw = (data.get('choices') or [{}])[0].get('message', {}).get('content', '').strip()
+        if raw.startswith('```'):
+            raw = raw.strip('`')
+            if raw.lower().startswith('json'):
+                raw = raw[4:]
+            raw = raw.strip()
+        parsed = json.loads(raw)
+        # Нормализуем ключи: серия без пробелов будет лучше для отображения, но оставим как есть
+        result = {
+            'full_name': (parsed.get('full_name') or '').strip(),
+            'series': (parsed.get('series') or '').strip().replace(' ', ''),
+            'number': (parsed.get('number') or '').strip().replace(' ', ''),
+            'issued_by': (parsed.get('issued_by') or '').strip(),
+            'issued_date': parsed.get('issued_date') or None,
+            'birth_date': parsed.get('birth_date') or None,
+            'address': (parsed.get('address') or '').strip(),
+        }
+        return result
+    except Exception as e:
+        # AI-сбой не должен ломать загрузку самого фото
+        return {'_ocr_error': str(e)[:200]}
+
+
+def client_passport_upload(body, employee):
+    """Принимает фото паспорта в base64, грузит в S3 и (если есть AI-ключ)
+    распознаёт паспортные данные. Возвращает {url, passport_data}.
+
+    body:
+      - image_base64: data:image/...;base64,... или чистый base64
+      - field: 'passport_photo_url' | 'passport_photo2_url' | 'face_photo_url' (опц., для S3-пути)
+      - recognize: bool (по умолчанию true) — запускать ли OCR
+    """
+    image_b64 = body.get('image_base64') or ''
+    if not image_b64:
+        return _err(400, 'image_base64 обязателен')
+    field = (body.get('field') or 'passport_photo_url').strip()
+    recognize = body.get('recognize')
+    if recognize is None:
+        recognize = True
+
+    # Подготавливаем data_url для AI и raw bytes для S3
+    if image_b64.startswith('data:'):
+        data_url = image_b64
+        # вырезаем base64-часть
+        try:
+            _, b64_part = image_b64.split(',', 1)
+        except ValueError:
+            return _err(400, 'некорректный формат image_base64')
+    else:
+        data_url = 'data:image/jpeg;base64,' + image_b64
+        b64_part = image_b64
+
+    try:
+        raw_bytes = base64.b64decode(b64_part)
+    except Exception:
+        return _err(400, 'не удалось декодировать base64')
+    if not raw_bytes or len(raw_bytes) < 200:
+        return _err(400, 'фото слишком маленькое')
+
+    # Загрузка в S3
+    suffix = 'jpg'
+    if 'image/png' in data_url[:40]:
+        suffix = 'png'
+    elif 'image/webp' in data_url[:40]:
+        suffix = 'webp'
+    today = datetime.utcnow().strftime('%Y%m%d')
+    key = f"passport/{today}/{field}_{uuid.uuid4().hex[:12]}.{suffix}"
+    try:
+        s3 = _get_s3()
+        s3.put_object(
+            Bucket='files',
+            Key=key,
+            Body=raw_bytes,
+            ContentType=f'image/{suffix}',
+        )
+    except Exception as e:
+        return _err(500, f'Не удалось сохранить фото: {str(e)[:200]}')
+    url = _cdn_url(key)
+
+    # Распознавание (опционально, на странице 2-3 паспорта)
+    passport_data = {}
+    if recognize and field in ('passport_photo_url', 'passport_photo2_url'):
+        passport_data = _ocr_passport_via_ai(data_url)
+
+    return _ok({'url': url, 'field': field, 'passport_data': passport_data})
 
 
 # ============ Specs templates / autofill ============

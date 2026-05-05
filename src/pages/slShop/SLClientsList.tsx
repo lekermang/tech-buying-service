@@ -79,6 +79,23 @@ function ClientForm({ token, client, onClose, onSaved }: { token: string; client
       }
     >
       <div className="space-y-2">
+        {/* Фото паспорта (если есть) */}
+        {(d.passport_photo_url || d.passport_photo2_url) && (
+          <div className="grid grid-cols-2 gap-1.5">
+            {d.passport_photo_url && (
+              <a href={d.passport_photo_url} target="_blank" rel="noreferrer" className="block relative group">
+                <img src={d.passport_photo_url} alt="Паспорт" className="w-full h-24 object-cover rounded-md border border-[#1A1A1A] group-hover:border-[#FFD700]/40" />
+                <div className="absolute bottom-1 left-1 bg-black/70 text-[#FFD700] text-[8px] font-bold px-1 py-0.5 rounded uppercase tracking-wide">Фото 1</div>
+              </a>
+            )}
+            {d.passport_photo2_url && (
+              <a href={d.passport_photo2_url} target="_blank" rel="noreferrer" className="block relative group">
+                <img src={d.passport_photo2_url} alt="Прописка" className="w-full h-24 object-cover rounded-md border border-[#1A1A1A] group-hover:border-[#FFD700]/40" />
+                <div className="absolute bottom-1 left-1 bg-black/70 text-[#FFD700] text-[8px] font-bold px-1 py-0.5 rounded uppercase tracking-wide">Прописка</div>
+              </a>
+            )}
+          </div>
+        )}
         <SLField label="ФИО" required>
           <SLInput value={d.full_name || ""} onChange={e => setD({ ...d, full_name: e.target.value })} />
         </SLField>

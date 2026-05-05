@@ -240,6 +240,9 @@ export type SLClient = {
   address?: string | null;
   birth_date?: string | null;
   notes?: string | null;
+  passport_photo_url?: string | null;
+  passport_photo2_url?: string | null;
+  face_photo_url?: string | null;
 };
 
 export type SLItemStatus = "stock" | "showcase" | "consignment" | "sold" | "returned" | "hidden";
