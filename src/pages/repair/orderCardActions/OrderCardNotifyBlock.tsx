@@ -2,6 +2,7 @@ import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import { Order } from "../types";
 import { useStaffToast } from "../../staff/StaffToast";
+import { humanizeError } from "../staffTab/humanizeError";
 import {
   STATUS_LABEL,
   STATUS_SHORT,
@@ -33,15 +34,22 @@ export default function OrderCardNotifyBlock({ o, token, authHeader }: Props) {
         headers: { "Content-Type": "application/json", [authHeader]: token },
         body: JSON.stringify({ action: "notify", order_id: o.id, status_key: statusKey }),
       });
-      if (!res.ok) {
-        toast.update(tid, { kind: "error", message: `Ошибка сервера (${res.status})`, duration: 5000 });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        toast.update(tid, {
+          kind: "error",
+          message: humanizeError({ action: "notify_tg", httpStatus: res.status, serverError: data.error }),
+          duration: 6000,
+        });
       } else {
-        const data = await res.json().catch(() => ({}));
-        if (data.ok) toast.update(tid, { kind: "success", message: "Telegram отправлен", duration: 2500 });
-        else toast.update(tid, { kind: "error", message: data.error || "Не удалось отправить", duration: 5000 });
+        toast.update(tid, { kind: "success", message: "Telegram отправлен", duration: 2500 });
       }
-    } catch {
-      toast.update(tid, { kind: "error", message: "Ошибка соединения", duration: 5000 });
+    } catch (e) {
+      toast.update(tid, {
+        kind: "error",
+        message: humanizeError({ action: "notify_tg", thrown: e }),
+        duration: 6000,
+      });
     }
     setTimeout(() => setSentKey(null), 3000);
   };
@@ -55,15 +63,22 @@ export default function OrderCardNotifyBlock({ o, token, authHeader }: Props) {
         headers: { "Content-Type": "application/json", [authHeader]: token },
         body: JSON.stringify({ action: "notify_sms", order_id: o.id, status_key: statusKey }),
       });
-      if (!res.ok) {
-        toast.update(tid, { kind: "error", message: `Ошибка сервера (${res.status})`, duration: 5000 });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        toast.update(tid, {
+          kind: "error",
+          message: humanizeError({ action: "notify_sms", httpStatus: res.status, serverError: data.error }),
+          duration: 6000,
+        });
       } else {
-        const data = await res.json().catch(() => ({}));
-        if (data.ok) toast.update(tid, { kind: "success", message: `SMS отправлено на ${o.phone || "клиента"}`, duration: 2500 });
-        else toast.update(tid, { kind: "error", message: data.error || "Не удалось отправить SMS", duration: 5000 });
+        toast.update(tid, { kind: "success", message: `SMS отправлено на ${o.phone || "клиента"}`, duration: 2500 });
       }
-    } catch {
-      toast.update(tid, { kind: "error", message: "Ошибка соединения", duration: 5000 });
+    } catch (e) {
+      toast.update(tid, {
+        kind: "error",
+        message: humanizeError({ action: "notify_sms", thrown: e }),
+        duration: 6000,
+      });
     }
     setTimeout(() => setSmsSentKey(null), 3000);
   };

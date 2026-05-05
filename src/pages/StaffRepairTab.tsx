@@ -12,6 +12,7 @@ import StaffRepairList from "./repair/staffTab/StaffRepairList";
 import { View, Period, RepairAnalytics, EditForm, EMPTY_READY } from "./repair/staffTab/staffTabTypes";
 import { useStaffToast } from "./staff/StaffToast";
 import useDebouncedValue from "@/hooks/useDebouncedValue";
+import { humanizeError } from "./repair/staffTab/humanizeError";
 
 export default function StaffRepairTab({ token, isOwner = false }: { token: string; isOwner?: boolean }) {
   const toast = useStaffToast();
@@ -79,11 +80,15 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
     const url = REPAIR_URL + (ps.length ? "?" + ps.join("&") : "");
     try {
       const res = await fetch(url, { headers: { "X-Employee-Token": token }, signal });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        toast.error(humanizeError({ action: "load", httpStatus: res.status, serverError: data.error }));
+        return;
+      }
       setOrders(data.orders || []);
     } catch (e) {
       if ((e as { name?: string })?.name !== "AbortError") {
-        toast.error("Не удалось загрузить заявки");
+        toast.error(humanizeError({ action: "load", thrown: e }));
       }
     } finally {
       setLoading(false);
@@ -155,14 +160,18 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
         setForm(EMPTY_FORM);
         loadOrders();
       } else {
-        const msg = data.error
-          ? `Не удалось создать заявку: ${data.error}`
-          : `Не удалось создать заявку (HTTP ${res.status})`;
-        toast.update(tid, { kind: "error", message: msg, duration: 7000 });
+        toast.update(tid, {
+          kind: "error",
+          message: humanizeError({ action: "create", httpStatus: res.status, serverError: data.error }),
+          duration: 7000,
+        });
       }
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      toast.update(tid, { kind: "error", message: `Сбой сети: ${msg}`, duration: 7000 });
+      toast.update(tid, {
+        kind: "error",
+        message: humanizeError({ action: "create", thrown: e }),
+        duration: 7000,
+      });
     } finally {
       setCreating(false);
     }
@@ -192,18 +201,20 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
         method: "POST", headers,
         body: JSON.stringify(body),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok || data.error) {
-        setSaveError(data.error || "Ошибка");
-        toast.error(data.error || "Не удалось сохранить заявку");
+        const msg = humanizeError({ action: "save", httpStatus: res.status, serverError: data.error });
+        setSaveError(msg);
+        toast.error(msg);
         return;
       }
       toast.success(`Заявка #${o.id} сохранена`);
       setExpandedId(null);
       loadOrders();
-    } catch {
-      setSaveError("Ошибка сети");
-      toast.error("Сбой сети при сохранении");
+    } catch (e) {
+      const msg = humanizeError({ action: "save", thrown: e });
+      setSaveError(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -222,18 +233,20 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
         method: "POST", headers,
         body: JSON.stringify({ id, status, ...(extra || {}) }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok || data.error) {
-        setSaveError(data.error || "Ошибка");
-        toast.error(data.error || "Не удалось изменить статус");
+        const msg = humanizeError({ action: "status", httpStatus: res.status, serverError: data.error });
+        setSaveError(msg);
+        toast.error(msg);
         return false;
       }
       toast.success(`#${id}: ${STATUS_LABELS[status] || status}`);
       loadOrders();
       return true;
-    } catch {
-      setSaveError("Ошибка сети");
-      toast.error("Сбой сети при смене статуса");
+    } catch (e) {
+      const msg = humanizeError({ action: "status", thrown: e });
+      setSaveError(msg);
+      toast.error(msg);
       return false;
     } finally {
       setSaving(false);
@@ -286,10 +299,18 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
         toast.update(tid, { kind: "success", message: `Заявка #${id} удалена`, duration: 3000 });
         loadOrders();
       } else {
-        toast.update(tid, { kind: "error", message: data.error || "Не удалось удалить заявку", duration: 5000 });
+        toast.update(tid, {
+          kind: "error",
+          message: humanizeError({ action: "delete", httpStatus: res.status, serverError: data.error }),
+          duration: 6000,
+        });
       }
-    } catch {
-      toast.update(tid, { kind: "error", message: "Сбой сети при удалении", duration: 5000 });
+    } catch (e) {
+      toast.update(tid, {
+        kind: "error",
+        message: humanizeError({ action: "delete", thrown: e }),
+        duration: 6000,
+      });
     }
   };
 
@@ -337,7 +358,8 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
       setReadyModal(null);
       setExpandedId(null);
     } else {
-      setReadyError("Ошибка сохранения");
+      // saveError уже содержит человекочитаемое сообщение из changeStatus
+      setReadyError(saveError || humanizeError({ action: "ready" }));
     }
   };
 

@@ -2,6 +2,7 @@ import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import { Order, printReceipt, printAct, printActHTML } from "../types";
 import { useStaffToast } from "../../staff/StaffToast";
+import { humanizeError } from "../staffTab/humanizeError";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -34,18 +35,24 @@ export default function OrderCardDocsBlock({ o, isOwner, token, authHeader, onDe
         headers: { "Content-Type": "application/json", [authHeader]: token },
         body: JSON.stringify({ action: "send_act", id: o.id }),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json().catch(() => ({}));
-      if (data.ok) {
+      if (!res.ok || !data.ok) {
+        toast.update(tid, {
+          kind: "error",
+          message: humanizeError({ action: "send_act", httpStatus: res.status, serverError: data.error }),
+          duration: 6000,
+        });
+      } else {
         setActSent(true);
         setTimeout(() => setActSent(false), 3000);
         toast.update(tid, { kind: "success", message: "Акт отправлен в Telegram", duration: 3000 });
-      } else {
-        toast.update(tid, { kind: "error", message: data.error || "Не удалось отправить акт", duration: 5000 });
       }
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Ошибка соединения";
-      toast.update(tid, { kind: "error", message: `Ошибка отправки акта: ${msg}`, duration: 5000 });
+      toast.update(tid, {
+        kind: "error",
+        message: humanizeError({ action: "send_act", thrown: e }),
+        duration: 6000,
+      });
     } finally {
       setActSending(false);
     }
