@@ -1078,7 +1078,61 @@ def client_passport_upload(body, employee):
     if recognize and field in ('passport_photo_url', 'passport_photo2_url'):
         passport_data = _ocr_passport_via_ai(data_url)
 
-    return _ok({'url': url, 'field': field, 'passport_data': passport_data})
+    # Поиск дубля клиента по распознанным данным.
+    # Приоритет: 1) серия+номер (точно), 2) серия+номер по отдельности, 3) ФИО+ДР.
+    matches = []
+    if passport_data and not passport_data.get('_ocr_error'):
+        try:
+            conn = get_conn()
+            cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            series = (passport_data.get('series') or '').strip().replace(' ', '')
+            number = (passport_data.get('number') or '').strip().replace(' ', '')
+            full_name = (passport_data.get('full_name') or '').strip()
+            birth_date = passport_data.get('birth_date')
+            # Точный матч серия+номер
+            if series and number:
+                cur.execute(
+                    f"SELECT id, full_name, phone, passport_series, passport_number, "
+                    f"passport_issued_by, passport_issued_date, address, birth_date, "
+                    f"passport_photo_url, passport_photo2_url, face_photo_url "
+                    f"FROM {SCHEMA}.slshop_clients "
+                    f"WHERE REPLACE(COALESCE(passport_series,''),' ','')={_esc(series)} "
+                    f"AND REPLACE(COALESCE(passport_number,''),' ','')={_esc(number)} "
+                    f"ORDER BY updated_at DESC LIMIT 5"
+                )
+                matches = [dict(r) for r in cur.fetchall()]
+            # Если не нашли по паспорту — пробуем по ФИО+дате рождения
+            if not matches and full_name and birth_date:
+                cur.execute(
+                    f"SELECT id, full_name, phone, passport_series, passport_number, "
+                    f"passport_issued_by, passport_issued_date, address, birth_date, "
+                    f"passport_photo_url, passport_photo2_url, face_photo_url "
+                    f"FROM {SCHEMA}.slshop_clients "
+                    f"WHERE LOWER(full_name)=LOWER({_esc(full_name)}) "
+                    f"AND birth_date={_esc(birth_date)} LIMIT 5"
+                )
+                matches = [dict(r) for r in cur.fetchall()]
+            # Последний шанс — только по ФИО (может быть несколько однофамильцев)
+            if not matches and full_name:
+                cur.execute(
+                    f"SELECT id, full_name, phone, passport_series, passport_number, "
+                    f"passport_issued_by, passport_issued_date, address, birth_date, "
+                    f"passport_photo_url, passport_photo2_url, face_photo_url "
+                    f"FROM {SCHEMA}.slshop_clients "
+                    f"WHERE LOWER(full_name)=LOWER({_esc(full_name)}) "
+                    f"ORDER BY updated_at DESC LIMIT 5"
+                )
+                matches = [dict(r) for r in cur.fetchall()]
+            cur.close(); conn.close()
+        except Exception:
+            matches = []
+
+    return _ok({
+        'url': url,
+        'field': field,
+        'passport_data': passport_data,
+        'matches': matches,
+    })
 
 
 # ============ Specs templates / autofill ============

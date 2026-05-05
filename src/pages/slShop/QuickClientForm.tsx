@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import Icon from "@/components/ui/icon";
-import { slApi } from "./types";
+import { slApi, type SLClient } from "./types";
 import { SLField, SLInput, SLButton, SLGrid } from "./slUI";
 
 type Props = {
@@ -20,6 +20,12 @@ type PassportData = {
   _ocr_error?: string;
 };
 
+type ClientMatch = Pick<SLClient,
+  "id" | "full_name" | "phone" | "passport_series" | "passport_number" |
+  "passport_issued_by" | "passport_issued_date" | "address" | "birth_date" |
+  "passport_photo_url" | "passport_photo2_url" | "face_photo_url"
+>;
+
 /** Быстрое создание клиента: 1) фото паспорта с камеры, 2) AI распознаёт данные,
  *  3) сотрудник проверяет/правит и нажимает "Создать". */
 export default function QuickClientForm({ token, onCreated, onCancel }: Props) {
@@ -29,6 +35,9 @@ export default function QuickClientForm({ token, onCreated, onCancel }: Props) {
   const [photo2Busy, setPhoto2Busy] = useState(false);
   const [ocrBusy, setOcrBusy] = useState(false);
   const [recognizedFields, setRecognizedFields] = useState<Set<string>>(new Set());
+  // Найденные дубли в БД (по серии/номеру или ФИО+ДР)
+  const [matches, setMatches] = useState<ClientMatch[]>([]);
+  const [matchesDismissed, setMatchesDismissed] = useState(false);
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [series, setSeries] = useState("");
@@ -70,7 +79,7 @@ export default function QuickClientForm({ token, onCreated, onCancel }: Props) {
     try {
       // Сжимаем фото на клиенте (максимум 1600px по длинной стороне)
       const compressed = await compressImage(file, 1600, 0.82);
-      const r = await slApi<{ url: string; passport_data?: PassportData }>(token, "client_passport_upload", {
+      const r = await slApi<{ url: string; passport_data?: PassportData; matches?: ClientMatch[] }>(token, "client_passport_upload", {
         method: "POST",
         body: { image_base64: compressed, field: fieldKey, recognize: true },
       });
@@ -80,6 +89,11 @@ export default function QuickClientForm({ token, onCreated, onCancel }: Props) {
         // Применяем распознанные данные (бэкенд OCR-ит синхронно)
         if (r.data.passport_data) {
           applyPassportData(r.data.passport_data);
+        }
+        // Если найдены дубли в базе — показываем подсказку "Это он?"
+        if (r.data.matches && r.data.matches.length > 0) {
+          setMatches(r.data.matches);
+          setMatchesDismissed(false);
         }
       } else {
         setErr(r.error || "Ошибка загрузки фото");
@@ -219,6 +233,59 @@ export default function QuickClientForm({ token, onCreated, onCancel }: Props) {
         </div>
       )}
 
+      {/* Найден дубль клиента в базе — предлагаем выбрать его, а не создавать новый */}
+      {matches.length > 0 && !matchesDismissed && (
+        <div className="rounded-lg bg-gradient-to-br from-[#FFD700]/12 via-[#FFD700]/4 to-transparent border-2 border-[#FFD700]/50 p-2 space-y-1.5 shadow-[0_0_18px_rgba(255,215,0,0.18)]">
+          <div className="flex items-start gap-1.5">
+            <Icon name="UserSearch" size={14} className="text-[#FFD700] mt-0.5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="font-bold text-[12px] text-[#FFD700] uppercase tracking-wide leading-tight">
+                {matches.length === 1 ? "Похоже, это он?" : `Найдено похожих клиентов: ${matches.length}`}
+              </div>
+              <div className="text-[10px] text-white/60 leading-tight mt-0.5">
+                Такой клиент уже есть в базе — выбери его, чтобы не создавать дубль
+              </div>
+            </div>
+            <button onClick={() => setMatchesDismissed(true)}
+              title="Скрыть и создать нового"
+              className="text-white/40 hover:text-white p-0.5 shrink-0">
+              <Icon name="X" size={12} />
+            </button>
+          </div>
+          <div className="space-y-1">
+            {matches.map(m => (
+              <button key={m.id} onClick={() => onCreated(m.id, m.full_name)}
+                className="w-full text-left bg-[#0E0E0E] hover:bg-[#141414] active:scale-[0.99] border border-[#1F1F1F] hover:border-[#FFD700] rounded-md p-2 flex items-center gap-2 transition-all">
+                {m.passport_photo_url ? (
+                  <img src={m.passport_photo_url} alt="" className="w-10 h-10 object-cover rounded shrink-0 border border-[#FFD700]/30" />
+                ) : (
+                  <div className="w-10 h-10 rounded bg-[#1A1A1A] flex items-center justify-center shrink-0">
+                    <Icon name="User" size={16} className="text-white/30" />
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-[12px] text-white truncate flex items-center gap-1.5">
+                    {m.full_name}
+                    <span className="text-[9px] text-white/40 font-normal">#{m.id}</span>
+                  </div>
+                  <div className="text-[10px] text-white/55 flex flex-wrap gap-x-2 mt-0.5">
+                    {m.phone && <span><Icon name="Phone" size={9} className="inline mr-0.5" />{m.phone}</span>}
+                    {m.passport_series && <span><Icon name="IdCard" size={9} className="inline mr-0.5" />{m.passport_series} {m.passport_number}</span>}
+                  </div>
+                </div>
+                <div className="shrink-0 inline-flex items-center gap-1 bg-[#FFD700] text-black text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded">
+                  <Icon name="Check" size={10} /> Это он
+                </div>
+              </button>
+            ))}
+          </div>
+          <button onClick={() => setMatchesDismissed(true)}
+            className="w-full text-[10px] text-white/45 hover:text-white/80 underline underline-offset-2 py-1">
+            Не он — создать нового клиента
+          </button>
+        </div>
+      )}
+
       <SLField label={<>2 · ФИО{aiBadge("fullName")}</>} required>
         <SLInput value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Иванов Иван Иванович" />
       </SLField>
@@ -282,6 +349,13 @@ export default function QuickClientForm({ token, onCreated, onCancel }: Props) {
       </details>
 
       {err && <div className="rounded-md bg-red-500/10 border border-red-500/30 text-red-300 px-2 py-1.5 text-[12px] flex items-center gap-1.5"><Icon name="AlertTriangle" size={11} />{err}</div>}
+
+      {matches.length > 0 && !matchesDismissed && (
+        <div className="rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-200 px-2 py-1.5 text-[10px] flex items-center gap-1.5">
+          <Icon name="AlertTriangle" size={11} className="text-amber-300 shrink-0" />
+          <span>Сначала проверь похожих клиентов выше — возможно, такой уже есть</span>
+        </div>
+      )}
 
       <SLButton variant="gold" size="lg" icon={busy ? "Loader2" : "Check"} onClick={submit} disabled={busy || !fullName.trim()} className="w-full">
         {busy ? "Создаю…" : "Создать клиента и продолжить"}
