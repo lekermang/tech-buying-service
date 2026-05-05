@@ -472,7 +472,10 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
               <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${autoPrint ? "left-4" : "left-0.5"}`} />
             </button>
           </label>
-          <div className="sticky bottom-0 bg-gradient-to-t from-[#0D0D0D] via-[#0D0D0D]/95 to-transparent pt-2 pb-1 -mx-1 px-1">
+          <div
+            className="sticky bottom-0 bg-gradient-to-t from-[#0D0D0D] via-[#0D0D0D]/95 to-transparent pt-2 -mx-1 px-1 z-10"
+            style={{ paddingBottom: 'calc(0.25rem + env(safe-area-inset-bottom, 0px))' }}
+          >
             <button
               onClick={submit}
               disabled={saving}

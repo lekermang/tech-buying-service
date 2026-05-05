@@ -1079,7 +1079,7 @@ def client_passport_upload(body, employee):
         passport_data = _ocr_passport_via_ai(data_url)
 
     # Поиск дубля клиента по распознанным данным.
-    # Приоритет: 1) серия+номер (точно), 2) серия+номер по отдельности, 3) ФИО+ДР.
+    # Приоритет: 1) серия+номер (точно), 2) ФИО+ДР, 3) только ФИО.
     matches = []
     if passport_data and not passport_data.get('_ocr_error'):
         try:
@@ -1089,43 +1089,68 @@ def client_passport_upload(body, employee):
             number = (passport_data.get('number') or '').strip().replace(' ', '')
             full_name = (passport_data.get('full_name') or '').strip()
             birth_date = passport_data.get('birth_date')
+
+            base_select = (
+                f"SELECT id, full_name, phone, passport_series, passport_number, "
+                f"passport_issued_by, passport_issued_date, address, birth_date, "
+                f"passport_photo_url, passport_photo2_url, face_photo_url "
+                f"FROM {SCHEMA}.slshop_clients "
+            )
             # Точный матч серия+номер
             if series and number:
                 cur.execute(
-                    f"SELECT id, full_name, phone, passport_series, passport_number, "
-                    f"passport_issued_by, passport_issued_date, address, birth_date, "
-                    f"passport_photo_url, passport_photo2_url, face_photo_url "
-                    f"FROM {SCHEMA}.slshop_clients "
+                    base_select +
                     f"WHERE REPLACE(COALESCE(passport_series,''),' ','')={_esc(series)} "
                     f"AND REPLACE(COALESCE(passport_number,''),' ','')={_esc(number)} "
                     f"ORDER BY updated_at DESC LIMIT 5"
                 )
                 matches = [dict(r) for r in cur.fetchall()]
-            # Если не нашли по паспорту — пробуем по ФИО+дате рождения
+            # ФИО + ДР
             if not matches and full_name and birth_date:
                 cur.execute(
-                    f"SELECT id, full_name, phone, passport_series, passport_number, "
-                    f"passport_issued_by, passport_issued_date, address, birth_date, "
-                    f"passport_photo_url, passport_photo2_url, face_photo_url "
-                    f"FROM {SCHEMA}.slshop_clients "
+                    base_select +
                     f"WHERE LOWER(full_name)=LOWER({_esc(full_name)}) "
                     f"AND birth_date={_esc(birth_date)} LIMIT 5"
                 )
                 matches = [dict(r) for r in cur.fetchall()]
-            # Последний шанс — только по ФИО (может быть несколько однофамильцев)
+            # Только ФИО (несколько однофамильцев)
             if not matches and full_name:
                 cur.execute(
-                    f"SELECT id, full_name, phone, passport_series, passport_number, "
-                    f"passport_issued_by, passport_issued_date, address, birth_date, "
-                    f"passport_photo_url, passport_photo2_url, face_photo_url "
-                    f"FROM {SCHEMA}.slshop_clients "
+                    base_select +
                     f"WHERE LOWER(full_name)=LOWER({_esc(full_name)}) "
                     f"ORDER BY updated_at DESC LIMIT 5"
                 )
                 matches = [dict(r) for r in cur.fetchall()]
+
+            # Подтянем краткую статистику по каждому: сколько у нас от него
+            # принято товаров, на какую сумму, когда последний приход.
+            if matches:
+                ids = ', '.join(str(int(m['id'])) for m in matches)
+                cur.execute(
+                    f"SELECT buy_client_id AS cid, "
+                    f"COUNT(*) AS items_count, "
+                    f"COALESCE(SUM(buy_price), 0) AS total_buy, "
+                    f"COALESCE(SUM(sell_price), 0) AS total_sell, "
+                    f"MAX(buy_at) AS last_buy_at "
+                    f"FROM {SCHEMA}.slshop_items "
+                    f"WHERE buy_client_id IN ({ids}) "
+                    f"GROUP BY buy_client_id"
+                )
+                stats_by_id = {int(r['cid']): r for r in cur.fetchall()}
+                for m in matches:
+                    s = stats_by_id.get(int(m['id']))
+                    if s:
+                        m['stats'] = {
+                            'items_count': int(s['items_count'] or 0),
+                            'total_buy': float(s['total_buy'] or 0),
+                            'total_sell': float(s['total_sell'] or 0),
+                            'last_buy_at': s['last_buy_at'].isoformat() if s.get('last_buy_at') else None,
+                        }
+                    else:
+                        m['stats'] = {'items_count': 0, 'total_buy': 0, 'total_sell': 0, 'last_buy_at': None}
             cur.close(); conn.close()
         except Exception:
-            matches = []
+            matches = matches or []
 
     return _ok({
         'url': url,

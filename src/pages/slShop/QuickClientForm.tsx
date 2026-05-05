@@ -20,11 +20,33 @@ type PassportData = {
   _ocr_error?: string;
 };
 
+type ClientMatchStats = {
+  items_count: number;
+  total_buy: number;
+  total_sell: number;
+  last_buy_at: string | null;
+};
+
 type ClientMatch = Pick<SLClient,
   "id" | "full_name" | "phone" | "passport_series" | "passport_number" |
   "passport_issued_by" | "passport_issued_date" | "address" | "birth_date" |
   "passport_photo_url" | "passport_photo2_url" | "face_photo_url"
->;
+> & { stats?: ClientMatchStats };
+
+// "2 недели назад" / "вчера" / "12 дней назад" — для last_buy_at
+function relTime(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const diffMs = Date.now() - d.getTime();
+  const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (days <= 0) return "сегодня";
+  if (days === 1) return "вчера";
+  if (days < 7) return `${days} дн назад`;
+  if (days < 30) return `${Math.floor(days / 7)} нед назад`;
+  if (days < 365) return `${Math.floor(days / 30)} мес назад`;
+  return `${Math.floor(days / 365)} г назад`;
+}
 
 /** Быстрое создание клиента: 1) фото паспорта с камеры, 2) AI распознаёт данные,
  *  3) сотрудник проверяет/правит и нажимает "Создать". */
@@ -253,31 +275,63 @@ export default function QuickClientForm({ token, onCreated, onCancel }: Props) {
             </button>
           </div>
           <div className="space-y-1">
-            {matches.map(m => (
-              <button key={m.id} onClick={() => onCreated(m.id, m.full_name)}
-                className="w-full text-left bg-[#0E0E0E] hover:bg-[#141414] active:scale-[0.99] border border-[#1F1F1F] hover:border-[#FFD700] rounded-md p-2 flex items-center gap-2 transition-all">
-                {m.passport_photo_url ? (
-                  <img src={m.passport_photo_url} alt="" className="w-10 h-10 object-cover rounded shrink-0 border border-[#FFD700]/30" />
-                ) : (
-                  <div className="w-10 h-10 rounded bg-[#1A1A1A] flex items-center justify-center shrink-0">
-                    <Icon name="User" size={16} className="text-white/30" />
+            {matches.map(m => {
+              const s = m.stats;
+              const hasHistory = s && s.items_count > 0;
+              return (
+                <button key={m.id} onClick={() => onCreated(m.id, m.full_name)}
+                  className="w-full text-left bg-[#0E0E0E] hover:bg-[#141414] active:scale-[0.99] border border-[#1F1F1F] hover:border-[#FFD700] rounded-md p-2 transition-all">
+                  <div className="flex items-center gap-2">
+                    {m.passport_photo_url ? (
+                      <img src={m.passport_photo_url} alt="" className="w-10 h-10 object-cover rounded shrink-0 border border-[#FFD700]/30" />
+                    ) : (
+                      <div className="w-10 h-10 rounded bg-[#1A1A1A] flex items-center justify-center shrink-0">
+                        <Icon name="User" size={16} className="text-white/30" />
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold text-[12px] text-white truncate flex items-center gap-1.5">
+                        {m.full_name}
+                        <span className="text-[9px] text-white/40 font-normal">#{m.id}</span>
+                      </div>
+                      <div className="text-[10px] text-white/55 flex flex-wrap gap-x-2 mt-0.5">
+                        {m.phone && <span><Icon name="Phone" size={9} className="inline mr-0.5" />{m.phone}</span>}
+                        {m.passport_series && <span>{m.passport_series} {m.passport_number}</span>}
+                      </div>
+                    </div>
+                    <div className="shrink-0 inline-flex items-center gap-1 bg-[#FFD700] text-black text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded">
+                      <Icon name="Check" size={10} /> Это он
+                    </div>
                   </div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="font-bold text-[12px] text-white truncate flex items-center gap-1.5">
-                    {m.full_name}
-                    <span className="text-[9px] text-white/40 font-normal">#{m.id}</span>
-                  </div>
-                  <div className="text-[10px] text-white/55 flex flex-wrap gap-x-2 mt-0.5">
-                    {m.phone && <span><Icon name="Phone" size={9} className="inline mr-0.5" />{m.phone}</span>}
-                    {m.passport_series && <span><Icon name="IdCard" size={9} className="inline mr-0.5" />{m.passport_series} {m.passport_number}</span>}
-                  </div>
-                </div>
-                <div className="shrink-0 inline-flex items-center gap-1 bg-[#FFD700] text-black text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded">
-                  <Icon name="Check" size={10} /> Это он
-                </div>
-              </button>
-            ))}
+                  {/* История сделок */}
+                  {hasHistory ? (
+                    <div className="mt-1.5 pt-1.5 border-t border-[#1F1F1F]/70 flex items-center gap-1.5 flex-wrap text-[10px]">
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-bold">
+                        <Icon name="ShoppingBag" size={9} />
+                        {s!.items_count} {s!.items_count === 1 ? "сделка" : (s!.items_count < 5 ? "сделки" : "сделок")}
+                      </span>
+                      {s!.total_buy > 0 && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#FFD700]/10 border border-[#FFD700]/25 text-[#FFD700] font-bold tabular-nums">
+                          <Icon name="Wallet" size={9} />
+                          {Math.round(s!.total_buy).toLocaleString("ru-RU")} ₽
+                        </span>
+                      )}
+                      {s!.last_buy_at && (
+                        <span className="inline-flex items-center gap-1 text-white/55">
+                          <Icon name="Clock" size={9} />
+                          {relTime(s!.last_buy_at)}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="mt-1.5 pt-1.5 border-t border-[#1F1F1F]/70 text-[10px] text-white/35 flex items-center gap-1">
+                      <Icon name="UserPlus" size={9} />
+                      Новый постоянный — сделок пока не было
+                    </div>
+                  )}
+                </button>
+              );
+            })}
           </div>
           <button onClick={() => setMatchesDismissed(true)}
             className="w-full text-[10px] text-white/45 hover:text-white/80 underline underline-offset-2 py-1">

@@ -93,23 +93,41 @@ export function SLModal({
   footer?: ReactNode;
 }) {
   if (!open) return null;
+  // ВАЖНО для iPhone Safari: фиксированная панель браузера и Home Indicator
+  // могут перекрывать модалку. Используем 100dvh + safe-area-inset-bottom,
+  // плюс резерв 84px (высота нижней навигации приложения + запас).
   return (
-    <div className="fixed inset-0 z-[80] bg-black/75 backdrop-blur-sm flex items-end sm:items-center justify-center p-2 sm:p-3 animate-[fadeIn_0.15s_ease]" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-[80] bg-black/75 backdrop-blur-sm flex items-end sm:items-center justify-center p-2 sm:p-3 animate-[fadeIn_0.15s_ease]"
+      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)' }}
+      onClick={onClose}
+    >
       <div
-        className={`w-full ${maxWidth} ${slClasses.card} max-h-[92vh] flex flex-col`}
+        className={`w-full ${maxWidth} ${slClasses.card} flex flex-col rounded-b-2xl sm:rounded-2xl`}
+        style={{
+          // 100dvh учитывает адресную строку Safari — иначе модалка уезжает под бар
+          maxHeight: 'min(92dvh, calc(100dvh - 96px))',
+        }}
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-[#1A1A1A]">
+        <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-[#1A1A1A] shrink-0">
           <div className="flex items-center gap-1.5 min-w-0">
             {icon && <Icon name={icon} size={13} className="text-[#FFD700] shrink-0" />}
             <h3 className="font-oswald uppercase text-[13px] tracking-wide font-bold truncate">{title}</h3>
           </div>
-          <button onClick={onClose} className="text-white/40 hover:text-white shrink-0 p-1 -mr-1"><Icon name="X" size={14} /></button>
+          <button onClick={onClose} className="text-white/40 hover:text-white shrink-0 p-1.5 -mr-1 active:scale-90"><Icon name="X" size={16} /></button>
         </div>
-        <div className="flex-1 overflow-y-auto scrollbar-premium p-3">
+        <div className="flex-1 overflow-y-auto overscroll-contain scrollbar-premium p-3">
           {children}
         </div>
-        {footer && <div className="border-t border-[#1A1A1A] px-3 py-2 flex gap-2 justify-end">{footer}</div>}
+        {footer && (
+          <div
+            className="border-t border-[#1A1A1A] px-3 py-2 flex gap-2 justify-end bg-[#0D0D0D] shrink-0"
+            style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom, 0px))' }}
+          >
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );

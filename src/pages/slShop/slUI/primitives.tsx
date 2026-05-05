@@ -11,7 +11,9 @@ export const slClasses = {
   card: "bg-[#101010] border border-[#1A1A1A] rounded-xl shadow-[0_1px_0_rgba(255,215,0,0.04)_inset,0_8px_24px_rgba(0,0,0,0.3)]",
   cardPad: "p-2.5 sm:p-3",
   field: "rounded-md bg-[#0A0A0A] border border-[#1A1A1A] focus-within:border-[#FFD700]/60 focus-within:bg-[#0E0E0E] hover:border-[#262626] transition-all",
-  input: "w-full bg-transparent outline-none px-2.5 py-1.5 text-[13px] text-white placeholder:text-white/25",
+  // На мобильных 16px шрифт + py-2.5 (40px высота) — Apple/Google рекомендуют ≥40px,
+  // и ≥16px чтобы iOS не зумил страницу при фокусе.
+  input: "w-full bg-transparent outline-none px-2.5 py-2.5 sm:py-1.5 text-[16px] sm:text-[13px] text-white placeholder:text-white/25",
   label: "text-[9px] uppercase tracking-[0.08em] font-bold text-white/45",
   pill: "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wide font-semibold border",
   btn: "inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-bold uppercase tracking-wide transition active:scale-[0.97]",
@@ -142,5 +144,14 @@ export function SLPageWrap({
     xl: "max-w-[1200px]",
     full: "max-w-full",
   }[max];
-  return <div className={`mx-auto w-full ${w} ${className}`}>{children}</div>;
+  // На мобильных добавляем небольшие боковые отступы и safe-area снизу,
+  // чтобы контент не уезжал под нижнюю навигацию приложения.
+  return (
+    <div
+      className={`mx-auto w-full ${w} px-2 sm:px-0 ${className}`}
+      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+    >
+      {children}
+    </div>
+  );
 }
