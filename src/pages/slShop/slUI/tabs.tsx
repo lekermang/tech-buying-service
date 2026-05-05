@@ -85,7 +85,7 @@ export function SLTabsGrid({
   className?: string;
 }) {
   return (
-    <div className={`grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 ${className}`}>
+    <div className={`grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-7 gap-1.5 ${className}`}>
       {items.map(t => {
         const active = value === t.v;
         const featured = t.featured && !active;
@@ -121,7 +121,7 @@ export function SLTabsGrid({
               type="button"
               onClick={() => onChange(t.v)}
               aria-label={t.tooltip || t.l}
-              className={`relative w-full h-[78px] rounded-xl p-[1.5px] overflow-visible transition-all duration-300 active:scale-[0.95] ${
+              className={`relative w-full h-[62px] rounded-lg p-[1px] overflow-visible transition-all duration-300 active:scale-[0.95] ${
                 active
                   ? "bg-[conic-gradient(from_180deg_at_50%_50%,#fff3a0_0deg,#FFD700_90deg,#b8860b_180deg,#FFD700_270deg,#fff3a0_360deg)] shadow-[0_8px_28px_rgba(255,215,0,0.55),0_0_42px_rgba(255,215,0,0.35)]"
                   : featured
@@ -131,7 +131,7 @@ export function SLTabsGrid({
             >
               {/* Внутренний слой — основное тело плитки */}
               <div
-                className={`relative w-full h-full rounded-[10px] flex flex-col items-center justify-center gap-1 px-1.5 py-2 font-bold uppercase tracking-[0.04em] text-[10px] overflow-hidden transition-colors duration-200 ${
+                className={`relative w-full h-full rounded-[7px] flex flex-col items-center justify-center gap-0.5 px-1 py-1 font-bold uppercase tracking-[0.03em] text-[8.5px] overflow-hidden transition-colors duration-200 ${
                   active
                     ? "bg-gradient-to-br from-[#FFE34D] via-[#FFD700] to-[#d4a017] text-black"
                     : featured
@@ -181,7 +181,7 @@ export function SLTabsGrid({
                           : "group-hover:scale-110 group-hover:drop-shadow-[0_0_10px_rgba(255,215,0,0.7)]"
                     }`}
                   >
-                    <Icon name={t.icon} size={20} />
+                    <Icon name={t.icon} size={15} />
                     {/* Бейдж */}
                     {((typeof t.badge === "number" && t.badge > 0) || (typeof t.badge === "string" && t.badge)) ? (
                       <span

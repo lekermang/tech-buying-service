@@ -107,7 +107,14 @@ export function StaffMainLayout({
   const initials = getInitials(empName);
 
   return (
-    <div className="min-h-screen bg-[#0D0D0D] text-white flex flex-col relative overflow-x-hidden" style={{ fontFamily: "var(--staff-font, inherit)" }}>
+    <div
+      className="bg-[#0D0D0D] text-white flex flex-col relative overflow-x-hidden"
+      style={{
+        fontFamily: "var(--staff-font, inherit)",
+        // 100dvh учитывает адресную строку Safari — иначе нижняя навигация уезжает под бар
+        minHeight: "100dvh",
+      }}
+    >
       <FontApplier />
       {/* Премиум фон — как на главной (hero-grid + золотые blur-свечения) */}
       <div
@@ -240,8 +247,13 @@ export function StaffMainLayout({
         <div className="absolute bottom-0 left-0 right-0 h-px bg-[linear-gradient(90deg,transparent,rgba(255,215,0,0.45),transparent)] pointer-events-none" />
       </div>
 
-      {/* Контент — растягивается, с паддингом под нижнюю панель */}
-      <div className="flex-1 overflow-y-auto relative z-10" style={{ paddingBottom: 'calc(56px + env(safe-area-inset-bottom, 12px))' }}>
+      {/* Контент — растягивается, с паддингом под нижнюю панель.
+          Запас 24px нужен для Safari/Chrome на iOS: их адресная строка
+          может перекрывать кнопки, если контент скроллится в самый низ. */}
+      <div
+        className="flex-1 overflow-y-auto relative z-10"
+        style={{ paddingBottom: 'calc(64px + env(safe-area-inset-bottom, 0px) + 32px)' }}
+      >
         <StaffSectionBanner tab={tab} />
         <TabErrorBoundary key={tab}>
           <React.Suspense fallback={<div className="flex items-center justify-center py-16 text-white/20 font-roboto text-sm"><Icon name="Loader" size={16} className="animate-spin mr-2" />Загружаю...</div>}>
