@@ -6,6 +6,7 @@ import SLItemsMovePanel from "./SLItemsMovePanel";
 import SLItemDetail from "./SLItemDetail";
 import SLItemSellModal from "./SLItemSellModal";
 import SLItemsTable from "./SLItemsTable";
+import SLInvoiceModal from "./SLInvoiceModal";
 import { printLabelQuick } from "./labelPrinter";
 
 const PHONE_SPECS_AI_URL = "https://functions.poehali.dev/983744a8-1cfc-42d8-a566-bf31dfa328b2";
@@ -46,6 +47,8 @@ export default function SLItemsList({ token, empName: _empName, isOwner = false 
     setViewMode(m);
     try { window.localStorage.setItem("sl_items_view", m); } catch { /* noop */ }
   };
+  // Модалка «Накладная»: скачать XLSX / загрузить по фото
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -252,19 +255,28 @@ export default function SLItemsList({ token, empName: _empName, isOwner = false 
         </div>
       )}
 
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
         <div className="text-[11px] text-white/40">
           Найдено: <span className="text-white font-bold">{items.length}</span>
         </div>
-        <div className="flex items-center gap-1 bg-[#0F0F0F] border border-[#1F1F1F] rounded-lg p-0.5">
-          <button onClick={() => setView("cards")}
-            className={`text-[11px] px-2.5 py-1 rounded font-bold flex items-center gap-1 ${viewMode === "cards" ? "bg-[#FFD700] text-black" : "text-white/50 hover:text-white"}`}>
-            <Icon name="LayoutGrid" size={11} /> Карточки
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setInvoiceOpen(true)}
+            title="Скачать накладную в Excel или загрузить товары по фото бумажной накладной"
+            className="text-[11px] px-2.5 py-1 rounded font-bold flex items-center gap-1 bg-gradient-to-br from-[#FFD700]/15 to-transparent border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/20 active:scale-95"
+          >
+            <Icon name="FileSpreadsheet" size={11} /> Накладная
           </button>
-          <button onClick={() => setView("table")}
-            className={`text-[11px] px-2.5 py-1 rounded font-bold flex items-center gap-1 ${viewMode === "table" ? "bg-[#FFD700] text-black" : "text-white/50 hover:text-white"}`}>
-            <Icon name="Table" size={11} /> Таблица
-          </button>
+          <div className="flex items-center gap-1 bg-[#0F0F0F] border border-[#1F1F1F] rounded-lg p-0.5">
+            <button onClick={() => setView("cards")}
+              className={`text-[11px] px-2.5 py-1 rounded font-bold flex items-center gap-1 ${viewMode === "cards" ? "bg-[#FFD700] text-black" : "text-white/50 hover:text-white"}`}>
+              <Icon name="LayoutGrid" size={11} /> Карточки
+            </button>
+            <button onClick={() => setView("table")}
+              className={`text-[11px] px-2.5 py-1 rounded font-bold flex items-center gap-1 ${viewMode === "table" ? "bg-[#FFD700] text-black" : "text-white/50 hover:text-white"}`}>
+              <Icon name="Table" size={11} /> Таблица
+            </button>
+          </div>
         </div>
       </div>
 
@@ -388,6 +400,17 @@ export default function SLItemsList({ token, empName: _empName, isOwner = false 
 
       {open && <SLItemDetail token={token} item={open} isOwner={isOwner} onClose={() => setOpen(null)} onUpdated={() => { setOpen(null); load(); }} onSell={() => { setSellOpen(open); setOpen(null); }} />}
       {sellOpen && <SLItemSellModal token={token} item={sellOpen} onClose={() => setSellOpen(null)} onDone={() => { setSellOpen(null); load(); }} />}
+      {invoiceOpen && (
+        <SLInvoiceModal
+          token={token}
+          branches={branches}
+          cats={cats}
+          defaultBrand={brandFilter}
+          defaultBranchId={typeof branchFilter === "number" ? branchFilter : null}
+          onClose={() => setInvoiceOpen(false)}
+          onCreated={() => load()}
+        />
+      )}
     </div>
   );
 }

@@ -1160,6 +1160,379 @@ def client_passport_upload(body, employee):
     })
 
 
+# ============ Накладные: экспорт XLSX и распознавание по фото ============
+INVOICE_OCR_PROMPT = (
+    "На фото — приёмная накладная (список товаров на скупку). "
+    "Извлеки СТРОКИ таблицы и верни СТРОГО JSON-массив объектов в поле items. "
+    "Поля каждого объекта:\n"
+    "- title: наименование товара одной строкой (например 'Awei Y680 колонка портативная')\n"
+    "- quantity: количество, целое число (если не указано — поставь 1)\n"
+    "- buy_price: цена закупки за 1 шт, целое число в рублях (без валюты)\n"
+    "- color: цвет, если указан (иначе пустая строка)\n\n"
+    "Не выдумывай. Если каких-то полей не видно — оставь пустыми/0. "
+    "Не добавляй комментарии. Верни строго JSON: {\"items\":[{...}, ...]}."
+)
+
+
+def _invoice_ocr_via_ai(data_url: str) -> list:
+    """Распознаёт строки накладной через GPT-4o (Polza.ai). Если ключа нет
+    или произошёл сбой — возвращает пустой список."""
+    api_key = os.environ.get('POLZA_AI_API_KEY', '')
+    if not api_key:
+        return []
+    try:
+        payload = json.dumps({
+            "model": "gpt-4o-mini",
+            "messages": [{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": INVOICE_OCR_PROMPT},
+                    {"type": "image_url", "image_url": {"url": data_url}},
+                ],
+            }],
+            "max_tokens": 3000,
+            "temperature": 0.1,
+            "response_format": {"type": "json_object"},
+        }).encode('utf-8')
+        req = urllib.request.Request(
+            'https://api.polza.ai/v1/chat/completions',
+            data=payload,
+            headers={
+                'Content-Type': 'application/json',
+                'Authorization': f'Bearer {api_key}',
+            },
+        )
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = json.loads(resp.read())
+        raw = (data.get('choices') or [{}])[0].get('message', {}).get('content', '').strip()
+        if raw.startswith('```'):
+            raw = raw.strip('`')
+            if raw.lower().startswith('json'):
+                raw = raw[4:]
+            raw = raw.strip()
+        parsed = json.loads(raw)
+        items = parsed.get('items') or []
+        result = []
+        for it in items:
+            try:
+                title = str(it.get('title') or '').strip()
+                qty = int(it.get('quantity') or 1)
+                buy = float(str(it.get('buy_price') or '0').replace(',', '.').replace(' ', '') or 0)
+                if not title:
+                    continue
+                if qty < 1:
+                    qty = 1
+                result.append({
+                    'title': title,
+                    'quantity': qty,
+                    'buy_price': int(buy),
+                    'color': str(it.get('color') or '').strip(),
+                })
+            except (TypeError, ValueError):
+                continue
+        return result
+    except Exception:
+        return []
+
+
+def _auto_sell_price(buy_price: float) -> int:
+    """Правило авто-розницы: ≤500 ₽ → ×3, иначе ×2."""
+    b = float(buy_price or 0)
+    if b <= 0:
+        return 0
+    return int(b * 3 if b <= 500 else b * 2)
+
+
+def items_invoice_recognize(body, employee):
+    """Принимает фото накладной (image_base64), грузит в S3, прогоняет через
+    GPT-4o Vision и возвращает массив распознанных строк (без сохранения).
+    Сотрудник проверит и подтвердит создание через items_bulk_create."""
+    image_b64 = body.get('image_base64') or ''
+    if not image_b64:
+        return _err(400, 'image_base64 обязателен')
+    if image_b64.startswith('data:'):
+        data_url = image_b64
+        try:
+            _, b64_part = image_b64.split(',', 1)
+        except ValueError:
+            return _err(400, 'некорректный формат image_base64')
+    else:
+        data_url = 'data:image/jpeg;base64,' + image_b64
+        b64_part = image_b64
+
+    try:
+        raw_bytes = base64.b64decode(b64_part)
+    except Exception:
+        return _err(400, 'не удалось декодировать base64')
+    if not raw_bytes or len(raw_bytes) < 500:
+        return _err(400, 'фото слишком маленькое')
+
+    # Сохраняем фото в S3 для истории
+    today = datetime.utcnow().strftime('%Y%m%d')
+    key = f"invoices/{today}/invoice_{uuid.uuid4().hex[:12]}.jpg"
+    photo_url = None
+    try:
+        s3 = _get_s3()
+        s3.put_object(Bucket='files', Key=key, Body=raw_bytes, ContentType='image/jpeg')
+        photo_url = _cdn_url(key)
+    except Exception:
+        photo_url = None
+
+    items = _invoice_ocr_via_ai(data_url)
+    # Добавим рекомендованную розницу к каждой строке
+    for it in items:
+        it['suggested_sell_price'] = _auto_sell_price(it.get('buy_price') or 0)
+
+    return _ok({
+        'photo_url': photo_url,
+        'items': items,
+        'count': len(items),
+    })
+
+
+def items_bulk_create(body, employee):
+    """Массовое создание товаров из распознанной накладной.
+    body: { items: [{title, quantity, buy_price, sell_price?, color?, brand?}, ...],
+            branch_id, status, source }
+    Возвращает { created: [...], errors: [...], total_count, total_qty, total_buy }"""
+    items_in = body.get('items') or []
+    if not isinstance(items_in, list) or not items_in:
+        return _err(400, 'items должен быть непустым массивом')
+    branch_id = body.get('branch_id')
+    status = (body.get('status') or 'stock').strip()
+    source = (body.get('source') or 'buyout').strip()
+    default_brand = (body.get('brand') or '').strip()
+    default_category_id = body.get('category_id')
+
+    created = []
+    errors = []
+    total_qty = 0
+    total_buy = 0.0
+
+    for idx, it in enumerate(items_in):
+        title = str(it.get('title') or '').strip()
+        if not title:
+            errors.append({'index': idx, 'error': 'пустое наименование'})
+            continue
+        try:
+            qty = int(it.get('quantity') or 1)
+        except (TypeError, ValueError):
+            qty = 1
+        if qty < 1:
+            qty = 1
+        try:
+            buy = float(str(it.get('buy_price') or 0).replace(',', '.').replace(' ', '') or 0)
+        except (TypeError, ValueError):
+            buy = 0.0
+        # Розница: если передана — используем, иначе авто-расчёт
+        sell_raw = it.get('sell_price')
+        if sell_raw in (None, '', 0, '0'):
+            sell = _auto_sell_price(buy)
+        else:
+            try:
+                sell = int(float(str(sell_raw).replace(',', '.').replace(' ', '')))
+            except (TypeError, ValueError):
+                sell = _auto_sell_price(buy)
+
+        # Используем уже существующий create_item для единообразия
+        sub_body = {
+            'title': title,
+            'brand': str(it.get('brand') or default_brand or '').strip(),
+            'category_id': it.get('category_id') or default_category_id or None,
+            'color': str(it.get('color') or '').strip(),
+            'buy_price': buy,
+            'sell_price': sell,
+            'quantity': qty,
+            'status': status,
+            'source': source,
+            'branch_id': branch_id,
+        }
+        res = create_item(sub_body, employee)
+        try:
+            data = json.loads(res.get('body', '{}'))
+        except Exception:
+            data = {}
+        if res.get('statusCode') == 200 and data.get('id'):
+            created.append({
+                'index': idx,
+                'id': data['id'],
+                'sku': data.get('sku'),
+                'title': title,
+                'quantity': qty,
+                'buy_price': buy,
+                'sell_price': sell,
+            })
+            total_qty += qty
+            total_buy += buy * qty
+        else:
+            errors.append({'index': idx, 'title': title, 'error': data.get('error') or 'Не удалось создать'})
+
+    return _ok({
+        'created': created,
+        'errors': errors,
+        'total_count': len(created),
+        'total_qty': total_qty,
+        'total_buy': total_buy,
+    })
+
+
+def items_invoice_export(params):
+    """Экспортирует список товаров в XLSX в формате приёмной накладной.
+    Параметры: date_from, date_to (YYYY-MM-DD), brand, branch_id, status.
+    Возвращает base64 + filename."""
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
+    except Exception:
+        return _err(500, 'openpyxl не установлен')
+
+    date_from = (params.get('date_from') or '').strip()
+    date_to = (params.get('date_to') or '').strip()
+    brand = (params.get('brand') or '').strip()
+    branch_id = params.get('branch_id')
+    status = (params.get('status') or '').strip()
+
+    where = []
+    if date_from:
+        where.append(f"i.created_at::date >= {_esc(date_from)}::date")
+    if date_to:
+        where.append(f"i.created_at::date <= {_esc(date_to)}::date")
+    if brand:
+        where.append(f"LOWER(COALESCE(i.brand,''))=LOWER({_esc(brand)})")
+    if branch_id:
+        try:
+            where.append(f"i.branch_id={int(branch_id)}")
+        except (TypeError, ValueError):
+            pass
+    if status:
+        where.append(f"i.status={_esc(status)}")
+    wsql = (' WHERE ' + ' AND '.join(where)) if where else ''
+
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        f"SELECT i.id, i.sku, i.title, i.brand, i.color, i.buy_price, i.sell_price, "
+        f"COALESCE(i.quantity, 1) AS quantity, i.created_at, "
+        f"b.name AS branch_name "
+        f"FROM {SCHEMA}.slshop_items i "
+        f"LEFT JOIN {SCHEMA}.slshop_branches b ON b.id=i.branch_id "
+        f"{wsql} ORDER BY i.created_at ASC, i.id ASC"
+    )
+    rows = [dict(r) for r in cur.fetchall()]
+    cur.close(); conn.close()
+
+    # Формируем XLSX в формате накладной
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Накладная'
+
+    bold = Font(bold=True, size=11)
+    big = Font(bold=True, size=13)
+    center = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    left = Alignment(horizontal='left', vertical='center', wrap_text=True)
+    right_a = Alignment(horizontal='right', vertical='center')
+    thin = Side(style='thin', color='000000')
+    box = Border(left=thin, right=thin, top=thin, bottom=thin)
+    head_fill = PatternFill('solid', fgColor='FFE699')
+
+    # Шапка
+    title_text = 'НАКЛАДНАЯ ПРИЁМА ТОВАРА'
+    if brand:
+        title_text += f' — {brand}'
+    if date_from or date_to:
+        title_text += f' ({date_from or "..."} — {date_to or "..."})'
+    ws.merge_cells('A1:G1')
+    ws['A1'] = title_text
+    ws['A1'].font = big
+    ws['A1'].alignment = center
+    ws.row_dimensions[1].height = 24
+
+    headers = ['№', 'Наименование товара', 'Цвет', 'Кол-во', 'Цена ₽', 'Сумма ₽', 'SKU']
+    for col_idx, h in enumerate(headers, 1):
+        c = ws.cell(row=3, column=col_idx, value=h)
+        c.font = bold
+        c.alignment = center
+        c.border = box
+        c.fill = head_fill
+
+    # Ширина колонок
+    widths = [5, 50, 14, 9, 12, 14, 16]
+    for i, w in enumerate(widths, 1):
+        ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = w
+
+    total_qty = 0
+    total_buy = 0.0
+    total_sell = 0.0
+    for idx, r in enumerate(rows, 1):
+        row_n = 3 + idx
+        qty = int(r.get('quantity') or 1)
+        buy = float(r.get('buy_price') or 0)
+        sell = float(r.get('sell_price') or 0)
+        line_sum = buy * qty
+        ws.cell(row=row_n, column=1, value=idx).alignment = center
+        ws.cell(row=row_n, column=2, value=r.get('title') or '').alignment = left
+        ws.cell(row=row_n, column=3, value=r.get('color') or '').alignment = center
+        ws.cell(row=row_n, column=4, value=qty).alignment = center
+        ws.cell(row=row_n, column=5, value=int(buy)).alignment = right_a
+        ws.cell(row=row_n, column=6, value=int(line_sum)).alignment = right_a
+        ws.cell(row=row_n, column=7, value=r.get('sku') or '').alignment = center
+        for col in range(1, 8):
+            ws.cell(row=row_n, column=col).border = box
+        total_qty += qty
+        total_buy += line_sum
+        total_sell += sell * qty
+
+    total_row = 3 + len(rows) + 1
+    ws.merge_cells(start_row=total_row, start_column=1, end_row=total_row, end_column=3)
+    c_label = ws.cell(row=total_row, column=1, value='ИТОГО:')
+    c_label.font = bold
+    c_label.alignment = right_a
+    c_label.border = box
+    qty_cell = ws.cell(row=total_row, column=4, value=total_qty)
+    qty_cell.font = bold
+    qty_cell.alignment = center
+    qty_cell.border = box
+    sum_label = ws.cell(row=total_row, column=5, value='')
+    sum_label.border = box
+    sum_cell = ws.cell(row=total_row, column=6, value=int(total_buy))
+    sum_cell.font = bold
+    sum_cell.alignment = right_a
+    sum_cell.border = box
+    ws.cell(row=total_row, column=7, value='').border = box
+
+    # Краткая сводка под таблицей
+    summary_row = total_row + 2
+    ws.merge_cells(start_row=summary_row, start_column=1, end_row=summary_row, end_column=7)
+    ws.cell(row=summary_row, column=1, value=(
+        f'Позиций: {len(rows)} · Штук всего: {total_qty} · '
+        f'Закупка: {int(total_buy):,} ₽ · Розница: {int(total_sell):,} ₽'
+    ).replace(',', ' ')).alignment = left
+
+    out = io.BytesIO()
+    wb.save(out)
+    out.seek(0)
+    b64 = base64.b64encode(out.read()).decode('ascii')
+
+    fn_parts = ['nakladnaya']
+    if brand:
+        # транслитерация не критична — пишем латиницей если возможно, иначе оставим
+        safe = re.sub(r'[^a-zA-Z0-9_-]', '_', brand) or 'brand'
+        fn_parts.append(safe)
+    if date_from:
+        fn_parts.append(date_from.replace('-', ''))
+    fn = '_'.join(fn_parts) + '.xlsx'
+
+    return _ok({
+        'filename': fn,
+        'content_base64': b64,
+        'mime_type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'positions': len(rows),
+        'total_qty': total_qty,
+        'total_buy': int(total_buy),
+        'total_sell': int(total_sell),
+    })
+
+
 # ============ Specs templates / autofill ============
 def autofill_specs(body):
     title = (body.get('title') or '').strip()
@@ -2226,6 +2599,13 @@ def handler(event: dict, context) -> dict:
             return remove_item(body, employee)
         if action == 'items_recognize_storage' and method == 'POST':
             return items_recognize_storage(body, employee)
+        # ── Накладная: распознать фото / массово создать / выгрузить XLSX ──
+        if action == 'items_invoice_recognize' and method == 'POST':
+            return items_invoice_recognize(body, employee)
+        if action == 'items_bulk_create' and method == 'POST':
+            return items_bulk_create(body, employee)
+        if action == 'items_invoice_export':
+            return items_invoice_export(params)
         if action == 'item_sell' and method == 'POST':
             return sell_item(body, employee)
         if action == 'item_return' and method == 'POST':
