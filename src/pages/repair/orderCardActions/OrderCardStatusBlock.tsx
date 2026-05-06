@@ -1,6 +1,6 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
-import { Order, STATUSES } from "../types";
+import { Order, STATUSES, PRIMARY_STATUS_KEYS } from "../types";
 import { STATUS_FX, EditForm } from "./orderCardActionsTypes";
 
 type Props = {
@@ -13,33 +13,58 @@ type Props = {
   onIssueOrder: (o: Order, issuedAt?: string) => void;
 };
 
+/**
+ * Воронка статусов для CRM-ремонта.
+ *
+ * 4 главные кнопки в одну линию: Принят → На согласование → Готов → Выдан.
+ * Текущий статус подсвечен и не кликабелен. Остальные — кликабельны.
+ *
+ * Редкие статусы (В работе, Ждём запчасть, Гарантия, Отменено) скрыты в выпадающем меню «Прочее».
+ *
+ * Бизнес-логика:
+ *   • «На согласование» → Telegram-уведомление мастеру (backend сам отправит)
+ *   • «Готов» → автоматическая SMS клиенту (backend сам отправит)
+ *   • «Выдан» — требует заполненные поля закупки и цены клиенту (financeBlocked)
+ *   • «Принят» — стартовая точка, сюда обычно не возвращаются
+ */
 export default function OrderCardStatusBlock({
   o, ef, saving, financeBlocked,
   onChangeStatus, onOpenReadyModal, onIssueOrder,
 }: Props) {
-  // Дата выдачи (для кнопки "Выдано")
+  // Дата выдачи (для кнопки «Выдан»)
   const nowLocal = () => {
     const d = new Date();
     d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
     return d.toISOString().slice(0, 16);
   };
   const [issuedAt, setIssuedAt] = useState<string>(nowLocal);
+  const [moreOpen, setMoreOpen] = useState(false);
+
+  // Главные статусы (4 кнопки воронки)
+  const primary = STATUSES.filter(s => (PRIMARY_STATUS_KEYS as readonly string[]).includes(s.key));
+  // Прочие (служебные статусы для редких случаев)
+  const secondary = STATUSES.filter(s => !(PRIMARY_STATUS_KEYS as readonly string[]).includes(s.key));
+
+  const handleClick = (key: string) => {
+    if (key === o.status) return;
+    if (key === "ready") onOpenReadyModal(o);
+    else if (key === "done") onIssueOrder(o, issuedAt);
+    else onChangeStatus(o.id, key, { admin_note: ef.admin_note });
+    setMoreOpen(false);
+  };
 
   return (
-    <div className="relative overflow-hidden rounded-xl border border-[#FFD700]/15 bg-gradient-to-br from-[#1a1a1a] via-[#0E0E0E] to-[#0A0A0A] p-3 shadow-[0_0_30px_-15px_rgba(255,215,0,0.25)]">
-      {/* декоративные блики */}
-      <div className="pointer-events-none absolute -top-20 -right-10 w-44 h-44 bg-[#FFD700]/8 rounded-full blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-20 -left-10 w-44 h-44 bg-violet-500/8 rounded-full blur-3xl" />
-
+    <div className="relative overflow-hidden rounded-xl border border-[#FFD700]/15 bg-gradient-to-br from-[#1a1a1a] via-[#0E0E0E] to-[#0A0A0A] p-3">
       {/* Header */}
-      <div className="relative flex items-center gap-2 mb-3">
+      <div className="flex items-center gap-2 mb-3">
         <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#FFD700] to-yellow-600 text-black flex items-center justify-center shrink-0 shadow-lg shadow-[#FFD700]/20">
-          <Icon name="RefreshCw" size={13} />
+          <Icon name="Workflow" size={13} />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="font-oswald font-bold text-white text-[12px] uppercase tracking-wider leading-tight">Сменить статус</div>
+          <div className="font-oswald font-bold text-white text-[12px] uppercase tracking-wider leading-tight">Этап ремонта</div>
           <div className="font-roboto text-[10px] text-white/40 leading-tight truncate">
-            текущий: <span className={STATUS_FX[o.status]?.text || "text-white/60"}>
+            сейчас:{" "}
+            <span className={STATUS_FX[o.status]?.text || "text-white/60"}>
               {(STATUSES.find(s => s.key === o.status)?.label) || o.status}
             </span>
           </div>
@@ -51,10 +76,70 @@ export default function OrderCardStatusBlock({
         )}
       </div>
 
-      {/* Поле даты выдачи — премиум */}
-      {o.status !== "done" && (
-        <div className="relative flex items-center gap-2 bg-gradient-to-r from-[#FFD700]/[0.08] via-[#FFD700]/[0.04] to-transparent border border-[#FFD700]/25 rounded-lg px-3 py-2 mb-3">
-          <Icon name="CalendarCheck" size={14} className="text-[#FFD700] shrink-0" />
+      {/* ── Воронка 4 кнопок ── */}
+      <div className="grid grid-cols-4 gap-1.5">
+        {primary.map((s, idx) => {
+          const fx = STATUS_FX[s.key] || STATUS_FX.new;
+          const isCurrent = s.key === o.status;
+          const blocked = s.key === "done" && financeBlocked;
+          const isLoading = saving;
+          const arrow = idx < primary.length - 1; // стрелка между шагами
+
+          return (
+            <div key={s.key} className="relative">
+              {arrow && (
+                <span aria-hidden className="absolute -right-1 top-1/2 -translate-y-1/2 z-10 text-white/20 hidden sm:inline">
+                  <Icon name="ChevronRight" size={12} />
+                </span>
+              )}
+              <button
+                onClick={() => handleClick(s.key)}
+                disabled={isCurrent || isLoading || blocked}
+                title={
+                  isCurrent ? `Сейчас: ${s.label}` :
+                  blocked ? "Заполни «Закупка» и «Цена клиенту» перед выдачей" :
+                  s.key === "pending_approval" ? "Перевести на согласование (мастер получит Telegram)" :
+                  s.key === "ready" ? "Готов — клиенту уйдёт SMS автоматически" :
+                  s.label
+                }
+                className={`group relative w-full rounded-lg border transition-all py-2.5 px-1.5 flex flex-col items-center justify-center gap-1 min-h-[68px] active:scale-[0.97] ${
+                  isCurrent
+                    ? `${fx.bg} ${fx.border} ${fx.text} ring-2 ring-current/30 cursor-default font-bold`
+                    : blocked
+                      ? "border-white/5 bg-black/40 text-white/25 cursor-not-allowed"
+                      : isLoading
+                        ? "opacity-50 cursor-not-allowed border-white/10 text-white/30"
+                        : `border-white/10 bg-white/[0.02] text-white/55 hover:${fx.bg.replace("/10","/15")} hover:${fx.border} hover:${fx.text} hover:scale-[1.02]`
+                }`}
+              >
+                {/* Иконка */}
+                <span className={`relative w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${
+                  isCurrent ? "bg-black/30 border border-current/30" : "bg-black/30 border border-white/10 group-hover:border-current/30"
+                }`}>
+                  {blocked
+                    ? <Icon name="Lock" size={13} />
+                    : isCurrent
+                      ? <Icon name={fx.icon} size={13} className="drop-shadow-[0_0_4px_currentColor]" />
+                      : <Icon name={fx.icon} size={13} />}
+                </span>
+                {/* Подпись */}
+                <span className="font-oswald font-bold text-[10px] uppercase tracking-tight leading-tight text-center">
+                  {s.label}
+                </span>
+                {/* Метки шагов */}
+                {isCurrent && (
+                  <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-current animate-pulse shadow-[0_0_6px_currentColor]" />
+                )}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Дата выдачи — появляется только когда сейчас не "Выдан" и есть смысл выдать */}
+      {o.status !== "done" && (o.status === "ready" || o.status === "pending_approval") && (
+        <div className="mt-2.5 relative flex items-center gap-2 bg-gradient-to-r from-[#FFD700]/[0.08] via-[#FFD700]/[0.04] to-transparent border border-[#FFD700]/25 rounded-lg px-3 py-2">
+          <Icon name="CalendarCheck" size={13} className="text-[#FFD700] shrink-0" />
           <span className="font-roboto text-[10px] text-[#FFD700]/80 shrink-0 uppercase tracking-wider font-bold">Дата выдачи</span>
           <input
             type="datetime-local"
@@ -65,55 +150,63 @@ export default function OrderCardStatusBlock({
         </div>
       )}
 
-      {/* Сетка статусов — премиум-плитки */}
-      <div className="relative grid grid-cols-2 gap-2">
-        {STATUSES.filter(s => s.key !== o.status).map(s => {
-          const fx = STATUS_FX[s.key] || STATUS_FX.new;
-          // «Готов» — можно нажать без сумм (СМС уйдёт автоматически).
-          // «Выдано» — только при заполненных закупке + цене выдачи.
-          const blocked = s.key === "done" && financeBlocked;
-          const isLoading = saving;
-          return (
-            <button key={s.key}
-              onClick={() => {
-                if (s.key === "ready") onOpenReadyModal(o);
-                else if (s.key === "done") onIssueOrder(o, issuedAt);
-                else onChangeStatus(o.id, s.key, { admin_note: ef.admin_note });
-              }}
-              disabled={isLoading || blocked}
-              title={blocked ? "Введите суммы закупки и выдачи" : s.label}
-              className={`group relative overflow-hidden font-roboto text-[12px] py-2.5 px-3 rounded-lg border transition-all flex items-center gap-2 min-h-[48px] active:scale-95 ${
-                blocked
-                  ? "border-white/5 bg-black/40 text-white/25 cursor-not-allowed"
-                  : isLoading
-                  ? "opacity-50 cursor-not-allowed border-white/10 text-white/30"
-                  : `${fx.bg} ${fx.border} ${fx.text} hover:bg-gradient-to-br hover:${fx.grad} hover:shadow-lg hover:${fx.glow} hover:border-current/50 font-bold`
-              }`}>
-              {/* hover-блик */}
-              {!blocked && !isLoading && (
-                <span className={`pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-br ${fx.grad}`} />
-              )}
-              {/* Иконка статуса */}
-              <span className="relative w-7 h-7 rounded-md bg-black/30 border border-white/10 flex items-center justify-center shrink-0">
-                {blocked
-                  ? <Icon name="Lock" size={12} />
-                  : <Icon name={fx.icon} size={13} />}
-              </span>
-              <span className="relative flex-1 text-left leading-tight">{s.label}</span>
-              {!blocked && (
-                <span className={`relative w-1.5 h-1.5 rounded-full shrink-0 ${fx.dot} animate-pulse`} />
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {financeBlocked && (
-        <div className="relative mt-2 text-[10px] font-roboto text-orange-300/80 flex items-center gap-1.5 bg-gradient-to-r from-orange-500/10 to-transparent border border-orange-500/25 rounded-lg px-2.5 py-1.5">
-          <Icon name="Info" size={11} className="text-orange-400 shrink-0" />
-          Для «Выдано» укажите закупку и цену выдачи. «Готов» можно нажать без них — СМС уйдёт клиенту.
+      {/* Подсказка о SMS на этапе "Готов" */}
+      {o.status !== "ready" && o.status !== "done" && (
+        <div className="mt-2 text-[10px] font-roboto text-white/40 flex items-start gap-1.5">
+          <Icon name="MessageSquare" size={10} className="mt-0.5 shrink-0" />
+          <span>
+            При нажатии «<span className="text-[#FFD700]">Готов</span>» клиенту автоматически уйдёт SMS.{" "}
+            «<span className="text-purple-300">На согласование</span>» — Telegram мастеру.
+          </span>
         </div>
       )}
+
+      {financeBlocked && o.status === "ready" && (
+        <div className="mt-2 text-[10px] font-roboto text-orange-300/85 flex items-center gap-1.5 bg-gradient-to-r from-orange-500/10 to-transparent border border-orange-500/25 rounded-lg px-2.5 py-1.5">
+          <Icon name="Info" size={11} className="text-orange-400 shrink-0" />
+          Чтобы нажать «Выдан», заполни «Закупка» и «Цена клиенту» в финансовом блоке ниже.
+        </div>
+      )}
+
+      {/* ── «Прочее» — служебные статусы ── */}
+      <div className="mt-2.5 border-t border-white/5 pt-2.5">
+        <button
+          onClick={() => setMoreOpen(v => !v)}
+          className="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-md text-white/40 hover:text-white/70 hover:bg-white/[0.03] transition-colors text-[11px] font-roboto"
+        >
+          <span className="inline-flex items-center gap-1.5">
+            <Icon name="MoreHorizontal" size={11} />
+            Прочие статусы (для особых случаев)
+          </span>
+          <Icon name={moreOpen ? "ChevronUp" : "ChevronDown"} size={11} />
+        </button>
+
+        {moreOpen && (
+          <div className="grid grid-cols-2 gap-1.5 mt-2">
+            {secondary.map(s => {
+              const fx = STATUS_FX[s.key] || STATUS_FX.new;
+              const isCurrent = s.key === o.status;
+              return (
+                <button
+                  key={s.key}
+                  onClick={() => handleClick(s.key)}
+                  disabled={isCurrent || saving}
+                  title={isCurrent ? `Сейчас: ${s.label}` : s.label}
+                  className={`relative font-roboto text-[11px] py-1.5 px-2 rounded-md border transition-all flex items-center gap-1.5 min-h-[34px] active:scale-95 ${
+                    isCurrent
+                      ? `${fx.bg} ${fx.border} ${fx.text} ring-1 ring-current/30 font-bold cursor-default`
+                      : `border-white/8 bg-white/[0.02] text-white/50 hover:${fx.bg} hover:${fx.text} hover:${fx.border}`
+                  }`}
+                >
+                  <Icon name={fx.icon} size={11} className="shrink-0" />
+                  <span className="truncate">{s.label}</span>
+                  {isCurrent && <span className={`ml-auto w-1.5 h-1.5 rounded-full ${fx.dot} animate-pulse`} />}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

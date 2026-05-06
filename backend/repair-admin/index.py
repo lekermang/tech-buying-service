@@ -7,12 +7,13 @@ HEADERS = {'Access-Control-Allow-Origin': '*'}
 
 
 STATUS_LABELS = {
-    'new': '🆕 Новая',
+    'new': '🆕 Принят',
     'accepted': '🤝 Принят мастером',
+    'pending_approval': '🔍 На согласование',
     'in_progress': '🔧 В работе',
     'waiting_parts': '⏳ Ожидание запчастей',
-    'ready': '✅ Готово к выдаче',
-    'done': '✔️ Выдано',
+    'ready': '✅ Готов',
+    'done': '✔️ Выдан',
     'warranty': '🛡 На гарантии',
     'cancelled': '❌ Отменено',
 }
@@ -378,7 +379,7 @@ SCHEMA = 't_p31606708_tech_buying_service'
 ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN', 'Mark2015N')
 ADMIN_TOKEN_ALT = 'Mark2015N'
 
-VALID_STATUSES = ['new', 'accepted', 'in_progress', 'waiting_parts', 'ready', 'done', 'warranty', 'cancelled']
+VALID_STATUSES = ['new', 'accepted', 'pending_approval', 'in_progress', 'waiting_parts', 'ready', 'done', 'warranty', 'cancelled']
 ALLOW_HEADERS = 'Content-Type, X-Admin-Token, X-Employee-Token'
 
 
@@ -820,6 +821,32 @@ def handler(event: dict, context) -> dict:
             cur.close(); conn.close()
             print(f"[sms_contacts] group={group} total={len(contacts)}", flush=True)
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'contacts': contacts, 'total': len(contacts)}, ensure_ascii=False)}
+
+        # ─── История изменений статуса/полей по конкретной заявке ───
+        if action == 'order_history':
+            try:
+                hid = int(params.get('id', '0') or 0)
+            except (ValueError, TypeError):
+                hid = 0
+            if not hid:
+                cur.close(); conn.close()
+                return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'Укажи id заявки'}, ensure_ascii=False)}
+            cur.execute(
+                f"""SELECT changed_at, changed_by, field_name, old_value, new_value
+                    FROM {SCHEMA}.repair_order_history
+                    WHERE order_id = {hid}
+                    ORDER BY changed_at DESC LIMIT 100"""
+            )
+            rows = cur.fetchall()
+            history = [{
+                'changed_at': r[0].isoformat() if r[0] else None,
+                'changed_by': r[1],
+                'field_name': r[2],
+                'old_value': r[3],
+                'new_value': r[4],
+            } for r in rows]
+            cur.close(); conn.close()
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'history': history}, ensure_ascii=False)}
 
         # Список заявок
         status_filter = params.get('status', '')
@@ -1449,23 +1476,44 @@ def handler(event: dict, context) -> dict:
             main_chat_id = os.environ['TELEGRAM_CHAT_ID']
             send_tg_all(token, main_chat_id, conn, tg_msg)
 
-            # SMS клиенту ТОЛЬКО при статусе "ready" (Готово к выдаче).
+            # SMS клиенту ТОЛЬКО при статусе "ready" (Готов).
             # Сумма не обязательна: если её нет — отправляем шаблон без цены.
+            # Шаблоны можно переопределить через таблицу settings (ключи sms_tpl_ready / sms_tpl_ready_no_price).
+            # Доступные плейсхолдеры: {id} {device} {amount}
             if new_status == 'ready' and client_phone:
                 dev = device_model or 'устройство'
                 if r_amount:
-                    default_ready_tpl = 'Скупка24: {device} готов! Стоимость: {amount} руб. Ждём вас. Skypka24.com'
+                    default_ready_tpl = 'Скупка24: ремонт #{id} готов к выдаче. Сумма: {amount} ₽. Ждём вас! Тел.: 8-800-600-68-33'
                     settings_key = 'sms_tpl_ready'
                 else:
-                    default_ready_tpl = 'Скупка24: {device} готов к выдаче! Ждём вас. Skypka24.com'
+                    default_ready_tpl = 'Скупка24: ремонт #{id} готов к выдаче. Ждём вас! Тел.: 8-800-600-68-33'
                     settings_key = 'sms_tpl_ready_no_price'
                 cur2 = conn.cursor()
                 cur2.execute(f"SELECT value FROM {SCHEMA}.settings WHERE key = '{settings_key}'")
                 row2 = cur2.fetchone()
                 cur2.close()
                 tpl = (row2[0] if row2 and row2[0] else default_ready_tpl)
-                sms_text = tpl.replace('{device}', dev).replace('{amount}', str(r_amount or ''))
+                sms_text = (
+                    tpl.replace('{id}', str(order_id))
+                       .replace('{device}', dev)
+                       .replace('{amount}', str(r_amount or ''))
+                )
                 send_sms(client_phone, sms_text)
+
+            # При статусе "pending_approval" — особое уведомление мастеру в Telegram
+            # Клиенту НИЧЕГО не уходит (внутренний этап).
+            if new_status == 'pending_approval':
+                staff_url = os.environ.get('STAFF_URL', 'https://skypka24.com/staff')
+                approval_msg = (
+                    f"🔍 *Ремонт #{order_id} — Требуется согласование*\n\n"
+                    f"📱 *Устройство:* {device_model or '—'}\n"
+                    f"🔧 *Тип ремонта:* {repair_t or '—'}\n"
+                    f"👤 *Клиент:* {client_name}\n"
+                    f"📞 *Телефон:* {client_phone}\n\n"
+                    f"⚡ *Подтверди, скорректируй или отклони смету.*\n"
+                    f"🔗 {staff_url}#repair={order_id}"
+                )
+                send_tg_all(token, main_chat_id, conn, approval_msg)
 
             # При выдаче (done) — фиксируем дату получения
             if new_status == 'done':

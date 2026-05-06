@@ -171,8 +171,16 @@ export function useStaffRepairActions(token: string, st: StaffRepairState) {
 
   // ─── Изменить статус ─────────────────────────────────────────────────────────
   const STATUS_LABELS: Record<string, string> = {
-    new: "Новая", in_progress: "В работе", waiting_parts: "Ждёт запчасть",
-    ready: "Готова к выдаче", done: "Выдана клиенту", cancelled: "Отменена", refused: "Отказ",
+    new: "Принят",
+    pending_approval: "На согласование (мастеру отправлено в Telegram)",
+    accepted: "Принят мастером",
+    in_progress: "В работе",
+    waiting_parts: "Ждёт запчасть",
+    ready: "Готов (клиенту отправлена SMS)",
+    done: "Выдан клиенту",
+    warranty: "На гарантии",
+    cancelled: "Отменён",
+    refused: "Отказ",
   };
   const changeStatus = async (id: number, status: string, extra?: Record<string, unknown>) => {
     setSaving(true);

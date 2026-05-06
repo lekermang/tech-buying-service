@@ -1,14 +1,21 @@
 export const REPAIR_URL = "https://functions.poehali.dev/a105aede-d55d-4b99-9d3e-5e977887aa04";
 
+// ─── 4 ОСНОВНЫХ статуса воронки CRM ─────────────────────────────
+// Принят → На согласование → Готов → Выдан
+// Остальные (в работе, ждём запчасть, гарантия, отменено) — служебные / редкие,
+// доступны через подменю "Прочее", в истории и фильтрах.
+export const PRIMARY_STATUS_KEYS = ["new", "pending_approval", "ready", "done"] as const;
+
 export const STATUSES = [
-  { key: "new", label: "Принята", color: "bg-white/10 text-white/70", dot: "bg-white/40" },
-  { key: "accepted", label: "Принят мастером", color: "bg-purple-500/20 text-purple-400", dot: "bg-purple-400" },
-  { key: "in_progress", label: "В работе", color: "bg-blue-500/20 text-blue-400", dot: "bg-blue-400" },
-  { key: "waiting_parts", label: "Ждём запчасть", color: "bg-orange-500/20 text-orange-400", dot: "bg-orange-400" },
-  { key: "ready", label: "Готово ✓", color: "bg-yellow-500/20 text-[#FFD700]", dot: "bg-[#FFD700]" },
-  { key: "done", label: "Выдано", color: "bg-green-500/20 text-green-400", dot: "bg-green-400" },
-  { key: "warranty", label: "На гарантии", color: "bg-teal-500/20 text-teal-400", dot: "bg-teal-400" },
-  { key: "cancelled", label: "Отменено", color: "bg-red-500/20 text-red-400", dot: "bg-red-400" },
+  { key: "new",              label: "Принят",          color: "bg-blue-500/20 text-blue-300",       dot: "bg-blue-400",     primary: true  },
+  { key: "pending_approval", label: "На согласование", color: "bg-purple-500/20 text-purple-300",   dot: "bg-purple-400",   primary: true  },
+  { key: "accepted",         label: "Принят мастером", color: "bg-violet-500/20 text-violet-400",   dot: "bg-violet-400",   primary: false },
+  { key: "in_progress",      label: "В работе",        color: "bg-sky-500/20 text-sky-400",         dot: "bg-sky-400",      primary: false },
+  { key: "waiting_parts",    label: "Ждём запчасть",   color: "bg-orange-500/20 text-orange-400",   dot: "bg-orange-400",   primary: false },
+  { key: "ready",            label: "Готов",           color: "bg-yellow-500/20 text-[#FFD700]",    dot: "bg-[#FFD700]",    primary: true  },
+  { key: "done",             label: "Выдан",           color: "bg-green-500/20 text-green-400",     dot: "bg-green-400",    primary: true  },
+  { key: "warranty",         label: "На гарантии",     color: "bg-teal-500/20 text-teal-400",       dot: "bg-teal-400",     primary: false },
+  { key: "cancelled",        label: "Отменено",        color: "bg-red-500/20 text-red-400",         dot: "bg-red-400",      primary: false },
 ];
 
 export type Order = {

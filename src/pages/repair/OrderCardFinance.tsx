@@ -39,6 +39,25 @@ export default function OrderCardFinance({ orderId, ef, onEditFormChange }: Prop
           className="w-full bg-[#0A0A0A] border border-[#1F1F1F] text-white px-3 py-2 font-roboto text-xs rounded-md focus:outline-none focus:border-[#FFD700]/50 placeholder:text-white/20 transition-colors" />
       </div>
 
+      {/* Подсказка из предварительной оценки — для удобства мастера */}
+      {ef.price && (!ef.repair_amount || parseInt(ef.repair_amount) === 0) && (
+        <button
+          type="button"
+          onClick={() => onEditFormChange(orderId, { ...ef, repair_amount: ef.price })}
+          className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md border border-[#FFD700]/25 bg-[#FFD700]/5 hover:bg-[#FFD700]/10 transition-colors text-[10px] font-roboto text-[#FFD700]/85"
+          title="Заполнить «Цена клиенту» из предварительной оценки"
+        >
+          <span className="inline-flex items-center gap-1.5">
+            <Icon name="Sparkles" size={10} />
+            Предв. оценка: <span className="font-oswald font-bold tabular-nums">{parseInt(ef.price).toLocaleString("ru-RU")} ₽</span>
+          </span>
+          <span className="inline-flex items-center gap-0.5 uppercase tracking-wider">
+            Перенести
+            <Icon name="ArrowRight" size={10} />
+          </span>
+        </button>
+      )}
+
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label className={LBL + " text-orange-400/80 flex items-center gap-1"}>
@@ -58,12 +77,15 @@ export default function OrderCardFinance({ orderId, ef, onEditFormChange }: Prop
         </div>
         <div>
           <label className={LBL + " text-green-400/80 flex items-center gap-1"}>
-            <Icon name="ArrowUpCircle" size={10} />Выдано за ремонт ₽
+            <Icon name="ArrowUpCircle" size={10} />Цена клиенту ₽
           </label>
           <input type="number" inputMode="numeric" value={ef.repair_amount}
             onChange={e => onEditFormChange(orderId, { ...ef, repair_amount: e.target.value })}
             placeholder="1500"
             className="w-full bg-[#0A0A0A] border border-green-500/20 text-green-300 px-3 py-2 font-roboto text-sm font-bold rounded-md focus:outline-none focus:border-green-500/60 tabular-nums transition-colors" />
+          <div className="text-[9px] text-white/40 mt-1 leading-tight">
+            Можно вписать на любом этапе — даже до «Готов».
+          </div>
         </div>
       </div>
 

@@ -4,6 +4,7 @@ import OrderCardHeader from "./OrderCardHeader";
 import OrderCardFinance from "./OrderCardFinance";
 import OrderCardFields from "./OrderCardFields";
 import OrderCardActions from "./OrderCardActions";
+import OrderCardHistory from "./OrderCardHistory";
 
 type EditForm = {
   name: string; phone: string; model: string; repair_type: string;
@@ -119,6 +120,9 @@ export default function StaffRepairOrderCard({
             onIssueOrder={onIssueOrder}
             onDelete={onDelete}
           />
+
+          {/* История изменений (статус, цены, заметки) */}
+          <OrderCardHistory orderId={o.id} token={token} authHeader={authHeader} />
 
         </div>
       )}
