@@ -43,57 +43,17 @@ export default function StaffRepairOrderCard({
   const isCritical = isNew && ageHours >= 48;
 
   return (
-    <div id={`order-${o.id}`} className="relative scroll-mt-24 h-full">
-      {/* HALO — внешний золотой ореол вокруг раскрытой карточки */}
-      {isExpanded && (
-        <span
-          aria-hidden
-          className="absolute -inset-1.5 rounded-2xl pointer-events-none"
-          style={{ background: "radial-gradient(closest-side,rgba(255,215,0,0.25),rgba(255,215,0,0.06) 60%,transparent 85%)", filter: "blur(14px)" }}
-        />
-      )}
-
-      {/* Подсветка для НОВЫХ заявок (status === "new") — пульсирующий ореол */}
-      {!isExpanded && isNew && (
-        <span
-          aria-hidden
-          className="absolute -inset-1 rounded-2xl pointer-events-none animate-pulse"
-          style={{
-            background: isCritical
-              ? "radial-gradient(closest-side,rgba(239,68,68,0.45),rgba(239,68,68,0.08) 60%,transparent 85%)"
-              : "radial-gradient(closest-side,rgba(255,165,0,0.30),rgba(255,165,0,0.05) 60%,transparent 85%)",
-            filter: "blur(10px)",
-          }}
-        />
-      )}
-
-      {/* Conic-gradient рамка для раскрытой / красная для КРИТИЧЕСКОЙ / премиум для НОВОЙ / простая для свёрнутой */}
-      <div className={`relative rounded-xl transition-all duration-300 overflow-hidden h-full ${
+    <div id={`order-${o.id}`} className="relative scroll-mt-24">
+      {/* Тонкая граница: красная пульсирующая для критических НОВЫХ, золотая для раскрытой, обычная для остальных */}
+      <div className={`relative rounded-lg overflow-hidden transition-all duration-200 ${
         isExpanded
-          ? "p-[1.5px] bg-[conic-gradient(from_180deg_at_50%_50%,rgba(255,215,0,0.7)_0deg,rgba(255,215,0,0.15)_180deg,rgba(255,243,160,0.7)_360deg)] shadow-[0_8px_28px_rgba(255,215,0,0.18)]"
+          ? "border border-[#FFD700]/60 bg-[#0E0E0E] shadow-[0_2px_12px_rgba(255,215,0,0.10)]"
           : isCritical
-            ? "p-[1.5px] bg-[conic-gradient(from_180deg_at_50%_50%,rgba(239,68,68,0.95)_0deg,rgba(248,113,113,0.6)_120deg,rgba(254,202,202,0.9)_240deg,rgba(239,68,68,0.95)_360deg)] shadow-[0_4px_22px_rgba(239,68,68,0.55)] hover:shadow-[0_6px_28px_rgba(239,68,68,0.75)]"
+            ? "border border-red-500/55 bg-[#0E0808] hover:border-red-400/80 animate-pulse"
             : isNew
-              ? "p-[1.5px] bg-[conic-gradient(from_180deg_at_50%_50%,rgba(255,165,0,0.85)_0deg,rgba(255,215,0,0.45)_120deg,rgba(255,243,160,0.85)_240deg,rgba(255,165,0,0.85)_360deg)] shadow-[0_4px_18px_rgba(255,140,0,0.35)] hover:shadow-[0_6px_24px_rgba(255,140,0,0.55)]"
-              : "border border-[#1F1F1F] bg-gradient-to-br from-[#141414] to-[#0E0E0E] hover:border-[#FFD700]/30 hover:shadow-[0_0_14px_rgba(255,215,0,0.15)]"
+              ? "border border-orange-500/35 bg-[#100C08] hover:border-orange-400/60"
+              : "border border-[#1F1F1F] bg-[#0F0F0F] hover:border-[#FFD700]/25"
       }`}>
-        <div className={`relative rounded-[10px] overflow-hidden h-full ${
-          isExpanded
-            ? "bg-gradient-to-br from-[#1A1A1A] via-[#141414] to-[#0E0E0E]"
-            : isCritical
-              ? "bg-gradient-to-br from-[#1A0E0E] via-[#100808] to-[#0A0606]"
-              : isNew
-                ? "bg-gradient-to-br from-[#1A1410] via-[#0F0C08] to-[#0A0806]"
-                : ""
-        }`}>
-          {/* Декор раскрытой */}
-          {isExpanded && (
-            <>
-              <div className="absolute -top-12 -left-12 w-32 h-32 rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(255,215,0,0.10)" }} />
-              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#FFD700]/60 to-transparent pointer-events-none" />
-            </>
-          )}
-
           {/* ── Шапка карточки ── */}
           <OrderCardHeader o={o} isExpanded={isExpanded} onToggle={onToggle} />
 
@@ -162,7 +122,6 @@ export default function StaffRepairOrderCard({
 
         </div>
       )}
-        </div>
       </div>
     </div>
   );

@@ -8,6 +8,7 @@ import { ymGoal, Goals } from "@/lib/ym";
 import ExitPopup from "@/components/skupka/ExitPopup";
 import CookieBanner from "@/components/skupka/CookieBanner";
 import JobsSection from "@/components/skupka/JobsSection";
+import HolidayBanner from "@/components/holidays/HolidayBanner";
 
 const scrollTo = (href: string) => {
   const el = document.querySelector(href);
@@ -304,6 +305,8 @@ const Index = ({ goldOpen = false }: { goldOpen?: boolean }) => {
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-white pb-[72px] md:pb-0">
       {!splashDone && <SplashScreen onDone={() => setSplashDone(true)} />}
+      {/* Праздничный баннер — автоматически появляется за 3 дня до и 3 дня после праздника (9 мая, 23 фев, 8 марта и т.д.) */}
+      <HolidayBanner />
       <Header scrollTo={scrollTo} goldOpen={goldOpen} />
       <HeroSection scrollTo={scrollTo} externalModalOpen={evalOpen} onExternalModalClose={() => setEvalOpen(false)} />
       <InfoSections />

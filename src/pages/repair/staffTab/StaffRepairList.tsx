@@ -63,8 +63,8 @@ export default function StaffRepairList({
 }: Props) {
   // На мобильном (md и ниже) всегда 1 колонка, на десктопе — зависит от cardsView
   const containerCls = cardsView === "grid"
-    ? "px-3 py-3 grid gap-2.5 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
-    : "px-3 py-3 space-y-2.5";
+    ? "px-2 py-2 grid gap-1.5 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
+    : "px-2 py-2 space-y-1.5";
 
   // Сортировка: сначала "Принята" по убыванию срочности (старше → выше),
   // затем остальные по дате создания (свежие выше). Стабильно через index.
