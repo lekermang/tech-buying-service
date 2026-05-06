@@ -108,12 +108,55 @@ export const HOLIDAYS: Holiday[] = [
   },
 ];
 
+// ─── Настройки из админки ──────────────────────────────────────────────────
+export type HolidaysSettings = {
+  /** Глобальный выключатель — если false, баннеры не показываются вообще */
+  enabled: boolean;
+  /** id праздников, которые ВЫКЛЮЧЕНЫ (по умолчанию все включены) */
+  disabled: string[];
+  /** Принудительно показать конкретный праздник (для тестирования). null = автоопределение */
+  forced: string | null;
+};
+
+const STORAGE_KEY = "holidays_settings";
+const DEFAULT_SETTINGS: HolidaysSettings = { enabled: true, disabled: [], forced: null };
+
+export function loadHolidaysSettings(): HolidaysSettings {
+  if (typeof window === "undefined") return DEFAULT_SETTINGS;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return DEFAULT_SETTINGS;
+    const parsed = JSON.parse(raw);
+    return { ...DEFAULT_SETTINGS, ...parsed };
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
+}
+
+export function saveHolidaysSettings(s: HolidaysSettings) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+  // Сбрасываем "скрытие пользователем" при изменении — чтобы баннер вернулся сразу
+  localStorage.removeItem("holiday_dismissed_id");
+  window.dispatchEvent(new CustomEvent("holidays-settings-changed"));
+}
+
 /** Возвращает активный праздник, если сейчас попадает в диапазон ±3 дня (или индивидуальный) */
 export function getActiveHoliday(now: Date = new Date()): { holiday: Holiday; daysToHoliday: number } | null {
+  const settings = loadHolidaysSettings();
+  if (!settings.enabled) return null;
+
+  // Принудительный показ из админки (для тестирования / превью)
+  if (settings.forced) {
+    const forced = HOLIDAYS.find(x => x.id === settings.forced);
+    if (forced) return { holiday: forced, daysToHoliday: 0 };
+  }
+
   const year = now.getFullYear();
   const today = new Date(year, now.getMonth(), now.getDate()).getTime();
 
   for (const h of HOLIDAYS) {
+    if (settings.disabled.includes(h.id)) continue;
     const before = h.daysBefore ?? 3;
     const after = h.daysAfter ?? 3;
     const eventDate = new Date(year, h.month - 1, h.day).getTime();

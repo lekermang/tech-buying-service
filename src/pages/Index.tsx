@@ -169,31 +169,44 @@ const SplashScreen = ({ onDone }: { onDone: () => void }) => {
       <div className="relative flex flex-col items-center gap-7 px-4">
 
         {/* Премиум-медальон: вращающееся золотое кольцо + статичный логотип внутри */}
-        <div className="relative animate-[fadeIn_0.4s_ease]">
-          {/* мощное свечение вокруг */}
-          <div className="absolute inset-0 -m-4 rounded-full blur-2xl animate-pulse" style={{ background: "rgba(255,215,0,0.45)", animationDuration: "2s" }} />
+        <div className="relative">
+          <style>{`
+            @keyframes logoSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+            @keyframes logoSpinR { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
+            @keyframes logoGlow { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+            .logo-spin { animation: logoSpin 8s linear infinite; will-change: transform; transform: translateZ(0); backface-visibility: hidden; }
+            .logo-spin-slow { animation: logoSpin 18s linear infinite; will-change: transform; transform: translateZ(0); backface-visibility: hidden; }
+            .logo-spin-reverse { animation: logoSpinR 8s linear infinite; will-change: transform; transform: translateZ(0); backface-visibility: hidden; }
+            .logo-glow { animation: logoGlow 2.4s ease-in-out infinite; will-change: opacity; }
+          `}</style>
+
+          {/* мощное свечение вокруг (только opacity — без layout) */}
+          <div className="absolute inset-0 -m-4 rounded-full blur-2xl logo-glow pointer-events-none" style={{ background: "rgba(255,215,0,0.45)" }} />
+
           {/* внешнее тонкое кольцо-орбита */}
-          <div className="absolute -inset-3 rounded-full border border-[#FFD700]/25" style={{ animation: "spin 14s linear infinite" }}>
+          <div className="absolute -inset-3 rounded-full border border-[#FFD700]/25 logo-spin-slow pointer-events-none">
             <span className="absolute -top-[3px] left-1/2 w-1.5 h-1.5 -translate-x-1/2 rounded-full bg-[#FFD700]" style={{ boxShadow: "0 0 10px #FFD700" }} />
             <span className="absolute top-1/2 -right-[3px] w-1 h-1 -translate-y-1/2 rounded-full bg-[#fff3a0]" style={{ boxShadow: "0 0 8px #FFD700" }} />
           </div>
-          {/* основной золотой ободок (вращается) */}
-          <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-full p-[2px]
+
+          {/* основной золотой ободок (вращается плавно) */}
+          <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-full p-[2px] logo-spin
                           bg-[conic-gradient(from_0deg,#b8860b,#ffd700,#fff3a0,#ffd700,#b8860b)]
-                          shadow-[0_0_50px_rgba(255,215,0,0.55)]"
-               style={{ animation: "spin 6s linear infinite" }}>
-            <div className="w-full h-full rounded-full bg-black p-1">
+                          shadow-[0_0_50px_rgba(255,215,0,0.55)]">
+            {/* Логотип внутри — компенсируем вращение родителя обратной анимацией, чтобы картинка стояла ровно */}
+            <div className="w-full h-full rounded-full bg-black p-1 logo-spin-reverse">
               <img
                 src="https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/9c9b4fca-bfd7-4841-a827-eb0354dad8da.JPG"
                 alt="Скупка24"
                 className="w-full h-full rounded-full object-cover"
-                style={{ animation: "spin 6s linear infinite reverse" }}
+                draggable={false}
               />
             </div>
           </div>
+
           {/* искры в углах */}
-          <Icon name="Sparkles" size={14} className="absolute -top-2 -right-2 text-[#FFD700] animate-pulse" />
-          <Icon name="Sparkles" size={10} className="absolute -bottom-1 -left-2 text-[#fff3a0] animate-pulse" />
+          <Icon name="Sparkles" size={14} className="absolute -top-2 -right-2 text-[#FFD700] animate-pulse pointer-events-none" />
+          <Icon name="Sparkles" size={10} className="absolute -bottom-1 -left-2 text-[#fff3a0] animate-pulse pointer-events-none" />
         </div>
 
         {/* Бренд + бейдж */}

@@ -16,6 +16,7 @@ const SettingsTab      = lazy(() => import("@/components/admin/SettingsTab"));
 const ClientsAdminTab  = lazy(() => import("@/components/admin/ClientsAdminTab"));
 const SmsBlastTab      = lazy(() => import("@/components/admin/SmsBlastTab"));
 const ThemeTab         = lazy(() => import("@/components/admin/ThemeTab"));
+const HolidaysTab      = lazy(() => import("@/components/admin/HolidaysTab"));
 
 const TabFallback = () => (
   <div className="flex items-center justify-center h-full text-white/40 gap-2 py-12">
@@ -27,7 +28,7 @@ const TabFallback = () => (
 const ADMIN_URL = "https://functions.poehali.dev/a105aede-d55d-4b99-9d3e-5e977887aa04";
 const EXPORT_URL = "https://functions.poehali.dev/13db4dbd-0d2b-47d4-8e09-c6f82483ffde";
 
-type Tab = "repair" | "prices" | "sky" | "catalog" | "items" | "api-catalog" | "tools-import" | "analytics" | "notifications" | "settings" | "clients" | "sms-blast" | "theme";
+type Tab = "repair" | "prices" | "sky" | "catalog" | "items" | "api-catalog" | "tools-import" | "analytics" | "notifications" | "settings" | "clients" | "sms-blast" | "theme" | "holidays";
 
 const MENU: { key: Tab; label: string; icon: string; group: string }[] = [
   { key: "analytics",     label: "Аналитика",       icon: "BarChart2",   group: "Статистика" },
@@ -43,6 +44,7 @@ const MENU: { key: Tab; label: string; icon: string; group: string }[] = [
   { key: "clients",       label: "Клиенты",        icon: "Users",       group: "Система" },
   { key: "settings",      label: "Настройки",      icon: "Settings",    group: "Система" },
   { key: "theme",         label: "Тема",           icon: "Palette",     group: "Система" },
+  { key: "holidays",      label: "Праздники",      icon: "PartyPopper", group: "Система" },
 ];
 
 export default function Admin() {
@@ -296,6 +298,7 @@ export default function Admin() {
             {tab === "clients"       && <ClientsAdminTab token={token} />}
             {tab === "settings"      && <SettingsTab token={token} />}
             {tab === "theme"         && <ThemeTab token={token} />}
+            {tab === "holidays"      && <HolidaysTab />}
           </Suspense>
         </div>
       </div>

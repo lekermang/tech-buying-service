@@ -112,10 +112,22 @@ export default function HolidayBanner({ forcedHolidayId, dismissible = true, cla
     return localStorage.getItem("holiday_dismissed_id");
   });
 
-  // Каждые 30 минут пересчитываем активный праздник (на случай если страница долго открыта)
+  // Пересчитываем активный праздник каждые 30 минут + при изменении настроек из админки
   useEffect(() => {
-    const t = setInterval(() => setActive(getActiveHoliday()), 30 * 60 * 1000);
-    return () => clearInterval(t);
+    const refresh = () => {
+      setActive(getActiveHoliday());
+      setDismissed(localStorage.getItem("holiday_dismissed_id"));
+    };
+    const t = setInterval(refresh, 30 * 60 * 1000);
+    window.addEventListener("holidays-settings-changed", refresh);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener("holidays-settings-changed", refresh);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("storage", refresh);
+    };
   }, []);
 
   if (!active) return null;
