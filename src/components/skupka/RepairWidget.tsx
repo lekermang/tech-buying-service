@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import RepairWidgetHeader from "./repair-widget/RepairWidgetHeader";
 import RepairWidgetBody from "./repair-widget/RepairWidgetBody";
 import { useRepairParts } from "./repair-widget/useRepairParts";
@@ -8,6 +8,28 @@ import { useRepairSubmit } from "./repair-widget/useRepairSubmit";
 export default function RepairWidget() {
   const [tab, setTab] = useState<"form" | "status">("form");
   const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  // Открыть виджет ремонта извне (по событию или хэшу #repair) и проскроллить к нему
+  useEffect(() => {
+    const openAndScroll = () => {
+      setOpen(true);
+      setTimeout(() => {
+        rootRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 50);
+    };
+    const onCustom = () => openAndScroll();
+    const onHash = () => {
+      if (window.location.hash === "#repair") openAndScroll();
+    };
+    window.addEventListener("open-repair", onCustom);
+    window.addEventListener("hashchange", onHash);
+    if (window.location.hash === "#repair") openAndScroll();
+    return () => {
+      window.removeEventListener("open-repair", onCustom);
+      window.removeEventListener("hashchange", onHash);
+    };
+  }, []);
 
   const [form, setForm] = useState({ name: "", phone: "", model: "", fault: "" });
   const [agreed, setAgreed] = useState(false);
@@ -34,7 +56,7 @@ export default function RepairWidget() {
   };
 
   return (
-    <div className="border border-white/10 bg-black/30 px-4 py-5 w-full">
+    <div ref={rootRef} id="repair" className="border border-white/10 bg-black/30 px-4 py-5 w-full scroll-mt-24">
       <RepairWidgetHeader open={open} onToggle={() => setOpen(v => !v)} />
 
       {open && (

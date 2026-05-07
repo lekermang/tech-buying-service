@@ -16,6 +16,28 @@ const CONDITION_COLOR: Record<string, string> = {
 export default function UsedGoodsSearch() {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"own" | "resold">("own");
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  // Открыть виджет извне (по событию или хэшу #used-tech) и проскроллить к нему
+  useEffect(() => {
+    const openAndScroll = () => {
+      setOpen(true);
+      setTimeout(() => {
+        rootRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 50);
+    };
+    const onCustom = () => openAndScroll();
+    const onHash = () => {
+      if (window.location.hash === "#used-tech") openAndScroll();
+    };
+    window.addEventListener("open-used-tech", onCustom);
+    window.addEventListener("hashchange", onHash);
+    if (window.location.hash === "#used-tech") openAndScroll();
+    return () => {
+      window.removeEventListener("open-used-tech", onCustom);
+      window.removeEventListener("hashchange", onHash);
+    };
+  }, []);
 
   // Собственные товары
   const [query, setQuery] = useState("");
@@ -86,7 +108,7 @@ export default function UsedGoodsSearch() {
     : resoldItems;
 
   return (
-    <div className="border border-white/10 bg-black/30 px-4 py-5 w-full">
+    <div ref={rootRef} id="used-tech" className="border border-white/10 bg-black/30 px-4 py-5 w-full scroll-mt-24">
       <button className="flex items-center justify-between w-full" onClick={() => setOpen(v => !v)}>
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-[#FFD700] flex items-center justify-center shrink-0">
