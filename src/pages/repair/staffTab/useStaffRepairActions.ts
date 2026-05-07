@@ -52,11 +52,17 @@ export function useStaffRepairActions(token: string, st: StaffRepairState) {
   }, [token, filterStatus, debouncedSearch, dateFrom, dateTo, toast, setLoading, setOrders]);
 
   // ─── Загрузка аналитики ───────────────────────────────────────────────────────
-  const loadAnalytics = useCallback(async (p: Period, signal?: AbortSignal) => {
+  // Для period='custom' опционально передаём произвольный диапазон через df/dt (YYYY-MM-DD).
+  const loadAnalytics = useCallback(async (p: Period, signal?: AbortSignal, df?: string, dt?: string) => {
     setAnalyticsLoading(true);
     try {
+      const ps: string[] = [`action=analytics`, `period=${p}`];
+      if (p === "custom") {
+        if (df) ps.push(`date_from=${df}`);
+        if (dt) ps.push(`date_to=${dt}`);
+      }
       const [analyticsRes, statsRes] = await Promise.all([
-        fetch(`${REPAIR_URL}?action=analytics&period=${p}`, { headers: { "X-Employee-Token": token }, signal }),
+        fetch(`${REPAIR_URL}?${ps.join("&")}`, { headers: { "X-Employee-Token": token }, signal }),
         fetch(`${REPAIR_URL}?action=daily_stats`, { headers: { "X-Employee-Token": token }, signal }),
       ]);
       const [analyticsD, statsD] = await Promise.all([analyticsRes.json(), statsRes.json()]);

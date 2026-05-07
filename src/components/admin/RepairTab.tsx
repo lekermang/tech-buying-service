@@ -20,6 +20,8 @@ export { STATUSES } from "./repair/repairTypes";
 const REPAIR_PARTS_URL = "https://functions.poehali.dev/68da5b17-ae5f-4568-8e27-0d945b995d82";
 
 type View = "orders" | "analytics" | "labor_prices" | "price_list" | "import_parts";
+// Период в админке оставляем простым (4 значения), т.к. админка использует свой компонент аналитики.
+// StatusOrdersModal принимает расширенный тип Period — наш subset валиден для него.
 type Period = "day" | "yesterday" | "week" | "month";
 
 export default function RepairTab({ token }: { token: string }) {

@@ -1,40 +1,88 @@
 import Icon from "@/components/ui/icon";
 import { STATUSES, DayStat, fmtDay } from "./types";
-
-type Period = "day" | "yesterday" | "week" | "month";
+import type { Period } from "./staffTab/staffTabTypes";
 
 type RepairAnalytics = {
   total: number; done: number; cancelled: number; ready: number;
   in_progress: number; waiting_parts: number; new: number;
+  pending_approval?: number;
   revenue: number; costs: number; profit: number; master_total: number;
+  avg_check?: number;
+  avg_repair_hours?: number;
+  conversion?: number;
+  paid_count?: number;
   daily: { day: string; total: number; done: number; revenue: number; costs: number; profit: number }[];
 };
 
 const money = (v: number | null | undefined) =>
   v != null ? v.toLocaleString("ru-RU") + " ₽" : "—";
 
+// Форматирование длительности в часах: 36ч → "1д 12ч", 4.5 → "4ч 30м"
+const fmtHours = (h: number | null | undefined): string => {
+  if (h == null || !Number.isFinite(h) || h <= 0) return "—";
+  if (h < 1) return `${Math.round(h * 60)} мин`;
+  if (h < 24) {
+    const hours = Math.floor(h);
+    const mins = Math.round((h - hours) * 60);
+    return mins > 0 ? `${hours}ч ${mins}м` : `${hours}ч`;
+  }
+  const days = Math.floor(h / 24);
+  const hh = Math.round(h - days * 24);
+  return hh > 0 ? `${days}д ${hh}ч` : `${days}д`;
+};
+
 type Props = {
   analytics: RepairAnalytics | null;
   analyticsLoading: boolean;
   period: Period;
   stats: DayStat[];
+  dateFrom?: string;
+  dateTo?: string;
   onPeriodChange: (p: Period) => void;
+  onDateFromChange?: (v: string) => void;
+  onDateToChange?: (v: string) => void;
   onRefresh: () => void;
   onShowHistory: () => void;
   onShowOrders?: (params: { statuses: string[]; title: string; accent: "revenue" | "costs" | "master" | "profit" | "status" }) => void;
 };
 
-export default function StaffRepairAnalytics({ analytics, analyticsLoading, period, stats, onPeriodChange, onRefresh, onShowHistory, onShowOrders }: Props) {
+export default function StaffRepairAnalytics({
+  analytics, analyticsLoading, period, stats,
+  dateFrom = "", dateTo = "",
+  onPeriodChange, onDateFromChange, onDateToChange,
+  onRefresh, onShowHistory, onShowOrders,
+}: Props) {
   const DONE_STATUSES = ["done", "warranty", "ready"];
   const openFinance = (accent: "revenue" | "costs" | "master" | "profit", title: string) =>
     onShowOrders?.({ statuses: DONE_STATUSES, title, accent });
   const openStatus = (key: string, label: string) =>
     onShowOrders?.({ statuses: key === "new" ? ["new", "accepted"] : [key], title: label, accent: "status" });
+  // Быстрые пресеты для произвольных периодов: месяц этого года, прошлый месяц, конкретный год
+  const today = new Date();
+  const fmtISO = (d: Date) => d.toISOString().slice(0, 10);
+  const setMonthRange = (year: number, month: number) => {
+    const start = new Date(year, month, 1);
+    const end = new Date(year, month + 1, 0);
+    onDateFromChange?.(fmtISO(start));
+    onDateToChange?.(fmtISO(end));
+    onPeriodChange("custom");
+  };
+  const setYearRange = (year: number) => {
+    onDateFromChange?.(`${year}-01-01`);
+    onDateToChange?.(`${year}-12-31`);
+    onPeriodChange("custom");
+  };
+  const PERIOD_LBL: Record<Period, string> = {
+    day: "Сегодня", yesterday: "Вчера", week: "7 дней", month: "30 дней",
+    quarter: "Квартал", year: "Год", custom: "Свой период",
+  };
+
   return (
     <div className="p-3 sm:p-4 overflow-y-auto">
-      <div className="flex gap-1.5 mb-4 items-center flex-wrap">
-        {(["day", "yesterday", "week", "month"] as Period[]).map(p => {
-          const lbl = p === "day" ? "Сегодня" : p === "yesterday" ? "Вчера" : p === "week" ? "7 дней" : "30 дней";
+      {/* ── Переключатель периода — основные кнопки + произвольный диапазон ── */}
+      <div className="flex gap-1.5 mb-2 items-center flex-wrap">
+        {(["day", "yesterday", "week", "month", "quarter", "year"] as Period[]).map(p => {
+          const lbl = PERIOD_LBL[p];
           const active = period === p;
           return (
             <button key={p} onClick={() => onPeriodChange(p)}
@@ -49,6 +97,16 @@ export default function StaffRepairAnalytics({ analytics, analyticsLoading, peri
             </button>
           );
         })}
+        <button onClick={() => onPeriodChange("custom")}
+          title="Произвольный диапазон дат"
+          className={`relative px-3 py-1.5 font-roboto text-[11px] rounded-md transition-all active:scale-95 inline-flex items-center gap-1 overflow-hidden ${
+            period === "custom"
+              ? "bg-gradient-to-b from-[#FFE34D] via-[#FFD700] to-[#d4a017] text-black font-bold shadow-[0_3px_12px_rgba(255,215,0,0.4),inset_0_1px_0_rgba(255,255,255,0.55)]"
+              : "bg-gradient-to-br from-[#141414] to-[#0E0E0E] border border-[#1F1F1F] text-white/55 hover:text-[#FFD700] hover:border-[#FFD700]/40"
+          }`}>
+          <Icon name="CalendarRange" size={11} />
+          <span>Свой период</span>
+        </button>
         <button onClick={onShowHistory}
           title="Журнал действий по заявкам"
           className="inline-flex items-center gap-1 bg-gradient-to-br from-[#141414] to-[#0E0E0E] border border-[#1F1F1F] hover:border-[#FFD700]/40 hover:text-[#FFD700] hover:shadow-[0_0_10px_rgba(255,215,0,0.15)] text-white/55 px-3 py-1.5 font-roboto text-[11px] rounded-md transition-all active:scale-95">
@@ -60,6 +118,62 @@ export default function StaffRepairAnalytics({ analytics, analyticsLoading, peri
           <Icon name={analyticsLoading ? "Loader" : "RefreshCw"} size={13} className={analyticsLoading ? "animate-spin text-[#FFD700]" : ""} />
         </button>
       </div>
+
+      {/* ── Произвольный диапазон + быстрые пресеты по месяцам/годам ── */}
+      {period === "custom" && (
+        <div className="mb-3 rounded-lg border border-[#FFD700]/20 bg-gradient-to-br from-[#1A1A1A] via-[#141414] to-[#0E0E0E] p-2.5 space-y-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="inline-flex items-center gap-1.5 text-[10px] font-roboto text-white/45 uppercase tracking-wider">
+              <Icon name="CalendarRange" size={11} className="text-[#FFD700]" />
+              Диапазон
+            </div>
+            <input type="date" value={dateFrom}
+              onChange={e => onDateFromChange?.(e.target.value)}
+              className="bg-[#0A0A0A] border border-[#1F1F1F] focus:border-[#FFD700]/60 text-white px-2 py-1 font-roboto text-[11px] rounded outline-none tabular-nums" />
+            <span className="text-white/40 text-xs">—</span>
+            <input type="date" value={dateTo}
+              onChange={e => onDateToChange?.(e.target.value)}
+              className="bg-[#0A0A0A] border border-[#1F1F1F] focus:border-[#FFD700]/60 text-white px-2 py-1 font-roboto text-[11px] rounded outline-none tabular-nums" />
+            {(dateFrom || dateTo) && (
+              <button onClick={() => { onDateFromChange?.(""); onDateToChange?.(""); }}
+                title="Сбросить даты"
+                className="text-white/40 hover:text-red-300 text-[11px] font-roboto px-1.5 py-0.5 rounded hover:bg-red-500/10">
+                ✕ сброс
+              </button>
+            )}
+          </div>
+          {/* Быстрые пресеты — последние 12 месяцев */}
+          <div className="flex flex-wrap gap-1">
+            <span className="text-[9px] font-roboto text-white/35 uppercase tracking-wider self-center mr-1">Месяц:</span>
+            {Array.from({ length: 12 }).map((_, i) => {
+              const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+              const lbl = d.toLocaleDateString("ru-RU", { month: "short", year: "2-digit" });
+              return (
+                <button key={i} onClick={() => setMonthRange(d.getFullYear(), d.getMonth())}
+                  className="text-[10px] font-roboto px-2 py-0.5 rounded border border-[#1F1F1F] bg-[#0E0E0E] text-white/55 hover:text-[#FFD700] hover:border-[#FFD700]/40 transition-all">
+                  {lbl}
+                </button>
+              );
+            })}
+          </div>
+          {/* Быстрые пресеты — годы */}
+          <div className="flex flex-wrap gap-1">
+            <span className="text-[9px] font-roboto text-white/35 uppercase tracking-wider self-center mr-1">Год:</span>
+            {[today.getFullYear(), today.getFullYear() - 1, today.getFullYear() - 2].map(y => (
+              <button key={y} onClick={() => setYearRange(y)}
+                className="text-[10px] font-roboto px-2 py-0.5 rounded border border-[#1F1F1F] bg-[#0E0E0E] text-white/55 hover:text-[#FFD700] hover:border-[#FFD700]/40 transition-all">
+                {y}
+              </button>
+            ))}
+          </div>
+          {!dateFrom && !dateTo && (
+            <div className="text-[10px] font-roboto text-orange-300/80 flex items-center gap-1.5 bg-orange-500/10 border border-orange-500/25 rounded px-2 py-1">
+              <Icon name="Info" size={10} />
+              Выбери даты или нажми один из пресетов выше
+            </div>
+          )}
+        </div>
+      )}
 
       {analyticsLoading && (
         <div className="text-center py-12">
@@ -83,6 +197,13 @@ export default function StaffRepairAnalytics({ analytics, analyticsLoading, peri
               <div className="relative flex items-center gap-1.5 mb-2">
                 <Icon name="Calculator" size={11} className="text-[#FFD700] drop-shadow-[0_0_4px_rgba(255,215,0,0.5)]" />
                 <div className="font-roboto text-[#FFD700]/80 text-[10px] uppercase tracking-[0.08em] font-bold">Расчёт прибыли</div>
+                {analytics.ready > 0 && (
+                  <span title="Заявки в статусе «Готов» уже учитываются — прибыль не ждёт момента выдачи"
+                    className="ml-auto inline-flex items-center gap-1 text-[9px] font-roboto text-[#FFD700]/85 bg-[#FFD700]/10 border border-[#FFD700]/30 rounded px-1.5 py-0.5">
+                    <Icon name="CheckCircle2" size={9} />
+                    + {analytics.ready} «Готов»
+                  </span>
+                )}
               </div>
             <div className="flex items-center gap-2 flex-wrap">
               <button onClick={() => openFinance("revenue", "Выручка — детализация")} className="text-center hover:bg-white/5 px-1.5 py-0.5 -mx-1.5 transition-colors">
@@ -122,6 +243,59 @@ export default function StaffRepairAnalytics({ analytics, analyticsLoading, peri
                 <span className="font-roboto text-[#FFD700]/70 text-[10px] font-bold">{money(analytics.profit)}</span>
               </div>
             )}
+            </div>
+          </div>
+
+          {/* ── Расширенные KPI: средний чек / время ремонта / конверсия / оплачено ── */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+            {/* Средний чек */}
+            <div className="bg-gradient-to-br from-[#1A1A1A] via-[#141414] to-[#0E0E0E] border border-[#1F1F1F] p-2.5 rounded-lg">
+              <div className="flex items-center gap-1 mb-0.5">
+                <Icon name="Receipt" size={10} className="text-[#FFD700]/80" />
+                <div className="font-roboto text-white/35 text-[9px] uppercase tracking-wider">Средний чек</div>
+              </div>
+              <div className="font-oswald font-bold text-lg text-[#FFD700] tabular-nums">
+                {analytics.avg_check ? money(analytics.avg_check) : "—"}
+              </div>
+              <div className="text-[9px] text-white/30 mt-0.5">
+                {analytics.done > 0 ? `${analytics.done} ремонт${analytics.done === 1 ? "" : analytics.done < 5 ? "а" : "ов"}` : "нет данных"}
+              </div>
+            </div>
+            {/* Среднее время ремонта */}
+            <div className="bg-gradient-to-br from-[#1A1A1A] via-[#141414] to-[#0E0E0E] border border-[#1F1F1F] p-2.5 rounded-lg">
+              <div className="flex items-center gap-1 mb-0.5">
+                <Icon name="Clock" size={10} className="text-sky-400/80" />
+                <div className="font-roboto text-white/35 text-[9px] uppercase tracking-wider">Скорость</div>
+              </div>
+              <div className="font-oswald font-bold text-lg text-sky-300 tabular-nums">
+                {fmtHours(analytics.avg_repair_hours)}
+              </div>
+              <div className="text-[9px] text-white/30 mt-0.5">от приёма до готовности</div>
+            </div>
+            {/* Конверсия */}
+            <div className="bg-gradient-to-br from-[#1A1A1A] via-[#141414] to-[#0E0E0E] border border-[#1F1F1F] p-2.5 rounded-lg">
+              <div className="flex items-center gap-1 mb-0.5">
+                <Icon name="TrendingUp" size={10} className="text-emerald-400/80" />
+                <div className="font-roboto text-white/35 text-[9px] uppercase tracking-wider">Конверсия</div>
+              </div>
+              <div className="font-oswald font-bold text-lg text-emerald-300 tabular-nums">
+                {analytics.conversion != null ? `${analytics.conversion}%` : "—"}
+              </div>
+              <div className="text-[9px] text-white/30 mt-0.5">выдано из принятых</div>
+            </div>
+            {/* Оплачено / в работе */}
+            <div className="bg-gradient-to-br from-[#1A1A1A] via-[#141414] to-[#0E0E0E] border border-[#1F1F1F] p-2.5 rounded-lg">
+              <div className="flex items-center gap-1 mb-0.5">
+                <Icon name="Wallet" size={10} className="text-blue-400/80" />
+                <div className="font-roboto text-white/35 text-[9px] uppercase tracking-wider">Оплачено</div>
+              </div>
+              <div className="font-oswald font-bold text-lg text-blue-300 tabular-nums">
+                {analytics.paid_count ?? 0}
+                <span className="text-white/30 text-[10px] font-normal"> / {analytics.done}</span>
+              </div>
+              <div className="text-[9px] text-white/30 mt-0.5">
+                {analytics.done ? `${Math.round(((analytics.paid_count ?? 0) / analytics.done) * 100)}% покрыто` : "нет данных"}
+              </div>
             </div>
           </div>
 

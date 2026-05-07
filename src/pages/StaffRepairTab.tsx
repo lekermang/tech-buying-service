@@ -8,13 +8,20 @@ export default function StaffRepairTab({ token, isOwner = false }: { token: stri
   const st = useStaffRepairState();
   const actions = useStaffRepairActions(token, st);
 
-  // Загружаем заявки или аналитику при смене вкладки/периода
+  // Загружаем заявки или аналитику при смене вкладки/периода/диапазона
   useEffect(() => {
     const ctrl = new AbortController();
-    if (st.view === "list") actions.loadOrders(ctrl.signal);
-    else actions.loadAnalytics(st.period, ctrl.signal);
+    if (st.view === "list") {
+      actions.loadOrders(ctrl.signal);
+    } else {
+      // Для custom-периода загружаем только если задан хотя бы один край диапазона
+      if (st.period === "custom" && !st.analyticsDateFrom && !st.analyticsDateTo) {
+        return;
+      }
+      actions.loadAnalytics(st.period, ctrl.signal, st.analyticsDateFrom, st.analyticsDateTo);
+    }
     return () => ctrl.abort();
-  }, [st.view, actions.loadOrders, actions.loadAnalytics, st.period]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [st.view, actions.loadOrders, actions.loadAnalytics, st.period, st.analyticsDateFrom, st.analyticsDateTo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="flex flex-col">

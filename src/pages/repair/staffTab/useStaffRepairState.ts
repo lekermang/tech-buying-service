@@ -50,6 +50,9 @@ export function useStaffRepairState() {
   // Аналитика
   const [analytics, setAnalytics] = useState<RepairAnalytics | null>(null);
   const [period, setPeriod] = useState<Period>("week");
+  // Произвольный диапазон для period === 'custom' (формат YYYY-MM-DD)
+  const [analyticsDateFrom, setAnalyticsDateFrom] = useState<string>("");
+  const [analyticsDateTo, setAnalyticsDateTo] = useState<string>("");
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
 
@@ -82,6 +85,8 @@ export function useStaffRepairState() {
     readySaving, setReadySaving,
     analytics, setAnalytics,
     period, setPeriod,
+    analyticsDateFrom, setAnalyticsDateFrom,
+    analyticsDateTo, setAnalyticsDateTo,
     analyticsLoading, setAnalyticsLoading,
     showHistory, setShowHistory,
     ordersModal, setOrdersModal,

@@ -23,6 +23,8 @@ export default function StaffRepairModals({
         <StatusOrdersModal
           token={token}
           period={st.period}
+          dateFrom={st.analyticsDateFrom}
+          dateTo={st.analyticsDateTo}
           statuses={st.ordersModal.statuses}
           title={st.ordersModal.title}
           accent={st.ordersModal.accent}

@@ -61,8 +61,12 @@ export default function StaffRepairViews({
           analyticsLoading={st.analyticsLoading}
           period={st.period}
           stats={st.stats}
+          dateFrom={st.analyticsDateFrom}
+          dateTo={st.analyticsDateTo}
           onPeriodChange={st.setPeriod}
-          onRefresh={() => actions.loadAnalytics(st.period)}
+          onDateFromChange={st.setAnalyticsDateFrom}
+          onDateToChange={st.setAnalyticsDateTo}
+          onRefresh={() => actions.loadAnalytics(st.period, undefined, st.analyticsDateFrom, st.analyticsDateTo)}
           onShowHistory={() => st.setShowHistory(true)}
           onShowOrders={(p) => st.setOrdersModal(p)}
         />

@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import Icon from "@/components/ui/icon";
 import { REPAIR_URL, Order, STATUSES, fmt } from "./types";
-
-type Period = "day" | "yesterday" | "week" | "month";
+import type { Period } from "./staffTab/staffTabTypes";
 
 type Props = {
   token?: string;
@@ -10,6 +9,9 @@ type Props = {
   statuses: string[];
   title: string;
   accent: "revenue" | "costs" | "master" | "profit" | "status";
+  /** Произвольный диапазон (для period='custom') */
+  dateFrom?: string;
+  dateTo?: string;
   onClose: () => void;
   /** Кастомный URL (для админки) */
   fetchUrl?: string;
@@ -19,15 +21,25 @@ type Props = {
   onOrderClick?: (orderId: number) => void;
 };
 
-const periodLabel = (p: Period) =>
-  p === "day" ? "сегодня" : p === "yesterday" ? "вчера" : p === "week" ? "за 7 дней" : "за 30 дней";
+const periodLabel = (p: Period, df?: string, dt?: string) => {
+  switch (p) {
+    case "day": return "сегодня";
+    case "yesterday": return "вчера";
+    case "week": return "за 7 дней";
+    case "month": return "за 30 дней";
+    case "quarter": return "за 90 дней";
+    case "year": return "за год";
+    case "custom": return df && dt ? `с ${df} по ${dt}` : df ? `с ${df}` : dt ? `по ${dt}` : "произвольный период";
+    default: return "за период";
+  }
+};
 
 const money = (v: number | null | undefined) =>
   v != null ? v.toLocaleString("ru-RU") + " ₽" : "—";
 
 const STATUS_LABEL: Record<string, string> = {
-  new: "Принята", accepted: "Принят мастером", in_progress: "В работе",
-  waiting_parts: "Ждём запчасть", ready: "Готово", done: "Выдано",
+  new: "Принят", pending_approval: "На согласование", accepted: "Принят мастером",
+  in_progress: "В работе", waiting_parts: "Ждём запчасть", ready: "Готов", done: "Выдан",
   warranty: "На гарантии", cancelled: "Отменено",
 };
 
@@ -39,22 +51,27 @@ const csvEscape = (v: unknown): string => {
   return s;
 };
 
-export default function StatusOrdersModal({ token, period, statuses, title, accent, onClose, fetchUrl, fetchHeaders, onOrderClick }: Props) {
+export default function StatusOrdersModal({ token, period, statuses, title, accent, dateFrom, dateTo, onClose, fetchUrl, fetchHeaders, onOrderClick }: Props) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const sp = statuses.length ? `&statuses=${statuses.join(",")}` : "";
+      const params: string[] = [`action=analytics_orders`, `period=${period}`];
+      if (statuses.length) params.push(`statuses=${statuses.join(",")}`);
+      if (period === "custom") {
+        if (dateFrom) params.push(`date_from=${dateFrom}`);
+        if (dateTo) params.push(`date_to=${dateTo}`);
+      }
       const url = fetchUrl || REPAIR_URL;
       const headers = fetchHeaders || (token ? { "X-Employee-Token": token } : {});
-      const res = await fetch(`${url}?action=analytics_orders&period=${period}${sp}`, { headers });
+      const res = await fetch(`${url}?${params.join("&")}`, { headers });
       const data = await res.json();
       setOrders(data.orders || []);
       setLoading(false);
     })();
-  }, [token, period, statuses, fetchUrl, fetchHeaders]);
+  }, [token, period, statuses, dateFrom, dateTo, fetchUrl, fetchHeaders]);
 
   const totals = orders.reduce(
     (a, o) => ({
@@ -104,7 +121,11 @@ export default function StatusOrdersModal({ token, period, statuses, title, acce
     const csv = [header, ...rows, totalsRow].map((r) => r.map(csvEscape).join(";")).join("\r\n");
     // UTF-8 BOM — чтобы Excel правильно открыл кириллицу
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
-    const periodName = period === "day" ? "сегодня" : period === "yesterday" ? "вчера" : period === "week" ? "7-дней" : "30-дней";
+    const periodNameMap: Record<string, string> = {
+      day: "сегодня", yesterday: "вчера", week: "7-дней", month: "30-дней",
+      quarter: "90-дней", year: "год", custom: dateFrom && dateTo ? `${dateFrom}_${dateTo}` : "период",
+    };
+    const periodName = periodNameMap[period] || "период";
     const stamp = new Date().toISOString().slice(0, 10);
     saveAs(blob, `ремонт-${periodName}-${stamp}.csv`);
     setExporting(false);
@@ -133,7 +154,7 @@ export default function StatusOrdersModal({ token, period, statuses, title, acce
             <div>
               <div className="font-oswald font-bold text-base truncate bg-gradient-to-r from-[#FFD700] via-[#fff3a0] to-[#FFD700] bg-clip-text text-transparent animate-shimmer">{title}</div>
               <div className="font-roboto text-white/55 text-[10px] mt-0.5">
-                {periodLabel(period)} · {orders.length} {orders.length === 1 ? "заказ" : "заказов"}
+                {periodLabel(period, dateFrom, dateTo)} · {orders.length} {orders.length === 1 ? "заказ" : "заказов"}
               </div>
             </div>
           </div>

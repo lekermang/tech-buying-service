@@ -490,19 +490,36 @@ def handler(event: dict, context) -> dict:
     if method == 'GET':
         action = params.get('action', '')
 
-        # Аналитика за период (day/week/month)
+        # Аналитика за период.
+        #
+        # Поддерживаемые периоды:
+        #   day        — текущий рабочий день (с 07:00 МСК)
+        #   yesterday  — вчерашний рабочий день
+        #   week       — последние 7 рабочих дней
+        #   month      — последние 30 рабочих дней
+        #   quarter    — последние 90 рабочих дней
+        #   year       — последние 365 рабочих дней
+        #   custom     — произвольный диапазон через ?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD
         if action == 'analytics':
             period = params.get('period', 'month')
-            # Рабочий день: с 07:00 МСК текущего дня до 07:00 МСК следующего дня
-            # "Сегодня" (day)      = с 07:00 МСК сегодня (или вчера если сейчас < 07:00) до сейчас
-            # "Вчера"  (yesterday) = с 07:00 МСК позавчера до 07:00 МСК вчера (рабочий день)
-            # "7 дней" (week)      = 7 рабочих дней по 07:00
-            # "Месяц"  (month)     = 30 рабочих дней по 07:00
-            #
-            # Начало текущего рабочего дня: если сейчас МСК >= 07:00 — сегодня 07:00, иначе вчера 07:00
-            # UTC offset МСК = +3h, 07:00 МСК = 04:00 UTC
-            if period == 'yesterday':
-                # Вчерашний рабочий день: с 07:00 МСК позавчера до 07:00 МСК вчера
+            date_from = (params.get('date_from') or '').strip()
+            date_to = (params.get('date_to') or '').strip()
+
+            def safe_date(s: str) -> str:
+                # Защита от инъекций — пропускаем только YYYY-MM-DD
+                import re
+                return s if re.fullmatch(r'\d{4}-\d{2}-\d{2}', s or '') else ''
+
+            if period == 'custom' and (date_from or date_to):
+                df = safe_date(date_from)
+                dt = safe_date(date_to)
+                clauses = []
+                if df:
+                    clauses.append(f"COALESCE(status_updated_at, created_at) >= '{df}'::timestamp + INTERVAL '7 hours' - INTERVAL '3 hours'")
+                if dt:
+                    clauses.append(f"COALESCE(status_updated_at, created_at) < ('{dt}'::date + 1)::timestamp + INTERVAL '7 hours' - INTERVAL '3 hours'")
+                period_where = " AND ".join(clauses) if clauses else "TRUE"
+            elif period == 'yesterday':
                 period_where = """
                     COALESCE(status_updated_at, created_at) >= (
                         DATE_TRUNC('day', (NOW() + INTERVAL '3 hours')::date - 1) + INTERVAL '7 hours' - INTERVAL '3 hours'
@@ -511,9 +528,7 @@ def handler(event: dict, context) -> dict:
                         DATE_TRUNC('day', (NOW() + INTERVAL '3 hours')::date) + INTERVAL '7 hours' - INTERVAL '3 hours'
                     )
                 """
-                days = None
             elif period == 'day':
-                # Текущий рабочий день: с 07:00 МСК сегодня (если < 07:00 МСК — с вчера 07:00)
                 period_where = """
                     COALESCE(status_updated_at, created_at) >= (
                         CASE
@@ -523,13 +538,9 @@ def handler(event: dict, context) -> dict:
                         END
                     )
                 """
-                days = 1
             else:
-                if period == 'week':
-                    days = 7
-                else:
-                    days = 30
-                # Для week/month: N рабочих дней назад от начала текущего рабочего дня
+                days_map = {'week': 7, 'month': 30, 'quarter': 90, 'year': 365}
+                days = days_map.get(period, 30)
                 period_where = f"""
                     COALESCE(status_updated_at, created_at) >= (
                         CASE
@@ -540,6 +551,8 @@ def handler(event: dict, context) -> dict:
                     )
                 """
 
+            # Основная аналитика. Прибыль/выручка считаются для статусов 'ready','done','warranty':
+            # это значит, что после нажатия «Готов» прибыль уже видна — даже до фактической выдачи.
             cur.execute(f"""
                 SELECT
                     COUNT(*) FILTER (WHERE status IN ('done','warranty','ready')) as done,
@@ -547,20 +560,34 @@ def handler(event: dict, context) -> dict:
                     COUNT(*) FILTER (WHERE status = 'ready') as ready,
                     COUNT(*) FILTER (WHERE status = 'in_progress') as in_progress,
                     COUNT(*) FILTER (WHERE status = 'waiting_parts') as waiting_parts,
-                    COUNT(*) FILTER (WHERE status IN ('new','accepted')) as new_count,
+                    COUNT(*) FILTER (WHERE status IN ('new','accepted','pending_approval')) as new_count,
                     COALESCE(SUM(repair_amount) FILTER (WHERE status IN ('done','warranty','ready')), 0) as revenue,
                     COALESCE(SUM(purchase_amount) FILTER (WHERE status IN ('done','warranty','ready')), 0) as costs,
                     COALESCE(SUM(master_income) FILTER (WHERE status IN ('done','warranty','ready')), 0) as master_total,
-                    COUNT(*) as total
+                    COUNT(*) as total,
+                    COUNT(*) FILTER (WHERE status = 'pending_approval') as pending_approval,
+                    COUNT(*) FILTER (WHERE is_paid = true AND status IN ('done','warranty','ready')) as paid_count,
+                    COALESCE(AVG(EXTRACT(EPOCH FROM (status_updated_at - created_at)) / 3600.0)
+                             FILTER (WHERE status IN ('done','warranty','ready') AND status_updated_at IS NOT NULL), 0) as avg_repair_hours
                 FROM {SCHEMA}.repair_orders
                 WHERE {period_where}
             """)
             row = cur.fetchone()
 
+            done_count = int(row[0]) if row[0] else 0
             revenue = int(row[6]) if row[6] else 0
             costs = int(row[7]) if row[7] else 0
             master_total = int(row[8]) if row[8] else 0
+            total = int(row[9]) if row[9] else 0
+            pending_approval = int(row[10]) if row[10] else 0
+            paid_count = int(row[11]) if row[11] else 0
+            avg_repair_hours = float(row[12]) if row[12] else 0.0
             profit = revenue - costs
+            avg_check = round(revenue / done_count) if done_count else 0
+            # Конверсия: выданы / (всего за период минус отменённые)
+            cancelled_count = int(row[1]) if row[1] else 0
+            relevant = total - cancelled_count
+            conversion = round((done_count / relevant) * 100) if relevant > 0 else 0
 
             # Динамика по дням — группируем по МСК-дню выдачи
             cur.execute(f"""
@@ -593,9 +620,16 @@ def handler(event: dict, context) -> dict:
                 'headers': HEADERS,
                 'body': json.dumps({
                     'period': period,
-                    'total': row[9], 'done': row[0], 'cancelled': row[1],
+                    'date_from': date_from if period == 'custom' else None,
+                    'date_to': date_to if period == 'custom' else None,
+                    'total': total, 'done': done_count, 'cancelled': cancelled_count,
                     'ready': row[2], 'in_progress': row[3], 'waiting_parts': row[4], 'new': row[5],
+                    'pending_approval': pending_approval,
                     'revenue': revenue, 'costs': costs, 'profit': profit, 'master_total': master_total,
+                    'avg_check': avg_check,
+                    'avg_repair_hours': round(avg_repair_hours, 1),
+                    'conversion': conversion,
+                    'paid_count': paid_count,
                     'daily': daily,
                 }, ensure_ascii=False)
             }
@@ -636,7 +670,23 @@ def handler(event: dict, context) -> dict:
         if action == 'analytics_orders':
             period_o = params.get('period', 'day')
             status_filter = params.get('statuses', '').strip()
-            if period_o == 'yesterday':
+            date_from_o = (params.get('date_from') or '').strip()
+            date_to_o = (params.get('date_to') or '').strip()
+
+            def safe_date_o(s: str) -> str:
+                import re
+                return s if re.fullmatch(r'\d{4}-\d{2}-\d{2}', s or '') else ''
+
+            if period_o == 'custom' and (date_from_o or date_to_o):
+                df_o = safe_date_o(date_from_o)
+                dt_o = safe_date_o(date_to_o)
+                clauses_o = []
+                if df_o:
+                    clauses_o.append(f"COALESCE(status_updated_at, created_at) >= '{df_o}'::timestamp + INTERVAL '7 hours' - INTERVAL '3 hours'")
+                if dt_o:
+                    clauses_o.append(f"COALESCE(status_updated_at, created_at) < ('{dt_o}'::date + 1)::timestamp + INTERVAL '7 hours' - INTERVAL '3 hours'")
+                period_where_o = " AND ".join(clauses_o) if clauses_o else "TRUE"
+            elif period_o == 'yesterday':
                 period_where_o = """
                     COALESCE(status_updated_at, created_at) >= (
                         DATE_TRUNC('day', (NOW() + INTERVAL '3 hours')::date - 1) + INTERVAL '7 hours' - INTERVAL '3 hours'
@@ -656,7 +706,8 @@ def handler(event: dict, context) -> dict:
                     )
                 """
             else:
-                days_o = 7 if period_o == 'week' else 30
+                days_map_o = {'week': 7, 'month': 30, 'quarter': 90, 'year': 365}
+                days_o = days_map_o.get(period_o, 30)
                 period_where_o = f"""
                     COALESCE(status_updated_at, created_at) >= (
                         CASE
@@ -667,7 +718,7 @@ def handler(event: dict, context) -> dict:
                     )
                 """
             # Фильтр по статусам (через запятую), разрешаем только безопасные значения
-            allowed = {'new','accepted','in_progress','waiting_parts','ready','done','warranty','cancelled'}
+            allowed = {'new','accepted','pending_approval','in_progress','waiting_parts','ready','done','warranty','cancelled'}
             status_where = ''
             if status_filter:
                 vals = [s.strip() for s in status_filter.split(',') if s.strip() in allowed]
