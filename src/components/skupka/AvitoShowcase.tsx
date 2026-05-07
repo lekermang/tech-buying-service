@@ -24,20 +24,22 @@ const formatPrice = (p: number | null | undefined) =>
 
 export default function AvitoShowcase() {
   const [items, setItems] = useState<AvitoItem[]>([]);
+  const [listItems, setListItems] = useState<AvitoItem[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [total, setTotal] = useState(0);
+  const [counts, setCounts] = useState<{ premium: number; basic: number; total: number }>({ premium: 0, basic: 0, total: 0 });
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
   const [activeCat, setActiveCat] = useState<string>("");
   const [offset, setOffset] = useState(0);
   const [openItem, setOpenItem] = useState<AvitoItem | null>(null);
   const [photoIdx, setPhotoIdx] = useState(0);
+  const [showList, setShowList] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   const limit = 12;
 
   const load = useCallback((q: string, cat: string, off: number) => {
     setLoading(true);
-    const params = new URLSearchParams({ limit: String(limit), offset: String(off) });
+    const params = new URLSearchParams({ mode: "premium", limit: String(limit), offset: String(off) });
     if (q) params.set("q", q);
     if (cat) params.set("category", cat);
     fetch(`${AVITO_URL}?${params.toString()}`)
@@ -45,21 +47,34 @@ export default function AvitoShowcase() {
       .then(d => {
         setItems(d.items || []);
         setCategories(d.categories || []);
-        setTotal(d.total || 0);
+        setCounts(d.counts || { premium: 0, basic: 0, total: 0 });
         setLoading(false);
       })
       .catch(() => setLoading(false));
   }, []);
 
+  const loadList = useCallback((q: string) => {
+    const params = new URLSearchParams({ mode: "list", limit: "300" });
+    if (q) params.set("q", q);
+    fetch(`${AVITO_URL}?${params.toString()}`)
+      .then(r => r.json())
+      .then(d => setListItems(d.items || []))
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     load("", "", 0);
-  }, [load]);
+    loadList("");
+  }, [load, loadList]);
 
   const onSearch = (val: string) => {
     setQuery(val);
     setOffset(0);
     clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => load(val, activeCat, 0), 350);
+    debounceRef.current = setTimeout(() => {
+      load(val, activeCat, 0);
+      loadList(val);
+    }, 350);
   };
 
   const onCat = (c: string) => {
@@ -80,7 +95,7 @@ export default function AvitoShowcase() {
     setPhotoIdx(0);
   };
 
-  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const totalPages = Math.max(1, Math.ceil(counts.premium / limit));
   const currentPage = Math.floor(offset / limit) + 1;
 
   return (
@@ -99,7 +114,7 @@ export default function AvitoShowcase() {
         </div>
         <div className="flex items-center gap-1 px-2 py-2 bg-[#FFD700]/10 border border-[#FFD700]/30 rounded">
           <Icon name="Package" size={12} className="text-[#FFD700]" />
-          <span className="font-oswald font-bold text-[11px] text-[#FFD700]">{total}</span>
+          <span className="font-oswald font-bold text-[11px] text-[#FFD700]">{counts.total}</span>
         </div>
       </div>
 
@@ -130,11 +145,11 @@ export default function AvitoShowcase() {
       )}
 
       {!loading && items.length === 0 && (
-        <div className="text-center py-8">
-          <Icon name="PackageOpen" size={32} className="text-[#FFD700]/40 mx-auto mb-2" />
-          <div className="text-white/50 font-roboto text-xs">Товары не найдены</div>
-          <div className="text-white/30 font-roboto text-[10px] mt-1">
-            Попробуйте изменить запрос или сбросить фильтр
+        <div className="text-center py-6 border border-dashed border-[#FFD700]/20 rounded-lg">
+          <Icon name="Sparkles" size={24} className="text-[#FFD700]/50 mx-auto mb-2" />
+          <div className="text-white/60 font-roboto text-xs">Премиум-карточки скоро появятся</div>
+          <div className="text-white/40 font-roboto text-[10px] mt-1">
+            Сотрудник магазина сейчас добавляет фото товаров
           </div>
         </div>
       )}
@@ -216,6 +231,62 @@ export default function AvitoShowcase() {
           >
             <Icon name="ChevronRight" size={14} />
           </button>
+        </div>
+      )}
+
+      {listItems.length > 0 && (
+        <div className="mt-5 pt-4 border-t border-white/10">
+          <button
+            onClick={() => setShowList(v => !v)}
+            className="flex items-center justify-between w-full text-left group"
+          >
+            <div>
+              <div className="font-oswald font-bold text-white/90 text-sm uppercase tracking-wide">
+                Ещё в наличии
+              </div>
+              <div className="font-roboto text-[10px] text-white/40 mt-0.5">
+                Товары без фото — нажмите, чтобы посмотреть на Авито
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0 ml-2">
+              <span className="bg-white/10 text-white/80 font-oswald font-bold text-xs px-2 py-1 rounded">
+                {listItems.length}
+              </span>
+              <Icon
+                name={showList ? "ChevronUp" : "ChevronDown"}
+                size={18}
+                className="text-[#FFD700]/60 group-hover:text-[#FFD700] transition-colors"
+              />
+            </div>
+          </button>
+
+          {showList && (
+            <div className="mt-2 divide-y divide-white/5">
+              {listItems.map(it => (
+                <a
+                  key={it.id}
+                  href={it.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-between gap-2 py-2 group hover:bg-white/[0.02] -mx-1 px-1 rounded transition-colors"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="font-roboto text-xs text-white/85 truncate group-hover:text-[#FFD700] transition-colors">
+                      {it.title}
+                    </div>
+                    {it.category && (
+                      <div className="font-roboto text-[9px] text-white/40 mt-0.5 uppercase tracking-wide truncate">
+                        {it.category}
+                      </div>
+                    )}
+                  </div>
+                  <div className="font-oswald font-bold text-[#FFD700] text-sm shrink-0">
+                    {formatPrice(it.price)}
+                  </div>
+                </a>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
