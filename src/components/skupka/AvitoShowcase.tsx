@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Icon from "@/components/ui/icon";
+import AvitoImg from "./AvitoImg";
 
 const AVITO_URL = "https://functions.poehali.dev/d46cee41-3a2e-4973-a236-29fa6b90b7ce";
 const SYNC_URL = "https://functions.poehali.dev/49e23745-1449-4e4c-80c2-e7967f3c5584";
@@ -253,11 +254,13 @@ export default function AvitoShowcase() {
               className="group relative bg-gradient-to-br from-white/[0.06] via-white/[0.02] to-transparent border border-[#FFD700]/25 hover:border-[#FFD700]/80 rounded-lg overflow-hidden text-left transition-all duration-300 hover:shadow-[0_0_24px_rgba(255,215,0,0.3)] hover:-translate-y-0.5 animate-in fade-in slide-in-from-bottom-2 fill-mode-both"
             >
               <div className="relative aspect-square bg-[#0D0D0D] overflow-hidden">
-                <img
-                  src={it.main_photo!}
+                <AvitoImg
+                  src={it.main_photo}
                   alt={it.title}
-                  loading="lazy"
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                  width={idx < 4 ? 480 : 360}
+                  priority={idx < 2}
+                  className="w-full h-full transition-transform duration-700 group-hover:scale-110"
+                  sizes="(max-width: 640px) 50vw, 25vw"
                 />
                 {/* Премиум блик при наведении */}
                 <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/0 to-white/0 group-hover:via-white/10 group-hover:to-white/20 transition-all duration-500" />
@@ -538,11 +541,14 @@ function ProductModal({
                 className="block w-full h-full"
                 title="Увеличить"
               >
-                <img
+                <AvitoImg
                   src={photos[photoIdx]}
                   alt={item.title}
-                  className="w-full h-full object-contain transition-opacity duration-200"
-                  key={photoIdx}
+                  width={800}
+                  priority
+                  fit="contain"
+                  className="w-full h-full"
+                  sizes="(max-width: 640px) 100vw, 512px"
                 />
               </button>
               {photos.length > 1 && (

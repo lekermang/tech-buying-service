@@ -4,6 +4,7 @@ import base64
 import time
 import hashlib
 import urllib.request
+import urllib.error
 from typing import Any
 import psycopg2
 from psycopg2.extras import RealDictCursor, Json
@@ -125,6 +126,83 @@ def get_product(product_id: int) -> dict | None:
         )
         r = cur.fetchone()
         return dict(r) if r else None
+    finally:
+        cur.close()
+        conn.close()
+
+
+def _download_url(url: str, timeout: int = 15) -> bytes | None:
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={
+                'User-Agent': 'Mozilla/5.0 (compatible; ImageBot/1.0)',
+                'Accept': 'image/webp,image/jpeg,image/*',
+                'Referer': 'https://www.avito.ru/',
+            },
+            method='GET',
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            data = r.read()
+            if len(data) > 12 * 1024 * 1024:
+                return None
+            return data
+    except Exception:
+        return None
+
+
+def import_from_urls(product_id: int, urls: list[str]) -> dict:
+    """Скачивает фото по списку URL (например с CDN avito.st) и сохраняет в S3 нашего проекта."""
+    dsn = os.environ['DATABASE_URL']
+    conn = psycopg2.connect(dsn)
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute(
+            f"SELECT avito_id, photos FROM {SCHEMA}.avito_products WHERE id=%s",
+            (product_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            raise ValueError('Товар не найден')
+        avito_id = row['avito_id']
+        photos = list(row['photos'] or [])
+        added = 0
+        skipped = 0
+        s3 = get_s3()
+        for src in urls[:10]:
+            if len(photos) >= 5:
+                break
+            data = _download_url(src)
+            if not data:
+                skipped += 1
+                continue
+            ts = int(time.time() * 1000)
+            h = hashlib.md5(data).hexdigest()[:8]
+            ext = 'jpg'
+            ctype = 'image/jpeg'
+            sl = src.lower()
+            if '.webp' in sl:
+                ext = 'webp'
+                ctype = 'image/webp'
+            elif '.png' in sl:
+                ext = 'png'
+                ctype = 'image/png'
+            key = f'avito/{avito_id}/{ts}_{h}.{ext}'
+            try:
+                s3.put_object(Bucket='files', Key=key, Body=data, ContentType=ctype, ACL='public-read')
+                photos.append(cdn_url(key))
+                added += 1
+            except Exception:
+                skipped += 1
+        main = photos[0] if photos else None
+        cur.execute(
+            f"""UPDATE {SCHEMA}.avito_products
+                SET photos=%s, main_photo=%s, updated_at=NOW()
+                WHERE id=%s""",
+            (Json(photos), main, product_id),
+        )
+        conn.commit()
+        return {'photos': photos, 'main_photo': main, 'added': added, 'skipped': skipped}
     finally:
         cur.close()
         conn.close()
@@ -323,6 +401,38 @@ def handler(event: dict, context: Any) -> dict:
             if not pid or not img:
                 return _resp(400, {'ok': False, 'error': 'product_id и image_base64 обязательны'})
             return _resp(200, {'ok': True, **upload_photo(pid, img)})
+
+        if method == 'POST' and action == 'import_urls':
+            pid = int(body.get('product_id') or 0)
+            urls = body.get('urls') or []
+            if not pid or not isinstance(urls, list) or not urls:
+                return _resp(400, {'ok': False, 'error': 'product_id и urls[] обязательны'})
+            return _resp(200, {'ok': True, **import_from_urls(pid, urls)})
+
+        if method == 'POST' and action == 'import_batch':
+            batch = body.get('batch') or []
+            if not isinstance(batch, list) or not batch:
+                return _resp(400, {'ok': False, 'error': 'batch[] обязателен'})
+            results = []
+            total_added = 0
+            for item in batch[:50]:
+                try:
+                    pid = int(item.get('product_id') or 0)
+                    urls = item.get('urls') or []
+                    desc = item.get('description') or ''
+                    if not pid:
+                        continue
+                    res = import_from_urls(pid, urls) if urls else {'added': 0, 'photos': []}
+                    if desc:
+                        try:
+                            update_product(pid, {'description': desc})
+                        except Exception:
+                            pass
+                    total_added += res.get('added', 0)
+                    results.append({'product_id': pid, 'added': res.get('added', 0)})
+                except Exception as e:
+                    results.append({'product_id': item.get('product_id'), 'error': str(e)})
+            return _resp(200, {'ok': True, 'total_added': total_added, 'count': len(results), 'results': results})
 
         if method == 'POST' and action == 'bulk_upload':
             pid = int(body.get('product_id') or 0)

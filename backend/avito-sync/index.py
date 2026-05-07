@@ -100,46 +100,142 @@ def fetch_item_detail(token: str, user_id: int, item_id: int) -> dict | None:
         return None
 
 
-def fetch_public_item(item_url: str) -> dict:
-    """Подтягивает фото и описание с публичной страницы Авито."""
+_AVITO_UA = (
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) '
+    'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
+)
+
+
+def _pick_best_photo(p: dict) -> str | None:
+    """Выбирает максимальное разрешение из объекта фото мобильного API."""
+    if not isinstance(p, dict):
+        return None
+    candidates: list = []
+    for key in ('image_url', 'url'):
+        v = p.get(key)
+        if isinstance(v, str):
+            candidates.append((9999, v))
+    sizes = p.get('sizes') or p.get('variants') or {}
+    if isinstance(sizes, dict):
+        for k, v in sizes.items():
+            if isinstance(v, str):
+                try:
+                    w = int(str(k).split('x')[0])
+                except Exception:
+                    w = 100
+                candidates.append((w, v))
+    if not candidates:
+        for v in (p.values() if isinstance(p, dict) else []):
+            if isinstance(v, str) and ('avito.st' in v or 'avito.ru' in v) and ('.jpg' in v or '.webp' in v):
+                candidates.append((100, v))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda x: -x[0])
+    return candidates[0][1]
+
+
+def fetch_public_item(item_url_or_id: str | int) -> dict:
+    """Тянет фото и описание через мобильный публичный API Авито (m.avito.ru/api/15/items/{id})."""
     out: dict = {'photos': [], 'description': ''}
-    if not item_url:
-        return out
-    try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml',
-            'Accept-Language': 'ru-RU,ru;q=0.9',
-        }
-        status, raw = _http_get(item_url, headers, timeout=20)
-        if status != 200 or not raw:
-            return out
-        html = raw.decode('utf-8', errors='ignore')
-
+    item_id: int | None = None
+    if isinstance(item_url_or_id, int):
+        item_id = item_url_or_id
+    elif isinstance(item_url_or_id, str):
         import re
-        og_imgs = re.findall(r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"', html)
-        if not og_imgs:
-            og_imgs = re.findall(r'<meta[^>]+content="([^"]+)"[^>]+property="og:image"', html)
-        seen = set()
-        for u in og_imgs:
-            if u in seen:
-                continue
-            seen.add(u)
-            out['photos'].append(u)
-
-        gallery_urls = re.findall(r'"(https://\d+\.avito\.st/image/[0-9a-zA-Z_/.-]+\.jpg[^"]*)"', html)
-        for u in gallery_urls:
-            base = u.split('?')[0]
-            if base in seen:
-                continue
-            seen.add(base)
-            out['photos'].append(u)
-
-        m = re.search(r'<meta[^>]+property="og:description"[^>]+content="([^"]+)"', html)
+        m = re.search(r'_(\d{6,})(?:[/?]|$)', item_url_or_id)
         if m:
-            out['description'] = m.group(1).replace('&quot;', '"').replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
-    except Exception:
-        pass
+            try:
+                item_id = int(m.group(1))
+            except Exception:
+                item_id = None
+        else:
+            digits = re.findall(r'(\d{8,})', item_url_or_id)
+            if digits:
+                try:
+                    item_id = int(digits[-1])
+                except Exception:
+                    item_id = None
+    if not item_id:
+        return out
+
+    api_endpoints = [
+        f'https://m.avito.ru/api/15/items/{item_id}?key=af0deccbgcgidddjgnvljitntccdduijhdinfgjgfjir',
+        f'https://m.avito.ru/api/16/items/{item_id}?key=af0deccbgcgidddjgnvljitntccdduijhdinfgjgfjir',
+        f'https://www.avito.ru/api/15/items/{item_id}?key=af0deccbgcgidddjgnvljitntccdduijhdinfgjgfjir',
+    ]
+    headers = {
+        'User-Agent': _AVITO_UA,
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'ru-RU,ru;q=0.9',
+        'Referer': 'https://m.avito.ru/',
+        'Origin': 'https://m.avito.ru',
+    }
+    data: dict | None = None
+    for url in api_endpoints:
+        try:
+            status, raw = _http_get(url, headers, timeout=20)
+            if status == 200 and raw:
+                try:
+                    data = json.loads(raw.decode('utf-8'))
+                    if isinstance(data, dict):
+                        break
+                except Exception:
+                    continue
+        except Exception:
+            continue
+
+    if isinstance(data, dict):
+        seen: set = set()
+        photos_arr = (
+            data.get('images')
+            or data.get('photos')
+            or (data.get('gallery') or {}).get('images')
+            or []
+        )
+        if isinstance(photos_arr, list):
+            for p in photos_arr:
+                u = _pick_best_photo(p) if isinstance(p, dict) else (p if isinstance(p, str) else None)
+                if not u:
+                    continue
+                base = u.split('?')[0]
+                if base in seen:
+                    continue
+                seen.add(base)
+                out['photos'].append(u)
+
+        for fkey in ('description', 'descriptionHtml', 'description_html'):
+            d = data.get(fkey)
+            if isinstance(d, str) and d.strip():
+                txt = d
+                if '<' in txt:
+                    import re
+                    txt = re.sub(r'<br\s*/?\s*>', '\n', txt, flags=re.I)
+                    txt = re.sub(r'</p>', '\n', txt, flags=re.I)
+                    txt = re.sub(r'<[^>]+>', '', txt)
+                txt = txt.replace('&quot;', '"').replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>').replace('&nbsp;', ' ')
+                out['description'] = txt.strip()
+                break
+
+    if not out['photos'] and isinstance(item_url_or_id, str) and item_url_or_id.startswith('http'):
+        try:
+            status, raw = _http_get(item_url_or_id, headers, timeout=15)
+            if status == 200 and raw:
+                html = raw.decode('utf-8', errors='ignore')
+                import re
+                og_imgs = re.findall(r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"', html)
+                seen = set()
+                for u in og_imgs:
+                    if u in seen:
+                        continue
+                    seen.add(u)
+                    out['photos'].append(u)
+                if not out['description']:
+                    m = re.search(r'<meta[^>]+property="og:description"[^>]+content="([^"]+)"', html)
+                    if m:
+                        out['description'] = m.group(1).replace('&quot;', '"').replace('&amp;', '&')
+        except Exception:
+            pass
+
     return out
 
 
@@ -255,7 +351,7 @@ def sync_all(reupload_photos: bool = False) -> dict:
             old = existing.get(avito_id)
             need_public_fetch = not photo_urls or not description
             if need_public_fetch:
-                pub = fetch_public_item(url)
+                pub = fetch_public_item(avito_id)
                 if not photo_urls:
                     photo_urls = pub.get('photos') or []
                 if not description:
@@ -349,8 +445,8 @@ def sync_all(reupload_photos: bool = False) -> dict:
         conn.close()
 
 
-def refresh_missing_photos(limit: int = 30) -> dict:
-    """Догружает фото и описания для товаров, у которых их ещё нет (через публичную страницу Авито)."""
+def refresh_missing_photos(limit: int = 10) -> dict:
+    """Догружает фото и описания для товаров без фото через мобильный API Авито."""
     dsn = os.environ['DATABASE_URL']
     conn = psycopg2.connect(dsn)
     cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -363,21 +459,23 @@ def refresh_missing_photos(limit: int = 30) -> dict:
     processed = 0
     updated = 0
     photos_total = 0
+    found_photos_for = 0
     try:
         cur.execute(
             f"""SELECT id, avito_id, url, photos, description
                 FROM {SCHEMA}.avito_products
-                WHERE status='active' AND (photos = '[]'::jsonb OR main_photo IS NULL OR description IS NULL OR description='')
+                WHERE status='active' AND (photos = '[]'::jsonb OR main_photo IS NULL)
                 ORDER BY id ASC LIMIT %s""",
             (limit,),
         )
         rows = cur.fetchall()
         for r in rows:
             processed += 1
-            pub = fetch_public_item(r['url'])
+            pub = fetch_public_item(r['avito_id'])
             new_photos: list[str] = list(r['photos'] or [])
             if not new_photos and pub.get('photos'):
-                for idx, pu in enumerate(pub['photos'][:10]):
+                found_photos_for += 1
+                for idx, pu in enumerate(pub['photos'][:5]):
                     cdn = upload_photo_to_s3(s3, pu, r['avito_id'], idx)
                     if cdn:
                         new_photos.append(cdn)
@@ -393,7 +491,28 @@ def refresh_missing_photos(limit: int = 30) -> dict:
             )
             updated += 1
             conn.commit()
-        return {'ok': True, 'processed': processed, 'updated': updated, 'photos_uploaded': photos_total}
+        return {
+            'ok': True,
+            'processed': processed,
+            'updated': updated,
+            'photos_uploaded': photos_total,
+            'found_photos_for': found_photos_for,
+        }
+    finally:
+        cur.close()
+        conn.close()
+
+
+def get_no_photo_count() -> int:
+    dsn = os.environ['DATABASE_URL']
+    conn = psycopg2.connect(dsn)
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            f"""SELECT COUNT(*) FROM {SCHEMA}.avito_products
+                WHERE status='active' AND (photos = '[]'::jsonb OR main_photo IS NULL)"""
+        )
+        return cur.fetchone()[0] or 0
     finally:
         cur.close()
         conn.close()
@@ -502,6 +621,9 @@ def handler(event: dict, context: Any) -> dict:
             return _resp(200, result)
         except Exception as e:
             return _resp(500, {'ok': False, 'error': str(e)})
+
+    if action == 'probe':
+        return _resp(410, {'ok': False, 'error': 'deprecated'})
 
     if action == 'auto':
         try:

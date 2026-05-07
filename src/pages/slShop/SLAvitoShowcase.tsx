@@ -130,6 +130,133 @@ export default function SLAvitoShowcase({ token }: { token: string }) {
     return Math.round((stats.with_photos / stats.total_active) * 100);
   }, [stats]);
 
+  // Авто-импорт фото: парсит HTML Авито через CORS-прокси в браузере сотрудника
+  const [importing, setImporting] = useState(false);
+  const [importStat, setImportStat] = useState<{ done: number; total: number; added: number } | null>(null);
+  const cancelImportRef = useRef(false);
+
+  const fetchAvitoMeta = async (avitoUrl: string): Promise<{ photos: string[]; description: string }> => {
+    const proxies = [
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(avitoUrl)}`,
+      `https://corsproxy.io/?${encodeURIComponent(avitoUrl)}`,
+    ];
+    for (const p of proxies) {
+      try {
+        const ctrl = new AbortController();
+        const tm = setTimeout(() => ctrl.abort(), 15000);
+        const r = await fetch(p, { signal: ctrl.signal });
+        clearTimeout(tm);
+        if (!r.ok) continue;
+        const html = await r.text();
+        if (!html || html.length < 1000) continue;
+        const seen = new Set<string>();
+        const photos: string[] = [];
+        const ogRe = /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/gi;
+        let m: RegExpExecArray | null;
+        while ((m = ogRe.exec(html))) {
+          const u = m[1];
+          if (!seen.has(u)) {
+            seen.add(u);
+            photos.push(u);
+          }
+        }
+        const galRe = /(https:\/\/\d+\.avito\.st\/image\/[0-9a-zA-Z_/.-]+\.(?:jpg|webp|png))/gi;
+        while ((m = galRe.exec(html))) {
+          const base = m[1].split("?")[0];
+          if (!seen.has(base)) {
+            seen.add(base);
+            photos.push(m[1]);
+          }
+        }
+        let desc = "";
+        const dm = /<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i.exec(html);
+        if (dm) {
+          desc = dm[1]
+            .replace(/&quot;/g, '"')
+            .replace(/&amp;/g, "&")
+            .replace(/&lt;/g, "<")
+            .replace(/&gt;/g, ">")
+            .replace(/&#39;/g, "'");
+        }
+        if (photos.length || desc) return { photos: photos.slice(0, 5), description: desc };
+      } catch {
+        // try next proxy
+      }
+    }
+    return { photos: [], description: "" };
+  };
+
+  const importMissingPhotos = async () => {
+    if (importing) return;
+    cancelImportRef.current = false;
+    setImporting(true);
+    setImportStat({ done: 0, total: 0, added: 0 });
+    try {
+      const r0 = await fetch(`${PHOTOS_URL}?action=list&has_photo=no&limit=200`, {
+        headers: { "X-Employee-Token": token, "X-Auth-Token": token },
+      });
+      const d0 = await r0.json();
+      if (!d0.ok) {
+        flash("err", "Не удалось получить список товаров");
+        return;
+      }
+      const targets: AvitoProduct[] = d0.items || [];
+      if (targets.length === 0) {
+        flash("ok", "Все товары уже с фото!");
+        return;
+      }
+      setImportStat({ done: 0, total: targets.length, added: 0 });
+      let added = 0;
+      const queue = [...targets];
+      const worker = async () => {
+        while (queue.length > 0 && !cancelImportRef.current) {
+          const it = queue.shift();
+          if (!it) break;
+          try {
+            const meta = await fetchAvitoMeta(it.url);
+            if (meta.photos.length > 0 || meta.description) {
+              const r = await fetch(`${PHOTOS_URL}?action=import_urls`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "X-Employee-Token": token,
+                  "X-Auth-Token": token,
+                },
+                body: JSON.stringify({ product_id: it.id, urls: meta.photos }),
+              });
+              const d = await r.json();
+              if (d.ok && d.added) added += d.added;
+              if (meta.description) {
+                fetch(`${PHOTOS_URL}?action=update`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "X-Employee-Token": token,
+                    "X-Auth-Token": token,
+                  },
+                  body: JSON.stringify({ product_id: it.id, description: meta.description }),
+                }).catch(() => {});
+              }
+            }
+          } catch {
+            // ignore
+          }
+          setImportStat(s => (s ? { ...s, done: s.done + 1, added } : s));
+        }
+      };
+      await Promise.all([worker(), worker(), worker(), worker()]);
+      flash("ok", cancelImportRef.current
+        ? `Остановлено. Загружено ${added} фото`
+        : `Готово: загружено ${added} фото`);
+      load(query, filter);
+    } catch (e) {
+      flash("err", e instanceof Error ? e.message : "Ошибка авто-импорта");
+    } finally {
+      setImporting(false);
+      setTimeout(() => setImportStat(null), 4000);
+    }
+  };
+
   return (
     <div className="space-y-3">
       {/* Шапка с прогрессом */}
@@ -151,15 +278,58 @@ export default function SLAvitoShowcase({ token }: { token: string }) {
               </div>
             </div>
           </div>
-          <button
-            onClick={runSync}
-            disabled={syncing}
-            className="w-full sm:w-auto flex items-center justify-center gap-1.5 bg-gradient-to-r from-[#FFD700] to-[#FFE55C] hover:shadow-[0_0_16px_rgba(255,215,0,0.5)] text-black font-oswald font-bold text-xs px-3 py-2 rounded uppercase tracking-wide disabled:opacity-50 transition-all"
-          >
-            <Icon name={syncing ? "Loader2" : "RefreshCw"} size={14} className={syncing ? "animate-spin" : ""} />
-            {syncing ? "Синхронизирую..." : "Обновить с Авито"}
-          </button>
+          <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-1.5">
+            <button
+              onClick={importMissingPhotos}
+              disabled={importing || stats.no_photos === 0}
+              className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-purple-600 to-violet-500 hover:shadow-[0_0_16px_rgba(168,85,247,0.5)] text-white font-oswald font-bold text-xs px-3 py-2 rounded uppercase tracking-wide disabled:opacity-40 transition-all relative overflow-hidden"
+              title="Парсит фото и описания с Авито через браузер сотрудника"
+            >
+              <Icon name={importing ? "Loader2" : "Wand2"} size={14} className={importing ? "animate-spin" : ""} />
+              {importing ? "Авто-импорт..." : "🪄 Загрузить фото с Авито"}
+            </button>
+            <button
+              onClick={runSync}
+              disabled={syncing}
+              className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-[#FFD700] to-[#FFE55C] hover:shadow-[0_0_16px_rgba(255,215,0,0.5)] text-black font-oswald font-bold text-xs px-3 py-2 rounded uppercase tracking-wide disabled:opacity-50 transition-all"
+            >
+              <Icon name={syncing ? "Loader2" : "RefreshCw"} size={14} className={syncing ? "animate-spin" : ""} />
+              {syncing ? "Синхронизирую..." : "Обновить список"}
+            </button>
+          </div>
         </div>
+
+        {importStat && (
+          <div className="relative mt-3 bg-purple-500/10 border border-purple-500/30 rounded-lg p-2.5">
+            <div className="flex items-center justify-between text-[11px] text-white/85 mb-1.5">
+              <span className="flex items-center gap-1.5">
+                <Icon name="Wand2" size={12} className="text-purple-300" />
+                <span className="font-roboto">Парсю Авито в твоём браузере...</span>
+              </span>
+              <button
+                onClick={() => (cancelImportRef.current = true)}
+                className="text-white/50 hover:text-white"
+                title="Остановить"
+              >
+                <Icon name="X" size={13} />
+              </button>
+            </div>
+            <div className="flex items-center justify-between text-[10px] text-white/70 mb-1">
+              <span>
+                {importStat.done} / {importStat.total}
+              </span>
+              <span className="text-emerald-400 font-bold">+{importStat.added} фото</span>
+            </div>
+            <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-purple-500 to-violet-400 transition-all duration-300"
+                style={{
+                  width: `${importStat.total ? Math.round((importStat.done / importStat.total) * 100) : 0}%`,
+                }}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Прогресс-бар */}
         <div className="relative mt-3">
