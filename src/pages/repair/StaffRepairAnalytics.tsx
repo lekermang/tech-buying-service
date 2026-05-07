@@ -11,6 +11,8 @@ type RepairAnalytics = {
   avg_repair_hours?: number;
   conversion?: number;
   paid_count?: number;
+  /** Потенциальная выручка от готовых, но ещё НЕ выданных заявок (для подсказки в UI) */
+  ready_potential_revenue?: number;
   daily: { day: string; total: number; done: number; revenue: number; costs: number; profit: number }[];
 };
 
@@ -52,7 +54,9 @@ export default function StaffRepairAnalytics({
   onPeriodChange, onDateFromChange, onDateToChange,
   onRefresh, onShowHistory, onShowOrders,
 }: Props) {
-  const DONE_STATUSES = ["done", "warranty", "ready"];
+  // Прибыль / выручка / закупка считаются ТОЛЬКО для выданных клиенту заявок (done + warranty).
+  // Готовые, но ещё не выданные («ready») в финансовую статистику НЕ попадают.
+  const DONE_STATUSES = ["done", "warranty"];
   const openFinance = (accent: "revenue" | "costs" | "master" | "profit", title: string) =>
     onShowOrders?.({ statuses: DONE_STATUSES, title, accent });
   const openStatus = (key: string, label: string) =>
@@ -197,13 +201,11 @@ export default function StaffRepairAnalytics({
               <div className="relative flex items-center gap-1.5 mb-2">
                 <Icon name="Calculator" size={11} className="text-[#FFD700] drop-shadow-[0_0_4px_rgba(255,215,0,0.5)]" />
                 <div className="font-roboto text-[#FFD700]/80 text-[10px] uppercase tracking-[0.08em] font-bold">Расчёт прибыли</div>
-                {analytics.ready > 0 && (
-                  <span title="Заявки в статусе «Готов» уже учитываются — прибыль не ждёт момента выдачи"
-                    className="ml-auto inline-flex items-center gap-1 text-[9px] font-roboto text-[#FFD700]/85 bg-[#FFD700]/10 border border-[#FFD700]/30 rounded px-1.5 py-0.5">
-                    <Icon name="CheckCircle2" size={9} />
-                    + {analytics.ready} «Готов»
-                  </span>
-                )}
+                <span title="В прибыль попадают только выданные клиенту заявки (Выдан / На гарантии). «Готов» — ещё не учитывается."
+                  className="ml-auto inline-flex items-center gap-1 text-[9px] font-roboto text-emerald-300/80 bg-emerald-500/10 border border-emerald-400/30 rounded px-1.5 py-0.5">
+                  <Icon name="PackageCheck" size={9} />
+                  только «Выдан»
+                </span>
               </div>
             <div className="flex items-center gap-2 flex-wrap">
               <button onClick={() => openFinance("revenue", "Выручка — детализация")} className="text-center hover:bg-white/5 px-1.5 py-0.5 -mx-1.5 transition-colors">
@@ -242,6 +244,22 @@ export default function StaffRepairAnalytics({
                 <span className="font-roboto text-white/30 text-[9px]">До вычета мастера (выручка − закупка)</span>
                 <span className="font-roboto text-[#FFD700]/70 text-[10px] font-bold">{money(analytics.profit)}</span>
               </div>
+            )}
+            {/* Потенциальная выручка с готовых, но не выданных */}
+            {(analytics.ready ?? 0) > 0 && (
+              <button
+                onClick={() => onShowOrders?.({ statuses: ["ready"], title: "Готовы к выдаче — поступит после выдачи", accent: "revenue" })}
+                className="w-full mt-2 pt-2 border-t border-[#FFD700]/15 flex justify-between items-center hover:bg-white/[0.03] transition-colors -mx-1 px-1 rounded"
+                title="Эти ремонты уже готовы — деньги попадут в выручку после нажатия «Выдан»"
+              >
+                <span className="font-roboto text-amber-300/60 text-[9px] inline-flex items-center gap-1">
+                  <Icon name="Hourglass" size={9} />
+                  Готовы к выдаче ({analytics.ready}) — поступит после выдачи
+                </span>
+                <span className="font-roboto text-amber-300/85 text-[10px] font-bold tabular-nums">
+                  {analytics.ready_potential_revenue ? `+ ${money(analytics.ready_potential_revenue)}` : "— ₽"}
+                </span>
+              </button>
             )}
             </div>
           </div>

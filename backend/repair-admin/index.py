@@ -551,24 +551,27 @@ def handler(event: dict, context) -> dict:
                     )
                 """
 
-            # Основная аналитика. Прибыль/выручка считаются для статусов 'ready','done','warranty':
-            # это значит, что после нажатия «Готов» прибыль уже видна — даже до фактической выдачи.
+            # Основная аналитика.
+            # Прибыль/выручка/закупка/мастер-инкам считаются ТОЛЬКО для статусов 'done' и 'warranty'.
+            # 'ready' (готов к выдаче) — НЕ учитывается в прибыли, только в счётчике "готов".
+            # Это значит: пока заявка не выдана клиенту, она не попадает в статистику дохода.
             cur.execute(f"""
                 SELECT
-                    COUNT(*) FILTER (WHERE status IN ('done','warranty','ready')) as done,
+                    COUNT(*) FILTER (WHERE status IN ('done','warranty')) as done,
                     COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled,
                     COUNT(*) FILTER (WHERE status = 'ready') as ready,
                     COUNT(*) FILTER (WHERE status = 'in_progress') as in_progress,
                     COUNT(*) FILTER (WHERE status = 'waiting_parts') as waiting_parts,
                     COUNT(*) FILTER (WHERE status IN ('new','accepted','pending_approval')) as new_count,
-                    COALESCE(SUM(repair_amount) FILTER (WHERE status IN ('done','warranty','ready')), 0) as revenue,
-                    COALESCE(SUM(purchase_amount) FILTER (WHERE status IN ('done','warranty','ready')), 0) as costs,
-                    COALESCE(SUM(master_income) FILTER (WHERE status IN ('done','warranty','ready')), 0) as master_total,
+                    COALESCE(SUM(repair_amount) FILTER (WHERE status IN ('done','warranty')), 0) as revenue,
+                    COALESCE(SUM(purchase_amount) FILTER (WHERE status IN ('done','warranty')), 0) as costs,
+                    COALESCE(SUM(master_income) FILTER (WHERE status IN ('done','warranty')), 0) as master_total,
                     COUNT(*) as total,
                     COUNT(*) FILTER (WHERE status = 'pending_approval') as pending_approval,
-                    COUNT(*) FILTER (WHERE is_paid = true AND status IN ('done','warranty','ready')) as paid_count,
+                    COUNT(*) FILTER (WHERE is_paid = true AND status IN ('done','warranty')) as paid_count,
                     COALESCE(AVG(EXTRACT(EPOCH FROM (status_updated_at - created_at)) / 3600.0)
-                             FILTER (WHERE status IN ('done','warranty','ready') AND status_updated_at IS NOT NULL), 0) as avg_repair_hours
+                             FILTER (WHERE status IN ('done','warranty') AND status_updated_at IS NOT NULL), 0) as avg_repair_hours,
+                    COALESCE(SUM(repair_amount) FILTER (WHERE status = 'ready'), 0) as ready_potential_revenue
                 FROM {SCHEMA}.repair_orders
                 WHERE {period_where}
             """)
@@ -582,6 +585,7 @@ def handler(event: dict, context) -> dict:
             pending_approval = int(row[10]) if row[10] else 0
             paid_count = int(row[11]) if row[11] else 0
             avg_repair_hours = float(row[12]) if row[12] else 0.0
+            ready_potential_revenue = int(row[13]) if row[13] else 0
             profit = revenue - costs
             avg_check = round(revenue / done_count) if done_count else 0
             # Конверсия: выданы / (всего за период минус отменённые)
@@ -589,7 +593,7 @@ def handler(event: dict, context) -> dict:
             relevant = total - cancelled_count
             conversion = round((done_count / relevant) * 100) if relevant > 0 else 0
 
-            # Динамика по дням — группируем по МСК-дню выдачи
+            # Динамика по дням — группируем по МСК-дню выдачи (только реально выданные)
             cur.execute(f"""
                 SELECT
                     DATE(COALESCE(status_updated_at, created_at) + INTERVAL '3 hours') as day,
@@ -597,7 +601,7 @@ def handler(event: dict, context) -> dict:
                     COALESCE(SUM(repair_amount), 0) as revenue,
                     COALESCE(SUM(purchase_amount), 0) as costs
                 FROM {SCHEMA}.repair_orders
-                WHERE status IN ('done','warranty','ready')
+                WHERE status IN ('done','warranty')
                   AND {period_where}
                 GROUP BY day
                 ORDER BY day ASC
@@ -630,6 +634,8 @@ def handler(event: dict, context) -> dict:
                     'avg_repair_hours': round(avg_repair_hours, 1),
                     'conversion': conversion,
                     'paid_count': paid_count,
+                    # Потенциальная выручка с уже готовых, но НЕ выданных заявок (для подсказки в UI)
+                    'ready_potential_revenue': ready_potential_revenue,
                     'daily': daily,
                 }, ensure_ascii=False)
             }
@@ -638,17 +644,18 @@ def handler(event: dict, context) -> dict:
         # Рабочий день определяется как: DATE(время_МСК - 7 часов)
         # Т.е. 00:43 МСК 23 апр → 23:43 МСК 22 апр → рабочий день 22 апр
         if action == 'daily_stats':
+            # Прибыль/выручка считаются ТОЛЬКО для статусов 'done' и 'warranty' (выданные клиенту).
             cur.execute(f"""
                 SELECT
                     DATE((COALESCE(status_updated_at, created_at) + INTERVAL '3 hours') - INTERVAL '7 hours') as work_day,
                     COUNT(*) as total,
-                    COUNT(*) FILTER (WHERE status IN ('done','warranty','ready')) as done,
+                    COUNT(*) FILTER (WHERE status IN ('done','warranty')) as done,
                     COUNT(*) FILTER (WHERE status = 'cancelled') as cancelled,
-                    COALESCE(SUM(repair_amount) FILTER (WHERE status IN ('done','warranty','ready')), 0) as revenue,
-                    COALESCE(SUM(purchase_amount) FILTER (WHERE status IN ('done','warranty','ready')), 0) as costs,
-                    COALESCE(SUM(master_income) FILTER (WHERE status IN ('done','warranty','ready')), 0) as master_income
+                    COALESCE(SUM(repair_amount) FILTER (WHERE status IN ('done','warranty')), 0) as revenue,
+                    COALESCE(SUM(purchase_amount) FILTER (WHERE status IN ('done','warranty')), 0) as costs,
+                    COALESCE(SUM(master_income) FILTER (WHERE status IN ('done','warranty')), 0) as master_income
                 FROM {SCHEMA}.repair_orders
-                WHERE status IN ('done','warranty','ready')
+                WHERE status IN ('done','warranty')
                   AND COALESCE(status_updated_at, created_at) >= NOW() - INTERVAL '31 days'
                 GROUP BY work_day
                 ORDER BY work_day DESC

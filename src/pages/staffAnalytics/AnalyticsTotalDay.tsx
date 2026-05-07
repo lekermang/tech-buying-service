@@ -1,6 +1,8 @@
+import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import { type Analytics } from "../staff.types";
 import { type GoldAnalytics } from "../gold/types";
+import AnalyticsBreakdownModal, { type BreakdownContent } from "./AnalyticsBreakdownModal";
 
 type RepairAnalytics = {
   total: number; done: number; revenue: number; costs: number;
@@ -49,47 +51,159 @@ export default function AnalyticsTotalDay({
     period === "yesterday" ? "вчера" :
     period === "week" ? "за 7 дней" : "за 30 дней";
 
+  // Модалка детализации (за что эта сумма)
+  const [breakdown, setBreakdown] = useState<BreakdownContent | null>(null);
+
+  // Сборка детализации для каждого направления
+  const showRepairBreakdown = () => setBreakdown({
+    title: "🔧 Ремонт — детализация",
+    emoji: "🔧",
+    total: repairPart,
+    totalLabel: "чистая прибыль (выручка − закупка − мастер)",
+    accentColor: "emerald",
+    periodLabel,
+    rows: [
+      { icon: "TrendingUp", label: "Выручка с выданных ремонтов", value: repairRevenue, color: "text-[#FFD700]", hint: `${repairData?.done ?? 0} выдано клиенту` },
+      { icon: "ShoppingBag", label: "Закупка запчастей", value: -repairCosts, color: "text-orange-400", hint: "потрачено на запчасти" },
+      ...(masterIncome > 0
+        ? [{ icon: "Award", label: "Доход мастера (50% от прибыли)", value: -masterIncome, color: "text-blue-400" } as const]
+        : []),
+      { icon: "Equal", label: "Чистая прибыль владельца", value: repairPart, color: repairPart >= 0 ? "text-emerald-300" : "text-red-300", divider: true },
+    ],
+  });
+
+  const showGoldBreakdown = () => setBreakdown({
+    title: "🥇 Золото — детализация",
+    emoji: "🥇",
+    total: goldPart,
+    totalLabel: `прогноз прибыли по цене ${goldForecastPriceNum.toLocaleString("ru-RU")} ₽/г`,
+    accentColor: "gold",
+    periodLabel,
+    rows: [
+      { icon: "Scale", label: "Принято золота 585 пробы", value: goldData?.period_weight585 ? `${goldData.period_weight585.toFixed(2)} г` : "—", color: "text-white/85", hint: `${goldData?.period_buy_count ?? 0} скупок за период` },
+      { icon: "ArrowDownCircle", label: "Закупка (потрачено)", value: -(goldData?.period_buy_sum ?? 0), color: "text-orange-400" },
+      { icon: "TrendingUp", label: `Прогноз продажи (по ${goldForecastPriceNum.toLocaleString("ru-RU")} ₽/г)`, value: goldData?.period_weight585 ? Math.round(goldData.period_weight585 * goldForecastPriceNum) : 0, color: "text-[#FFD700]" },
+      { icon: "Equal", label: "Прогнозная прибыль", value: goldPart, color: goldPart >= 0 ? "text-emerald-300" : "text-red-300", divider: true },
+      ...(goldData && goldData.total_weight > 0
+        ? [{ icon: "Package", label: "Уже продано (фактически)", value: goldProfit, color: "text-emerald-300/80", hint: `вес: ${goldData.total_weight.toFixed(2)} г, выручка: ${goldRevenue.toLocaleString("ru-RU")} ₽` } as const]
+        : []),
+    ],
+  });
+
+  const showSlBreakdown = () => setBreakdown({
+    title: "📦 Б/У техника — детализация",
+    emoji: "📦",
+    total: slPart,
+    totalLabel: "прибыль кассы за период",
+    accentColor: "purple",
+    periodLabel,
+    rows: [
+      { icon: "TrendingUp", label: "Продажи (выручка)", value: slSalesTotal || slRevenue, color: "text-[#FFD700]", hint: `${slSalesCount} продаж` },
+      { icon: "ShoppingBag", label: "Скупка / выкуп", value: -(slBuyoutTotal || slExpense), color: "text-orange-400", hint: `${slBuyoutCount} скупок` },
+      { icon: "Equal", label: "Прибыль", value: slPart, color: slPart >= 0 ? "text-emerald-300" : "text-red-300", divider: true },
+    ],
+  });
+
+  const showTotalBreakdown = () => setBreakdown({
+    title: "💎 Итого прибыль",
+    emoji: "💎",
+    total: totalDay,
+    totalLabel: "сумма по всем направлениям",
+    accentColor: totalDay >= 0 ? "emerald" : "red",
+    periodLabel,
+    rows: [
+      { icon: "Wrench", label: "🔧 Ремонт", value: repairPart, color: repairPart >= 0 ? "text-emerald-300" : "text-red-300", hint: "чистая прибыль с выданных" },
+      { icon: "Coins", label: "🥇 Золото (прогноз)", value: goldPart, color: goldPart >= 0 ? "text-emerald-300" : "text-red-300", hint: `по ${goldForecastPriceNum.toLocaleString("ru-RU")} ₽/г` },
+      { icon: "Package", label: "📦 Б/У техника", value: slPart, color: slPart >= 0 ? "text-emerald-300" : "text-red-300", hint: `${slSalesCount} продаж · ${slBuyoutCount} скупок` },
+      { icon: "Equal", label: "Итого", value: totalDay, color: totalDay >= 0 ? "text-emerald-300" : "text-red-300", divider: true },
+    ],
+  });
+
   return (
     <>
       {/* ИТОГО ЗА ДЕНЬ — ремонт + золото (прогноз) + б/у техника */}
       <div className="relative bg-gradient-to-br from-emerald-500/15 via-[#FFD700]/8 to-purple-500/10 border border-emerald-400/30 rounded-xl p-4 mb-3 overflow-hidden">
         <div className="absolute -top-8 -right-8 text-[120px] opacity-[0.05] select-none">💎</div>
         <div className="relative">
-          <div className="font-roboto text-emerald-300/80 text-[10px] uppercase tracking-wider mb-2 flex items-center gap-1.5">
-            <Icon name="Sparkles" size={12} />
-            Итого прибыль · {periodLabel}
-          </div>
-          <div className={`font-oswald font-bold text-5xl tabular-nums mb-3 ${totalDay >= 0 ? "text-emerald-300" : "text-red-300"}`}>
-            {totalDay >= 0 ? "+" : ""}{totalDay.toLocaleString("ru-RU")} ₽
-          </div>
+          <button
+            onClick={showTotalBreakdown}
+            className="w-full text-left group"
+            title="Нажми, чтобы увидеть разбивку по направлениям"
+          >
+            <div className="font-roboto text-emerald-300/80 text-[10px] uppercase tracking-wider mb-2 flex items-center gap-1.5 group-hover:text-emerald-300">
+              <Icon name="Sparkles" size={12} />
+              Итого прибыль · {periodLabel}
+              <Icon name="ChevronRight" size={11} className="ml-auto text-white/30 group-hover:text-white/70 transition-transform group-hover:translate-x-0.5" />
+            </div>
+            <div className={`font-oswald font-bold text-5xl tabular-nums mb-3 ${totalDay >= 0 ? "text-emerald-300" : "text-red-300"} group-hover:drop-shadow-[0_0_12px_currentColor] transition-all`}>
+              {totalDay >= 0 ? "+" : ""}{totalDay.toLocaleString("ru-RU")} ₽
+            </div>
+          </button>
           <div className="grid grid-cols-3 gap-2">
-            <div className="bg-black/40 border border-[#1F1F1F] rounded-lg p-2.5">
-              <div className="font-roboto text-white/40 text-[9px] uppercase tracking-wide mb-0.5 flex items-center gap-1">🔧 Ремонт</div>
+            <button
+              onClick={showRepairBreakdown}
+              className="bg-black/40 border border-[#1F1F1F] hover:border-emerald-400/50 hover:bg-emerald-500/[0.05] rounded-lg p-2.5 text-left transition-all active:scale-[0.97] relative group"
+              title="🔧 Ремонт — за что эта сумма?"
+            >
+              <div className="font-roboto text-white/40 text-[9px] uppercase tracking-wide mb-0.5 flex items-center gap-1">
+                🔧 Ремонт
+                <Icon name="Info" size={9} className="ml-auto text-white/25 group-hover:text-emerald-300/80" />
+              </div>
               <div className={`font-oswald font-bold text-base tabular-nums ${repairPart >= 0 ? "text-green-400" : "text-red-400"}`}>
                 {repairPart >= 0 ? "+" : ""}{repairPart.toLocaleString("ru-RU")}
               </div>
-            </div>
-            <div className="bg-black/40 border border-[#1F1F1F] rounded-lg p-2.5">
-              <div className="font-roboto text-white/40 text-[9px] uppercase tracking-wide mb-0.5 flex items-center gap-1">🥇 Золото</div>
+              <div className="font-roboto text-white/30 text-[9px] mt-0.5 group-hover:text-emerald-300/70 transition-colors">
+                {repairData?.done ? `${repairData.done} выдано` : "нажми для деталей"}
+              </div>
+            </button>
+            <button
+              onClick={showGoldBreakdown}
+              className="bg-black/40 border border-[#1F1F1F] hover:border-[#FFD700]/50 hover:bg-[#FFD700]/[0.05] rounded-lg p-2.5 text-left transition-all active:scale-[0.97] relative group"
+              title="🥇 Золото — за что эта сумма?"
+            >
+              <div className="font-roboto text-white/40 text-[9px] uppercase tracking-wide mb-0.5 flex items-center gap-1">
+                🥇 Золото
+                <Icon name="Info" size={9} className="ml-auto text-white/25 group-hover:text-[#FFD700]/80" />
+              </div>
               <div className={`font-oswald font-bold text-base tabular-nums ${goldPart >= 0 ? "text-green-400" : "text-red-400"}`}>
                 {goldPart >= 0 ? "+" : ""}{goldPart.toLocaleString("ru-RU")}
               </div>
-              <div className="font-roboto text-white/30 text-[9px] tabular-nums mt-0.5">по {goldForecastPriceNum.toLocaleString("ru-RU")} ₽/г</div>
-            </div>
-            <div className="bg-black/40 border border-[#1F1F1F] rounded-lg p-2.5">
-              <div className="font-roboto text-white/40 text-[9px] uppercase tracking-wide mb-0.5 flex items-center gap-1">📦 Б/У</div>
+              <div className="font-roboto text-white/30 text-[9px] tabular-nums mt-0.5 group-hover:text-[#FFD700]/70 transition-colors">
+                по {goldForecastPriceNum.toLocaleString("ru-RU")} ₽/г
+              </div>
+            </button>
+            <button
+              onClick={showSlBreakdown}
+              className="bg-black/40 border border-[#1F1F1F] hover:border-purple-400/50 hover:bg-purple-500/[0.05] rounded-lg p-2.5 text-left transition-all active:scale-[0.97] relative group"
+              title="📦 Б/У техника — за что эта сумма?"
+            >
+              <div className="font-roboto text-white/40 text-[9px] uppercase tracking-wide mb-0.5 flex items-center gap-1">
+                📦 Б/У
+                <Icon name="Info" size={9} className="ml-auto text-white/25 group-hover:text-purple-300/80" />
+              </div>
               <div className={`font-oswald font-bold text-base tabular-nums ${slPart >= 0 ? "text-green-400" : "text-red-400"}`}>
                 {slPart >= 0 ? "+" : ""}{slPart.toLocaleString("ru-RU")}
               </div>
-              {(slSalesCount > 0 || slBuyoutCount > 0) && (
-                <div className="font-roboto text-white/30 text-[9px] tabular-nums mt-0.5">
+              {(slSalesCount > 0 || slBuyoutCount > 0) ? (
+                <div className="font-roboto text-white/30 text-[9px] tabular-nums mt-0.5 group-hover:text-purple-300/70 transition-colors">
                   {slSalesCount} продаж · {slBuyoutCount} скупок
                 </div>
+              ) : (
+                <div className="font-roboto text-white/30 text-[9px] mt-0.5 group-hover:text-purple-300/70 transition-colors">
+                  нажми для деталей
+                </div>
               )}
-            </div>
+            </button>
           </div>
         </div>
       </div>
+
+      {breakdown && (
+        <AnalyticsBreakdownModal
+          content={breakdown}
+          onClose={() => setBreakdown(null)}
+        />
+      )}
 
       {/* Premium ОБЩИЙ ДОХОД */}
       <div className="relative bg-gradient-to-br from-[#FFD700]/15 via-green-500/8 to-transparent border border-[#FFD700]/30 rounded-xl p-4 mb-3 overflow-hidden">

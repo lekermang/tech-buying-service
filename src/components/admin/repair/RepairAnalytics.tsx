@@ -13,7 +13,9 @@ type Props = {
 };
 
 export default function RepairAnalytics({ analytics, analyticsLoading, period, onPeriodChange, onRefresh, onShowOrders }: Props) {
-  const DONE_STATUSES = ["done", "warranty", "ready"];
+  // В прибыль попадают ТОЛЬКО выданные клиенту заявки (done + warranty).
+  // Готовые («ready»), но ещё не выданные — НЕ учитываются.
+  const DONE_STATUSES = ["done", "warranty"];
   const openFinance = (accent: "revenue" | "costs" | "master" | "profit", title: string) =>
     onShowOrders?.({ statuses: DONE_STATUSES, title, accent });
   const openStatus = (key: string, label: string) =>
