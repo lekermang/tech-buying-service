@@ -10,6 +10,7 @@ import CookieBanner from "@/components/skupka/CookieBanner";
 import JobsSection from "@/components/skupka/JobsSection";
 import HolidayBanner from "@/components/holidays/HolidayBanner";
 import HolidayCornerDecor from "@/components/holidays/HolidayCornerDecor";
+import PremiumServicesGrid from "@/components/skupka/PremiumServicesGrid";
 
 const scrollTo = (href: string) => {
   const el = document.querySelector(href);
@@ -259,9 +260,9 @@ const SplashScreen = ({ onDone }: { onDone: () => void }) => {
         </div>
 
         {/* Главный слоган с золотым градиентом */}
-        <h2 className="font-oswald text-4xl sm:text-5xl md:text-6xl font-bold uppercase text-center leading-[0.95] animate-[slideDown_0.5s_ease_0.2s_both]">
-          <span className="block text-white drop-shadow-[0_0_18px_rgba(255,255,255,0.15)]">Купим дорого</span>
-          <span className="block bg-gradient-to-r from-[#FFD700] via-[#fff3a0] to-[#FFD700] bg-clip-text text-transparent animate-shimmer">всё!</span>
+        <h2 className="font-oswald text-3xl sm:text-4xl md:text-5xl font-bold uppercase text-center leading-[1.1] tracking-tight animate-[fadeIn_0.5s_ease_0.2s_both] flex flex-col items-center gap-1">
+          <span className="block text-white drop-shadow-[0_0_18px_rgba(255,255,255,0.15)] py-1">Купим дорого</span>
+          <span className="block bg-gradient-to-r from-[#FFD700] via-[#fff3a0] to-[#FFD700] bg-clip-text text-transparent animate-shimmer py-1">всё!</span>
         </h2>
 
         {/* Праздничное приветствие на сплеше (если активен праздник) */}
@@ -379,6 +380,7 @@ const Index = ({ goldOpen = false }: { goldOpen?: boolean }) => {
       <HolidayCornerDecor />
       <Header scrollTo={scrollTo} goldOpen={goldOpen} />
       <HeroSection scrollTo={scrollTo} externalModalOpen={evalOpen} onExternalModalClose={() => setEvalOpen(false)} />
+      <PremiumServicesGrid />
       <InfoSections />
       <JobsSection />
       <ContactsFooter scrollTo={scrollTo} />
