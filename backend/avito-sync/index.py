@@ -399,6 +399,38 @@ def refresh_missing_photos(limit: int = 30) -> dict:
         conn.close()
 
 
+def auto_sync_if_stale(min_age_minutes: int = 30) -> dict:
+    """Запускает синхронизацию только если последняя успешная была давно. Безопасно для частых вызовов."""
+    dsn = os.environ['DATABASE_URL']
+    conn = psycopg2.connect(dsn)
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute(
+            f"""SELECT MAX(finished_at) AS last
+                FROM {SCHEMA}.avito_sync_log
+                WHERE status='success'"""
+        )
+        row = cur.fetchone()
+        last = row['last'] if row else None
+        if last:
+            from datetime import datetime, timezone, timedelta
+            now = datetime.now(timezone.utc).replace(tzinfo=None)
+            age = (now - last).total_seconds() / 60.0
+            if age < min_age_minutes:
+                return {'ok': True, 'skipped': True, 'reason': 'fresh', 'age_minutes': round(age, 1)}
+        cur.execute(
+            f"""SELECT 1 FROM {SCHEMA}.avito_sync_log
+                WHERE status='running' AND started_at > NOW() - INTERVAL '5 minutes'
+                LIMIT 1"""
+        )
+        if cur.fetchone():
+            return {'ok': True, 'skipped': True, 'reason': 'already_running'}
+    finally:
+        cur.close()
+        conn.close()
+    return sync_all(reupload_photos=False)
+
+
 def get_status() -> dict:
     dsn = os.environ['DATABASE_URL']
     conn = psycopg2.connect(dsn)
@@ -468,6 +500,16 @@ def handler(event: dict, context: Any) -> dict:
         try:
             result = refresh_missing_photos(limit_n)
             return _resp(200, result)
+        except Exception as e:
+            return _resp(500, {'ok': False, 'error': str(e)})
+
+    if action == 'auto':
+        try:
+            mins = int(qs.get('min') or 30)
+        except Exception:
+            mins = 30
+        try:
+            return _resp(200, auto_sync_if_stale(mins))
         except Exception as e:
             return _resp(500, {'ok': False, 'error': str(e)})
 

@@ -324,6 +324,29 @@ def handler(event: dict, context: Any) -> dict:
                 return _resp(400, {'ok': False, 'error': 'product_id и image_base64 обязательны'})
             return _resp(200, {'ok': True, **upload_photo(pid, img)})
 
+        if method == 'POST' and action == 'bulk_upload':
+            pid = int(body.get('product_id') or 0)
+            images = body.get('images') or []
+            if not pid or not isinstance(images, list) or not images:
+                return _resp(400, {'ok': False, 'error': 'product_id и images[] обязательны'})
+            ok_count = 0
+            errors: list = []
+            last_state = None
+            for img in images[:5]:
+                try:
+                    res = upload_photo(pid, img)
+                    last_state = res
+                    ok_count += 1
+                except Exception as e:
+                    errors.append(str(e))
+            return _resp(200, {
+                'ok': True,
+                'uploaded': ok_count,
+                'errors': errors,
+                'photos': last_state['photos'] if last_state else [],
+                'main_photo': last_state['main_photo'] if last_state else None,
+            })
+
         if method == 'POST' and action == 'delete_photo':
             pid = int(body.get('product_id') or 0)
             url = body.get('photo_url') or ''

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Icon from "@/components/ui/icon";
 
 const PHOTOS_URL = "https://functions.poehali.dev/4e286b87-fc23-49ef-9b77-22611bb6e1f9";
@@ -19,6 +19,7 @@ type AvitoProduct = {
 };
 
 type Stats = { with_photos: number; no_photos: number; total_active: number };
+type FilterMode = "no" | "yes" | "all";
 
 const formatPrice = (p: number | null) => (p ? p.toLocaleString("ru-RU") + " ₽" : "—");
 
@@ -58,17 +59,17 @@ export default function SLAvitoShowcase({ token }: { token: string }) {
   const [items, setItems] = useState<AvitoProduct[]>([]);
   const [stats, setStats] = useState<Stats>({ with_photos: 0, no_photos: 0, total_active: 0 });
   const [loading, setLoading] = useState(false);
-  const [filter, setFilter] = useState<"no" | "yes" | "all">("no");
+  const [filter, setFilter] = useState<FilterMode>("no");
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<AvitoProduct | null>(null);
   const [syncing, setSyncing] = useState(false);
-  const [msg, setMsg] = useState<string>("");
+  const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const debRef = useRef<ReturnType<typeof setTimeout>>();
 
   const load = useCallback(
-    (q: string, f: "no" | "yes" | "all") => {
+    (q: string, f: FilterMode) => {
       setLoading(true);
-      const params = new URLSearchParams({ action: "list", limit: "60", has_photo: f });
+      const params = new URLSearchParams({ action: "list", limit: "120", has_photo: f });
       if (q) params.set("q", q);
       fetch(`${PHOTOS_URL}?${params.toString()}`, {
         headers: { "X-Employee-Token": token, "X-Auth-Token": token },
@@ -96,134 +97,233 @@ export default function SLAvitoShowcase({ token }: { token: string }) {
     debRef.current = setTimeout(() => load(val, filter), 350);
   };
 
+  const flash = (type: "ok" | "err", text: string) => {
+    setMsg({ type, text });
+    setTimeout(() => setMsg(null), 4500);
+  };
+
   const runSync = async () => {
     setSyncing(true);
-    setMsg("");
     try {
       const r = await fetch(`${SYNC_URL}?action=firstrun`);
       const d = await r.json();
       if (d.ok) {
-        setMsg(
+        flash(
+          "ok",
           d.skipped
             ? `Уже синхронизировано: ${d.count} товаров`
-            : `Готово: добавлено ${d.added}, обновлено ${d.updated}, архивировано ${d.archived ?? 0}`,
+            : `Готово: добавлено ${d.added}, обновлено ${d.updated}`,
         );
         load(query, filter);
       } else {
-        setMsg(`Ошибка: ${d.error || "не удалось"}`);
+        flash("err", `Ошибка: ${d.error || "не удалось"}`);
       }
     } catch {
-      setMsg("Ошибка соединения");
+      flash("err", "Ошибка соединения");
     } finally {
       setSyncing(false);
-      setTimeout(() => setMsg(""), 5000);
     }
   };
 
+  const progress = useMemo(() => {
+    if (!stats.total_active) return 0;
+    return Math.round((stats.with_photos / stats.total_active) * 100);
+  }, [stats]);
+
   return (
     <div className="space-y-3">
-      <div className="rounded-lg bg-gradient-to-br from-[#FFD700]/10 to-transparent border border-[#FFD700]/30 p-3 flex flex-col sm:flex-row gap-2 items-start sm:items-center">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <div className="w-9 h-9 rounded-lg bg-[#FFD700]/20 flex items-center justify-center shrink-0">
-            <Icon name="Sparkles" size={18} className="text-[#FFD700]" />
+      {/* Шапка с прогрессом */}
+      <div className="relative rounded-xl bg-gradient-to-br from-[#FFD700]/12 via-[#FFD700]/4 to-transparent border border-[#FFD700]/30 p-3 overflow-hidden">
+        <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-[#FFD700]/8 blur-3xl pointer-events-none" />
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#FFD700]/40 to-transparent" />
+
+        <div className="relative flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+          <div className="flex items-center gap-2.5 flex-1 min-w-0">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#FFE34D] via-[#FFD700] to-[#b8860b] flex items-center justify-center shrink-0 shadow-[0_4px_12px_rgba(255,215,0,0.4)]">
+              <Icon name="Sparkles" size={18} className="text-black drop-shadow" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="font-oswald font-bold uppercase text-[14px] tracking-[0.04em] leading-tight bg-gradient-to-r from-[#FFD700] via-[#FFE34D] to-[#FFD700] bg-clip-text text-transparent">
+                Витрина Авито
+              </div>
+              <div className="text-[11px] text-white/60 mt-0.5">
+                Загрузи фото с телефона — товары появятся в премиум-карточках на сайте
+              </div>
+            </div>
           </div>
-          <div className="min-w-0">
-            <div className="font-oswald font-bold text-white text-sm uppercase tracking-wide">
-              Витрина Авито
-            </div>
-            <div className="text-[11px] text-white/60">
-              {stats.total_active} товаров · с фото: <b className="text-emerald-400">{stats.with_photos}</b> · без фото:{" "}
-              <b className="text-orange-400">{stats.no_photos}</b>
-            </div>
+          <button
+            onClick={runSync}
+            disabled={syncing}
+            className="w-full sm:w-auto flex items-center justify-center gap-1.5 bg-gradient-to-r from-[#FFD700] to-[#FFE55C] hover:shadow-[0_0_16px_rgba(255,215,0,0.5)] text-black font-oswald font-bold text-xs px-3 py-2 rounded uppercase tracking-wide disabled:opacity-50 transition-all"
+          >
+            <Icon name={syncing ? "Loader2" : "RefreshCw"} size={14} className={syncing ? "animate-spin" : ""} />
+            {syncing ? "Синхронизирую..." : "Обновить с Авито"}
+          </button>
+        </div>
+
+        {/* Прогресс-бар */}
+        <div className="relative mt-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] text-white/50 font-roboto uppercase tracking-wide">
+              Готовность витрины
+            </span>
+            <span className="font-oswald font-bold text-[11px] text-[#FFD700]">{progress}%</span>
+          </div>
+          <div className="relative h-2 bg-white/5 rounded-full overflow-hidden border border-white/10">
+            <div
+              className="absolute inset-y-0 left-0 bg-gradient-to-r from-[#b8860b] via-[#FFD700] to-[#FFE34D] rounded-full transition-all duration-700 shadow-[0_0_10px_rgba(255,215,0,0.5)]"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <div className="flex items-center justify-between mt-1.5 text-[10px] text-white/55 font-roboto">
+            <span className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              <b className="text-emerald-400">{stats.with_photos}</b> готовы
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-orange-400" />
+              <b className="text-orange-400">{stats.no_photos}</b> ждут фото
+            </span>
+            <span>всего {stats.total_active}</span>
           </div>
         </div>
-        <button
-          onClick={runSync}
-          disabled={syncing}
-          className="w-full sm:w-auto flex items-center justify-center gap-1.5 bg-[#FFD700] hover:bg-[#FFE55C] text-black font-oswald font-bold text-xs px-3 py-2 rounded uppercase tracking-wide disabled:opacity-50"
-        >
-          <Icon name={syncing ? "Loader2" : "RefreshCw"} size={14} className={syncing ? "animate-spin" : ""} />
-          {syncing ? "Синхронизирую..." : "Обновить с Авито"}
-        </button>
       </div>
 
       {msg && (
-        <div className="text-[11px] text-white/80 bg-white/5 border border-white/10 rounded px-3 py-2">{msg}</div>
+        <div
+          className={`text-[11px] rounded px-3 py-2 flex items-center gap-2 ${
+            msg.type === "ok"
+              ? "bg-emerald-500/10 border border-emerald-500/30 text-emerald-300"
+              : "bg-red-500/10 border border-red-500/30 text-red-300"
+          }`}
+        >
+          <Icon name={msg.type === "ok" ? "CheckCircle2" : "AlertCircle"} size={13} />
+          {msg.text}
+        </div>
       )}
 
-      <div className="flex flex-col sm:flex-row gap-2">
-        <div className="relative flex-1">
-          <Icon name="Search" size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/40" />
-          <input
-            value={query}
-            onChange={e => onSearch(e.target.value)}
-            placeholder="Поиск по названию или ID..."
-            className="w-full bg-[#0D0D0D] border border-white/15 text-white pl-8 pr-3 py-2 font-roboto text-sm rounded focus:outline-none focus:border-[#FFD700]"
-          />
-        </div>
-        <div className="flex gap-1">
-          {([
-            { k: "no", l: "Без фото", n: stats.no_photos, color: "orange" },
-            { k: "yes", l: "С фото", n: stats.with_photos, color: "emerald" },
-            { k: "all", l: "Все", n: stats.total_active, color: "white" },
-          ] as const).map(b => (
-            <button
-              key={b.k}
-              onClick={() => setFilter(b.k)}
-              className={`flex-1 sm:flex-none text-xs font-roboto px-3 py-2 rounded transition-all ${
-                filter === b.k
-                  ? "bg-[#FFD700] text-black font-semibold"
-                  : "bg-white/5 text-white/70 hover:bg-white/10 border border-white/10"
-              }`}
-            >
-              {b.l} <span className="opacity-70 text-[10px]">·{b.n}</span>
-            </button>
-          ))}
+      {/* Sticky фильтры */}
+      <div className="sticky top-0 z-10 bg-[#0D0D0D]/95 backdrop-blur-md py-2 -mx-1 px-1 border-b border-white/5">
+        <div className="flex flex-col sm:flex-row gap-2">
+          <div className="relative flex-1">
+            <Icon name="Search" size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/40" />
+            <input
+              value={query}
+              onChange={e => onSearch(e.target.value)}
+              placeholder="Поиск по названию или ID..."
+              className="w-full bg-[#0D0D0D] border border-white/15 text-white pl-8 pr-8 py-2 font-roboto text-sm rounded-lg focus:outline-none focus:border-[#FFD700] focus:shadow-[0_0_12px_rgba(255,215,0,0.15)] transition-all"
+            />
+            {query && (
+              <button
+                onClick={() => onSearch("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/70"
+              >
+                <Icon name="X" size={11} />
+              </button>
+            )}
+          </div>
+          <div className="flex gap-1">
+            {([
+              { k: "no", l: "Без фото", n: stats.no_photos, icon: "ImagePlus" },
+              { k: "yes", l: "С фото", n: stats.with_photos, icon: "ImageCheck" },
+              { k: "all", l: "Все", n: stats.total_active, icon: "Layers" },
+            ] as const).map(b => (
+              <button
+                key={b.k}
+                onClick={() => setFilter(b.k)}
+                className={`flex-1 sm:flex-none flex items-center justify-center gap-1 text-xs font-roboto px-3 py-2 rounded-lg transition-all ${
+                  filter === b.k
+                    ? "bg-[#FFD700] text-black font-semibold shadow-[0_0_10px_rgba(255,215,0,0.35)]"
+                    : "bg-white/5 text-white/70 hover:bg-white/10 border border-white/10"
+                }`}
+              >
+                <Icon name={b.icon} size={12} />
+                <span className="hidden sm:inline">{b.l}</span>
+                <span className="opacity-70 text-[10px]">·{b.n}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       {loading && items.length === 0 && (
-        <div className="text-center py-8 text-white/40 font-roboto text-sm">Загружаю...</div>
-      )}
-
-      {!loading && items.length === 0 && (
-        <div className="text-center py-8 text-white/40 font-roboto text-sm">
-          {filter === "no" ? "Нет товаров без фото" : "Ничего не найдено"}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="aspect-square bg-white/5 rounded-lg animate-pulse" />
+          ))}
         </div>
       )}
 
+      {!loading && items.length === 0 && (
+        <div className="text-center py-12 border border-dashed border-white/10 rounded-xl">
+          <Icon
+            name={filter === "no" ? "PartyPopper" : "PackageOpen"}
+            size={32}
+            className="text-[#FFD700]/50 mx-auto mb-2"
+          />
+          <div className="text-white/70 font-oswald font-bold text-sm uppercase tracking-wide">
+            {filter === "no" ? "Все товары с фото" : "Ничего не найдено"}
+          </div>
+          <div className="text-white/40 font-roboto text-[11px] mt-1">
+            {filter === "no"
+              ? "Витрина полностью оформлена — отличная работа!"
+              : "Попробуйте изменить фильтр или запрос"}
+          </div>
+        </div>
+      )}
+
+      {/* Сетка товаров */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-        {items.map(it => (
+        {items.map((it, idx) => (
           <button
             key={it.id}
             onClick={() => setEditing(it)}
-            className="group relative bg-white/[0.03] hover:bg-white/[0.06] border border-white/10 hover:border-[#FFD700]/50 rounded-lg overflow-hidden text-left transition-all"
+            style={{ animationDelay: `${Math.min(idx * 25, 300)}ms` }}
+            className="group relative bg-white/[0.03] hover:bg-white/[0.06] border border-white/10 hover:border-[#FFD700]/60 rounded-lg overflow-hidden text-left transition-all hover:shadow-[0_4px_20px_rgba(255,215,0,0.15)] hover:-translate-y-0.5 animate-in fade-in slide-in-from-bottom-2 fill-mode-both"
           >
             <div className="relative aspect-square bg-[#0D0D0D]">
               {it.main_photo ? (
-                <img src={it.main_photo} alt="" className="w-full h-full object-cover" loading="lazy" />
+                <>
+                  <img src={it.main_photo} alt="" className="w-full h-full object-cover" loading="lazy" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                </>
               ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center gap-1 bg-gradient-to-br from-orange-500/10 to-transparent border border-dashed border-orange-400/30">
-                  <Icon name="ImagePlus" size={28} className="text-orange-400/70" />
-                  <span className="text-[9px] text-orange-300/80 font-roboto uppercase tracking-wide">
+                <div className="w-full h-full flex flex-col items-center justify-center gap-1 bg-gradient-to-br from-orange-500/15 via-orange-500/5 to-transparent border border-dashed border-orange-400/40">
+                  <Icon name="ImagePlus" size={28} className="text-orange-400/80" />
+                  <span className="text-[9px] text-orange-300/90 font-roboto uppercase tracking-wide font-semibold">
                     Добавить фото
                   </span>
                 </div>
               )}
               {it.photos.length > 0 && (
-                <div className="absolute top-1 right-1 bg-emerald-500/90 text-white font-oswald font-bold text-[10px] px-1.5 py-0.5 rounded">
+                <div className="absolute top-1 right-1 bg-emerald-500/95 text-white font-oswald font-bold text-[10px] px-1.5 py-0.5 rounded shadow-md flex items-center gap-0.5">
+                  <Icon name="Images" size={10} />
                   {it.photos.length}
                 </div>
               )}
               {!it.is_visible && (
-                <div className="absolute top-1 left-1 bg-red-600/90 text-white font-roboto text-[9px] px-1.5 py-0.5 rounded uppercase">
+                <div className="absolute top-1 left-1 bg-red-600/95 text-white font-roboto text-[9px] px-1.5 py-0.5 rounded uppercase shadow-md flex items-center gap-0.5">
+                  <Icon name="EyeOff" size={9} />
                   скрыт
                 </div>
               )}
+              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                <div className="bg-[#FFD700] text-black font-oswald font-bold text-[10px] px-2 py-1 rounded uppercase tracking-wider shadow-lg flex items-center gap-1">
+                  <Icon name={it.main_photo ? "Pencil" : "Camera"} size={10} />
+                  {it.main_photo ? "Изменить" : "Сфото"}
+                </div>
+              </div>
             </div>
             <div className="p-2">
               <div className="font-roboto text-[11px] text-white truncate">{it.title}</div>
-              <div className="font-oswald font-bold text-[#FFD700] text-sm mt-0.5">{formatPrice(it.price)}</div>
+              <div className="flex items-center justify-between mt-0.5">
+                <div className="font-oswald font-bold text-[#FFD700] text-sm">{formatPrice(it.price)}</div>
+                {it.category && (
+                  <div className="font-roboto text-[8px] text-white/40 truncate ml-1 max-w-[60%]">
+                    {it.category}
+                  </div>
+                )}
+              </div>
             </div>
           </button>
         ))}
@@ -236,13 +336,29 @@ export default function SLAvitoShowcase({ token }: { token: string }) {
           onClose={() => setEditing(null)}
           onUpdated={updated => {
             setItems(prev => prev.map(p => (p.id === updated.id ? { ...p, ...updated } : p)));
-            setEditing(updated as AvitoProduct);
+            setEditing(prev => (prev ? { ...prev, ...updated } : prev));
+            if ("photos" in updated) {
+              const oldHad = (editing.photos || []).length > 0;
+              const newHas = ((updated.photos as string[]) || []).length > 0;
+              if (oldHad !== newHas) {
+                setStats(s => ({
+                  ...s,
+                  with_photos: newHas ? s.with_photos + 1 : Math.max(0, s.with_photos - 1),
+                  no_photos: newHas ? Math.max(0, s.no_photos - 1) : s.no_photos + 1,
+                }));
+              }
+            }
           }}
-          onDeleted={id => {
-            setItems(prev => prev.filter(p => p.id !== id));
-            setEditing(null);
+          onPrev={() => {
+            const i = items.findIndex(p => p.id === editing.id);
+            if (i > 0) setEditing(items[i - 1]);
           }}
-          reload={() => load(query, filter)}
+          onNext={() => {
+            const i = items.findIndex(p => p.id === editing.id);
+            if (i >= 0 && i < items.length - 1) setEditing(items[i + 1]);
+          }}
+          hasPrev={items.findIndex(p => p.id === editing.id) > 0}
+          hasNext={items.findIndex(p => p.id === editing.id) < items.length - 1}
         />
       )}
     </div>
@@ -254,14 +370,19 @@ function SLEditModal({
   token,
   onClose,
   onUpdated,
-  reload,
+  onPrev,
+  onNext,
+  hasPrev,
+  hasNext,
 }: {
   item: AvitoProduct;
   token: string;
   onClose: () => void;
   onUpdated: (p: Partial<AvitoProduct> & { id: number }) => void;
-  onDeleted: (id: number) => void;
-  reload: () => void;
+  onPrev: () => void;
+  onNext: () => void;
+  hasPrev: boolean;
+  hasNext: boolean;
 }) {
   const [photos, setPhotos] = useState<string[]>(item.photos || []);
   const [description, setDescription] = useState(item.description || "");
@@ -269,14 +390,35 @@ function SLEditModal({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string>("");
   const [savedTimer, setSavedTimer] = useState<string>("");
+  const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null);
+  const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const descChangedRef = useRef(false);
+  const descTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    setPhotos(item.photos || []);
+    setDescription(item.description || "");
+    setIsVisible(item.is_visible);
+    setErr("");
+    setSavedTimer("");
+    descChangedRef.current = false;
+  }, [item.id]);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowLeft" && hasPrev && !(e.target instanceof HTMLTextAreaElement) && !(e.target instanceof HTMLInputElement)) onPrev();
+      if (e.key === "ArrowRight" && hasNext && !(e.target instanceof HTMLTextAreaElement) && !(e.target instanceof HTMLInputElement)) onNext();
+    };
+    window.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = "";
+      window.removeEventListener("keydown", onKey);
     };
-  }, []);
+  }, [onClose, onPrev, onNext, hasPrev, hasNext]);
 
   const apiCall = async (action: string, body: object) => {
     const r = await fetch(`${PHOTOS_URL}?action=${action}`, {
@@ -296,23 +438,41 @@ function SLEditModal({
     setTimeout(() => setSavedTimer(""), 2000);
   };
 
-  const onPickFile = async (file: File) => {
+  const onPickFiles = async (files: FileList) => {
     setErr("");
+    const arr = Array.from(files).slice(0, 5 - photos.length);
+    if (arr.length === 0) {
+      setErr("Достигнут лимит — 5 фото");
+      return;
+    }
     setBusy(true);
+    setUploadProgress({ done: 0, total: arr.length });
+    let curPhotos = [...photos];
+    let curMain: string | null = null;
+    let okN = 0;
     try {
-      const b64 = await compressImage(file, 1600, 0.85);
-      const d = await apiCall("upload", { product_id: item.id, image_base64: b64 });
-      if (d.ok) {
-        setPhotos(d.photos);
-        onUpdated({ id: item.id, photos: d.photos, main_photo: d.main_photo });
-        flash("Фото загружено");
-      } else {
-        setErr(d.error || "Не удалось загрузить");
+      for (let i = 0; i < arr.length; i++) {
+        try {
+          const b64 = await compressImage(arr[i], 1600, 0.85);
+          const d = await apiCall("upload", { product_id: item.id, image_base64: b64 });
+          if (d.ok) {
+            curPhotos = d.photos;
+            curMain = d.main_photo;
+            okN++;
+          } else {
+            setErr(d.error || "Не удалось загрузить");
+          }
+        } catch (e) {
+          setErr(e instanceof Error ? e.message : "Ошибка");
+        }
+        setUploadProgress({ done: i + 1, total: arr.length });
       }
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "Ошибка");
+      setPhotos(curPhotos);
+      onUpdated({ id: item.id, photos: curPhotos, main_photo: curMain });
+      if (okN > 0) flash(okN === 1 ? "Фото загружено" : `Загружено: ${okN}`);
     } finally {
       setBusy(false);
+      setTimeout(() => setUploadProgress(null), 600);
     }
   };
 
@@ -324,6 +484,7 @@ function SLEditModal({
       if (d.ok) {
         setPhotos(d.photos);
         onUpdated({ id: item.id, photos: d.photos, main_photo: d.main_photo });
+        flash("Удалено");
       } else {
         setErr(d.error || "Не удалось удалить");
       }
@@ -347,20 +508,72 @@ function SLEditModal({
     }
   };
 
-  const saveDescription = async () => {
+  const onDragStart = (i: number) => setDraggingIdx(i);
+  const onDragOver = (e: React.DragEvent, i: number) => {
+    e.preventDefault();
+    setDragOverIdx(i);
+  };
+  const onDrop = async (e: React.DragEvent, i: number) => {
+    e.preventDefault();
+    if (draggingIdx == null || draggingIdx === i) {
+      setDraggingIdx(null);
+      setDragOverIdx(null);
+      return;
+    }
+    const newOrder = [...photos];
+    const [moved] = newOrder.splice(draggingIdx, 1);
+    newOrder.splice(i, 0, moved);
+    setPhotos(newOrder);
+    setDraggingIdx(null);
+    setDragOverIdx(null);
     setBusy(true);
-    setErr("");
     try {
-      const d = await apiCall("update", { product_id: item.id, description });
+      const d = await apiCall("reorder", { product_id: item.id, photos: newOrder });
       if (d.ok) {
-        onUpdated({ id: item.id, description });
-        flash("Описание сохранено");
-      } else {
-        setErr(d.error || "Не удалось сохранить");
+        onUpdated({ id: item.id, photos: d.photos, main_photo: d.main_photo });
+        flash("Порядок изменён");
       }
     } finally {
       setBusy(false);
     }
+  };
+
+  const setAsMain = async (i: number) => {
+    if (i === 0) return;
+    const newOrder = [...photos];
+    const [moved] = newOrder.splice(i, 1);
+    newOrder.unshift(moved);
+    setPhotos(newOrder);
+    setBusy(true);
+    try {
+      const d = await apiCall("reorder", { product_id: item.id, photos: newOrder });
+      if (d.ok) {
+        onUpdated({ id: item.id, photos: d.photos, main_photo: d.main_photo });
+        flash("Главное фото обновлено");
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onDescChange = (v: string) => {
+    setDescription(v);
+    descChangedRef.current = true;
+    clearTimeout(descTimerRef.current);
+    descTimerRef.current = setTimeout(async () => {
+      if (!descChangedRef.current) return;
+      setBusy(true);
+      try {
+        const d = await apiCall("update", { product_id: item.id, description: v });
+        if (d.ok) {
+          onUpdated({ id: item.id, description: v });
+          flash("Описание сохранено");
+          descChangedRef.current = false;
+        }
+      } finally {
+        setBusy(false);
+      }
+    }, 1200);
   };
 
   const toggleVisible = async () => {
@@ -378,54 +591,90 @@ function SLEditModal({
     }
   };
 
+  const totalPhotosLeft = 5 - photos.length;
+  const isReady = photos.length > 0 && description.trim().length > 0;
+
   return (
     <div
-      className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+      className="fixed inset-0 z-[300] bg-black/85 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in"
       onClick={onClose}
     >
       <div
-        className="relative w-full sm:max-w-2xl max-h-[95vh] bg-gradient-to-br from-[#1a1a1a] to-[#0D0D0D] border-2 border-[#FFD700]/30 rounded-t-2xl sm:rounded-xl overflow-hidden flex flex-col"
+        className="relative w-full sm:max-w-2xl max-h-[95vh] bg-gradient-to-br from-[#1a1a1a] to-[#0D0D0D] border-2 border-[#FFD700]/30 rounded-t-2xl sm:rounded-xl overflow-hidden flex flex-col shadow-[0_0_60px_rgba(255,215,0,0.2)] animate-in slide-in-from-bottom-8 sm:slide-in-from-bottom-4 duration-300"
         onClick={e => e.stopPropagation()}
       >
+        <span aria-hidden className="absolute top-0 left-0 right-0 h-px" style={{ background: "linear-gradient(90deg, transparent, rgba(255,215,0,0.9), transparent)" }} />
+
+        {/* Шапка */}
         <div className="shrink-0 flex items-start justify-between gap-2 p-3 border-b border-white/10">
-          <div className="min-w-0 flex-1">
-            <div className="font-oswald font-bold text-white text-sm leading-tight line-clamp-2">{item.title}</div>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="font-oswald font-bold text-[#FFD700] text-lg">{formatPrice(item.price)}</span>
-              {item.category && <span className="text-[10px] text-white/40">· {item.category}</span>}
-            </div>
-            <a
-              href={item.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-[10px] text-[#FFD700]/70 hover:text-[#FFD700] mt-1"
+          <div className="flex items-start gap-2 min-w-0 flex-1">
+            <button
+              onClick={onPrev}
+              disabled={!hasPrev}
+              className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 hover:border-[#FFD700]/40 flex items-center justify-center text-white/70 disabled:opacity-30 transition-all shrink-0"
+              title="Предыдущий"
             >
-              <Icon name="ExternalLink" size={10} />
-              Открыть на Авито
-            </a>
+              <Icon name="ChevronLeft" size={16} />
+            </button>
+            <div className="min-w-0 flex-1">
+              <div className="font-oswald font-bold text-white text-sm leading-tight line-clamp-2">{item.title}</div>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <span className="font-oswald font-bold text-[#FFD700] text-lg">{formatPrice(item.price)}</span>
+                {item.category && <span className="text-[10px] text-white/40">· {item.category}</span>}
+                {isReady && (
+                  <span className="bg-emerald-500/20 text-emerald-300 font-roboto text-[9px] px-1.5 py-0.5 rounded uppercase tracking-wide flex items-center gap-1">
+                    <Icon name="CheckCircle2" size={9} />
+                    Готов
+                  </span>
+                )}
+              </div>
+              <a
+                href={item.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-[10px] text-[#FFD700]/70 hover:text-[#FFD700] mt-1 transition-colors"
+              >
+                <Icon name="ExternalLink" size={10} />
+                На Авито
+              </a>
+            </div>
+            <button
+              onClick={onNext}
+              disabled={!hasNext}
+              className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 hover:border-[#FFD700]/40 flex items-center justify-center text-white/70 disabled:opacity-30 transition-all shrink-0"
+              title="Следующий"
+            >
+              <Icon name="ChevronRight" size={16} />
+            </button>
           </div>
           <button
             onClick={onClose}
-            className="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-white"
+            className="w-9 h-9 rounded-full bg-white/5 hover:bg-white/15 flex items-center justify-center text-white shrink-0"
           >
             <Icon name="X" size={18} />
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 scrollbar-premium">
+          {/* Фотографии */}
           <div className="mb-4">
             <div className="flex items-center justify-between mb-2">
-              <div className="font-oswald font-bold text-white text-xs uppercase tracking-wide">
-                Фотографии ({photos.length}/5)
+              <div>
+                <div className="font-oswald font-bold text-white text-xs uppercase tracking-wide">
+                  Фотографии
+                </div>
+                <div className="text-[10px] text-white/40 mt-0.5">
+                  {photos.length}/5 · перетащи чтобы изменить порядок
+                </div>
               </div>
-              {photos.length < 5 && (
+              {totalPhotosLeft > 0 && (
                 <button
                   onClick={() => fileRef.current?.click()}
                   disabled={busy}
-                  className="flex items-center gap-1 bg-[#FFD700] text-black font-oswald font-bold text-[11px] px-2.5 py-1.5 rounded uppercase tracking-wide hover:bg-[#FFE55C] disabled:opacity-50"
+                  className="flex items-center gap-1 bg-gradient-to-r from-[#FFD700] to-[#FFE55C] text-black font-oswald font-bold text-[11px] px-2.5 py-1.5 rounded uppercase tracking-wide hover:shadow-[0_0_12px_rgba(255,215,0,0.4)] disabled:opacity-50 transition-all"
                 >
                   <Icon name="Camera" size={12} />
-                  Добавить
+                  + Добавить ({totalPhotosLeft})
                 </button>
               )}
             </div>
@@ -434,106 +683,169 @@ function SLEditModal({
               type="file"
               accept="image/*"
               capture="environment"
+              multiple
               className="hidden"
               onChange={e => {
-                const f = e.target.files?.[0];
-                if (f) onPickFile(f);
+                const fs = e.target.files;
+                if (fs && fs.length) onPickFiles(fs);
                 e.target.value = "";
               }}
             />
 
-            {photos.length === 0 && (
+            {uploadProgress && (
+              <div className="mb-2 bg-[#FFD700]/10 border border-[#FFD700]/30 rounded-lg p-2">
+                <div className="flex items-center justify-between text-[11px] text-white/80 mb-1">
+                  <span className="flex items-center gap-1.5">
+                    <Icon name="Loader2" size={11} className="animate-spin text-[#FFD700]" />
+                    Загружаю фото...
+                  </span>
+                  <span className="font-oswald font-bold text-[#FFD700]">
+                    {uploadProgress.done} / {uploadProgress.total}
+                  </span>
+                </div>
+                <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-[#FFD700] to-[#FFE55C] transition-all duration-300"
+                    style={{ width: `${Math.round((uploadProgress.done / uploadProgress.total) * 100)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {photos.length === 0 ? (
               <button
                 onClick={() => fileRef.current?.click()}
                 disabled={busy}
-                className="w-full aspect-video rounded-lg border-2 border-dashed border-[#FFD700]/30 hover:border-[#FFD700] hover:bg-[#FFD700]/5 flex flex-col items-center justify-center gap-2 text-white/60 hover:text-[#FFD700] transition-all disabled:opacity-50"
+                className="w-full aspect-video rounded-lg border-2 border-dashed border-[#FFD700]/30 hover:border-[#FFD700] hover:bg-[#FFD700]/5 flex flex-col items-center justify-center gap-2 text-white/60 hover:text-[#FFD700] transition-all disabled:opacity-50 group"
               >
-                <Icon name="ImagePlus" size={32} />
-                <div className="font-oswald font-bold text-xs uppercase tracking-wide">Сфотографировать товар</div>
-                <div className="text-[10px] text-white/40">Камера или галерея</div>
+                <Icon name="ImagePlus" size={36} className="group-hover:scale-110 transition-transform" />
+                <div className="font-oswald font-bold text-sm uppercase tracking-wide">Сфотографировать товар</div>
+                <div className="text-[10px] text-white/40">Камера или несколько фото из галереи</div>
               </button>
-            )}
-
-            {photos.length > 0 && (
+            ) : (
               <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                 {photos.map((url, i) => (
-                  <div key={url} className="relative group aspect-square rounded overflow-hidden bg-black">
-                    <img src={url} alt="" className="w-full h-full object-cover" />
+                  <div
+                    key={url}
+                    draggable
+                    onDragStart={() => onDragStart(i)}
+                    onDragOver={e => onDragOver(e, i)}
+                    onDrop={e => onDrop(e, i)}
+                    onDragEnd={() => {
+                      setDraggingIdx(null);
+                      setDragOverIdx(null);
+                    }}
+                    className={`relative group aspect-square rounded overflow-hidden bg-black cursor-grab active:cursor-grabbing transition-all ${
+                      draggingIdx === i ? "opacity-40 scale-95" : ""
+                    } ${dragOverIdx === i && draggingIdx !== i ? "ring-2 ring-[#FFD700] scale-105" : ""}`}
+                  >
+                    <img src={url} alt="" className="w-full h-full object-cover pointer-events-none" />
                     {i === 0 && (
-                      <div className="absolute top-1 left-1 bg-[#FFD700] text-black font-oswald font-bold text-[9px] px-1 py-0.5 rounded uppercase">
+                      <div className="absolute top-1 left-1 bg-gradient-to-r from-[#FFD700] to-[#FFE55C] text-black font-oswald font-bold text-[9px] px-1 py-0.5 rounded uppercase shadow-md flex items-center gap-0.5">
+                        <Icon name="Star" size={8} />
                         Главное
                       </div>
                     )}
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/60 transition-all flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100">
-                      <button
-                        onClick={() => movePhoto(i, -1)}
-                        disabled={i === 0 || busy}
-                        className="w-7 h-7 bg-white/20 rounded text-white disabled:opacity-30"
-                        title="Влево"
-                      >
-                        <Icon name="ChevronLeft" size={14} />
-                      </button>
-                      <button
-                        onClick={() => removePhoto(url)}
-                        disabled={busy}
-                        className="w-7 h-7 bg-red-600 rounded text-white"
-                        title="Удалить"
-                      >
-                        <Icon name="Trash2" size={12} />
-                      </button>
-                      <button
-                        onClick={() => movePhoto(i, 1)}
-                        disabled={i === photos.length - 1 || busy}
-                        className="w-7 h-7 bg-white/20 rounded text-white disabled:opacity-30"
-                        title="Вправо"
-                      >
-                        <Icon name="ChevronRight" size={14} />
-                      </button>
+                    <div className="absolute top-1 right-1 bg-black/70 text-white/80 text-[9px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
+                      {i + 1}
+                    </div>
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/70 transition-all flex flex-col items-center justify-center gap-1 opacity-0 group-hover:opacity-100 p-1">
+                      <div className="flex gap-1">
+                        {i > 0 && (
+                          <button
+                            onClick={() => setAsMain(i)}
+                            disabled={busy}
+                            className="w-7 h-7 bg-[#FFD700] hover:bg-[#FFE55C] rounded text-black"
+                            title="Сделать главным"
+                          >
+                            <Icon name="Star" size={12} />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => removePhoto(url)}
+                          disabled={busy}
+                          className="w-7 h-7 bg-red-600 hover:bg-red-500 rounded text-white"
+                          title="Удалить"
+                        >
+                          <Icon name="Trash2" size={12} />
+                        </button>
+                      </div>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => movePhoto(i, -1)}
+                          disabled={i === 0 || busy}
+                          className="w-7 h-7 bg-white/20 hover:bg-white/30 rounded text-white disabled:opacity-30"
+                          title="Влево"
+                        >
+                          <Icon name="ChevronLeft" size={12} />
+                        </button>
+                        <button
+                          onClick={() => movePhoto(i, 1)}
+                          disabled={i === photos.length - 1 || busy}
+                          className="w-7 h-7 bg-white/20 hover:bg-white/30 rounded text-white disabled:opacity-30"
+                          title="Вправо"
+                        >
+                          <Icon name="ChevronRight" size={12} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
+                {totalPhotosLeft > 0 && (
+                  <button
+                    onClick={() => fileRef.current?.click()}
+                    disabled={busy}
+                    className="aspect-square rounded border-2 border-dashed border-[#FFD700]/30 hover:border-[#FFD700] hover:bg-[#FFD700]/5 flex flex-col items-center justify-center gap-1 text-white/50 hover:text-[#FFD700] transition-all disabled:opacity-50"
+                  >
+                    <Icon name="Plus" size={20} />
+                    <span className="text-[9px] font-roboto uppercase tracking-wide">+{totalPhotosLeft}</span>
+                  </button>
+                )}
               </div>
             )}
           </div>
 
+          {/* Описание */}
           <div className="mb-4">
-            <div className="font-oswald font-bold text-white text-xs uppercase tracking-wide mb-2">
-              Описание для витрины
+            <div className="flex items-center justify-between mb-2">
+              <div className="font-oswald font-bold text-white text-xs uppercase tracking-wide">
+                Описание для витрины
+              </div>
+              <span className="text-[10px] text-white/40">{description.length}/500</span>
             </div>
             <textarea
               value={description}
-              onChange={e => setDescription(e.target.value)}
-              placeholder="Краткое описание для покупателя: состояние, комплект, отличия от нового..."
+              onChange={e => onDescChange(e.target.value.slice(0, 500))}
+              placeholder="Краткое описание для покупателя: состояние, комплект, что отличает от нового..."
               rows={4}
-              className="w-full bg-[#0D0D0D] border border-white/15 text-white px-3 py-2 font-roboto text-sm rounded focus:outline-none focus:border-[#FFD700] resize-none"
+              className="w-full bg-[#0D0D0D] border border-white/15 text-white px-3 py-2 font-roboto text-sm rounded-lg focus:outline-none focus:border-[#FFD700] focus:shadow-[0_0_12px_rgba(255,215,0,0.15)] resize-none transition-all"
             />
-            <button
-              onClick={saveDescription}
-              disabled={busy}
-              className="mt-2 bg-white/10 hover:bg-white/20 text-white font-oswald font-bold text-xs px-3 py-1.5 rounded uppercase tracking-wide"
-            >
-              Сохранить описание
-            </button>
+            <div className="flex items-center gap-2 mt-1.5 text-[10px] text-white/40">
+              <Icon name="Info" size={10} />
+              Сохраняется автоматически через секунду после остановки ввода
+            </div>
           </div>
 
-          <div className="flex items-center justify-between p-2 rounded bg-white/5 border border-white/10">
+          {/* Видимость */}
+          <div className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10 hover:border-white/20 transition-colors">
             <div>
-              <div className="font-oswald font-bold text-white text-xs uppercase tracking-wide">
+              <div className="font-oswald font-bold text-white text-xs uppercase tracking-wide flex items-center gap-1.5">
+                <Icon name={isVisible ? "Eye" : "EyeOff"} size={14} className={isVisible ? "text-emerald-400" : "text-white/40"} />
                 Показывать на сайте
               </div>
-              <div className="text-[10px] text-white/40">
-                {isVisible ? "Виден покупателям на сайте" : "Скрыт с витрины"}
+              <div className="text-[10px] text-white/40 mt-0.5">
+                {isVisible ? "Виден покупателям на витрине" : "Скрыт с витрины (только в БД)"}
               </div>
             </div>
             <button
               onClick={toggleVisible}
               disabled={busy}
-              className={`w-12 h-6 rounded-full transition-all relative ${
-                isVisible ? "bg-emerald-500" : "bg-white/20"
+              className={`w-12 h-6 rounded-full transition-all relative shrink-0 ${
+                isVisible ? "bg-gradient-to-r from-emerald-500 to-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.4)]" : "bg-white/15"
               }`}
             >
               <span
-                className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-all ${
+                className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-all shadow ${
                   isVisible ? "left-6" : "left-0.5"
                 }`}
               />
@@ -541,16 +853,31 @@ function SLEditModal({
           </div>
 
           {err && (
-            <div className="mt-3 text-xs text-red-400 bg-red-500/10 border border-red-500/30 rounded px-2 py-1.5">
+            <div className="mt-3 text-xs text-red-400 bg-red-500/10 border border-red-500/30 rounded px-2 py-1.5 flex items-center gap-1.5">
+              <Icon name="AlertCircle" size={12} />
               {err}
             </div>
           )}
           {savedTimer && (
-            <div className="mt-3 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded px-2 py-1.5 flex items-center gap-1">
+            <div className="mt-3 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded px-2 py-1.5 flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1">
               <Icon name="CheckCircle2" size={12} />
               {savedTimer}
             </div>
           )}
+        </div>
+
+        {/* Футер */}
+        <div className="shrink-0 border-t border-white/10 bg-black/40 p-2 flex items-center justify-between">
+          <div className="text-[10px] text-white/40 flex items-center gap-1">
+            <Icon name="Keyboard" size={10} />
+            <span className="hidden sm:inline">← → переключение</span>
+          </div>
+          <button
+            onClick={onClose}
+            className="bg-white/10 hover:bg-white/20 text-white font-oswald font-bold text-xs px-4 py-1.5 rounded uppercase tracking-wide transition-colors"
+          >
+            Закрыть
+          </button>
         </div>
       </div>
     </div>
