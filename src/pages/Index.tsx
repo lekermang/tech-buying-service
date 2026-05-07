@@ -152,16 +152,6 @@ const SplashScreen = ({ onDone }: { onDone: () => void }) => {
       <div className="absolute bottom-4 right-4 w-10 h-10 border-r-2 border-b-2 border-[#FFD700]/60" />
 
       {/* Праздничная полоса сверху на сплеше — Георгиевская лента / снежинки / триколор */}
-      {holiday && holiday.holiday.pattern === "ribbon" && (
-        <div
-          aria-hidden
-          className="absolute top-0 left-0 right-0 h-2.5 z-10 pointer-events-none"
-          style={{
-            background: "repeating-linear-gradient(90deg, #2A1A0A 0 14px, #FFA500 14px 24px, #2A1A0A 24px 38px, #FFA500 38px 48px)",
-            boxShadow: "0 2px 12px rgba(255,165,0,0.4)",
-          }}
-        />
-      )}
       {holiday && holiday.holiday.pattern === "snow" && (
         <div aria-hidden className="absolute inset-0 pointer-events-none overflow-hidden z-10">
           {[...Array(20)].map((_, i) => (
@@ -277,16 +267,18 @@ const SplashScreen = ({ onDone }: { onDone: () => void }) => {
         {/* Праздничное приветствие на сплеше (если активен праздник) */}
         {holiday && (
           <div
-            className="flex items-center gap-2 px-4 py-2 rounded-full border animate-[fadeIn_0.5s_ease_0.4s_both]"
+            className="relative inline-flex items-center gap-2.5 px-5 py-2 rounded-full border animate-[fadeIn_0.5s_ease_0.4s_both] overflow-hidden"
             style={{
-              background: `linear-gradient(90deg, ${holiday.holiday.primaryColor}AA, ${holiday.holiday.primaryColor}66)`,
+              background: `linear-gradient(90deg, ${holiday.holiday.primaryColor}DD, ${holiday.holiday.primaryColor}99)`,
               borderColor: holiday.holiday.secondaryColor + "AA",
-              boxShadow: `0 0 20px ${holiday.holiday.primaryColor}55`,
+              boxShadow: `0 0 24px ${holiday.holiday.primaryColor}66, inset 0 1px 0 ${holiday.holiday.secondaryColor}40`,
             }}
           >
-            <span className="text-xl drop-shadow-[0_2px_6px_rgba(0,0,0,0.4)]">{holiday.holiday.emoji}</span>
+            <span className="relative text-xl drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]" aria-hidden>
+              {holiday.holiday.emoji}
+            </span>
             <span
-              className="font-oswald font-bold text-sm uppercase tracking-wider"
+              className="relative font-oswald font-bold text-sm uppercase tracking-wider whitespace-nowrap"
               style={{ color: "#fff", textShadow: `0 1px 4px rgba(0,0,0,0.6), 0 0 10px ${holiday.holiday.secondaryColor}88` }}
             >
               {holiday.holiday.greeting}

@@ -5,15 +5,15 @@ import { getActiveHoliday, getHolidayCountdownText, type Holiday } from "./holid
 /** Декоративный узор для конкретного праздника */
 function HolidayPattern({ pattern, color }: { pattern: Holiday["pattern"]; color: string }) {
   if (pattern === "ribbon") {
-    // 9 мая — Георгиевская лента (полоски)
+    // 9 мая — Георгиевская лента: горизонтальные тонкие полосы (правильное направление, как у настоящей ленты — вдоль).
     return (
       <div
         aria-hidden
-        className="absolute inset-0 pointer-events-none opacity-30"
+        className="absolute inset-0 pointer-events-none opacity-25"
         style={{
-          background: "repeating-linear-gradient(90deg, #2A1A0A 0 14px, #FFA500 14px 24px, #2A1A0A 24px 38px, #FFA500 38px 48px)",
-          maskImage: "linear-gradient(180deg, transparent 0%, black 50%, transparent 100%)",
-          WebkitMaskImage: "linear-gradient(180deg, transparent 0%, black 50%, transparent 100%)",
+          background: "repeating-linear-gradient(0deg, #FF8C00 0 5px, #1a0d00 5px 7px, #FF8C00 7px 12px, #1a0d00 12px 14px)",
+          maskImage: "linear-gradient(90deg, transparent 0%, black 30%, black 70%, transparent 100%)",
+          WebkitMaskImage: "linear-gradient(90deg, transparent 0%, black 30%, black 70%, transparent 100%)",
         }}
       />
     );
