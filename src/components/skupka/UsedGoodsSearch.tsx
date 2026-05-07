@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import Icon from "@/components/ui/icon";
+import AvitoShowcase from "./AvitoShowcase";
 
 const GOODS_URL = "https://functions.poehali.dev/de4c1e8e-0c7b-4f25-a3fd-155c46fa3399";
 const RESOLD_URL = "https://functions.poehali.dev/a10aef75-50fc-411c-85bb-692d44fb31e7";
@@ -15,7 +16,7 @@ const CONDITION_COLOR: Record<string, string> = {
 
 export default function UsedGoodsSearch() {
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<"own" | "resold">("own");
+  const [tab, setTab] = useState<"own" | "avito" | "resold">("avito");
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   // Открыть виджет извне (по событию или хэшу #used-tech) и проскроллить к нему
@@ -137,20 +138,30 @@ export default function UsedGoodsSearch() {
         <div className="relative mt-3 border-t border-[#FFD700]/20 pt-3">
 
           {/* Вкладки */}
-          <div className="flex gap-1 mb-3">
+          <div className="flex gap-1 mb-3 overflow-x-auto scrollbar-premium pb-1">
+            <button
+              onClick={() => setTab("avito")}
+              className={`shrink-0 text-[10px] font-roboto px-2.5 py-1 rounded transition-all flex items-center gap-1 ${tab === "avito" ? "bg-[#FFD700] text-black font-semibold" : "text-white/50 hover:text-white border border-white/10"}`}
+            >
+              <Icon name="Sparkles" size={10} />
+              Витрина магазина
+            </button>
             <button
               onClick={() => setTab("own")}
-              className={`text-[10px] font-roboto px-2.5 py-1 transition-all ${tab === "own" ? "bg-[#FFD700] text-black font-semibold" : "text-white/40 hover:text-white border border-white/10"}`}
+              className={`shrink-0 text-[10px] font-roboto px-2.5 py-1 rounded transition-all ${tab === "own" ? "bg-[#FFD700] text-black font-semibold" : "text-white/50 hover:text-white border border-white/10"}`}
             >
-              Наш магазин
+              Каталог
             </button>
             <button
               onClick={() => { setTab("resold"); if (resoldItems.length === 0) fetchResold(1); }}
-              className={`text-[10px] font-roboto px-2.5 py-1 transition-all ${tab === "resold" ? "bg-[#FFD700] text-black font-semibold" : "text-white/40 hover:text-white border border-white/10"}`}
+              className={`shrink-0 text-[10px] font-roboto px-2.5 py-1 rounded transition-all ${tab === "resold" ? "bg-[#FFD700] text-black font-semibold" : "text-white/50 hover:text-white border border-white/10"}`}
             >
-              «Скупка24» Калуга, Кирова 11
+              Кирова 11
             </button>
           </div>
+
+          {/* Авито витрина */}
+          {tab === "avito" && <AvitoShowcase />}
 
           {/* Наши товары */}
           {tab === "own" && (
