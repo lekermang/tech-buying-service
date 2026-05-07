@@ -105,10 +105,22 @@ type Props = {
  * Праздничный баннер. Автоматически появляется за N дней до праздника
  * и остаётся ещё N дней после. Сейчас (май 2026) — это 9 мая.
  */
+// Версия dismiss-логики. Если меняется (например, добавили новый декор) —
+// один раз сбрасываем у всех пользователей сохранённое скрытие, чтобы баннер появился снова.
+const DISMISS_VERSION = "may9-2026-v2";
+
 export default function HolidayBanner({ forcedHolidayId, dismissible = true, className = "" }: Props) {
   const [active, setActive] = useState(() => getActiveHoliday());
   const [dismissed, setDismissed] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
+    // Один раз на новой версии очищаем старое скрытие
+    const ver = localStorage.getItem("holiday_dismiss_version");
+    if (ver !== DISMISS_VERSION) {
+      localStorage.removeItem("holiday_dismissed_id");
+      localStorage.removeItem("holiday_corner_dismissed");
+      localStorage.setItem("holiday_dismiss_version", DISMISS_VERSION);
+      return null;
+    }
     return localStorage.getItem("holiday_dismissed_id");
   });
 
