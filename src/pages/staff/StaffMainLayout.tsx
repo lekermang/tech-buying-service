@@ -6,6 +6,9 @@ import AnimeMascot from "../staffTheme/AnimeMascot";
 import StaffThemeSettings from "../staffTheme/StaffThemeSettings";
 import InstallPwaButton from "./InstallPwaButton";
 import { OfflineBanner } from "./StaffStatusBanners";
+import HolidayBanner from "@/components/holidays/HolidayBanner";
+import HolidayCornerDecor from "@/components/holidays/HolidayCornerDecor";
+import HolidayShowAgainButton from "@/components/holidays/HolidayShowAgainButton";
 import { PROTECTED_TABS, ROLE_BADGE, ROLE_LABEL, getInitials, type StaffTab } from "./staffConstants";
 import { FontApplier, MskClock, ThemeBanner, TabErrorBoundary } from "./StaffPwa";
 import {
@@ -147,6 +150,10 @@ export function StaffMainLayout({
       )}
       {/* Системный баннер офлайн (постоянный, пока нет сети) */}
       <OfflineBanner />
+      {/* Праздничный баннер (показывается за N дней до и после праздника) */}
+      <HolidayBanner className="z-20" />
+      {/* Угловое праздничное украшение (Георгиевская лента 9 мая, снежинки на НГ и т.д.) */}
+      <HolidayCornerDecor />
       {/* Баннер темы */}
       <ThemeBanner onOpen={() => setThemeOpen(true)} />
       {/* Шапка — премиальная как на главной */}
@@ -223,6 +230,7 @@ export function StaffMainLayout({
               </button>
             )}
             <InstallPwaButton />
+            <HolidayShowAgainButton />
             <SLTooltip content={<><b>Мой профиль</b><br/>Изменить аватар, имя, пин-код</>} placement="bottom">
               <button onClick={() => setProfileOpen(true)}
                 className="text-white/40 hover:text-[#FFD700] active:text-[#FFD700] transition-all p-2 rounded-md hover:bg-[#FFD700]/10 hover:shadow-[0_0_10px_rgba(255,215,0,0.15)]">

@@ -9,6 +9,7 @@ import ExitPopup from "@/components/skupka/ExitPopup";
 import CookieBanner from "@/components/skupka/CookieBanner";
 import JobsSection from "@/components/skupka/JobsSection";
 import HolidayBanner from "@/components/holidays/HolidayBanner";
+import HolidayCornerDecor from "@/components/holidays/HolidayCornerDecor";
 
 const scrollTo = (href: string) => {
   const el = document.querySelector(href);
@@ -99,9 +100,21 @@ const useDynamicSeo = (ready: boolean) => {
   }, [ready]);
 };
 
+// Хук для активного праздника на сплеше
+const useActiveHoliday = () => {
+  const [h, setH] = useState<{ holiday: { id: string; name: string; emoji: string; greeting: string; primaryColor: string; secondaryColor: string; pattern: string }; daysToHoliday: number } | null>(null);
+  useEffect(() => {
+    import("@/components/holidays/holidays").then(m => {
+      setH(m.getActiveHoliday() as typeof h);
+    }).catch(() => { /* noop */ });
+  }, []);
+  return h;
+};
+
 const SplashScreen = ({ onDone }: { onDone: () => void }) => {
   const [hiding, setHiding] = useState(false);
   const [progress, setProgress] = useState(0);
+  const holiday = useActiveHoliday();
 
   useEffect(() => {
     const start = performance.now();
@@ -137,6 +150,36 @@ const SplashScreen = ({ onDone }: { onDone: () => void }) => {
       <div className="absolute top-4 right-4 w-10 h-10 border-r-2 border-t-2 border-[#FFD700]/60" />
       <div className="absolute bottom-4 left-4 w-10 h-10 border-l-2 border-b-2 border-[#FFD700]/60" />
       <div className="absolute bottom-4 right-4 w-10 h-10 border-r-2 border-b-2 border-[#FFD700]/60" />
+
+      {/* Праздничная полоса сверху на сплеше — Георгиевская лента / снежинки / триколор */}
+      {holiday && holiday.holiday.pattern === "ribbon" && (
+        <div
+          aria-hidden
+          className="absolute top-0 left-0 right-0 h-2.5 z-10 pointer-events-none"
+          style={{
+            background: "repeating-linear-gradient(90deg, #2A1A0A 0 14px, #FFA500 14px 24px, #2A1A0A 24px 38px, #FFA500 38px 48px)",
+            boxShadow: "0 2px 12px rgba(255,165,0,0.4)",
+          }}
+        />
+      )}
+      {holiday && holiday.holiday.pattern === "snow" && (
+        <div aria-hidden className="absolute inset-0 pointer-events-none overflow-hidden z-10">
+          {[...Array(20)].map((_, i) => (
+            <span
+              key={i}
+              className="absolute text-white/55 select-none"
+              style={{
+                left: `${(i * 7 + 3) % 100}%`,
+                top: "-10px",
+                fontSize: `${10 + (i % 3) * 6}px`,
+                animation: `splashParticle ${8 + (i % 5) * 2}s linear ${i * 0.4}s infinite`,
+              }}
+            >
+              ❄
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* Боковые золотые линии */}
       <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-transparent via-[#FFD700] to-transparent" />
@@ -231,6 +274,26 @@ const SplashScreen = ({ onDone }: { onDone: () => void }) => {
           <span className="block bg-gradient-to-r from-[#FFD700] via-[#fff3a0] to-[#FFD700] bg-clip-text text-transparent animate-shimmer">всё!</span>
         </h2>
 
+        {/* Праздничное приветствие на сплеше (если активен праздник) */}
+        {holiday && (
+          <div
+            className="flex items-center gap-2 px-4 py-2 rounded-full border animate-[fadeIn_0.5s_ease_0.4s_both]"
+            style={{
+              background: `linear-gradient(90deg, ${holiday.holiday.primaryColor}AA, ${holiday.holiday.primaryColor}66)`,
+              borderColor: holiday.holiday.secondaryColor + "AA",
+              boxShadow: `0 0 20px ${holiday.holiday.primaryColor}55`,
+            }}
+          >
+            <span className="text-xl drop-shadow-[0_2px_6px_rgba(0,0,0,0.4)]">{holiday.holiday.emoji}</span>
+            <span
+              className="font-oswald font-bold text-sm uppercase tracking-wider"
+              style={{ color: "#fff", textShadow: `0 1px 4px rgba(0,0,0,0.6), 0 0 10px ${holiday.holiday.secondaryColor}88` }}
+            >
+              {holiday.holiday.greeting}
+            </span>
+          </div>
+        )}
+
         {/* Прогресс-бар с золотым градиентом + проценты */}
         <div className="w-64 sm:w-80 flex flex-col gap-2 animate-[fadeIn_0.4s_ease_0.5s_both]">
           <div className="flex items-center justify-between text-[10px] font-roboto uppercase tracking-[0.3em] font-semibold">
@@ -320,6 +383,8 @@ const Index = ({ goldOpen = false }: { goldOpen?: boolean }) => {
       {!splashDone && <SplashScreen onDone={() => setSplashDone(true)} />}
       {/* Праздничный баннер — автоматически появляется за 3 дня до и 3 дня после праздника (9 мая, 23 фев, 8 марта и т.д.) */}
       <HolidayBanner />
+      {/* Угловое праздничное украшение поверх всей страницы (Георгиевская лента, снежинки и т.д.) */}
+      <HolidayCornerDecor />
       <Header scrollTo={scrollTo} goldOpen={goldOpen} />
       <HeroSection scrollTo={scrollTo} externalModalOpen={evalOpen} onExternalModalClose={() => setEvalOpen(false)} />
       <InfoSections />
