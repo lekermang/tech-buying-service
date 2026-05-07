@@ -131,6 +131,78 @@ def get_product(product_id: int) -> dict | None:
         conn.close()
 
 
+def import_b64_photos(product_id: int, images_b64: list[str], description: str = '') -> dict:
+    """Принимает массив base64 (фото скачано в браузере сотрудника) и сохраняет в S3."""
+    dsn = os.environ['DATABASE_URL']
+    conn = psycopg2.connect(dsn)
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute(
+            f"SELECT avito_id, photos, description FROM {SCHEMA}.avito_products WHERE id=%s",
+            (product_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            raise ValueError('Товар не найден')
+        avito_id = row['avito_id']
+        photos = list(row['photos'] or [])
+        added = 0
+        s3 = get_s3()
+        for img in images_b64[:10]:
+            if len(photos) >= 5:
+                break
+            try:
+                b64 = img
+                ctype = 'image/jpeg'
+                ext = 'jpg'
+                if ',' in b64:
+                    head, b64 = b64.split(',', 1)
+                    if 'webp' in head:
+                        ctype = 'image/webp'; ext = 'webp'
+                    elif 'png' in head:
+                        ctype = 'image/png'; ext = 'png'
+                data = base64.b64decode(b64)
+                if not data or len(data) > 12 * 1024 * 1024:
+                    continue
+                ts = int(time.time() * 1000)
+                h = hashlib.md5(data).hexdigest()[:8]
+                key = f'avito/{avito_id}/{ts}_{h}.{ext}'
+                s3.put_object(Bucket='files', Key=key, Body=data, ContentType=ctype, ACL='public-read')
+                photos.append(cdn_url(key))
+                added += 1
+            except Exception:
+                continue
+        main = photos[0] if photos else None
+        new_desc = (description or '').strip() or row['description'] or ''
+        cur.execute(
+            f"""UPDATE {SCHEMA}.avito_products
+                SET photos=%s, main_photo=%s, description=%s, updated_at=NOW()
+                WHERE id=%s""",
+            (Json(photos), main, new_desc, product_id),
+        )
+        conn.commit()
+        return {'photos': photos, 'main_photo': main, 'added': added}
+    finally:
+        cur.close()
+        conn.close()
+
+
+def find_product_by_avito_id(avito_id: int) -> dict | None:
+    dsn = os.environ['DATABASE_URL']
+    conn = psycopg2.connect(dsn)
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute(
+            f"SELECT id, avito_id, title FROM {SCHEMA}.avito_products WHERE avito_id=%s",
+            (avito_id,),
+        )
+        r = cur.fetchone()
+        return dict(r) if r else None
+    finally:
+        cur.close()
+        conn.close()
+
+
 def _download_url(url: str, timeout: int = 15) -> bytes | None:
     try:
         req = urllib.request.Request(
@@ -362,12 +434,25 @@ def handler(event: dict, context: Any) -> dict:
     token = headers.get('X-Employee-Token') or headers.get('x-employee-token') \
         or headers.get('X-Auth-Token') or headers.get('x-auth-token') or ''
 
+    qs = event.get('queryStringParameters') or {}
+    action = qs.get('action', 'list')
+
+    # Для action=bookmarklet_save токен передаётся в боди (т.к. bookmarklet с avito.ru не может ставить кастомные заголовки в no-cors)
+    body_for_token: dict = {}
+    if method == 'POST' and action == 'bookmarklet_save':
+        try:
+            raw_b = event.get('body') or '{}'
+            if event.get('isBase64Encoded'):
+                raw_b = base64.b64decode(raw_b).decode('utf-8')
+            body_for_token = json.loads(raw_b)
+            if not token:
+                token = body_for_token.get('token') or ''
+        except Exception:
+            pass
+
     emp = auth_employee(token)
     if not emp:
         return _resp(401, {'ok': False, 'error': 'Требуется авторизация сотрудника'})
-
-    qs = event.get('queryStringParameters') or {}
-    action = qs.get('action', 'list')
 
     try:
         if method == 'GET':
@@ -401,6 +486,22 @@ def handler(event: dict, context: Any) -> dict:
             if not pid or not img:
                 return _resp(400, {'ok': False, 'error': 'product_id и image_base64 обязательны'})
             return _resp(200, {'ok': True, **upload_photo(pid, img)})
+
+        if method == 'POST' and action == 'bookmarklet_save':
+            avito_id_in = body.get('avito_id')
+            images = body.get('images') or []
+            desc = body.get('description') or ''
+            if not avito_id_in or not isinstance(images, list):
+                return _resp(400, {'ok': False, 'error': 'avito_id и images[] обязательны'})
+            try:
+                avid = int(avito_id_in)
+            except Exception:
+                return _resp(400, {'ok': False, 'error': 'avito_id должен быть числом'})
+            prod = find_product_by_avito_id(avid)
+            if not prod:
+                return _resp(404, {'ok': False, 'error': f'Товар с avito_id={avid} не найден на сайте. Сначала нажмите «Обновить список».'})
+            result = import_b64_photos(prod['id'], images, desc)
+            return _resp(200, {'ok': True, 'product_id': prod['id'], 'title': prod['title'], **result})
 
         if method == 'POST' and action == 'import_urls':
             pid = int(body.get('product_id') or 0)
