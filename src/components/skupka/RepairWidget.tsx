@@ -56,8 +56,16 @@ export default function RepairWidget() {
   };
 
   return (
-    <div ref={rootRef} id="repair" className="border border-white/10 bg-black/30 px-4 py-5 w-full scroll-mt-24">
-      <RepairWidgetHeader open={open} onToggle={() => setOpen(v => !v)} />
+    <div ref={rootRef} id="repair" className="hero-premium-btn group relative bg-gradient-to-br from-white/[0.06] via-white/[0.02] to-transparent backdrop-blur-sm border-2 border-[#FFD700]/30 hover:border-[#FFD700]/70 px-4 py-4 w-full rounded-xl overflow-hidden scroll-mt-24 transition-all">
+      <span aria-hidden className="absolute top-0 left-0 right-0 h-px opacity-70" style={{ background: "linear-gradient(90deg, transparent, rgba(255,215,0,0.9), transparent)" }} />
+      <span aria-hidden className="absolute top-1.5 left-1.5 w-3 h-3 border-l-2 border-t-2 border-[#FFD700]/70 group-hover:border-[#FFD700] transition-colors" />
+      <span aria-hidden className="absolute top-1.5 right-1.5 w-3 h-3 border-r-2 border-t-2 border-[#FFD700]/70 group-hover:border-[#FFD700] transition-colors" />
+      <span aria-hidden className="absolute bottom-1.5 left-1.5 w-3 h-3 border-l-2 border-b-2 border-[#FFD700]/70 group-hover:border-[#FFD700] transition-colors" />
+      <span aria-hidden className="absolute bottom-1.5 right-1.5 w-3 h-3 border-r-2 border-b-2 border-[#FFD700]/70 group-hover:border-[#FFD700] transition-colors" />
+
+      <div className="relative">
+        <RepairWidgetHeader open={open} onToggle={() => setOpen(v => !v)} />
+      </div>
 
       {open && (
         <RepairWidgetBody
