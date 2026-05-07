@@ -28,6 +28,9 @@ export function useRepairSubmit() {
     const staticExtraLabels = STATIC_EXTRAS.filter(w => extraWorks.includes(w.id)).map(w => w.label);
     const staticExtraTotal = STATIC_EXTRAS.filter(w => extraWorks.includes(w.id)).reduce((s, w) => s + w.price, 0);
     const allExtras = [...extraLabels, ...staticExtraLabels];
+    // Итоговая сумма заявки: суммируем выбранную запчасть (если есть) + ВСЕ позиции (динамические + статические доп.услуги).
+    // Это значение придёт в Staff и автоматически встанет в поле «Принято от клиента» (repair_amount).
+    const totalToSubmit = (selectedPart ? grandTotal : 0) + (selectedPart ? 0 : staticExtraTotal);
     try {
       const res = await fetch(REPAIR_ORDER_URL, {
         method: "POST",
@@ -39,7 +42,7 @@ export function useRepairSubmit() {
           repair_type: selectedPart
             ? `${PART_TYPE_LABEL[selectedPart.part_type] || selectedPart.part_type}${allExtras.length ? " + " + allExtras.join(", ") : ""}`
             : [form.fault, ...staticExtraLabels].filter(Boolean).join(" + "),
-          price: selectedPart ? grandTotal : (staticExtraTotal > 0 ? staticExtraTotal : undefined),
+          price: totalToSubmit > 0 ? totalToSubmit : undefined,
           comment: form.fault,
           // Полная информация о выбранной запчасти — чтобы Staff знал откуда заказывать
           selected_part: selectedPart ? {

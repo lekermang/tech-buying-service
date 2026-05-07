@@ -966,12 +966,17 @@ def handler(event: dict, context) -> dict:
         prow = cur.fetchone()
         client_chat_id = prow[0] if prow else None
 
+        # Если в заявке с сайта указана цена (price = сумма позиций) —
+        # автоматически записываем её и в repair_amount («принято от клиента»),
+        # чтобы карточка в Ремонте сразу попадала с заполненной итоговой суммой.
+        # Сотрудник всегда может скорректировать вручную в карточке.
+        repair_amount_initial = price if price else None
         cur.execute(
             f"INSERT INTO {SCHEMA}.repair_orders "
-            "(name, phone, model, repair_type, price, comment, client_tg_chat_id, "
+            "(name, phone, model, repair_type, price, repair_amount, comment, client_tg_chat_id, "
             " part_id, part_name, part_quality, part_source, part_supplier, part_code, part_category, part_supplier_price) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
-            (name, phone, model or None, repair_type or None, price, comment or None, client_chat_id,
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+            (name, phone, model or None, repair_type or None, price, repair_amount_initial, comment or None, client_chat_id,
              part_id, part_name, part_quality, part_source, part_supplier, part_code, part_category, part_supplier_price)
         )
         order_id = cur.fetchone()[0]
