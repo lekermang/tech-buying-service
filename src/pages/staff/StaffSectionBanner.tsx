@@ -21,6 +21,7 @@ const SECTION_META: Record<string, SectionMeta> = {
   clients:      { title: "Клиенты",      subtitle: "База клиентов, скидки и СМС-рассылки",                    icon: "Users" },
   analytics:    { title: "Статистика",   subtitle: "Аналитика по продажам, ремонтам и сотрудникам",           icon: "BarChart2" },
   smartlombard: { title: "СмартЛомбард", subtitle: "Скупка и продажа Б/У техники",                            icon: "Coins", skip: true },
+  avitopro:     { title: "Авито PRO",    subtitle: "Сводка по объявлениям, статистика и автодействия",         icon: "Zap", skip: true },
   gold:         { title: "Золото",       subtitle: "Учёт ювелирных изделий и драгметаллов",                   icon: "Gem" },
   employees:    { title: "Команда",      subtitle: "Управление сотрудниками, ролями и графиками",             icon: "UserCog" },
   goods:        { title: "Товары",       subtitle: "Каталог товаров в наличии",                               icon: "Package" },

@@ -572,6 +572,179 @@ def get_status() -> dict:
         conn.close()
 
 
+def get_dashboard() -> dict:
+    """Возвращает агрегаты для Авито PRO Dashboard: тоталы, топ по просмотрам, графики 7/30 дней."""
+    dsn = os.environ['DATABASE_URL']
+    conn = psycopg2.connect(dsn)
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        # Тоталы по статусам
+        cur.execute(
+            f"""SELECT
+                COUNT(*) FILTER (WHERE status='active') AS active,
+                COUNT(*) FILTER (WHERE status='archived') AS archived,
+                COUNT(*) FILTER (WHERE status='removed') AS removed,
+                COUNT(*) FILTER (WHERE avito_status='moderation') AS moderation,
+                COUNT(*) FILTER (WHERE avito_status='rejected') AS rejected,
+                COUNT(*) FILTER (WHERE status='active' AND (main_photo IS NULL OR main_photo='')) AS no_photo,
+                COUNT(*) AS total,
+                COALESCE(SUM(views_total), 0) AS views_total,
+                COALESCE(SUM(contacts_total), 0) AS contacts_total,
+                COALESCE(SUM(favorites_total), 0) AS favorites_total
+                FROM {SCHEMA}.avito_products"""
+        )
+        totals_row = cur.fetchone() or {}
+        totals = {k: int(v or 0) for k, v in dict(totals_row).items()}
+
+        # Последняя успешная синхронизация
+        cur.execute(
+            f"""SELECT MAX(synced_at) AS last_sync FROM {SCHEMA}.avito_products"""
+        )
+        last_sync_row = cur.fetchone() or {}
+
+        # Топ-10 по просмотрам
+        cur.execute(
+            f"""SELECT id, avito_id, title, price, main_photo, url,
+                COALESCE(views_total, 0) AS views,
+                COALESCE(contacts_total, 0) AS contacts,
+                COALESCE(favorites_total, 0) AS favorites
+                FROM {SCHEMA}.avito_products
+                WHERE status='active'
+                ORDER BY COALESCE(views_total, 0) DESC, id DESC
+                LIMIT 10"""
+        )
+        top = [dict(r) for r in cur.fetchall()]
+
+        # Графики за 30 дней (если есть таблица avito_stats)
+        chart: list[dict] = []
+        try:
+            cur.execute(
+                f"""SELECT date::text AS date,
+                    COALESCE(SUM(views), 0) AS views,
+                    COALESCE(SUM(contacts), 0) AS contacts,
+                    COALESCE(SUM(favorites), 0) AS favorites
+                    FROM {SCHEMA}.avito_stats
+                    WHERE date >= CURRENT_DATE - INTERVAL '30 days'
+                    GROUP BY date
+                    ORDER BY date ASC"""
+            )
+            chart = [
+                {
+                    'date': r['date'],
+                    'views': int(r['views'] or 0),
+                    'contacts': int(r['contacts'] or 0),
+                    'favorites': int(r['favorites'] or 0),
+                }
+                for r in cur.fetchall()
+            ]
+        except Exception:
+            chart = []
+
+        return {
+            'totals': totals,
+            'top': top,
+            'chart': chart,
+            'last_sync': str(last_sync_row.get('last_sync')) if last_sync_row.get('last_sync') else None,
+        }
+    finally:
+        cur.close()
+        conn.close()
+
+
+def fetch_item_stats(token: str, user_id: int, item_ids: list[int]) -> dict:
+    """Получает статистику просмотров/контактов из Avito API за последние 30 дней."""
+    if not item_ids:
+        return {}
+    from datetime import datetime, timedelta
+    date_to = datetime.utcnow().date()
+    date_from = date_to - timedelta(days=30)
+    body = json.dumps({
+        'dateFrom': date_from.isoformat(),
+        'dateTo': date_to.isoformat(),
+        'fields': ['uniqViews', 'uniqContacts', 'uniqFavorites'],
+        'itemIds': item_ids[:200],
+        'periodGrouping': 'day',
+    }).encode('utf-8')
+    url = f'{AVITO_BASE}/stats/v1/accounts/{user_id}/items'
+    req = urllib.request.Request(
+        url,
+        data=body,
+        headers={'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'},
+        method='POST',
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return json.loads(r.read().decode('utf-8'))
+    except Exception:
+        return {}
+
+
+def sync_stats() -> dict:
+    """Тянет статистику просмотров/контактов с Avito API и кладёт в avito_stats + обновляет totals в avito_products."""
+    dsn = os.environ['DATABASE_URL']
+    conn = psycopg2.connect(dsn)
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute(
+            f"SELECT avito_id FROM {SCHEMA}.avito_products WHERE status='active' ORDER BY id LIMIT 200"
+        )
+        ids = [int(r['avito_id']) for r in cur.fetchall()]
+        if not ids:
+            return {'ok': True, 'updated': 0, 'skipped_reason': 'no active items'}
+
+        token = get_token()
+        uid = get_user_id()
+        data = fetch_item_stats(token, uid, ids)
+        items_data = (data or {}).get('result', {}).get('items') or []
+
+        rows_inserted = 0
+        for item in items_data:
+            try:
+                item_id = int(item.get('itemId') or item.get('item_id') or 0)
+                if not item_id:
+                    continue
+                stats_arr = item.get('stats') or []
+                total_v = 0
+                total_c = 0
+                total_f = 0
+                for st in stats_arr:
+                    date_s = st.get('date') or ''
+                    v = int(st.get('uniqViews') or 0)
+                    c = int(st.get('uniqContacts') or 0)
+                    f = int(st.get('uniqFavorites') or 0)
+                    total_v += v
+                    total_c += c
+                    total_f += f
+                    if date_s:
+                        cur.execute(
+                            f"""INSERT INTO {SCHEMA}.avito_stats(avito_id, date, views, contacts, favorites, captured_at)
+                                VALUES(%s, %s, %s, %s, %s, NOW())
+                                ON CONFLICT(avito_id, date) DO UPDATE SET
+                                    views=EXCLUDED.views,
+                                    contacts=EXCLUDED.contacts,
+                                    favorites=EXCLUDED.favorites,
+                                    captured_at=NOW()""",
+                            (item_id, date_s, v, c, f),
+                        )
+                        rows_inserted += 1
+                cur.execute(
+                    f"""UPDATE {SCHEMA}.avito_products
+                        SET views_total=%s, contacts_total=%s, favorites_total=%s, stats_updated_at=NOW()
+                        WHERE avito_id=%s""",
+                    (total_v, total_c, total_f, item_id),
+                )
+            except Exception:
+                continue
+        conn.commit()
+        return {'ok': True, 'updated': rows_inserted, 'items': len(items_data)}
+    except Exception as e:
+        conn.rollback()
+        return {'ok': False, 'error': str(e)}
+    finally:
+        cur.close()
+        conn.close()
+
+
 def handler(event: dict, context: Any) -> dict:
     """Синхронизация товаров профиля Авито с сайтом Скупка24. Тянет объявления через официальное API, сохраняет фото в S3, кладёт в БД."""
     method = event.get('httpMethod', 'GET')
@@ -632,6 +805,18 @@ def handler(event: dict, context: Any) -> dict:
             mins = 30
         try:
             return _resp(200, auto_sync_if_stale(mins))
+        except Exception as e:
+            return _resp(500, {'ok': False, 'error': str(e)})
+
+    if action == 'dashboard':
+        try:
+            return _resp(200, {'ok': True, **get_dashboard()})
+        except Exception as e:
+            return _resp(500, {'ok': False, 'error': str(e)})
+
+    if action == 'sync_stats':
+        try:
+            return _resp(200, sync_stats())
         except Exception as e:
             return _resp(500, {'ok': False, 'error': str(e)})
 

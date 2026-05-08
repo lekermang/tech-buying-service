@@ -7,6 +7,7 @@ export const loadGold          = () => import("../GoldTab");
 export const loadOtherTabs     = () => import("../StaffOtherTabs");
 export const loadVipChat       = () => import("../StaffVipChatTab");
 export const loadSmartLombard  = () => import("../slShop/SLShopTab");
+export const loadAvitoPro      = () => import("../StaffAvitoProTab");
 
 export const GoodsTab        = lazy(loadGoods);
 export const StaffRepairTab  = lazy(loadRepair);
@@ -17,6 +18,7 @@ export const AnalyticsTab    = lazy(() => loadOtherTabs().then(m => ({ default: 
 export const EmployeesTab    = lazy(() => loadOtherTabs().then(m => ({ default: m.EmployeesTab })));
 export const VipChatTab      = lazy(loadVipChat);
 export const SmartLombardTab = lazy(loadSmartLombard);
+export const AvitoProTab     = lazy(loadAvitoPro);
 
 export const TAB_PRELOADERS: Record<string, () => Promise<unknown>> = {
   goods: loadGoods,
@@ -28,6 +30,7 @@ export const TAB_PRELOADERS: Record<string, () => Promise<unknown>> = {
   employees: loadOtherTabs,
   chat: loadVipChat,
   smartlombard: loadSmartLombard,
+  avitopro: loadAvitoPro,
 };
 
 export function prefetchTab(t: string): void {

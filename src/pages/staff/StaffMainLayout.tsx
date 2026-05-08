@@ -13,7 +13,7 @@ import { PROTECTED_TABS, ROLE_BADGE, ROLE_LABEL, getInitials, type StaffTab } fr
 import { FontApplier, MskClock, ThemeBanner, TabErrorBoundary } from "./StaffPwa";
 import {
   GoodsTab, StaffRepairTab, GoldTab, SalesTab, ClientsTab, AnalyticsTab,
-  EmployeesTab, VipChatTab, SmartLombardTab, prefetchTab,
+  EmployeesTab, VipChatTab, SmartLombardTab, AvitoProTab, prefetchTab,
 } from "./StaffLazy";
 import MyProfileModal from "./MyProfileModal";
 import StaffSectionBanner from "./StaffSectionBanner";
@@ -103,6 +103,7 @@ export function StaffMainLayout({
     { k: "clients",      l: "Клиенты",      icon: "Users",         tip: "База клиентов, скидки, СМС-рассылки." },
     { k: "analytics",    l: "Статистика",   icon: "BarChart2",     tip: "Аналитика по продажам, ремонтам и сотрудникам." },
     { k: "smartlombard", l: "СмартЛомбард", icon: "Coins",         tip: "Скупка и продажа Б/У техники, касса, договоры на 14 дней." },
+    { k: "avitopro",     l: "Авито PRO",    icon: "Zap",           tip: "Сводка по объявлениям, статистика просмотров и контактов, авто-действия." },
     ...(isOwnerOrAdmin ? [{ k: "gold" as Tab, l: "Золото", icon: "Gem", tip: "Учёт ювелирных изделий и драгметаллов." }] : []),
     ...(isOwnerOrAdmin ? [{ k: "employees" as Tab, l: "Команда", icon: "UserCog", tip: "Управление сотрудниками, роли, графики." }] : []),
   ];
@@ -273,6 +274,7 @@ export function StaffMainLayout({
             {tab === "gold"      && isOwnerOrAdmin && <GoldTab token={token} />}
             {tab === "employees" && isOwnerOrAdmin && <EmployeesTab token={token} myRole={empRole} />}
             {tab === "smartlombard" && <SmartLombardTab token={token} myRole={empRole} />}
+            {tab === "avitopro"  && <AvitoProTab token={token} />}
             {tab === "chat"      && <VipChatTab token={token} onUnread={setChatUnread} />}
           </React.Suspense>
         </TabErrorBoundary>
