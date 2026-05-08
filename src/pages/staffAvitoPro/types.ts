@@ -48,6 +48,13 @@ export type AutoloadConfig = {
   last_items_count: number;
 };
 
+export type AutoloadStatus = {
+  config: AutoloadConfig | null;
+  eligible: number;
+  no_photo: number;
+  active_visible: number;
+};
+
 export const VAS_TYPES = [
   { v: "xl", l: "XL-объявление", price: "≈399 ₽" },
   { v: "highlight", l: "Выделение цветом", price: "≈79 ₽" },

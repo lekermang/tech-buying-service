@@ -1147,7 +1147,7 @@ def run_schedule(sid: int) -> dict:
 
 
 def build_autoload_xml() -> str:
-    """Генерирует XML-фид для Avito Autoload из активных товаров."""
+    """Генерирует XML-фид для Avito Autoload из активных товаров (только с фото!)."""
     dsn = os.environ['DATABASE_URL']
     conn = psycopg2.connect(dsn)
     cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -1156,6 +1156,10 @@ def build_autoload_xml() -> str:
             f"""SELECT avito_id, title, description, price, category, photos, address, url, main_photo
                 FROM {SCHEMA}.avito_products
                 WHERE status='active' AND is_visible=TRUE
+                  AND (
+                    (main_photo IS NOT NULL AND main_photo != '')
+                    OR (photos IS NOT NULL AND photos::text NOT IN ('[]', 'null', ''))
+                  )
                 ORDER BY id ASC"""
         )
         rows = [dict(r) for r in cur.fetchall()]
@@ -1176,6 +1180,11 @@ def build_autoload_xml() -> str:
                 photos = []
         if not photos and r.get('main_photo'):
             photos = [r['main_photo']]
+        # Защита: пропускаем товар, если нет ни одного валидного фото-URL
+        valid_photos = [p for p in photos if isinstance(p, str) and p.strip()]
+        if not valid_photos:
+            continue
+        photos = valid_photos
         parts.append('<Ad>')
         parts.append(f"<Id>{r['avito_id']}</Id>")
         parts.append(f"<Title>{esc(r.get('title', ''))}</Title>")
@@ -1207,10 +1216,29 @@ def get_autoload_status() -> dict:
         )
         cfg = dict(cur.fetchone() or {})
         cur.execute(
-            f"SELECT COUNT(*) AS n FROM {SCHEMA}.avito_products WHERE status='active' AND is_visible=TRUE"
+            f"""SELECT
+                COUNT(*) FILTER (
+                    WHERE status='active' AND is_visible=TRUE
+                      AND (
+                        (main_photo IS NOT NULL AND main_photo != '')
+                        OR (photos IS NOT NULL AND photos::text NOT IN ('[]', 'null', ''))
+                      )
+                ) AS eligible,
+                COUNT(*) FILTER (
+                    WHERE status='active' AND is_visible=TRUE
+                      AND (main_photo IS NULL OR main_photo='')
+                      AND (photos IS NULL OR photos::text IN ('[]', 'null', ''))
+                ) AS no_photo,
+                COUNT(*) FILTER (WHERE status='active' AND is_visible=TRUE) AS active_visible
+                FROM {SCHEMA}.avito_products"""
         )
-        n = (cur.fetchone() or {}).get('n', 0)
-        return {'config': cfg, 'eligible': int(n or 0)}
+        row = dict(cur.fetchone() or {})
+        return {
+            'config': cfg,
+            'eligible': int(row.get('eligible') or 0),
+            'no_photo': int(row.get('no_photo') or 0),
+            'active_visible': int(row.get('active_visible') or 0),
+        }
     finally:
         cur.close()
         conn.close()

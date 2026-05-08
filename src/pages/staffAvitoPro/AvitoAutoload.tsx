@@ -5,8 +5,11 @@ import { AutoloadConfig, SYNC_URL, formatDate } from "./types";
 export default function AvitoAutoload() {
   const [cfg, setCfg] = useState<AutoloadConfig | null>(null);
   const [eligible, setEligible] = useState(0);
+  const [noPhoto, setNoPhoto] = useState(0);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [photoLoading, setPhotoLoading] = useState(false);
+  const [photoProgress, setPhotoProgress] = useState<{ done: number; total: number } | null>(null);
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
   const flash = (type: "ok" | "err", text: string) => {
@@ -21,6 +24,7 @@ export default function AvitoAutoload() {
       if (d.ok) {
         setCfg(d.config || null);
         setEligible(d.eligible || 0);
+        setNoPhoto(d.no_photo || 0);
       }
     } finally {
       setLoading(false);
@@ -28,6 +32,39 @@ export default function AvitoAutoload() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const loadPhotos = async () => {
+    if (photoLoading) return;
+    setPhotoLoading(true);
+    setPhotoProgress({ done: 0, total: noPhoto });
+    try {
+      // Грузим батчами по 30, чтобы не упереться в таймаут функции
+      const BATCH = 30;
+      let totalDone = 0;
+      let attempts = 0;
+      const maxAttempts = Math.ceil(noPhoto / BATCH) + 2;
+      while (attempts < maxAttempts) {
+        attempts += 1;
+        const r = await fetch(`${SYNC_URL}?action=refresh&limit=${BATCH}`);
+        const d = await r.json();
+        if (!d.ok) {
+          flash("err", d.error || "Ошибка загрузки фото");
+          break;
+        }
+        const processed = Number(d.processed || d.updated || 0);
+        const uploaded = Number(d.photos_uploaded || d.uploaded || 0);
+        totalDone += uploaded;
+        setPhotoProgress({ done: totalDone, total: noPhoto });
+        // Если ничего не обработали — выходим (нечего больше грузить)
+        if (processed === 0 && uploaded === 0) break;
+      }
+      flash("ok", `Загружено фото: ${totalDone}`);
+      await load();
+    } finally {
+      setPhotoLoading(false);
+      setTimeout(() => setPhotoProgress(null), 2000);
+    }
+  };
 
   const regenerate = async () => {
     setBusy(true);
@@ -87,20 +124,90 @@ export default function AvitoAutoload() {
               <Icon name="Upload" size={16} className="text-emerald-300" />
               <span className="font-oswald font-bold text-white text-sm uppercase tracking-wide">Avito Autoload</span>
             </div>
-            <div className="text-[11px] text-white/60 mt-0.5">
-              Публикация товаров на Авито через XML-фид · готовых к публикации: <b className="text-white/85">{eligible}</b>
+            <div className="text-[11px] text-white/60 mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
+              <span>
+                <Icon name="CheckCircle2" size={11} className="inline -mt-0.5 mr-1 text-emerald-400" />
+                Готовы к публикации: <b className="text-emerald-300">{eligible}</b>
+              </span>
+              {noPhoto > 0 && (
+                <span>
+                  <Icon name="ImageOff" size={11} className="inline -mt-0.5 mr-1 text-orange-400" />
+                  Без фото: <b className="text-orange-300">{noPhoto}</b>
+                </span>
+              )}
             </div>
           </div>
           <button
             onClick={regenerate}
-            disabled={busy}
-            className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-600 to-teal-500 text-white font-oswald font-bold text-xs px-3 py-2 rounded uppercase tracking-wide disabled:opacity-50"
+            disabled={busy || eligible === 0}
+            className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-600 to-teal-500 text-white font-oswald font-bold text-xs px-3 py-2 rounded uppercase tracking-wide disabled:opacity-40"
+            title={eligible === 0 ? "Нет товаров с фото — сначала загрузите фото" : "Создать актуальный XML-фид"}
           >
             <Icon name={busy ? "Loader2" : "RefreshCw"} size={12} className={busy ? "animate-spin" : ""} />
             Сгенерировать XML
           </button>
         </div>
       </div>
+
+      {/* Плашка-проблема "товары без фото" */}
+      {noPhoto > 0 && (
+        <div className="rounded-xl bg-gradient-to-br from-orange-500/15 to-red-500/5 border-2 border-orange-500/40 p-3 shadow-[0_0_20px_rgba(251,146,60,0.15)]">
+          <div className="flex items-start gap-3">
+            <div className="shrink-0 w-9 h-9 rounded-lg bg-orange-500/20 border border-orange-500/40 flex items-center justify-center">
+              <Icon name="AlertTriangle" size={18} className="text-orange-300" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-oswald font-bold text-white text-sm uppercase tracking-wide">
+                Товары без фото: {noPhoto}
+              </div>
+              <div className="text-[11px] text-white/70 mt-1 leading-relaxed">
+                Авито отклонит объявления без изображений. Загружу фото с самого Авито за 1 клик —
+                это займёт минуту-две.
+              </div>
+              {photoProgress && (
+                <div className="mt-2">
+                  <div className="flex items-center justify-between text-[10px] text-white/60 mb-1">
+                    <span>Загружаю фото...</span>
+                    <span className="font-oswald font-bold text-orange-300">
+                      {photoProgress.done} / {photoProgress.total}
+                    </span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-orange-500 to-amber-400 transition-all"
+                      style={{
+                        width: `${Math.min(100, (photoProgress.done / Math.max(1, photoProgress.total)) * 100)}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+              <button
+                onClick={loadPhotos}
+                disabled={photoLoading}
+                className="mt-2.5 inline-flex items-center gap-1.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:shadow-[0_0_16px_rgba(251,146,60,0.4)] text-white font-oswald font-bold text-xs px-3 py-1.5 rounded uppercase tracking-wide disabled:opacity-50 transition-all"
+              >
+                <Icon
+                  name={photoLoading ? "Loader2" : "ImagePlus"}
+                  size={12}
+                  className={photoLoading ? "animate-spin" : ""}
+                />
+                {photoLoading ? "Загружаю..." : `Загрузить фото с Авито`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Состояние "всё ок" */}
+      {noPhoto === 0 && eligible > 0 && (
+        <div className="rounded-xl bg-gradient-to-br from-emerald-500/10 to-transparent border border-emerald-500/30 p-3 flex items-center gap-2">
+          <Icon name="CheckCircle2" size={16} className="text-emerald-300 shrink-0" />
+          <div className="text-[12px] text-white/80">
+            <b className="text-emerald-300">Все товары с фото.</b> Можно генерировать фид и подключать автозагрузку на Авито.
+          </div>
+        </div>
+      )}
 
       {msg && (
         <div className={`text-[11px] rounded px-3 py-2 flex items-center gap-2 ${
@@ -189,7 +296,7 @@ export default function AvitoAutoload() {
       <div className="rounded-xl bg-gradient-to-br from-[#FFD700]/10 to-transparent border border-[#FFD700]/30 p-3 flex items-start gap-2">
         <Icon name="Lightbulb" size={14} className="text-[#FFD700] shrink-0 mt-0.5" />
         <div className="text-[11px] text-white/70 leading-relaxed">
-          <b className="text-white/90">Важно:</b> в фид попадают только товары со статусом «Активный» и галочкой «Показывать на сайте». Товары без фото будут отклонены Авито — сначала загрузи фото в разделе «Витрина Авито».
+          <b className="text-white/90">Как это работает:</b> в фид попадают только активные товары с фото и галочкой «Показывать на сайте». Если у товара нет фото — он автоматически исключается из фида (Авито такие отклонит). Кнопка <b className="text-white/90">«Загрузить фото с Авито»</b> подтянет недостающие изображения за один клик.
         </div>
       </div>
     </div>
