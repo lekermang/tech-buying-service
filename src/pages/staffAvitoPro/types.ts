@@ -1,5 +1,70 @@
 export const SYNC_URL = "https://functions.poehali.dev/49e23745-1449-4e4c-80c2-e7967f3c5584";
 
+export type SubTab = "dashboard" | "chat" | "promote" | "autoload";
+
+export type ChatItem = {
+  chat_id: string;
+  avito_id: number | null;
+  item_title: string | null;
+  user_name: string | null;
+  user_avatar: string | null;
+  last_message: string | null;
+  last_message_at: string | null;
+  unread_count: number;
+};
+
+export type ChatStats = {
+  unread_chats: number;
+  unread_total: number;
+  total: number;
+};
+
+export type ChatMessage = {
+  message_id: string;
+  author_id: string;
+  is_outgoing: boolean;
+  text: string;
+  type: string;
+  created_at: string | null;
+};
+
+export type Schedule = {
+  id?: number;
+  name: string;
+  category: string | null;
+  weekdays: string;
+  hour: number;
+  vas_type: string;
+  is_active: boolean;
+  last_run_at?: string | null;
+  last_run_count?: number;
+};
+
+export type AutoloadConfig = {
+  id?: number;
+  feed_url: string | null;
+  is_enabled: boolean;
+  last_generated_at: string | null;
+  last_items_count: number;
+};
+
+export const VAS_TYPES = [
+  { v: "xl", l: "XL-объявление", price: "≈399 ₽" },
+  { v: "highlight", l: "Выделение цветом", price: "≈79 ₽" },
+  { v: "premium", l: "Премиум", price: "≈1199 ₽" },
+  { v: "vip", l: "VIP-блок", price: "≈499 ₽" },
+];
+
+export const WEEKDAYS = [
+  { v: "1", l: "Пн" },
+  { v: "2", l: "Вт" },
+  { v: "3", l: "Ср" },
+  { v: "4", l: "Чт" },
+  { v: "5", l: "Пт" },
+  { v: "6", l: "Сб" },
+  { v: "7", l: "Вс" },
+];
+
 export type Totals = {
   active: number;
   archived: number;
