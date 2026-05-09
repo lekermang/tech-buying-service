@@ -1362,6 +1362,92 @@ def handler(event: dict, context: Any) -> dict:
         except Exception as e:
             return _resp(500, {'ok': False, 'error': str(e)})
 
+    if action == 'find_by_query':
+        # Поиск активных Авито-объявлений по названию/IMEI для снятия после полного выкупа в Смарт-Ломбарде
+        q = (qs.get('q') or '').strip()
+        imei = (qs.get('imei') or '').strip()
+        if not q and not imei:
+            return _resp(200, {'ok': True, 'items': []})
+        dsn = os.environ['DATABASE_URL']
+        conn = psycopg2.connect(dsn)
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        try:
+            # Сначала по IMEI/serial — точное совпадение
+            items = []
+            if imei and len(imei) >= 6:
+                cur.execute(
+                    f"""SELECT id, avito_id, title, price, url, main_photo
+                        FROM {SCHEMA}.avito_products
+                        WHERE status='active'
+                          AND (raw_data::text ILIKE %s OR description ILIKE %s OR title ILIKE %s)
+                        ORDER BY id DESC LIMIT 20""",
+                    (f'%{imei}%', f'%{imei}%', f'%{imei}%')
+                )
+                items = [dict(r) for r in cur.fetchall()]
+            # Если по IMEI ничего — ищем по названию (нечётко: разбиваем на слова)
+            if not items and q:
+                words = [w for w in q.split() if len(w) >= 2][:5]
+                if words:
+                    where_parts = ['status=%s']
+                    params: list = ['active']
+                    for w in words:
+                        where_parts.append('title ILIKE %s')
+                        params.append(f'%{w}%')
+                    sql = (
+                        f"SELECT id, avito_id, title, price, url, main_photo "
+                        f"FROM {SCHEMA}.avito_products "
+                        f"WHERE {' AND '.join(where_parts)} "
+                        f"ORDER BY id DESC LIMIT 20"
+                    )
+                    cur.execute(sql, params)
+                    items = [dict(r) for r in cur.fetchall()]
+            # Возвращаем id (avito_id используется в UI как идентификатор)
+            out = []
+            for it in items:
+                out.append({
+                    'id': it.get('avito_id'),
+                    'title': it.get('title'),
+                    'price': float(it['price']) if it.get('price') is not None else None,
+                    'url': it.get('url'),
+                    'main_photo': it.get('main_photo'),
+                })
+            return _resp(200, {'ok': True, 'items': out})
+        except Exception as e:
+            return _resp(500, {'ok': False, 'error': str(e)})
+        finally:
+            cur.close(); conn.close()
+
+    if action == 'archive_product':
+        # Снять Авито-товар с публикации (status='archived', is_visible=FALSE)
+        try:
+            body = json.loads(event.get('body') or '{}')
+        except Exception:
+            body = {}
+        avito_id = body.get('avito_id') or qs.get('avito_id')
+        if not avito_id:
+            return _resp(400, {'ok': False, 'error': 'avito_id required'})
+        try:
+            avito_id = int(avito_id)
+        except Exception:
+            return _resp(400, {'ok': False, 'error': 'avito_id must be int'})
+        dsn = os.environ['DATABASE_URL']
+        conn = psycopg2.connect(dsn)
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                f"UPDATE {SCHEMA}.avito_products "
+                f"SET status='archived', is_visible=FALSE, updated_at=NOW() "
+                f"WHERE avito_id=%s",
+                (avito_id,)
+            )
+            conn.commit()
+            return _resp(200, {'ok': True, 'avito_id': avito_id})
+        except Exception as e:
+            conn.rollback()
+            return _resp(500, {'ok': False, 'error': str(e)})
+        finally:
+            cur.close(); conn.close()
+
     if action == 'probe':
         return _resp(410, {'ok': False, 'error': 'deprecated'})
 

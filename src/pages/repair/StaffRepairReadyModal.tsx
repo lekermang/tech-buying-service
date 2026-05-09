@@ -15,13 +15,23 @@ type Props = {
 
 export default function StaffRepairReadyModal({ order, form, error, saving, onFormChange, onSubmit, onClose }: Props) {
   return (
-    <div className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-[200] bg-black/85 backdrop-blur-md flex items-end sm:items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200"
+      onClick={onClose}
+    >
       {/* Внешний золотой HALO */}
-      <div className="relative w-full max-w-sm" onClick={e => e.stopPropagation()}>
+      <div
+        className="relative w-full max-w-sm"
+        onClick={e => e.stopPropagation()}
+        style={{
+          maxHeight: 'min(92dvh, calc(100dvh - 110px))',
+          marginBottom: 'max(env(safe-area-inset-bottom, 0px), 8px)',
+        }}
+      >
         <span aria-hidden className="absolute -inset-3 rounded-3xl pointer-events-none" style={{ background: "radial-gradient(closest-side,rgba(255,215,0,0.30),transparent 75%)", filter: "blur(20px)" }} />
         {/* Conic-gradient рамка */}
-        <div className="relative p-[1.5px] rounded-2xl bg-[conic-gradient(from_180deg_at_50%_50%,rgba(255,215,0,0.7)_0deg,rgba(255,215,0,0.15)_180deg,rgba(255,243,160,0.7)_360deg)] shadow-[0_12px_40px_rgba(255,215,0,0.25)]">
-          <div className="relative bg-gradient-to-br from-[#1A1A1A] via-[#141414] to-[#0E0E0E] p-5 rounded-2xl overflow-hidden">
+        <div className="relative p-[1.5px] rounded-2xl bg-[conic-gradient(from_180deg_at_50%_50%,rgba(255,215,0,0.7)_0deg,rgba(255,215,0,0.15)_180deg,rgba(255,243,160,0.7)_360deg)] shadow-[0_12px_40px_rgba(255,215,0,0.25)] overflow-hidden flex flex-col" style={{ maxHeight: 'inherit' }}>
+          <div className="relative bg-gradient-to-br from-[#1A1A1A] via-[#141414] to-[#0E0E0E] p-5 rounded-2xl overflow-y-auto overscroll-contain" style={{ maxHeight: 'inherit' }}>
             <div className="absolute -top-16 -left-16 w-40 h-40 rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(255,215,0,0.10)" }} />
             <div className="absolute -bottom-16 -right-16 w-40 h-40 rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(255,215,0,0.06)" }} />
             <span aria-hidden className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#FFD700]/60 to-transparent" />

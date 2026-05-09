@@ -157,11 +157,17 @@ function CashMovementForm({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const nowLocal = () => {
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
   const [accountId, setAccountId] = useState<number | "">(defaultAccountId || "");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState(direction === "out" ? "Прочее" : "Внесение");
   const [reason, setReason] = useState("");
   const [takenBy, setTakenBy] = useState("");
+  const [createdAt, setCreatedAt] = useState<string>(nowLocal());
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const cats = direction === "out" ? CATEGORIES_OUT : CATEGORIES_IN;
@@ -175,6 +181,7 @@ function CashMovementForm({
     setSaving(true); setErr(null);
     const r = await slApi(token, "cash_movement_create", { method: "POST", body: {
       account_id: accountId, direction, amount: Number(amount), category, reason, taken_by: takenBy,
+      created_at: createdAt || null,
     }});
     setSaving(false);
     if (r.ok) onSaved();
@@ -231,6 +238,10 @@ function CashMovementForm({
 
         <SLField label="На что / комментарий">
           <SLTextarea rows={2} value={reason} onChange={e => setReason(e.target.value)} placeholder="Например: купить кабели для ремонта" />
+        </SLField>
+
+        <SLField label="Дата операции" hint="По умолчанию — сейчас. Поменяй для проведения задним числом.">
+          <SLInput type="datetime-local" value={createdAt} onChange={e => setCreatedAt(e.target.value)} iconLeft="Calendar" />
         </SLField>
 
         {err && <div className="rounded-md bg-red-500/10 border border-red-500/30 text-red-300 px-2 py-1.5 text-[12px] flex items-center gap-1.5"><Icon name="AlertTriangle" size={11} />{err}</div>}

@@ -4,6 +4,7 @@ import {
   c14dApi, fmt, fmtDate, STATUS_BADGE,
   type C14dDetail, type C14dCashAccount,
 } from "./types";
+import { SYNC_URL } from "../../staffAvitoPro/types";
 import { printContract14d } from "./printContract14d";
 import {
   SLSection, SLField, SLInput, SLTextarea, SLSelect,
@@ -26,6 +27,19 @@ export default function C14dDetailView({ token, contractId, onBack }: Props) {
   const [accounts, setAccounts] = useState<C14dCashAccount[]>([]);
   const [payAccountId, setPayAccountId] = useState<string>("");
   const [paySkipCash, setPaySkipCash] = useState(false);
+  // Дата операции (по умолчанию — сейчас, формат datetime-local)
+  const nowLocal = () => {
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+  const [payPaidAt, setPayPaidAt] = useState<string>(nowLocal());
+
+  // Авито-объявления для снятия после полного выкупа
+  type AvitoMatch = { id: number; title: string; price: number | null; url: string | null; main_photo: string | null };
+  const [avitoMatches, setAvitoMatches] = useState<AvitoMatch[] | null>(null);
+  const [avitoModalOpen, setAvitoModalOpen] = useState(false);
+  const [avitoArchiving, setAvitoArchiving] = useState<number | null>(null);
 
   const [photoSrc, setPhotoSrc] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<null | { kind: "terminate" | "close"; reason?: string }>(null);
@@ -51,24 +65,67 @@ export default function C14dDetailView({ token, contractId, onBack }: Props) {
 
   useEffect(() => { reload();   }, [contractId]);
 
+  const findAvitoListings = async () => {
+    if (!c) return;
+    const queryParts = [c.item_brand, c.item_model].filter(Boolean) as string[];
+    const query = queryParts.join(" ").trim();
+    const imei = c.serial_number || "";
+    if (!query && !imei) {
+      setAvitoMatches([]);
+      setAvitoModalOpen(true);
+      return;
+    }
+    try {
+      const r = await fetch(
+        `${SYNC_URL}?action=find_by_query&q=${encodeURIComponent(query)}&imei=${encodeURIComponent(imei)}`,
+      );
+      const d = await r.json();
+      setAvitoMatches(d.ok && Array.isArray(d.items) ? d.items : []);
+    } catch {
+      setAvitoMatches([]);
+    }
+    setAvitoModalOpen(true);
+  };
+
+  const archiveAvitoItem = async (avitoId: number) => {
+    setAvitoArchiving(avitoId);
+    try {
+      await fetch(`${SYNC_URL}?action=archive_product`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ avito_id: avitoId }),
+      });
+      setAvitoMatches(prev => prev?.filter(m => m.id !== avitoId) || []);
+    } finally {
+      setAvitoArchiving(null);
+    }
+  };
+
   const submitPayment = async () => {
     if (!c) return;
     const a = Number(paySum);
     if (!a || a <= 0) { setErr("Сумма должна быть больше 0"); return; }
     setPaySaving(true);
-    const r = await c14dApi(token, "payment", {
+    const r = await c14dApi<{ status?: string }>(token, "payment", {
       method: "POST",
       body: {
         contract_id: c.id, amount: a, payment_type: payType,
         comment: payComment || null,
         cash_account_id: payAccountId ? Number(payAccountId) : null,
         skip_cash: paySkipCash,
+        paid_at: payPaidAt || null,
       },
     });
     setPaySaving(false);
     if (!r.ok) { setErr(r.error || "Ошибка платежа"); return; }
+    const wasFullPayment = payType === "full" || r.data?.status === "closed";
     setPayOpen(false); setPaySum(""); setPayComment(""); setPayType("partial"); setPaySkipCash(false);
-    reload();
+    setPayPaidAt(nowLocal());
+    await reload();
+    // После полного выкупа — ищем в Авито-каталоге, чтобы снять с продажи
+    if (wasFullPayment) {
+      findAvitoListings();
+    }
   };
 
   const submitConfirm = async () => {
@@ -269,6 +326,18 @@ export default function C14dDetailView({ token, contractId, onBack }: Props) {
         onClose={() => !paySaving && setPayOpen(false)}
         title="Внести платёж"
         icon="Wallet"
+        footer={
+          <SLButton
+            variant="gold"
+            size="lg"
+            icon={paySaving ? "Loader2" : "Check"}
+            onClick={submitPayment}
+            disabled={paySaving}
+            className="w-full"
+          >
+            Подтвердить платёж
+          </SLButton>
+        }
       >
         <div className="text-[11px] text-white/55 mb-2">Остаток: <b className="text-red-300">{fmt(c.remaining_debt)} ₽</b></div>
 
@@ -299,6 +368,12 @@ export default function C14dDetailView({ token, contractId, onBack }: Props) {
               <div className="text-[9px] text-emerald-300/70 mt-0.5">Сумма приведётся к {fmt(c.today_calc.today_remaining)} ₽ (на сегодня)</div>
             )}
           </SLField>
+          <SLField
+            label="Дата операции"
+            hint="По умолчанию — сейчас. Поменяй для проведения задним числом."
+          >
+            <SLInput type="datetime-local" value={payPaidAt} onChange={e => setPayPaidAt(e.target.value)} iconLeft="Calendar" />
+          </SLField>
           <SLField label="Касса прихода">
             <SLSelect value={payAccountId} onChange={e => setPayAccountId(e.target.value)} disabled={paySkipCash}>
               {accounts.length === 0 && <option value="">Нет касс</option>}
@@ -309,10 +384,73 @@ export default function C14dDetailView({ token, contractId, onBack }: Props) {
           <SLField label="Комментарий">
             <SLTextarea rows={2} value={payComment} onChange={e => setPayComment(e.target.value)} />
           </SLField>
-          <SLButton variant="gold" size="lg" icon={paySaving ? "Loader2" : "Check"} onClick={submitPayment} disabled={paySaving} className="w-full">
-            Подтвердить платёж
-          </SLButton>
         </div>
+      </SLModal>
+
+      {/* Модал: Авито-объявления для снятия после полного выкупа */}
+      <SLModal
+        open={avitoModalOpen}
+        onClose={() => setAvitoModalOpen(false)}
+        title="Снять с Авито"
+        icon="Search"
+        maxWidth="max-w-lg"
+        footer={
+          <SLButton variant="dark" onClick={() => setAvitoModalOpen(false)}>Закрыть</SLButton>
+        }
+      >
+        <div className="rounded-md bg-emerald-500/10 border border-emerald-500/30 p-2 mb-3 text-[11px] text-emerald-300/90">
+          <Icon name="CheckCircle2" size={11} className="inline -mt-0.5 mr-1" />
+          Договор закрыт, телефон возвращён клиенту. Товар автоматически убран из раздела б/у.
+          {avitoMatches && avitoMatches.length > 0 && " Ниже — активные объявления на Авито с похожим названием. Сними их с публикации, чтобы не продать тот же телефон повторно."}
+        </div>
+
+        {avitoMatches === null && (
+          <div className="text-center py-6 text-white/40"><Icon name="Loader2" size={16} className="animate-spin inline" /> Ищу объявления...</div>
+        )}
+
+        {avitoMatches && avitoMatches.length === 0 && (
+          <div className="text-center py-4 text-white/50 text-[12px]">
+            <Icon name="Inbox" size={20} className="inline mb-1 text-white/30" />
+            <div>Совпадений в Авито-каталоге не найдено</div>
+            <div className="text-[10px] text-white/35 mt-0.5">Возможно, телефона уже нет на витрине</div>
+          </div>
+        )}
+
+        {avitoMatches && avitoMatches.length > 0 && (
+          <div className="space-y-2">
+            {avitoMatches.map(m => (
+              <div key={m.id} className="rounded-lg bg-white/5 border border-white/10 p-2 flex gap-2">
+                {m.main_photo && (
+                  <img src={m.main_photo} alt="" className="w-14 h-14 rounded object-cover shrink-0" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="text-[12px] font-bold text-white truncate">{m.title}</div>
+                  {m.price !== null && <div className="text-[11px] text-[#FFD700]">{fmt(m.price)} ₽</div>}
+                  <div className="flex gap-1.5 mt-1.5 flex-wrap">
+                    {m.url && (
+                      <a
+                        href={m.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/40 text-blue-200 text-[10px] font-bold uppercase tracking-wide"
+                      >
+                        <Icon name="ExternalLink" size={10} /> Открыть на Авито
+                      </a>
+                    )}
+                    <button
+                      onClick={() => archiveAvitoItem(m.id)}
+                      disabled={avitoArchiving === m.id}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-200 text-[10px] font-bold uppercase tracking-wide disabled:opacity-50"
+                    >
+                      <Icon name={avitoArchiving === m.id ? "Loader2" : "Archive"} size={10} className={avitoArchiving === m.id ? "animate-spin" : ""} />
+                      Снять
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </SLModal>
 
       {/* Модал расторжения / закрытия */}

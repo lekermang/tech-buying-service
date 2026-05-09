@@ -93,20 +93,22 @@ export function SLModal({
   footer?: ReactNode;
 }) {
   if (!open) return null;
-  // ВАЖНО для iPhone Safari: фиксированная панель браузера и Home Indicator
-  // могут перекрывать модалку. Используем 100dvh + safe-area-inset-bottom,
-  // плюс резерв 84px (высота нижней навигации приложения + запас).
+  // iPhone Safari + наш staff-tabbar (Ремонт/Чат/.../Команда) внизу занимают ~80px.
+  // Резервируем достаточно места, чтобы кнопка "Подтвердить" не уезжала под бар.
+  // 110px = высота нашего таб-бара + Safari-бара + запас.
+  const bottomReserve = 'max(env(safe-area-inset-bottom, 0px), 12px)';
   return (
     <div
-      className="fixed inset-0 z-[80] bg-black/75 backdrop-blur-sm flex items-end sm:items-center justify-center p-2 sm:p-3 animate-[fadeIn_0.15s_ease]"
-      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)' }}
+      className="fixed inset-0 z-[80] bg-black/75 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-3 animate-[fadeIn_0.15s_ease]"
       onClick={onClose}
     >
       <div
-        className={`w-full ${maxWidth} ${slClasses.card} flex flex-col rounded-b-2xl sm:rounded-2xl`}
+        className={`w-full ${maxWidth} ${slClasses.card} flex flex-col rounded-t-2xl sm:rounded-2xl`}
         style={{
-          // 100dvh учитывает адресную строку Safari — иначе модалка уезжает под бар
-          maxHeight: 'min(92dvh, calc(100dvh - 96px))',
+          // dvh — динамическая высота viewport, корректно учитывает Safari address bar.
+          // Резервируем 110px снизу под наш таб-бар приложения (Ремонт/Чат/Команда).
+          maxHeight: 'min(92dvh, calc(100dvh - 110px))',
+          marginBottom: `calc(${bottomReserve} + 4px)`,
         }}
         onClick={e => e.stopPropagation()}
       >
@@ -117,7 +119,7 @@ export function SLModal({
           </div>
           <button onClick={onClose} className="text-white/40 hover:text-white shrink-0 p-1.5 -mr-1 active:scale-90"><Icon name="X" size={16} /></button>
         </div>
-        <div className="flex-1 overflow-y-auto overscroll-contain scrollbar-premium p-3">
+        <div className="flex-1 overflow-y-auto overscroll-contain scrollbar-premium p-3 pb-4">
           {children}
         </div>
         {footer && (

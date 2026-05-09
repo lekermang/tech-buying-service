@@ -1961,6 +1961,14 @@ def cash_movement_create(body, employee):
     category = body.get('category') or ('Поступление' if direction == 'in' else 'Расход')
     reason = body.get('reason') or ''
     taken_by = body.get('taken_by') or ''
+    # Дата операции (опционально, для проведения задним числом)
+    created_at_raw = body.get('created_at') or ''
+    created_at_sql = 'NOW()'
+    if isinstance(created_at_raw, str) and created_at_raw.strip():
+        s = created_at_raw.strip().replace('T', ' ')[:19]
+        safe = ''.join(ch for ch in s if ch.isdigit() or ch in '-: ')
+        if len(safe) >= 10:
+            created_at_sql = f"'{safe}'::timestamptz"
     conn = get_conn(); cur = conn.cursor()
     cur.execute(f"SELECT balance, branch_id FROM {SCHEMA}.slshop_cash_accounts WHERE id={int(account_id)}")
     row = cur.fetchone()
@@ -1970,9 +1978,9 @@ def cash_movement_create(body, employee):
     branch_id = row[1]
     new_balance = balance + amount_f if direction == 'in' else balance - amount_f
     cur.execute(
-        f"INSERT INTO {SCHEMA}.slshop_cash_movements (account_id, direction, amount, balance_after, category, reason, taken_by, employee_name, branch_id) "
+        f"INSERT INTO {SCHEMA}.slshop_cash_movements (account_id, direction, amount, balance_after, category, reason, taken_by, employee_name, branch_id, created_at) "
         f"VALUES ({int(account_id)}, {_esc(direction)}, {amount_f}, {new_balance}, {_esc(category)}, {_esc(reason)}, {_esc(taken_by)}, "
-        f"{_esc(employee.get('full_name') if employee else None)}, {_esc(branch_id)}) RETURNING id"
+        f"{_esc(employee.get('full_name') if employee else None)}, {_esc(branch_id)}, {created_at_sql}) RETURNING id"
     )
     mid = cur.fetchone()[0]
     cur.execute(f"UPDATE {SCHEMA}.slshop_cash_accounts SET balance={new_balance} WHERE id={int(account_id)}")
@@ -2187,6 +2195,8 @@ def sell_item(body, employee):
     client_id = body.get('client_id')
     contract = body.get('contract_number')
     note = body.get('note')
+    # Дата операции (опционально, для проведения задним числом)
+    sold_at_raw = (body.get('sold_at') or '').strip() if isinstance(body.get('sold_at'), str) else ''
     # Сколько штук продаём за один раз (для партий аксессуаров). По умолчанию 1.
     try:
         sell_qty = int(body.get('quantity') or 1)
@@ -2198,6 +2208,15 @@ def sell_item(body, employee):
         return _err(400, 'item_id обязателен')
     if amount in (None, ''):
         return _err(400, 'amount обязателен')
+    # Готовим SQL-выражение даты: если передали sold_at — используем его, иначе NOW()
+    sold_at_sql = 'NOW()'
+    if sold_at_raw:
+        # формат datetime-local: '2026-05-09T14:30' или 'YYYY-MM-DD'
+        s = sold_at_raw.replace('T', ' ')[:19]
+        # экранирование на всякий случай (только цифры/дефисы/двоеточия/пробелы)
+        safe = ''.join(ch for ch in s if ch.isdigit() or ch in '-: ')
+        if len(safe) >= 10:
+            sold_at_sql = f"'{safe}'::timestamptz"
     conn = get_conn(); cur = conn.cursor()
     cur.execute(f"SELECT status, COALESCE(quantity, 1) FROM {SCHEMA}.slshop_items WHERE id={int(item_id)}")
     row = cur.fetchone()
@@ -2216,15 +2235,15 @@ def sell_item(body, employee):
     ok_cl, client_id_norm, _err_cl = _validate_fk(cur, 'slshop_clients', client_id, 'client_id')
     client_id = client_id_norm if ok_cl else None
     cur.execute(
-        f"INSERT INTO {SCHEMA}.slshop_operations (op_type, item_id, client_id, amount, payment_method, contract_number, note, employee_name, status_from, status_to) "
-        f"VALUES ('sell', {int(item_id)}, {_esc(client_id)}, {_esc(amount)}, {_esc(payment)}, {_esc(contract)}, {_esc(note)}, {_esc(employee.get('full_name') if employee else None)}, {_esc(cur_status)}, {_esc(final_status)}) RETURNING id"
+        f"INSERT INTO {SCHEMA}.slshop_operations (op_type, item_id, client_id, amount, payment_method, contract_number, note, employee_name, status_from, status_to, created_at) "
+        f"VALUES ('sell', {int(item_id)}, {_esc(client_id)}, {_esc(amount)}, {_esc(payment)}, {_esc(contract)}, {_esc(note)}, {_esc(employee.get('full_name') if employee else None)}, {_esc(cur_status)}, {_esc(final_status)}, {sold_at_sql}) RETURNING id"
     )
     op_id = cur.fetchone()[0]
     if new_qty <= 0:
         # Партия закрыта (или это был штучный товар) — переводим в sold
         cur.execute(
             f"UPDATE {SCHEMA}.slshop_items SET status='sold', sell_price={_esc(amount)}, sell_operation_id={op_id}, "
-            f"sell_at=NOW(), warranty_until=(CURRENT_DATE + COALESCE(warranty_days, 365) * INTERVAL '1 day')::date, "
+            f"sell_at={sold_at_sql}, warranty_until=(CURRENT_DATE + COALESCE(warranty_days, 365) * INTERVAL '1 day')::date, "
             f"quantity=0, updated_at=NOW() WHERE id={int(item_id)} RETURNING branch_id, title"
         )
     else:

@@ -537,6 +537,18 @@ def action_payment(body, actor):
     comment = body.get('comment') or None
     cash_account_id = body.get('cash_account_id')
     skip_cash = bool(body.get('skip_cash'))
+    # Дата операции (datetime-local: '2026-05-09T14:30'). Если не передано — NOW()
+    paid_at_raw = (body.get('paid_at') or '').strip()
+    paid_at_value = None
+    if paid_at_raw:
+        try:
+            # datetime-local формат
+            paid_at_value = datetime.strptime(paid_at_raw[:16], '%Y-%m-%dT%H:%M')
+        except Exception:
+            try:
+                paid_at_value = datetime.strptime(paid_at_raw[:10], '%Y-%m-%d')
+            except Exception:
+                paid_at_value = None
 
     conn = get_conn(); cur = conn.cursor()
     try:
@@ -609,14 +621,24 @@ def action_payment(body, actor):
                     actor
                 )
 
-        cur.execute(
-            f"INSERT INTO {SCHEMA}.contracts_14d_payments "
-            f"(contract_id, amount, payment_type, comment, recorded_by, "
-            f"cash_account_id, cash_movement_id, income_type) "
-            f"VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
-            (cid, amount, payment_type, comment, (actor or {}).get('full_name'),
-             cash_id, movement_id, income_type)
-        )
+        if paid_at_value is not None:
+            cur.execute(
+                f"INSERT INTO {SCHEMA}.contracts_14d_payments "
+                f"(contract_id, amount, payment_type, comment, recorded_by, "
+                f"cash_account_id, cash_movement_id, income_type, paid_at) "
+                f"VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+                (cid, amount, payment_type, comment, (actor or {}).get('full_name'),
+                 cash_id, movement_id, income_type, paid_at_value)
+            )
+        else:
+            cur.execute(
+                f"INSERT INTO {SCHEMA}.contracts_14d_payments "
+                f"(contract_id, amount, payment_type, comment, recorded_by, "
+                f"cash_account_id, cash_movement_id, income_type) "
+                f"VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+                (cid, amount, payment_type, comment, (actor or {}).get('full_name'),
+                 cash_id, movement_id, income_type)
+            )
         payment_id = cur.fetchone()[0]
 
         new_status = 'closed' if new_remaining <= 0 else 'active'
