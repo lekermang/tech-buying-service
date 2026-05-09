@@ -655,7 +655,382 @@ def action_invite_create(body, headers):
         f"(вход без регистрации, ответим за минуту)"
     )
     sent, sms_info = send_sms(phone, sms_text)
-    return _ok({'ok': True, 'invite_token': token, 'url': invite_url, 'sms_sent': bool(sent), 'sms_info': sms_info})
+    # Параллельно пробуем отправить через Telegram (если у клиента уже был tg_id) и WhatsApp-ссылку
+    tg_sent = False
+    try:
+        digits = _normalize_phone(phone)
+        cn = _conn(); cu = cn.cursor()
+        cu.execute(f"SELECT telegram_id FROM {SCHEMA}.pchat_clients WHERE phone={_esc(digits)} AND telegram_id IS NOT NULL LIMIT 1")
+        rr = cu.fetchone()
+        cu.close(); cn.close()
+        if rr and rr[0]:
+            bot_token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+            if bot_token:
+                requests.post(
+                    f'https://api.telegram.org/bot{bot_token}/sendMessage',
+                    json={'chat_id': rr[0],
+                          'text': f"💬 Скупка24: вас приглашают в персональный чат с менеджером.\nОткройте: {invite_url}",
+                          'disable_web_page_preview': False},
+                    timeout=8,
+                )
+                tg_sent = True
+    except Exception:
+        pass
+    digits = _normalize_phone(phone)
+    wa_url = f'https://wa.me/{digits}?text=' + requests.utils.quote(
+        f"Здравствуйте! Это Скупка24. Ваш персональный чат с менеджером: {invite_url}"
+    )
+    return _ok({
+        'ok': True,
+        'invite_token': token,
+        'url': invite_url,
+        'sms_sent': bool(sent), 'sms_info': sms_info,
+        'tg_sent': tg_sent,
+        'wa_url': wa_url,
+    })
+
+
+# ═══════════════════ TELEGRAM LOGIN WIDGET ═══════════════════
+import hashlib
+import hmac as hmac_module
+
+
+def _verify_tg_widget(payload: dict, bot_token: str) -> bool:
+    """Проверка подписи Telegram Login Widget по HMAC-SHA256 от bot_token."""
+    auth_hash = payload.get('hash')
+    if not auth_hash or not bot_token:
+        return False
+    data_check = '\n'.join(
+        f'{k}={v}' for k, v in sorted(payload.items()) if k != 'hash' and v is not None
+    )
+    secret = hashlib.sha256(bot_token.encode()).digest()
+    calc_hash = hmac_module.new(secret, data_check.encode(), hashlib.sha256).hexdigest()
+    return hmac_module.compare_digest(calc_hash, auth_hash)
+
+
+def action_verify_telegram(body):
+    """Вход через Telegram Login Widget. Принимает: id, first_name, last_name?, username?, photo_url?, auth_date, hash."""
+    bot_token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+    if not bot_token:
+        return _err(500, 'TELEGRAM_BOT_TOKEN not configured')
+    payload = body.get('tg') or body
+    if not _verify_tg_widget(payload, bot_token):
+        return _err(401, 'Telegram signature invalid')
+    try:
+        auth_date = int(payload.get('auth_date') or 0)
+    except Exception:
+        auth_date = 0
+    if not auth_date or (datetime.utcnow().timestamp() - auth_date) > 86400:
+        return _err(401, 'Auth-data слишком старая')
+    tg_id = int(payload.get('id') or 0)
+    first = (payload.get('first_name') or '').strip()
+    last = (payload.get('last_name') or '').strip()
+    username = (payload.get('username') or '').strip() or None
+    photo = (payload.get('photo_url') or '').strip() or None
+    name = (first + ' ' + last).strip() or username or 'Клиент TG'
+    if not tg_id:
+        return _err(400, 'No tg id')
+    conn = _conn(); cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(f"SELECT id, phone FROM {SCHEMA}.pchat_clients WHERE telegram_id={tg_id} LIMIT 1")
+    existing = cur.fetchone()
+    auth = _gen_token()
+    if existing:
+        cid = int(existing['id'])
+        cur.execute(
+            f"UPDATE {SCHEMA}.pchat_clients SET auth_token={_esc(auth)}, display_name={_esc(name)}, "
+            f"telegram_username={_esc(username)}, avatar_url={_esc(photo)}, "
+            f"auth_method='telegram', last_seen_at=NOW() WHERE id={cid}"
+        )
+    else:
+        # Используем псевдо-телефон вида tg:<id>, чтобы соблюсти NOT NULL
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.pchat_clients (phone, display_name, auth_token, last_seen_at, "
+            f"telegram_id, telegram_username, avatar_url, auth_method) "
+            f"VALUES ({_esc('tg:' + str(tg_id))}, {_esc(name)}, {_esc(auth)}, NOW(), "
+            f"{tg_id}, {_esc(username)}, {_esc(photo)}, 'telegram') RETURNING id"
+        )
+        cid = cur.fetchone()['id']
+    conn.commit(); cur.close(); conn.close()
+    room_id = get_or_create_direct_room(cid, name)
+    return _ok({'ok': True, 'token': auth, 'client_id': cid, 'name': name, 'direct_room_id': room_id, 'method': 'telegram'})
+
+
+# ═══════════════════ TELEGRAM-БОТ КОД ═══════════════════
+def action_bot_request_code(body):
+    """Генерируем короткий код, клиент жмёт на ссылку t.me/botname?start=<code>, бот пишет ему /start с этим кодом."""
+    bot_username = os.environ.get('TELEGRAM_BOT_USERNAME', '')
+    if not bot_username:
+        return _err(500, 'TELEGRAM_BOT_USERNAME not configured')
+    name = (body.get('name') or '').strip() or None
+    code = ''.join(secrets.choice(string.ascii_lowercase + string.digits) for _ in range(10))
+    conn = _conn(); cur = conn.cursor()
+    cur.execute(
+        f"INSERT INTO {SCHEMA}.pchat_bot_pending (code, intended_name, expires_at) "
+        f"VALUES ({_esc(code)}, {_esc(name)}, NOW() + INTERVAL '15 minutes')"
+    )
+    conn.commit(); cur.close(); conn.close()
+    return _ok({
+        'ok': True,
+        'code': code,
+        'deep_link': f'https://t.me/{bot_username}?start={code}',
+    })
+
+
+def action_bot_check(body):
+    """Polling: клиент опрашивает — нажал он /start в боте или нет. Если used=TRUE — выдаём auth_token."""
+    code = (body.get('code') or '').strip()
+    if not code:
+        return _err(400, 'code required')
+    conn = _conn(); cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        f"SELECT * FROM {SCHEMA}.pchat_bot_pending WHERE code={_esc(code)} LIMIT 1"
+    )
+    p = cur.fetchone()
+    if not p:
+        cur.close(); conn.close(); return _err(404, 'not found')
+    if p['expires_at'] < datetime.utcnow():
+        cur.close(); conn.close(); return _err(410, 'expired')
+    if not p['used'] or not p['auth_token']:
+        cur.close(); conn.close()
+        return _ok({'ok': True, 'used': False})
+    # Готов
+    cur.execute(f"SELECT id, display_name FROM {SCHEMA}.pchat_clients WHERE auth_token={_esc(p['auth_token'])} LIMIT 1")
+    cli = cur.fetchone()
+    cur.close(); conn.close()
+    if not cli:
+        return _err(500, 'client not found')
+    rid = get_or_create_direct_room(int(cli['id']), cli['display_name'])
+    return _ok({'ok': True, 'used': True, 'token': p['auth_token'], 'name': cli['display_name'], 'client_id': cli['id'], 'direct_room_id': rid, 'method': 'tg_bot'})
+
+
+def action_tg_webhook(body):
+    """Webhook от Telegram: ловим /start <code> и привязываем телеграм-юзера к pending-коду."""
+    msg = body.get('message') or body.get('edited_message') or {}
+    text = (msg.get('text') or '').strip()
+    if not text.startswith('/start'):
+        return _ok({'ok': True})
+    parts = text.split(maxsplit=1)
+    if len(parts) < 2:
+        # Простой /start без параметра — обычное приветствие
+        chat_id = (msg.get('chat') or {}).get('id')
+        if chat_id:
+            bot_token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+            if bot_token:
+                try:
+                    requests.post(
+                        f'https://api.telegram.org/bot{bot_token}/sendMessage',
+                        json={'chat_id': chat_id, 'text': '👋 Я бот Скупка24. Чтобы войти в чат с менеджером — откройте https://skypka24.com/chat и выберите «Войти через Telegram».'},
+                        timeout=8,
+                    )
+                except Exception:
+                    pass
+        return _ok({'ok': True})
+    code = parts[1].strip()
+    user = msg.get('from') or {}
+    tg_id = int(user.get('id') or 0)
+    first = (user.get('first_name') or '').strip()
+    last = (user.get('last_name') or '').strip()
+    username = (user.get('username') or '').strip() or None
+    name = (first + ' ' + last).strip() or username or 'Клиент TG'
+    if not tg_id:
+        return _ok({'ok': True})
+    conn = _conn(); cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        f"SELECT * FROM {SCHEMA}.pchat_bot_pending WHERE code={_esc(code)} AND used=FALSE LIMIT 1"
+    )
+    p = cur.fetchone()
+    if not p or p['expires_at'] < datetime.utcnow():
+        cur.close(); conn.close()
+        bot_token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+        if bot_token:
+            try:
+                requests.post(
+                    f'https://api.telegram.org/bot{bot_token}/sendMessage',
+                    json={'chat_id': tg_id, 'text': '⚠️ Код неверный или устарел. Запросите новый на skypka24.com/chat.'},
+                    timeout=8,
+                )
+            except Exception:
+                pass
+        return _ok({'ok': True})
+    use_name = (p['intended_name'] or name).strip() or 'Клиент TG'
+    # Создаём/обновляем клиента
+    cur.execute(f"SELECT id FROM {SCHEMA}.pchat_clients WHERE telegram_id={tg_id} LIMIT 1")
+    existing = cur.fetchone()
+    auth = _gen_token()
+    if existing:
+        cid = int(existing['id'])
+        cur.execute(
+            f"UPDATE {SCHEMA}.pchat_clients SET auth_token={_esc(auth)}, display_name={_esc(use_name)}, "
+            f"telegram_username={_esc(username)}, auth_method='tg_bot', last_seen_at=NOW() WHERE id={cid}"
+        )
+    else:
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.pchat_clients (phone, display_name, auth_token, last_seen_at, "
+            f"telegram_id, telegram_username, auth_method) "
+            f"VALUES ({_esc('tg:' + str(tg_id))}, {_esc(use_name)}, {_esc(auth)}, NOW(), "
+            f"{tg_id}, {_esc(username)}, 'tg_bot') RETURNING id"
+        )
+        cid = cur.fetchone()['id']
+    cur.execute(
+        f"UPDATE {SCHEMA}.pchat_bot_pending SET used=TRUE, auth_token={_esc(auth)}, telegram_id={tg_id} "
+        f"WHERE id={int(p['id'])}"
+    )
+    conn.commit(); cur.close(); conn.close()
+    # Подтверждение клиенту в TG
+    bot_token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+    if bot_token:
+        try:
+            requests.post(
+                f'https://api.telegram.org/bot{bot_token}/sendMessage',
+                json={'chat_id': tg_id, 'text': f'✅ Готово, {use_name}! Возвращайтесь на сайт — вы автоматически войдёте в чат.'},
+                timeout=8,
+            )
+        except Exception:
+            pass
+    return _ok({'ok': True})
+
+
+# ═══════════════════ ГОСТЕВОЙ ВХОД ═══════════════════
+def action_guest_login(body):
+    """Анонимный вход — только имя, доступ только к общему каналу."""
+    name = (body.get('name') or '').strip()
+    if not name or len(name) < 2:
+        return _err(400, 'Имя обязательно')
+    if len(name) > 40:
+        name = name[:40]
+    auth = _gen_token()
+    fake_phone = 'guest:' + _gen_token(12)
+    conn = _conn(); cur = conn.cursor()
+    cur.execute(
+        f"INSERT INTO {SCHEMA}.pchat_clients (phone, display_name, auth_token, last_seen_at, "
+        f"is_guest, auth_method) "
+        f"VALUES ({_esc(fake_phone)}, {_esc(name)}, {_esc(auth)}, NOW(), TRUE, 'guest') RETURNING id"
+    )
+    cid = cur.fetchone()[0]
+    conn.commit(); cur.close(); conn.close()
+    return _ok({'ok': True, 'token': auth, 'client_id': cid, 'name': name, 'method': 'guest', 'guest_only': True})
+
+
+# ═══════════════════ ZVONOK.COM (звонок-пароль) ═══════════════════
+def action_zvonok_request(body):
+    """Заказывает звонок клиенту через Zvonok.com. Клиент вводит ПОСЛЕДНИЕ 4 ЦИФРЫ номера, с которого был звонок."""
+    pub_key = os.environ.get('ZVONOK_PUBLIC_KEY', '')
+    campaign_id = os.environ.get('ZVONOK_CAMPAIGN_ID', '')
+    if not pub_key or not campaign_id:
+        return _err(500, 'Zvonok not configured')
+    phone = _normalize_phone(body.get('phone') or '')
+    if len(phone) != 11:
+        return _err(400, 'Неверный номер')
+    # Rate-limit: не больше 3 за 10 минут
+    conn = _conn(); cur = conn.cursor()
+    cur.execute(
+        f"SELECT COUNT(*) FROM {SCHEMA}.pchat_zvonok WHERE phone={_esc(phone)} "
+        f"AND created_at > NOW() - INTERVAL '10 minutes'"
+    )
+    if cur.fetchone()[0] >= 3:
+        cur.close(); conn.close()
+        return _err(429, 'Слишком много попыток. Попробуйте через 10 минут.')
+    try:
+        r = requests.get(
+            'https://zvonok.com/manager/cabapi_external/api/v1/phones/call/',
+            params={
+                'public_key': pub_key,
+                'campaign_id': campaign_id,
+                'phone': '+' + phone,
+            },
+            timeout=15,
+        )
+        try:
+            d = r.json()
+        except Exception:
+            cur.close(); conn.close()
+            print(f'[ZVONOK] non-json response: {r.text[:300]}')
+            return _err(502, 'Сервис звонка недоступен')
+        # Zvonok возвращает: {"call_id": ..., "pincode": "1234", ...}
+        call_id = str(d.get('call_id') or d.get('id') or '')
+        pincode = str(d.get('pincode') or d.get('pin') or '')
+        if not pincode:
+            # У некоторых типов кампаний код не возвращается через API — клиент вводит последние 4 цифры
+            pincode = ''
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.pchat_zvonok (phone, pincode, call_id, expires_at) "
+            f"VALUES ({_esc(phone)}, {_esc(pincode)}, {_esc(call_id)}, NOW() + INTERVAL '10 minutes')"
+        )
+        conn.commit(); cur.close(); conn.close()
+        return _ok({'ok': True, 'pin_known': bool(pincode), 'call_id': call_id})
+    except Exception as e:
+        cur.close(); conn.close()
+        print(f'[ZVONOK] exception: {e}')
+        return _err(500, 'Ошибка вызова')
+
+
+def action_zvonok_verify(body):
+    """Проверяет код, введённый клиентом. Если pincode у нас сохранён — сравниваем; иначе — берём последние 4 цифры из caller-id (call_id ответа Zvonok)."""
+    phone = _normalize_phone(body.get('phone') or '')
+    code = (body.get('code') or '').strip()
+    name = (body.get('name') or '').strip() or None
+    if len(phone) != 11 or len(code) < 4:
+        return _err(400, 'Введите номер и код')
+    conn = _conn(); cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        f"SELECT * FROM {SCHEMA}.pchat_zvonok WHERE phone={_esc(phone)} AND used=FALSE "
+        f"AND expires_at > NOW() ORDER BY id DESC LIMIT 1"
+    )
+    row = cur.fetchone()
+    if not row:
+        cur.close(); conn.close()
+        return _err(400, 'Сначала запросите звонок')
+    if row['attempts'] >= 5:
+        cur.close(); conn.close()
+        return _err(400, 'Превышено число попыток')
+    expected = (row.get('pincode') or '').strip()
+    # Если pincode у нас есть — сравниваем. Иначе пробуем тянуть caller_id из API Zvonok
+    ok = False
+    if expected and expected == code:
+        ok = True
+    else:
+        # Возможно клиент ввёл последние 4 цифры — попытаемся узнать у Zvonok caller_number
+        try:
+            pub_key = os.environ.get('ZVONOK_PUBLIC_KEY', '')
+            call_id = row.get('call_id')
+            if pub_key and call_id:
+                r = requests.get(
+                    'https://zvonok.com/manager/cabapi_external/api/v1/phones/calls/',
+                    params={'public_key': pub_key, 'call_id': call_id},
+                    timeout=10,
+                )
+                d = r.json() if r.ok else {}
+                caller = str(d.get('caller_number') or d.get('caller_id') or d.get('phone_from') or '')
+                last4 = re.sub(r'\D', '', caller)[-4:] if caller else ''
+                if last4 and last4 == code:
+                    ok = True
+        except Exception:
+            pass
+    if not ok:
+        cur.execute(f"UPDATE {SCHEMA}.pchat_zvonok SET attempts=attempts+1 WHERE id={int(row['id'])}")
+        conn.commit(); cur.close(); conn.close()
+        return _err(400, 'Неверный код')
+    cur.execute(f"UPDATE {SCHEMA}.pchat_zvonok SET used=TRUE WHERE id={int(row['id'])}")
+    cur2 = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur2.execute(f"SELECT id, display_name FROM {SCHEMA}.pchat_clients WHERE phone={_esc(phone)} LIMIT 1")
+    existing = cur2.fetchone()
+    auth = _gen_token()
+    new_name = name or (existing.get('display_name') if existing else None) or 'Клиент'
+    if existing:
+        cid = int(existing['id'])
+        cur.execute(
+            f"UPDATE {SCHEMA}.pchat_clients SET auth_token={_esc(auth)}, display_name={_esc(new_name)}, "
+            f"auth_method='zvonok', last_seen_at=NOW() WHERE id={cid}"
+        )
+    else:
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.pchat_clients (phone, display_name, auth_token, last_seen_at, auth_method) "
+            f"VALUES ({_esc(phone)}, {_esc(new_name)}, {_esc(auth)}, NOW(), 'zvonok') RETURNING id"
+        )
+        cid = cur.fetchone()[0]
+    conn.commit(); cur.close(); cur2.close(); conn.close()
+    rid = get_or_create_direct_room(cid, new_name)
+    return _ok({'ok': True, 'token': auth, 'client_id': cid, 'name': new_name, 'direct_room_id': rid, 'method': 'zvonok'})
 
 
 # ───────── Handler ─────────
@@ -672,6 +1047,9 @@ def handler(event, context):
     except Exception:
         body = {}
     action = (qp.get('action') or body.get('action') or '').strip()
+    # Telegram webhook без action — определим по полю message/edited_message
+    if not action and isinstance(body, dict) and (body.get('message') or body.get('edited_message')):
+        action = 'tg_webhook'
     try:
         # клиентские
         if action == 'request_otp':   return action_request_otp(body)
@@ -682,6 +1060,14 @@ def handler(event, context):
         if action == 'send':          return action_send(body, headers)
         if action == 'mark_read':     return action_mark_read(body, headers)
         if action == 'upload_photo':  return action_upload_photo(body, headers)
+        # альт. способы входа
+        if action == 'verify_telegram': return action_verify_telegram(body)
+        if action == 'bot_request_code': return action_bot_request_code(body)
+        if action == 'bot_check':       return action_bot_check(body)
+        if action == 'guest_login':     return action_guest_login(body)
+        if action == 'zvonok_request':  return action_zvonok_request(body)
+        if action == 'zvonok_verify':   return action_zvonok_verify(body)
+        if action == 'tg_webhook':      return action_tg_webhook(body)
         # сотрудники
         if action == 'staff_rooms':   return action_staff_rooms(qp, headers)
         if action == 'staff_poll':    return action_staff_poll(body, headers)

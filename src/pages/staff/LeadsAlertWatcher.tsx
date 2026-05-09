@@ -208,14 +208,24 @@ export default function LeadsAlertWatcher({ token, empName }: { token: string; e
       });
       const d = await r.json();
       if (d.ok) {
-        setShareToast(d.sms_sent ? "📲 Приглашение отправлено клиенту" : "✅ Ссылка создана (SMS не настроен)");
+        const channels: string[] = [];
+        if (d.tg_sent) channels.push("TG");
+        if (d.sms_sent) channels.push("SMS");
+        const msg = channels.length
+          ? `📲 Отправлено: ${channels.join(" + ")}`
+          : "✅ Ссылка создана";
+        setShareToast(msg);
+        // Если ничего не отправлено — открываем WhatsApp как fallback
+        if (!d.tg_sent && !d.sms_sent && d.wa_url) {
+          window.open(d.wa_url as string, "_blank");
+        }
       } else {
         setShareToast("❌ Ошибка приглашения");
       }
     } catch {
       setShareToast("❌ Ошибка сети");
     }
-    setTimeout(() => setShareToast(null), 3000);
+    setTimeout(() => setShareToast(null), 3500);
   };
 
   const overdue = stats?.overdue_count || 0;
