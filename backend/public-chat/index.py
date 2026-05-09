@@ -915,9 +915,14 @@ def action_guest_login(body):
 def action_zvonok_request(body):
     """Заказывает звонок клиенту через Zvonok.com. Клиент вводит ПОСЛЕДНИЕ 4 ЦИФРЫ номера, с которого был звонок."""
     pub_key = os.environ.get('ZVONOK_PUBLIC_KEY', '')
-    campaign_id = os.environ.get('ZVONOK_CAMPAIGN_ID', '')
-    if not pub_key or not campaign_id:
-        return _err(500, 'Zvonok not configured')
+    # Ищем Campaign ID в любом из заведённых секретов (приоритет: специальный OTP → LEAD → общий)
+    campaign_id = (os.environ.get('ZVONOK_CAMPAIGN_OTP', '')
+                   or os.environ.get('ZVONOK_CAMPAIGN_ID', '')
+                   or os.environ.get('ZVONOK_CAMPAIGN_LEAD', ''))
+    if not pub_key:
+        return _err(500, 'Zvonok: не задан ZVONOK_PUBLIC_KEY')
+    if not campaign_id:
+        return _err(500, 'Zvonok: не задан Campaign ID (ZVONOK_CAMPAIGN_ID или ZVONOK_CAMPAIGN_LEAD)')
     phone = _normalize_phone(body.get('phone') or '')
     if len(phone) != 11:
         return _err(400, 'Неверный номер')
