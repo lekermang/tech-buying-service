@@ -80,8 +80,23 @@ def _gen_code():
 
 
 # ───────── SMS ─────────
+def _try_send_sms(api_id, digits, text, sender):
+    """Один попытка отправить SMS через sms.ru. Возвращает (ok, response_dict)."""
+    params = {'api_id': api_id, 'to': digits, 'msg': text, 'json': 1}
+    if sender:
+        params['from'] = sender
+    r = requests.get('https://sms.ru/sms/send', params=params, timeout=10)
+    try:
+        d = r.json()
+    except Exception:
+        return False, {'error': 'non_json', 'raw': r.text[:300]}
+    sms_obj = (d.get('sms') or {}).get(digits) or {}
+    ok = d.get('status') == 'OK' and sms_obj.get('status') == 'OK'
+    return ok, d
+
+
 def send_sms(phone, text):
-    """Отправка SMS через sms.ru. Возвращает (ok, info_dict)."""
+    """Отправка SMS через sms.ru с fallback. Возвращает (ok, info_dict)."""
     api_id = os.environ.get('SMSRU_API_ID', '')
     if not api_id:
         print('[SMS] SMSRU_API_ID is not set')
@@ -91,36 +106,40 @@ def send_sms(phone, text):
         print(f'[SMS] bad phone: {phone}')
         return False, {'error': 'bad_phone'}
     try:
-        sender = os.environ.get('SMSRU_FROM', 'IPMamedov')
-        r = requests.get(
-            'https://sms.ru/sms/send',
-            params={'api_id': api_id, 'to': digits, 'msg': text, 'from': sender, 'json': 1},
-            timeout=10,
-        )
-        try:
-            d = r.json()
-        except Exception:
-            print(f'[SMS] non-json response: {r.text[:300]}')
-            return False, {'error': 'non_json', 'raw': r.text[:300]}
-        # sms.ru: status="OK" / status_code=100 — успех
-        status = d.get('status')
-        sms_obj = (d.get('sms') or {}).get(digits) or {}
-        sms_status = sms_obj.get('status')
-        sms_status_code = sms_obj.get('status_code')
-        sms_status_text = sms_obj.get('status_text')
-        ok = status == 'OK' and sms_status == 'OK'
-        # Полный ответ возвращаем наружу — чтобы было видно в Network
-        print(f'[SMS] to={digits} ok={ok} full_response={json.dumps(d, ensure_ascii=False)}')
-        return ok, {
-            'status': status,
-            'status_code': d.get('status_code'),
-            'status_text': d.get('status_text'),
-            'sms_status': sms_status,
-            'sms_status_code': sms_status_code,
-            'sender': sender,
-            'full_response': d,
-            'sms_status_text': sms_status_text,
-            'balance': d.get('balance'),
+        # Список отправителей с fallback: пробуем по очереди
+        # 1) одобренный бренд из секрета (или дефолтный IPMamedov)
+        # 2) пустое имя — sms.ru сам выберет
+        # 3) системное "sms_ru" — почти всегда работает
+        primary = os.environ.get('SMSRU_FROM', 'IPMamedov')
+        senders_to_try = [primary, '', 'sms_ru']
+        attempts = []
+        last_d = None
+        for sender in senders_to_try:
+            ok, d = _try_send_sms(api_id, digits, text, sender)
+            last_d = d
+            sms_obj = (d.get('sms') or {}).get(digits) or {}
+            sms_status_text = sms_obj.get('status_text', '')
+            attempts.append({
+                'sender': sender or '(default)',
+                'ok': ok,
+                'status_text': sms_status_text,
+                'status_code': sms_obj.get('status_code'),
+            })
+            print(f'[SMS] try sender="{sender}" to={digits} ok={ok} status_text="{sms_status_text}"')
+            if ok:
+                return True, {
+                    'sent_with': sender or '(default)',
+                    'attempts': attempts,
+                    'balance': d.get('balance'),
+                }
+            # Если ошибка не "оператор не подключен" — нет смысла пробовать другие имена
+            if 'оператор' not in (sms_status_text or '').lower() and 'отправитель' not in (sms_status_text or '').lower():
+                # Прочая ошибка (баланс, лимит, чёрный список) — выходим
+                break
+        return False, {
+            'attempts': attempts,
+            'last_response': last_d,
+            'balance': (last_d or {}).get('balance'),
         }
     except Exception as e:
         print(f'[SMS] exception: {e}')
