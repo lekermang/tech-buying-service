@@ -1088,6 +1088,25 @@ def action_zvonok_diag(body):
         'campaign_ready': os.environ.get('ZVONOK_CAMPAIGN_READY', ''),
         'campaign_otp': os.environ.get('ZVONOK_CAMPAIGN_OTP', ''),
     }
+    # Проверка статуса конкретного звонка по call_id
+    test_call_id = (body or {}).get('check_call_id', '')
+    if pub_key and test_call_id:
+        # 1. Информация о звонке
+        endpoints = [
+            ('/manager/cabapi_external/api/v1/phones/calls/', {'public_key': pub_key, 'call_id': str(test_call_id)}),
+            ('/manager/cabapi_external/api/v1/phones/call_by_id/', {'public_key': pub_key, 'call_id': str(test_call_id)}),
+        ]
+        for path, params in endpoints:
+            try:
+                rr = requests.get(f'https://zvonok.com{path}', params=params, timeout=8)
+                key = path.split('/')[-2]
+                out[f'call_check_{key}_status'] = rr.status_code
+                try:
+                    out[f'call_check_{key}'] = rr.json()
+                except Exception:
+                    out[f'call_check_{key}_raw'] = rr.text[:500]
+            except Exception as e:
+                out[f'call_check_{key}_err'] = str(e)
     # Если в body указан test_phone — пробуем отправить тестовый звонок
     test_phone = (body or {}).get('test_phone', '')
     test_campaign = (body or {}).get('test_campaign', '') or out['campaign_id']
