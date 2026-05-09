@@ -71,13 +71,23 @@ def send_sms_confirmation(phone: str, lead_id: int, name: str = ''):
         return False
     text = f"Скупка24: заявка #{lead_id} принята! Перезвоним в течение 15 мин. Срочно: 88005553535"
     try:
-        requests.get(
+        sender = os.environ.get('SMSRU_FROM', 'IPMamedov')
+        r = requests.get(
             'https://sms.ru/sms/send',
-            params={'api_id': api_id, 'to': digits, 'msg': text, 'json': 1},
+            params={'api_id': api_id, 'to': digits, 'msg': text, 'from': sender, 'json': 1},
             timeout=8,
         )
-        return True
-    except Exception:
+        try:
+            d = r.json()
+            sms_obj = (d.get('sms') or {}).get(digits) or {}
+            ok = d.get('status') == 'OK' and sms_obj.get('status') == 'OK'
+            if not ok:
+                print(f'[SMS][send-lead] to={digits} fail: {d}')
+            return ok
+        except Exception:
+            return True
+    except Exception as e:
+        print(f'[SMS][send-lead] exception: {e}')
         return False
 
 

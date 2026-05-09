@@ -1119,10 +1119,17 @@ def handler(event: dict, context) -> dict:
             sms_digits = re.sub(r'\D', '', phone)
             if len(sms_digits) == 11:
                 sms_text = f"Скупка24: заявка на ремонт #{order_id} принята! Перезвоним в течение 15 мин."
-                requests.get('https://sms.ru/sms/send',
-                             params={'api_id': sms_api_id, 'to': sms_digits, 'msg': sms_text, 'json': 1}, timeout=8)
-    except Exception:
-        pass
+                sms_sender = os.environ.get('SMSRU_FROM', 'IPMamedov')
+                r_sms = requests.get('https://sms.ru/sms/send',
+                             params={'api_id': sms_api_id, 'to': sms_digits, 'msg': sms_text, 'from': sms_sender, 'json': 1}, timeout=8)
+                try:
+                    d_sms = r_sms.json()
+                    if d_sms.get('status') != 'OK':
+                        print(f'[SMS][repair] fail: {d_sms}')
+                except Exception:
+                    pass
+    except Exception as e:
+        print(f'[SMS][repair] exception: {e}')
 
     # ── УВЕДОМЛЕНИЯ (не влияют на сохранение заявки) ─────────────────────────
     if token:

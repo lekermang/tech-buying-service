@@ -91,9 +91,10 @@ def send_sms(phone, text):
         print(f'[SMS] bad phone: {phone}')
         return False, {'error': 'bad_phone'}
     try:
+        sender = os.environ.get('SMSRU_FROM', 'IPMamedov')
         r = requests.get(
             'https://sms.ru/sms/send',
-            params={'api_id': api_id, 'to': digits, 'msg': text, 'json': 1},
+            params={'api_id': api_id, 'to': digits, 'msg': text, 'from': sender, 'json': 1},
             timeout=10,
         )
         try:

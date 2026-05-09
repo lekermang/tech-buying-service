@@ -65,14 +65,20 @@ def send_sms(phone, text):
     if not digits or len(digits) < 11:
         return False
     try:
+        sender = os.environ.get('SMSRU_FROM', 'IPMamedov')
         r = requests.get(
             'https://sms.ru/sms/send',
-            params={'api_id': api_id, 'to': digits, 'msg': text, 'json': 1},
+            params={'api_id': api_id, 'to': digits, 'msg': text, 'from': sender, 'json': 1},
             timeout=10,
         )
         d = r.json()
-        return d.get('status') == 'OK'
-    except Exception:
+        sms_obj = (d.get('sms') or {}).get(digits) or {}
+        ok = d.get('status') == 'OK' and sms_obj.get('status') == 'OK'
+        if not ok:
+            print(f'[SMS] to={digits} fail: {d}')
+        return ok
+    except Exception as e:
+        print(f'[SMS] exception: {e}')
         return False
 
 
