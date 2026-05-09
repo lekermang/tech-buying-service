@@ -81,21 +81,44 @@ def _gen_code():
 
 # ───────── SMS ─────────
 def send_sms(phone, text):
+    """Отправка SMS через sms.ru. Возвращает (ok, info_dict)."""
     api_id = os.environ.get('SMSRU_API_ID', '')
     if not api_id:
-        return False
+        print('[SMS] SMSRU_API_ID is not set')
+        return False, {'error': 'no_api_id'}
     digits = _normalize_phone(phone)
     if not digits or len(digits) < 11:
-        return False
+        print(f'[SMS] bad phone: {phone}')
+        return False, {'error': 'bad_phone'}
     try:
-        requests.get(
+        r = requests.get(
             'https://sms.ru/sms/send',
             params={'api_id': api_id, 'to': digits, 'msg': text, 'json': 1},
-            timeout=8,
+            timeout=10,
         )
-        return True
-    except Exception:
-        return False
+        try:
+            d = r.json()
+        except Exception:
+            print(f'[SMS] non-json response: {r.text[:300]}')
+            return False, {'error': 'non_json', 'raw': r.text[:300]}
+        # sms.ru: status="OK" / status_code=100 — успех
+        status = d.get('status')
+        sms_obj = (d.get('sms') or {}).get(digits) or {}
+        sms_status = sms_obj.get('status')
+        sms_status_code = sms_obj.get('status_code')
+        sms_status_text = sms_obj.get('status_text')
+        ok = status == 'OK' and sms_status == 'OK'
+        print(f'[SMS] to={digits} ok={ok} status={status} sms_status={sms_status} code={sms_status_code} text={sms_status_text} balance={d.get("balance")}')
+        return ok, {
+            'status': status,
+            'sms_status': sms_status,
+            'sms_status_code': sms_status_code,
+            'sms_status_text': sms_status_text,
+            'balance': d.get('balance'),
+        }
+    except Exception as e:
+        print(f'[SMS] exception: {e}')
+        return False, {'error': str(e)}
 
 
 # ───────── Auth helpers ─────────
@@ -207,8 +230,8 @@ def action_request_otp(body):
         f"VALUES ({_esc(phone)}, {_esc(code)}, NOW() + INTERVAL '10 minutes')"
     )
     conn.commit(); cur.close(); conn.close()
-    sent = send_sms(phone, f'Скупка24: код входа в чат — {code}')
-    return _ok({'ok': True, 'sent': bool(sent)})
+    sent, info = send_sms(phone, f'Скупка24: код входа в чат — {code}')
+    return _ok({'ok': True, 'sent': bool(sent), 'sms_info': info})
 
 
 def action_verify_otp(body):
@@ -606,8 +629,8 @@ def action_invite_create(body, headers):
         f"Скупка24: ваш персональный чат с менеджером — {invite_url} "
         f"(вход без регистрации, ответим за минуту)"
     )
-    sent = send_sms(phone, sms_text)
-    return _ok({'ok': True, 'invite_token': token, 'url': invite_url, 'sms_sent': bool(sent)})
+    sent, sms_info = send_sms(phone, sms_text)
+    return _ok({'ok': True, 'invite_token': token, 'url': invite_url, 'sms_sent': bool(sent), 'sms_info': sms_info})
 
 
 # ───────── Handler ─────────
