@@ -1076,6 +1076,49 @@ def action_zvonok_verify(body):
     return _ok({'ok': True, 'token': auth, 'client_id': cid, 'name': new_name, 'direct_room_id': rid, 'method': 'zvonok'})
 
 
+# ───────── Диагностика Zvonok ─────────
+def action_zvonok_diag(_body):
+    """Диагностика: проверить баланс и получить ответ Zvonok-API. Без авторизации, для отладки."""
+    pub_key = os.environ.get('ZVONOK_PUBLIC_KEY', '')
+    out = {
+        'has_pub_key': bool(pub_key),
+        'pub_key_len': len(pub_key) if pub_key else 0,
+        'campaign_id': os.environ.get('ZVONOK_CAMPAIGN_ID', ''),
+        'campaign_lead': os.environ.get('ZVONOK_CAMPAIGN_LEAD', ''),
+        'campaign_ready': os.environ.get('ZVONOK_CAMPAIGN_READY', ''),
+        'campaign_otp': os.environ.get('ZVONOK_CAMPAIGN_OTP', ''),
+    }
+    if not pub_key:
+        return _ok({'ok': False, 'error': 'ZVONOK_PUBLIC_KEY не задан', **out})
+    # 1. Проверим баланс
+    try:
+        r = requests.get(
+            'https://zvonok.com/manager/cabapi_external/api/v1/users/balance/',
+            params={'public_key': pub_key}, timeout=8,
+        )
+        out['balance_status'] = r.status_code
+        try:
+            out['balance'] = r.json()
+        except Exception:
+            out['balance_raw'] = r.text[:300]
+    except Exception as e:
+        out['balance_error'] = str(e)
+    # 2. Проверим список кампаний
+    try:
+        r = requests.get(
+            'https://zvonok.com/manager/cabapi_external/api/v1/campaigns/',
+            params={'public_key': pub_key, 'mode': 'all'}, timeout=8,
+        )
+        out['campaigns_status'] = r.status_code
+        try:
+            out['campaigns'] = r.json()
+        except Exception:
+            out['campaigns_raw'] = r.text[:500]
+    except Exception as e:
+        out['campaigns_error'] = str(e)
+    return _ok({'ok': True, **out})
+
+
 # ───────── Handler ─────────
 def handler(event, context):
     """Публичный чат Скупка24 LIVE: SMS-вход для клиентов + диалоги/общий канал + интеграция со Staff."""
@@ -1110,6 +1153,7 @@ def handler(event, context):
         if action == 'guest_login':     return action_guest_login(body)
         if action == 'zvonok_request':  return action_zvonok_request(body)
         if action == 'zvonok_verify':   return action_zvonok_verify(body)
+        if action == 'zvonok_diag':     return action_zvonok_diag(body)
         if action == 'tg_webhook':      return action_tg_webhook(body)
         # сотрудники
         if action == 'staff_rooms':   return action_staff_rooms(qp, headers)
