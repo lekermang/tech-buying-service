@@ -6,6 +6,7 @@ export const loadRepair        = () => import("../StaffRepairTab");
 export const loadGold          = () => import("../GoldTab");
 export const loadOtherTabs     = () => import("../StaffOtherTabs");
 export const loadVipChat       = () => import("../StaffVipChatTab");
+export const loadLiveChat      = () => import("../StaffLiveChatTab");
 export const loadSmartLombard  = () => import("../slShop/SLShopTab");
 export const loadAvitoPro      = () => import("../StaffAvitoProTab");
 
@@ -17,6 +18,7 @@ export const ClientsTab      = lazy(() => loadOtherTabs().then(m => ({ default: 
 export const AnalyticsTab    = lazy(() => loadOtherTabs().then(m => ({ default: m.AnalyticsTab })));
 export const EmployeesTab    = lazy(() => loadOtherTabs().then(m => ({ default: m.EmployeesTab })));
 export const VipChatTab      = lazy(loadVipChat);
+export const LiveChatTab     = lazy(loadLiveChat);
 export const SmartLombardTab = lazy(loadSmartLombard);
 export const AvitoProTab     = lazy(loadAvitoPro);
 
@@ -29,6 +31,7 @@ export const TAB_PRELOADERS: Record<string, () => Promise<unknown>> = {
   analytics: loadOtherTabs,
   employees: loadOtherTabs,
   chat: loadVipChat,
+  live: loadLiveChat,
   smartlombard: loadSmartLombard,
   avitopro: loadAvitoPro,
 };

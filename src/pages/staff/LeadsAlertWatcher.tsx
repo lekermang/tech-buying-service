@@ -199,6 +199,25 @@ export default function LeadsAlertWatcher({ token, empName }: { token: string; e
     setTimeout(() => setShareToast(null), 2000);
   };
 
+  const inviteLead = async (lead: Lead) => {
+    try {
+      const r = await fetch("https://functions.poehali.dev/db114166-21ce-4b87-9d05-59286ee73d6e?action=invite_create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Employee-Token": token },
+        body: JSON.stringify({ phone: lead.client_phone, name: lead.client_name, lead_id: lead.id }),
+      });
+      const d = await r.json();
+      if (d.ok) {
+        setShareToast(d.sms_sent ? "📲 Приглашение отправлено клиенту" : "✅ Ссылка создана (SMS не настроен)");
+      } else {
+        setShareToast("❌ Ошибка приглашения");
+      }
+    } catch {
+      setShareToast("❌ Ошибка сети");
+    }
+    setTimeout(() => setShareToast(null), 3000);
+  };
+
   const overdue = stats?.overdue_count || 0;
   const newCount = stats?.new_count || 0;
   const totalActive = newCount + (stats?.taken_count || 0);
@@ -392,13 +411,20 @@ export default function LeadsAlertWatcher({ token, empName }: { token: string; e
                         📞
                       </a>
                     </div>
-                    <div className="mt-1 flex items-center justify-between gap-2">
+                    <div className="mt-1 flex items-center justify-between gap-2 flex-wrap">
                       <button
                         onClick={() => shareLead(l)}
                         className="text-[10px] text-blue-300/80 hover:text-blue-200 underline inline-flex items-center gap-1"
                         title="Отправить карточку заявки в чат сотрудников"
                       >
                         <Icon name="MessageSquareShare" size={11} fallback="Send" /> В чат сотрудникам
+                      </button>
+                      <button
+                        onClick={() => inviteLead(l)}
+                        className="text-[10px] text-emerald-300/80 hover:text-emerald-200 underline inline-flex items-center gap-1"
+                        title="Отправить SMS со ссылкой на персональный чат"
+                      >
+                        <Icon name="MessageCircle" size={11} /> Пригласить в чат
                       </button>
                       {l.status === "taken" && (
                         <button onClick={() => closeLead(l.id)} className="text-[10px] text-white/40 hover:text-white/70 underline">

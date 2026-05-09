@@ -1,0 +1,7 @@
+{
+  "tests": [
+    {"name": "OPTIONS preflight", "method": "OPTIONS", "path": "/", "expectedStatus": 200},
+    {"name": "Unknown action", "method": "GET", "path": "/?action=unknown_xyz", "expectedStatus": 400},
+    {"name": "Verify OTP без данных", "method": "POST", "path": "/?action=verify_otp", "body": {}, "expectedStatus": 400}
+  ]
+}

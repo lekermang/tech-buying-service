@@ -11,6 +11,7 @@ import JobsSection from "@/components/skupka/JobsSection";
 import HolidayBanner from "@/components/holidays/HolidayBanner";
 import HolidayCornerDecor from "@/components/holidays/HolidayCornerDecor";
 import PremiumServicesGrid from "@/components/skupka/PremiumServicesGrid";
+import ChatBubble from "@/components/skupka/ChatBubble";
 
 const scrollTo = (href: string) => {
   const el = document.querySelector(href);
@@ -387,6 +388,11 @@ const Index = ({ goldOpen = false }: { goldOpen?: boolean }) => {
       <ExitPopup onOpenEval={() => setEvalOpen(true)} />
       <CookieBanner />
 
+      {/* Плавающий пузырь чата — на десктопе */}
+      <div className="hidden md:block">
+        <ChatBubble />
+      </div>
+
       {/* Sticky нижняя панель — только мобильные */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0D0D0D]/98 backdrop-blur-sm border-t border-[#FFD700]/20 pb-safe">
         <div className="flex h-[68px]">
@@ -404,12 +410,11 @@ const Index = ({ goldOpen = false }: { goldOpen?: boolean }) => {
             <span className="font-oswald font-bold text-sm uppercase tracking-wide">Оценить онлайн</span>
           </button>
           <a
-            href="https://t.me/skypka24"
-            target="_blank" rel="noopener noreferrer"
-            onClick={() => ymGoal(Goals.TELEGRAM_CLICK, { place: "sticky_bar" })}
-            className="flex-1 flex flex-col items-center justify-center gap-1 text-[#FFD700] hover:bg-[#FFD700]/5 active:bg-[#FFD700]/10 transition-colors">
+            href="/chat"
+            className="flex-1 flex flex-col items-center justify-center gap-1 text-[#FFD700] hover:bg-[#FFD700]/5 active:bg-[#FFD700]/10 transition-colors relative">
             <Icon name="MessageCircle" size={22} />
-            <span className="font-roboto text-[10px] uppercase tracking-wide">Telegram</span>
+            <span className="font-roboto text-[10px] uppercase tracking-wide">Чат LIVE</span>
+            <span className="absolute top-2 right-1/3 w-2 h-2 bg-green-400 rounded-full ring-2 ring-[#0D0D0D] animate-pulse" />
           </a>
           {installPrompt && !installed ? (
             <button

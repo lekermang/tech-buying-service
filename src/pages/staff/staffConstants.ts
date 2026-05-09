@@ -6,6 +6,7 @@ export type StaffTab =
   | "employees"
   | "repair"
   | "chat"
+  | "live"
   | "gold"
   | "smartlombard"
   | "avitopro";
@@ -65,6 +66,7 @@ export function readSavedTab(fallback: StaffTab): StaffTab {
       "employees",
       "repair",
       "chat",
+      "live",
       "gold",
       "smartlombard",
       "avitopro",
