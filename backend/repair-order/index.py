@@ -53,15 +53,56 @@ def auth_staff(event: dict) -> bool:
         return False
 
 
-def send_tg(token: str, chat_id, text: str, parse_mode: str = 'Markdown'):
+def send_tg(token: str, chat_id, text: str, parse_mode: str = 'Markdown', reply_markup: dict = None):
     try:
+        payload = {'chat_id': chat_id, 'text': text, 'parse_mode': parse_mode}
+        if reply_markup:
+            import json as _json
+            payload['reply_markup'] = _json.dumps(reply_markup)
         requests.post(
             f'https://api.telegram.org/bot{token}/sendMessage',
-            json={'chat_id': chat_id, 'text': text, 'parse_mode': parse_mode},
+            json=payload,
             timeout=10,
         )
     except Exception:
         pass
+
+
+def _normalize_phone(phone: str) -> str:
+    import re as _re
+    digits = _re.sub(r'\D', '', phone or '')
+    if len(digits) == 11 and digits.startswith('8'):
+        digits = '7' + digits[1:]
+    elif len(digits) == 10:
+        digits = '7' + digits
+    return digits
+
+
+def build_contact_keyboard(phone: str, client_name: str = '', model: str = '', order_id=None) -> dict:
+    """Inline-клавиатура: WhatsApp / Telegram / Позвонить / SMS — для быстрого ответа клиенту."""
+    import urllib.parse as _up
+    digits = _normalize_phone(phone)
+    if not digits or len(digits) < 11:
+        return None
+    plus_phone = f'+{digits}'
+    greet_name = (client_name.split()[0] if client_name else '').strip()
+    hello = f'Здравствуйте, {greet_name}!' if greet_name else 'Здравствуйте!'
+    body = hello + ' Вы оставляли заявку на ремонт в Скупка24'
+    if order_id:
+        body += f' (#{order_id})'
+    if model:
+        body += f', устройство: {model}'
+    body += '. Подскажите, удобно сейчас обсудить?'
+    enc = _up.quote(body)
+    return {
+        'inline_keyboard': [[
+            {'text': '💬 WhatsApp', 'url': f'https://wa.me/{digits}?text={enc}'},
+            {'text': '✈️ Telegram', 'url': f'https://t.me/{plus_phone}'},
+        ], [
+            {'text': '📞 Позвонить', 'url': f'tel:{plus_phone}'},
+            {'text': '✉️ SMS', 'url': f'sms:{plus_phone}?body={enc}'},
+        ]]
+    }
 
 
 def build_act_html(order_id, name, phone, model, repair_type, price_str, comment, advance=0, is_paid=False) -> bytes:
@@ -1057,8 +1098,9 @@ def handler(event: dict, context) -> dict:
         try:
             html_bytes = build_act_html(order_id, name, phone, model, repair_type, price_str, comment)
             filename = f'Акт_приёмки_{order_id}_{name.replace(" ", "_")}.html'
+            kb = build_contact_keyboard(phone, name, model, order_id)
             for cid in chat_ids:
-                send_tg(token, cid, tg_text)
+                send_tg(token, cid, tg_text, reply_markup=kb)
                 send_tg_document(token, cid, html_bytes, filename, caption=f'📋 Акт приёмки №{order_id} — открыть и распечатать', mime='text/html')
         except Exception as tg_err:
             print(f"[repair-order] TG notify error order={order_id} err={tg_err}")

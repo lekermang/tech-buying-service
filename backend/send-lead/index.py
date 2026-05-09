@@ -1,6 +1,8 @@
 import base64
 import json
 import os
+import re
+import urllib.parse
 import requests
 import psycopg2
 
@@ -8,25 +10,65 @@ HEADERS = {'Access-Control-Allow-Origin': '*'}
 SCHEMA = 't_p31606708_tech_buying_service'
 
 
-def send_tg_text(token: str, chat_id: str, text: str):
+def normalize_phone(phone: str) -> str:
+    """Нормализация телефона в формат 7XXXXXXXXXX (только цифры, 11 знаков)."""
+    digits = re.sub(r'\D', '', phone or '')
+    if len(digits) == 11 and digits.startswith('8'):
+        digits = '7' + digits[1:]
+    elif len(digits) == 10:
+        digits = '7' + digits
+    return digits
+
+
+def build_contact_keyboard(phone: str, client_name: str = '', model: str = '') -> dict:
+    """Inline-клавиатура: WhatsApp / Telegram / Позвонить / SMS — все по номеру клиента."""
+    digits = normalize_phone(phone)
+    if not digits or len(digits) < 11:
+        return {}
+    plus_phone = f'+{digits}'
+    greet_name = (client_name.split()[0] if client_name else '').strip()
+    hello = f'Здравствуйте, {greet_name}!' if greet_name else 'Здравствуйте!'
+    body = hello + f' Вы оставляли заявку в Скупка24'
+    if model:
+        body += f' ({model})'
+    body += '. Подскажите, удобно сейчас обсудить?'
+    enc = urllib.parse.quote(body)
+    return {
+        'inline_keyboard': [[
+            {'text': '💬 WhatsApp', 'url': f'https://wa.me/{digits}?text={enc}'},
+            {'text': '✈️ Telegram', 'url': f'https://t.me/{plus_phone}'},
+        ], [
+            {'text': '📞 Позвонить', 'url': f'tel:{plus_phone}'},
+            {'text': '✉️ SMS', 'url': f'sms:{plus_phone}?body={enc}'},
+        ]]
+    }
+
+
+def send_tg_text(token: str, chat_id: str, text: str, reply_markup: dict = None):
     try:
+        payload = {'chat_id': chat_id, 'text': text, 'parse_mode': 'Markdown'}
+        if reply_markup:
+            payload['reply_markup'] = json.dumps(reply_markup)
         requests.post(
             f'https://api.telegram.org/bot{token}/sendMessage',
-            json={'chat_id': chat_id, 'text': text, 'parse_mode': 'Markdown'},
+            json=payload,
             timeout=10
         )
     except Exception:
         pass
 
 
-def send_tg_photos(token: str, chat_id: str, caption: str, photos_b64: list):
+def send_tg_photos(token: str, chat_id: str, caption: str, photos_b64: list, reply_markup: dict = None):
     tg_url = f'https://api.telegram.org/bot{token}'
     try:
         if len(photos_b64) == 1:
             photo_bytes = base64.b64decode(photos_b64[0])
+            data = {'chat_id': chat_id, 'caption': caption, 'parse_mode': 'Markdown'}
+            if reply_markup:
+                data['reply_markup'] = json.dumps(reply_markup)
             requests.post(
                 f'{tg_url}/sendPhoto',
-                data={'chat_id': chat_id, 'caption': caption, 'parse_mode': 'Markdown'},
+                data=data,
                 files={'photo': ('photo.jpg', photo_bytes, 'image/jpeg')},
                 timeout=30
             )
@@ -47,6 +89,9 @@ def send_tg_photos(token: str, chat_id: str, caption: str, photos_b64: list):
                 files=files_dict,
                 timeout=45
             )
+            # У альбома нельзя прикрепить inline-кнопки — отправим отдельным сообщением
+            if reply_markup:
+                send_tg_text(token, chat_id, '👇 Быстро связаться с клиентом:', reply_markup)
     except Exception:
         pass
 
@@ -113,14 +158,15 @@ def handler(event: dict, context) -> dict:
 
     photos_b64 = body.get('photos') or ([photo_b64] if photo_b64 else [])
     recipients = get_all_recipients(main_chat_id)
+    kb = build_contact_keyboard(phone, name, category or desc)
 
     if photos_b64:
-        send_tg_photos(token, main_chat_id, caption, photos_b64)
+        send_tg_photos(token, main_chat_id, caption, photos_b64, kb)
         for cid in recipients[1:]:
-            send_tg_text(token, cid, caption)
+            send_tg_text(token, cid, caption, kb)
     else:
         for cid in recipients:
-            send_tg_text(token, cid, caption)
+            send_tg_text(token, cid, caption, kb)
 
     # Если заявка на золото — сохраняем в gold_orders
     if category == 'Золото':
