@@ -109,11 +109,16 @@ def send_sms(phone, text):
         sms_status_code = sms_obj.get('status_code')
         sms_status_text = sms_obj.get('status_text')
         ok = status == 'OK' and sms_status == 'OK'
-        print(f'[SMS] to={digits} ok={ok} status={status} sms_status={sms_status} code={sms_status_code} text={sms_status_text} balance={d.get("balance")}')
+        # Полный ответ возвращаем наружу — чтобы было видно в Network
+        print(f'[SMS] to={digits} ok={ok} full_response={json.dumps(d, ensure_ascii=False)}')
         return ok, {
             'status': status,
+            'status_code': d.get('status_code'),
+            'status_text': d.get('status_text'),
             'sms_status': sms_status,
             'sms_status_code': sms_status_code,
+            'sender': sender,
+            'full_response': d,
             'sms_status_text': sms_status_text,
             'balance': d.get('balance'),
         }
