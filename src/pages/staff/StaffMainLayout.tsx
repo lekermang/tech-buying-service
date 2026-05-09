@@ -19,6 +19,7 @@ import MyProfileModal from "./MyProfileModal";
 import StaffSectionBanner from "./StaffSectionBanner";
 import { SLTooltip } from "../slShop/slUI";
 import LeadsAlertWatcher from "./LeadsAlertWatcher";
+import ChatAlertWatcher from "./ChatAlertWatcher";
 
 type Tab = StaffTab;
 
@@ -350,6 +351,9 @@ export function StaffMainLayout({
 
       {/* Глобальный watcher горящих заявок: всплывающие toast'ы + плавающая кнопка */}
       <LeadsAlertWatcher token={token} empName={empName} />
+
+      {/* Watcher VIP-чата: всплывающие toast'ы при новых сообщениях когда чат закрыт */}
+      <ChatAlertWatcher token={token} isChatOpen={tab === "chat"} onOpenChat={() => setTab("chat")} />
 
       {/* Модалка пароля для сотрудников */}
       {pwModal && (
