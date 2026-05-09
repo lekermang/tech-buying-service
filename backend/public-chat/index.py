@@ -1077,7 +1077,7 @@ def action_zvonok_verify(body):
 
 
 # ───────── Диагностика Zvonok ─────────
-def action_zvonok_diag(_body):
+def action_zvonok_diag(body):
     """Диагностика: проверить баланс и получить ответ Zvonok-API. Без авторизации, для отладки."""
     pub_key = os.environ.get('ZVONOK_PUBLIC_KEY', '')
     out = {
@@ -1088,6 +1088,28 @@ def action_zvonok_diag(_body):
         'campaign_ready': os.environ.get('ZVONOK_CAMPAIGN_READY', ''),
         'campaign_otp': os.environ.get('ZVONOK_CAMPAIGN_OTP', ''),
     }
+    # Если в body указан test_phone — пробуем отправить тестовый звонок
+    test_phone = (body or {}).get('test_phone', '')
+    test_campaign = (body or {}).get('test_campaign', '') or out['campaign_id']
+    if pub_key and test_phone and test_campaign:
+        try:
+            digits = re.sub(r'\D', '', test_phone)
+            if len(digits) == 11 and digits.startswith('8'):
+                digits = '7' + digits[1:]
+            r_test = requests.get(
+                'https://zvonok.com/manager/cabapi_external/api/v1/phones/call/',
+                params={'public_key': pub_key, 'campaign_id': str(test_campaign), 'phone': '+' + digits},
+                timeout=10,
+            )
+            try:
+                out['test_call_response'] = r_test.json()
+            except Exception:
+                out['test_call_raw'] = r_test.text[:500]
+            out['test_call_status'] = r_test.status_code
+            out['test_call_phone'] = '+' + digits
+            out['test_call_campaign'] = str(test_campaign)
+        except Exception as e:
+            out['test_call_error'] = str(e)
     if not pub_key:
         return _ok({'ok': False, 'error': 'ZVONOK_PUBLIC_KEY не задан', **out})
     # 1. Проверим баланс
