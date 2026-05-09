@@ -1,0 +1,148 @@
+import Icon from "@/components/ui/icon";
+import {
+  fmt, fmtDate, STATUS_BADGE,
+  type C14dDetail,
+} from "../types";
+import { printContract14d } from "../printContract14d";
+import {
+  SLSection, SLButton, SLPill, SLStat, SLGrid,
+} from "../../slUI";
+
+type Props = {
+  c: C14dDetail;
+  onBack: () => void;
+  onPay: () => void;
+  onClose: () => void;
+  onTerminate: () => void;
+  onPhotoClick: (url: string) => void;
+};
+
+export default function C14dDetailHeader({ c, onBack, onPay, onClose, onTerminate, onPhotoClick }: Props) {
+  const badge = STATUS_BADGE[c.status];
+  const passport = c.passport_series ? `${c.passport_series} ${c.passport_number || ""}` : "";
+  const passportFull = c.passport_issued_by ? `${passport}, ${c.passport_issued_by} ${fmtDate(c.passport_issue_date)}` : passport;
+
+  return (
+    <>
+      {/* Шапка с действиями */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <button onClick={onBack} className="inline-flex items-center gap-1 text-white/60 hover:text-white text-[12px] font-semibold">
+          <Icon name="ChevronLeft" size={14} /> К списку
+        </button>
+        <div className="flex flex-wrap gap-1">
+          <SLButton variant="goldOutline" size="sm" icon="Printer" onClick={() => printContract14d(c)}>Печать</SLButton>
+          {c.status === "active" && (
+            <>
+              <SLButton variant="success" size="sm" icon="Wallet" onClick={onPay}>Платёж</SLButton>
+              {Number(c.remaining_debt) <= 0 && (
+                <SLButton variant="dark" size="sm" icon="CheckCircle2" onClick={onClose}>Закрыть</SLButton>
+              )}
+              <SLButton variant="danger" size="sm" icon="Ban" onClick={onTerminate}>Расторгнуть</SLButton>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Шапка договора */}
+      <div className="rounded-xl bg-[#101010] border border-[#1A1A1A] px-3 py-2 flex items-center gap-2 flex-wrap">
+        <div className="font-oswald font-bold text-[16px] uppercase tracking-wide text-[#FFD700]">{c.contract_number}</div>
+        <span className={`text-[9px] px-2 py-0.5 rounded-full border uppercase tracking-wide font-bold ${badge.cls}`}>{badge.l}</span>
+        {c.overdue && <SLPill color="red" icon="AlertCircle">Просрочка {c.overdue_days} дн.</SLPill>}
+        <div className="text-[10px] text-white/40 ml-auto">{fmtDate(c.created_at)} · {c.created_by || "—"}</div>
+      </div>
+
+      {/* Финансы */}
+      <SLGrid cols={4}>
+        <SLStat label="Выдача" value={`${fmt(c.amount)} ₽`} />
+        <SLStat label="К возврату макс" value={`${fmt(c.total_due)} ₽`} color="gold" />
+        <SLStat label="Оплачено" value={`${fmt(c.paid_total)} ₽`} color="green" />
+        <SLStat label="Остаток" value={`${fmt(c.remaining_debt)} ₽`} color={Number(c.remaining_debt) > 0 ? "red" : "green"} />
+      </SLGrid>
+
+      {/* Сумма на сегодня */}
+      {c.status === "active" && c.today_calc && (
+        <div className="rounded-xl bg-gradient-to-br from-emerald-500/15 via-[#FFD700]/4 to-transparent border border-emerald-500/30 p-2.5 sm:p-3">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <Icon name="Zap" size={12} className="text-emerald-300" />
+            <h3 className="font-oswald uppercase text-[12px] tracking-wide font-bold text-emerald-300">
+              {c.today_calc.is_early ? "Досрочный выкуп · сегодня" : "Сумма на сегодня"}
+            </h3>
+          </div>
+          <div className="grid grid-cols-4 gap-1.5">
+            <SLStat label="Прошло дней" value={`${Math.max(0, c.today_calc.days_passed_raw)}/${c.term_days}`} />
+            <SLStat label="% за факт. дни" value={`${fmt(c.today_calc.interest_today)} ₽`} color="orange" />
+            <SLStat label="К возврату сегодня" value={`${fmt(c.today_calc.today_due_full)} ₽`} color="green" />
+            <SLStat label="Доплатить" value={`${fmt(c.today_calc.today_remaining)} ₽`} color={c.today_calc.today_remaining > 0 ? "gold" : "green"} />
+          </div>
+          {c.today_calc.is_early && c.today_calc.saving > 0 && (
+            <div className="mt-1.5 text-[10px] text-emerald-300/85 flex items-center gap-1">
+              <Icon name="Sparkles" size={10} /> Экономия <b>{fmt(c.today_calc.saving)} ₽</b> vs полный срок ({fmt(c.today_calc.full_due)} ₽)
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Клиент */}
+      <SLSection icon="User" title="Клиент">
+        <SLGrid cols={2}>
+          <Row l="ФИО" v={c.client_name} />
+          <Row l="Дата рождения" v={fmtDate(c.client_birth_date)} />
+          <Row l="Паспорт" v={passportFull} />
+          <Row l="Телефон" v={c.client_phone} />
+          {c.client_email && <Row l="E-mail" v={c.client_email} />}
+        </SLGrid>
+      </SLSection>
+
+      {/* Имущество */}
+      <SLSection icon="Package" title="Имущество">
+        <SLGrid cols={2}>
+          <Row l="Тип" v={c.item_type} />
+          <Row l="Состояние" v={c.condition} />
+          <Row l="Марка / модель" v={[c.item_brand, c.item_model].filter(Boolean).join(" ")} />
+          <Row l="Серийный" v={c.serial_number} />
+          {(c.accessories?.length ?? 0) > 0 && <Row l="Комплект" v={(c.accessories || []).join(", ")} />}
+          {c.item_notes && <Row l="Отметки" v={c.item_notes} />}
+        </SLGrid>
+      </SLSection>
+
+      {/* Условия */}
+      <SLSection icon="ScrollText" title="Условия">
+        <SLGrid cols={4}>
+          <Row l="Ставка" v={`${fmt(c.interest_rate)}%/день`} />
+          <Row l="Срок" v={`${c.term_days} дн.`} />
+          <Row l="Начало" v={fmtDate(c.start_date)} />
+          <Row l="Конец" v={fmtDate(c.end_date)} />
+        </SLGrid>
+        <div className="mt-1.5 rounded-md bg-[#FFD700]/5 border border-[#FFD700]/15 px-2 py-1 text-[10px] text-white/60">
+          <Icon name="Info" size={10} className="inline mr-1 text-[#FFD700]" />
+          Запрет продажи имущества третьим лицам в течение 14 дней.
+        </div>
+      </SLSection>
+
+      {/* Фото */}
+      {c.photos && c.photos.length > 0 && (
+        <SLSection icon="Camera" title="Фото">
+          <div className="grid grid-cols-2 gap-1.5">
+            {c.photos.map(p => (
+              <button key={p.id} onClick={() => onPhotoClick(p.file_url)} className="relative group rounded-md overflow-hidden border border-[#1F1F1F] hover:border-[#FFD700]/40 bg-black/30">
+                <img src={p.file_url} alt={p.photo_type} className="w-full h-24 sm:h-28 object-cover" />
+                <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-[9px] text-white/85 px-1.5 py-0.5 uppercase tracking-wide font-bold">
+                  {p.photo_type === "passport" ? "Паспорт" : "Устройство"}
+                </div>
+              </button>
+            ))}
+          </div>
+        </SLSection>
+      )}
+    </>
+  );
+}
+
+function Row({ l, v }: { l: string; v: string | number | null | undefined }) {
+  return (
+    <div className="min-w-0">
+      <div className="text-[9px] uppercase tracking-wider text-white/40 font-bold">{l}</div>
+      <div className="text-[12px] text-white/85 truncate">{v || "—"}</div>
+    </div>
+  );
+}
