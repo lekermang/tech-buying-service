@@ -21,14 +21,14 @@ def normalize_phone(phone: str) -> str:
 
 
 def build_contact_keyboard(phone: str, client_name: str = '', model: str = '') -> dict:
-    """Inline-клавиатура: WhatsApp / Telegram / Позвонить / SMS — все по номеру клиента."""
+    """Inline-клавиатура: WhatsApp / Telegram — только https-ссылки (tel:/sms: Telegram не разрешает)."""
     digits = normalize_phone(phone)
     if not digits or len(digits) < 11:
-        return {}
+        return None
     plus_phone = f'+{digits}'
     greet_name = (client_name.split()[0] if client_name else '').strip()
     hello = f'Здравствуйте, {greet_name}!' if greet_name else 'Здравствуйте!'
-    body = hello + f' Вы оставляли заявку в Скупка24'
+    body = hello + ' Вы оставляли заявку в Скупка24'
     if model:
         body += f' ({model})'
     body += '. Подскажите, удобно сейчас обсудить?'
@@ -37,41 +37,49 @@ def build_contact_keyboard(phone: str, client_name: str = '', model: str = '') -
         'inline_keyboard': [[
             {'text': '💬 WhatsApp', 'url': f'https://wa.me/{digits}?text={enc}'},
             {'text': '✈️ Telegram', 'url': f'https://t.me/{plus_phone}'},
-        ], [
-            {'text': '📞 Позвонить', 'url': f'tel:{plus_phone}'},
-            {'text': '✉️ SMS', 'url': f'sms:{plus_phone}?body={enc}'},
         ]]
     }
 
 
 def send_tg_text(token: str, chat_id: str, text: str, reply_markup: dict = None):
+    """Отправка с fallback: если TG отказал из-за кнопок — повторяем без кнопок и без markdown."""
+    url = f'https://api.telegram.org/bot{token}/sendMessage'
     try:
         payload = {'chat_id': chat_id, 'text': text, 'parse_mode': 'Markdown'}
         if reply_markup:
             payload['reply_markup'] = json.dumps(reply_markup)
-        requests.post(
-            f'https://api.telegram.org/bot{token}/sendMessage',
-            json=payload,
-            timeout=10
-        )
+        r = requests.post(url, json=payload, timeout=10)
+        if r.status_code == 200:
+            return
+        # Fallback 1: без reply_markup, но с Markdown
+        r2 = requests.post(url, json={'chat_id': chat_id, 'text': text, 'parse_mode': 'Markdown'}, timeout=10)
+        if r2.status_code == 200:
+            return
+        # Fallback 2: без markdown (на случай битых символов)
+        requests.post(url, json={'chat_id': chat_id, 'text': text}, timeout=10)
     except Exception:
-        pass
+        try:
+            requests.post(url, json={'chat_id': chat_id, 'text': text}, timeout=10)
+        except Exception:
+            pass
 
 
 def send_tg_photos(token: str, chat_id: str, caption: str, photos_b64: list, reply_markup: dict = None):
     tg_url = f'https://api.telegram.org/bot{token}'
+    photo_ok = False
     try:
         if len(photos_b64) == 1:
             photo_bytes = base64.b64decode(photos_b64[0])
             data = {'chat_id': chat_id, 'caption': caption, 'parse_mode': 'Markdown'}
             if reply_markup:
                 data['reply_markup'] = json.dumps(reply_markup)
-            requests.post(
+            r = requests.post(
                 f'{tg_url}/sendPhoto',
                 data=data,
                 files={'photo': ('photo.jpg', photo_bytes, 'image/jpeg')},
                 timeout=30
             )
+            photo_ok = (r.status_code == 200)
         else:
             media = []
             files_dict = {}
@@ -83,17 +91,21 @@ def send_tg_photos(token: str, chat_id: str, caption: str, photos_b64: list, rep
                     item['caption'] = caption
                     item['parse_mode'] = 'Markdown'
                 media.append(item)
-            requests.post(
+            r = requests.post(
                 f'{tg_url}/sendMediaGroup',
                 data={'chat_id': chat_id, 'media': json.dumps(media)},
                 files=files_dict,
                 timeout=45
             )
+            photo_ok = (r.status_code == 200)
             # У альбома нельзя прикрепить inline-кнопки — отправим отдельным сообщением
-            if reply_markup:
+            if photo_ok and reply_markup:
                 send_tg_text(token, chat_id, '👇 Быстро связаться с клиентом:', reply_markup)
     except Exception:
-        pass
+        photo_ok = False
+    # Гарантируем хотя бы текстовое уведомление, если фото не прошли
+    if not photo_ok:
+        send_tg_text(token, chat_id, caption, reply_markup)
 
 
 def get_all_recipients(main_chat_id: str) -> list:

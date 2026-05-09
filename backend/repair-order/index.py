@@ -54,18 +54,25 @@ def auth_staff(event: dict) -> bool:
 
 
 def send_tg(token: str, chat_id, text: str, parse_mode: str = 'Markdown', reply_markup: dict = None):
+    """Отправка с fallback: если кнопки/markdown сломали запрос — повторяем без них."""
+    import json as _json
+    url = f'https://api.telegram.org/bot{token}/sendMessage'
     try:
         payload = {'chat_id': chat_id, 'text': text, 'parse_mode': parse_mode}
         if reply_markup:
-            import json as _json
             payload['reply_markup'] = _json.dumps(reply_markup)
-        requests.post(
-            f'https://api.telegram.org/bot{token}/sendMessage',
-            json=payload,
-            timeout=10,
-        )
+        r = requests.post(url, json=payload, timeout=10)
+        if r.status_code == 200:
+            return
+        r2 = requests.post(url, json={'chat_id': chat_id, 'text': text, 'parse_mode': parse_mode}, timeout=10)
+        if r2.status_code == 200:
+            return
+        requests.post(url, json={'chat_id': chat_id, 'text': text}, timeout=10)
     except Exception:
-        pass
+        try:
+            requests.post(url, json={'chat_id': chat_id, 'text': text}, timeout=10)
+        except Exception:
+            pass
 
 
 def _normalize_phone(phone: str) -> str:
@@ -79,7 +86,7 @@ def _normalize_phone(phone: str) -> str:
 
 
 def build_contact_keyboard(phone: str, client_name: str = '', model: str = '', order_id=None) -> dict:
-    """Inline-клавиатура: WhatsApp / Telegram / Позвонить / SMS — для быстрого ответа клиенту."""
+    """Inline-клавиатура: WhatsApp / Telegram — только https (tel:/sms: Telegram не разрешает в кнопках)."""
     import urllib.parse as _up
     digits = _normalize_phone(phone)
     if not digits or len(digits) < 11:
@@ -98,9 +105,6 @@ def build_contact_keyboard(phone: str, client_name: str = '', model: str = '', o
         'inline_keyboard': [[
             {'text': '💬 WhatsApp', 'url': f'https://wa.me/{digits}?text={enc}'},
             {'text': '✈️ Telegram', 'url': f'https://t.me/{plus_phone}'},
-        ], [
-            {'text': '📞 Позвонить', 'url': f'tel:{plus_phone}'},
-            {'text': '✉️ SMS', 'url': f'sms:{plus_phone}?body={enc}'},
         ]]
     }
 
