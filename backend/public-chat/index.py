@@ -983,10 +983,23 @@ def action_zvonok_request(body):
         except Exception as ie:
             print(f'[ZVONOK REQUEST] insert error: {ie}')
 
-        # Если Zvonok вернул ошибку — пробрасываем её клиенту
+        # Если Zvonok вернул ошибку — переводим её в понятный текст для клиента
         if r.status_code != 200:
-            err_msg = str(d.get('error') or d.get('message') or d.get('raw') or f'HTTP {r.status_code}')[:300]
-            return _err(502, f'Zvonok отклонил: {err_msg}')
+            raw_err = str(d.get('error') or d.get('message') or d.get('data') or d.get('raw') or f'HTTP {r.status_code}')
+            err_lower = raw_err.lower()
+            if 'duplicate' in err_lower:
+                user_msg = 'Звонок уже запрошен. Дождитесь звонка или попробуйте через 5 минут.'
+            elif 'audio' in err_lower or 'clip' in err_lower:
+                user_msg = 'Сервис временно недоступен (нет аудио). Попробуйте другой способ входа.'
+            elif 'balance' in err_lower or 'недостаточно' in err_lower:
+                user_msg = 'Сервис временно недоступен. Попробуйте позже.'
+            elif 'campaign' in err_lower:
+                user_msg = 'Сервис настраивается. Попробуйте через минуту.'
+            else:
+                user_msg = f'Не удалось позвонить: {raw_err[:150]}'
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({
+                'ok': False, 'error': user_msg, 'zvonok_error': raw_err[:300],
+            }, ensure_ascii=False)}
 
         return _ok({'ok': True, 'pin_known': bool(pincode), 'call_id': call_id, 'response': d})
     except Exception as e:
