@@ -41,8 +41,48 @@ def build_contact_keyboard(phone: str, client_name: str = '', model: str = '') -
     }
 
 
+def build_take_keyboard(lead_id: int, phone: str, client_name: str = '', model: str = '') -> dict:
+    """Кнопка 'Беру в работу' (callback) + WhatsApp/Telegram (https)."""
+    digits = normalize_phone(phone)
+    plus_phone = f'+{digits}' if digits else ''
+    greet_name = (client_name.split()[0] if client_name else '').strip()
+    hello = f'Здравствуйте, {greet_name}!' if greet_name else 'Здравствуйте!'
+    body = hello + ' Вы оставляли заявку в Скупка24'
+    if model:
+        body += f' ({model})'
+    body += '. Подскажите, удобно сейчас обсудить?'
+    enc = urllib.parse.quote(body)
+    rows = [[{'text': '🎯 Беру в работу', 'callback_data': f'take:{lead_id}'}]]
+    if digits and len(digits) == 11:
+        rows.append([
+            {'text': '💬 WhatsApp', 'url': f'https://wa.me/{digits}?text={enc}'},
+            {'text': '✈️ Telegram', 'url': f'https://t.me/{plus_phone}'},
+        ])
+    return {'inline_keyboard': rows}
+
+
+def send_sms_confirmation(phone: str, lead_id: int, name: str = ''):
+    """SMS клиенту с подтверждением заявки через sms.ru."""
+    api_id = os.environ.get('SMSRU_API_ID', '')
+    if not api_id:
+        return False
+    digits = normalize_phone(phone)
+    if not digits or len(digits) < 11:
+        return False
+    text = f"Скупка24: заявка #{lead_id} принята! Перезвоним в течение 15 мин. Срочно: 88005553535"
+    try:
+        requests.get(
+            'https://sms.ru/sms/send',
+            params={'api_id': api_id, 'to': digits, 'msg': text, 'json': 1},
+            timeout=8,
+        )
+        return True
+    except Exception:
+        return False
+
+
 def send_tg_text(token: str, chat_id: str, text: str, reply_markup: dict = None):
-    """Отправка с fallback: если TG отказал из-за кнопок — повторяем без кнопок и без markdown."""
+    """Отправка с fallback. Возвращает message_id или None."""
     url = f'https://api.telegram.org/bot{token}/sendMessage'
     try:
         payload = {'chat_id': chat_id, 'text': text, 'parse_mode': 'Markdown'}
@@ -50,18 +90,22 @@ def send_tg_text(token: str, chat_id: str, text: str, reply_markup: dict = None)
             payload['reply_markup'] = json.dumps(reply_markup)
         r = requests.post(url, json=payload, timeout=10)
         if r.status_code == 200:
-            return
-        # Fallback 1: без reply_markup, но с Markdown
+            try: return r.json().get('result', {}).get('message_id')
+            except Exception: return None
         r2 = requests.post(url, json={'chat_id': chat_id, 'text': text, 'parse_mode': 'Markdown'}, timeout=10)
         if r2.status_code == 200:
-            return
-        # Fallback 2: без markdown (на случай битых символов)
-        requests.post(url, json={'chat_id': chat_id, 'text': text}, timeout=10)
+            try: return r2.json().get('result', {}).get('message_id')
+            except Exception: return None
+        r3 = requests.post(url, json={'chat_id': chat_id, 'text': text}, timeout=10)
+        if r3.status_code == 200:
+            try: return r3.json().get('result', {}).get('message_id')
+            except Exception: return None
     except Exception:
         try:
             requests.post(url, json={'chat_id': chat_id, 'text': text}, timeout=10)
         except Exception:
             pass
+    return None
 
 
 def send_tg_photos(token: str, chat_id: str, caption: str, photos_b64: list, reply_markup: dict = None):
@@ -168,17 +212,72 @@ def handler(event: dict, context) -> dict:
         + (f"\n🥇 *Курс золота:* {gold_price} ₽/г" if gold_price else "")
     )
 
+    # ── Регистрируем заявку в системе трекинга (lead_id для кнопки "Беру") ───
+    lead_id = None
+    try:
+        conn0 = psycopg2.connect(os.environ['DATABASE_URL'])
+        cur0 = conn0.cursor()
+        # SQL injection защита: используем параметры через replace
+        n_e = name.replace("'", "''")
+        p_e = phone.replace("'", "''")
+        c_e = (category or '').replace("'", "''")
+        d_e = (desc or '').replace("'", "''")
+        src = 'lead'
+        if category == 'Золото': src = 'gold'
+        elif 'Apple' in (category or ''): src = 'apple'
+        elif 'Вакансия' in (category or ''): src = 'jobs'
+        elif 'нструмент' in (category or ''): src = 'tools'
+        cur0.execute(
+            f"INSERT INTO {SCHEMA}.leads_tracking (source, client_name, client_phone, category, description) "
+            f"VALUES ('{src}', '{n_e}', '{p_e}', '{c_e}', '{d_e}') RETURNING id"
+        )
+        lead_id = cur0.fetchone()[0]
+        cur0.execute(
+            f"INSERT INTO {SCHEMA}.leads_tracking_log (lead_id, action, note) VALUES ({lead_id}, 'created', '{src}')"
+        )
+        conn0.commit(); cur0.close(); conn0.close()
+    except Exception:
+        lead_id = None
+
+    # Если есть lead_id — добавляем кнопку "Беру в работу" + WhatsApp/Telegram
     photos_b64 = body.get('photos') or ([photo_b64] if photo_b64 else [])
     recipients = get_all_recipients(main_chat_id)
-    kb = build_contact_keyboard(phone, name, category or desc)
+    if lead_id:
+        kb = build_take_keyboard(lead_id, phone, name, category or desc)
+        # Префикс с номером заявки в caption
+        caption = f"📦 *Новая заявка #{lead_id} — Скупка24*\n\n" + caption.split('\n\n', 1)[1] if '\n\n' in caption else caption
+    else:
+        kb = build_contact_keyboard(phone, name, category or desc)
 
+    msg_ids = {}
     if photos_b64:
         send_tg_photos(token, main_chat_id, caption, photos_b64, kb)
         for cid in recipients[1:]:
-            send_tg_text(token, cid, caption, kb)
+            mid = send_tg_text(token, cid, caption, kb)
+            if mid: msg_ids[str(cid)] = mid
     else:
         for cid in recipients:
-            send_tg_text(token, cid, caption, kb)
+            mid = send_tg_text(token, cid, caption, kb)
+            if mid: msg_ids[str(cid)] = mid
+
+    # Сохраняем message_ids чтобы потом можно было отредактировать сообщения
+    if lead_id and msg_ids:
+        try:
+            conn0 = psycopg2.connect(os.environ['DATABASE_URL'])
+            cur0 = conn0.cursor()
+            cur0.execute(
+                f"UPDATE {SCHEMA}.leads_tracking SET tg_message_ids='{json.dumps(msg_ids).replace(chr(39), chr(39)+chr(39))}'::jsonb, updated_at=NOW() WHERE id={lead_id}"
+            )
+            conn0.commit(); cur0.close(); conn0.close()
+        except Exception:
+            pass
+
+    # SMS клиенту с подтверждением
+    if lead_id:
+        try:
+            send_sms_confirmation(phone, lead_id, name)
+        except Exception:
+            pass
 
     # Если заявка на золото — сохраняем в gold_orders
     if category == 'Золото':

@@ -18,6 +18,7 @@ import {
 import MyProfileModal from "./MyProfileModal";
 import StaffSectionBanner from "./StaffSectionBanner";
 import { SLTooltip } from "../slShop/slUI";
+import LeadsAlertWatcher from "./LeadsAlertWatcher";
 
 type Tab = StaffTab;
 
@@ -346,6 +347,9 @@ export function StaffMainLayout({
           </div>
         </div>
       </nav>
+
+      {/* Глобальный watcher горящих заявок: всплывающие toast'ы + плавающая кнопка */}
+      <LeadsAlertWatcher token={token} empName={empName} />
 
       {/* Модалка пароля для сотрудников */}
       {pwModal && (

@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import smtplib
 import requests
 import psycopg2
@@ -54,7 +55,7 @@ def auth_staff(event: dict) -> bool:
 
 
 def send_tg(token: str, chat_id, text: str, parse_mode: str = 'Markdown', reply_markup: dict = None):
-    """Отправка с fallback: если кнопки/markdown сломали запрос — повторяем без них."""
+    """Отправка с fallback. Возвращает message_id или None."""
     import json as _json
     url = f'https://api.telegram.org/bot{token}/sendMessage'
     try:
@@ -63,16 +64,22 @@ def send_tg(token: str, chat_id, text: str, parse_mode: str = 'Markdown', reply_
             payload['reply_markup'] = _json.dumps(reply_markup)
         r = requests.post(url, json=payload, timeout=10)
         if r.status_code == 200:
-            return
+            try: return r.json().get('result', {}).get('message_id')
+            except Exception: return None
         r2 = requests.post(url, json={'chat_id': chat_id, 'text': text, 'parse_mode': parse_mode}, timeout=10)
         if r2.status_code == 200:
-            return
-        requests.post(url, json={'chat_id': chat_id, 'text': text}, timeout=10)
+            try: return r2.json().get('result', {}).get('message_id')
+            except Exception: return None
+        r3 = requests.post(url, json={'chat_id': chat_id, 'text': text}, timeout=10)
+        if r3.status_code == 200:
+            try: return r3.json().get('result', {}).get('message_id')
+            except Exception: return None
     except Exception:
         try:
             requests.post(url, json={'chat_id': chat_id, 'text': text}, timeout=10)
         except Exception:
             pass
+    return None
 
 
 def _normalize_phone(phone: str) -> str:
@@ -1084,6 +1091,39 @@ def handler(event: dict, context) -> dict:
         + (f"\n✅ Клиент в TG" if client_chat_id else "")
     )
 
+    # ── Регистрируем заявку в leads_tracking ─────────────────────────────
+    lead_id = None
+    try:
+        connlt = psycopg2.connect(os.environ['DATABASE_URL'])
+        curlt = connlt.cursor()
+        n_e = (name or '').replace("'", "''")
+        p_e = (phone or '').replace("'", "''")
+        c_e = (model or '').replace("'", "''")
+        d_e = ((repair_type or '') + (' | ' + comment if comment else '')).replace("'", "''")
+        curlt.execute(
+            f"INSERT INTO {SCHEMA}.leads_tracking (source, external_id, client_name, client_phone, category, description) "
+            f"VALUES ('repair', {int(order_id)}, '{n_e}', '{p_e}', '{c_e}', '{d_e}') RETURNING id"
+        )
+        lead_id = curlt.fetchone()[0]
+        curlt.execute(
+            f"INSERT INTO {SCHEMA}.leads_tracking_log (lead_id, action, note) VALUES ({lead_id}, 'created', 'repair')"
+        )
+        connlt.commit(); curlt.close(); connlt.close()
+    except Exception:
+        lead_id = None
+
+    # SMS клиенту
+    try:
+        sms_api_id = os.environ.get('SMSRU_API_ID', '')
+        if sms_api_id and phone:
+            sms_digits = re.sub(r'\D', '', phone)
+            if len(sms_digits) == 11:
+                sms_text = f"Скупка24: заявка на ремонт #{order_id} принята! Перезвоним в течение 15 мин."
+                requests.get('https://sms.ru/sms/send',
+                             params={'api_id': sms_api_id, 'to': sms_digits, 'msg': sms_text, 'json': 1}, timeout=8)
+    except Exception:
+        pass
+
     # ── УВЕДОМЛЕНИЯ (не влияют на сохранение заявки) ─────────────────────────
     if token:
         try:
@@ -1102,10 +1142,31 @@ def handler(event: dict, context) -> dict:
         try:
             html_bytes = build_act_html(order_id, name, phone, model, repair_type, price_str, comment)
             filename = f'Акт_приёмки_{order_id}_{name.replace(" ", "_")}.html'
-            kb = build_contact_keyboard(phone, name, model, order_id)
+            # Если есть lead_id — добавим кнопку "Беру в работу"
+            if lead_id:
+                kb_rows = [[{'text': '🎯 Беру в работу', 'callback_data': f'take:{lead_id}'}]]
+                digits = re.sub(r'\D', '', phone or '')
+                if len(digits) == 11:
+                    kb_rows.append([
+                        {'text': '💬 WhatsApp', 'url': f'https://wa.me/{digits}'},
+                        {'text': '✈️ Telegram', 'url': f'https://t.me/+{digits}'},
+                    ])
+                kb = {'inline_keyboard': kb_rows}
+            else:
+                kb = build_contact_keyboard(phone, name, model, order_id)
+            msg_ids = {}
             for cid in chat_ids:
-                send_tg(token, cid, tg_text, reply_markup=kb)
+                mid = send_tg(token, cid, tg_text, reply_markup=kb)
+                if mid: msg_ids[str(cid)] = mid
                 send_tg_document(token, cid, html_bytes, filename, caption=f'📋 Акт приёмки №{order_id} — открыть и распечатать', mime='text/html')
+            # сохранить msg_ids
+            if lead_id and msg_ids:
+                try:
+                    cn = psycopg2.connect(os.environ['DATABASE_URL']); cu = cn.cursor()
+                    cu.execute(f"UPDATE {SCHEMA}.leads_tracking SET tg_message_ids='{json.dumps(msg_ids)}'::jsonb WHERE id={lead_id}")
+                    cn.commit(); cu.close(); cn.close()
+                except Exception:
+                    pass
         except Exception as tg_err:
             print(f"[repair-order] TG notify error order={order_id} err={tg_err}")
 

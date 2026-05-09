@@ -1,0 +1,24 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Unknown action returns 400",
+      "method": "GET",
+      "path": "/?action=unknown_xyz",
+      "expectedStatus": 400
+    },
+    {
+      "name": "Hot list returns ok",
+      "method": "GET",
+      "path": "/?action=hot",
+      "expectedStatus": 200,
+      "expectedBody": {"ok": true},
+      "bodyMatcher": "partial"
+    }
+  ]
+}
