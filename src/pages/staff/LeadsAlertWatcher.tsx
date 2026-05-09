@@ -1,5 +1,6 @@
 import React from "react";
 import Icon from "@/components/ui/icon";
+import { shareToChat, formatLeadShare } from "@/lib/shareToChat";
 
 const LEADS_URL = "https://functions.poehali.dev/cccc3788-d793-49a5-9254-f194e6d94e18";
 
@@ -182,6 +183,20 @@ export default function LeadsAlertWatcher({ token, empName }: { token: string; e
       });
       fetchHot();
     } catch { /* */ }
+  };
+
+  const [shareToast, setShareToast] = React.useState<string | null>(null);
+  const shareLead = async (lead: Lead) => {
+    const ok = await shareToChat(token, formatLeadShare({
+      id: lead.id,
+      client_name: lead.client_name,
+      client_phone: lead.client_phone,
+      category: lead.category,
+      description: lead.description,
+      source: lead.source,
+    }));
+    setShareToast(ok ? "✅ Отправлено в чат" : "❌ Не удалось отправить");
+    setTimeout(() => setShareToast(null), 2000);
   };
 
   const overdue = stats?.overdue_count || 0;
@@ -377,16 +392,32 @@ export default function LeadsAlertWatcher({ token, empName }: { token: string; e
                         📞
                       </a>
                     </div>
-                    {l.status === "taken" && (
-                      <button onClick={() => closeLead(l.id)} className="mt-1 w-full text-[10px] text-white/40 hover:text-white/70 underline">
-                        Закрыть заявку
+                    <div className="mt-1 flex items-center justify-between gap-2">
+                      <button
+                        onClick={() => shareLead(l)}
+                        className="text-[10px] text-blue-300/80 hover:text-blue-200 underline inline-flex items-center gap-1"
+                        title="Отправить карточку заявки в чат сотрудников"
+                      >
+                        <Icon name="MessageSquareShare" size={11} fallback="Send" /> В чат сотрудникам
                       </button>
-                    )}
+                      {l.status === "taken" && (
+                        <button onClick={() => closeLead(l.id)} className="text-[10px] text-white/40 hover:text-white/70 underline">
+                          Закрыть заявку
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Мини-уведомление об успехе шаринга */}
+      {shareToast && (
+        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[210] px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-bold shadow-2xl shadow-blue-500/30 animate-in fade-in slide-in-from-top-2">
+          {shareToast}
         </div>
       )}
     </>

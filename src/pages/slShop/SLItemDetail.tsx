@@ -5,6 +5,7 @@ import CategoryTreeSelect from "./CategoryTreeSelect";
 import PrintDocsButton from "./PrintDocsButton";
 import { Row, Inp2, fmtRamStorage, parseStorageStr } from "./SLItemsCommon";
 import { printLabelQuick, LABEL_SIZES, getLastLabelSize, setLastLabelSize } from "./labelPrinter";
+import { shareToChat, formatSlItemShare } from "@/lib/shareToChat";
 
 const PHONE_SPECS_AI_URL = "https://functions.poehali.dev/983744a8-1cfc-42d8-a566-bf31dfa328b2";
 
@@ -120,6 +121,23 @@ export default function SLItemDetail({ token, item: itemProp, isOwner, onClose, 
   };
   const stCfg = STATUS_LABEL[item.status] || STATUS_LABEL.stock;
   const currentCat = cats.find(c => c.id === item.category_id);
+
+  const [shareToast, setShareToast] = useState<string | null>(null);
+  const shareItem = async () => {
+    const ok = await shareToChat(token, formatSlItemShare({
+      id: item.id,
+      brand: item.brand,
+      model: item.model,
+      imei: item.imei,
+      buy_price: item.buy_price,
+      sell_price: item.sell_price,
+      status: STATUS_LABEL[item.status]?.l || item.status,
+      notes: item.specs_short,
+    }));
+    setShareToast(ok ? "✅ Отправлено в чат" : "❌ Не удалось");
+    setTimeout(() => setShareToast(null), 2000);
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-black/80 flex items-end sm:items-center justify-center p-2" onClick={onClose}>
       <div className="bg-[#0A0A0A] border border-[#1F1F1F] rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
@@ -133,6 +151,12 @@ export default function SLItemDetail({ token, item: itemProp, isOwner, onClose, 
             )}
           </div>
           <div className="flex items-center gap-1">
+            <button
+              onClick={shareItem}
+              title="Отправить карточку в чат сотрудников"
+              className="text-white/60 hover:text-blue-300 p-1.5 rounded hover:bg-blue-500/10">
+              <Icon name="MessageSquareShare" fallback="Send" size={16} />
+            </button>
             <button
               onClick={() => printLabelQuick(item, { size: labelSize, discount: discountOpts })}
               title={`Печать ценника (${LABEL_SIZES.find(s => s.code === labelSize)?.name || labelSize})`}
@@ -375,6 +399,11 @@ export default function SLItemDetail({ token, item: itemProp, isOwner, onClose, 
           )}
         </div>
       </div>
+      {shareToast && (
+        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[210] px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-bold shadow-2xl shadow-blue-500/30">
+          {shareToast}
+        </div>
+      )}
     </div>
   );
 }

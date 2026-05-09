@@ -1,5 +1,6 @@
-import { forwardRef } from "react";
+import { forwardRef, useState } from "react";
 import Icon from "@/components/ui/icon";
+import EmojiPicker from "./EmojiPicker";
 
 type Props = {
   text: string;
@@ -23,6 +24,8 @@ const ChatComposer = forwardRef<HTMLInputElement, Props>(function ChatComposer({
   onCancelPhoto, onPickFile, onFileChange, onSend, onKeyDown,
   lightbox, onCloseLightbox,
 }, fileRef) {
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const onPickEmoji = (e: string) => setText(text + e);
   return (
     <>
       {/* Превью прикрепляемого фото */}
@@ -53,7 +56,13 @@ const ChatComposer = forwardRef<HTMLInputElement, Props>(function ChatComposer({
       )}
 
       {/* Поле ввода */}
-      <div className="border-t border-white/5 p-3 bg-black/40">
+      <div className="border-t border-white/5 p-3 bg-black/40 relative">
+        <EmojiPicker
+          open={emojiOpen}
+          onClose={() => setEmojiOpen(false)}
+          onPick={onPickEmoji}
+          anchorClass="bottom-full left-3 mb-2"
+        />
         <div className="flex items-end gap-2 bg-[#141414] border border-white/10 rounded-xl px-2 py-1.5 focus-within:border-[#FFD700]/40 transition-colors">
           <input ref={fileRef} type="file" accept="image/*" onChange={onFileChange} className="hidden" />
           <button
@@ -62,6 +71,12 @@ const ChatComposer = forwardRef<HTMLInputElement, Props>(function ChatComposer({
             title="Прикрепить фото"
             className="shrink-0 p-2 text-white/40 hover:text-[#FFD700] transition-colors disabled:opacity-40">
             <Icon name="Paperclip" size={18} />
+          </button>
+          <button
+            onClick={() => setEmojiOpen(v => !v)}
+            title="Эмодзи"
+            className={`shrink-0 p-2 transition-colors ${emojiOpen ? "text-[#FFD700]" : "text-white/40 hover:text-[#FFD700]"}`}>
+            <Icon name="Smile" size={18} />
           </button>
           <textarea
             value={text}
