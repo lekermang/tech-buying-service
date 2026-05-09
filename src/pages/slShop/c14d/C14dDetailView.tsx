@@ -370,9 +370,15 @@ export default function C14dDetailView({ token, contractId, onBack }: Props) {
           </SLField>
           <SLField
             label="Дата операции"
-            hint="По умолчанию — сейчас. Поменяй для проведения задним числом."
+            hint="По умолчанию — сейчас. Поменяй для проведения задним числом — проценты пересчитаются на эту дату."
           >
             <SLInput type="datetime-local" value={payPaidAt} onChange={e => setPayPaidAt(e.target.value)} iconLeft="Calendar" />
+            {payPaidAt && new Date(payPaidAt).toDateString() !== new Date().toDateString() && (
+              <div className="mt-1 rounded-md bg-amber-500/10 border border-amber-500/30 p-1.5 text-[10px] text-amber-300/90 flex items-start gap-1">
+                <Icon name="Info" size={10} className="mt-0.5 shrink-0" />
+                <span>Платёж задним числом: проценты пересчитаются на выбранную дату, договор закроется этой же датой.</span>
+              </div>
+            )}
           </SLField>
           <SLField label="Касса прихода">
             <SLSelect value={payAccountId} onChange={e => setPayAccountId(e.target.value)} disabled={paySkipCash}>

@@ -165,8 +165,10 @@ def _resolve_cash_account(cur, account_id):
     return row[0] if row else None
 
 
-def _cash_movement(cur, account_id, direction, amount, category, reason, actor, branch_id=None):
-    """Создаёт движение в кассе и обновляет баланс. Возвращает id движения."""
+def _cash_movement(cur, account_id, direction, amount, category, reason, actor, branch_id=None, created_at=None):
+    """Создаёт движение в кассе и обновляет баланс. Возвращает id движения.
+    created_at — опциональная дата операции (для проведения задним числом).
+    """
     amt = Decimal(str(amount))
     if amt <= 0:
         return None
@@ -183,13 +185,22 @@ def _cash_movement(cur, account_id, direction, amount, category, reason, actor, 
         f"UPDATE {SCHEMA}.slshop_cash_accounts SET balance=%s WHERE id=%s",
         (new_balance, account_id)
     )
-    cur.execute(
-        f"INSERT INTO {SCHEMA}.slshop_cash_movements "
-        f"(account_id, direction, amount, balance_after, category, reason, employee_name, is_auto, branch_id) "
-        f"VALUES (%s, %s, %s, %s, %s, %s, %s, TRUE, %s) RETURNING id",
-        (account_id, direction, amt, new_balance, category, reason,
-         (actor or {}).get('full_name'), branch_id)
-    )
+    if created_at is not None:
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.slshop_cash_movements "
+            f"(account_id, direction, amount, balance_after, category, reason, employee_name, is_auto, branch_id, created_at) "
+            f"VALUES (%s, %s, %s, %s, %s, %s, %s, TRUE, %s, %s) RETURNING id",
+            (account_id, direction, amt, new_balance, category, reason,
+             (actor or {}).get('full_name'), branch_id, created_at)
+        )
+    else:
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.slshop_cash_movements "
+            f"(account_id, direction, amount, balance_after, category, reason, employee_name, is_auto, branch_id) "
+            f"VALUES (%s, %s, %s, %s, %s, %s, %s, TRUE, %s) RETURNING id",
+            (account_id, direction, amt, new_balance, category, reason,
+             (actor or {}).get('full_name'), branch_id)
+        )
     return cur.fetchone()[0]
 
 
@@ -572,8 +583,10 @@ def action_payment(body, actor):
         if status != 'active':
             return _err(400, 'Платёж можно вносить только по активному договору')
 
-        # При досрочном выкупе считаем сумму к возврату на сегодня
-        today_calc = _calc_today(principal, rate, term_days, sd, paid_total)
+        # При досрочном выкупе считаем сумму к возврату на дату операции
+        # (если сотрудник проводит платёж задним числом — проценты считаются на эту дату)
+        op_date = paid_at_value.date() if paid_at_value is not None else date.today()
+        today_calc = _calc_today(principal, rate, term_days, sd, paid_total, on_date=op_date)
         today_due_full = Decimal(str(today_calc['today_due_full']))
         is_early = bool(today_calc['is_early'])
 
@@ -618,7 +631,8 @@ def action_payment(body, actor):
                     cur, cash_id, 'in', amount,
                     'contracts_14d_payment',
                     f'Платёж по договору {contract_number}' + (f' · {comment}' if comment else ''),
-                    actor
+                    actor,
+                    created_at=paid_at_value,
                 )
 
         if paid_at_value is not None:
@@ -642,14 +656,22 @@ def action_payment(body, actor):
         payment_id = cur.fetchone()[0]
 
         new_status = 'closed' if new_remaining <= 0 else 'active'
-        # При досрочном выкупе обновляем total_due на актуальную сумму на сегодня,
+        # При досрочном выкупе обновляем total_due на актуальную сумму на дату операции,
         # чтобы остаток и сумма к возврату везде показывались корректно.
         new_total_due = effective_due if is_early else total_due
-        cur.execute(
-            f"UPDATE {SCHEMA}.contracts_14d SET total_due=%s, paid_total=%s, remaining_debt=%s, status=%s, "
-            f"closed_at=CASE WHEN %s='closed' THEN NOW() ELSE closed_at END, updated_at=NOW() WHERE id=%s",
-            (new_total_due, new_paid, new_remaining, new_status, new_status, cid)
-        )
+        # closed_at = дата операции (если задним числом) или NOW()
+        if new_status == 'closed' and paid_at_value is not None:
+            cur.execute(
+                f"UPDATE {SCHEMA}.contracts_14d SET total_due=%s, paid_total=%s, remaining_debt=%s, status=%s, "
+                f"closed_at=%s, updated_at=NOW() WHERE id=%s",
+                (new_total_due, new_paid, new_remaining, new_status, paid_at_value, cid)
+            )
+        else:
+            cur.execute(
+                f"UPDATE {SCHEMA}.contracts_14d SET total_due=%s, paid_total=%s, remaining_debt=%s, status=%s, "
+                f"closed_at=CASE WHEN %s='closed' THEN NOW() ELSE closed_at END, updated_at=NOW() WHERE id=%s",
+                (new_total_due, new_paid, new_remaining, new_status, new_status, cid)
+            )
 
         _log(cur, cid, 'payment', {
             'payment_id': payment_id,
