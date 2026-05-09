@@ -922,51 +922,89 @@ def action_zvonok_request(body):
     if not pub_key:
         return _err(500, 'Zvonok: не задан ZVONOK_PUBLIC_KEY')
     if not campaign_id:
-        return _err(500, 'Zvonok: не задан Campaign ID (ZVONOK_CAMPAIGN_ID или ZVONOK_CAMPAIGN_LEAD)')
+        return _err(500, 'Zvonok: не задан Campaign ID')
     phone = _normalize_phone(body.get('phone') or '')
     if len(phone) != 11:
         return _err(400, 'Неверный номер')
-    # Rate-limit: не больше 3 за 10 минут
-    conn = _conn(); cur = conn.cursor()
-    cur.execute(
-        f"SELECT COUNT(*) FROM {SCHEMA}.pchat_zvonok WHERE phone={_esc(phone)} "
-        f"AND created_at > NOW() - INTERVAL '10 minutes'"
-    )
-    if cur.fetchone()[0] >= 3:
-        cur.close(); conn.close()
-        return _err(429, 'Слишком много попыток. Попробуйте через 10 минут.')
+
+    conn = None; cur = None
     try:
-        r = requests.get(
-            'https://zvonok.com/manager/cabapi_external/api/v1/phones/call/',
-            params={
-                'public_key': pub_key,
-                'campaign_id': campaign_id,
-                'phone': '+' + phone,
-            },
-            timeout=15,
-        )
-        try:
-            d = r.json()
-        except Exception:
-            cur.close(); conn.close()
-            print(f'[ZVONOK] non-json response: {r.text[:300]}')
-            return _err(502, 'Сервис звонка недоступен')
-        # Zvonok возвращает: {"call_id": ..., "pincode": "1234", ...}
-        call_id = str(d.get('call_id') or d.get('id') or '')
-        pincode = str(d.get('pincode') or d.get('pin') or '')
-        if not pincode:
-            # У некоторых типов кампаний код не возвращается через API — клиент вводит последние 4 цифры
-            pincode = ''
+        conn = _conn(); cur = conn.cursor()
+        # Rate-limit: не больше 3 за 10 минут
         cur.execute(
-            f"INSERT INTO {SCHEMA}.pchat_zvonok (phone, pincode, call_id, expires_at) "
-            f"VALUES ({_esc(phone)}, {_esc(pincode)}, {_esc(call_id)}, NOW() + INTERVAL '10 minutes')"
+            f"SELECT COUNT(*) FROM {SCHEMA}.pchat_zvonok WHERE phone={_esc(phone)} "
+            f"AND created_at > NOW() - INTERVAL '10 minutes'"
         )
-        conn.commit(); cur.close(); conn.close()
-        return _ok({'ok': True, 'pin_known': bool(pincode), 'call_id': call_id})
+        if cur.fetchone()[0] >= 3:
+            return _err(429, 'Слишком много попыток. Попробуйте через 10 минут.')
+
+        # Делаем вызов Zvonok (короткий таймаут, чтобы успеть в 30 сек лимит лямбды)
+        try:
+            r = requests.get(
+                'https://zvonok.com/manager/cabapi_external/api/v1/phones/call/',
+                params={
+                    'public_key': pub_key,
+                    'campaign_id': str(campaign_id),
+                    'phone': '+' + phone,
+                },
+                timeout=10,
+            )
+        except requests.exceptions.Timeout:
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({
+                'ok': False, 'error': 'Zvonok не ответил за 10 сек (timeout)',
+            }, ensure_ascii=False)}
+        except Exception as req_err:
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({
+                'ok': False, 'error': f'Не удалось связаться со Zvonok: {req_err}',
+            }, ensure_ascii=False)}
+        d = {}
+        try:
+            d = r.json() if r.text else {}
+        except Exception:
+            d = {'raw': r.text[:300]}
+        print(f'[ZVONOK REQUEST] phone={phone} campaign={campaign_id} status={r.status_code} resp={d}')
+
+        # Извлекаем call_id и pincode (если кампания их возвращает)
+        call_id = ''
+        pincode = ''
+        try:
+            call_id = str(d.get('call_id') or d.get('id') or '')[:128]
+            pincode = str(d.get('pincode') or d.get('pin') or '')[:32]
+        except Exception:
+            pass
+
+        # Сохраняем запись (даже если Zvonok вернул ошибку — для отладки)
+        try:
+            cur.execute(
+                f"INSERT INTO {SCHEMA}.pchat_zvonok (phone, pincode, call_id, expires_at) "
+                f"VALUES ({_esc(phone)}, {_esc(pincode)}, {_esc(call_id)}, NOW() + INTERVAL '10 minutes')"
+            )
+            conn.commit()
+        except Exception as ie:
+            print(f'[ZVONOK REQUEST] insert error: {ie}')
+
+        # Если Zvonok вернул ошибку — пробрасываем её клиенту
+        if r.status_code != 200:
+            err_msg = str(d.get('error') or d.get('message') or d.get('raw') or f'HTTP {r.status_code}')[:300]
+            return _err(502, f'Zvonok отклонил: {err_msg}')
+
+        return _ok({'ok': True, 'pin_known': bool(pincode), 'call_id': call_id, 'response': d})
     except Exception as e:
-        cur.close(); conn.close()
-        print(f'[ZVONOK] exception: {e}')
-        return _err(500, 'Ошибка вызова')
+        import traceback
+        tb = traceback.format_exc()
+        print(f'[ZVONOK REQUEST] exception: {e}\n{tb}')
+        # Возвращаем 200 с подробной ошибкой, чтобы её точно увидел фронт
+        return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({
+            'ok': False,
+            'error': f'Ошибка вызова Zvonok: {type(e).__name__}: {e}',
+            'traceback': tb[:1500],
+        }, ensure_ascii=False)}
+    finally:
+        try:
+            if cur: cur.close()
+            if conn: conn.close()
+        except Exception:
+            pass
 
 
 def action_zvonok_verify(body):
