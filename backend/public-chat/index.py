@@ -1209,6 +1209,11 @@ def handler(event, context):
         if action == 'zvonok_verify':   return action_zvonok_verify(body)
         if action == 'zvonok_diag':     return action_zvonok_diag(body)
         if action == 'tg_webhook':      return action_tg_webhook(body)
+        if action == 'bot_info':
+            return _ok({
+                'ok': True,
+                'username': os.environ.get('TELEGRAM_BOT_USERNAME', ''),
+            })
         # сотрудники
         if action == 'staff_rooms':   return action_staff_rooms(qp, headers)
         if action == 'staff_poll':    return action_staff_poll(body, headers)

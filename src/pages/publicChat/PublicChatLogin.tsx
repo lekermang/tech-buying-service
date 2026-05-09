@@ -22,7 +22,7 @@ declare global {
   }
 }
 
-const TG_BOT_USERNAME = "Skupka24Bot"; // должен совпадать с TELEGRAM_BOT_USERNAME (без @)
+const DEFAULT_TG_BOT_USERNAME = "SkypkaIgbot"; // fallback, реальное берём из bot_info
 
 const saveAndGo = (token: string, name: string, directRoomId?: number) => {
   localStorage.setItem(PCHAT_TOKEN_KEY, token);
@@ -50,6 +50,14 @@ export default function PublicChatLogin({ onSuccess }: Props) {
   const [guestName, setGuestName] = useState("");
 
   const tgWidgetRef = useRef<HTMLDivElement>(null);
+  const [botUsername, setBotUsername] = useState<string>(DEFAULT_TG_BOT_USERNAME);
+
+  // Получаем актуальный username бота с бэкенда
+  useEffect(() => {
+    pchatApi("bot_info").then(r => {
+      if (r.ok && r.username) setBotUsername(r.username as string);
+    });
+  }, []);
 
   useEffect(() => {
     if (method !== "tg_widget" || !tgWidgetRef.current) return;
@@ -65,13 +73,13 @@ export default function PublicChatLogin({ onSuccess }: Props) {
     const s = document.createElement("script");
     s.src = "https://telegram.org/js/telegram-widget.js?22";
     s.async = true;
-    s.setAttribute("data-telegram-login", TG_BOT_USERNAME);
+    s.setAttribute("data-telegram-login", botUsername);
     s.setAttribute("data-size", "large");
     s.setAttribute("data-radius", "10");
     s.setAttribute("data-onauth", "onTelegramAuth(user)");
     s.setAttribute("data-request-access", "write");
     tgWidgetRef.current.appendChild(s);
-  }, [method, onSuccess]);
+  }, [method, onSuccess, botUsername]);
 
   const requestOtp = async () => {
     if (!isPhoneValid(phone)) { setErr("Введите номер целиком"); return; }
