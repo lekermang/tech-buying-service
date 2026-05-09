@@ -57,51 +57,85 @@ export default function SLBookkeeping({ token }: { token: string }) {
         }
       />
 
+      {/* Итог по периоду */}
       <div className="bg-gradient-to-br from-[#FFD700]/10 to-transparent border border-[#FFD700]/30 rounded-xl p-3">
-        <div className="text-[11px] uppercase font-bold tracking-wide text-[#FFD700] mb-2">Денежная сводка</div>
+        <div className="text-[11px] uppercase font-bold tracking-wide text-[#FFD700] mb-2">Прибыль кассы за период</div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <Stat l="Выручка с продаж" v={fmt(data?.revenue || 0) + " ₽"} c="text-emerald-300" />
-          <Stat
-            l="Проценты СмартЛомбард"
-            v={"+" + fmt(data?.contract_income || 0) + " ₽"}
-            c="text-purple-300"
-            hint="Доход от процентов и пени по закрытым договорам 14 дней. Тело займа в прибыль не попадает — это возврат денег клиенту."
-          />
-          <Stat
-            l="Инвестировано в товар"
-            v={fmt((data?.purchases ?? 0)) + " ₽"}
-            c="text-sky-300"
-            hint="Скупка Б/У техники — это инвестиция в склад, а не расход. В прибыль попадает только разница sell−buy после продажи."
-          />
-          <Stat
-            l="Себестоимость продаж"
-            v={"−" + fmt((data?.cogs ?? 0)) + " ₽"}
-            c="text-amber-300"
-            hint="Закупочная цена именно того, что продали в этом периоде — единственное, что вычитается из выручки в прибыль"
-          />
-          <Stat
-            l="Операционные расходы"
-            v={"−" + fmt((data?.opex ?? 0)) + " ₽"}
-            c="text-red-300"
-            hint="Зарплаты, аренда, прочие платежи из кассы"
-          />
-          <Stat
-            l="Маржа (до расходов)"
-            v={fmt(Math.max(0, Number(data?.gross_profit ?? 0))) + " ₽"}
-            c="text-emerald-200"
-            hint="(Выручка − Себестоимость) + Проценты по договорам"
-          />
-          <Stat
-            l="Чистая прибыль"
-            v={fmt(Math.max(0, Number(data?.profit ?? 0))) + " ₽"}
-            c="text-[#FFD700]"
-            hint="Маржа − Операционные расходы"
-          />
+          <Stat l="Б/У техника" v={"+" + fmt(Math.max(0, Number(data?.profit_used ?? 0))) + " ₽"} c="text-blue-300" hint="Чистая прибыль с продаж б/у: выручка − себестоимость" />
+          <Stat l="СмартЛомбард" v={"+" + fmt(Math.max(0, Number(data?.contract_profit ?? 0))) + " ₽"} c="text-purple-300" hint="Прибыль от закрытых договоров 14 дней (возвращено − выдано)" />
+          <Stat l="Операц. расходы" v={"−" + fmt(data?.opex ?? 0) + " ₽"} c="text-red-300" hint="Зарплаты, аренда, прочие платежи из кассы" />
+          <Stat l="Чистая прибыль" v={fmt(Math.max(0, Number(data?.profit ?? 0))) + " ₽"} c="text-[#FFD700]" hint="Б/У + СмартЛомбард − Операционные расходы" />
           <Stat l="Касса (сейчас)" v={fmt(totalCash) + " ₽"} c="text-blue-300" />
-          <Stat l="Сделок (прод/закуп)" v={`${data?.sales_count || 0} / ${data?.buys_count || 0}`} c="text-white/70" />
+        </div>
+      </div>
+
+      {/* Б/У техника — детализация */}
+      <div className="bg-gradient-to-br from-blue-500/10 to-transparent border border-blue-500/30 rounded-xl p-3">
+        <div className="flex items-center gap-1.5 mb-2">
+          <Icon name="Package" size={14} className="text-blue-300" />
+          <div className="text-[11px] uppercase font-bold tracking-wide text-blue-300">Б/У техника — детализация</div>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <Stat l="Продажи (выручка)" v={fmt(data?.revenue || 0) + " ₽"} c="text-emerald-300" hint={`${data?.sales_count || 0} продаж`} />
+          <Stat l="Скупка / выкуп" v={"−" + fmt(data?.purchases ?? 0) + " ₽"} c="text-sky-300" hint={`${data?.buys_count || 0} скупок · НЕ вычитается из прибыли (инвестиция в склад)`} />
+          <Stat l="Себестоимость проданного" v={"−" + fmt(data?.cogs ?? 0) + " ₽"} c="text-amber-300" hint="Закупка именно тех товаров, что продали в этот период" />
+          <Stat l="Прибыль" v={"+" + fmt(Math.max(0, Number(data?.profit_used ?? 0))) + " ₽"} c="text-blue-200" hint="Выручка − Себестоимость продаж" />
         </div>
         <div className="text-[10px] text-white/40 mt-2 leading-relaxed">
-          «Инвестировано в товар» — это вложения в склад Б/У, они НЕ уменьшают прибыль. В прибыль вписывается только разница (sell − buy) с уже проданных товаров + проценты по закрытым договорам СмартЛомбарда.
+          Скупка б/у — это инвестиция в склад, а не расход. В прибыль идёт только разница (sell − buy) с уже проданных товаров.
+        </div>
+      </div>
+
+      {/* СмартЛомбард — детализация */}
+      <div className="bg-gradient-to-br from-purple-500/10 to-transparent border border-purple-500/30 rounded-xl p-3">
+        <div className="flex items-center gap-1.5 mb-2">
+          <Icon name="Coins" size={14} className="text-purple-300" />
+          <div className="text-[11px] uppercase font-bold tracking-wide text-purple-300">СмартЛомбард — детализация</div>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <Stat
+            l="Закрыто договоров"
+            v={`${data?.contract_closed_count || 0} шт.`}
+            c="text-white/85"
+            hint="Сколько договоров полностью закрылось за период"
+          />
+          <Stat
+            l="Выдано клиентам"
+            v={"−" + fmt(data?.contract_issued ?? 0) + " ₽"}
+            c="text-sky-300"
+            hint="Сумма займов (тело) по этим договорам — это были наши деньги, отданные клиентам"
+          />
+          <Stat
+            l="Возвращено клиентами"
+            v={"+" + fmt(data?.contract_returned ?? 0) + " ₽"}
+            c="text-emerald-300"
+            hint="Сколько клиенты заплатили (тело + проценты + пеня)"
+          />
+          <Stat
+            l="Прибыль"
+            v={"+" + fmt(Math.max(0, Number(data?.contract_profit ?? 0))) + " ₽"}
+            c="text-purple-200"
+            hint="Возвращено − Выдано. Например: дали 15 000, получили 16 800 → прибыль 1 800"
+          />
+        </div>
+        {(data?.contract_active_count ?? 0) > 0 && (
+          <div className="mt-2 pt-2 border-t border-purple-500/20 grid grid-cols-2 gap-2">
+            <Stat
+              l="Активных договоров (всего)"
+              v={`${data?.contract_active_count || 0} шт.`}
+              c="text-amber-300"
+              hint="Сколько договоров сейчас в работе (ещё не закрыты)"
+            />
+            <Stat
+              l="В работе денег"
+              v={fmt(data?.contract_active_issued ?? 0) + " ₽"}
+              c="text-amber-200"
+              hint="Сумма выданных займов по активным договорам — деньги ещё не вернулись"
+            />
+          </div>
+        )}
+        <div className="text-[10px] text-white/40 mt-2 leading-relaxed">
+          В прибыль попадают только полностью закрытые договоры. Активные пока показаны отдельно — это деньги «в работе».
         </div>
       </div>
 

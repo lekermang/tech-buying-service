@@ -68,8 +68,8 @@ export default function SLDashboard({ token, onNav, empName: _empName }: { token
           title="Прибыль"
           value={`${fmt(Math.max(0, Number(data?.profit ?? 0)))} ₽`}
           sub={
-            (data?.contract_income ?? 0) > 0
-              ? `+ ${fmt(data?.contract_income)} ₽ % с договоров`
+            (data?.contract_profit ?? 0) > 0
+              ? `б/у ${fmt(data?.profit_used)} + ломбард ${fmt(data?.contract_profit)}`
               : `за период`
           }
           icon="TrendingUp"
@@ -77,6 +77,56 @@ export default function SLDashboard({ token, onNav, empName: _empName }: { token
         />
         <Card title="На складе" value={`${stockCount} шт.`} sub={`${fmt(stockSum)} ₽`} icon="Package" color="white" />
       </div>
+
+      {/* Детализация по направлениям */}
+      {((data?.profit_used ?? 0) > 0 || (data?.contract_closed_count ?? 0) > 0) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+          {/* Б/У техника */}
+          <div className="bg-gradient-to-br from-blue-500/10 to-transparent border border-blue-500/30 rounded-lg p-2.5">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <Icon name="Package" size={12} className="text-blue-300" />
+              <div className="text-[10px] uppercase font-bold tracking-wide text-blue-300">Б/У техника</div>
+            </div>
+            <div className="flex items-center justify-between text-[12px]">
+              <span className="text-white/60">Продажи</span>
+              <span className="text-emerald-300">{data?.sold_count || 0} шт · {fmt(data?.revenue || 0)} ₽</span>
+            </div>
+            <div className="flex items-center justify-between text-[12px]">
+              <span className="text-white/60">Скупка</span>
+              <span className="text-sky-300">{data?.bought_count || 0} шт · −{fmt(data?.spent || 0)} ₽</span>
+            </div>
+            <div className="flex items-center justify-between text-[12px] mt-1 pt-1 border-t border-blue-500/20">
+              <span className="text-white/80 font-bold">Прибыль</span>
+              <span className="text-blue-200 font-bold">+{fmt(Math.max(0, Number(data?.profit_used ?? 0)))} ₽</span>
+            </div>
+          </div>
+
+          {/* СмартЛомбард */}
+          <div className="bg-gradient-to-br from-purple-500/10 to-transparent border border-purple-500/30 rounded-lg p-2.5">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <Icon name="Coins" size={12} className="text-purple-300" />
+              <div className="text-[10px] uppercase font-bold tracking-wide text-purple-300">СмартЛомбард</div>
+            </div>
+            <div className="flex items-center justify-between text-[12px]">
+              <span className="text-white/60">Выдано</span>
+              <span className="text-sky-300">{data?.contract_closed_count || 0} дог. · −{fmt(data?.contract_issued || 0)} ₽</span>
+            </div>
+            <div className="flex items-center justify-between text-[12px]">
+              <span className="text-white/60">Возвращено</span>
+              <span className="text-emerald-300">+{fmt(data?.contract_returned || 0)} ₽</span>
+            </div>
+            <div className="flex items-center justify-between text-[12px] mt-1 pt-1 border-t border-purple-500/20">
+              <span className="text-white/80 font-bold">Прибыль</span>
+              <span className="text-purple-200 font-bold">+{fmt(Math.max(0, Number(data?.contract_profit ?? 0)))} ₽</span>
+            </div>
+            {(data?.contract_active_count ?? 0) > 0 && (
+              <div className="text-[10px] text-amber-300/70 mt-1">
+                + активных: {data?.contract_active_count} дог. на {fmt(data?.contract_active_issued || 0)} ₽ (в работе)
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Разбивка по статусам */}
       <div className="grid grid-cols-3 gap-2 mb-3">
