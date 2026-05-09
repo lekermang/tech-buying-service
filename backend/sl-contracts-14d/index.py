@@ -731,6 +731,121 @@ def action_terminate(body, actor):
         cur.close(); conn.close()
 
 
+def action_payment_cancel(body, actor):
+    """Отменить ошибочный платёж. Откатывает кассу, удаляет запись, пересчитывает остаток.
+    Если договор был закрыт этим платежом — снова активирует."""
+    payment_id = body.get('payment_id')
+    if not payment_id:
+        return _err(400, 'payment_id required')
+    try:
+        payment_id = int(payment_id)
+    except Exception:
+        return _err(400, 'Некорректный payment_id')
+    conn = get_conn(); cur = conn.cursor()
+    try:
+        # 1. Получаем платёж + договор
+        cur.execute(
+            f"SELECT p.contract_id, p.amount, p.payment_type, p.cash_account_id, p.cash_movement_id, "
+            f"p.paid_at, p.recorded_by, "
+            f"c.amount AS principal, c.paid_total, c.remaining_debt, c.total_due, c.status, "
+            f"c.interest_rate, c.term_days, c.start_date "
+            f"FROM {SCHEMA}.contracts_14d_payments p "
+            f"JOIN {SCHEMA}.contracts_14d c ON c.id=p.contract_id "
+            f"WHERE p.id=%s",
+            (payment_id,)
+        )
+        row = cur.fetchone()
+        if not row:
+            return _err(404, 'Платёж не найден')
+        cid = int(row[0])
+        amt = Decimal(str(row[1]))
+        cash_id = row[3]
+        movement_id = row[4]
+        paid_at_value = row[5]
+        principal = Decimal(str(row[7]))
+        paid_total = Decimal(str(row[8]))
+        cur_status = row[11]
+        rate = Decimal(str(row[12]))
+        term_days = int(row[13])
+        sd = row[14]
+
+        # 2. Откатываем кассу — создаём обратное движение 'out' той же датой
+        if cash_id and movement_id:
+            # Узнаём ветку
+            cur.execute(
+                f"SELECT branch_id FROM {SCHEMA}.slshop_cash_accounts WHERE id=%s",
+                (cash_id,)
+            )
+            br_row = cur.fetchone()
+            branch_id = br_row[0] if br_row else None
+            _cash_movement(
+                cur, cash_id, 'out', amt,
+                'contracts_14d_payment_cancel',
+                f'Отмена платежа №{payment_id} по договору',
+                actor, branch_id=branch_id, created_at=paid_at_value,
+            )
+
+        # 3. Удаляем сам платёж
+        cur.execute(
+            f"DELETE FROM {SCHEMA}.contracts_14d_payments WHERE id=%s",
+            (payment_id,)
+        )
+
+        # 4. Пересчитываем paid_total и остаток
+        new_paid_total = paid_total - amt
+        if new_paid_total < Decimal('0'):
+            new_paid_total = Decimal('0')
+
+        # Пересчёт суммы к возврату на сегодня (для досрочки) или полная (после срока)
+        today_calc = _calc_today(principal, rate, term_days, sd, new_paid_total)
+        is_early_now = bool(today_calc['is_early'])
+        # Восстанавливаем total_due: если договор был закрыт досрочно — total_due был пересчитан
+        # на день закрытия, теперь надо вернуть оригинальный total
+        full_total = (principal * (Decimal(1) + rate * Decimal(term_days) / Decimal(100))).quantize(Decimal('0.01'))
+        new_total_due = full_total
+        new_remaining = new_total_due - new_paid_total
+        if new_remaining < Decimal('0'):
+            new_remaining = Decimal('0')
+
+        # 5. Возвращаем статус active, если был closed
+        new_status = 'active' if cur_status == 'closed' else cur_status
+        if new_status == 'active':
+            cur.execute(
+                f"UPDATE {SCHEMA}.contracts_14d SET total_due=%s, paid_total=%s, remaining_debt=%s, "
+                f"status='active', closed_at=NULL, updated_at=NOW() WHERE id=%s",
+                (new_total_due, new_paid_total, new_remaining, cid)
+            )
+        else:
+            cur.execute(
+                f"UPDATE {SCHEMA}.contracts_14d SET total_due=%s, paid_total=%s, remaining_debt=%s, "
+                f"updated_at=NOW() WHERE id=%s",
+                (new_total_due, new_paid_total, new_remaining, cid)
+            )
+
+        # 6. Лог
+        _log(cur, cid, 'payment_cancel', {
+            'payment_id': payment_id,
+            'amount': float(amt),
+            'reopened': cur_status == 'closed',
+            'new_remaining': float(new_remaining),
+            'is_early_now': is_early_now,
+        }, actor)
+        conn.commit()
+        return _ok({
+            'ok': True,
+            'reopened': cur_status == 'closed',
+            'paid_total': float(new_paid_total),
+            'remaining_debt': float(new_remaining),
+            'total_due': float(new_total_due),
+            'status': new_status,
+        })
+    except Exception as e:
+        conn.rollback()
+        return _err(500, f'DB error: {e}')
+    finally:
+        cur.close(); conn.close()
+
+
 def action_close(body, actor):
     cid = body.get('contract_id')
     if not cid:
@@ -941,6 +1056,8 @@ def handler(event: dict, context) -> dict:
             return action_create(body, actor)
         if action == 'payment':
             return action_payment(body, actor)
+        if action == 'payment_cancel':
+            return action_payment_cancel(body, actor)
         if action == 'terminate':
             return action_terminate(body, actor)
         if action == 'close':

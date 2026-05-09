@@ -44,6 +44,8 @@ export default function C14dDetailView({ token, contractId, onBack }: Props) {
   const [photoSrc, setPhotoSrc] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<null | { kind: "terminate" | "close"; reason?: string }>(null);
   const [confirmSaving, setConfirmSaving] = useState(false);
+  const [cancelPaymentId, setCancelPaymentId] = useState<number | null>(null);
+  const [cancelSaving, setCancelSaving] = useState(false);
 
   useEffect(() => {
     c14dApi<{ accounts: C14dCashAccount[] }>(token, "cash_accounts").then(r => {
@@ -136,6 +138,19 @@ export default function C14dDetailView({ token, contractId, onBack }: Props) {
     setConfirmSaving(false);
     if (!r.ok) { setErr(r.error || "Ошибка"); return; }
     setConfirm(null); reload();
+  };
+
+  const submitCancelPayment = async () => {
+    if (!cancelPaymentId) return;
+    setCancelSaving(true);
+    const r = await c14dApi(token, "payment_cancel", {
+      method: "POST",
+      body: { payment_id: cancelPaymentId },
+    });
+    setCancelSaving(false);
+    if (!r.ok) { setErr(r.error || "Не удалось отменить платёж"); return; }
+    setCancelPaymentId(null);
+    reload();
   };
 
   if (loading) return <div className="text-center py-8 text-white/40"><Icon name="Loader2" size={18} className="animate-spin inline" /></div>;
@@ -279,6 +294,7 @@ export default function C14dDetailView({ token, contractId, onBack }: Props) {
                   <th className="text-left p-1">Доход</th>
                   <th className="text-left p-1">Касса</th>
                   <th className="text-left p-1">Принял</th>
+                  <th className="text-right p-1"></th>
                 </tr>
               </thead>
               <tbody>
@@ -296,6 +312,15 @@ export default function C14dDetailView({ token, contractId, onBack }: Props) {
                           : <span className="text-white/25 text-[10px]">—</span>}
                       </td>
                       <td className="p-1 text-white/55 truncate max-w-[80px]">{p.recorded_by || "—"}</td>
+                      <td className="p-1 text-right">
+                        <button
+                          onClick={() => setCancelPaymentId(p.id)}
+                          title="Отменить платёж"
+                          className="inline-flex items-center justify-center w-6 h-6 rounded text-white/30 hover:text-red-300 hover:bg-red-500/10 active:scale-90 transition"
+                        >
+                          <Icon name="Trash2" size={11} />
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}
@@ -489,6 +514,53 @@ export default function C14dDetailView({ token, contractId, onBack }: Props) {
           </SLField>
         )}
       </SLModal>
+
+      {/* Модал отмены платежа */}
+      {(() => {
+        const p = c.payments?.find(x => x.id === cancelPaymentId);
+        const wasFullClose = p?.payment_type === "full" && c.status === "closed";
+        return (
+          <SLModal
+            open={!!cancelPaymentId}
+            onClose={() => !cancelSaving && setCancelPaymentId(null)}
+            title="Отменить платёж?"
+            icon="AlertTriangle"
+            maxWidth="max-w-sm"
+            footer={
+              <>
+                <SLButton variant="dark" onClick={() => setCancelPaymentId(null)} disabled={cancelSaving}>Назад</SLButton>
+                <SLButton
+                  variant="danger"
+                  icon={cancelSaving ? "Loader2" : "Trash2"}
+                  onClick={submitCancelPayment}
+                  disabled={cancelSaving}
+                >{cancelSaving ? "Отменяю..." : "Отменить платёж"}</SLButton>
+              </>
+            }
+          >
+            <div className="text-[12px] text-white/70 space-y-2">
+              {p && (
+                <div className="rounded-md bg-white/5 border border-white/10 p-2">
+                  <div className="text-[10px] text-white/40 uppercase tracking-wide font-bold mb-0.5">Платёж</div>
+                  <div><b className="text-emerald-300">{fmt(p.amount)} ₽</b> · {p.payment_type === "full" ? "Полный расчёт" : "Частичный"}</div>
+                  <div className="text-[11px] text-white/50">{fmtDate(p.paid_at)} · {p.recorded_by || "—"}</div>
+                </div>
+              )}
+              <div>Что произойдёт:</div>
+              <ul className="text-[11px] text-white/65 space-y-1 pl-4 list-disc">
+                <li>Платёж удалится из истории</li>
+                <li>Сумма вернётся в кассу обратным движением (той же датой)</li>
+                <li>Остаток долга и проценты пересчитаются заново</li>
+                {wasFullClose && <li className="text-amber-300">Договор снова станет активным</li>}
+              </ul>
+              <div className="rounded-md bg-amber-500/10 border border-amber-500/30 p-1.5 text-[10px] text-amber-300/90">
+                <Icon name="Info" size={10} className="inline mr-1" />
+                После отмены проведи платёж заново с правильной датой.
+              </div>
+            </div>
+          </SLModal>
+        );
+      })()}
 
       {/* Просмотр фото */}
       {photoSrc && (
