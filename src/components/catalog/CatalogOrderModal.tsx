@@ -2,6 +2,7 @@ import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import { CatalogItem, SEND_LEAD_URL, MODEL_PHOTOS, MODEL_PHOTOS_EXTRA, MODEL_COLOR_PHOTOS, CATEGORY_PHOTOS } from "@/pages/catalog.types";
 import { ymGoal, Goals } from "@/lib/ym";
+import { formatPhone, isPhoneValid } from "@/lib/phoneFormat";
 
 interface Props {
   item: CatalogItem;
@@ -26,7 +27,11 @@ const CatalogOrderModal = ({ item, onClose, markup = 3500 }: Props) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name || !form.phone) return;
+    if (!form.name) return;
+    if (!isPhoneValid(form.phone)) {
+      alert("Введите номер целиком в формате +7 (___) ___-__-__");
+      return;
+    }
     setLoading(true);
     try {
       await fetch(SEND_LEAD_URL, {
@@ -206,7 +211,9 @@ const CatalogOrderModal = ({ item, onClose, markup = 3500 }: Props) => {
                 <label className="text-xs font-medium text-[#1d1d1f]/40 block mb-1.5">Телефон</label>
                 <input
                   type="tel" required value={form.phone}
-                  onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
+                  onChange={e => setForm(p => ({ ...p, phone: formatPhone(e.target.value) }))}
+                  onFocus={() => { if (!form.phone) setForm(p => ({ ...p, phone: "+7" })); }}
+                  inputMode="tel"
                   placeholder="+7 (___) ___-__-__"
                   className="w-full bg-[#f5f5f7] text-[#1d1d1f] px-4 py-3 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0071e3]/30 transition-all placeholder:text-[#1d1d1f]/25"
                 />

@@ -4,6 +4,7 @@ import RepairWidgetBody from "./repair-widget/RepairWidgetBody";
 import { useRepairParts } from "./repair-widget/useRepairParts";
 import { useRepairStatus } from "./repair-widget/useRepairStatus";
 import { useRepairSubmit } from "./repair-widget/useRepairSubmit";
+import { isPhoneValid } from "@/lib/phoneFormat";
 
 export default function RepairWidget() {
   const [tab, setTab] = useState<"form" | "status">("form");
@@ -38,7 +39,7 @@ export default function RepairWidget() {
   const status = useRepairStatus();
   const order = useRepairSubmit();
 
-  const canSubmit = !!(form.name && form.phone && form.model && form.fault && agreed);
+  const canSubmit = !!(form.name && isPhoneValid(form.phone) && form.model && form.fault && agreed);
 
   const handleSubmit = () => order.submit({
     form,

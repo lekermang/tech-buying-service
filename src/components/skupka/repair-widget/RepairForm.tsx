@@ -90,8 +90,10 @@ export default function RepairForm({
       <input type="text" value={form.name}
         onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
         placeholder="Ваше имя *" className={INP} />
-      <input type="tel" value={form.phone}
+      <input type="tel" inputMode="tel" value={form.phone}
         onChange={e => setForm(p => ({ ...p, phone: formatPhone(e.target.value) }))}
+        onFocus={() => { if (!form.phone) setForm(p => ({ ...p, phone: "+7" })); }}
+        required
         placeholder="+7 (___) ___-__-__" className={INP} />
 
       {/* Модель + поиск запчастей */}

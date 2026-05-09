@@ -3,6 +3,7 @@ import GoldTicker from "./header/GoldTicker";
 import MainNav, { type NavLink } from "./header/MainNav";
 import MobileMenu from "./header/MobileMenu";
 import SellGoldModal, { type ClientType, type Probe } from "./header/SellGoldModal";
+import { isPhoneValid } from "@/lib/phoneFormat";
 
 const GOLD_PRICE_URL = "https://functions.poehali.dev/0e3260ee-7b92-4be2-833b-d3fcc9d2472d";
 const SEND_LEAD_URL = "https://functions.poehali.dev/52666ff7-db52-4b6a-a90e-d60aeed699de";
@@ -113,7 +114,10 @@ const Header = ({ scrollTo, goldOpen = false }: HeaderProps) => {
 
   const handleSell = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name || !form.phone) return;
+    if (!form.name || !isPhoneValid(form.phone)) {
+      alert("Введите имя и номер телефона целиком в формате +7 (___) ___-__-__");
+      return;
+    }
     setSending(true);
     try {
       await fetch(SEND_LEAD_URL, {

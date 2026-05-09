@@ -11,3 +11,9 @@ export function formatPhone(raw: string): string {
   if (v.length <= 9) return `+7 (${v.slice(1,4)}) ${v.slice(4,7)}-${v.slice(7)}`;
   return `+7 (${v.slice(1,4)}) ${v.slice(4,7)}-${v.slice(7,9)}-${v.slice(9)}`;
 }
+
+/** Проверка валидности телефона: ровно 11 цифр, начинается с 7 */
+export function isPhoneValid(raw: string): boolean {
+  const digits = (raw || "").replace(/\D/g, "");
+  return digits.length === 11 && digits.startsWith("7");
+}

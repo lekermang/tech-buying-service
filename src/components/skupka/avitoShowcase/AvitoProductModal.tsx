@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import Icon from "@/components/ui/icon";
 import AvitoImg from "../AvitoImg";
 import { AvitoItem, formatPrice, LEAD_URL } from "./types";
+import { formatPhone, isPhoneValid } from "@/lib/phoneFormat";
 
 type Props = {
   item: AvitoItem;
@@ -51,7 +52,10 @@ export default function AvitoProductModal({ item, photoIdx, setPhotoIdx, onClose
   };
 
   const submit = async () => {
-    if (!phone.trim()) return;
+    if (!isPhoneValid(phone)) {
+      alert("Введите номер целиком в формате +7 (___) ___-__-__");
+      return;
+    }
     setSending(true);
     try {
       await fetch(LEAD_URL, {
@@ -250,9 +254,11 @@ export default function AvitoProductModal({ item, photoIdx, setPhotoIdx, onClose
               />
               <input
                 value={phone}
-                onChange={e => setPhone(e.target.value)}
+                onChange={e => setPhone(formatPhone(e.target.value))}
+                onFocus={() => { if (!phone) setPhone("+7"); }}
                 type="tel"
-                placeholder="+7 999 123-45-67"
+                inputMode="tel"
+                placeholder="+7 (___) ___-__-__"
                 className="w-full bg-[#0D0D0D] border border-[#FFD700]/20 text-white px-3 py-2 font-roboto text-sm rounded focus:outline-none focus:border-[#FFD700]"
               />
               <div className="flex gap-2">
@@ -264,7 +270,7 @@ export default function AvitoProductModal({ item, photoIdx, setPhotoIdx, onClose
                 </button>
                 <button
                   onClick={submit}
-                  disabled={sending || !phone.trim()}
+                  disabled={sending || !isPhoneValid(phone)}
                   className="flex-1 bg-gradient-to-r from-[#FFD700] to-[#FFE55C] text-black font-oswald font-bold text-sm py-2 rounded uppercase tracking-wide hover:shadow-[0_0_16px_rgba(255,215,0,0.5)] disabled:opacity-50 transition-all"
                 >
                   {sending ? "Отправляю..." : "Отправить заявку"}

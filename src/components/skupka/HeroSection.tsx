@@ -4,6 +4,7 @@ import AppleWidget from "@/components/skupka/AppleWidget";
 import RepairWidget from "@/components/skupka/RepairWidget";
 import UsedGoodsSearch from "@/components/skupka/UsedGoodsSearch";
 import { ymGoal, Goals } from "@/lib/ym";
+import { formatPhone, isPhoneValid } from "@/lib/phoneFormat";
 
 const CATEGORIES = [
   { icon: "Smartphone", title: "Смартфоны", desc: "iPhone, Samsung, Xiaomi и другие", price: "до 95 000 ₽" },
@@ -87,7 +88,7 @@ const EvaluateModal = ({ onClose }: { onClose: () => void }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim()) { setError("Введите ваше имя"); return; }
-    if (!formData.phone.trim()) { setError("Введите телефон"); return; }
+    if (!isPhoneValid(formData.phone)) { setError("Введите номер целиком в формате +7 (___) ___-__-__"); return; }
     ymGoal(Goals.FORM_SUBMIT, { category: formData.category });
     setLoading(true);
     setError(null);
@@ -160,7 +161,10 @@ const EvaluateModal = ({ onClose }: { onClose: () => void }) => {
                   <label className="font-roboto text-white/50 text-xs uppercase tracking-wider block mb-1">Телефон</label>
                   <input type="tel"
                     value={formData.phone}
-                    onChange={e => setFormData(p => ({ ...p, phone: e.target.value }))}
+                    onChange={e => setFormData(p => ({ ...p, phone: formatPhone(e.target.value) }))}
+                    onFocus={() => { if (!formData.phone) setFormData(p => ({ ...p, phone: "+7" })); }}
+                    required
+                    inputMode="tel"
                     placeholder="+7 (___) ___-__-__"
                     className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-3 font-roboto text-base focus:outline-none focus:border-[#FFD700] transition-colors" />
                 </div>

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import { ymGoal, Goals } from "@/lib/ym";
-import { formatPhone } from "@/lib/phoneFormat";
+import { formatPhone, isPhoneValid } from "@/lib/phoneFormat";
 
 const SEND_LEAD_URL = "https://functions.poehali.dev/52666ff7-db52-4b6a-a90e-d60aeed699de";
 
@@ -92,7 +92,11 @@ const useAppleWidget = () => {
   };
 
   const handleSell = async () => {
-    if (!phone || !result) return;
+    if (!result) return;
+    if (!isPhoneValid(phone)) {
+      alert("Введите номер целиком в формате +7 (___) ___-__-__");
+      return;
+    }
     setSending(true);
     try {
       await fetch(SEND_LEAD_URL, {
@@ -240,9 +244,13 @@ const AppleWidget = ({ compact }: AppleWidgetProps) => {
               </div>
             )}
             <div className="flex gap-2 flex-wrap">
-              <input type="tel" value={w.phone} onChange={e => w.setPhone(formatPhone(e.target.value))} placeholder="+7 (___) ___-__-__"
+              <input type="tel" inputMode="tel" value={w.phone}
+                onChange={e => w.setPhone(formatPhone(e.target.value))}
+                onFocus={() => { if (!w.phone) w.setPhone("+7"); }}
+                required
+                placeholder="+7 (___) ___-__-__"
                 className="flex-1 min-w-[160px] bg-[#1A1A1A] border border-[#444] text-white px-4 py-3 font-roboto text-sm focus:outline-none focus:border-[#FFD700] transition-colors" />
-              <button onClick={w.handleSell} disabled={w.sending || !w.phone}
+              <button onClick={w.handleSell} disabled={w.sending || !isPhoneValid(w.phone)}
                 className="bg-[#FFD700] text-black font-oswald font-bold px-6 py-3 uppercase text-sm hover:bg-yellow-400 transition-colors disabled:opacity-50 flex items-center gap-2 shrink-0">
                 <Icon name="Send" size={14} />
                 {w.sending ? "Отправляем..." : "Продать"}

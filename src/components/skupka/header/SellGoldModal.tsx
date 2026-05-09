@@ -1,4 +1,5 @@
 import Icon from "@/components/ui/icon";
+import { formatPhone } from "@/lib/phoneFormat";
 
 export type Probe = { label: string; value: number; coeff: number };
 
@@ -137,7 +138,9 @@ const SellGoldModal = ({
               <div>
                 <label className="font-roboto text-white/50 text-xs uppercase tracking-wider block mb-1">Телефон</label>
                 <input type="tel" required value={form.phone}
-                  onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
+                  onChange={e => setForm(p => ({ ...p, phone: formatPhone(e.target.value) }))}
+                  onFocus={() => { if (!form.phone) setForm(p => ({ ...p, phone: "+7" })); }}
+                  inputMode="tel"
                   placeholder="+7 (___) ___-__-__"
                   className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-2.5 font-roboto text-sm focus:outline-none focus:border-[#FFD700] transition-colors" />
               </div>

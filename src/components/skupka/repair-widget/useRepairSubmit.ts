@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ymGoal, Goals } from "@/lib/ym";
 import { REPAIR_ORDER_URL, PART_TYPE_LABEL, STATIC_EXTRAS, Part, ExtraWork } from "./types";
+import { isPhoneValid } from "@/lib/phoneFormat";
 
 type SubmitParams = {
   form: { name: string; phone: string; model: string; fault: string };
@@ -16,7 +17,11 @@ export function useRepairSubmit() {
   const [orderId, setOrderId] = useState<number | null>(null);
 
   const submit = async ({ form, selectedPart, extraWorks, extraWorksList, grandTotal }: SubmitParams) => {
-    if (!form.name || !form.phone || !form.model || !form.fault) return;
+    if (!form.name || !form.model || !form.fault) return;
+    if (!isPhoneValid(form.phone)) {
+      alert("Введите номер телефона целиком в формате +7 (___) ___-__-__");
+      return;
+    }
     setSending(true);
     // Цель: попытка отправки заявки на ремонт (микроконверсия)
     ymGoal(Goals.REPAIR_SUBMIT, {

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import { ymGoal, Goals } from "@/lib/ym";
+import { formatPhone, isPhoneValid } from "@/lib/phoneFormat";
 
 const SEND_JOB_URL = "https://functions.poehali.dev/52666ff7-db52-4b6a-a90e-d60aeed699de";
 
@@ -18,7 +19,8 @@ export default function JobsSection() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name.trim() || !form.phone.trim()) return;
+    if (!form.name.trim()) { setError("Введите имя"); return; }
+    if (!isPhoneValid(form.phone)) { setError("Введите номер целиком в формате +7 (___) ___-__-__"); return; }
     setSending(true);
     setError("");
     try {
@@ -169,9 +171,11 @@ export default function JobsSection() {
                   <input
                     type="tel"
                     required
+                    inputMode="tel"
                     value={form.phone}
-                    onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-                    placeholder="+7 (999) 000-00-00"
+                    onChange={e => setForm(f => ({ ...f, phone: formatPhone(e.target.value) }))}
+                    onFocus={() => { if (!form.phone) setForm(f => ({ ...f, phone: "+7" })); }}
+                    placeholder="+7 (___) ___-__-__"
                     className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-3 font-roboto text-sm focus:outline-none focus:border-[#FFD700] transition-colors placeholder:text-white/20"
                   />
                 </div>

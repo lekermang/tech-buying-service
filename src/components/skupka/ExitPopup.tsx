@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import Icon from "@/components/ui/icon";
 import { ymGoal, Goals } from "@/lib/ym";
+import { formatPhone, isPhoneValid } from "@/lib/phoneFormat";
 
 const SEND_LEAD_URL = "https://functions.poehali.dev/52666ff7-db52-4b6a-a90e-d60aeed699de";
 const STORAGE_KEY = "exit_popup_shown";
@@ -74,7 +75,10 @@ const ExitPopup = ({ onOpenEval }: ExitPopupProps) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phone.trim()) return;
+    if (!isPhoneValid(phone)) {
+      setError("Введите номер целиком в формате +7 (___) ___-__-__");
+      return;
+    }
     setLoading(true);
     setError("");
     try {
@@ -168,8 +172,10 @@ const ExitPopup = ({ onOpenEval }: ExitPopupProps) => {
                 <input
                   type="tel"
                   value={phone}
-                  onChange={e => setPhone(e.target.value)}
+                  onChange={e => setPhone(formatPhone(e.target.value))}
+                  onFocus={() => { if (!phone) setPhone("+7"); }}
                   required
+                  inputMode="tel"
                   placeholder="+7 (___) ___-__-__"
                   className="w-full bg-[#1A1A1A] border border-[#333] focus:border-[#FFD700] text-white px-4 py-3 text-sm outline-none transition-colors placeholder:text-white/20"
                 />

@@ -2,6 +2,7 @@ import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import { CartItem, fmt } from "./types";
 import { ymGoal, Goals } from "@/lib/ym";
+import { formatPhone, isPhoneValid } from "@/lib/phoneFormat";
 
 const SEND_API = "https://functions.poehali.dev/52666ff7-db52-4b6a-a90e-d60aeed699de";
 
@@ -21,7 +22,8 @@ export default function ToolsCartModal({ cart, onClose, onRemove, onQty }: Props
   const total = cart.reduce((s, i) => s + (i.discount_price || i.base_price) * i.qty, 0);
 
   const handleOrder = async () => {
-    if (!name.trim() || !phone.trim()) { setErr("Заполните имя и телефон"); return; }
+    if (!name.trim()) { setErr("Введите имя"); return; }
+    if (!isPhoneValid(phone)) { setErr("Введите номер целиком в формате +7 (___) ___-__-__"); return; }
     setSending(true); setErr("");
     try {
       const lines = cart.map(i =>
@@ -82,7 +84,13 @@ export default function ToolsCartModal({ cart, onClose, onRemove, onQty }: Props
             </div>
             <input value={name} onChange={e => setName(e.target.value)} placeholder="Ваше имя"
               className="w-full bg-gray-800 border border-gray-700 text-white px-3 py-2.5 rounded text-sm focus:outline-none focus:border-orange-400 placeholder-gray-600" />
-            <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+7 (___) ___-__-__"
+            <input
+              type="tel"
+              inputMode="tel"
+              value={phone}
+              onChange={e => setPhone(formatPhone(e.target.value))}
+              onFocus={() => { if (!phone) setPhone("+7"); }}
+              placeholder="+7 (___) ___-__-__"
               className="w-full bg-gray-800 border border-gray-700 text-white px-3 py-2.5 rounded text-sm focus:outline-none focus:border-orange-400 placeholder-gray-600" />
             {err && <p className="text-red-400 text-xs">{err}</p>}
             <button onClick={handleOrder} disabled={sending}
