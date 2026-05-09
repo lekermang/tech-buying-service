@@ -62,6 +62,12 @@ export default function SLBookkeeping({ token }: { token: string }) {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <Stat l="Выручка с продаж" v={fmt(data?.revenue || 0) + " ₽"} c="text-emerald-300" />
           <Stat
+            l="Проценты СмартЛомбард"
+            v={"+" + fmt(data?.contract_income || 0) + " ₽"}
+            c="text-purple-300"
+            hint="Доход от процентов и пени по закрытым договорам 14 дней. Тело займа в прибыль не попадает — это возврат денег клиенту."
+          />
+          <Stat
             l="Инвестировано в товар"
             v={fmt((data?.purchases ?? 0)) + " ₽"}
             c="text-sky-300"
@@ -83,7 +89,7 @@ export default function SLBookkeeping({ token }: { token: string }) {
             l="Маржа (до расходов)"
             v={fmt(Math.max(0, Number(data?.gross_profit ?? 0))) + " ₽"}
             c="text-emerald-200"
-            hint="Выручка − Себестоимость продаж"
+            hint="(Выручка − Себестоимость) + Проценты по договорам"
           />
           <Stat
             l="Чистая прибыль"
@@ -95,7 +101,7 @@ export default function SLBookkeeping({ token }: { token: string }) {
           <Stat l="Сделок (прод/закуп)" v={`${data?.sales_count || 0} / ${data?.buys_count || 0}`} c="text-white/70" />
         </div>
         <div className="text-[10px] text-white/40 mt-2 leading-relaxed">
-          «Инвестировано в товар» — это вложения в склад Б/У, они НЕ уменьшают прибыль. В прибыль вписывается только разница (sell − buy) с уже проданных товаров.
+          «Инвестировано в товар» — это вложения в склад Б/У, они НЕ уменьшают прибыль. В прибыль вписывается только разница (sell − buy) с уже проданных товаров + проценты по закрытым договорам СмартЛомбарда.
         </div>
       </div>
 

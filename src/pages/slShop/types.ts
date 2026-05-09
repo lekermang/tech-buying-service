@@ -130,8 +130,11 @@ export type SLAccounting = {
   purchases?: number;       // сколько потратили на закупку товаров за период
   cogs?: number;            // себестоимость проданных за период
   opex?: number;            // операционные расходы (касса out)
-  gross_profit?: number;    // маржа = revenue - cogs
+  gross_profit?: number;    // маржа = (revenue - cogs) + проценты по договорам
   profit: number;           // чистая прибыль = gross_profit - opex
+  contract_income?: number; // проценты + пеня по договорам 14 дней
+  contract_interest?: number;
+  contract_penalty?: number;
   sales_count: number;
   buys_count: number;
   cash_by_branch: { branch: string | null; account: string; balance: number; in_sum: number; out_sum: number }[];
@@ -373,6 +376,9 @@ export type SLStats = {
   sold_count: number;
   revenue: number;
   profit: number;
+  contract_income?: number;
+  contract_interest?: number;
+  contract_penalty?: number;
   returns_count: number;
   by_status: Record<string, { count: number; sum: number }>;
   by_category: { name: string | null; cnt: number; s: number }[];

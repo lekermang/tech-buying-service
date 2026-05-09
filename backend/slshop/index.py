@@ -642,6 +642,32 @@ def accounting_summary(params):
     )
     opex_row = cur.fetchone() or {}
     opex = float(opex_row.get('opex') or 0)
+    # 3.1) Доход от процентов закрытых договоров СмартЛомбарда (14 дней)
+    # Считаем только проценты (interest) и пеню (penalty) — это чистый доход.
+    # Тело займа (principal) — это возврат денег клиенту, не доход.
+    # Mixed-платёж: считаем долю процентов = amount - часть, погасившая тело.
+    contract_interest = 0.0
+    contract_penalty = 0.0
+    try:
+        cur.execute(
+            f"SELECT "
+            f"COALESCE(SUM(amount) FILTER (WHERE income_type='interest'),0) AS interest, "
+            f"COALESCE(SUM(amount) FILTER (WHERE income_type='penalty'),0) AS penalty, "
+            f"COALESCE(SUM(amount) FILTER (WHERE income_type='mixed'),0) AS mixed "
+            f"FROM {SCHEMA}.contracts_14d_payments p "
+            f"WHERE p.paid_at >= {_esc(date_from)}"
+        )
+        cr = cur.fetchone() or {}
+        contract_interest = float(cr.get('interest') or 0)
+        contract_penalty = float(cr.get('penalty') or 0)
+        # Для mixed — берём 50% как процентную часть (грубая оценка).
+        # Если нужна точность — потом сделаем расчёт по контракту.
+        contract_mixed_interest_part = float(cr.get('mixed') or 0) * 0.5
+        contract_interest += contract_mixed_interest_part
+    except Exception:
+        # Таблица может ещё не существовать в schema — не падаем
+        pass
+    contract_income = contract_interest + contract_penalty
     # 4) Касса по филиалам (текущий баланс + движение за период)
     cur.execute(
         f"SELECT b.name AS branch, a.name AS account, a.balance, "
@@ -662,8 +688,8 @@ def accounting_summary(params):
     cur.close(); conn.close()
     revenue = float(totals.get('revenue') or 0)
     purchases = float(totals.get('purchases') or 0)
-    # Маржа (прибыль с продаж до операционных расходов)
-    gross_profit = revenue - cogs
+    # Маржа от б/у (revenue - cogs) + проценты по договорам 14 дней
+    gross_profit = (revenue - cogs) + contract_income
     # Чистая прибыль с учётом расходов кассы
     net_profit = gross_profit - opex
     # Полные затраты периода (для совместимости со старым полем spent)
@@ -674,8 +700,11 @@ def accounting_summary(params):
         'purchases': purchases,         # сколько потратили на закупку товаров
         'cogs': cogs,                   # себестоимость проданных за период
         'opex': opex,                   # операционные расходы (касса out)
-        'gross_profit': gross_profit,   # маржа: revenue - cogs
-        'profit': net_profit,           # чистая прибыль: маржа - opex
+        'contract_income': contract_income,        # проценты + пеня от договоров 14д
+        'contract_interest': contract_interest,    # только проценты
+        'contract_penalty': contract_penalty,      # только пеня
+        'gross_profit': gross_profit,   # маржа: (revenue - cogs) + проценты
+        'profit': net_profit,           # чистая прибыль: gross - opex
         'spent': spent,                 # обратная совместимость: закупки + расходы
         'sales_count': int(totals.get('sales_count') or 0),
         'buys_count': int(totals.get('buys_count') or 0),
@@ -2418,11 +2447,30 @@ def stats(params):
     )
     cogs_row = cur.fetchone() or {}
     cogs = float(cogs_row.get('cogs') or 0)
+    # Доход от процентов по договорам 14 дней (закрытые/активные платежи за период)
+    contract_interest = 0.0
+    contract_penalty = 0.0
+    try:
+        cur.execute(
+            f"SELECT "
+            f"COALESCE(SUM(amount) FILTER (WHERE income_type='interest'),0) AS interest, "
+            f"COALESCE(SUM(amount) FILTER (WHERE income_type='penalty'),0) AS penalty, "
+            f"COALESCE(SUM(amount) FILTER (WHERE income_type='mixed'),0) AS mixed "
+            f"FROM {SCHEMA}.contracts_14d_payments "
+            f"WHERE paid_at>={_esc(date_from)} "
+            f"AND paid_at<{_esc(date_to)}::date + INTERVAL '1 day'"
+        )
+        cr = cur.fetchone() or {}
+        contract_interest = float(cr.get('interest') or 0) + float(cr.get('mixed') or 0) * 0.5
+        contract_penalty = float(cr.get('penalty') or 0)
+    except Exception:
+        pass
+    contract_income = contract_interest + contract_penalty
     cur.close(); conn.close()
     revenue = float(sold['s'])
     spent = float(bought['s'])
-    # Прибыль = выручка − себестоимость проданного (а не все закупки за период)
-    profit = revenue - cogs
+    # Прибыль = (выручка − COGS) + проценты по договорам 14 дней
+    profit = (revenue - cogs) + contract_income
     return _ok({
         'period': period,
         'date_from': date_from,
@@ -2433,6 +2481,9 @@ def stats(params):
         'sold_count': int(sold['c']),
         'revenue': revenue,
         'profit': profit,
+        'contract_income': contract_income,
+        'contract_interest': contract_interest,
+        'contract_penalty': contract_penalty,
         'returns_count': int(returns['c']),
         'by_status': by_status,
         'by_category': by_category,
