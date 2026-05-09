@@ -56,6 +56,107 @@ def _normalize_phone(phone):
     return digits
 
 
+# ───────── Zvonok (робот-звонок клиенту) ─────────
+def get_branches():
+    """Список активных филиалов из БД."""
+    try:
+        conn = _conn()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            f"SELECT name, address, phone, hours, specialization "
+            f"FROM {SCHEMA}.zvonok_branches WHERE is_active=TRUE ORDER BY sort_order, id"
+        )
+        rows = [dict(x) for x in cur.fetchall()]
+        cur.close(); conn.close()
+        return rows
+    except Exception:
+        return []
+
+
+def call_zvonok(purpose, phone, campaign_id, related_type=None, related_id=None, extra_vars=None):
+    """Отправляет звонок через Zvonok. Возвращает (ok, info)."""
+    pub_key = os.environ.get('ZVONOK_PUBLIC_KEY', '')
+    if not pub_key or not campaign_id:
+        return False, {'error': 'zvonok_not_configured'}
+    digits = _normalize_phone(phone)
+    if len(digits) != 11:
+        return False, {'error': 'bad_phone'}
+    # Анти-дубль: не звоним повторно по одному и тому же поводу за 30 минут
+    try:
+        cn = _conn(); cu = cn.cursor()
+        if related_type and related_id:
+            cu.execute(
+                f"SELECT 1 FROM {SCHEMA}.zvonok_log "
+                f"WHERE related_type={_esc(related_type)} AND related_id={int(related_id)} "
+                f"AND purpose={_esc(purpose)} AND success=TRUE "
+                f"AND created_at > NOW() - INTERVAL '30 minutes' LIMIT 1"
+            )
+            if cu.fetchone():
+                cu.close(); cn.close()
+                return False, {'error': 'already_called_recently'}
+        cu.close(); cn.close()
+    except Exception:
+        pass
+    # Параметры. Zvonok принимает доп. переменные через text_param/var_/ext_*. Передаём всё подряд:
+    params = {
+        'public_key': pub_key,
+        'campaign_id': str(campaign_id),
+        'phone': '+' + digits,
+    }
+    if extra_vars:
+        for k, v in extra_vars.items():
+            params[f'var_{k}'] = str(v)[:200]
+            # дублируем через ext_attrs для совместимости
+            params[f'ext_{k}'] = str(v)[:200]
+    success = False
+    err_text = None
+    api_resp = {}
+    try:
+        r = requests.get(
+            'https://zvonok.com/manager/cabapi_external/api/v1/phones/call/',
+            params=params, timeout=15,
+        )
+        try:
+            api_resp = r.json()
+        except Exception:
+            api_resp = {'raw': r.text[:500]}
+        # Успех: есть call_id или status=ok
+        if api_resp.get('call_id') or api_resp.get('id') or api_resp.get('status') in ('ok', 'OK'):
+            success = True
+        else:
+            err_text = str(api_resp.get('error') or api_resp.get('message') or 'unknown')[:300]
+    except Exception as e:
+        err_text = str(e)[:300]
+    # Логируем
+    try:
+        cn = _conn(); cu = cn.cursor()
+        cu.execute(
+            f"INSERT INTO {SCHEMA}.zvonok_log (purpose, phone, campaign_id, related_type, related_id, "
+            f"api_response, success, error_text) "
+            f"VALUES ({_esc(purpose)}, {_esc(digits)}, {_esc(str(campaign_id))}, "
+            f"{_esc(related_type)}, {('NULL' if related_id is None else int(related_id))}, "
+            f"{_esc(json.dumps(api_resp, ensure_ascii=False))}::jsonb, {'TRUE' if success else 'FALSE'}, "
+            f"{_esc(err_text)})"
+        )
+        cn.commit(); cu.close(); cn.close()
+    except Exception as e:
+        print(f'[ZVONOK] log error: {e}')
+    print(f'[ZVONOK] purpose={purpose} to={digits} ok={success} resp={api_resp}')
+    return success, {'success': success, 'response': api_resp, 'error': err_text}
+
+
+def branches_to_text():
+    """Преобразует список филиалов в строку для робота."""
+    branches = get_branches()
+    if not branches:
+        return 'улица Кирова 7 или Кирова 11'
+    parts = []
+    for b in branches:
+        addr = b.get('address') or b.get('name') or ''
+        parts.append(addr)
+    return ' или '.join(parts)
+
+
 # ───────── SMS клиенту ─────────
 def send_sms(phone, text):
     api_id = os.environ.get('SMSRU_API_ID', '')
@@ -391,10 +492,10 @@ def action_pulse(_body):
         f"ORDER BY created_at"
     )
     rows = cur.fetchall()
-    actions = {'escalated_5': 0, 'escalated_15': 0, 'escalated_30': 0, 'sms_sent': 0}
+    actions = {'escalated_5': 0, 'escalated_15': 0, 'escalated_30': 0, 'sms_sent': 0, 'robocall_lead': 0}
     for r in rows:
         lid = int(r['id']); age = float(r['age_minutes'] or 0); status = r['status']; level = int(r['escalation_level'] or 0)
-        # 5 минут — повторное уведомление в TG если новая
+        # 5 минут — повторное уведомление в TG если новая + робот-звонок клиенту с приглашением
         if status == 'new' and age >= 5 and level < 5:
             cur2 = conn.cursor()
             cur2.execute(
@@ -413,6 +514,27 @@ def action_pulse(_body):
             for cid in get_recipients():
                 tg_send(cid, text, kb)
             actions['escalated_5'] += 1
+            # Робот-звонок клиенту — кампания "Обработка заявки на скупку техники"
+            lead_campaign = os.environ.get('ZVONOK_CAMPAIGN_LEAD', '') or os.environ.get('ZVONOK_CAMPAIGN_ID', '')
+            if lead_campaign:
+                ok_call, _info = call_zvonok(
+                    purpose='lead_invite',
+                    phone=r['client_phone'],
+                    campaign_id=lead_campaign,
+                    related_type='lead',
+                    related_id=lid,
+                    extra_vars={
+                        'name': (r['client_name'] or '').split(' ')[0] or 'клиент',
+                        'category': r.get('category') or '',
+                        'address': branches_to_text(),
+                        'hours': '10:00-21:00',
+                    },
+                )
+                if ok_call:
+                    actions['robocall_lead'] += 1
+                    cur3 = conn.cursor()
+                    log_action(cur3, lid, 'robocall', None, None, 'Робот-звонок клиенту (Zvonok)')
+                    cur3.close()
         # 15 минут — SMS клиенту "извините, скоро ответим"
         if status == 'new' and age >= 15 and not r['client_warned_15']:
             sms_text = (
@@ -458,6 +580,96 @@ def action_pulse(_body):
             actions['escalated_30'] += 1
     conn.commit(); cur.close(); conn.close()
     return _ok({'ok': True, 'actions': actions, 'checked': len(rows)})
+
+
+# ───────── Ручные звонки (Zvonok) ─────────
+def _employee_by_token(token):
+    if not token:
+        return None
+    try:
+        cn = _conn(); cu = cn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cu.execute(
+            f"SELECT id, full_name, role, is_active FROM {SCHEMA}.employees WHERE auth_token={_esc(token)} LIMIT 1"
+        )
+        row = cu.fetchone()
+        cu.close(); cn.close()
+        if not row or not row.get('is_active'):
+            return None
+        return dict(row)
+    except Exception:
+        return None
+
+
+def action_robocall_ready(body, headers):
+    """Сотрудник жмёт «📞 Позвонить роботом» в карточке ремонта.
+    Звонит клиенту с сообщением о готовности устройства."""
+    emp = _employee_by_token(headers.get('X-Employee-Token') or headers.get('x-employee-token') or '')
+    if not emp:
+        return _err(401, 'Auth required')
+    phone = body.get('phone') or ''
+    name = (body.get('name') or 'клиент').split(' ')[0] or 'клиент'
+    model = body.get('model') or 'устройство'
+    price = body.get('price') or ''
+    order_id = body.get('order_id')
+    branch = body.get('address') or 'улица Кирова 7'
+    campaign = os.environ.get('ZVONOK_CAMPAIGN_READY', '')
+    if not campaign:
+        return _err(500, 'ZVONOK_CAMPAIGN_READY не настроен')
+    ok, info = call_zvonok(
+        purpose='ready',
+        phone=phone,
+        campaign_id=campaign,
+        related_type='repair',
+        related_id=int(order_id) if order_id else None,
+        extra_vars={
+            'name': name,
+            'model': model,
+            'price': str(price),
+            'address': branch,
+            'hours': '10:00-21:00',
+        },
+    )
+    return _ok({'ok': bool(ok), 'info': info})
+
+
+def action_robocall_lead_manual(body, headers):
+    """Сотрудник жмёт «📞 Позвонить роботом-приглашением» в карточке заявки."""
+    emp = _employee_by_token(headers.get('X-Employee-Token') or headers.get('x-employee-token') or '')
+    if not emp:
+        return _err(401, 'Auth required')
+    lead_id = body.get('lead_id')
+    if not lead_id:
+        return _err(400, 'lead_id required')
+    cn = _conn(); cu = cn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cu.execute(
+        f"SELECT id, client_name, client_phone, category FROM {SCHEMA}.leads_tracking WHERE id={int(lead_id)} LIMIT 1"
+    )
+    r = cu.fetchone()
+    cu.close(); cn.close()
+    if not r:
+        return _err(404, 'Заявка не найдена')
+    campaign = os.environ.get('ZVONOK_CAMPAIGN_LEAD', '') or os.environ.get('ZVONOK_CAMPAIGN_ID', '')
+    if not campaign:
+        return _err(500, 'ZVONOK кампания скупки не настроена')
+    ok, info = call_zvonok(
+        purpose='lead_manual',
+        phone=r['client_phone'],
+        campaign_id=campaign,
+        related_type='lead',
+        related_id=int(r['id']),
+        extra_vars={
+            'name': (r['client_name'] or '').split(' ')[0] or 'клиент',
+            'category': r.get('category') or '',
+            'address': branches_to_text(),
+            'hours': '10:00-21:00',
+        },
+    )
+    return _ok({'ok': bool(ok), 'info': info})
+
+
+def action_branches_get(_body, _headers):
+    """Список филиалов (для фронта — чтобы выбрать адрес перед звонком)."""
+    return _ok({'ok': True, 'branches': get_branches()})
 
 
 # ───────── Утренняя сводка ─────────
@@ -569,6 +781,7 @@ def handler(event, context):
 
     qp = event.get('queryStringParameters') or {}
     action = (qp.get('action') or '').strip()
+    headers = event.get('headers') or {}
     raw = event.get('body') or '{}'
     try:
         body = json.loads(raw) if isinstance(raw, str) else (raw or {})
@@ -595,6 +808,12 @@ def handler(event, context):
             return action_pulse(body)
         if action == 'morning_digest':
             return action_morning_digest(body)
+        if action == 'robocall_ready':
+            return action_robocall_ready(body, headers)
+        if action == 'robocall_lead':
+            return action_robocall_lead_manual(body, headers)
+        if action == 'branches':
+            return action_branches_get(body, headers)
         return _err(400, f'Unknown action: {action}')
     except Exception as e:
         return _err(500, f'{type(e).__name__}: {e}')

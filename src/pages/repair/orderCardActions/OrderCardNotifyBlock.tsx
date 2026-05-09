@@ -12,6 +12,8 @@ import {
   AuthHeader,
 } from "./orderCardActionsTypes";
 
+const LEADS_MONITOR_URL = "https://functions.poehali.dev/cccc3788-d793-49a5-9254-f194e6d94e18";
+
 type Props = {
   o: Order;
   token: string;
@@ -22,8 +24,38 @@ export default function OrderCardNotifyBlock({ o, token, authHeader }: Props) {
   const toast = useStaffToast();
   const [sentKey, setSentKey] = useState<string | null>(null);
   const [smsSentKey, setSmsSentKey] = useState<string | null>(null);
-  const [channel, setChannel] = useState<Channel>("tg");
+  const [channel, setChannel] = useState<Channel | "robot">("tg");
   const [pendingKey, setPendingKey] = useState<string | null>(null);
+  const [robotPending, setRobotPending] = useState(false);
+
+  const handleRobotCall = async () => {
+    setRobotPending(true);
+    const tid = toast.loading("Робот звонит клиенту...");
+    try {
+      const res = await fetch(`${LEADS_MONITOR_URL}?action=robocall_ready`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Employee-Token": token },
+        body: JSON.stringify({
+          phone: o.phone,
+          name: o.name || "клиент",
+          model: o.model || "устройство",
+          price: o.price || "",
+          order_id: o.id,
+          address: "улица Кирова 7",
+        }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || !d.ok) {
+        toast.update(tid, { kind: "error", message: d.error || "Не удалось позвонить", duration: 5000 });
+      } else {
+        toast.update(tid, { kind: "success", message: "📞 Робот звонит клиенту", duration: 3000 });
+      }
+    } catch {
+      toast.update(tid, { kind: "error", message: "Ошибка сети", duration: 4000 });
+    } finally {
+      setRobotPending(false);
+    }
+  };
 
   const handleSend = async (statusKey: string) => {
     setSentKey(statusKey);
@@ -126,7 +158,7 @@ export default function OrderCardNotifyBlock({ o, token, authHeader }: Props) {
       </div>
 
       {/* Сегмент-переключатель каналов */}
-      <div className="relative grid grid-cols-3 gap-1 p-1 bg-black/40 border border-white/5 rounded-lg mb-3">
+      <div className="relative grid grid-cols-3 gap-1 p-1 bg-black/40 border border-white/5 rounded-lg mb-2">
         {([
           { k: "tg" as Channel,   l: "Telegram", icon: "Send",          color: "from-[#229ED9] to-[#1a7eb0]" },
           { k: "sms" as Channel,  l: "SMS",      icon: "MessageSquare", color: "from-emerald-500 to-emerald-700" },
@@ -146,6 +178,23 @@ export default function OrderCardNotifyBlock({ o, token, authHeader }: Props) {
           );
         })}
       </div>
+
+      {/* Робот-звонок (Zvonok) — отдельной кнопкой, шлёт сообщение о готовности */}
+      <button
+        type="button"
+        onClick={handleRobotCall}
+        disabled={robotPending || !o.phone}
+        className="relative w-full mb-3 group overflow-hidden rounded-lg border border-purple-400/30 bg-gradient-to-br from-purple-500/15 via-fuchsia-500/10 to-purple-500/15 hover:from-purple-500/25 hover:to-purple-500/25 px-3 py-2 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+        title="Робот-звонок клиенту: «Ваш ремонт готов» (Zvonok)"
+      >
+        <div className="flex items-center gap-2 justify-center">
+          <Icon name={robotPending ? "Loader" : "PhoneCall"} size={14} className={`text-purple-300 ${robotPending ? "animate-spin" : ""}`} />
+          <span className="font-roboto text-[11px] font-bold text-purple-200 uppercase tracking-wider">
+            {robotPending ? "Звоним..." : "🤖 Робот-звонок: ремонт готов"}
+          </span>
+        </div>
+        <div className="text-[9px] text-purple-300/60 text-center mt-0.5">Zvonok · бесплатно для клиента</div>
+      </button>
 
       {/* Сетка статусов — одной кнопкой шлёт по выбранному каналу */}
       <div className="relative grid grid-cols-4 sm:grid-cols-7 gap-1.5">

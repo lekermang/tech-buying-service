@@ -199,6 +199,21 @@ export default function LeadsAlertWatcher({ token, empName }: { token: string; e
     setTimeout(() => setShareToast(null), 2000);
   };
 
+  const robocallLead = async (lead: Lead) => {
+    try {
+      const r = await fetch(`${LEADS_URL}?action=robocall_lead`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Employee-Token": token },
+        body: JSON.stringify({ lead_id: lead.id }),
+      });
+      const d = await r.json();
+      setShareToast(d.ok ? "📞 Робот звонит клиенту" : `❌ ${d.error || "Ошибка"}`);
+    } catch {
+      setShareToast("❌ Ошибка сети");
+    }
+    setTimeout(() => setShareToast(null), 3000);
+  };
+
   const inviteLead = async (lead: Lead) => {
     try {
       const r = await fetch("https://functions.poehali.dev/db114166-21ce-4b87-9d05-59286ee73d6e?action=invite_create", {
@@ -435,6 +450,13 @@ export default function LeadsAlertWatcher({ token, empName }: { token: string; e
                         title="Отправить SMS со ссылкой на персональный чат"
                       >
                         <Icon name="MessageCircle" size={11} /> Пригласить в чат
+                      </button>
+                      <button
+                        onClick={() => robocallLead(l)}
+                        className="text-[10px] text-purple-300/80 hover:text-purple-200 underline inline-flex items-center gap-1"
+                        title="Робот-звонок клиенту с приглашением на адрес (Zvonok)"
+                      >
+                        <Icon name="PhoneCall" size={11} /> Робот-звонок
                       </button>
                       {l.status === "taken" && (
                         <button onClick={() => closeLead(l.id)} className="text-[10px] text-white/40 hover:text-white/70 underline">
