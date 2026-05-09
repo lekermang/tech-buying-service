@@ -7,6 +7,7 @@ import AnalyticsTotalDay from "./staffAnalytics/AnalyticsTotalDay";
 import AnalyticsGoldForecast from "./staffAnalytics/AnalyticsGoldForecast";
 import AnalyticsSmartlombard, { type SmartlombardStats } from "./staffAnalytics/AnalyticsSmartlombard";
 import AnalyticsRepairAndStaff from "./staffAnalytics/AnalyticsRepairAndStaff";
+import PeriodPicker from "./staffAnalytics/PeriodPicker";
 import { SLSHOP_URL } from "./staff.types";
 
 type RepairAnalytics = {
@@ -17,6 +18,7 @@ type RepairAnalytics = {
 
 export function AnalyticsTab({ token }: { token: string }) {
   const [period, setPeriod] = useState("week");
+  const [customRange, setCustomRange] = useState<{ from: string; to: string } | null>(null);
   const [data, setData] = useState<Analytics | null>(null);
   const [repairData, setRepairData] = useState<RepairAnalytics | null>(null);
   const [goldData, setGoldData] = useState<GoldAnalytics | null>(null);
@@ -27,16 +29,21 @@ export function AnalyticsTab({ token }: { token: string }) {
   const [slLoading, setSlLoading] = useState(false);
   const [slError, setSlError] = useState<string | null>(null);
 
-  const repairPeriod = period === "today" ? "day" : period === "yesterday" ? "yesterday" : period === "week" ? "week" : "month";
+  const repairPeriod = period === "today" ? "day" : period === "yesterday" ? "yesterday" : period === "week" ? "week" : period === "custom" ? "custom" : "month";
+
+  // Хвост query string для кастомного периода
+  const customQS = period === "custom" && customRange
+    ? `&date_from=${customRange.from}&date_to=${customRange.to}`
+    : "";
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const [salesRes, repairRes, goldRes] = await Promise.all([
-        fetch(`${SALES_URL}?action=analytics&period=${period}`, { headers: { "X-Employee-Token": token } }),
-        fetch(`${REPAIR_URL}?action=analytics&period=${repairPeriod}`, { headers: { "X-Employee-Token": token } }),
-        fetch(`${GOLD_URL}?action=analytics&period=${repairPeriod}`, { headers: { "X-Employee-Token": token } }),
+        fetch(`${SALES_URL}?action=analytics&period=${period}${customQS}`, { headers: { "X-Employee-Token": token } }),
+        fetch(`${REPAIR_URL}?action=analytics&period=${repairPeriod}${customQS}`, { headers: { "X-Employee-Token": token } }),
+        fetch(`${GOLD_URL}?action=analytics&period=${repairPeriod}${customQS}`, { headers: { "X-Employee-Token": token } }),
       ]);
       const [salesD, repairD, goldD] = await Promise.all([salesRes.json(), repairRes.json(), goldRes.json()]);
       if (salesD && typeof salesD === "object" && !salesD.error) setData(salesD);
@@ -52,7 +59,7 @@ export function AnalyticsTab({ token }: { token: string }) {
     } finally {
       setLoading(false);
     }
-  }, [period, repairPeriod, token]);
+  }, [period, repairPeriod, token, customQS]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -61,9 +68,9 @@ export function AnalyticsTab({ token }: { token: string }) {
     setSlLoading(true);
     setSlError(null);
     try {
-      const periodMap: Record<string, string> = { today: "today", yesterday: "yesterday", week: "7d", month: "30d" };
+      const periodMap: Record<string, string> = { today: "today", yesterday: "yesterday", week: "7d", month: "30d", custom: "custom" };
       const p = periodMap[period] || "30d";
-      const url = `${SLSHOP_URL}?action=stats&period=${p}`;
+      const url = `${SLSHOP_URL}?action=stats&period=${p}${customQS}`;
       const res = await fetch(url, { headers: { "X-Employee-Token": token } });
       const d = await res.json();
       if (d && !d.error) {
@@ -96,16 +103,10 @@ export function AnalyticsTab({ token }: { token: string }) {
     } finally {
       setSlLoading(false);
     }
-  }, [period, token]);
+  }, [period, token, customQS]);
 
   useEffect(() => { loadSmartlombard(false); }, [loadSmartlombard]);
 
-  const PERIODS = [
-    { v: "today", l: "Сегодня" },
-    { v: "yesterday", l: "Вчера" },
-    { v: "week", l: "7 дней" },
-    { v: "month", l: "30 дней" },
-  ];
   const TYPE_LABELS: Record<string, string> = { goods: "📦 Продажи", repair: "🔧 Ремонт", purchase: "💰 Закупка" };
 
   const repairRevenue = repairData?.revenue || 0;
@@ -140,28 +141,14 @@ export function AnalyticsTab({ token }: { token: string }) {
   return (
     <div className="p-3">
       {/* Премиум переключатель периода */}
-      <div className="flex gap-1.5 mb-3 flex-wrap items-center">
-        {PERIODS.map(p => {
-          const active = period === p.v;
-          return (
-            <button key={p.v} onClick={() => setPeriod(p.v)}
-              title={`Период: ${p.l}`}
-              className={`relative font-roboto text-[11px] px-3 py-1.5 rounded-full transition-all active:scale-95 inline-flex items-center overflow-hidden group ${
-                active
-                  ? "bg-gradient-to-b from-[#FFE34D] via-[#FFD700] to-[#d4a017] text-black font-bold shadow-[0_3px_12px_rgba(255,215,0,0.45),inset_0_1px_0_rgba(255,255,255,0.55)]"
-                  : "bg-gradient-to-br from-[#141414] to-[#0E0E0E] border border-[#1F1F1F] text-white/55 hover:text-[#FFD700] hover:border-[#FFD700]/40 hover:shadow-[0_0_10px_rgba(255,215,0,0.18)]"
-              }`}>
-              {active && <span aria-hidden className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/35 to-transparent rounded-t-full pointer-events-none" />}
-              <span className="relative">{p.l}</span>
-            </button>
-          );
-        })}
-        <button onClick={load} disabled={loading}
-          title="Обновить данные"
-          className="ml-auto text-white/45 hover:text-[#FFD700] active:scale-90 p-2 rounded-md transition-all bg-gradient-to-br from-[#141414] to-[#0E0E0E] border border-[#1F1F1F] hover:border-[#FFD700]/40 hover:shadow-[0_0_12px_rgba(255,215,0,0.18)] group">
-          <Icon name={loading ? "Loader" : "RefreshCw"} size={14} className={`${loading ? "animate-spin text-[#FFD700]" : "group-hover:rotate-180 transition-transform duration-500"}`} />
-        </button>
-      </div>
+      <PeriodPicker
+        period={period}
+        setPeriod={setPeriod}
+        customRange={customRange}
+        setCustomRange={setCustomRange}
+        onRefresh={load}
+        loading={loading}
+      />
 
       {error && (
         <div className="relative bg-gradient-to-r from-red-500/15 to-red-500/5 border border-red-500/40 text-red-300 font-roboto text-sm p-3 mb-4 rounded-lg flex items-center gap-2 shadow-[0_0_14px_rgba(239,68,68,0.20)]">

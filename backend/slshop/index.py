@@ -598,7 +598,14 @@ def accounting_summary(params):
     """Бухгалтерия: оборот, прибыль, налоговая база за период по филиалам и кассам."""
     period = (params.get('period') or '30d').strip()
     now = datetime.utcnow()
-    if period == 'today':
+    if period == 'custom':
+        df_raw = (params.get('date_from') or '').strip()
+        try:
+            datetime.strptime(df_raw[:10], '%Y-%m-%d')
+            date_from = df_raw[:10]
+        except Exception:
+            date_from = (now - timedelta(days=30)).strftime('%Y-%m-%d')
+    elif period == 'today':
         date_from = now.strftime('%Y-%m-%d')
     elif period == 'yesterday':
         date_from = (now - timedelta(days=1)).strftime('%Y-%m-%d')
@@ -2390,7 +2397,27 @@ def list_operations(params):
 def stats(params):
     period = (params.get('period') or '30d').strip()
     now = datetime.utcnow()
-    if period == 'today':
+    # Произвольный период (конкретная дата или диапазон): date_from + date_to из query
+    if period == 'custom':
+        df_raw = (params.get('date_from') or '').strip()
+        dt_raw = (params.get('date_to') or '').strip()
+        # валидируем формат YYYY-MM-DD
+        def _safe_date(s):
+            try:
+                datetime.strptime(s[:10], '%Y-%m-%d')
+                return s[:10]
+            except Exception:
+                return None
+        df_safe = _safe_date(df_raw)
+        dt_safe = _safe_date(dt_raw)
+        if df_safe and dt_safe:
+            date_from = df_safe
+            date_to = dt_safe
+        else:
+            # fallback: если дата невалидная, берём 30 дней
+            date_from = (now - timedelta(days=30)).strftime('%Y-%m-%d')
+            date_to = now.strftime('%Y-%m-%d')
+    elif period == 'today':
         date_from = now.strftime('%Y-%m-%d')
     elif period == 'yesterday':
         date_from = (now - timedelta(days=1)).strftime('%Y-%m-%d')
