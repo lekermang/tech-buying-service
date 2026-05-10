@@ -326,6 +326,26 @@ export function useStaffRepairActions(token: string, st: StaffRepairState) {
     }
   };
 
+  // ─── Ручной звонок роботом «Ремонт готов» ────────────────────────────────────
+  const callRobotReady = async (id: number): Promise<boolean> => {
+    try {
+      const res = await fetch(REPAIR_URL, {
+        method: "POST", headers,
+        body: JSON.stringify({ action: "call_ready", id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.ok === false || data.error) {
+        toast.error(data.error || "Не удалось дозвониться роботом");
+        return false;
+      }
+      toast.success(`#${id}: робот звонит клиенту`);
+      return true;
+    } catch (e) {
+      toast.error(humanizeError({ action: "status", thrown: e }));
+      return false;
+    }
+  };
+
   // ─── Инициализация формы редактирования ──────────────────────────────────────
   const initEditForm = (o: Order): EditForm => ({
     name: o.name, phone: o.phone,
@@ -345,6 +365,7 @@ export function useStaffRepairActions(token: string, st: StaffRepairState) {
     createOrder, saveCard, changeStatus,
     issueOrder, deleteOrder,
     openReadyModal, submitReady,
+    callRobotReady,
     initEditForm,
   };
 }

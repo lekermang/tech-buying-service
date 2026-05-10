@@ -77,4 +77,5 @@ export type OrderCardActionsProps = {
   onOpenReadyModal: (o: Order) => void;
   onIssueOrder: (o: Order, issuedAt?: string) => void;
   onDelete: (id: number) => void;
+  onCallRobotReady?: (id: number) => Promise<boolean> | void;
 };

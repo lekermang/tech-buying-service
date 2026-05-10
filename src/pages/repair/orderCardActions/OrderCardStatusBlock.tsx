@@ -11,6 +11,7 @@ type Props = {
   onChangeStatus: (id: number, status: string, extra?: Record<string, unknown>) => void;
   onOpenReadyModal: (o: Order) => void;
   onIssueOrder: (o: Order, issuedAt?: string) => void;
+  onCallRobotReady?: (id: number) => Promise<boolean> | void;
 };
 
 /**
@@ -29,8 +30,14 @@ type Props = {
  */
 export default function OrderCardStatusBlock({
   o, ef, saving, financeBlocked,
-  onChangeStatus, onOpenReadyModal, onIssueOrder,
+  onChangeStatus, onOpenReadyModal, onIssueOrder, onCallRobotReady,
 }: Props) {
+  const [calling, setCalling] = useState(false);
+  const callRobot = async () => {
+    if (!onCallRobotReady || calling) return;
+    setCalling(true);
+    try { await onCallRobotReady(o.id); } finally { setCalling(false); }
+  };
   // Дата выдачи (для кнопки «Выдан»)
   const nowLocal = () => {
     const d = new Date();
@@ -166,6 +173,19 @@ export default function OrderCardStatusBlock({
           <Icon name="Info" size={11} className="text-orange-400 shrink-0" />
           Чтобы нажать «Выдан», заполни «Закупка» и «Цена клиенту» в финансовом блоке ниже.
         </div>
+      )}
+
+      {/* Кнопка «Ремонт готов — позвонить роботом» — видна когда уже Готов / Выдан */}
+      {(o.status === "ready" || o.status === "done") && onCallRobotReady && o.phone && (
+        <button
+          onClick={callRobot}
+          disabled={calling}
+          title="Робот Zvonok перезвонит клиенту и зачитает: ремонт готов, адрес, режим работы"
+          className="mt-2.5 w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500/15 to-emerald-500/5 hover:from-emerald-500/25 hover:to-emerald-500/10 border border-emerald-500/40 hover:border-emerald-400 text-emerald-300 hover:text-emerald-200 px-3 py-2 rounded-lg text-[11px] font-oswald font-bold uppercase tracking-wide transition-all active:scale-[0.98] disabled:opacity-50"
+        >
+          <Icon name={calling ? "Loader" : "PhoneCall"} size={13} className={calling ? "animate-spin" : ""} />
+          {calling ? "Робот звонит..." : "Позвонить роботом «Ремонт готов»"}
+        </button>
       )}
 
       {/* ── «Прочее» — служебные статусы ── */}

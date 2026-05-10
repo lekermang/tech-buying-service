@@ -375,6 +375,73 @@ def send_sms(phone: str, message: str):
         )
     except Exception:
         pass
+
+
+def zvonok_call_ready(conn, order_id: int, client_phone: str, client_name: str, device_model: str, repair_amount):
+    """Робот-звонок «Ваш ремонт готов» через Zvonok. Возвращает (ok: bool, info: dict).
+    Используется и при автоматическом переходе в статус ready, и при ручной кнопке «Позвонить роботом»."""
+    pub_key = os.environ.get('ZVONOK_PUBLIC_KEY', '')
+    campaign = os.environ.get('ZVONOK_CAMPAIGN_READY', '')
+    digits_only = ''.join(c for c in (client_phone or '') if c.isdigit())
+    if len(digits_only) == 11 and digits_only.startswith('8'):
+        digits_only = '7' + digits_only[1:]
+    elif len(digits_only) == 10:
+        digits_only = '7' + digits_only
+    if not (pub_key and campaign and len(digits_only) == 11):
+        return False, {'error': 'Zvonok не настроен или неверный телефон',
+                       'has_key': bool(pub_key), 'has_campaign': bool(campaign), 'phone_len': len(digits_only)}
+    first_name = (client_name or '').split(' ')[0] or 'клиент'
+    dev = device_model or 'устройство'
+    params_zv = {
+        'public_key': pub_key,
+        'campaign_id': str(campaign),
+        'phone': '+' + digits_only,
+        'var_name': first_name,
+        'var_model': dev,
+        'var_price': str(repair_amount or ''),
+        'var_address': 'улица Кирова 7',
+        'var_hours': '10:00-21:00',
+        'ext_name': first_name,
+        'ext_model': dev,
+        'ext_price': str(repair_amount or ''),
+        'ext_address': 'улица Кирова 7',
+    }
+    zv_resp = {}
+    zv_ok = False
+    err_text = ''
+    try:
+        r_zv = requests.get(
+            'https://zvonok.com/manager/cabapi_external/api/v1/phones/call/',
+            params=params_zv, timeout=15,
+        )
+        try:
+            zv_resp = r_zv.json()
+        except Exception:
+            zv_resp = {'raw': (r_zv.text or '')[:300]}
+        zv_ok = bool(zv_resp.get('call_id') or zv_resp.get('id') or zv_resp.get('status') in ('ok', 'OK'))
+        if not zv_ok:
+            err_text = str(zv_resp.get('error') or zv_resp.get('message') or '')[:300]
+    except Exception as call_err:
+        err_text = f'{type(call_err).__name__}: {call_err}'[:300]
+        zv_resp = {'error': err_text}
+    print(f'[ZVONOK READY] order={order_id} phone={digits_only} ok={zv_ok} resp={zv_resp}')
+    try:
+        cur_log = conn.cursor()
+        resp_json = json.dumps(zv_resp, ensure_ascii=False).replace("'", "''")
+        err_safe = err_text.replace("'", "''")
+        cur_log.execute(
+            f"INSERT INTO {SCHEMA}.zvonok_log (purpose, phone, campaign_id, related_type, related_id, "
+            f"api_response, success, error_text) "
+            f"VALUES ('ready', '{digits_only}', '{campaign}', 'repair', {int(order_id)}, "
+            f"'{resp_json}'::jsonb, {'TRUE' if zv_ok else 'FALSE'}, '{err_safe}')"
+        )
+        conn.commit()
+        cur_log.close()
+    except Exception as log_err:
+        print(f'[ZVONOK READY] log error: {log_err}')
+    return zv_ok, {'response': zv_resp, 'error': err_text}
+
+
 SCHEMA = 't_p31606708_tech_buying_service'
 ADMIN_TOKEN = os.environ.get('ADMIN_TOKEN', 'Mark2015N')
 ADMIN_TOKEN_ALT = 'Mark2015N'
@@ -1379,6 +1446,27 @@ def handler(event: dict, context) -> dict:
             conn.commit(); cur.close(); conn.close()
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True}, ensure_ascii=False)}
 
+        # Ручной звонок роботом «Ремонт готов» — без смены статуса
+        if action == 'call_ready':
+            order_id = int(body.get('id', 0))
+            if not order_id:
+                cur.close(); conn.close()
+                return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'ok': False, 'error': 'id обязателен'}, ensure_ascii=False)}
+            cur.execute(f"SELECT phone, name, model, repair_amount FROM {SCHEMA}.repair_orders WHERE id={order_id}")
+            row = cur.fetchone()
+            if not row:
+                cur.close(); conn.close()
+                return {'statusCode': 404, 'headers': HEADERS, 'body': json.dumps({'ok': False, 'error': 'Заявка не найдена'}, ensure_ascii=False)}
+            r_phone, r_name, r_model, r_amount_db = row
+            if not r_phone:
+                cur.close(); conn.close()
+                return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'ok': False, 'error': 'У клиента не указан телефон'}, ensure_ascii=False)}
+            ok_call, info = zvonok_call_ready(conn, order_id, r_phone, r_name or '', r_model or '', r_amount_db)
+            cur.close(); conn.close()
+            if ok_call:
+                return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'message': 'Робот звонит клиенту'}, ensure_ascii=False)}
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': False, 'error': info.get('error') or 'Не удалось дозвониться'}, ensure_ascii=False)}
+
         # Обновить статус / поля заявки
         order_id = int(body.get('id', 0))
         if not order_id:
@@ -1560,59 +1648,7 @@ def handler(event: dict, context) -> dict:
 
                 # 🤖 Робот-звонок Zvonok: «Ваш ремонт готов»
                 try:
-                    pub_key = os.environ.get('ZVONOK_PUBLIC_KEY', '')
-                    campaign = os.environ.get('ZVONOK_CAMPAIGN_READY', '')
-                    digits_only = ''.join(c for c in (client_phone or '') if c.isdigit())
-                    if len(digits_only) == 11 and digits_only.startswith('8'):
-                        digits_only = '7' + digits_only[1:]
-                    elif len(digits_only) == 10:
-                        digits_only = '7' + digits_only
-                    if pub_key and campaign and len(digits_only) == 11:
-                        first_name = (client_name or '').split(' ')[0] or 'клиент'
-                        zvonok_params = {
-                            'public_key': pub_key,
-                            'campaign_id': str(campaign),
-                            'phone': '+' + digits_only,
-                            'var_name': first_name,
-                            'var_model': dev,
-                            'var_price': str(r_amount or ''),
-                            'var_address': 'улица Кирова 7',
-                            'var_hours': '10:00-21:00',
-                            'ext_name': first_name,
-                            'ext_model': dev,
-                            'ext_price': str(r_amount or ''),
-                            'ext_address': 'улица Кирова 7',
-                        }
-                        try:
-                            r_zv = requests.get(
-                                'https://zvonok.com/manager/cabapi_external/api/v1/phones/call/',
-                                params=zvonok_params, timeout=15
-                            )
-                            zv_resp = {}
-                            try:
-                                zv_resp = r_zv.json()
-                            except Exception:
-                                zv_resp = {'raw': r_zv.text[:300]}
-                            zv_ok = bool(zv_resp.get('call_id') or zv_resp.get('id') or zv_resp.get('status') in ('ok', 'OK'))
-                            print(f'[ZVONOK READY] order={order_id} phone={digits_only} ok={zv_ok} resp={zv_resp}')
-                            try:
-                                cur_log = conn.cursor()
-                                resp_json = json.dumps(zv_resp, ensure_ascii=False).replace("'", "''")
-                                err_text = '' if zv_ok else str(zv_resp.get('error') or zv_resp.get('message') or '')[:300].replace("'", "''")
-                                cur_log.execute(
-                                    f"INSERT INTO {SCHEMA}.zvonok_log (purpose, phone, campaign_id, related_type, related_id, "
-                                    f"api_response, success, error_text) "
-                                    f"VALUES ('ready', '{digits_only}', '{campaign}', 'repair', {int(order_id)}, "
-                                    f"'{resp_json}'::jsonb, {'TRUE' if zv_ok else 'FALSE'}, '{err_text}')"
-                                )
-                                conn.commit()
-                                cur_log.close()
-                            except Exception as log_err:
-                                print(f'[ZVONOK READY] log error: {log_err}')
-                        except Exception as call_err:
-                            print(f'[ZVONOK READY] call exception: {call_err}')
-                    else:
-                        print(f'[ZVONOK READY] skipped: pub_key={bool(pub_key)} campaign={bool(campaign)} phone_len={len(digits_only)}')
+                    zvonok_call_ready(conn, order_id, client_phone, client_name or '', dev, r_amount)
                 except Exception as zvonok_err:
                     print(f'[ZVONOK READY] error: {zvonok_err}')
 

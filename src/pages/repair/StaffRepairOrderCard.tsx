@@ -29,11 +29,12 @@ type Props = {
   onIssueOrder: (o: Order, issuedAt?: string) => void;
   onSaveCard: (o: Order) => void;
   onDelete: (id: number) => void;
+  onCallRobotReady?: (id: number) => Promise<boolean> | void;
 };
 
 export default function StaffRepairOrderCard({
   o, isExpanded, ef, saving, saveError, isOwner, token, authHeader,
-  onToggle, onEditFormChange, onChangeStatus, onOpenReadyModal, onIssueOrder, onSaveCard, onDelete,
+  onToggle, onEditFormChange, onChangeStatus, onOpenReadyModal, onIssueOrder, onSaveCard, onDelete, onCallRobotReady,
 }: Props) {
   const hasAmount = ef.repair_amount !== "" && ef.repair_amount != null;
   const hasPurchase = ef.purchase_amount !== "" && ef.purchase_amount != null;
@@ -119,6 +120,7 @@ export default function StaffRepairOrderCard({
             onOpenReadyModal={onOpenReadyModal}
             onIssueOrder={onIssueOrder}
             onDelete={onDelete}
+            onCallRobotReady={onCallRobotReady}
           />
 
           {/* История изменений (статус, цены, заметки) */}

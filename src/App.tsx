@@ -83,6 +83,16 @@ const App = () => {
       if ("serviceWorker" in navigator && !window.location.pathname.startsWith("/staff")) {
         navigator.serviceWorker.register("/site-sw.js", { scope: "/" }).catch(() => { /* ignore */ });
       }
+
+      // Idle-prefetch: пока пользователь смотрит главную, фоном тянем чанки соседних разделов.
+      // На /staff и /admin это не нужно — там сотрудники.
+      const path = window.location.pathname;
+      if (path === "/" || path === "/TopGold") {
+        import("./pages/RepairDiscount").catch(() => { /* ignore */ });
+        import("./pages/Catalog").catch(() => { /* ignore */ });
+        import("./pages/Tools").catch(() => { /* ignore */ });
+        import("./pages/PublicChat").catch(() => { /* ignore */ });
+      }
     });
   }, []);
 

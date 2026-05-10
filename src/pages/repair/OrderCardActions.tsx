@@ -16,7 +16,7 @@ import { OrderCardActionsProps } from "./orderCardActions/orderCardActionsTypes"
  */
 export default function OrderCardActions({
   o, ef, saving, isOwner, token, authHeader, financeBlocked,
-  onChangeStatus, onOpenReadyModal, onIssueOrder, onDelete,
+  onChangeStatus, onOpenReadyModal, onIssueOrder, onDelete, onCallRobotReady,
 }: OrderCardActionsProps) {
   const [showManualNotify, setShowManualNotify] = useState(false);
 
@@ -30,6 +30,7 @@ export default function OrderCardActions({
         onChangeStatus={onChangeStatus}
         onOpenReadyModal={onOpenReadyModal}
         onIssueOrder={onIssueOrder}
+        onCallRobotReady={onCallRobotReady}
       />
 
       {/* Ручные уведомления — свёрнуто по умолчанию, открывается по запросу */}
