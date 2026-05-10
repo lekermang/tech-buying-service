@@ -561,9 +561,18 @@ def action_staff_poll(body, headers):
         return _err(400, 'room_id required')
     conn = _conn(); cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cur.execute(
-        f"SELECT id, author_type, author_id, author_name, author_avatar, text, photo_url, is_system, created_at "
-        f"FROM {SCHEMA}.pchat_messages WHERE room_id={room_id} AND id > {after_id} "
-        f"ORDER BY id ASC LIMIT {limit}"
+        f"SELECT m.id, m.author_type, m.author_id, m.author_name, m.author_avatar, "
+        f"m.text, m.photo_url, m.is_system, m.created_at, "
+        f"CASE WHEN m.author_type='client' "
+        f"AND c.phone IS NOT NULL "
+        f"AND c.phone NOT LIKE 'guest:%' "
+        f"AND c.phone NOT LIKE 'tg:%' "
+        f"THEN c.phone ELSE NULL END AS author_phone "
+        f"FROM {SCHEMA}.pchat_messages m "
+        f"LEFT JOIN {SCHEMA}.pchat_clients c "
+        f"  ON c.id = m.author_id AND m.author_type='client' "
+        f"WHERE m.room_id={room_id} AND m.id > {after_id} "
+        f"ORDER BY m.id ASC LIMIT {limit}"
     )
     msgs = [dict(x) for x in cur.fetchall()]
     cur.execute(f"SELECT COALESCE(MAX(id),0) AS m FROM {SCHEMA}.pchat_messages WHERE room_id={room_id}")

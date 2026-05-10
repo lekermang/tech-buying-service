@@ -141,8 +141,14 @@ export function saveHolidaysSettings(s: HolidaysSettings) {
   window.dispatchEvent(new CustomEvent("holidays-settings-changed"));
 }
 
+/** ВРЕМЕННЫЙ ГЛОБАЛЬНЫЙ ВЫКЛЮЧАТЕЛЬ.
+ *  Праздники полностью отключены до тех пор, пока в админке не починим тумблер.
+ *  Чтобы вернуть — поставь HOLIDAYS_FORCE_OFF = false. */
+const HOLIDAYS_FORCE_OFF = true;
+
 /** Возвращает активный праздник, если сейчас попадает в диапазон ±3 дня (или индивидуальный) */
 export function getActiveHoliday(now: Date = new Date()): { holiday: Holiday; daysToHoliday: number } | null {
+  if (HOLIDAYS_FORCE_OFF) return null;
   const settings = loadHolidaysSettings();
   if (!settings.enabled) return null;
 

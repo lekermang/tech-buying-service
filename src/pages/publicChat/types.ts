@@ -27,6 +27,8 @@ export type Message = {
   photo_url: string | null;
   is_system: boolean;
   created_at: string;
+  /** Телефон автора-клиента (если есть и не guest:/tg:) — показываем менеджеру в Live */
+  author_phone?: string | null;
 };
 
 export const fmtTime = (iso: string) => {

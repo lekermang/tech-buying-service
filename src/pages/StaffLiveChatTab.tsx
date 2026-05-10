@@ -238,9 +238,20 @@ export default function StaffLiveChatTab({ token }: Props) {
                           )}
                         </div>
                         <div className={`max-w-[75%] flex flex-col ${isMine ? "items-end" : "items-start"}`}>
-                          <div className="text-[10px] text-white/45 mb-0.5 px-1">
-                            {m.author_name} · {fmtTime(m.created_at)}
-                            {m.author_type === "employee" && <span className="ml-1 text-[#FFD700]">★</span>}
+                          <div className="text-[10px] text-white/45 mb-0.5 px-1 flex items-center gap-1.5 flex-wrap">
+                            <span>{m.author_name}</span>
+                            {m.author_phone && (
+                              <a
+                                href={`tel:${m.author_phone}`}
+                                className="text-[#FFD700]/85 hover:text-[#FFD700] font-mono inline-flex items-center gap-0.5"
+                                title="Позвонить клиенту"
+                              >
+                                <Icon name="Phone" size={9} />
+                                {m.author_phone}
+                              </a>
+                            )}
+                            <span>· {fmtTime(m.created_at)}</span>
+                            {m.author_type === "employee" && <span className="text-[#FFD700]">★</span>}
                           </div>
                           <div className={`px-3 py-2 rounded-2xl text-sm whitespace-pre-wrap break-words ${
                             isMine
