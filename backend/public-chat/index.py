@@ -902,23 +902,39 @@ def action_tg_webhook(body):
 
 # ═══════════════════ ГОСТЕВОЙ ВХОД ═══════════════════
 def action_guest_login(body):
-    """Анонимный вход — только имя, доступ только к общему каналу."""
+    """Лёгкий вход — имя + телефон, без OTP. Доступ только к общему каналу.
+    Если клиент с таким телефоном уже был — обновляем имя и выдаём новый токен."""
     name = (body.get('name') or '').strip()
+    phone_raw = (body.get('phone') or '').strip()
     if not name or len(name) < 2:
         return _err(400, 'Имя обязательно')
     if len(name) > 40:
         name = name[:40]
+
+    # нормализуем телефон до +7XXXXXXXXXX (11 цифр)
+    digits = ''.join(ch for ch in phone_raw if ch.isdigit())
+    if digits.startswith('8'):
+        digits = '7' + digits[1:]
+    if len(digits) != 11 or not digits.startswith('7'):
+        return _err(400, 'Введите телефон полностью (11 цифр)')
+    phone = '+' + digits
+
     auth = _gen_token()
-    fake_phone = 'guest:' + _gen_token(12)
     conn = _conn(); cur = conn.cursor()
+    # UPSERT по телефону: если уже есть — обновляем имя/токен/метку времени
     cur.execute(
         f"INSERT INTO {SCHEMA}.pchat_clients (phone, display_name, auth_token, last_seen_at, "
         f"is_guest, auth_method) "
-        f"VALUES ({_esc(fake_phone)}, {_esc(name)}, {_esc(auth)}, NOW(), TRUE, 'guest') RETURNING id"
+        f"VALUES ({_esc(phone)}, {_esc(name)}, {_esc(auth)}, NOW(), TRUE, 'guest') "
+        f"ON CONFLICT (phone) DO UPDATE SET "
+        f"display_name=EXCLUDED.display_name, auth_token=EXCLUDED.auth_token, "
+        f"last_seen_at=NOW(), is_blocked=FALSE "
+        f"RETURNING id"
     )
     cid = cur.fetchone()[0]
     conn.commit(); cur.close(); conn.close()
-    return _ok({'ok': True, 'token': auth, 'client_id': cid, 'name': name, 'method': 'guest', 'guest_only': True})
+    return _ok({'ok': True, 'token': auth, 'client_id': cid, 'name': name,
+                'phone': phone, 'method': 'guest', 'guest_only': True})
 
 
 # ═══════════════════ ZVONOK.COM (звонок-пароль) ═══════════════════
