@@ -355,37 +355,43 @@ def action_client_rooms(qp):
     cli = get_client_by_token(token)
     if not cli:
         return _err(401, 'Auth required')
-    conn = _conn(); cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    # Гостям и всем неверифицированным клиентам — только общий канал.
-    # Личный диалог появится автоматически, когда вернём авторизацию по номеру/Telegram.
-    rooms = [
-        {'id': PUBLIC_ROOM_ID, 'type': 'public', 'title': 'Скупка24 LIVE'},
-    ]
-    if not cli.get('is_guest') and cli.get('phone') and not str(cli.get('phone', '')).startswith(('guest:', 'tg:')):
-        # Только верифицированным клиентам с реальным телефоном — личный диалог
-        direct_id = get_or_create_direct_room(cli['id'], cli.get('display_name'))
-        rooms.append({'id': direct_id, 'type': 'direct', 'title': 'Менеджер Скупка24'})
-    # подсчёт непрочитанных для каждой
-    out = []
-    for r in rooms:
-        cur.execute(f"SELECT COALESCE(MAX(id),0) FROM {SCHEMA}.pchat_messages WHERE room_id={int(r['id'])}")
-        max_id = cur.fetchone()[0] or 0
+    try:
+        conn = _conn(); cur = conn.cursor()
+        cli_id = int(cli['id'])
+        # Простой режим: всем клиентам — только общий канал «Скупка24 LIVE».
+        # Считаем max_id и непрочитанные для общего канала.
+        cur.execute(f"SELECT COALESCE(MAX(id),0) FROM {SCHEMA}.pchat_messages WHERE room_id={PUBLIC_ROOM_ID}")
+        max_id = int(cur.fetchone()[0] or 0)
         cur.execute(
             f"SELECT last_read_msg_id FROM {SCHEMA}.pchat_reads "
-            f"WHERE room_id={int(r['id'])} AND reader_type='client' AND reader_id={int(cli['id'])} LIMIT 1"
+            f"WHERE room_id={PUBLIC_ROOM_ID} AND reader_type='client' AND reader_id={cli_id} LIMIT 1"
         )
         rr = cur.fetchone()
-        last_read = rr['last_read_msg_id'] if rr else 0
+        last_read = int(rr[0]) if rr else 0
         cur.execute(
             f"SELECT COUNT(*) FROM {SCHEMA}.pchat_messages "
-            f"WHERE room_id={int(r['id'])} AND id > {int(last_read)} AND author_type <> 'client'"
+            f"WHERE room_id={PUBLIC_ROOM_ID} AND id > {last_read} AND author_type <> 'client'"
         )
-        unread = cur.fetchone()[0] or 0
-        r['unread'] = int(unread)
-        r['max_id'] = int(max_id)
-        out.append(r)
-    cur.close(); conn.close()
-    return _ok({'ok': True, 'rooms': out, 'me': {'id': cli['id'], 'name': cli.get('display_name')}})
+        unread = int(cur.fetchone()[0] or 0)
+        cur.close(); conn.close()
+        rooms = [{
+            'id': PUBLIC_ROOM_ID,
+            'type': 'public',
+            'title': 'Скупка24 LIVE',
+            'max_id': max_id,
+            'unread': unread,
+        }]
+        return _ok({
+            'ok': True,
+            'rooms': rooms,
+            'me': {'id': cli_id, 'name': cli.get('display_name') or 'Клиент'},
+        })
+    except Exception as e:
+        import traceback
+        print(f'[ROOMS] error: {e}\n{traceback.format_exc()}')
+        return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({
+            'ok': False, 'error': f'Не удалось загрузить комнаты: {type(e).__name__}: {e}',
+        }, ensure_ascii=False)}
 
 
 def action_poll(body, headers):
