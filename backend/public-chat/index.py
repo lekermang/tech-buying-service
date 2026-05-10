@@ -356,11 +356,15 @@ def action_client_rooms(qp):
     if not cli:
         return _err(401, 'Auth required')
     conn = _conn(); cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    direct_id = get_or_create_direct_room(cli['id'], cli.get('display_name'))
+    # Гостям и всем неверифицированным клиентам — только общий канал.
+    # Личный диалог появится автоматически, когда вернём авторизацию по номеру/Telegram.
     rooms = [
         {'id': PUBLIC_ROOM_ID, 'type': 'public', 'title': 'Скупка24 LIVE'},
-        {'id': direct_id, 'type': 'direct', 'title': 'Менеджер Скупка24'},
     ]
+    if not cli.get('is_guest') and cli.get('phone') and not str(cli.get('phone', '')).startswith(('guest:', 'tg:')):
+        # Только верифицированным клиентам с реальным телефоном — личный диалог
+        direct_id = get_or_create_direct_room(cli['id'], cli.get('display_name'))
+        rooms.append({'id': direct_id, 'type': 'direct', 'title': 'Менеджер Скупка24'})
     # подсчёт непрочитанных для каждой
     out = []
     for r in rooms:
