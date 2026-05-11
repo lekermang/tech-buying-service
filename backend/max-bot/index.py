@@ -870,18 +870,38 @@ def action_send(body: dict) -> dict:
 
 
 def action_staff_send(body: dict) -> dict:
-    """Отправить сообщение в MAX-канал сотрудников (если привязан).
-    Используется из send-lead, repair-order, repair-admin."""
+    """Отправить сообщение во ВСЕ staff-каналы MAX:
+    1) staff-канал (если бот добавлен в группу/канал),
+    2) личные ID владельцев из MAX_OWNER_USER_ID (через запятую) — приходит в личку MAX-бота.
+    Используется из send-lead, repair-order, repair-admin, public-chat."""
     text = (body.get('text') or '').strip()
     if not text:
         return _err(400, 'text обязателен')
+    targets: list[int] = []
     cid = get_staff_channel_id()
-    if not cid:
-        return _ok({'ok': True, 'delivered': False, 'reason': 'staff_channel_not_bound'})
-    ok, d = send_max_message(int(cid), text)
-    _log('out', 'staff_send', text, max_chat_id=int(cid),
-         payload=d, error='' if ok else json.dumps(d, ensure_ascii=False)[:300])
-    return _ok({'ok': ok, 'delivered': ok, 'response': d, 'channel_id': cid})
+    if cid:
+        targets.append(int(cid))
+    # Личные получатели — владельцы
+    owners_raw = (os.environ.get('MAX_OWNER_USER_ID') or '').strip()
+    for piece in owners_raw.replace(' ', '').split(','):
+        if piece.isdigit():
+            uid = int(piece)
+            if uid and uid not in targets:
+                targets.append(uid)
+    if not targets:
+        return _ok({'ok': True, 'delivered': False, 'reason': 'no_targets',
+                    'hint': 'Добавь бота в канал ИЛИ заполни секрет MAX_OWNER_USER_ID'})
+    delivered = 0
+    last_resp: dict = {}
+    for tid in targets:
+        ok, d = send_max_message(tid, text)
+        last_resp = d
+        _log('out', 'staff_send', text, max_chat_id=tid,
+             payload=d, error='' if ok else json.dumps(d, ensure_ascii=False)[:300])
+        if ok:
+            delivered += 1
+    return _ok({'ok': delivered > 0, 'delivered': delivered, 'targets': targets,
+                'response': last_resp})
 
 
 def action_staff_status() -> dict:
