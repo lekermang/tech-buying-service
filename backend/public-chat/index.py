@@ -603,7 +603,30 @@ def action_staff_send(body, headers):
     cur.execute(
         f"UPDATE {SCHEMA}.pchat_rooms SET last_message_at=NOW(), last_message_text={_esc(snippet)} WHERE id={room_id}"
     )
+    # Если у клиента есть MAX-чат — дублируем ответ туда (мост LIVE → MAX)
+    max_chat_id = None
+    try:
+        cur.execute(
+            f"SELECT c.max_chat_id FROM {SCHEMA}.pchat_rooms r "
+            f"JOIN {SCHEMA}.pchat_clients c ON c.id = r.client_id "
+            f"WHERE r.id={room_id} AND c.max_chat_id IS NOT NULL LIMIT 1"
+        )
+        rr = cur.fetchone()
+        if rr and rr[0]:
+            max_chat_id = int(rr[0])
+    except Exception:
+        pass
     conn.commit(); cur.close(); conn.close()
+    if max_chat_id and text:
+        try:
+            max_bot_url = 'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c'
+            requests.post(
+                max_bot_url + '?action=send',
+                json={'max_chat_id': max_chat_id, 'text': text},
+                timeout=8,
+            )
+        except Exception as max_err:
+            print(f'[STAFF_SEND→MAX] error: {max_err}')
     return _ok({'ok': True, 'id': mid})
 
 

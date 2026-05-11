@@ -1,0 +1,39 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "GET info — без токена возвращает 200 (но bot может быть пустой)",
+      "method": "GET",
+      "path": "/?action=info",
+      "expectedStatus": 200
+    },
+    {
+      "name": "POST send без text → 400",
+      "method": "POST",
+      "path": "/?action=send",
+      "body": {},
+      "expectedStatus": 400,
+      "expectedBody": {"ok": false},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "POST webhook с пустым телом → 200",
+      "method": "POST",
+      "path": "/",
+      "body": {},
+      "expectedStatus": 200
+    },
+    {
+      "name": "POST setup_webhook без admin token → 401",
+      "method": "POST",
+      "path": "/?action=setup_webhook",
+      "body": {"url": "https://example.com/hook"},
+      "expectedStatus": 401
+    }
+  ]
+}

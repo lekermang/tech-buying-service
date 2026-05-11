@@ -1704,6 +1704,35 @@ def handler(event: dict, context) -> dict:
                 except Exception as zvonok_err:
                     print(f'[ZVONOK READY] error: {zvonok_err}')
 
+                # 💬 MAX-бот: если клиент когда-либо писал нашему MAX-боту — дублируем уведомление туда
+                try:
+                    digits_phone = ''.join(c for c in (client_phone or '') if c.isdigit())
+                    if len(digits_phone) == 11 and digits_phone.startswith('8'):
+                        digits_phone = '7' + digits_phone[1:]
+                    elif len(digits_phone) == 10:
+                        digits_phone = '7' + digits_phone
+                    cur_max = conn.cursor()
+                    cur_max.execute(
+                        f"SELECT max_chat_id FROM {SCHEMA}.pchat_clients "
+                        f"WHERE max_chat_id IS NOT NULL AND phone='{digits_phone}' LIMIT 1"
+                    )
+                    rr_max = cur_max.fetchone()
+                    cur_max.close()
+                    if rr_max and rr_max[0]:
+                        max_text = (
+                            f"✅ *Ремонт #{order_id} готов к выдаче*\n"
+                            f"📱 {dev}\n"
+                            + (f"💰 К оплате: {r_amount} ₽\n" if r_amount else "")
+                            + "📍 ул. Кирова, 7 · 10:00–21:00"
+                        )
+                        requests.post(
+                            'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c?action=send',
+                            json={'max_chat_id': int(rr_max[0]), 'text': max_text},
+                            timeout=8,
+                        )
+                except Exception as max_err:
+                    print(f'[MAX READY] error: {max_err}')
+
             # При статусе "pending_approval" — особое уведомление мастеру в Telegram
             # Клиенту НИЧЕГО не уходит (внутренний этап).
             if new_status == 'pending_approval':
