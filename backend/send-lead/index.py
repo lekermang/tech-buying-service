@@ -289,6 +289,25 @@ def handler(event: dict, context) -> dict:
         except Exception:
             pass
 
+    # 💬 MAX-бот: уведомить клиента о принятии заявки (если он писал нашему MAX-боту)
+    if lead_id:
+        try:
+            max_text = (
+                f"✅ *Заявка #{lead_id} принята!*\n"
+                + (f"📋 {category}\n" if category else "")
+                + (f"📝 {(desc or '')[:200]}\n" if desc else "")
+                + (f"💰 Ваша оценка: {client_price} ₽\n" if client_price else "")
+                + "\n📞 Менеджер позвонит в течение 15 минут.\n"
+                + "Срочные вопросы — пишите прямо сюда, в MAX."
+            )
+            requests.post(
+                'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c?action=send',
+                json={'phone': phone, 'text': max_text},
+                timeout=6,
+            )
+        except Exception as max_err:
+            print(f'[MAX LEAD] error: {max_err}')
+
     # Если заявка на золото — сохраняем в gold_orders
     if category == 'Золото':
         try:

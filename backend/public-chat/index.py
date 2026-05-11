@@ -734,16 +734,40 @@ def action_invite_create(body, headers):
     wa_url = f'https://wa.me/{digits}?text=' + requests.utils.quote(
         f"Здравствуйте! Это Скупка24. Ваш персональный чат с менеджером: {invite_url}"
     )
-    # MAX: если у компании есть публичная ссылка — отдаём её, иначе фолбек — диплинк по номеру.
-    max_url = max_invite_link if max_invite_link else f'max://u/+{digits}'
+    # 💬 MAX-бот: если клиент уже привязан к нашему MAX-боту — пишем ему туда напрямую.
+    # max_url для UI: либо канал компании, либо прямая ссылка на нашего бота.
+    max_sent = False
+    try:
+        rmax = requests.post(
+            'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c?action=send',
+            json={
+                'phone': digits,
+                'text': (
+                    f"💬 *Скупка24*: вас приглашают в персональный чат с менеджером.\n\n"
+                    f"Откройте: {invite_url}\n\n"
+                    f"_Или просто продолжайте писать здесь, в MAX — менеджер видит ваши сообщения._"
+                ),
+            },
+            timeout=6,
+        )
+        try:
+            max_sent = bool(rmax.json().get('delivered'))
+        except Exception:
+            max_sent = False
+    except Exception:
+        pass
+    max_bot_link = 'https://max.ru/id402810962699_bot'
+    max_url = max_invite_link or max_bot_link
     return _ok({
         'ok': True,
         'invite_token': token,
         'url': invite_url,
         'sms_sent': bool(sent), 'sms_info': sms_info,
         'tg_sent': tg_sent,
+        'max_sent': max_sent,
         'wa_url': wa_url,
         'max_url': max_url,
+        'max_bot_link': max_bot_link,
         'max_invite_link': max_invite_link,
     })
 

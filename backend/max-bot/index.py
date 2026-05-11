@@ -418,17 +418,49 @@ def action_webhook(body: dict) -> dict:
     return _ok({'ok': True, 'ignored': update_type})
 
 
+def _normalize_phone(phone: str) -> str:
+    """Нормализация телефона до 11 цифр, начинающихся с 7."""
+    digits = ''.join(c for c in (phone or '') if c.isdigit())
+    if len(digits) == 11 and digits.startswith('8'):
+        digits = '7' + digits[1:]
+    elif len(digits) == 10:
+        digits = '7' + digits
+    return digits
+
+
+def find_max_chat_by_phone(phone: str) -> int | None:
+    """Ищет max_chat_id по телефону клиента (если он привязал MAX к pchat_clients)."""
+    p = _normalize_phone(phone)
+    if len(p) != 11:
+        return None
+    try:
+        conn = _conn(); cur = conn.cursor()
+        cur.execute(
+            f"SELECT max_chat_id FROM {SCHEMA}.pchat_clients "
+            f"WHERE phone={_esc(p)} AND max_chat_id IS NOT NULL LIMIT 1"
+        )
+        r = cur.fetchone(); cur.close(); conn.close()
+        return int(r[0]) if r and r[0] else None
+    except Exception:
+        return None
+
+
 def action_send(body: dict) -> dict:
-    """Отправить сообщение в MAX. Параметры:
-    - max_chat_id (int) ИЛИ pchat_client_id (int) — кому
-    - text (str) — что отправить
-    Используется внутренними сервисами (public-chat при ответе сотрудника, repair-admin при статусе)."""
+    """Отправить сообщение в MAX. Кому (одно из):
+    - max_chat_id (int)
+    - pchat_client_id (int) — найдём max_chat_id в pchat_clients
+    - phone (str) — найдём клиента по нормализованному телефону
+    Параметры: text (str), reply_markup (dict, optional) — inline-кнопки MAX.
+    Возвращает {ok, response, delivered}. delivered=false если адресата нет в MAX-боте — не ошибка."""
     text = (body.get('text') or '').strip()
     if not text:
         return _err(400, 'text обязателен')
 
     max_chat_id = body.get('max_chat_id')
     pchat_client_id = body.get('pchat_client_id')
+    phone = (body.get('phone') or '').strip()
+    reply_markup = body.get('reply_markup')
+
     if not max_chat_id and pchat_client_id:
         try:
             conn = _conn(); cur = conn.cursor()
@@ -440,14 +472,18 @@ def action_send(body: dict) -> dict:
                 max_chat_id = int(r[0])
         except Exception:
             pass
-    if not max_chat_id:
-        return _err(400, 'Не найден MAX-чат для адресата')
+    if not max_chat_id and phone:
+        max_chat_id = find_max_chat_by_phone(phone)
 
-    ok, d = send_max_message(int(max_chat_id), text)
+    if not max_chat_id:
+        # Не ошибка — просто клиент не в MAX-боте
+        return _ok({'ok': True, 'delivered': False, 'reason': 'no_max_chat_for_recipient'})
+
+    ok, d = send_max_message(int(max_chat_id), text, reply_markup=reply_markup)
     _log('out', 'send', text, max_chat_id=int(max_chat_id),
          pchat_client_id=int(pchat_client_id) if pchat_client_id else None,
          payload=d, error='' if ok else json.dumps(d, ensure_ascii=False)[:300])
-    return _ok({'ok': ok, 'response': d})
+    return _ok({'ok': ok, 'delivered': ok, 'response': d})
 
 
 def action_setup_webhook(body: dict, headers: dict) -> dict:

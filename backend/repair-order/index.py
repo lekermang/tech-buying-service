@@ -1131,6 +1131,25 @@ def handler(event: dict, context) -> dict:
     except Exception as e:
         print(f'[SMS][repair] exception: {e}')
 
+    # 💬 MAX-бот: подтверждение заявки на ремонт клиенту (если он привязан к MAX-боту)
+    try:
+        max_text_repair = (
+            f"✅ *Заявка на ремонт #{order_id} принята!*\n\n"
+            f"👤 {name}\n"
+            f"📱 {model or '—'}\n"
+            + (f"🛠 {repair_type}\n" if repair_type else "")
+            + (f"💰 Ориентир: {price_str}\n" if price_str else "")
+            + "\n📞 Менеджер свяжется с вами в течение 15 минут.\n"
+            + f"Проверить статус — отправьте *#{order_id}* сюда же."
+        )
+        requests.post(
+            'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c?action=send',
+            json={'phone': phone, 'text': max_text_repair},
+            timeout=6,
+        )
+    except Exception as max_err:
+        print(f'[MAX][repair-new] error: {max_err}')
+
     # ── УВЕДОМЛЕНИЯ (не влияют на сохранение заявки) ─────────────────────────
     if token:
         try:

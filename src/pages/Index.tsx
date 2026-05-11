@@ -11,6 +11,7 @@ import JobsSection from "@/components/skupka/JobsSection";
 import HolidayBanner from "@/components/holidays/HolidayBanner";
 import HolidayCornerDecor from "@/components/holidays/HolidayCornerDecor";
 import PremiumServicesGrid from "@/components/skupka/PremiumServicesGrid";
+import MaxChannelBanner from "@/components/skupka/MaxChannelBanner";
 import ChatBubble from "@/components/skupka/ChatBubble";
 
 const scrollTo = (href: string) => {
@@ -384,6 +385,7 @@ const Index = ({ goldOpen = false }: { goldOpen?: boolean }) => {
       <PremiumServicesGrid />
       <InfoSections />
       <JobsSection />
+      <MaxChannelBanner />
       <ContactsFooter scrollTo={scrollTo} />
       <ExitPopup onOpenEval={() => setEvalOpen(true)} />
       <CookieBanner />

@@ -1674,6 +1674,34 @@ def handler(event: dict, context) -> dict:
             main_chat_id = os.environ['TELEGRAM_CHAT_ID']
             send_tg_all(token, main_chat_id, conn, tg_msg)
 
+            # 💬 MAX-бот: уведомить клиента о смене статуса (на ВСЕ ключевые статусы)
+            # Отправляется, только если клиент когда-либо писал нашему MAX-боту.
+            try:
+                max_status_msg = {
+                    'new': f"📥 *Заявка #{order_id} принята*\n📱 {device_model or 'устройство'}\nПередаём мастеру для оценки.",
+                    'pending_approval': f"🔍 *Ремонт #{order_id}* — на согласовании\n📱 {device_model or 'устройство'}\nМастер оценивает сложность. Скоро вернёмся со сроками.",
+                    'accepted': f"👨‍🔧 *Ремонт #{order_id}* — мастер взял в работу\n📱 {device_model or 'устройство'}",
+                    'in_progress': f"🔧 *Ремонт #{order_id} в работе*\n📱 {device_model or 'устройство'}",
+                    'waiting_parts': f"📦 *Ремонт #{order_id}* — ждём запчасть\n📱 {device_model or 'устройство'}\nКак придёт — продолжим работу. Сообщим о готовности.",
+                    'ready': (
+                        f"✅ *Ремонт #{order_id} готов к выдаче!*\n"
+                        f"📱 {device_model or 'устройство'}\n"
+                        + (f"💰 К оплате: {r_amount} ₽\n" if r_amount else "")
+                        + "📍 ул. Кирова, 7 · 10:00–21:00"
+                    ),
+                    'done': f"📤 *Ремонт #{order_id} выдан клиенту*\n📱 {device_model or 'устройство'}\nГарантия 90 дней. Спасибо, что выбрали Скупка24!",
+                    'warranty': f"🛡 *Ремонт #{order_id}* — принят на гарантийное обслуживание\n📱 {device_model or 'устройство'}",
+                    'cancelled': f"❌ *Ремонт #{order_id}* — отменён\n📱 {device_model or 'устройство'}\nЕсли это ошибка — напишите менеджеру здесь.",
+                }.get(new_status)
+                if max_status_msg and client_phone:
+                    requests.post(
+                        'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c?action=send',
+                        json={'phone': client_phone, 'text': max_status_msg},
+                        timeout=6,
+                    )
+            except Exception as max_err:
+                print(f'[MAX STATUS] error: {max_err}')
+
             # SMS клиенту ТОЛЬКО при статусе "ready" (Готов).
             # Сумма не обязательна: если её нет — отправляем шаблон без цены.
             # Шаблоны можно переопределить через таблицу settings (ключи sms_tpl_ready / sms_tpl_ready_no_price).
@@ -1704,34 +1732,7 @@ def handler(event: dict, context) -> dict:
                 except Exception as zvonok_err:
                     print(f'[ZVONOK READY] error: {zvonok_err}')
 
-                # 💬 MAX-бот: если клиент когда-либо писал нашему MAX-боту — дублируем уведомление туда
-                try:
-                    digits_phone = ''.join(c for c in (client_phone or '') if c.isdigit())
-                    if len(digits_phone) == 11 and digits_phone.startswith('8'):
-                        digits_phone = '7' + digits_phone[1:]
-                    elif len(digits_phone) == 10:
-                        digits_phone = '7' + digits_phone
-                    cur_max = conn.cursor()
-                    cur_max.execute(
-                        f"SELECT max_chat_id FROM {SCHEMA}.pchat_clients "
-                        f"WHERE max_chat_id IS NOT NULL AND phone='{digits_phone}' LIMIT 1"
-                    )
-                    rr_max = cur_max.fetchone()
-                    cur_max.close()
-                    if rr_max and rr_max[0]:
-                        max_text = (
-                            f"✅ *Ремонт #{order_id} готов к выдаче*\n"
-                            f"📱 {dev}\n"
-                            + (f"💰 К оплате: {r_amount} ₽\n" if r_amount else "")
-                            + "📍 ул. Кирова, 7 · 10:00–21:00"
-                        )
-                        requests.post(
-                            'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c?action=send',
-                            json={'max_chat_id': int(rr_max[0]), 'text': max_text},
-                            timeout=8,
-                        )
-                except Exception as max_err:
-                    print(f'[MAX READY] error: {max_err}')
+
 
             # При статусе "pending_approval" — особое уведомление мастеру в Telegram
             # Клиенту НИЧЕГО не уходит (внутренний этап).

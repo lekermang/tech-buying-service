@@ -34,6 +34,16 @@ export default function StaffLiveChatTab({ token }: Props) {
   const [invName, setInvName] = useState("");
   const [invBusy, setInvBusy] = useState(false);
   const [invDone, setInvDone] = useState<string | null>(null);
+  const [invResult, setInvResult] = useState<{
+    url: string;
+    wa_url?: string;
+    max_url?: string;
+    max_bot_link?: string;
+    sms_sent?: boolean;
+    tg_sent?: boolean;
+    max_sent?: boolean;
+  } | null>(null);
+  const [copied, setCopied] = useState<string>("");
 
   const listRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -135,8 +145,25 @@ export default function StaffLiveChatTab({ token }: Props) {
     setInvBusy(false);
     if (r.ok) {
       setInvDone(r.url as string);
-      setInvName(""); setInvPhone("+7");
-      setTimeout(() => setInvDone(null), 5000);
+      setInvResult({
+        url: r.url as string,
+        wa_url: r.wa_url as string | undefined,
+        max_url: r.max_url as string | undefined,
+        max_bot_link: r.max_bot_link as string | undefined,
+        sms_sent: r.sms_sent as boolean | undefined,
+        tg_sent: r.tg_sent as boolean | undefined,
+        max_sent: r.max_sent as boolean | undefined,
+      });
+    }
+  };
+
+  const copyToClipboard = async (text: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(label);
+      setTimeout(() => setCopied(""), 1500);
+    } catch {
+      // ignore
     }
   };
 
@@ -318,7 +345,8 @@ export default function StaffLiveChatTab({ token }: Props) {
               <button onClick={() => setInviteOpen(false)} className="text-white/55 hover:text-white"><Icon name="X" size={18} /></button>
             </div>
             <div className="text-xs text-white/55 mb-3">
-              Клиент получит SMS со ссылкой на персональный чат — войдёт без регистрации.
+              Клиент получит ссылку на персональный чат — войдёт без регистрации.
+              Доставка: SMS, Telegram, MAX (если клиент в боте) — куда удастся.
             </div>
             <label className="text-[10px] uppercase tracking-wider text-white/40 font-bold block mb-1">Имя</label>
             <input value={invName} onChange={e => setInvName(e.target.value)} placeholder="Иван" className="w-full bg-[#0A0A0A] border border-[#1F1F1F] focus:border-[#FFD700]/40 text-white text-sm px-3 py-2 rounded-lg outline-none mb-2" />
@@ -329,10 +357,42 @@ export default function StaffLiveChatTab({ token }: Props) {
               placeholder="+7 (___) ___-__-__"
               className="w-full bg-[#0A0A0A] border border-[#1F1F1F] focus:border-[#FFD700]/40 text-white text-sm px-3 py-2 rounded-lg outline-none mb-3"
             />
-            {invDone && (
-              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-2 mb-2 text-[11px] text-emerald-300">
-                ✅ Приглашение отправлено по SMS
-                <div className="text-emerald-200/70 mt-1 break-all">{invDone}</div>
+            {invDone && invResult && (
+              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3 mb-3 text-[11px] text-emerald-300 space-y-2">
+                <div className="font-bold text-emerald-200">✅ Приглашение создано</div>
+                <div className="flex flex-wrap gap-1 text-[10px]">
+                  {invResult.sms_sent && <span className="bg-emerald-500/20 px-2 py-0.5 rounded">SMS отправлен</span>}
+                  {invResult.tg_sent && <span className="bg-[#229ED9]/20 text-[#229ED9] px-2 py-0.5 rounded">Telegram</span>}
+                  {invResult.max_sent && <span className="bg-[#0077FF]/20 text-[#0077FF] px-2 py-0.5 rounded">MAX</span>}
+                </div>
+                <div className="pt-2 border-t border-emerald-500/20 space-y-1">
+                  <button
+                    onClick={() => copyToClipboard(invResult.url, "url")}
+                    className="w-full flex items-center justify-between gap-2 bg-[#0A0A0A] hover:bg-[#151515] px-2 py-1.5 rounded text-left"
+                  >
+                    <span className="text-white/80 text-[10px] truncate flex-1">{invResult.url}</span>
+                    <Icon name={copied === "url" ? "Check" : "Copy"} size={12} className="text-[#FFD700] shrink-0" />
+                  </button>
+                  {invResult.wa_url && (
+                    <a
+                      href={invResult.wa_url}
+                      target="_blank" rel="noopener noreferrer"
+                      className="w-full flex items-center justify-center gap-2 bg-[#25D366]/15 hover:bg-[#25D366]/25 border border-[#25D366]/40 text-[#25D366] text-xs py-1.5 rounded transition"
+                    >
+                      <Icon name="MessageCircle" size={12} /> Открыть WhatsApp
+                    </a>
+                  )}
+                  {invResult.max_bot_link && (
+                    <a
+                      href={invResult.max_bot_link}
+                      target="_blank" rel="noopener noreferrer"
+                      className="w-full flex items-center justify-center gap-2 bg-[#0077FF]/15 hover:bg-[#0077FF]/25 border border-[#0077FF]/40 text-[#0077FF] text-xs py-1.5 rounded transition"
+                    >
+                      <span className="inline-flex items-center justify-center w-4 h-4 rounded-sm bg-[#0077FF] text-white text-[8px] font-extrabold">MAX</span>
+                      Открыть бота в MAX
+                    </a>
+                  )}
+                </div>
               </div>
             )}
             <button
@@ -340,8 +400,16 @@ export default function StaffLiveChatTab({ token }: Props) {
               disabled={invBusy || !isPhoneValid(invPhone)}
               className="w-full bg-[#FFD700] hover:bg-[#FFE34D] text-black font-bold py-2.5 rounded-lg disabled:opacity-50 active:scale-95 transition"
             >
-              {invBusy ? "Отправляем..." : "Отправить приглашение"}
+              {invBusy ? "Отправляем..." : invDone ? "Отправить ещё одно" : "Отправить приглашение"}
             </button>
+            {invDone && (
+              <button
+                onClick={() => { setInvDone(null); setInvResult(null); setInvName(""); setInvPhone("+7"); }}
+                className="w-full mt-2 text-xs text-white/40 hover:text-white/70 transition py-1"
+              >
+                Сбросить форму
+              </button>
+            )}
           </div>
         </div>
       )}
