@@ -119,8 +119,8 @@ def max_call(method: str, params: dict | None = None, payload: dict | None = Non
 
 
 def send_max_message(chat_id: int, text: str, reply_markup: dict | None = None) -> tuple[bool, dict]:
-    """Отправляет текст в чат с пользователем MAX. chat_id — то, что пришло в webhook."""
-    payload = {'text': text}
+    """Отправляет текст в чат с пользователем MAX. chat_id — recipient.chat_id из webhook."""
+    payload = {'text': text, 'format': 'markdown'}
     if reply_markup:
         payload['attachments'] = [{'type': 'inline_keyboard', 'payload': reply_markup}]
     ok, d = max_call('messages', params={'chat_id': int(chat_id)}, payload=payload)
@@ -617,9 +617,16 @@ def handle_message(msg: dict) -> dict:
     """Главный обработчик одного сообщения от MAX-пользователя."""
     sender = msg.get('sender') or msg.get('from') or {}
     chat = msg.get('chat') or {}
+    # MAX присылает реальный chat_id в recipient.chat_id (НЕ в sender.user_id!)
+    recipient = msg.get('recipient') or {}
     max_user_id = int(sender.get('user_id') or sender.get('id') or 0)
-    max_chat_id = int(chat.get('chat_id') or chat.get('id') or msg.get('chat_id') or max_user_id)
-    chat_type = (chat.get('type') or chat.get('chat_type') or '').lower()
+    max_chat_id = int(
+        recipient.get('chat_id')  # ⬅ главный источник
+        or chat.get('chat_id') or chat.get('id')
+        or msg.get('chat_id')
+        or max_user_id
+    )
+    chat_type = (recipient.get('chat_type') or chat.get('type') or chat.get('chat_type') or '').lower()
     name = (sender.get('name') or sender.get('first_name') or '').strip() or 'MAX-клиент'
     username = (sender.get('username') or '').strip()
 
@@ -698,8 +705,14 @@ def handle_callback(cb: dict) -> dict:
     """Нажатие inline-кнопки (тип callback)."""
     sender = cb.get('user') or cb.get('sender') or cb.get('from') or {}
     max_user_id = int(sender.get('user_id') or sender.get('id') or 0)
-    chat = cb.get('message', {}).get('recipient') or cb.get('message', {}).get('chat') or cb.get('chat') or {}
-    max_chat_id = int(chat.get('chat_id') or chat.get('id') or max_user_id)
+    msg_obj = cb.get('message') or {}
+    recipient = msg_obj.get('recipient') or cb.get('recipient') or {}
+    chat = msg_obj.get('chat') or cb.get('chat') or {}
+    max_chat_id = int(
+        recipient.get('chat_id')
+        or chat.get('chat_id') or chat.get('id')
+        or max_user_id
+    )
     payload = cb.get('payload') or cb.get('data') or cb.get('callback_data') or ''
 
     if not max_user_id or not max_chat_id:
@@ -1017,6 +1030,38 @@ def handler(event: dict, context) -> dict:
 
     if method == 'GET' and action == 'staff_status':
         return action_staff_status()
+
+    # Диагностика: GET ?action=test_owner — отправить владельцу простой тест
+    if action == 'test_owner':
+        owners_raw = (os.environ.get('MAX_OWNER_USER_ID') or '').strip()
+        results = []
+        for piece in owners_raw.replace(' ', '').split(','):
+            if piece.isdigit():
+                uid = int(piece)
+                ok, d = send_max_message(uid, 'Тест от Скупка24. Если видишь это сообщение - связь работает!')
+                results.append({'uid': uid, 'ok': ok, 'resp': d})
+        return _ok({'ok': True, 'env_value': owners_raw, 'results': results})
+
+    # Диагностика: GET ?action=test_send&uid=28799083 — послать на конкретный uid
+    if action == 'test_send':
+        uid_str = (qp.get('uid') or '').strip()
+        if not uid_str.isdigit():
+            return _err(400, 'uid query param required')
+        ok1, d1 = send_max_message(int(uid_str), 'TEST1: простой текст без markdown без кнопок')
+        ok2, d2 = max_call('messages', params={'chat_id': int(uid_str)}, payload={
+            'text': 'TEST2: текст + markdown *жирный* _курсив_',
+            'format': 'markdown'
+        })
+        ok3, d3 = max_call('messages', params={'chat_id': int(uid_str)}, payload={
+            'text': 'TEST3: с кнопками',
+            'attachments': [{'type': 'inline_keyboard', 'payload': {'buttons': [
+                [{'type': 'callback', 'text': 'Кнопка 1', 'payload': 'test:1'}],
+            ]}}]
+        })
+        return _ok({'uid': int(uid_str),
+                    'test1_plain': {'ok': ok1, 'resp': d1},
+                    'test2_markdown': {'ok': ok2, 'resp': d2},
+                    'test3_buttons': {'ok': ok3, 'resp': d3}})
 
     # Обновить webhook на расширенный список update_types
     if action == 'resubscribe':
