@@ -7,6 +7,22 @@
       "body": {},
       "expectedStatus": 400,
       "bodyMatcher": "partial"
+    },
+    {
+      "name": "notify_max without token returns 401",
+      "method": "POST",
+      "path": "/?action=notify_max",
+      "body": {"order_id": 999999, "status_key": "ready"},
+      "expectedStatus": 401,
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "notify_all without token returns 401",
+      "method": "POST",
+      "path": "/?action=notify_all",
+      "body": {"order_id": 999999, "status_key": "ready"},
+      "expectedStatus": 401,
+      "bodyMatcher": "partial"
     }
   ]
 }

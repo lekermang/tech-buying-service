@@ -1051,6 +1051,100 @@ def action_subscriptions() -> dict:
     return _ok({'ok': ok, 'subscriptions': d})
 
 
+def _check_admin(headers: dict, qp: dict, body: dict) -> bool:
+    """Проверка X-Admin-Token (заголовок / query / body)."""
+    expected = os.environ.get('ADMIN_TOKEN', '')
+    if not expected:
+        return False
+    got = (
+        headers.get('X-Admin-Token')
+        or headers.get('x-admin-token')
+        or (qp.get('admin') if isinstance(qp, dict) else '')
+        or (body.get('admin') if isinstance(body, dict) else '')
+        or ''
+    )
+    return got == expected
+
+
+def action_broadcast(body: dict, headers: dict, qp: dict) -> dict:
+    """Массовая рассылка всем подписчикам MAX-бота.
+    Body: {text: str, dry_run?: bool}. Требует X-Admin-Token."""
+    if not _check_admin(headers, qp, body):
+        return _err(401, 'admin token required')
+    text = (body.get('text') or '').strip()
+    if not text:
+        return _err(400, 'text обязателен')
+    dry_run = bool(body.get('dry_run'))
+    try:
+        conn = _conn(); cur = conn.cursor()
+        cur.execute(
+            f"SELECT max_chat_id, display_name FROM {SCHEMA}.pchat_clients "
+            f"WHERE max_chat_id IS NOT NULL"
+        )
+        rows = cur.fetchall(); cur.close(); conn.close()
+    except Exception as e:
+        return _err(500, f'db error: {e}')
+    total = len(rows)
+    if dry_run:
+        return _ok({'ok': True, 'dry_run': True, 'total': total})
+    import time
+    sent = 0; failed = 0
+    for chat_id, _name in rows:
+        try:
+            ok, d = send_max_message(int(chat_id), text)
+            if ok:
+                sent += 1
+            else:
+                failed += 1
+                _log('out', 'broadcast', text, max_chat_id=int(chat_id),
+                     payload=d, error=json.dumps(d, ensure_ascii=False)[:300])
+        except Exception as e:
+            failed += 1
+            _log('out', 'broadcast', text, max_chat_id=int(chat_id), error=str(e)[:300])
+        time.sleep(0.1)
+    return _ok({'ok': True, 'sent': sent, 'failed': failed, 'total': total})
+
+
+def action_list_clients(headers: dict, qp: dict) -> dict:
+    """GET список подписчиков MAX-бота для админки. Требует X-Admin-Token.
+    Возвращает до 200 клиентов, отсортированных по last_seen_at DESC."""
+    if not _check_admin(headers, qp, {}):
+        return _err(401, 'admin token required')
+    try:
+        conn = _conn(); cur = conn.cursor()
+        # LEFT JOIN на leads_tracking — есть ли заявка по этому телефону
+        cur.execute(
+            f"SELECT c.id, c.max_user_id, c.display_name, c.max_username, c.phone, "
+            f"c.last_seen_at, "
+            f"EXISTS(SELECT 1 FROM {SCHEMA}.leads_tracking lt "
+            f"  WHERE REGEXP_REPLACE(lt.client_phone, '[^0-9]', '', 'g') = "
+            f"        REGEXP_REPLACE(c.phone, '[^0-9]', '', 'g') "
+            f"  AND c.phone IS NOT NULL AND c.phone NOT LIKE 'max:%') AS has_lead "
+            f"FROM {SCHEMA}.pchat_clients c "
+            f"WHERE c.max_chat_id IS NOT NULL "
+            f"ORDER BY c.last_seen_at DESC NULLS LAST "
+            f"LIMIT 200"
+        )
+        rows = cur.fetchall(); cur.close(); conn.close()
+    except Exception as e:
+        return _err(500, f'db error: {e}')
+    items = []
+    for r in rows:
+        cid, max_user_id, display_name, max_username, phone, last_seen_at, has_lead = r
+        # Скрываем «синтетические» phone вида 'max:<id>' — для UI это пусто
+        phone_clean = phone if (phone and not str(phone).startswith('max:')) else ''
+        items.append({
+            'id': int(cid),
+            'max_user_id': int(max_user_id) if max_user_id else None,
+            'display_name': display_name or '',
+            'max_username': max_username or '',
+            'phone': phone_clean,
+            'last_seen_at': last_seen_at.isoformat() if last_seen_at else None,
+            'has_lead': bool(has_lead),
+        })
+    return _ok({'ok': True, 'clients': items, 'count': len(items)})
+
+
 def action_auto_setup_webhook(qp: dict) -> dict:
     """Разовая регистрация webhook. Защита: admin-токен в query ?admin=<TOKEN>.
     Использование: GET /?action=auto_setup_webhook&admin=<TOKEN>&url=<WEBHOOK_URL>"""
@@ -1197,6 +1291,21 @@ def handler(event: dict, context) -> dict:
 
     if method == 'POST' and action == 'setup_webhook':
         return action_setup_webhook(body, headers)
+
+    # Массовая рассылка всем подписчикам MAX-бота (требует admin token)
+    if method == 'POST' and action == 'broadcast':
+        # headers здесь уже lower-cased в начале handler — пробросим оба ключа
+        # для совместимости
+        hdrs_for_check = {**headers}
+        # original-case дублируем, т.к. _check_admin ищет 'X-Admin-Token' и 'x-admin-token'
+        hdrs_for_check['X-Admin-Token'] = headers.get('x-admin-token', '')
+        return action_broadcast(body, hdrs_for_check, qp)
+
+    # Список подписчиков MAX-бота для админки (требует admin token)
+    if method == 'GET' and action == 'list_clients':
+        hdrs_for_check = {**headers}
+        hdrs_for_check['X-Admin-Token'] = headers.get('x-admin-token', '')
+        return action_list_clients(hdrs_for_check, qp)
 
     # Дефолт: всё остальное — это webhook от MAX
     if method == 'POST':

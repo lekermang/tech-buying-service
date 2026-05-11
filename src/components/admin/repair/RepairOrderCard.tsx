@@ -44,6 +44,8 @@ export default function RepairOrderCard({
   const [showDeletePrompt, setShowDeletePrompt] = useState(false);
   const [deletePass, setDeletePass] = useState("");
   const [deleteError, setDeleteError] = useState(false);
+  const [maxSending, setMaxSending] = useState<string | null>(null);
+  const [maxToast, setMaxToast] = useState<{ ok: boolean; text: string } | null>(null);
 
   const handleSendAct = async () => {
     setActSending(true);
@@ -75,6 +77,38 @@ export default function RepairOrderCard({
     }
     setTimeout(() => setSentKey(null), 3000);
   };
+
+  const callNotify = async (action: "notify_max" | "notify_all", statusKey: string) => {
+    setMaxSending(action);
+    setMaxToast(null);
+    try {
+      const res = await fetch(`${REPAIR_ORDER_URL}?action=${action}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", [authHeader]: token },
+        body: JSON.stringify({ order_id: o.id, status_key: statusKey }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        if (action === "notify_max") {
+          setMaxToast({ ok: true, text: "Отправлено в MAX" });
+        } else {
+          const channel = data.channel === "max" ? "MAX" : data.channel === "sms" ? "SMS" : (data.channel || "?");
+          setMaxToast({ ok: true, text: `Отправлено через ${channel}: ${data.sent_to || ""}` });
+        }
+      } else if (res.status === 404 && /MAX-боту|не привязан|не писал/i.test(String(data.error || ""))) {
+        setMaxToast({ ok: false, text: "Клиент не писал нашему MAX-боту. Попросите написать /start в MAX." });
+      } else {
+        setMaxToast({ ok: false, text: data.error || "Ошибка отправки" });
+      }
+    } catch {
+      setMaxToast({ ok: false, text: "Ошибка соединения" });
+    }
+    setMaxSending(null);
+    setTimeout(() => setMaxToast(null), 5000);
+  };
+
+  const currentStatusKey = o.status;
+  const canNotify = ["in_progress", "waiting_parts", "ready", "done", "cancelled"].includes(currentStatusKey);
 
   return (
     <div className={`bg-[#1A1A1A] border transition-colors ${isExpanded ? "border-[#FFD700]/40" : "border-[#2A2A2A]"}`}>
@@ -230,6 +264,56 @@ export default function RepairOrderCard({
             {notifyError && (
               <div className="mt-1.5 font-roboto text-[9px] text-orange-400 flex items-center gap-1">
                 <Icon name="AlertCircle" size={9} /> {notifyError}
+              </div>
+            )}
+          </div>
+
+          {/* MAX мессенджер — статус клиенту по текущему статусу заявки */}
+          <div className="border border-[#2787F5]/20 bg-[#2787F5]/5 p-2.5">
+            <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+              <div className="font-roboto text-white/30 text-[9px] uppercase tracking-wide flex items-center gap-1">
+                <Icon name="MessageCircle" size={9} className="text-[#2787F5]" />
+                Статус клиенту в MAX (по текущему: <span className="text-white/60 normal-case">{STATUS_LABEL[currentStatusKey] || currentStatusKey}</span>)
+              </div>
+            </div>
+            <div className="flex gap-1.5 flex-wrap">
+              <button
+                type="button"
+                onClick={() => canNotify && callNotify("notify_max", currentStatusKey)}
+                disabled={!canNotify || maxSending !== null}
+                title={canNotify ? "Отправить уведомление о текущем статусе в MAX" : "Этот статус нельзя отправлять клиенту"}
+                className={`font-roboto text-[10px] px-2.5 py-1.5 border transition-colors flex items-center gap-1 ${
+                  !canNotify
+                    ? "border-white/10 text-white/20 cursor-not-allowed"
+                    : maxSending === "notify_max"
+                      ? "border-[#2787F5]/40 text-[#2787F5] bg-[#2787F5]/10"
+                      : "border-[#2787F5]/30 text-[#2787F5] hover:bg-[#2787F5]/10"
+                }`}
+              >
+                <Icon name={maxSending === "notify_max" ? "Loader2" : "MessageCircle"} size={10} className={maxSending === "notify_max" ? "animate-spin" : ""} />
+                Уведомить в MAX
+              </button>
+              <button
+                type="button"
+                onClick={() => canNotify && callNotify("notify_all", currentStatusKey)}
+                disabled={!canNotify || maxSending !== null}
+                title="Сначала пробуем MAX, если клиент не привязан — отправляем SMS"
+                className={`font-roboto text-[10px] px-2.5 py-1.5 border transition-colors flex items-center gap-1 ${
+                  !canNotify
+                    ? "border-white/10 text-white/20 cursor-not-allowed"
+                    : maxSending === "notify_all"
+                      ? "border-[#FFD700]/40 text-[#FFD700] bg-[#FFD700]/10"
+                      : "border-[#FFD700]/30 text-[#FFD700] hover:bg-[#FFD700]/10"
+                }`}
+              >
+                <Icon name={maxSending === "notify_all" ? "Loader2" : "Zap"} size={10} className={maxSending === "notify_all" ? "animate-spin" : ""} />
+                MAX → SMS (рекомендовано)
+              </button>
+            </div>
+            {maxToast && (
+              <div className={`mt-1.5 font-roboto text-[9px] flex items-center gap-1 ${maxToast.ok ? "text-green-400/80" : "text-orange-400"}`}>
+                <Icon name={maxToast.ok ? "CheckCircle" : "AlertCircle"} size={9} />
+                {maxToast.text}
               </div>
             )}
           </div>

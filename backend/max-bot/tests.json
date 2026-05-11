@@ -34,6 +34,19 @@
       "path": "/?action=setup_webhook",
       "body": {"url": "https://example.com/hook"},
       "expectedStatus": 401
+    },
+    {
+      "name": "POST broadcast без admin token → 401",
+      "method": "POST",
+      "path": "/?action=broadcast",
+      "body": {"text": "test"},
+      "expectedStatus": 401
+    },
+    {
+      "name": "GET list_clients без admin token → 401",
+      "method": "GET",
+      "path": "/?action=list_clients",
+      "expectedStatus": 401
     }
   ]
 }

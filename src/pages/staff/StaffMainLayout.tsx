@@ -13,14 +13,13 @@ import { PROTECTED_TABS, ROLE_BADGE, ROLE_LABEL, getInitials, type StaffTab } fr
 import { FontApplier, MskClock, ThemeBanner, TabErrorBoundary } from "./StaffPwa";
 import {
   GoodsTab, StaffRepairTab, GoldTab, SalesTab, ClientsTab, AnalyticsTab,
-  EmployeesTab, VipChatTab, LiveChatTab, SmartLombardTab, AvitoProTab, prefetchTab,
+  EmployeesTab, VipChatTab, SmartLombardTab, AvitoProTab, prefetchTab,
 } from "./StaffLazy";
 import MyProfileModal from "./MyProfileModal";
 import StaffSectionBanner from "./StaffSectionBanner";
 import { SLTooltip } from "../slShop/slUI";
 import LeadsAlertWatcher from "./LeadsAlertWatcher";
 import ChatAlertWatcher from "./ChatAlertWatcher";
-import LiveChatWatcher from "./LiveChatWatcher";
 
 type Tab = StaffTab;
 
@@ -62,21 +61,6 @@ export function StaffMainLayout({
   const [profileOpen, setProfileOpen] = React.useState(false);
   const [myAvatar, setMyAvatar] = React.useState<string | null>(null);
   const [myName, setMyName] = React.useState<string | null>(null);
-  const [liveUnread, setLiveUnread] = React.useState<number>(0);
-  // Опрос непрочитанных в публичном чате
-  React.useEffect(() => {
-    if (!token) return;
-    const url = "https://functions.poehali.dev/db114166-21ce-4b87-9d05-59286ee73d6e?action=staff_unread";
-    const tick = () => {
-      if (typeof document !== "undefined" && document.hidden) return;
-      fetch(url, { headers: { "X-Employee-Token": token } })
-        .then(r => r.json()).then(d => { if (typeof d.unread === "number") setLiveUnread(d.unread); })
-        .catch(() => {});
-    };
-    tick();
-    const id = setInterval(tick, 30000);
-    return () => clearInterval(id);
-  }, [token]);
   // Мобильный режим: на узких экранах отключаем тяжёлые эффекты и компактим UI
   const [isMobile, setIsMobile] = React.useState<boolean>(() =>
     typeof window !== "undefined" && window.matchMedia("(max-width: 480px)").matches
@@ -118,7 +102,6 @@ export function StaffMainLayout({
   const TABS: { k: Tab; l: string; icon: string; badge?: number; tip?: string }[] = [
     { k: "repair",       l: "Ремонт",       icon: "Wrench",        tip: "Заявки на ремонт техники: новые, в работе, готовые. Поиск, фото, статусы." },
     { k: "chat",         l: "Чат",          icon: "MessageCircle", tip: "Внутренний чат сотрудников и общение с VIP-клиентами.", badge: chatUnread },
-    { k: "live",         l: "Live",         icon: "Radio",         tip: "Публичный чат с клиентами: общий канал + личные диалоги.", badge: liveUnread },
     { k: "clients",      l: "Клиенты",      icon: "Users",         tip: "База клиентов, скидки, СМС-рассылки." },
     { k: "analytics",    l: "Статистика",   icon: "BarChart2",     tip: "Аналитика по продажам, ремонтам и сотрудникам." },
     { k: "smartlombard", l: "СмартЛомбард", icon: "Coins",         tip: "Скупка и продажа Б/У техники, касса, договоры на 14 дней." },
@@ -295,7 +278,6 @@ export function StaffMainLayout({
             {tab === "smartlombard" && <SmartLombardTab token={token} myRole={empRole} />}
             {tab === "avitopro"  && <AvitoProTab token={token} />}
             {tab === "chat"      && <VipChatTab token={token} onUnread={setChatUnread} />}
-            {tab === "live"      && <LiveChatTab token={token} />}
           </React.Suspense>
         </TabErrorBoundary>
       </div>
@@ -372,9 +354,6 @@ export function StaffMainLayout({
 
       {/* Watcher VIP-чата: всплывающие toast'ы при новых сообщениях когда чат закрыт */}
       <ChatAlertWatcher token={token} isChatOpen={tab === "chat"} onOpenChat={() => setTab("chat")} />
-
-      {/* Watcher публичного чата клиентов */}
-      <LiveChatWatcher token={token} isLiveOpen={tab === "live"} onOpenLive={() => setTab("live")} />
 
       {/* Модалка пароля для сотрудников */}
       {pwModal && (

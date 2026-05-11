@@ -897,6 +897,153 @@ def handler(event: dict, context) -> dict:
         else:
             return {'statusCode': 500, 'headers': HEADERS, 'body': json.dumps({'error': d.get('status_text', 'Ошибка SMS')}, ensure_ascii=False)}
 
+    # ── MAX клиенту о статусе ────────────────────────────────────────────────
+    # Отправляет уведомление о статусе ремонта в мессенджер MAX, если клиент
+    # привязан (когда-то писал нашему MAX-боту /start). Использует max-bot
+    # endpoint /?action=send (он сам ищет max_chat_id по телефону клиента).
+    if action == 'notify_max':
+        if not auth_staff(event):
+            return {'statusCode': 401, 'headers': HEADERS,
+                    'body': json.dumps({'error': 'Unauthorized'}, ensure_ascii=False)}
+        order_id = int(body.get('order_id', 0))
+        status_key = str(body.get('status_key', '')).strip()
+        if not order_id or status_key not in STATUS_MSG:
+            return {'statusCode': 400, 'headers': HEADERS,
+                    'body': json.dumps({'error': 'order_id и status_key обязательны'}, ensure_ascii=False)}
+        conn = psycopg2.connect(os.environ['DATABASE_URL'])
+        cur = conn.cursor()
+        cur.execute(f"SELECT id, name, phone, repair_type, repair_amount FROM {SCHEMA}.repair_orders WHERE id = {order_id}")
+        row = cur.fetchone()
+        cur.close(); conn.close()
+        if not row:
+            return {'statusCode': 404, 'headers': HEADERS,
+                    'body': json.dumps({'error': 'Заявка не найдена'}, ensure_ascii=False)}
+        _, name, phone, repair_type, repair_amount = row
+        if not phone:
+            return {'statusCode': 400, 'headers': HEADERS,
+                    'body': json.dumps({'error': 'Телефон клиента не указан'}, ensure_ascii=False)}
+        amount_str = ''
+        if status_key == 'ready' and repair_amount:
+            amount_str = f"\nСтоимость ремонта: {int(repair_amount):,} ₽".replace(',', ' ')
+        max_text = (
+            f"🔧 *Скупка24 — ремонт #{order_id}*\n\n"
+            f"{STATUS_MSG[status_key]}{amount_str}{AD_FOOTER}"
+        )
+        try:
+            max_resp = requests.post(
+                'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c?action=send',
+                json={'phone': phone, 'text': max_text},
+                timeout=8,
+            )
+            max_data = max_resp.json() if max_resp.status_code == 200 else {}
+        except Exception as e:
+            return {'statusCode': 502, 'headers': HEADERS,
+                    'body': json.dumps({'error': f'MAX bot недоступен: {e}'}, ensure_ascii=False)}
+        # max-bot вернул delivered=False если у клиента нет привязки в pchat_clients
+        if not max_data.get('delivered'):
+            reason = max_data.get('reason') or 'unknown'
+            if reason == 'no_max_chat_for_recipient':
+                return {'statusCode': 404, 'headers': HEADERS,
+                        'body': json.dumps({
+                            'error': 'Клиент не писал нашему MAX-боту. Попросите написать /start в MAX.',
+                            'phone': phone,
+                            'channel': 'max',
+                        }, ensure_ascii=False)}
+            return {'statusCode': 500, 'headers': HEADERS,
+                    'body': json.dumps({'error': f'MAX не доставил: {reason}', 'response': max_data}, ensure_ascii=False)}
+        return {'statusCode': 200, 'headers': HEADERS,
+                'body': json.dumps({'ok': True, 'sent_to': name, 'phone': phone,
+                                    'channel': 'max', 'status': STATUS_LABEL.get(status_key, status_key)},
+                                   ensure_ascii=False)}
+
+    # ── Комбо: MAX, при неудаче — SMS fallback ───────────────────────────────
+    # Удобный одиночный endpoint для админки: пытаемся MAX, если клиент не
+    # привязан или MAX упал — шлём SMS.
+    if action == 'notify_all':
+        if not auth_staff(event):
+            return {'statusCode': 401, 'headers': HEADERS,
+                    'body': json.dumps({'error': 'Unauthorized'}, ensure_ascii=False)}
+        order_id = int(body.get('order_id', 0))
+        status_key = str(body.get('status_key', '')).strip()
+        if not order_id or status_key not in STATUS_MSG:
+            return {'statusCode': 400, 'headers': HEADERS,
+                    'body': json.dumps({'error': 'order_id и status_key обязательны'}, ensure_ascii=False)}
+        conn = psycopg2.connect(os.environ['DATABASE_URL'])
+        cur = conn.cursor()
+        cur.execute(f"SELECT id, name, phone, repair_type, repair_amount FROM {SCHEMA}.repair_orders WHERE id = {order_id}")
+        row = cur.fetchone()
+        cur.close(); conn.close()
+        if not row:
+            return {'statusCode': 404, 'headers': HEADERS,
+                    'body': json.dumps({'error': 'Заявка не найдена'}, ensure_ascii=False)}
+        _, name, phone, repair_type, repair_amount = row
+        if not phone:
+            return {'statusCode': 400, 'headers': HEADERS,
+                    'body': json.dumps({'error': 'Телефон клиента не указан'}, ensure_ascii=False)}
+
+        # 1) Пробуем MAX
+        amount_str = ''
+        if status_key == 'ready' and repair_amount:
+            amount_str = f"\nСтоимость ремонта: {int(repair_amount):,} ₽".replace(',', ' ')
+        max_text = (
+            f"🔧 *Скупка24 — ремонт #{order_id}*\n\n"
+            f"{STATUS_MSG[status_key]}{amount_str}{AD_FOOTER}"
+        )
+        max_delivered = False
+        max_error = ''
+        try:
+            max_resp = requests.post(
+                'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c?action=send',
+                json={'phone': phone, 'text': max_text},
+                timeout=8,
+            )
+            max_data = max_resp.json() if max_resp.status_code == 200 else {}
+            max_delivered = bool(max_data.get('delivered'))
+            if not max_delivered:
+                max_error = max_data.get('reason') or 'not_delivered'
+        except Exception as e:
+            max_error = f'{type(e).__name__}: {e}'
+
+        if max_delivered:
+            return {'statusCode': 200, 'headers': HEADERS,
+                    'body': json.dumps({'ok': True, 'channel': 'max', 'sent_to': name,
+                                        'phone': phone,
+                                        'status': STATUS_LABEL.get(status_key, status_key)},
+                                       ensure_ascii=False)}
+
+        # 2) Fallback на SMS
+        if not phone.startswith('+7'):
+            return {'statusCode': 400, 'headers': HEADERS,
+                    'body': json.dumps({'error': f'MAX не доставил ({max_error}); SMS невозможна — телефон не +7: {phone}',
+                                        'channel': 'sms_skipped'}, ensure_ascii=False)}
+        dev = repair_type or 'устройство'
+        sms_templates = {
+            'in_progress':   f"Скупка24: {dev} в ремонте. Готово — сообщим. Skypka24.com",
+            'waiting_parts': f"Скупка24: {dev} — ждём запчасть. Готово — сообщим. Skypka24.com",
+            'ready':         f"Скупка24: {dev} готов! Стоимость: {int(repair_amount) if repair_amount else '?'} руб. Ждём вас. Skypka24.com",
+            'done':          f"Скупка24: {dev} выдан. Спасибо за обращение! Skypka24.com",
+            'cancelled':     f"Скупка24: {dev} — ремонт отменён. Позвоните нам. Skypka24.com",
+        }
+        sms_text = sms_templates.get(status_key, '')
+        api_id = os.environ.get('SMSRU_API_ID', '')
+        if not api_id:
+            return {'statusCode': 500, 'headers': HEADERS,
+                    'body': json.dumps({'error': f'MAX не доставил ({max_error}); SMSRU_API_ID не задан'}, ensure_ascii=False)}
+        try:
+            sms_resp = requests.get('https://sms.ru/sms/send',
+                params={'api_id': api_id, 'to': phone, 'msg': sms_text, 'json': 1, 'from': 'IPMamedov'}, timeout=10)
+            sms_data = sms_resp.json() if sms_resp.status_code == 200 else {}
+        except Exception as e:
+            return {'statusCode': 502, 'headers': HEADERS,
+                    'body': json.dumps({'error': f'MAX не доставил ({max_error}); SMS upstream error: {e}'}, ensure_ascii=False)}
+        if sms_data.get('status') == 'OK':
+            return {'statusCode': 200, 'headers': HEADERS,
+                    'body': json.dumps({'ok': True, 'channel': 'sms', 'sent_to': name, 'phone': phone,
+                                        'max_skipped_reason': max_error,
+                                        'status': STATUS_LABEL.get(status_key, status_key)}, ensure_ascii=False)}
+        return {'statusCode': 500, 'headers': HEADERS,
+                'body': json.dumps({'error': f'MAX не доставил ({max_error}); SMS error: {sms_data.get("status_text", "unknown")}'}, ensure_ascii=False)}
+
     # ── Уведомить клиента о статусе ──────────────────────────────────────────
     if action == 'notify':
         if not auth_staff(event):

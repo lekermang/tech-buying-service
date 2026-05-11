@@ -143,56 +143,36 @@ export default function LeadsAlertWatcher({ token, empName }: { token: string; e
     setTimeout(() => setShareToast(null), 3000);
   };
 
+  // Live-чат удалён. Приглашение через WhatsApp как fallback.
   const inviteLead = async (lead: Lead) => {
     try {
-      const r = await fetch("https://functions.poehali.dev/db114166-21ce-4b87-9d05-59286ee73d6e?action=invite_create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Employee-Token": token },
-        body: JSON.stringify({ phone: lead.client_phone, name: lead.client_name, lead_id: lead.id }),
-      });
-      const d = await r.json();
-      if (d.ok) {
-        const channels: string[] = [];
-        if (d.tg_sent) channels.push("TG");
-        if (d.sms_sent) channels.push("SMS");
-        const msg = channels.length
-          ? `📲 Отправлено: ${channels.join(" + ")}`
-          : "✅ Ссылка создана";
-        setShareToast(msg);
-        // Если ничего не отправлено — открываем WhatsApp как fallback
-        if (!d.tg_sent && !d.sms_sent && d.wa_url) {
-          window.open(d.wa_url as string, "_blank");
-        }
+      const digits = (lead.client_phone || "").replace(/\D/g, "");
+      if (digits.length >= 10) {
+        const wa = `https://wa.me/${digits.length === 11 ? digits : "7" + digits.slice(-10)}`;
+        window.open(wa, "_blank");
+        setShareToast("💬 WhatsApp открыт");
       } else {
-        setShareToast("❌ Ошибка приглашения");
+        setShareToast("❌ Нет телефона клиента");
       }
     } catch {
-      setShareToast("❌ Ошибка сети");
+      setShareToast("❌ Ошибка");
     }
     setTimeout(() => setShareToast(null), 3500);
   };
 
-  // Пригласить клиента в мессенджер MAX: сотруднику открывается MAX на чате с клиентом,
-  // плюс клиенту параллельно уходит SMS со ссылкой (через тот же invite_create).
+  // Пригласить клиента в мессенджер MAX: открываем диплинк MAX у сотрудника.
   const inviteMax = async (lead: Lead) => {
     try {
-      const r = await fetch("https://functions.poehali.dev/db114166-21ce-4b87-9d05-59286ee73d6e?action=invite_create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Employee-Token": token },
-        body: JSON.stringify({ phone: lead.client_phone, name: lead.client_name, lead_id: lead.id }),
-      });
-      const d = await r.json();
-      if (d.ok && d.max_url) {
-        // Открываем MAX у сотрудника (диплинк или ссылка на бота)
-        window.open(d.max_url as string, "_blank");
-        const parts: string[] = ["MAX открыт"];
-        if (d.sms_sent) parts.push("SMS клиенту");
-        setShareToast(`💬 ${parts.join(" + ")}`);
+      const digits = (lead.client_phone || "").replace(/\D/g, "");
+      if (digits.length >= 10) {
+        const phone = digits.length === 11 ? digits : "7" + digits.slice(-10);
+        window.open(`max://u/+${phone}`, "_blank");
+        setShareToast("💬 MAX открыт");
       } else {
-        setShareToast("❌ Не удалось открыть MAX");
+        setShareToast("❌ Нет телефона клиента");
       }
     } catch {
-      setShareToast("❌ Ошибка сети");
+      setShareToast("❌ Ошибка");
     }
     setTimeout(() => setShareToast(null), 3500);
   };
