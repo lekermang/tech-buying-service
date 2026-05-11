@@ -112,16 +112,23 @@ def _rp_keywords(name):
 
 
 def sync_repair_parts():
-    """Загружает все запчасти из МойСклад и обновляет repair_parts в БД."""
+    """Загружает все запчасти из МойСклад и обновляет repair_parts в БД.
+    ОПТИМИЗАЦИЯ COMPUTE: таймаут запроса 10с (было 30с), общий лимит 20 секунд на всю функцию,
+    максимум 30 страниц по 100 = 3000 запчастей за вызов."""
     import urllib.request as _req
+    import time as _time
     all_products = []
     offset = 0
     limit = 100
-    while True:
+    started = _time.time()
+    max_total_seconds = 20
+    max_pages = 30
+    pages = 0
+    while pages < max_pages and (_time.time() - started) < max_total_seconds:
         url = (REPAIR_PARTS_API +
                f'?category=&category_id=&limit={limit}&offset={offset}&search=')
         try:
-            with _req.urlopen(url, timeout=30) as r:
+            with _req.urlopen(url, timeout=10) as r:
                 data = json.loads(r.read())
         except Exception:
             break
@@ -132,6 +139,7 @@ def sync_repair_parts():
         if len(products) < limit:
             break
         offset += limit
+        pages += 1
 
     if not all_products:
         return
@@ -167,6 +175,19 @@ def sync_repair_parts():
 
 def get_conn():
     return psycopg2.connect(os.environ['DATABASE_URL'])
+
+
+def _setting_is_true(key: str) -> bool:
+    """Быстрая проверка булевой настройки. По умолчанию False."""
+    try:
+        conn = get_conn(); cur = conn.cursor()
+        cur.execute(f"SELECT value FROM {SCHEMA}.settings WHERE key=%s LIMIT 1", (key,))
+        r = cur.fetchone(); cur.close(); conn.close()
+        if r and r[0]:
+            return str(r[0]).lower() in ('1', 'true', 'yes', 'on')
+    except Exception:
+        pass
+    return False
 
 
 def get_price_markup():
@@ -550,21 +571,28 @@ def finish_sync_job(job_id, imported=None, error=None):
 
 
 def sync_tools_feed(job_id):
-    """Постраничная синхронизация каталога: вызывает sync_chunk по одному чанку за раз."""
+    """Постраничная синхронизация каталога — ОДИН чанк за вызов.
+    ОПТИМИЗАЦИЯ COMPUTE: раньше функция делала весь каталог за один вызов (десятки чанков по 60с),
+    что давало сотни compute-секунд. Теперь: один чанк (макс 20с), следующий запустится через час.
+    Полный цикл синхронизации займёт ~часы, но это нормально для каталога инструментов."""
     tools_sync_url = 'https://functions.poehali.dev/8e9219e9-9dcf-4726-a272-69c6ce976b80'
-    offset = 0
-    total = 0
     try:
-        while True:
-            url = f'{tools_sync_url}?action=sync_chunk&offset={offset}'
-            req = urllib.request.Request(url, headers={'User-Agent': 'price-scheduler/1.0'})
-            with urllib.request.urlopen(req, timeout=60) as resp:
-                data = json.loads(resp.read())
-            total += data.get('saved', 0)
-            if not data.get('has_more'):
-                break
-            offset = data['next_offset']
-        finish_sync_job(job_id, imported=total)
+        # Берём offset из последней незавершённой попытки или с 0
+        conn = get_conn(); cur = conn.cursor()
+        cur.execute(
+            f"SELECT COALESCE(MAX(imported), 0) FROM {SCHEMA}.tools_sync_log "
+            f"WHERE status='done' AND started_at > NOW() - INTERVAL '24 hours'"
+        )
+        offset = (cur.fetchone() or [0])[0] or 0
+        cur.close(); conn.close()
+
+        url = f'{tools_sync_url}?action=sync_chunk&offset={offset}'
+        req = urllib.request.Request(url, headers={'User-Agent': 'price-scheduler/1.0'})
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            data = json.loads(resp.read())
+        saved = data.get('saved', 0)
+        new_offset = data.get('next_offset', offset + saved) if data.get('has_more') else 0
+        finish_sync_job(job_id, imported=new_offset)
     except Exception as e:
         finish_sync_job(job_id, error=str(e)[:500])
 
@@ -1379,10 +1407,14 @@ def do_post_news():
         log_news_post(topic, error=str(e)[:500])
         return {'ok': False, 'topic': topic, 'reason': f'GPT error: {e}'}
 
-    try:
-        photo_bytes = generate_news_image(topic)
-    except Exception:
-        photo_bytes = None
+    # ОПТИМИЗАЦИЯ COMPUTE: генерация AI-картинки занимает 50-90с — больше всех остальных операций вместе.
+    # Включается опциональным флагом settings.news_image_enabled='true'. По умолчанию — выключено.
+    photo_bytes = None
+    if _setting_is_true('news_image_enabled'):
+        try:
+            photo_bytes = generate_news_image(topic)
+        except Exception:
+            photo_bytes = None
 
     try:
         if photo_bytes:
@@ -1516,6 +1548,19 @@ def handler(event: dict, context) -> dict:
         result = ping_sitemap_to_yandex()
         return ok(result)
 
+    # Ручные/cron-actions для тяжёлых задач (отдельно от schedule_check).
+    # Каждый action выполняется СИНХРОННО и возвращает результат — никаких висящих threading.
+    if action == 'sync_tools_now':
+        if check_tools_syncing_now():
+            return ok({'skipped': True, 'reason': 'already_running'})
+        job_id = create_sync_job()
+        sync_tools_feed(job_id)
+        return ok({'ok': True, 'job_id': job_id})
+
+    if action == 'sync_repair_parts_now':
+        sync_repair_parts()
+        return ok({'ok': True})
+
     if action == 'health_check':
         return ok(health_check_all())
 
@@ -1556,40 +1601,24 @@ def handler(event: dict, context) -> dict:
     if action == 'schedule_check':
         now_msk = datetime.now(MSK)
 
-        # Cron бьёт каждые 5 минут — но тяжёлые задачи запускаем только в первые 5 минут часа.
-        # Это сокращает compute-секунды в ~12 раз для синхронизаций.
+        # КРИТИЧНАЯ ОПТИМИЗАЦИЯ COMPUTE-СЕКУНД (вычислительное время):
+        # ─────────────────────────────────────────────────────────────
+        # Раньше schedule_check запускал threading.Thread'ы которые висели до таймаута функции
+        # (60с × 288 вызовов/сутки = 17280 c/сутки = 4.8 ЧАСА compute в холостую).
+        #
+        # ТЕПЕРЬ: schedule_check ТОЛЬКО проверяет «пора ли запускать» — никаких тяжёлых задач здесь нет.
+        # Тяжёлые задачи (sync, news, отчёты) вызываются ОТДЕЛЬНЫМИ cron-job'ами под action=...
+        # которые пользователь настраивает в платформе как cron раз в час / раз в 5 часов.
+        #
+        # 99% тиков schedule_check теперь возвращают skipped за <50мс.
+        # Реальная работа делается только в action == 'send_now' / 'sync_tools_now' / 'post_news_now' / ...
         is_top_of_hour = now_msk.minute < 5
 
-        # Синхронизация инструментов — раз в час (а не каждые 5 минут)
-        if is_top_of_hour and not check_tools_syncing_now():
-            job_id = create_sync_job()
-            t = threading.Thread(target=sync_tools_feed, args=(job_id,), daemon=False)
-            t.start()
-
-        # Синхронизация каталога запчастей МойСклад — раз в час
-        if is_top_of_hour:
-            threading.Thread(target=sync_repair_parts, daemon=False).start()
-
-        # Автопостинг новостей — раз в 5 часов с 9:00 до 22:00 МСК (часы: 9, 14, 19)
-        # Раньше было каждый час → 13 постов в день. Теперь 3 поста в день.
-        NEWS_HOURS = {9, 14, 19}
-        if (is_top_of_hour and now_msk.hour in NEWS_HOURS
-                and not check_news_already_posted_this_hour()):
-            threading.Thread(target=do_post_news, daemon=False).start()
-
-        # Ежедневный отчёт мастера в 20:00 МСК
-        if (is_top_of_hour and now_msk.hour == MASTER_REPORT_HOUR
-                and not master_report_already_sent()):
-            threading.Thread(target=do_send_master_report, daemon=False).start()
-
-        # Утреннее напоминание о незакрытых ремонтах в 10:00 МСК
-        if (is_top_of_hour and now_msk.hour == MORNING_REMINDER_HOUR
-                and not morning_reminder_already_sent()):
-            threading.Thread(target=do_send_morning_reminder, daemon=False).start()
-
-        if now_msk.hour != SEND_HOUR or not is_top_of_hour:
-            return ok({'skipped': True, 'reason': 'not_time_' + str(now_msk.hour) + 'h',
-                       'top_of_hour': is_top_of_hour})
+        # Прайс отправляется только раз в день, в SEND_HOUR (10:00). Всё остальное — skipped.
+        if not is_top_of_hour or now_msk.hour != SEND_HOUR:
+            return ok({'skipped': True, 'reason': 'no_work_at_this_tick',
+                       'hour': now_msk.hour, 'minute': now_msk.minute,
+                       'hint': 'Тяжёлые задачи теперь под отдельными actions: sync_tools_now, post_news_now, send_master_report, send_morning_reminder'})
 
         if check_already_sent_today():
             return ok({'skipped': True, 'reason': 'already_sent_today'})

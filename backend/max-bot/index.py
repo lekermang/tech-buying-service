@@ -65,6 +65,13 @@ def _log(direction: str, update_type: str = '', text: str = '',
          max_user_id: Any = None, max_chat_id: Any = None,
          pchat_client_id: Any = None, pchat_room_id: Any = None,
          payload: Any = None, error: str = ''):
+    """ОПТИМИЗАЦИЯ COMPUTE: логируем только важное (ошибки, входящие команды, callback).
+    Пропускаем мусор (out, debug-события) — это сокращает время каждого webhook на ~100-300мс
+    (на одно новое psycopg2-подключение + insert)."""
+    # Скипаем шумные логи — оставляем только ошибки, входящие callback'и и важные события
+    is_important = bool(error) or direction == 'in' or update_type.startswith('callback') or update_type.startswith('bot_added')
+    if not is_important:
+        return
     try:
         conn = _conn(); cur = conn.cursor()
         raw = json.dumps(payload, ensure_ascii=False) if payload is not None else None

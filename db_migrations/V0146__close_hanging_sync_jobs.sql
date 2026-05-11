@@ -1,0 +1,1 @@
+UPDATE t_p31606708_tech_buying_service.tools_sync_log SET status='abandoned', finished_at=NOW(), error='auto-closed: threading.Thread leak fix' WHERE status='running';
