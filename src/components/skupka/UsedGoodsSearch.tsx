@@ -3,10 +3,8 @@ import Icon from "@/components/ui/icon";
 import AvitoShowcase from "./AvitoShowcase";
 
 const GOODS_URL = "https://functions.poehali.dev/de4c1e8e-0c7b-4f25-a3fd-155c46fa3399";
-const RESOLD_URL = "https://functions.poehali.dev/a10aef75-50fc-411c-85bb-692d44fb31e7";
 
 type Good = { id: number; title: string; category: string; condition: string; sell_price: number; brand: string; model: string; storage: string };
-type ResoldItem = { name: string; price: number | null; photo: string | null; link: string };
 
 const CONDITION_COLOR: Record<string, string> = {
   отличное: "text-green-400",
@@ -16,7 +14,7 @@ const CONDITION_COLOR: Record<string, string> = {
 
 export default function UsedGoodsSearch() {
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<"own" | "avito" | "resold">("avito");
+  const [tab, setTab] = useState<"own" | "avito">("avito");
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   // Открыть виджет извне (по событию или хэшу #used-tech) и проскроллить к нему
@@ -47,13 +45,6 @@ export default function UsedGoodsSearch() {
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   const abortRef = useRef<AbortController | null>(null);
 
-  // Resold товары
-  const [resoldItems, setResoldItems] = useState<ResoldItem[]>([]);
-  const [resoldLoading, setResoldLoading] = useState(false);
-  const [resoldPage, setResoldPage] = useState(1);
-  const [resoldTotal, setResoldTotal] = useState(1);
-  const [resoldQuery, setResoldQuery] = useState("");
-
   const fetchGoods = useCallback((q: string) => {
     abortRef.current?.abort();
     abortRef.current = new AbortController();
@@ -67,18 +58,6 @@ export default function UsedGoodsSearch() {
       .catch(e => { if (e.name !== "AbortError") setLoading(false); });
   }, []);
 
-  const fetchResold = useCallback((page: number) => {
-    setResoldLoading(true);
-    fetch(`${RESOLD_URL}?page=${page}`)
-      .then(r => r.json())
-      .then(d => {
-        setResoldItems(d.items || []);
-        setResoldTotal(d.total_pages || 1);
-        setResoldLoading(false);
-      })
-      .catch(() => setResoldLoading(false));
-  }, []);
-
   useEffect(() => {
     if (!open) return;
     fetchGoods("");
@@ -88,25 +67,11 @@ export default function UsedGoodsSearch() {
     };
   }, [open, fetchGoods]);
 
-  useEffect(() => {
-    if (!open || tab !== "resold") return;
-    if (resoldItems.length === 0) fetchResold(1);
-  }, [open, tab]);
-
   const handleSearch = useCallback((val: string) => {
     setQuery(val);
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => fetchGoods(val), 400);
   }, [fetchGoods]);
-
-  const handleResoldPage = (p: number) => {
-    setResoldPage(p);
-    fetchResold(p);
-  };
-
-  const filteredResold = resoldQuery
-    ? resoldItems.filter(i => i.name.toLowerCase().includes(resoldQuery.toLowerCase()))
-    : resoldItems;
 
   return (
     <div ref={rootRef} id="used-tech" className="hero-premium-btn group relative bg-gradient-to-br from-white/[0.06] via-white/[0.02] to-transparent backdrop-blur-sm border-2 border-[#FFD700]/30 hover:border-[#FFD700]/70 px-4 py-4 w-full rounded-xl overflow-hidden scroll-mt-24 transition-all">
@@ -152,12 +117,6 @@ export default function UsedGoodsSearch() {
             >
               Каталог
             </button>
-            <button
-              onClick={() => { setTab("resold"); if (resoldItems.length === 0) fetchResold(1); }}
-              className={`shrink-0 text-[10px] font-roboto px-2.5 py-1 rounded transition-all ${tab === "resold" ? "bg-[#FFD700] text-black font-semibold" : "text-white/50 hover:text-white border border-white/10"}`}
-            >
-              Кирова 11
-            </button>
           </div>
 
           {/* Авито витрина */}
@@ -198,59 +157,6 @@ export default function UsedGoodsSearch() {
             </>
           )}
 
-          {/* Resold витрина */}
-          {tab === "resold" && (
-            <>
-              <input
-                value={resoldQuery}
-                onChange={e => setResoldQuery(e.target.value)}
-                placeholder="Поиск по витрине..."
-                className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-2 font-roboto text-xs focus:outline-none focus:border-[#FFD700] transition-colors mb-2"
-              />
-
-              {resoldLoading && <div className="text-white/30 font-roboto text-[10px] py-2">Загружаю...</div>}
-
-              {!resoldLoading && filteredResold.length === 0 && (
-                <div className="text-white/30 font-roboto text-[10px] py-2">Ничего не найдено</div>
-              )}
-
-              {!resoldLoading && filteredResold.map((item, i) => (
-                <a
-                  key={i}
-                  href={item.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-between py-2 border-b border-white/5 last:border-0 hover:bg-white/3 -mx-1 px-1 transition-colors group"
-                >
-                  <div className="min-w-0 flex-1 flex items-center gap-2">
-                    {item.photo
-                      ? <img src={item.photo} alt="" className="w-7 h-7 object-cover shrink-0 rounded" loading="lazy" decoding="async" />
-                      : <div className="w-7 h-7 bg-white/5 shrink-0 rounded flex items-center justify-center"><Icon name="Package" size={12} className="text-white/20" /></div>
-                    }
-                    <span className="font-roboto text-xs text-white truncate group-hover:text-[#FFD700] transition-colors">{item.name}</span>
-                  </div>
-                  <div className="font-oswald font-bold text-[#FFD700] text-sm shrink-0 ml-2">
-                    {item.price ? `${item.price.toLocaleString("ru-RU")} ₽` : "По запросу"}
-                  </div>
-                </a>
-              ))}
-
-              {/* Пагинация */}
-              {!resoldLoading && resoldTotal > 1 && (
-                <div className="flex items-center gap-1 mt-3 pt-2 border-t border-white/5">
-                  {Array.from({ length: resoldTotal }, (_, i) => i + 1).map(p => (
-                    <button
-                      key={p}
-                      onClick={() => handleResoldPage(p)}
-                      className={`w-6 h-6 text-[10px] font-roboto transition-all ${resoldPage === p ? "bg-[#FFD700] text-black font-bold" : "text-white/40 hover:text-white border border-white/10"}`}
-                    >
-                      {p}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
         </div>
       )}
     </div>

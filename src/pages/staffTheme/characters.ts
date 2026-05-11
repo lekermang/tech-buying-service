@@ -82,4 +82,3 @@ export const DEFAULT_THEME: StaffThemeSettings = {
   font_family: "roboto",
 };
 
-export const STAFF_THEME_URL = "https://functions.poehali.dev/5cc66ff0-f3b5-46ca-9815-8f939e07eff7";

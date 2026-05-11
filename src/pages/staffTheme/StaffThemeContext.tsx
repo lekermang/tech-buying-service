@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
-import { DEFAULT_THEME, STAFF_THEME_URL, StaffThemeSettings } from "./characters";
+import { DEFAULT_THEME, StaffThemeSettings } from "./characters";
 
 type Ctx = {
   /** Применённая (сохранённая) тема — она активна на экране */
@@ -41,23 +41,9 @@ export function StaffThemeProvider({ token, children }: { token: string; childre
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  // Загрузка с сервера
+  // Тема хранится только в localStorage (backend staff-theme удалён для экономии compute)
   useEffect(() => {
-    if (!token) { setLoaded(true); return; }
-    let cancelled = false;
-    fetch(STAFF_THEME_URL, { headers: { "X-Employee-Token": token } })
-      .then(r => r.json())
-      .then(d => {
-        if (cancelled) return;
-        const s = d?.settings || {};
-        const merged = { ...DEFAULT_THEME, ...s };
-        setThemeState(merged);
-        setDraftState(merged);
-        try { localStorage.setItem(LS_KEY, JSON.stringify(merged)); } catch { /* ignore */ }
-      })
-      .catch(() => {})
-      .finally(() => { if (!cancelled) setLoaded(true); });
-    return () => { cancelled = true; };
+    setLoaded(true);
   }, [token]);
 
   const setDraft = useCallback((patch: Partial<StaffThemeSettings>) => {
@@ -71,34 +57,15 @@ export function StaffThemeProvider({ token, children }: { token: string; childre
   }, [theme]);
 
   const saveDraft = useCallback(async () => {
-    if (!token) {
-      // оффлайн режим — хотя бы применяем локально
-      setThemeState(draft);
-      try { localStorage.setItem(LS_KEY, JSON.stringify(draft)); } catch { /* ignore */ }
-      setSaved(true);
-      return true;
-    }
+    // Сохраняем только локально (backend staff-theme удалён)
     setSaving(true);
-    try {
-      const res = await fetch(STAFF_THEME_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Employee-Token": token },
-        body: JSON.stringify({ settings: draft }),
-      });
-      const ok = res.ok;
-      if (ok) {
-        setThemeState(draft);
-        try { localStorage.setItem(LS_KEY, JSON.stringify(draft)); } catch { /* ignore */ }
-        setSaved(true);
-        setTimeout(() => setSaved(false), 1800);
-      }
-      return ok;
-    } catch {
-      return false;
-    } finally {
-      setSaving(false);
-    }
-  }, [draft, token]);
+    setThemeState(draft);
+    try { localStorage.setItem(LS_KEY, JSON.stringify(draft)); } catch { /* ignore */ }
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1800);
+    setSaving(false);
+    return true;
+  }, [draft]);
 
   // Применяем акцент/плотность к root
   useEffect(() => {
