@@ -1556,29 +1556,40 @@ def handler(event: dict, context) -> dict:
     if action == 'schedule_check':
         now_msk = datetime.now(MSK)
 
-        # Синхронизация инструментов каждый час (для актуальных цен и наличия)
-        if not check_tools_syncing_now():
+        # Cron бьёт каждые 5 минут — но тяжёлые задачи запускаем только в первые 5 минут часа.
+        # Это сокращает compute-секунды в ~12 раз для синхронизаций.
+        is_top_of_hour = now_msk.minute < 5
+
+        # Синхронизация инструментов — раз в час (а не каждые 5 минут)
+        if is_top_of_hour and not check_tools_syncing_now():
             job_id = create_sync_job()
             t = threading.Thread(target=sync_tools_feed, args=(job_id,), daemon=False)
             t.start()
 
-        # Синхронизация каталога запчастей МойСклад каждый час
-        threading.Thread(target=sync_repair_parts, daemon=False).start()
+        # Синхронизация каталога запчастей МойСклад — раз в час
+        if is_top_of_hour:
+            threading.Thread(target=sync_repair_parts, daemon=False).start()
 
-        # Автопостинг новостей — каждый час, только с 9:00 до 22:00 МСК
-        if 9 <= now_msk.hour < 22 and not check_news_already_posted_this_hour():
+        # Автопостинг новостей — раз в 5 часов с 9:00 до 22:00 МСК (часы: 9, 14, 19)
+        # Раньше было каждый час → 13 постов в день. Теперь 3 поста в день.
+        NEWS_HOURS = {9, 14, 19}
+        if (is_top_of_hour and now_msk.hour in NEWS_HOURS
+                and not check_news_already_posted_this_hour()):
             threading.Thread(target=do_post_news, daemon=False).start()
 
         # Ежедневный отчёт мастера в 20:00 МСК
-        if now_msk.hour == MASTER_REPORT_HOUR and not master_report_already_sent():
+        if (is_top_of_hour and now_msk.hour == MASTER_REPORT_HOUR
+                and not master_report_already_sent()):
             threading.Thread(target=do_send_master_report, daemon=False).start()
 
         # Утреннее напоминание о незакрытых ремонтах в 10:00 МСК
-        if now_msk.hour == MORNING_REMINDER_HOUR and not morning_reminder_already_sent():
+        if (is_top_of_hour and now_msk.hour == MORNING_REMINDER_HOUR
+                and not morning_reminder_already_sent()):
             threading.Thread(target=do_send_morning_reminder, daemon=False).start()
 
-        if now_msk.hour != SEND_HOUR:
-            return ok({'skipped': True, 'reason': 'not_time_' + str(now_msk.hour) + 'h'})
+        if now_msk.hour != SEND_HOUR or not is_top_of_hour:
+            return ok({'skipped': True, 'reason': 'not_time_' + str(now_msk.hour) + 'h',
+                       'top_of_hour': is_top_of_hour})
 
         if check_already_sent_today():
             return ok({'skipped': True, 'reason': 'already_sent_today'})
