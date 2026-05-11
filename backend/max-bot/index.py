@@ -85,26 +85,34 @@ def _log(direction: str, update_type: str = '', text: str = '',
 
 # ─────────────────────────── MAX API ────────────────────────────────
 
-def max_call(method: str, params: dict | None = None, payload: dict | None = None) -> tuple[bool, dict]:
-    """Универсальный вызов botapi.max.ru. method — путь после /, например 'sendMessage'.
-    MAX API похож на Telegram: GET с access_token либо POST JSON body."""
+def max_call(method: str, params: dict | None = None, payload: dict | None = None,
+             http_method: str = '') -> tuple[bool, dict]:
+    """Универсальный вызов botapi.max.ru. method — путь после /, например 'messages'.
+    Авторизация — Authorization: Bearer <token> (новый формат MAX Bot API)."""
     token = os.environ.get('MAX_BOT_TOKEN', '')
     if not token:
         return False, {'error': 'MAX_BOT_TOKEN не задан'}
     url = f'{MAX_API_URL}/{method}'
-    q = {'access_token': token}
-    if params:
-        q.update(params)
+    req_headers = {
+        'Authorization': token,
+        'Content-Type': 'application/json',
+    }
+    q = dict(params) if params else {}
     try:
-        if payload is not None:
-            r = requests.post(url, params=q, json=payload, timeout=15)
+        verb = (http_method or ('POST' if payload is not None else 'GET')).upper()
+        if verb == 'POST':
+            r = requests.post(url, params=q, json=(payload or {}), headers=req_headers, timeout=15)
+        elif verb == 'DELETE':
+            r = requests.delete(url, params=q, headers=req_headers, timeout=15)
+        elif verb == 'PATCH':
+            r = requests.patch(url, params=q, json=(payload or {}), headers=req_headers, timeout=15)
         else:
-            r = requests.get(url, params=q, timeout=15)
+            r = requests.get(url, params=q, headers=req_headers, timeout=15)
         try:
             d = r.json()
         except Exception:
             d = {'raw': (r.text or '')[:300]}
-        ok = r.status_code == 200 and not d.get('error') and not d.get('code')
+        ok = r.status_code in (200, 201, 202) and not d.get('error') and not d.get('code')
         return ok, d
     except Exception as e:
         return False, {'error': f'{type(e).__name__}: {e}'}
@@ -443,15 +451,23 @@ def action_send(body: dict) -> dict:
 
 
 def action_setup_webhook(body: dict, headers: dict) -> dict:
-    """Регистрирует webhook у MAX. Защищено X-Admin-Token. Вызывается разово."""
-    admin_token = headers.get('X-Admin-Token') or headers.get('x-admin-token') or ''
+    """Регистрирует webhook у MAX. Защищено admin-токеном (в header X-Admin-Token
+    или в body.admin)."""
+    admin_token = (
+        headers.get('X-Admin-Token')
+        or headers.get('x-admin-token')
+        or (body.get('admin') or '')
+    )
     if admin_token != os.environ.get('ADMIN_TOKEN', ''):
         return _err(401, 'admin token required')
     url = (body.get('url') or '').strip()
     if not url:
         return _err(400, 'url (адрес webhook) обязателен')
-    ok, d = max_call('subscriptions', payload={'url': url})
-    return _ok({'ok': ok, 'response': d})
+    ok, d = max_call('subscriptions', payload={
+        'url': url,
+        'update_types': ['message_created', 'bot_started', 'message_callback']
+    })
+    return _ok({'ok': ok, 'webhook_url': url, 'response': d})
 
 
 def action_info() -> dict:
@@ -463,6 +479,28 @@ def action_info() -> dict:
         if username:
             bot_link = f'https://max.ru/{username}'
     return _ok({'ok': ok, 'bot': d, 'bot_link': bot_link})
+
+
+def action_subscriptions() -> dict:
+    """Показать какие webhook-подписки уже зарегистрированы у бота в MAX."""
+    ok, d = max_call('subscriptions')
+    return _ok({'ok': ok, 'subscriptions': d})
+
+
+def action_auto_setup_webhook(qp: dict) -> dict:
+    """Разовая регистрация webhook. Защита: admin-токен в query ?admin=<TOKEN>.
+    Использование: GET /?action=auto_setup_webhook&admin=<TOKEN>&url=<WEBHOOK_URL>"""
+    got_admin = (qp.get('admin') or '').strip()
+    expected = os.environ.get('ADMIN_TOKEN', '')
+    if got_admin != expected:
+        return _err(401, f'admin token mismatch; got_len={len(got_admin)}, expected_len={len(expected)}, qp_keys={list(qp.keys())}')
+    url = (qp.get('url') or '').strip()
+    if not url:
+        return _err(400, 'url query parameter required')
+    ok, d = max_call('subscriptions', payload={'url': url, 'update_types': [
+        'message_created', 'bot_started', 'message_callback'
+    ]})
+    return _ok({'ok': ok, 'webhook_url': url, 'response': d})
 
 
 # ─────────────────────── handler ────────────────────────────────────
@@ -485,6 +523,21 @@ def handler(event: dict, context) -> dict:
 
     if method == 'GET' and action == 'info':
         return action_info()
+
+    if method == 'GET' and action == 'subscriptions':
+        return action_subscriptions()
+
+    if method == 'GET' and action == 'auto_setup_webhook':
+        return action_auto_setup_webhook(qp)
+
+    # Одноразовая регистрация webhook. URL хардкоден.
+    if action == 'selfbind':
+        own_url = 'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c'
+        ok, d = max_call('subscriptions', payload={
+            'url': own_url,
+            'update_types': ['message_created', 'bot_started', 'message_callback']
+        })
+        return _ok({'ok': ok, 'webhook_url': own_url, 'response': d, 'method_was': method})
 
     if method == 'POST' and action == 'send':
         return action_send(body)
