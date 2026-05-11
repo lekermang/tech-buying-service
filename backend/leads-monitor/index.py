@@ -191,18 +191,19 @@ def tg_send(chat_id, text, reply_markup=None, parse_mode='Markdown'):
     payload = {'chat_id': chat_id, 'text': text, 'parse_mode': parse_mode}
     if reply_markup:
         payload['reply_markup'] = json.dumps(reply_markup)
+    # 5с достаточно — TG API обычно <300мс. Сокращаем compute при сбоях.
     try:
-        r = requests.post(f'https://api.telegram.org/bot{token}/sendMessage', json=payload, timeout=10)
+        r = requests.post(f'https://api.telegram.org/bot{token}/sendMessage', json=payload, timeout=5)
         if r.status_code == 200:
             return r.json().get('result', {}).get('message_id')
         # fallback без reply_markup
         r2 = requests.post(f'https://api.telegram.org/bot{token}/sendMessage',
-                           json={'chat_id': chat_id, 'text': text, 'parse_mode': parse_mode}, timeout=10)
+                           json={'chat_id': chat_id, 'text': text, 'parse_mode': parse_mode}, timeout=5)
         if r2.status_code == 200:
             return r2.json().get('result', {}).get('message_id')
         # без markdown
         r3 = requests.post(f'https://api.telegram.org/bot{token}/sendMessage',
-                           json={'chat_id': chat_id, 'text': text}, timeout=10)
+                           json={'chat_id': chat_id, 'text': text}, timeout=5)
         if r3.status_code == 200:
             return r3.json().get('result', {}).get('message_id')
     except Exception:
@@ -218,7 +219,7 @@ def tg_edit(chat_id, message_id, text, reply_markup=None, parse_mode='Markdown')
     if reply_markup is not None:
         payload['reply_markup'] = json.dumps(reply_markup)
     try:
-        requests.post(f'https://api.telegram.org/bot{token}/editMessageText', json=payload, timeout=10)
+        requests.post(f'https://api.telegram.org/bot{token}/editMessageText', json=payload, timeout=5)
         return True
     except Exception:
         return False
@@ -231,7 +232,7 @@ def tg_answer_callback(callback_id, text=''):
     try:
         requests.post(f'https://api.telegram.org/bot{token}/answerCallbackQuery',
                       json={'callback_query_id': callback_id, 'text': text or '✅', 'show_alert': False},
-                      timeout=8)
+                      timeout=4)
     except Exception:
         pass
 
@@ -482,16 +483,21 @@ def action_pulse(_body):
     """Запускается раз в минуту по cron'у. Делает эскалацию по SLA."""
     conn = _conn()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    # Заявки, которые горят: статус new/taken, SLA превышен
+    # Заявки, которые горят: статус new/taken, SLA превышен.
+    # ОПТИМИЗАЦИЯ: ограничиваем выборку 50-ю заявками + только те, где SLA реально мог истечь (>=5 мин).
+    # Это резко сокращает compute, тк раньше в худшем случае могло быть 500 заявок × 10 уведомлений × 10с = 50000с.
     cur.execute(
         f"SELECT id, source, client_name, client_phone, category, description, status, "
         f"owner_name, escalation_level, client_warned_15, sla_minutes, "
         f"EXTRACT(EPOCH FROM (NOW() - created_at))/60 AS age_minutes "
         f"FROM {SCHEMA}.leads_tracking "
         f"WHERE status IN ('new','taken') AND created_at > NOW() - INTERVAL '4 hours' "
-        f"ORDER BY created_at"
+        f"  AND created_at < NOW() - INTERVAL '5 minutes' "
+        f"ORDER BY created_at LIMIT 50"
     )
     rows = cur.fetchall()
+    # ОПТИМИЗАЦИЯ: кешируем получателей один раз, а не дёргаем БД в каждом цикле
+    cached_recipients = get_recipients() if rows else []
     actions = {'escalated_5': 0, 'escalated_15': 0, 'escalated_30': 0, 'sms_sent': 0, 'robocall_lead': 0}
     for r in rows:
         lid = int(r['id']); age = float(r['age_minutes'] or 0); status = r['status']; level = int(r['escalation_level'] or 0)
@@ -511,7 +517,7 @@ def action_pulse(_body):
                 f"Нажмите «Беру в работу» 👇"
             )
             kb = kb_new_lead(lid, r['client_phone'], r['client_name'])
-            for cid in get_recipients():
+            for cid in cached_recipients:
                 tg_send(cid, text, kb)
             actions['escalated_5'] += 1
             # Робот-звонок клиенту — кампания "Обработка заявки на скупку техники"
@@ -559,7 +565,7 @@ def action_pulse(_body):
                 f"👤 {r['client_name']} · 📞 {r['client_phone']}\n"
                 f"Клиенту отправлено SMS-извинение. Ответьте СЕЙЧАС."
             )
-            for cid in get_recipients():
+            for cid in cached_recipients:
                 tg_send(cid, text, kb_new_lead(lid, r['client_phone'], r['client_name']))
         # 30 минут — критический алерт
         if status == 'new' and age >= 30 and level < 30:
@@ -575,7 +581,7 @@ def action_pulse(_body):
                 f"👤 {r['client_name']} · 📞 {r['client_phone']}\n"
                 f"📞 ПОЗВОНИТЕ КЛИЕНТУ НЕМЕДЛЕННО"
             )
-            for cid in get_recipients():
+            for cid in cached_recipients:
                 tg_send(cid, text, kb_new_lead(lid, r['client_phone'], r['client_name']))
             actions['escalated_30'] += 1
     conn.commit(); cur.close(); conn.close()

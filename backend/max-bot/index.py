@@ -100,14 +100,15 @@ def max_call(method: str, params: dict | None = None, payload: dict | None = Non
     q = dict(params) if params else {}
     try:
         verb = (http_method or ('POST' if payload is not None else 'GET')).upper()
+        # 8с достаточно: MAX API обычно отвечает <500мс. Чем короче таймаут — тем меньше compute-секунд при сбое.
         if verb == 'POST':
-            r = requests.post(url, params=q, json=(payload or {}), headers=req_headers, timeout=15)
+            r = requests.post(url, params=q, json=(payload or {}), headers=req_headers, timeout=8)
         elif verb == 'DELETE':
-            r = requests.delete(url, params=q, headers=req_headers, timeout=15)
+            r = requests.delete(url, params=q, headers=req_headers, timeout=8)
         elif verb == 'PATCH':
-            r = requests.patch(url, params=q, json=(payload or {}), headers=req_headers, timeout=15)
+            r = requests.patch(url, params=q, json=(payload or {}), headers=req_headers, timeout=8)
         else:
-            r = requests.get(url, params=q, headers=req_headers, timeout=15)
+            r = requests.get(url, params=q, headers=req_headers, timeout=8)
         try:
             d = r.json()
         except Exception:

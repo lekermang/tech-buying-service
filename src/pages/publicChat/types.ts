@@ -3,7 +3,7 @@ export const PCHAT_TOKEN_KEY = "pchat_token";
 export const PCHAT_NAME_KEY = "pchat_name";
 export const PCHAT_PHONE_KEY = "pchat_phone";
 export const PCHAT_DIRECT_KEY = "pchat_direct_room";
-export const POLL_INTERVAL_MS = 4000;
+export const POLL_INTERVAL_MS = 8000;
 
 export type Room = {
   id: number;

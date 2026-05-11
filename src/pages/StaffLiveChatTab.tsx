@@ -64,7 +64,12 @@ export default function StaffLiveChatTab({ token }: Props) {
 
   useEffect(() => {
     loadRooms();
-    const id = setInterval(loadRooms, 8000);
+    // 12с вместо 8с + skip когда вкладка не активна (экономия compute)
+    const tick = () => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      loadRooms();
+    };
+    const id = setInterval(tick, 12000);
     return () => clearInterval(id);
   }, [loadRooms]);
 
@@ -75,6 +80,7 @@ export default function StaffLiveChatTab({ token }: Props) {
 
   const pollMessages = useCallback(async () => {
     if (!activeRoomId) return;
+    if (typeof document !== "undefined" && document.hidden) return;
     const r = await callApi(token, "staff_poll", { room_id: activeRoomId, after_id: lastIdRef.current });
     if (!r.ok) return;
     const msgs = (r.messages as Message[]) || [];

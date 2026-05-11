@@ -225,11 +225,12 @@ def notify_staff_new_message(room_id, author_name, text, room_type):
     label = 'Общий канал' if room_type == 'public' else 'Личный диалог'
     snippet = (text or '📷 Фото')[:160]
     msg = f"💬 *{label} · {author_name}*\n{snippet}\n\n_Открыть в Staff: вкладка «Клиенты Live»_"
+    # 4с достаточно: TG и MAX обычно <500мс. Это вызывается на каждое сообщение чата — экономия compute.
     try:
         requests.post(
             f'https://api.telegram.org/bot{token}/sendMessage',
             json={'chat_id': chat_id, 'text': msg, 'parse_mode': 'Markdown'},
-            timeout=8,
+            timeout=4,
         )
     except Exception:
         pass
@@ -238,7 +239,7 @@ def notify_staff_new_message(room_id, author_name, text, room_type):
         requests.post(
             'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c?action=staff_send',
             json={'text': msg},
-            timeout=6,
+            timeout=4,
         )
     except Exception:
         pass

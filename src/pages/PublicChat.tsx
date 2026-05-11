@@ -65,7 +65,12 @@ export default function PublicChat() {
   useEffect(() => {
     if (!token) return;
     loadRooms();
-    const id = setInterval(loadRooms, 12000);
+    // 20с вместо 12с + пропуск скрытой вкладки (экономия compute)
+    const tick = () => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      loadRooms();
+    };
+    const id = setInterval(tick, 20000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);

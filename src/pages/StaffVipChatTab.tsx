@@ -57,6 +57,8 @@ export default function StaffVipChatTab({ token, onUnread }: Props) {
   };
 
   const poll = useCallback(async () => {
+    // Не дёргаем backend если вкладка не активна
+    if (typeof document !== "undefined" && document.hidden) return;
     try {
       const data: PollResp = await api("poll", { after_id: lastIdRef.current });
       if (data.error) { setError(data.error); return; }

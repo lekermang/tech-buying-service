@@ -466,7 +466,7 @@ def _send_push_to_all_except(author_id: int, payload: dict) -> int:
                     data=body_str,
                     vapid_private_key=private_key,
                     vapid_claims=vapid_claims,
-                    timeout=8,
+                    timeout=4,
                 )
                 sent += 1
             except WebPushException as e:

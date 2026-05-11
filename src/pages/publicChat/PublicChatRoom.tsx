@@ -43,6 +43,8 @@ export default function PublicChatRoom({
 
   const poll = useCallback(async () => {
     if (!activeRoomId) return;
+    // Не дёргаем backend если вкладка не активна (экономия compute)
+    if (typeof document !== "undefined" && document.hidden) return;
     const r = await pchatApi("poll", { room_id: activeRoomId, after_id: lastIdRef.current }, token);
     if (!r.ok) return;
     const msgs = (r.messages as Message[]) || [];
