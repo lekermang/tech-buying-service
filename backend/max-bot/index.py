@@ -701,23 +701,79 @@ def handle_message(msg: dict) -> dict:
     return {'ok': True}
 
 
+def lookup_chat_id_by_user(max_user_id: int) -> int | None:
+    """Берём правильный chat_id из pchat_clients (сохранён при первом /start)."""
+    try:
+        conn = _conn(); cur = conn.cursor()
+        cur.execute(
+            f"SELECT max_chat_id FROM {SCHEMA}.pchat_clients "
+            f"WHERE max_user_id={int(max_user_id)} AND max_chat_id IS NOT NULL "
+            f"ORDER BY last_seen_at DESC NULLS LAST LIMIT 1"
+        )
+        r = cur.fetchone(); cur.close(); conn.close()
+        if r and r[0]:
+            return int(r[0])
+    except Exception as e:
+        print(f'[MAX] lookup_chat_id_by_user error: {e}')
+    return None
+
+
+def answer_callback(callback_id: str, text: str | None = None, notification: str | None = None) -> tuple[bool, dict]:
+    """Ответ на нажатие inline-кнопки. MAX API: POST /answers?callback_id=..."""
+    if not callback_id:
+        return False, {'error': 'empty callback_id'}
+    payload: dict = {}
+    if notification:
+        payload['notification'] = notification
+    if text is not None:
+        # message-объект для замены текста (если нужно)
+        payload['message'] = {'text': text, 'format': 'markdown'}
+    return max_call('answers', params={'callback_id': callback_id}, payload=payload or {'notification': '✓'})
+
+
 def handle_callback(cb: dict) -> dict:
-    """Нажатие inline-кнопки (тип callback)."""
+    """Нажатие inline-кнопки (тип callback).
+    В MAX callback приходит БЕЗ chat_id — только user_id и callback_id.
+    Поэтому chat_id берём из БД (сохранён, когда юзер первый раз писал /start)."""
     sender = cb.get('user') or cb.get('sender') or cb.get('from') or {}
     max_user_id = int(sender.get('user_id') or sender.get('id') or 0)
-    msg_obj = cb.get('message') or {}
-    recipient = msg_obj.get('recipient') or cb.get('recipient') or {}
-    chat = msg_obj.get('chat') or cb.get('chat') or {}
-    max_chat_id = int(
-        recipient.get('chat_id')
-        or chat.get('chat_id') or chat.get('id')
-        or max_user_id
-    )
     payload = cb.get('payload') or cb.get('data') or cb.get('callback_data') or ''
+    callback_id = cb.get('callback_id') or ''
 
-    if not max_user_id or not max_chat_id:
+    if not max_user_id:
+        _log('in', 'callback_no_user', payload, payload=cb, error='no max_user_id')
         return {'ok': False}
 
+    # 1. Ищем правильный chat_id в БД
+    max_chat_id = lookup_chat_id_by_user(max_user_id)
+
+    # 2. Если не нашли — пробуем достать из вложенных полей (на всякий случай)
+    if not max_chat_id:
+        msg_obj = cb.get('message') or {}
+        recipient = msg_obj.get('recipient') or cb.get('recipient') or {}
+        chat = msg_obj.get('chat') or cb.get('chat') or {}
+        max_chat_id = int(
+            recipient.get('chat_id')
+            or chat.get('chat_id') or chat.get('id')
+            or 0
+        )
+
+    if not max_chat_id:
+        # Совсем нет chat_id — пробуем хотя бы коротким ответом на callback
+        if callback_id:
+            answer_callback(callback_id, notification='Нажмите /start для активации меню')
+        _log('in', 'callback_no_chat', payload, max_user_id=max_user_id, payload=cb,
+             error='no chat_id; user must press /start first')
+        return {'ok': False, 'reason': 'no_chat_id'}
+
+    # 3. Подтверждаем нажатие (убираем «крутилку» с кнопки в UI)
+    if callback_id:
+        try:
+            answer_callback(callback_id)
+        except Exception as e:
+            print(f'[MAX] answer_callback failed: {e}')
+
+    # 4. Диспатчим меню
     if payload.startswith('menu:'):
         key = payload.split(':', 1)[1]
         dispatch_menu(key, max_chat_id, max_user_id)
@@ -788,7 +844,7 @@ def action_webhook(body: dict) -> dict:
         handle_callback(body.get('callback') or body)
         return _ok({'ok': True})
 
-    # Бота добавили в канал/группу — сохраняем chat_id как staff-канал
+    # Бота добавили в канал/группу — сохраняем chat_id как staff-канал или news-канал
     if update_type in ('bot_added', 'chat_member_updated', 'message_chat_created'):
         chat = body.get('chat') or body.get('recipient') or body
         chat_id = chat.get('chat_id') or chat.get('id')
@@ -796,12 +852,28 @@ def action_webhook(body: dict) -> dict:
         title = chat.get('title') or ''
         if chat_id:
             try:
-                save_staff_channel(int(chat_id), chat_type, title)
-                _log('in', f'bot_added:{chat_type}', title, max_chat_id=int(chat_id), payload=body)
-                # Поздороваемся
-                send_max_message(int(chat_id),
-                    f"✅ Бот *Скупка24* подключён к каналу «{title or chat_type}».\n"
-                    f"Сюда будут приходить новые заявки и сообщения клиентов.")
+                # Каналы (channel) — для публикации новостей. Группы (chat/group) — staff.
+                if chat_type == 'channel':
+                    conn = _conn(); cur = conn.cursor()
+                    cur.execute(
+                        f"INSERT INTO {SCHEMA}.settings (key, value) VALUES ('max_news_channel_id', {_esc(str(int(chat_id)))}) "
+                        f"ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value"
+                    )
+                    cur.execute(
+                        f"INSERT INTO {SCHEMA}.settings (key, value) VALUES ('max_news_channel_title', {_esc(title or 'channel')}) "
+                        f"ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value"
+                    )
+                    conn.commit(); cur.close(); conn.close()
+                    _log('in', f'bot_added:news_channel', title, max_chat_id=int(chat_id), payload=body)
+                    send_max_message(int(chat_id),
+                        f"✅ Бот *Скупка24* подключён к каналу «{title or 'канал'}».\n"
+                        f"Сюда будут публиковаться новости автоматически (раз в 5 часов).")
+                else:
+                    save_staff_channel(int(chat_id), chat_type, title)
+                    _log('in', f'bot_added:{chat_type}', title, max_chat_id=int(chat_id), payload=body)
+                    send_max_message(int(chat_id),
+                        f"✅ Бот *Скупка24* подключён к группе «{title or chat_type}».\n"
+                        f"Сюда будут приходить заявки и сообщения клиентов.")
             except Exception as e:
                 _log('in', update_type, '', payload=body, error=str(e))
         return _ok({'ok': True})
@@ -1031,6 +1103,45 @@ def handler(event: dict, context) -> dict:
 
     if method == 'GET' and action == 'staff_status':
         return action_staff_status()
+
+    # Постинг в MAX-канал новостей (chat_id из settings.max_news_channel_id)
+    if method == 'POST' and action == 'send_to_chat':
+        text = (body.get('text') or '').strip()
+        if not text:
+            return _err(400, 'text обязателен')
+        # Канал-получатель: явно из body или из settings.max_news_channel_id
+        target_id = body.get('chat_id')
+        if not target_id:
+            try:
+                conn = _conn(); cur = conn.cursor()
+                cur.execute(f"SELECT value FROM {SCHEMA}.settings WHERE key='max_news_channel_id' LIMIT 1")
+                r = cur.fetchone(); cur.close(); conn.close()
+                if r and r[0]:
+                    target_id = int(r[0])
+            except Exception:
+                target_id = None
+        if not target_id:
+            return _ok({'ok': True, 'delivered': False, 'reason': 'no_max_news_channel'})
+        ok, d = send_max_message(int(target_id), text)
+        _log('out', 'news_to_channel', text, max_chat_id=int(target_id),
+             payload=d, error='' if ok else json.dumps(d, ensure_ascii=False)[:300])
+        return _ok({'ok': ok, 'delivered': ok, 'channel_id': int(target_id), 'response': d})
+
+    # Привязка канала новостей: GET ?action=bind_news_channel&chat_id=...
+    if action == 'bind_news_channel':
+        cid_str = (qp.get('chat_id') or '').strip()
+        if not cid_str.lstrip('-').isdigit():
+            return _err(400, 'chat_id query param required')
+        try:
+            conn = _conn(); cur = conn.cursor()
+            cur.execute(
+                f"INSERT INTO {SCHEMA}.settings (key, value) VALUES ('max_news_channel_id', {_esc(cid_str)}) "
+                f"ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value"
+            )
+            conn.commit(); cur.close(); conn.close()
+        except Exception as e:
+            return _err(500, f'db error: {e}')
+        return _ok({'ok': True, 'max_news_channel_id': int(cid_str)})
 
     # Диагностика: GET ?action=test_owner — отправить владельцу простой тест
     if action == 'test_owner':

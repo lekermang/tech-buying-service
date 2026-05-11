@@ -1391,10 +1391,94 @@ def do_post_news():
             result = send_tg_message(news_chat_id, text)
         msg_id = result.get('result', {}).get('message_id')
         log_news_post(topic, message_id=msg_id)
+        # ─── Параллельно публикуем в MAX-канал (раз в 5 часов) ───
+        try:
+            post_max_news_if_due(topic, text)
+        except Exception as max_err:
+            print(f'[MAX NEWS] error: {max_err}')
         return {'ok': True, 'topic': topic, 'message_id': msg_id, 'has_photo': photo_bytes is not None}
     except Exception as e:
         log_news_post(topic, error=str(e)[:500])
         return {'ok': False, 'topic': topic, 'reason': f'Telegram error: {e}'}
+
+
+# ─────────── MAX-канал: автопостинг новостей раз в 5 часов ───────────
+
+def get_last_max_news_at():
+    """Когда последний раз постили в MAX-канал."""
+    try:
+        conn = get_conn(); cur = conn.cursor()
+        cur.execute(
+            f"SELECT value FROM {SCHEMA}.settings WHERE key='max_news_last_at' LIMIT 1"
+        )
+        r = cur.fetchone(); cur.close(); conn.close()
+        if r and r[0]:
+            return datetime.fromisoformat(r[0])
+    except Exception:
+        pass
+    return None
+
+
+def mark_max_news_posted():
+    try:
+        conn = get_conn(); cur = conn.cursor()
+        now_iso = datetime.now(timezone.utc).isoformat()
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.settings (key, value) VALUES ('max_news_last_at', %s) "
+            f"ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value",
+            (now_iso,)
+        )
+        conn.commit(); cur.close(); conn.close()
+    except Exception as e:
+        print(f'[MAX NEWS] mark error: {e}')
+
+
+def get_max_news_channel_id():
+    """ID канала-получателя новостей в MAX. Сохраняется в settings.max_news_channel_id."""
+    try:
+        conn = get_conn(); cur = conn.cursor()
+        cur.execute(
+            f"SELECT value FROM {SCHEMA}.settings WHERE key='max_news_channel_id' LIMIT 1"
+        )
+        r = cur.fetchone(); cur.close(); conn.close()
+        if r and r[0]:
+            v = int(r[0])
+            return v if v else None
+    except Exception:
+        pass
+    return None
+
+
+def post_max_news_if_due(topic: str, text: str) -> dict:
+    """Постит в MAX-канал если прошло >= 5 часов с прошлой публикации.
+    Если MAX-канал не привязан — no-op (тихо)."""
+    last = get_last_max_news_at()
+    now = datetime.now(timezone.utc)
+    if last and (now - last) < timedelta(hours=5):
+        return {'ok': True, 'skipped': True, 'reason': 'cooldown_5h',
+                'next_at': (last + timedelta(hours=5)).isoformat()}
+    channel_id = get_max_news_channel_id()
+    if not channel_id:
+        return {'ok': True, 'skipped': True, 'reason': 'no_max_channel'}
+    # Очищаем HTML-теги из текста (TG-формат) → markdown для MAX
+    plain = text.replace('<b>', '*').replace('</b>', '*').replace('<i>', '_').replace('</i>', '_')
+    plain = plain.replace('<br>', '\n').replace('<br/>', '\n')
+    # Удаляем прочие теги
+    import re as _re
+    plain = _re.sub(r'<[^>]+>', '', plain)
+    body = json.dumps({'text': plain}).encode('utf-8')
+    try:
+        req = urllib.request.Request(
+            'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c?action=send_to_chat',
+            data=body,
+            headers={'Content-Type': 'application/json'}
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            d = json.loads(resp.read())
+        mark_max_news_posted()
+        return {'ok': True, 'channel_id': channel_id, 'response': d}
+    except Exception as e:
+        return {'ok': False, 'error': str(e)}
 
 
 def handler(event: dict, context) -> dict:
