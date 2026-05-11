@@ -637,10 +637,10 @@ def handle_message(msg: dict) -> dict:
         _log('in', 'unknown_sender', text, payload=msg, error='no max_user_id')
         return {'ok': False}
 
-    # Если это сообщение из ГРУППЫ/КАНАЛА — фиксируем как staff-канал, не отвечаем приветствием
-    if chat_type in ('chat', 'channel', 'group') or max_chat_id != max_user_id:
+    # Если это сообщение из ГРУППЫ/КАНАЛА (НЕ личный диалог) — фиксируем как staff-канал, не отвечаем приветствием
+    if chat_type in ('chat', 'channel', 'group'):
         try:
-            save_staff_channel(max_chat_id, chat_type, chat.get('title') or '')
+            save_staff_channel(max_chat_id, chat_type, recipient.get('title') or chat.get('title') or '')
         except Exception:
             pass
         _log('in', f'staff_channel:{chat_type}', text[:200], max_chat_id=max_chat_id, payload=msg)
@@ -754,7 +754,8 @@ def get_staff_channel_id() -> int | None:
         cur.execute(f"SELECT value FROM {SCHEMA}.settings WHERE key='max_staff_channel_id' LIMIT 1")
         r = cur.fetchone(); cur.close(); conn.close()
         if r and r[0]:
-            return int(r[0])
+            v = int(r[0])
+            return v if v > 0 else None
     except Exception:
         pass
     return None
