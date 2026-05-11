@@ -21,6 +21,7 @@ export const Goals = {
   CALL_CLICK:        "call_click",        // клик по номеру телефона
   WHATSAPP_CLICK:    "whatsapp_click",    // переход в WhatsApp
   TELEGRAM_CLICK:    "telegram_click",    // переход в Telegram
+  MAX_CLICK:         "max_click",         // переход в MAX (max.ru)
   FORM_OPEN:         "form_open",         // открытие формы оценки
   FORM_SUBMIT:       "form_submit",       // отправка заявки (попытка)
   FORM_SUCCESS:      "form_success",      // успешная отправка заявки ★
