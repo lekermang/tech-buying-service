@@ -243,6 +243,31 @@ export default function LeadsAlertWatcher({ token, empName }: { token: string; e
     setTimeout(() => setShareToast(null), 3500);
   };
 
+  // Пригласить клиента в мессенджер MAX: сотруднику открывается MAX на чате с клиентом,
+  // плюс клиенту параллельно уходит SMS со ссылкой (через тот же invite_create).
+  const inviteMax = async (lead: Lead) => {
+    try {
+      const r = await fetch("https://functions.poehali.dev/db114166-21ce-4b87-9d05-59286ee73d6e?action=invite_create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Employee-Token": token },
+        body: JSON.stringify({ phone: lead.client_phone, name: lead.client_name, lead_id: lead.id }),
+      });
+      const d = await r.json();
+      if (d.ok && d.max_url) {
+        // Открываем MAX у сотрудника (диплинк или ссылка на бота)
+        window.open(d.max_url as string, "_blank");
+        const parts: string[] = ["MAX открыт"];
+        if (d.sms_sent) parts.push("SMS клиенту");
+        setShareToast(`💬 ${parts.join(" + ")}`);
+      } else {
+        setShareToast("❌ Не удалось открыть MAX");
+      }
+    } catch {
+      setShareToast("❌ Ошибка сети");
+    }
+    setTimeout(() => setShareToast(null), 3500);
+  };
+
   const overdue = stats?.overdue_count || 0;
   const newCount = stats?.new_count || 0;
   const totalActive = newCount + (stats?.taken_count || 0);
@@ -450,6 +475,13 @@ export default function LeadsAlertWatcher({ token, empName }: { token: string; e
                         title="Отправить SMS со ссылкой на персональный чат"
                       >
                         <Icon name="MessageCircle" size={11} /> Пригласить в чат
+                      </button>
+                      <button
+                        onClick={() => inviteMax(l)}
+                        className="text-[10px] text-cyan-300/85 hover:text-cyan-200 underline inline-flex items-center gap-1"
+                        title="Открыть мессенджер MAX у сотрудника и параллельно отправить клиенту SMS со ссылкой на MAX-чат"
+                      >
+                        <Icon name="Send" size={11} /> Пригласить в MAX
                       </button>
                       <button
                         onClick={() => robocallLead(l)}

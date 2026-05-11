@@ -78,4 +78,5 @@ export type OrderCardActionsProps = {
   onIssueOrder: (o: Order, issuedAt?: string) => void;
   onDelete: (id: number) => void;
   onCallRobotReady?: (id: number) => Promise<boolean> | void;
+  onInviteToMax?: (id: number) => Promise<boolean> | void;
 };

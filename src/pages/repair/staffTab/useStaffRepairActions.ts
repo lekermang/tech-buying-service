@@ -346,6 +346,30 @@ export function useStaffRepairActions(token: string, st: StaffRepairState) {
     }
   };
 
+  // ─── Пригласить клиента в MAX из карточки ремонта ────────────────────────────
+  const inviteToMax = async (id: number): Promise<boolean> => {
+    try {
+      const res = await fetch(REPAIR_URL, {
+        method: "POST", headers,
+        body: JSON.stringify({ action: "invite_max", id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.ok === false || data.error) {
+        toast.error(data.error || "Не удалось открыть MAX");
+        return false;
+      }
+      if (data.max_url) {
+        window.open(data.max_url as string, "_blank");
+      }
+      const sub = data.sms_sent ? " (SMS отправлена)" : "";
+      toast.success(`#${id}: MAX открыт${sub}`);
+      return true;
+    } catch (e) {
+      toast.error(humanizeError({ action: "status", thrown: e }));
+      return false;
+    }
+  };
+
   // ─── Инициализация формы редактирования ──────────────────────────────────────
   const initEditForm = (o: Order): EditForm => ({
     name: o.name, phone: o.phone,
@@ -366,6 +390,7 @@ export function useStaffRepairActions(token: string, st: StaffRepairState) {
     issueOrder, deleteOrder,
     openReadyModal, submitReady,
     callRobotReady,
+    inviteToMax,
     initEditForm,
   };
 }

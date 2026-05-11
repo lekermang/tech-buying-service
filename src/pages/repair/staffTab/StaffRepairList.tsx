@@ -51,6 +51,7 @@ type Props = {
   saveCard: (o: Order) => void;
   deleteOrder: (id: number) => void;
   callRobotReady?: (id: number) => Promise<boolean>;
+  inviteToMax?: (id: number) => Promise<boolean>;
   cardsView?: "grid" | "list";
 };
 
@@ -59,7 +60,7 @@ export default function StaffRepairList({
   showForm, form, setForm, creating, createOrder,
   expandedId, setExpandedId, editForm, setEditForm, initEditForm,
   saving, saveError, setSaveError, isOwner, token,
-  changeStatus, openReadyModal, issueOrder, saveCard, deleteOrder, callRobotReady,
+  changeStatus, openReadyModal, issueOrder, saveCard, deleteOrder, callRobotReady, inviteToMax,
   cardsView = "list",
 }: Props) {
   // На мобильном (md и ниже) всегда 1 колонка, на десктопе — зависит от cardsView
@@ -243,6 +244,7 @@ export default function StaffRepairList({
                 onSaveCard={saveCard}
                 onDelete={deleteOrder}
                 onCallRobotReady={callRobotReady}
+                onInviteToMax={inviteToMax}
               />
             </div>
           );

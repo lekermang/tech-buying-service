@@ -12,6 +12,7 @@ type Props = {
   onOpenReadyModal: (o: Order) => void;
   onIssueOrder: (o: Order, issuedAt?: string) => void;
   onCallRobotReady?: (id: number) => Promise<boolean> | void;
+  onInviteToMax?: (id: number) => Promise<boolean> | void;
 };
 
 /**
@@ -30,13 +31,19 @@ type Props = {
  */
 export default function OrderCardStatusBlock({
   o, ef, saving, financeBlocked,
-  onChangeStatus, onOpenReadyModal, onIssueOrder, onCallRobotReady,
+  onChangeStatus, onOpenReadyModal, onIssueOrder, onCallRobotReady, onInviteToMax,
 }: Props) {
   const [calling, setCalling] = useState(false);
+  const [maxInviting, setMaxInviting] = useState(false);
   const callRobot = async () => {
     if (!onCallRobotReady || calling) return;
     setCalling(true);
     try { await onCallRobotReady(o.id); } finally { setCalling(false); }
+  };
+  const inviteMax = async () => {
+    if (!onInviteToMax || maxInviting) return;
+    setMaxInviting(true);
+    try { await onInviteToMax(o.id); } finally { setMaxInviting(false); }
   };
   // Дата выдачи (для кнопки «Выдан»)
   const nowLocal = () => {
@@ -175,17 +182,32 @@ export default function OrderCardStatusBlock({
         </div>
       )}
 
-      {/* Кнопка «Ремонт готов — позвонить роботом» — видна когда уже Готов / Выдан */}
-      {(o.status === "ready" || o.status === "done") && onCallRobotReady && o.phone && (
-        <button
-          onClick={callRobot}
-          disabled={calling}
-          title="Робот Zvonok перезвонит клиенту и зачитает: ремонт готов, адрес, режим работы"
-          className="mt-2.5 w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500/15 to-emerald-500/5 hover:from-emerald-500/25 hover:to-emerald-500/10 border border-emerald-500/40 hover:border-emerald-400 text-emerald-300 hover:text-emerald-200 px-3 py-2 rounded-lg text-[11px] font-oswald font-bold uppercase tracking-wide transition-all active:scale-[0.98] disabled:opacity-50"
-        >
-          <Icon name={calling ? "Loader" : "PhoneCall"} size={13} className={calling ? "animate-spin" : ""} />
-          {calling ? "Робот звонит..." : "Позвонить роботом «Ремонт готов»"}
-        </button>
+      {/* Ряд кнопок связи: робот-звонок (только при Готов/Выдан) + пригласить в MAX (всегда если есть телефон) */}
+      {o.phone && (onCallRobotReady || onInviteToMax) && (
+        <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {(o.status === "ready" || o.status === "done") && onCallRobotReady && (
+            <button
+              onClick={callRobot}
+              disabled={calling}
+              title="Робот Zvonok перезвонит клиенту и зачитает: ремонт готов, адрес, режим работы"
+              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500/15 to-emerald-500/5 hover:from-emerald-500/25 hover:to-emerald-500/10 border border-emerald-500/40 hover:border-emerald-400 text-emerald-300 hover:text-emerald-200 px-3 py-2 rounded-lg text-[11px] font-oswald font-bold uppercase tracking-wide transition-all active:scale-[0.98] disabled:opacity-50"
+            >
+              <Icon name={calling ? "Loader" : "PhoneCall"} size={13} className={calling ? "animate-spin" : ""} />
+              {calling ? "Робот звонит..." : "Робот: «Ремонт готов»"}
+            </button>
+          )}
+          {onInviteToMax && (
+            <button
+              onClick={inviteMax}
+              disabled={maxInviting}
+              title="Открыть мессенджер MAX у сотрудника и параллельно отправить клиенту SMS со ссылкой на MAX-чат"
+              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-500/15 to-cyan-500/5 hover:from-cyan-500/25 hover:to-cyan-500/10 border border-cyan-500/40 hover:border-cyan-400 text-cyan-300 hover:text-cyan-200 px-3 py-2 rounded-lg text-[11px] font-oswald font-bold uppercase tracking-wide transition-all active:scale-[0.98] disabled:opacity-50"
+            >
+              <Icon name={maxInviting ? "Loader" : "Send"} size={13} className={maxInviting ? "animate-spin" : ""} />
+              {maxInviting ? "Открываю MAX..." : "Пригласить в MAX"}
+            </button>
+          )}
+        </div>
       )}
 
       {/* ── «Прочее» — служебные статусы ── */}

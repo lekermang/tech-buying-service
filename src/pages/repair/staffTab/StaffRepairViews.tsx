@@ -101,6 +101,7 @@ export default function StaffRepairViews({
           saveCard={actions.saveCard}
           deleteOrder={actions.deleteOrder}
           callRobotReady={actions.callRobotReady}
+          inviteToMax={actions.inviteToMax}
           cardsView={st.cardsView}
         />
       )}

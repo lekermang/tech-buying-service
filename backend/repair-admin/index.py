@@ -1467,6 +1467,58 @@ def handler(event: dict, context) -> dict:
                 return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'message': 'Робот звонит клиенту'}, ensure_ascii=False)}
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': False, 'error': info.get('error') or 'Не удалось дозвониться'}, ensure_ascii=False)}
 
+        # Пригласить клиента в чат через мессенджер MAX (и заодно SMS со ссылкой на персональный чат сайта).
+        # Используется кнопкой «Пригласить в MAX» в карточке ремонта.
+        if action == 'invite_max':
+            order_id = int(body.get('id', 0))
+            if not order_id:
+                cur.close(); conn.close()
+                return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'ok': False, 'error': 'id обязателен'}, ensure_ascii=False)}
+            cur.execute(f"SELECT phone, name FROM {SCHEMA}.repair_orders WHERE id={order_id}")
+            row = cur.fetchone()
+            if not row:
+                cur.close(); conn.close()
+                return {'statusCode': 404, 'headers': HEADERS, 'body': json.dumps({'ok': False, 'error': 'Заявка не найдена'}, ensure_ascii=False)}
+            r_phone, r_name = row
+            digits = ''.join(c for c in (r_phone or '') if c.isdigit())
+            if len(digits) == 11 and digits.startswith('8'):
+                digits = '7' + digits[1:]
+            elif len(digits) == 10:
+                digits = '7' + digits
+            if len(digits) != 11:
+                cur.close(); conn.close()
+                return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'ok': False, 'error': 'У клиента не указан телефон'}, ensure_ascii=False)}
+            # Читаем настройку max_invite_link
+            max_link = ''
+            try:
+                cur.execute(f"SELECT value FROM {SCHEMA}.settings WHERE key='max_invite_link' LIMIT 1")
+                rr = cur.fetchone()
+                if rr and rr[0]:
+                    max_link = str(rr[0]).strip()
+            except Exception:
+                pass
+            cur.close(); conn.close()
+            # SMS клиенту
+            if max_link:
+                sms_text = f"Скупка24: ремонт #{order_id} — напишите нам в MAX: {max_link} (ответим за минуту)"
+            else:
+                sms_text = f"Скупка24: ремонт #{order_id} — найдите нас в MAX по номеру 8-800-600-68-33 (ответим за минуту)"
+            sms_ok = False
+            try:
+                send_sms(r_phone, sms_text)
+                sms_ok = True
+            except Exception as sms_err:
+                print(f'[INVITE MAX] sms error: {sms_err}')
+            # Диплинк для сотрудника
+            max_url = max_link if max_link else f'max://u/+{digits}'
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({
+                'ok': True,
+                'max_url': max_url,
+                'max_invite_link': max_link,
+                'sms_sent': sms_ok,
+                'message': 'SMS отправлена клиенту' if sms_ok else 'Открыт MAX (SMS не отправлено)',
+            }, ensure_ascii=False)}
+
         # Обновить статус / поля заявки
         order_id = int(body.get('id', 0))
         if not order_id:

@@ -667,11 +667,23 @@ def action_invite_create(body, headers):
         f"VALUES ({_esc(token)}, {_esc(phone)}, {_esc(name)}, "
         f"{('NULL' if not lead_id else int(lead_id))}, {_esc(str(emp['id']))}, NOW() + INTERVAL '14 days')"
     )
+    # Читаем MAX-ссылку из настроек (если задана — добавим в SMS и вернём фронту)
+    max_invite_link = ''
+    try:
+        c2 = conn.cursor()
+        c2.execute(f"SELECT value FROM {SCHEMA}.settings WHERE key='max_invite_link' LIMIT 1")
+        rr2 = c2.fetchone()
+        if rr2 and rr2[0]:
+            max_invite_link = str(rr2[0]).strip()
+        c2.close()
+    except Exception:
+        pass
     conn.commit(); cur.close(); conn.close()
     invite_url = f'{SITE_URL}/chat?invite={token}'
+    max_part = f" Или MAX: {max_invite_link}" if max_invite_link else ''
     sms_text = (
-        f"Скупка24: ваш персональный чат с менеджером — {invite_url} "
-        f"(вход без регистрации, ответим за минуту)"
+        f"Скупка24: ваш персональный чат с менеджером — {invite_url}"
+        f"{max_part} (вход без регистрации, ответим за минуту)"
     )
     sent, sms_info = send_sms(phone, sms_text)
     # Параллельно пробуем отправить через Telegram (если у клиента уже был tg_id) и WhatsApp-ссылку
@@ -699,6 +711,8 @@ def action_invite_create(body, headers):
     wa_url = f'https://wa.me/{digits}?text=' + requests.utils.quote(
         f"Здравствуйте! Это Скупка24. Ваш персональный чат с менеджером: {invite_url}"
     )
+    # MAX: если у компании есть публичная ссылка — отдаём её, иначе фолбек — диплинк по номеру.
+    max_url = max_invite_link if max_invite_link else f'max://u/+{digits}'
     return _ok({
         'ok': True,
         'invite_token': token,
@@ -706,6 +720,8 @@ def action_invite_create(body, headers):
         'sms_sent': bool(sent), 'sms_info': sms_info,
         'tg_sent': tg_sent,
         'wa_url': wa_url,
+        'max_url': max_url,
+        'max_invite_link': max_invite_link,
     })
 
 
