@@ -1150,6 +1150,25 @@ def handler(event: dict, context) -> dict:
     except Exception as max_err:
         print(f'[MAX][repair-new] error: {max_err}')
 
+    # 💬 MAX-канал сотрудников: дублируем уведомление о новой заявке на ремонт
+    try:
+        staff_repair = (
+            f"🔧 *Новый ремонт #{order_id}*\n\n"
+            f"👤 {name or '—'}\n"
+            f"📞 {phone or '—'}\n"
+            f"📱 {model or '—'}\n"
+            + (f"🛠 {repair_type}\n" if repair_type else "")
+            + (f"💰 {price_str}\n" if price_str else "")
+            + (f"📝 {comment[:200]}\n" if comment else "")
+        )
+        requests.post(
+            'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c?action=staff_send',
+            json={'text': staff_repair},
+            timeout=6,
+        )
+    except Exception as max_err:
+        print(f'[MAX STAFF REPAIR-NEW] error: {max_err}')
+
     # ── УВЕДОМЛЕНИЯ (не влияют на сохранение заявки) ─────────────────────────
     if token:
         try:

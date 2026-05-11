@@ -218,58 +218,316 @@ def notify_staff_telegram(author: str, text: str, source: str = 'MAX'):
 
 # ───────────────── команды бота ────────────────────────────────────
 
+SITE_URL = 'https://skypka24.com'
+
 WELCOME_TEXT = (
-    "👋 Здравствуйте! Это Скупка24 — выкуп техники, ремонт, каталог Б/У.\n\n"
-    "Чем могу помочь?\n\n"
-    "📱 *Скупка* — оценим вашу технику и купим за 15 минут\n"
-    "🔧 *Ремонт* — починим за 1 день, гарантия 90 дней\n"
-    "🛒 *Каталог* — проверенные Б/У смартфоны\n"
-    "📞 *Контакты* — адрес и телефон\n\n"
-    "Или просто напишите ваш вопрос — менеджер ответит за минуту.\n"
-    "Чтобы узнать статус ремонта — отправьте *#номер* (например `#10`)."
+    "👋 *Скупка24 — техника, ремонт, золото*\n\n"
+    "Выбирайте — что нужно:\n\n"
+    "📱 *Оценить технику* — пришлём цену за 5 минут\n"
+    "🔧 *Сдать в ремонт* — починим за 1 день, гарантия 90 дней\n"
+    "🛒 *Каталог Б/У* — проверенные iPhone и Android\n"
+    "💰 *Цена золота* — актуальный курс приёма\n"
+    "📋 *Мои заявки* — статус ремонтов и оценок\n"
+    "📍 *Филиалы* — адреса, часы работы\n"
+    "💬 *Написать менеджеру* — ответим за минуту\n\n"
+    "_Подсказка: для статуса ремонта отправьте *#номер* (например #10)_"
 )
 
 
-def cmd_start(chat_id: int, max_user_id: int) -> dict:
-    keyboard = {
+def main_keyboard() -> dict:
+    """Главное меню — двумя колонками для компактности."""
+    return {
         'buttons': [
-            [{'type': 'callback', 'text': '📱 Скупка', 'payload': 'menu:buy'}],
-            [{'type': 'callback', 'text': '🔧 Ремонт', 'payload': 'menu:repair'}],
-            [{'type': 'callback', 'text': '🛒 Каталог', 'payload': 'menu:catalog'}],
-            [{'type': 'callback', 'text': '📞 Контакты', 'payload': 'menu:contacts'}],
+            [{'type': 'callback', 'text': '📱 Оценить технику', 'payload': 'menu:buy'},
+             {'type': 'callback', 'text': '🔧 Ремонт', 'payload': 'menu:repair'}],
+            [{'type': 'callback', 'text': '🛒 Каталог', 'payload': 'menu:catalog'},
+             {'type': 'callback', 'text': '💰 Цена золота', 'payload': 'menu:gold'}],
+            [{'type': 'callback', 'text': '📋 Мои заявки', 'payload': 'menu:my_orders'},
+             {'type': 'callback', 'text': '📍 Филиалы', 'payload': 'menu:branches'}],
+            [{'type': 'callback', 'text': '💬 Связаться с менеджером', 'payload': 'menu:contact'}],
+            [{'type': 'link', 'text': '🌐 Открыть сайт', 'url': SITE_URL}],
         ]
     }
-    send_max_message(chat_id, WELCOME_TEXT, reply_markup=keyboard)
+
+
+def cmd_start(chat_id: int, max_user_id: int) -> dict:
+    send_max_message(chat_id, WELCOME_TEXT, reply_markup=main_keyboard())
     return {'ok': True}
 
 
-MENU_TEXTS = {
-    'buy': (
-        "📱 *Скупка техники*\n\n"
-        "Покупаем iPhone, Android, ноутбуки, планшеты, часы.\n"
-        "Оценка за 5 минут, оплата сразу — наличные или на карту.\n\n"
-        "Напишите модель и состояние — пришлю ориентир по цене."
-    ),
-    'repair': (
-        "🔧 *Ремонт*\n\n"
-        "iPhone, Android, ноутбуки. Гарантия 90 дней.\n"
-        "Если уже сдали технику — пришлите *#номер заявки*, скажу статус.\n\n"
-        "Напишите модель и проблему — расскажу сроки и цену."
-    ),
-    'catalog': (
+# ─────────────── контент-блоки для каждого пункта меню ────────────
+
+def menu_buy() -> tuple[str, dict]:
+    text = (
+        "📱 *Оценить технику онлайн*\n\n"
+        "Покупаем iPhone, MacBook, iPad, Apple Watch, Android, ноутбуки, "
+        "PlayStation, Xbox, золото и украшения.\n\n"
+        "💵 Оплата сразу: наличные или на карту.\n"
+        "⚡ Оценка за 5 минут — без выезда.\n\n"
+        "Что дальше:\n"
+        "1️⃣ Откройте форму оценки на сайте\n"
+        "2️⃣ Или напишите сюда: *модель, состояние* — менеджер пришлёт цену"
+    )
+    kb = {'buttons': [
+        [{'type': 'link', 'text': '⚡ Форма оценки', 'url': f'{SITE_URL}?action=eval'}],
+        [{'type': 'link', 'text': '📱 Что принимаем', 'url': f'{SITE_URL}?section=catalog'}],
+        [{'type': 'callback', 'text': '⬅ В меню', 'payload': 'menu:home'}],
+    ]}
+    return text, kb
+
+
+def menu_repair() -> tuple[str, dict]:
+    text = (
+        "🔧 *Ремонт техники*\n\n"
+        "iPhone, Android, ноутбуки, планшеты. Гарантия *90 дней*.\n"
+        "Большинство ремонтов — за 1 день.\n\n"
+        "Что дальше:\n"
+        "📲 Откройте форму ремонта на сайте\n"
+        "🔢 Или пришлите *#номер заявки* — скажу статус\n"
+        "💬 Или напишите модель и проблему — оценим"
+    )
+    kb = {'buttons': [
+        [{'type': 'link', 'text': '🔧 Сдать в ремонт', 'url': f'{SITE_URL}?section=repair'}],
+        [{'type': 'callback', 'text': '📋 Мои ремонты', 'payload': 'menu:my_orders'}],
+        [{'type': 'callback', 'text': '⬅ В меню', 'payload': 'menu:home'}],
+    ]}
+    return text, kb
+
+
+def menu_catalog() -> tuple[str, dict]:
+    text = (
         "🛒 *Каталог Б/У*\n\n"
-        "Проверенные iPhone, Android, планшеты.\n"
-        "Полный каталог: https://skypka24.com/catalog\n\n"
-        "Напишите что ищете — подскажу что есть в наличии."
-    ),
-    'contacts': (
-        "📞 *Контакты*\n\n"
-        "Калуга, ул. Кирова, 7\n"
-        "Тел.: 8-800-600-68-33\n"
-        "Часы работы: 10:00–21:00 ежедневно\n\n"
-        "Сайт: https://skypka24.com"
-    ),
-}
+        "Проверенные iPhone, Android, ноутбуки, планшеты.\n"
+        "✅ Полная диагностика\n"
+        "✅ Гарантия 30 дней\n"
+        "✅ Возврат 7 дней без вопросов\n\n"
+        "Откройте каталог — там цены и фото."
+    )
+    kb = {'buttons': [
+        [{'type': 'link', 'text': '🛒 Открыть каталог', 'url': f'{SITE_URL}/catalog'}],
+        [{'type': 'link', 'text': '📱 iPhone Б/У', 'url': f'{SITE_URL}/catalog?category=iphone'}],
+        [{'type': 'callback', 'text': '⬅ В меню', 'payload': 'menu:home'}],
+    ]}
+    return text, kb
+
+
+def menu_gold() -> tuple[str, dict]:
+    """Цена золота из БД (gold_prices)."""
+    text_lines = ["💰 *Цена приёма золота сегодня*\n"]
+    try:
+        conn = _conn(); cur = conn.cursor()
+        cur.execute(
+            f"SELECT sample, price_per_gram FROM {SCHEMA}.gold_prices "
+            f"WHERE is_active=true ORDER BY sample"
+        )
+        rows = cur.fetchall()
+        cur.close(); conn.close()
+        if rows:
+            for sample, price in rows:
+                text_lines.append(f"• *{sample} проба*: {price} ₽/г")
+        else:
+            text_lines.append("_Уточняйте у менеджера — цена обновляется ежедневно._")
+    except Exception:
+        text_lines.append("_Уточняйте у менеджера — цена обновляется ежедневно._")
+    text_lines.append("\n💍 Принимаем: украшения, лом, монеты, слитки.")
+    text_lines.append("📍 Калуга, ул. Кирова, 7 — приходите без записи.")
+    text = "\n".join(text_lines)
+    kb = {'buttons': [
+        [{'type': 'link', 'text': '💰 Подробнее о приёме золота', 'url': f'{SITE_URL}?section=gold'}],
+        [{'type': 'callback', 'text': '⬅ В меню', 'payload': 'menu:home'}],
+    ]}
+    return text, kb
+
+
+def menu_branches() -> tuple[str, dict]:
+    text = (
+        "📍 *Наши филиалы в Калуге*\n\n"
+        "*Офис №1* — ул. Кирова, 11\n"
+        "🕙 10:00 – 21:00 ежедневно\n"
+        "🚇 Карта: https://yandex.ru/maps/-/CHc4mC-V\n\n"
+        "*Офис №2* — ул. Кирова, 7/47\n"
+        "🕙 10:00 – 21:00 ежедневно\n"
+        "🚇 Карта: https://yandex.ru/maps/-/CHc4mO5l\n\n"
+        "📞 Общий телефон: *8-800-600-68-33*"
+    )
+    kb = {'buttons': [
+        [{'type': 'link', 'text': '📞 Позвонить', 'url': 'tel:+78006006833'}],
+        [{'type': 'callback', 'text': '⬅ В меню', 'payload': 'menu:home'}],
+    ]}
+    return text, kb
+
+
+def menu_contact() -> tuple[str, dict]:
+    text = (
+        "💬 *Написать менеджеру*\n\n"
+        "Просто напишите вопрос в этот чат — менеджер увидит и ответит "
+        "в течение минуты (10:00–21:00).\n\n"
+        "Также можно:\n"
+        "📞 Позвонить: 8-800-600-68-33\n"
+        "💬 WhatsApp: +7 992 999-03-33\n"
+        "✈️ Telegram: @skypka24"
+    )
+    kb = {'buttons': [
+        [{'type': 'link', 'text': '📞 Позвонить', 'url': 'tel:+78006006833'}],
+        [{'type': 'link', 'text': '💬 WhatsApp', 'url': 'https://wa.me/79929990333'}],
+        [{'type': 'callback', 'text': '⬅ В меню', 'payload': 'menu:home'}],
+    ]}
+    return text, kb
+
+
+def menu_my_orders(max_user_id: int) -> tuple[str, dict]:
+    """Список ремонтов и заявок клиента по его MAX-телефону."""
+    try:
+        conn = _conn(); cur = conn.cursor()
+        cur.execute(
+            f"SELECT phone FROM {SCHEMA}.pchat_clients WHERE max_user_id={int(max_user_id)} LIMIT 1"
+        )
+        rrow = cur.fetchone()
+        client_phone = None
+        if rrow and rrow[0] and not rrow[0].startswith('max:'):
+            client_phone = rrow[0]
+        lines = ["📋 *Ваши заявки и ремонты*\n"]
+        found_any = False
+        # Ремонты
+        if client_phone:
+            cur.execute(
+                f"SELECT id, status, model, repair_amount FROM {SCHEMA}.repair_orders "
+                f"WHERE phone={_esc(client_phone)} "
+                f"ORDER BY id DESC LIMIT 10"
+            )
+            repairs = cur.fetchall()
+            if repairs:
+                lines.append("🔧 *Ремонты:*")
+                status_emoji = {
+                    'new': '🆕', 'pending_approval': '🔍', 'accepted': '👨‍🔧',
+                    'in_progress': '🔧', 'waiting_parts': '📦', 'ready': '✅',
+                    'done': '📤', 'warranty': '🛡', 'cancelled': '❌',
+                }
+                for r_id, r_status, r_model, r_amount in repairs:
+                    emoji = status_emoji.get(r_status, '•')
+                    amt = f" · {r_amount} ₽" if r_amount and r_status in ('ready', 'done') else ''
+                    lines.append(f"{emoji} #{r_id} — {(r_model or '—')[:30]}{amt}")
+                found_any = True
+            # Заявки на скупку
+            cur.execute(
+                f"SELECT id, category, status FROM {SCHEMA}.leads_tracking "
+                f"WHERE client_phone={_esc(client_phone)} "
+                f"ORDER BY id DESC LIMIT 5"
+            )
+            leads = cur.fetchall()
+            if leads:
+                lines.append("\n📱 *Заявки на скупку:*")
+                for l_id, l_cat, l_status in leads:
+                    lines.append(f"• #{l_id} — {(l_cat or 'без категории')[:30]}")
+                found_any = True
+        cur.close(); conn.close()
+        if not found_any:
+            lines.append("_Пока заявок нет._\n\nОставьте оценку или сдайте технику — заявка появится здесь автоматически.")
+    except Exception as e:
+        print(f'[MAX my_orders] error: {e}')
+        lines = ["📋 *Ваши заявки*\n\n_Не удалось загрузить. Попробуйте позже или напишите менеджеру._"]
+    kb = {'buttons': [
+        [{'type': 'callback', 'text': '🔄 Обновить', 'payload': 'menu:my_orders'}],
+        [{'type': 'link', 'text': '🌐 Открыть на сайте', 'url': f'{SITE_URL}/cabinet'}],
+        [{'type': 'callback', 'text': '⬅ В меню', 'payload': 'menu:home'}],
+    ]}
+    return "\n".join(lines), kb
+
+
+def menu_review(order_id: int = 0) -> tuple[str, dict]:
+    text = (
+        "⭐ *Оцените нашу работу*\n\n"
+        "Ваш отзыв помогает нам становиться лучше.\n"
+        "Будем благодарны за честную оценку 🙏"
+    )
+    kb = {'buttons': [
+        [{'type': 'link', 'text': '⭐ Яндекс.Карты', 'url': 'https://yandex.ru/maps/org/skupka24/114124804072/reviews/'}],
+        [{'type': 'link', 'text': '⭐ 2ГИС', 'url': 'https://2gis.ru/kaluga/firm/70000001037088876'}],
+        [{'type': 'callback', 'text': '⬅ В меню', 'payload': 'menu:home'}],
+    ]}
+    return text, kb
+
+
+# ─────────────── ОПЛАТА РЕМОНТА (ЮKassa + fallback на сайт) ──────
+
+def create_yookassa_payment(order_id: int, amount: float, description: str, return_url: str) -> str | None:
+    """Создаёт платёж в ЮKassa, возвращает confirmation_url. Если ключей нет — None."""
+    shop_id = os.environ.get('YOOKASSA_SHOP_ID', '')
+    secret = os.environ.get('YOOKASSA_SECRET_KEY', '')
+    if not shop_id or not secret:
+        return None
+    try:
+        import base64 as b64
+        import uuid
+        auth = b64.b64encode(f'{shop_id}:{secret}'.encode()).decode()
+        r = requests.post(
+            'https://api.yookassa.ru/v3/payments',
+            headers={
+                'Authorization': f'Basic {auth}',
+                'Idempotence-Key': str(uuid.uuid4()),
+                'Content-Type': 'application/json',
+            },
+            json={
+                'amount': {'value': f'{float(amount):.2f}', 'currency': 'RUB'},
+                'capture': True,
+                'confirmation': {'type': 'redirect', 'return_url': return_url},
+                'description': description,
+                'metadata': {'order_id': str(order_id), 'source': 'max-bot'},
+            },
+            timeout=10,
+        )
+        d = r.json()
+        if r.status_code == 200 and d.get('confirmation', {}).get('confirmation_url'):
+            return d['confirmation']['confirmation_url']
+        print(f'[YOOKASSA] error: {d}')
+    except Exception as e:
+        print(f'[YOOKASSA] exception: {e}')
+    return None
+
+
+def menu_pay(order_id: int, max_chat_id: int) -> tuple[str, dict]:
+    """Готовит текст и кнопку для оплаты ремонта. Использует ЮKassa, иначе fallback на сайт."""
+    try:
+        conn = _conn(); cur = conn.cursor()
+        cur.execute(
+            f"SELECT status, model, repair_amount, name FROM {SCHEMA}.repair_orders "
+            f"WHERE id={int(order_id)} LIMIT 1"
+        )
+        r = cur.fetchone(); cur.close(); conn.close()
+        if not r:
+            return f"❓ Ремонт #{order_id} не найден.", {'buttons': [
+                [{'type': 'callback', 'text': '⬅ В меню', 'payload': 'menu:home'}]
+            ]}
+        status, model, amount, client_name = r
+        if not amount:
+            return (
+                f"💰 *Ремонт #{order_id}* — сумма ещё не определена.\n\n"
+                f"Мастер выставит цену после диагностики. Тогда вернитесь и нажмите «Оплатить»."
+            ), {'buttons': [[{'type': 'callback', 'text': '⬅ В меню', 'payload': 'menu:home'}]]}
+        amount_float = float(amount)
+        text = (
+            f"💳 *Оплата ремонта #{order_id}*\n\n"
+            f"📱 {model or 'устройство'}\n"
+            f"💰 Сумма: *{amount} ₽*\n\n"
+            f"Нажмите «Оплатить» — откроется безопасная страница оплаты картой."
+        )
+        return_url = f'{SITE_URL}/cabinet?repair={order_id}&pay=success'
+        pay_url = create_yookassa_payment(
+            order_id, amount_float, f'Ремонт #{order_id} — Скупка24', return_url
+        )
+        if not pay_url:
+            # Fallback: страница оплаты на сайте
+            pay_url = f'{SITE_URL}/pay?repair={order_id}'
+        kb = {'buttons': [
+            [{'type': 'link', 'text': f'💳 Оплатить {amount} ₽', 'url': pay_url}],
+            [{'type': 'callback', 'text': '⬅ В меню', 'payload': 'menu:home'}],
+        ]}
+        return text, kb
+    except Exception as e:
+        print(f'[MAX menu_pay] error: {e}')
+        return "❌ Ошибка. Попробуйте позже.", {'buttons': [
+            [{'type': 'callback', 'text': '⬅ В меню', 'payload': 'menu:home'}]
+        ]}
 
 
 def repair_status_by_id(order_id: int) -> str | None:
@@ -312,12 +570,56 @@ def repair_status_by_id(order_id: int) -> str | None:
 
 # ───────────────── обработка входящих ──────────────────────────────
 
+def dispatch_menu(key: str, max_chat_id: int, max_user_id: int) -> bool:
+    """Универсальный диспетчер для callback и команд. Возвращает True если обработано."""
+    if key in ('home', 'start'):
+        send_max_message(max_chat_id, WELCOME_TEXT, reply_markup=main_keyboard())
+        return True
+    if key == 'buy':
+        t, k = menu_buy(); send_max_message(max_chat_id, t, reply_markup=k); return True
+    if key == 'repair':
+        t, k = menu_repair(); send_max_message(max_chat_id, t, reply_markup=k); return True
+    if key == 'catalog':
+        t, k = menu_catalog(); send_max_message(max_chat_id, t, reply_markup=k); return True
+    if key == 'gold':
+        t, k = menu_gold(); send_max_message(max_chat_id, t, reply_markup=k); return True
+    if key == 'branches':
+        t, k = menu_branches(); send_max_message(max_chat_id, t, reply_markup=k); return True
+    if key == 'contact':
+        t, k = menu_contact(); send_max_message(max_chat_id, t, reply_markup=k); return True
+    if key == 'my_orders':
+        t, k = menu_my_orders(max_user_id); send_max_message(max_chat_id, t, reply_markup=k); return True
+    if key == 'review':
+        t, k = menu_review(); send_max_message(max_chat_id, t, reply_markup=k); return True
+    if key.startswith('pay:'):
+        try:
+            oid = int(key.split(':', 1)[1])
+            t, k = menu_pay(oid, max_chat_id)
+            send_max_message(max_chat_id, t, reply_markup=k)
+            return True
+        except Exception:
+            return False
+    if key.startswith('status:'):
+        try:
+            oid = int(key.split(':', 1)[1])
+            info = repair_status_by_id(oid) or f"❓ Ремонт #{oid} не найден."
+            send_max_message(max_chat_id, info, reply_markup={'buttons': [
+                [{'type': 'callback', 'text': '💳 Оплатить', 'payload': f'menu:pay:{oid}'}],
+                [{'type': 'callback', 'text': '⬅ В меню', 'payload': 'menu:home'}],
+            ]})
+            return True
+        except Exception:
+            return False
+    return False
+
+
 def handle_message(msg: dict) -> dict:
     """Главный обработчик одного сообщения от MAX-пользователя."""
     sender = msg.get('sender') or msg.get('from') or {}
     chat = msg.get('chat') or {}
     max_user_id = int(sender.get('user_id') or sender.get('id') or 0)
     max_chat_id = int(chat.get('chat_id') or chat.get('id') or msg.get('chat_id') or max_user_id)
+    chat_type = (chat.get('type') or chat.get('chat_type') or '').lower()
     name = (sender.get('name') or sender.get('first_name') or '').strip() or 'MAX-клиент'
     username = (sender.get('username') or '').strip()
 
@@ -328,30 +630,48 @@ def handle_message(msg: dict) -> dict:
         _log('in', 'unknown_sender', text, payload=msg, error='no max_user_id')
         return {'ok': False}
 
+    # Если это сообщение из ГРУППЫ/КАНАЛА — фиксируем как staff-канал, не отвечаем приветствием
+    if chat_type in ('chat', 'channel', 'group') or max_chat_id != max_user_id:
+        try:
+            save_staff_channel(max_chat_id, chat_type, chat.get('title') or '')
+        except Exception:
+            pass
+        _log('in', f'staff_channel:{chat_type}', text[:200], max_chat_id=max_chat_id, payload=msg)
+        return {'ok': True}
+
     client_id, room_id = get_or_create_max_client(max_user_id, max_chat_id, name, username)
 
-    # 1. Команды
-    if text.startswith('/start'):
-        cmd_start(max_chat_id, max_user_id)
-        _log('in', 'command', '/start', max_user_id=max_user_id, max_chat_id=max_chat_id,
+    # 1. Команды (Russian + English)
+    cmd_map = {
+        '/start': 'home', '/help': 'home', '/menu': 'home', '/меню': 'home',
+        '/buy': 'buy', '/оценить': 'buy', '/sell': 'buy', '/скупка': 'buy',
+        '/repair': 'repair', '/ремонт': 'repair',
+        '/catalog': 'catalog', '/каталог': 'catalog',
+        '/gold': 'gold', '/золото': 'gold', '/цена_золота': 'gold',
+        '/branches': 'branches', '/филиалы': 'branches', '/адреса': 'branches',
+        '/contact': 'contact', '/контакты': 'contact', '/менеджер': 'contact',
+        '/orders': 'my_orders', '/мои_заявки': 'my_orders', '/заявки': 'my_orders',
+        '/review': 'review', '/отзыв': 'review',
+    }
+    cmd_key = cmd_map.get(text.lower().split()[0] if text else '')
+    if cmd_key:
+        dispatch_menu(cmd_key, max_chat_id, max_user_id)
+        _log('in', 'command', text, max_user_id=max_user_id, max_chat_id=max_chat_id,
              pchat_client_id=client_id, pchat_room_id=room_id, payload=msg)
         return {'ok': True}
 
-    if text.startswith('/help'):
-        send_max_message(max_chat_id, WELCOME_TEXT)
-        _log('in', 'command', '/help', max_user_id=max_user_id, max_chat_id=max_chat_id,
-             pchat_client_id=client_id, payload=msg)
+    # /оплатить N или /pay N
+    pay_match = re.match(r'^/(оплатить|pay)\s+#?(\d+)\s*$', text, re.IGNORECASE)
+    if pay_match:
+        dispatch_menu(f'pay:{pay_match.group(2)}', max_chat_id, max_user_id)
+        _log('in', 'command', text, max_user_id=max_user_id, max_chat_id=max_chat_id, payload=msg)
         return {'ok': True}
 
     # 2. Запрос статуса ремонта: #10 или просто "10"
     m = re.match(r'^#?\s*(\d{1,6})\s*$', text)
     if m:
         oid = int(m.group(1))
-        info = repair_status_by_id(oid)
-        if info:
-            send_max_message(max_chat_id, info)
-        else:
-            send_max_message(max_chat_id, f"❓ Ремонт #{oid} не найден. Проверьте номер или напишите ваш вопрос — менеджер ответит.")
+        dispatch_menu(f'status:{oid}', max_chat_id, max_user_id)
         _log('in', 'repair_status', text, max_user_id=max_user_id, max_chat_id=max_chat_id,
              pchat_client_id=client_id, payload=msg)
         return {'ok': True}
@@ -359,12 +679,13 @@ def handle_message(msg: dict) -> dict:
     # 3. Обычный текст — кладём в LIVE-чат, сотрудник ответит из Staff
     if text:
         mid = insert_client_message(room_id, client_id, name, text)
-        # Автоответ клиенту (только если сообщение длиннее 3 символов — не на «спасибо»)
         if len(text) > 5:
             send_max_message(
                 max_chat_id,
-                "✅ Принял ваш вопрос. Менеджер ответит в ближайшие минуты прямо здесь, в MAX.\n\n"
-                "_Чтобы посмотреть меню — отправьте /start_"
+                "✅ Принял ваш вопрос. Менеджер ответит в ближайшие минуты прямо здесь, в MAX.",
+                reply_markup={'buttons': [
+                    [{'type': 'callback', 'text': '⬅ В главное меню', 'payload': 'menu:home'}]
+                ]}
             )
         _log('in', 'text', text, max_user_id=max_user_id, max_chat_id=max_chat_id,
              pchat_client_id=client_id, pchat_room_id=room_id, payload=msg)
@@ -375,23 +696,67 @@ def handle_message(msg: dict) -> dict:
 
 def handle_callback(cb: dict) -> dict:
     """Нажатие inline-кнопки (тип callback)."""
-    sender = cb.get('user') or cb.get('sender') or {}
+    sender = cb.get('user') or cb.get('sender') or cb.get('from') or {}
     max_user_id = int(sender.get('user_id') or sender.get('id') or 0)
-    chat = cb.get('message', {}).get('recipient') or cb.get('message', {}).get('chat') or {}
+    chat = cb.get('message', {}).get('recipient') or cb.get('message', {}).get('chat') or cb.get('chat') or {}
     max_chat_id = int(chat.get('chat_id') or chat.get('id') or max_user_id)
-    payload = cb.get('payload') or cb.get('data') or ''
+    payload = cb.get('payload') or cb.get('data') or cb.get('callback_data') or ''
 
     if not max_user_id or not max_chat_id:
         return {'ok': False}
 
     if payload.startswith('menu:'):
         key = payload.split(':', 1)[1]
-        send_max_message(max_chat_id, MENU_TEXTS.get(key, WELCOME_TEXT))
+        dispatch_menu(key, max_chat_id, max_user_id)
         _log('in', 'callback', payload, max_user_id=max_user_id, max_chat_id=max_chat_id, payload=cb)
         return {'ok': True}
 
     _log('in', 'callback_unknown', payload, max_user_id=max_user_id, max_chat_id=max_chat_id, payload=cb)
     return {'ok': True}
+
+
+# ─────────────── привязка сотруднического канала/группы ───────────
+
+def save_staff_channel(chat_id: int, chat_type: str, title: str = '') -> None:
+    """Сохраняет ID канала/группы в settings — туда будут лететь дубликаты заявок."""
+    try:
+        conn = _conn(); cur = conn.cursor()
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.settings (key, value) VALUES ('max_staff_channel_id', {_esc(str(chat_id))}) "
+            f"ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value"
+        )
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.settings (key, value) VALUES ('max_staff_channel_title', {_esc(title or chat_type)}) "
+            f"ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value"
+        )
+        conn.commit(); cur.close(); conn.close()
+    except Exception as e:
+        print(f'[MAX] save_staff_channel error: {e}')
+
+
+def get_staff_channel_id() -> int | None:
+    """Читает сохранённый ID staff-канала из settings."""
+    try:
+        conn = _conn(); cur = conn.cursor()
+        cur.execute(f"SELECT value FROM {SCHEMA}.settings WHERE key='max_staff_channel_id' LIMIT 1")
+        r = cur.fetchone(); cur.close(); conn.close()
+        if r and r[0]:
+            return int(r[0])
+    except Exception:
+        pass
+    return None
+
+
+def notify_staff_max(text: str) -> bool:
+    """Отправляет уведомление в staff-канал MAX (если он привязан). Возвращает True если доставлено."""
+    cid = get_staff_channel_id()
+    if not cid:
+        return False
+    try:
+        ok, _ = send_max_message(cid, text)
+        return ok
+    except Exception:
+        return False
 
 
 # ─────────────────────── actions ────────────────────────────────────
@@ -407,6 +772,24 @@ def action_webhook(body: dict) -> dict:
 
     if update_type in ('message_callback', 'callback'):
         handle_callback(body.get('callback') or body)
+        return _ok({'ok': True})
+
+    # Бота добавили в канал/группу — сохраняем chat_id как staff-канал
+    if update_type in ('bot_added', 'chat_member_updated', 'message_chat_created'):
+        chat = body.get('chat') or body.get('recipient') or body
+        chat_id = chat.get('chat_id') or chat.get('id')
+        chat_type = (chat.get('type') or chat.get('chat_type') or 'chat').lower()
+        title = chat.get('title') or ''
+        if chat_id:
+            try:
+                save_staff_channel(int(chat_id), chat_type, title)
+                _log('in', f'bot_added:{chat_type}', title, max_chat_id=int(chat_id), payload=body)
+                # Поздороваемся
+                send_max_message(int(chat_id),
+                    f"✅ Бот *Скупка24* подключён к каналу «{title or chat_type}».\n"
+                    f"Сюда будут приходить новые заявки и сообщения клиентов.")
+            except Exception as e:
+                _log('in', update_type, '', payload=body, error=str(e))
         return _ok({'ok': True})
 
     # Если MAX шлёт без update_type — пробуем как message
@@ -484,6 +867,37 @@ def action_send(body: dict) -> dict:
          pchat_client_id=int(pchat_client_id) if pchat_client_id else None,
          payload=d, error='' if ok else json.dumps(d, ensure_ascii=False)[:300])
     return _ok({'ok': ok, 'delivered': ok, 'response': d})
+
+
+def action_staff_send(body: dict) -> dict:
+    """Отправить сообщение в MAX-канал сотрудников (если привязан).
+    Используется из send-lead, repair-order, repair-admin."""
+    text = (body.get('text') or '').strip()
+    if not text:
+        return _err(400, 'text обязателен')
+    cid = get_staff_channel_id()
+    if not cid:
+        return _ok({'ok': True, 'delivered': False, 'reason': 'staff_channel_not_bound'})
+    ok, d = send_max_message(int(cid), text)
+    _log('out', 'staff_send', text, max_chat_id=int(cid),
+         payload=d, error='' if ok else json.dumps(d, ensure_ascii=False)[:300])
+    return _ok({'ok': ok, 'delivered': ok, 'response': d, 'channel_id': cid})
+
+
+def action_staff_status() -> dict:
+    """Показать привязан ли staff-канал."""
+    cid = get_staff_channel_id()
+    title = ''
+    if cid:
+        try:
+            conn = _conn(); cur = conn.cursor()
+            cur.execute(f"SELECT value FROM {SCHEMA}.settings WHERE key='max_staff_channel_title' LIMIT 1")
+            r = cur.fetchone(); cur.close(); conn.close()
+            if r and r[0]:
+                title = r[0]
+        except Exception:
+            pass
+    return _ok({'ok': True, 'bound': bool(cid), 'channel_id': cid, 'title': title})
 
 
 def action_setup_webhook(body: dict, headers: dict) -> dict:
@@ -577,6 +991,24 @@ def handler(event: dict, context) -> dict:
 
     if method == 'POST' and action == 'send':
         return action_send(body)
+
+    if method == 'POST' and action == 'staff_send':
+        return action_staff_send(body)
+
+    if method == 'GET' and action == 'staff_status':
+        return action_staff_status()
+
+    # Обновить webhook на расширенный список update_types
+    if action == 'resubscribe':
+        own_url = 'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c'
+        ok, d = max_call('subscriptions', payload={
+            'url': own_url,
+            'update_types': [
+                'message_created', 'bot_started', 'message_callback',
+                'bot_added', 'message_chat_created',
+            ]
+        })
+        return _ok({'ok': ok, 'webhook_url': own_url, 'response': d})
 
     if method == 'POST' and action == 'setup_webhook':
         return action_setup_webhook(body, headers)

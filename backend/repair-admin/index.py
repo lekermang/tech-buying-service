@@ -1674,6 +1674,23 @@ def handler(event: dict, context) -> dict:
             main_chat_id = os.environ['TELEGRAM_CHAT_ID']
             send_tg_all(token, main_chat_id, conn, tg_msg)
 
+            # 💬 MAX-канал сотрудников: дубликат уведомления о смене статуса
+            try:
+                staff_max_text = (
+                    f"🔔 *Ремонт #{order_id} — {status_label}*\n\n"
+                    f"📱 {device_model or '—'}\n"
+                    f"👤 {client_name or '—'}\n"
+                    f"📞 {client_phone or '—'}"
+                    + (f"\n💰 {r_amount} ₽" if r_amount else "")
+                )
+                requests.post(
+                    'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c?action=staff_send',
+                    json={'text': staff_max_text},
+                    timeout=6,
+                )
+            except Exception as max_err:
+                print(f'[MAX STAFF STATUS] error: {max_err}')
+
             # 💬 MAX-бот: уведомить клиента о смене статуса (на ВСЕ ключевые статусы)
             # Отправляется, только если клиент когда-либо писал нашему MAX-боту.
             try:

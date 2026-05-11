@@ -233,6 +233,15 @@ def notify_staff_new_message(room_id, author_name, text, room_type):
         )
     except Exception:
         pass
+    # 💬 Дубликат в MAX-канал сотрудников
+    try:
+        requests.post(
+            'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c?action=staff_send',
+            json={'text': msg},
+            timeout=6,
+        )
+    except Exception:
+        pass
 
 
 # ───────── ACTIONS: client auth ─────────

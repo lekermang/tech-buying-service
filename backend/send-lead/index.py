@@ -308,6 +308,25 @@ def handler(event: dict, context) -> dict:
         except Exception as max_err:
             print(f'[MAX LEAD] error: {max_err}')
 
+        # 💬 MAX-канал сотрудников: дублируем уведомление о новой заявке
+        try:
+            staff_text = (
+                f"🔔 *Новая заявка #{lead_id}*\n\n"
+                f"👤 {name or '—'}\n"
+                f"📞 {phone or '—'}\n"
+                + (f"📋 {category}\n" if category else "")
+                + (f"📝 {(desc or '')[:300]}\n" if desc else "")
+                + (f"💰 Цена клиента: {client_price} ₽\n" if client_price else "")
+                + f"\n_Источник: сайт_"
+            )
+            requests.post(
+                'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c?action=staff_send',
+                json={'text': staff_text},
+                timeout=6,
+            )
+        except Exception as max_err:
+            print(f'[MAX STAFF LEAD] error: {max_err}')
+
     # Если заявка на золото — сохраняем в gold_orders
     if category == 'Золото':
         try:
