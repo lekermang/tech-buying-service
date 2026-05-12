@@ -31,7 +31,7 @@ type Props = {
 /** История изменений статуса и финансов по заявке.
  *  Тянется с backend action=order_history (таблица repair_order_history).
  *  Сворачивается/разворачивается по кнопке. */
-export default function OrderCardHistory({ orderId, token, authHeader, autoLoad = false }: Props) {
+export default function OrderCardHistory({ orderId, token, authHeader, autoLoad = true }: Props) {
   const [open, setOpen] = useState(autoLoad);
   const [data, setData] = useState<HistoryEntry[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -60,20 +60,50 @@ export default function OrderCardHistory({ orderId, token, authHeader, autoLoad 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  // Находим того, кто первым взял заявку в работу (перевёл в accepted/in_progress)
+  const tookIntoWork = (() => {
+    if (!data) return null;
+    // история отсортирована по убыванию даты — переворачиваем чтобы найти ПЕРВЫЙ переход
+    const asc = [...data].reverse();
+    const e = asc.find(h => h.field_name === "status" && h.new_value && /Принят|работ|accept|progress/i.test(h.new_value));
+    if (!e) return null;
+    return { by: e.changed_by || "система", at: e.changed_at };
+  })();
+
   return (
-    <div className="rounded-lg border border-white/10 bg-[#0E0E0E]/60 overflow-hidden">
+    <div className="rounded-lg border border-[#FFD700]/25 bg-gradient-to-br from-[#0E0E0E] to-[#0A0A0A] overflow-hidden shadow-[inset_0_1px_0_rgba(255,215,0,0.05)]">
+      {/* Pinned-блок: кто первым взял заявку в работу */}
+      {tookIntoWork && (
+        <div className="px-3 py-2 bg-gradient-to-r from-emerald-500/12 via-emerald-500/5 to-transparent border-b border-emerald-500/20 flex items-center gap-2">
+          <div className="shrink-0 w-6 h-6 rounded-full bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center">
+            <Icon name="UserCheck" size={12} className="text-emerald-300" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-[9px] uppercase tracking-wider text-emerald-300/70 font-oswald font-bold">Взял в работу</div>
+            <div className="text-[12px] text-white font-roboto truncate">
+              <span className="font-bold text-emerald-200">{tookIntoWork.by}</span>
+              {tookIntoWork.at && (
+                <span className="text-white/50 ml-1.5 text-[11px] tabular-nums">· {fmt(tookIntoWork.at)}</span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <button
         onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center justify-between gap-2 px-3 py-2 hover:bg-white/[0.03] transition-colors"
+        className="w-full flex items-center justify-between gap-2 px-3 py-2.5 hover:bg-white/[0.04] transition-colors group"
       >
-        <span className="inline-flex items-center gap-2 text-white/65">
-          <Icon name="History" size={13} />
-          <span className="font-oswald uppercase text-[11px] tracking-wider">История изменений</span>
+        <span className="inline-flex items-center gap-2 text-white/80">
+          <Icon name="History" size={14} className="text-[#FFD700]/80" />
+          <span className="font-oswald uppercase text-[12px] tracking-wider font-bold">История заявки</span>
           {data && data.length > 0 && (
-            <span className="text-[10px] text-white/35 tabular-nums">· {data.length}</span>
+            <span className="text-[10px] text-[#FFD700]/70 tabular-nums bg-[#FFD700]/10 border border-[#FFD700]/20 rounded px-1.5 py-0.5">
+              {data.length}
+            </span>
           )}
         </span>
-        <Icon name={open ? "ChevronUp" : "ChevronDown"} size={12} className="text-white/40" />
+        <Icon name={open ? "ChevronUp" : "ChevronDown"} size={14} className="text-white/50 group-hover:text-[#FFD700] transition-colors" />
       </button>
 
       {open && (

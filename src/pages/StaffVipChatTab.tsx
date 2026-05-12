@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
+import Icon from "@/components/ui/icon";
 import {
   isPushSupported, vipChatPushState, enableVipChatPush, disableVipChatPush,
 } from "@/lib/vipChatPush";
@@ -250,6 +251,25 @@ export default function StaffVipChatTab({ token, onUnread }: Props) {
           onTogglePush={togglePush}
           onShowMembers={() => setShowMembers(true)}
         />
+
+        {/* Мобильная CTA: открыть чат в нативном MAX (быстрее push-уведомлений и не требует держать вкладку) */}
+        <a
+          href="https://max.ru/id402810962699_bot"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="md:hidden mx-3 mt-2 mb-1 flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg bg-gradient-to-r from-[#0077FF] to-[#0066DD] shadow-[0_4px_14px_rgba(0,119,255,0.35)] active:scale-[0.98] transition-transform"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="shrink-0 w-9 h-9 rounded-lg bg-white/15 backdrop-blur flex items-center justify-center font-oswald font-extrabold text-white text-[13px] tracking-tight">
+              MAX
+            </div>
+            <div className="min-w-0">
+              <div className="font-oswald font-bold text-white text-[13px] uppercase tracking-wide leading-tight">Открыть в MAX</div>
+              <div className="font-roboto text-white/80 text-[10px] leading-tight">Push-уведомления, чат с клиентом</div>
+            </div>
+          </div>
+          <Icon name="ArrowUpRight" size={18} className="text-white shrink-0" />
+        </a>
 
         <MessagesList
           ref={listRef}

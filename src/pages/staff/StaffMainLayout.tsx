@@ -99,13 +99,15 @@ export function StaffMainLayout({
     setTab(t);
   };
 
-  const TABS: { k: Tab; l: string; icon: string; badge?: number; tip?: string }[] = [
+  // Премиум-перекомпоновка: ежедневные модули в центре, ломбард — премиум-акцент рядом с ремонтом,
+  // редко используемые (золото/команда) — на правом краю для админов.
+  const TABS: { k: Tab; l: string; icon: string; badge?: number; tip?: string; premium?: boolean }[] = [
     { k: "repair",       l: "Ремонт",       icon: "Wrench",        tip: "Заявки на ремонт техники: новые, в работе, готовые. Поиск, фото, статусы." },
+    { k: "smartlombard", l: "Ломбард",      icon: "Coins",         tip: "СмартЛомбард: скупка и продажа Б/У техники, касса, договоры на 14 дней.", premium: true },
     { k: "chat",         l: "Чат",          icon: "MessageCircle", tip: "Внутренний чат сотрудников и общение с VIP-клиентами.", badge: chatUnread },
     { k: "clients",      l: "Клиенты",      icon: "Users",         tip: "База клиентов, скидки, СМС-рассылки." },
+    { k: "avitopro",     l: "Авито",        icon: "Zap",           tip: "Авито PRO: сводка по объявлениям, статистика просмотров и контактов, авто-действия." },
     { k: "analytics",    l: "Статистика",   icon: "BarChart2",     tip: "Аналитика по продажам, ремонтам и сотрудникам." },
-    { k: "smartlombard", l: "СмартЛомбард", icon: "Coins",         tip: "Скупка и продажа Б/У техники, касса, договоры на 14 дней." },
-    { k: "avitopro",     l: "Авито PRO",    icon: "Zap",           tip: "Сводка по объявлениям, статистика просмотров и контактов, авто-действия." },
     ...(isOwnerOrAdmin ? [{ k: "gold" as Tab, l: "Золото", icon: "Gem", tip: "Учёт ювелирных изделий и драгметаллов." }] : []),
     ...(isOwnerOrAdmin ? [{ k: "employees" as Tab, l: "Команда", icon: "UserCog", tip: "Управление сотрудниками, роли, графики." }] : []),
   ];
@@ -318,17 +320,30 @@ export function StaffMainLayout({
                   aria-label={t.l}
                   aria-current={active ? "page" : undefined}
                   className={`w-full min-w-[56px] flex flex-col items-center justify-center gap-0.5 pt-2 pb-1.5 min-h-[56px] transition-all duration-300 active:scale-95 relative group ${
-                    active ? "text-[#FFD700]" : "text-white/45 hover:text-white/85"
+                    active
+                      ? "text-[#FFD700]"
+                      : t.premium
+                        ? "text-[#FFD700]/75 hover:text-[#FFD700]"
+                        : "text-white/45 hover:text-white/85"
                   }`}
                 >
+                  {/* Премиум-подложка для ломбарда — едва заметное золотое свечение, даже не-активного */}
+                  {t.premium && !active && (
+                    <span className="absolute inset-x-1.5 top-1 bottom-1 bg-gradient-to-b from-[#FFD700]/[0.06] to-transparent rounded-xl -z-10 ring-1 ring-inset ring-[#FFD700]/12" aria-hidden />
+                  )}
+
                   {/* Активная подсветка — премиум */}
                   {active && <>
                     <span className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-[2px] bg-gradient-to-r from-transparent via-[#FFD700] to-transparent rounded-b-full shadow-[0_0_10px_rgba(255,215,0,0.6)]" />
-                    <span className="absolute inset-x-2 top-1.5 bottom-1.5 bg-gradient-to-b from-[#FFD700]/14 via-[#FFD700]/4 to-transparent rounded-xl -z-10 shadow-[inset_0_1px_0_rgba(255,215,0,0.15)]" />
+                    <span className={`absolute inset-x-2 top-1.5 bottom-1.5 bg-gradient-to-b ${t.premium ? "from-[#FFD700]/20 via-[#FFD700]/8" : "from-[#FFD700]/14 via-[#FFD700]/4"} to-transparent rounded-xl -z-10 shadow-[inset_0_1px_0_rgba(255,215,0,0.15)]`} />
                   </>}
 
                   <div className={`relative transition-transform duration-300 ${active ? "scale-110 drop-shadow-[0_0_6px_rgba(255,215,0,0.5)]" : "group-active:scale-90"}`}>
                     <Icon name={t.icon} size={18} />
+                    {/* Премиум-точка-индикатор */}
+                    {t.premium && !active && (
+                      <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-[#FFD700] shadow-[0_0_6px_rgba(255,215,0,0.8)]" aria-hidden />
+                    )}
                     {locked && (
                       <span className="absolute -top-1.5 -right-2 text-[9px] bg-[#0A0A0A] rounded-full px-0.5">🔒</span>
                     )}
