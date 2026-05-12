@@ -36,6 +36,7 @@ const Index = safeLazy(() => import("./pages/Index"));
 const Admin = safeLazy(() => import("./pages/Admin"));
 const Cabinet = safeLazy(() => import("./pages/Cabinet"));
 const Staff = safeLazy(() => import("./pages/Staff"));
+const StaffShare = safeLazy(() => import("./pages/StaffShare"));
 const Catalog = safeLazy(() => import("./pages/Catalog"));
 const Tools = safeLazy(() => import("./pages/Tools"));
 const ToolsSync = safeLazy(() => import("./pages/ToolsSync"));
@@ -111,6 +112,7 @@ const App = () => {
             <Route path="/tools" element={<Tools />} />
             <Route path="/tools-sync" element={<ToolsSync />} />
             <Route path="/staff" element={<Staff />} />
+            <Route path="/staff/share" element={<StaffShare />} />
             <Route path="/repair-discount" element={<RepairDiscount />} />
             <Route path="/requisites" element={<Requisites />} />
             <Route path="/act" element={<Act />} />

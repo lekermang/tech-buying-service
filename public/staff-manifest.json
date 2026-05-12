@@ -6,35 +6,36 @@
   "start_url": "/staff",
   "scope": "/staff",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui"],
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "background_color": "#0A0A0A",
   "theme_color": "#0A0A0A",
-  "orientation": "portrait-primary",
+  "orientation": "portrait",
   "lang": "ru",
   "categories": ["business", "productivity"],
+  "prefer_related_applications": false,
   "icons": [
+    {
+      "src": "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/staff-pwa/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/staff-pwa/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/staff-pwa/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
     {
       "src": "/icon-s.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any"
-    },
-    {
-      "src": "/icon-s-maskable.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "maskable"
-    },
-    {
-      "src": "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/037de195-1dd5-4ae2-a555-efbcce4cd950.jpg",
-      "sizes": "512x512",
-      "type": "image/jpeg",
-      "purpose": "any"
-    },
-    {
-      "src": "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/037de195-1dd5-4ae2-a555-efbcce4cd950.jpg",
-      "sizes": "192x192",
-      "type": "image/jpeg",
       "purpose": "any"
     }
   ],
@@ -43,20 +44,53 @@
       "name": "Ремонт",
       "short_name": "Ремонт",
       "url": "/staff?tab=repair",
-      "icons": [{"src": "/icon-s.svg", "sizes": "any"}]
+      "icons": [
+        {
+          "src": "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/staff-pwa/shortcut-repair.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
     },
     {
       "name": "Чат",
       "short_name": "Чат",
       "url": "/staff?tab=chat",
-      "icons": [{"src": "/icon-s.svg", "sizes": "any"}]
+      "icons": [
+        {
+          "src": "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/staff-pwa/shortcut-chat.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
     },
     {
       "name": "Золото",
       "short_name": "Золото",
       "url": "/staff?tab=gold",
-      "icons": [{"src": "/icon-s.svg", "sizes": "any"}]
+      "icons": [
+        {
+          "src": "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/staff-pwa/shortcut-gold.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
     }
   ],
-  "prefer_related_applications": false
+  "share_target": {
+    "action": "/staff/share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "media",
+          "accept": ["image/*"]
+        }
+      ]
+    }
+  }
 }
