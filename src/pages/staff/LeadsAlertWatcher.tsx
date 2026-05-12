@@ -3,6 +3,8 @@ import { shareToChat, formatLeadShare } from "@/lib/shareToChat";
 import FloatingButton from "./LeadsAlertWatcher/FloatingButton";
 import ToastsStack from "./LeadsAlertWatcher/ToastsStack";
 import LeadsPanel from "./LeadsAlertWatcher/LeadsPanel";
+import ClientHistoryDrawer from "./LeadsAlertWatcher/ClientHistoryDrawer";
+import InviteToChatDialog from "./LeadsAlertWatcher/InviteToChatDialog";
 import {
   LEADS_URL,
   fmtPhone,
@@ -19,6 +21,8 @@ export default function LeadsAlertWatcher({ token, empName }: { token: string; e
   const [stats, setStats] = React.useState<Stats | null>(null);
   const [toasts, setToasts] = React.useState<Toast[]>([]);
   const [panelOpen, setPanelOpen] = React.useState(false);
+  const [historyLead, setHistoryLead] = React.useState<Lead | null>(null);
+  const [inviteLeadState, setInviteLeadState] = React.useState<Lead | null>(null);
   const seenRef = React.useRef<Set<number>>(getSeenIds());
 
   const fetchHot = React.useCallback(async () => {
@@ -190,6 +194,7 @@ export default function LeadsAlertWatcher({ token, empName }: { token: string; e
         <LeadsPanel
           leads={leads}
           stats={stats}
+          token={token}
           onClose={() => setPanelOpen(false)}
           onTake={takeLead}
           onMarkAnswered={markAnswered}
@@ -198,8 +203,30 @@ export default function LeadsAlertWatcher({ token, empName }: { token: string; e
           onInvite={inviteLead}
           onInviteMax={inviteMax}
           onRobocall={robocallLead}
+          onOpenHistory={(l) => setHistoryLead(l)}
+          onInviteToChat={(l) => setInviteLeadState(l)}
         />
       )}
+
+      {/* CRM-карточка клиента */}
+      <ClientHistoryDrawer
+        open={!!historyLead}
+        onClose={() => setHistoryLead(null)}
+        phone={historyLead?.client_phone || ""}
+        name={historyLead?.client_name || ""}
+        token={token}
+      />
+
+      {/* Диалог приглашения в чат */}
+      <InviteToChatDialog
+        open={!!inviteLeadState}
+        onClose={() => setInviteLeadState(null)}
+        phone={inviteLeadState?.client_phone || ""}
+        name={inviteLeadState?.client_name || ""}
+        leadId={inviteLeadState?.id || null}
+        device={inviteLeadState?.device || null}
+        token={token}
+      />
 
       {/* Мини-уведомление об успехе шаринга */}
       {shareToast && (

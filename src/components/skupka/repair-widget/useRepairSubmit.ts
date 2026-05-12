@@ -9,6 +9,8 @@ type SubmitParams = {
   extraWorks: string[];
   extraWorksList: ExtraWork[];
   grandTotal: number;
+  contactChannels?: string[];
+  contactTime?: string;
 };
 
 /** Отправка заявки на ремонт. */
@@ -16,7 +18,7 @@ export function useRepairSubmit() {
   const [sending, setSending] = useState(false);
   const [orderId, setOrderId] = useState<number | null>(null);
 
-  const submit = async ({ form, selectedPart, extraWorks, extraWorksList, grandTotal }: SubmitParams) => {
+  const submit = async ({ form, selectedPart, extraWorks, extraWorksList, grandTotal, contactChannels, contactTime }: SubmitParams) => {
     if (!form.name || !form.model || !form.fault) return;
     if (!isPhoneValid(form.phone)) {
       alert("Введите номер телефона целиком в формате +7 (___) ___-__-__");
@@ -58,6 +60,9 @@ export function useRepairSubmit() {
             in_stock: selectedPart.in_stock,
             supplier_price: selectedPart.supplier_price,
           } : null,
+          contact_channels: contactChannels || [],
+          contact_time: contactTime || "",
+          device: form.model,
         }),
       });
       const data = await res.json();

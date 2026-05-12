@@ -1,5 +1,6 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
+import ContactChannelsBlock from "@/components/forms/ContactChannelsBlock";
 import { ymGoal, Goals } from "@/lib/ym";
 import { formatPhone, isPhoneValid } from "@/lib/phoneFormat";
 
@@ -76,6 +77,8 @@ const useAppleWidget = () => {
   const [phone, setPhone] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const [contactChannels, setContactChannels] = useState<string[]>([]);
+  const [contactTime, setContactTime] = useState("");
 
   const search = async (q?: string) => {
     const searchQuery = q || query;
@@ -106,7 +109,10 @@ const useAppleWidget = () => {
           name: "Заявка Apple",
           phone,
           category: "Apple техника",
+          device: result.model,
           desc: `${result.model} — цена скупки: ${(result.skupka_price ?? 0).toLocaleString("ru-RU")} ₽ (Авито ~${(result.avito_avg ?? 0).toLocaleString("ru-RU")} ₽)`,
+          contact_channels: contactChannels,
+          contact_time: contactTime,
         }),
       });
       setSent(true);
@@ -120,7 +126,11 @@ const useAppleWidget = () => {
     }
   };
 
-  return { query, setQuery, loading, result, error, phone, setPhone, sending, sent, search, handleSell };
+  return {
+    query, setQuery, loading, result, error,
+    phone, setPhone, sending, sent, search, handleSell,
+    contactChannels, setContactChannels, contactTime, setContactTime,
+  };
 };
 
 const AppleWidget = ({ compact }: AppleWidgetProps) => {
@@ -182,6 +192,15 @@ const AppleWidget = ({ compact }: AppleWidgetProps) => {
                 className="bg-[#FFD700] text-black font-oswald font-bold px-3 py-2 uppercase text-xs hover:bg-yellow-400 transition-colors disabled:opacity-50 shrink-0">
                 {w.sending ? "..." : "Продать"}
               </button>
+            </div>
+            <div className="mt-2">
+              <ContactChannelsBlock
+                value={w.contactChannels}
+                onChange={w.setContactChannels}
+                timeNote={w.contactTime}
+                onTimeChange={w.setContactTime}
+                variant="compact"
+              />
             </div>
           </div>
         )}
@@ -255,6 +274,14 @@ const AppleWidget = ({ compact }: AppleWidgetProps) => {
                 <Icon name="Send" size={14} />
                 {w.sending ? "Отправляем..." : "Продать"}
               </button>
+            </div>
+            <div className="mt-3">
+              <ContactChannelsBlock
+                value={w.contactChannels}
+                onChange={w.setContactChannels}
+                timeNote={w.contactTime}
+                onTimeChange={w.setContactTime}
+              />
             </div>
           </div>
         )}

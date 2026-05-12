@@ -35,6 +35,12 @@ interface RepairWidgetBodyProps {
   onSubmit: () => void;
   onReset: () => void;
 
+  // contact channels
+  contactChannels: string[];
+  setContactChannels: React.Dispatch<React.SetStateAction<string[]>>;
+  contactTime: string;
+  setContactTime: React.Dispatch<React.SetStateAction<string>>;
+
   // status
   statusId: string;
   setStatusId: (v: string) => void;
@@ -119,6 +125,10 @@ const RepairWidgetBody = (p: RepairWidgetBodyProps) => (
         onChangeSelection={p.onChangeSelection}
         onSubmit={p.onSubmit}
         onReset={p.onReset}
+        contactChannels={p.contactChannels}
+        setContactChannels={p.setContactChannels}
+        contactTime={p.contactTime}
+        setContactTime={p.setContactTime}
         onCheckStatus={p.onCheckStatus}
         setStatusId={p.setStatusId}
         setTab={p.setTab}

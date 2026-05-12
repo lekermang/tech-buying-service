@@ -51,6 +51,8 @@ const Header = ({ scrollTo, goldOpen = false }: HeaderProps) => {
   const [form, setForm] = useState({ name: "", phone: "" });
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const [contactChannels, setContactChannels] = useState<string[]>([]);
+  const [contactTime, setContactTime] = useState("");
 
   useEffect(() => {
     if (goldOpen) setSellOpen(true);
@@ -133,6 +135,9 @@ const Header = ({ scrollTo, goldOpen = false }: HeaderProps) => {
           weight: weight || null,
           purity: probe || null,
           total_price: totalPrice || null,
+          contact_channels: contactChannels,
+          contact_time: contactTime,
+          device: `Золото (проба ${probe})`,
         }),
       });
       setSent(true);
@@ -183,6 +188,10 @@ const Header = ({ scrollTo, goldOpen = false }: HeaderProps) => {
         form={form}
         setForm={setForm}
         onSubmit={handleSell}
+        contactChannels={contactChannels}
+        setContactChannels={setContactChannels}
+        contactTime={contactTime}
+        setContactTime={setContactTime}
       />
     </header>
   );

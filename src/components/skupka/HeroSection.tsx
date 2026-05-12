@@ -3,6 +3,7 @@ import Icon from "@/components/ui/icon";
 import AppleWidget from "@/components/skupka/AppleWidget";
 import RepairWidget from "@/components/skupka/RepairWidget";
 import UsedGoodsSearch from "@/components/skupka/UsedGoodsSearch";
+import ContactChannelsBlock from "@/components/forms/ContactChannelsBlock";
 import { ymGoal, Goals } from "@/lib/ym";
 import { formatPhone, isPhoneValid } from "@/lib/phoneFormat";
 
@@ -61,6 +62,8 @@ const EvaluateModal = ({ onClose }: { onClose: () => void }) => {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [contactChannels, setContactChannels] = useState<string[]>([]);
+  const [contactTime, setContactTime] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -97,7 +100,14 @@ const EvaluateModal = ({ onClose }: { onClose: () => void }) => {
       const res = await fetch(SEND_LEAD_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...formData, photos: [], client_price: formData.client_price }),
+        body: JSON.stringify({
+          ...formData,
+          photos: [],
+          client_price: formData.client_price,
+          contact_channels: contactChannels,
+          contact_time: contactTime,
+          device: formData.category || undefined,
+        }),
       });
       if (!res.ok) throw new Error("bad_status");
       ymGoal(Goals.FORM_SUCCESS, { category: formData.category });
@@ -108,7 +118,14 @@ const EvaluateModal = ({ onClose }: { onClose: () => void }) => {
         fetch(SEND_LEAD_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...formData, desc: `[фото к заявке] ${formData.desc}`, photos: readyPhotos }),
+          body: JSON.stringify({
+            ...formData,
+            desc: `[фото к заявке] ${formData.desc}`,
+            photos: readyPhotos,
+            contact_channels: contactChannels,
+            contact_time: contactTime,
+            device: formData.category || undefined,
+          }),
         }).catch(() => {});
       }
     } catch (err) {
@@ -225,6 +242,13 @@ const EvaluateModal = ({ onClose }: { onClose: () => void }) => {
                 </div>
                 <input ref={fileRef} type="file" accept="image/*" multiple onChange={handlePhoto} className="hidden" />
               </div>
+
+              <ContactChannelsBlock
+                value={contactChannels}
+                onChange={setContactChannels}
+                timeNote={contactTime}
+                onTimeChange={setContactTime}
+              />
 
               {error && (
                 <p className="font-roboto text-red-400 text-sm text-center">{error}</p>

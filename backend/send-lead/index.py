@@ -9,6 +9,101 @@ import psycopg2
 HEADERS = {'Access-Control-Allow-Origin': '*'}
 SCHEMA = 't_p31606708_tech_buying_service'
 
+S3_BUCKET = 'files'
+S3_ENDPOINT = 'https://bucket.poehali.dev'
+
+CHANNEL_LABELS = {
+    'call': '📞 Звонок',
+    'phone': '📞 Звонок',
+    'tg': '✈️ Telegram',
+    'telegram': '✈️ Telegram',
+    'max': '💬 MAX',
+    'wa': '🟢 WhatsApp',
+    'whatsapp': '🟢 WhatsApp',
+    'sms': '✉️ SMS',
+    'email': '📧 Email',
+}
+
+
+def _s3_client():
+    """Boto3 client для S3 (poehali bucket)."""
+    try:
+        import boto3
+        from botocore.client import Config as BotoConfig
+        return boto3.client(
+            's3',
+            endpoint_url=S3_ENDPOINT,
+            aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
+            aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
+            config=BotoConfig(signature_version='s3v4'),
+        )
+    except Exception as e:
+        print(f'[send-lead][S3] init error: {e}')
+        return None
+
+
+def _cdn_url(s3_key: str) -> str:
+    access = os.environ.get('AWS_ACCESS_KEY_ID', '')
+    return f'https://cdn.poehali.dev/projects/{access}/bucket/{s3_key}'
+
+
+def upload_lead_photos_to_s3(lead_id: int, photos_b64: list) -> list:
+    """Загружает фото в S3 и в lead_photos. Возвращает список dict {s3_key, cdn_url}."""
+    if not lead_id or not photos_b64:
+        return []
+    s3 = _s3_client()
+    if s3 is None:
+        return []
+    saved = []
+    for i, b64 in enumerate(photos_b64[:10]):
+        try:
+            data = base64.b64decode(b64)
+            key = f'leads-photos/{lead_id}/{i}.jpg'
+            s3.put_object(
+                Bucket=S3_BUCKET, Key=key, Body=data,
+                ContentType='image/jpeg',
+            )
+            saved.append({'s3_key': key, 'cdn_url': _cdn_url(key)})
+        except Exception as e:
+            print(f'[send-lead][S3] upload {i} failed: {e}')
+    if not saved:
+        return []
+    # Запись в lead_photos
+    try:
+        conn = psycopg2.connect(os.environ['DATABASE_URL'])
+        cur = conn.cursor()
+        for ph in saved:
+            cur.execute(
+                f"INSERT INTO {SCHEMA}.lead_photos (lead_id, s3_key, cdn_url) VALUES (%s, %s, %s)",
+                (int(lead_id), ph['s3_key'], ph['cdn_url'])
+            )
+        conn.commit(); cur.close(); conn.close()
+    except Exception as e:
+        print(f'[send-lead][S3] db insert error: {e}')
+    return saved
+
+
+def _format_channels(channels) -> str:
+    """Формирует строку «📞 Звонок, ✈️ Telegram» из массива каналов."""
+    if not channels:
+        return ''
+    if isinstance(channels, str):
+        try:
+            channels = json.loads(channels)
+        except Exception:
+            channels = [c.strip() for c in channels.split(',') if c.strip()]
+    if not isinstance(channels, list):
+        return ''
+    labels = []
+    seen = set()
+    for ch in channels:
+        key = str(ch).strip().lower()
+        lbl = CHANNEL_LABELS.get(key)
+        if lbl and lbl not in seen:
+            seen.add(lbl)
+            labels.append(lbl)
+    return ', '.join(labels)
+
 
 def normalize_phone(phone: str) -> str:
     """Нормализация телефона в формат 7XXXXXXXXXX (только цифры, 11 знаков)."""
@@ -201,6 +296,8 @@ def handler(event: dict, context) -> dict:
     category = body.get('category', '').strip()
     desc = body.get('desc', '').strip()
     photo_b64 = body.get('photo')
+    contact_channels = body.get('contact_channels')  # массив ["call","tg","max","wa"]
+    device = (body.get('device') or '').strip()
 
     if not name or not phone:
         return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'Имя и телефон обязательны'})}
@@ -210,16 +307,19 @@ def handler(event: dict, context) -> dict:
     client_type = body.get('client_type', '').strip()
     gold_price = body.get('gold_price', '')
     client_price = str(body.get('client_price', '') or '').strip()
+    channels_str = _format_channels(contact_channels)
 
     caption = (
         f"📦 *Новая заявка — Скупка24*\n\n"
         f"👤 *Имя:* {name}\n"
         f"📞 *Телефон:* {phone}\n"
         f"🏷 *Категория:* {category or '—'}\n"
-        f"📝 *Описание:* {desc or '—'}"
+        + (f"📱 *Устройство:* {device}\n" if device else "")
+        + f"📝 *Описание:* {desc or '—'}"
         + (f"\n💵 *Цена клиента:* {client_price} ₽" if client_price and client_price != '0' else "")
         + (f"\n👥 *Тип клиента:* {client_type}" if client_type else "")
         + (f"\n🥇 *Курс золота:* {gold_price} ₽/г" if gold_price else "")
+        + (f"\n📡 *Предпочтительный способ связи:* {channels_str}" if channels_str else "")
     )
 
     # ── Регистрируем заявку в системе трекинга (lead_id для кнопки "Беру") ───
@@ -237,9 +337,21 @@ def handler(event: dict, context) -> dict:
         elif 'Apple' in (category or ''): src = 'apple'
         elif 'Вакансия' in (category or ''): src = 'jobs'
         elif 'нструмент' in (category or ''): src = 'tools'
+        # contact_channels сохраняем как JSON-string, device — как текст
+        ch_json = None
+        if contact_channels:
+            try:
+                ch_json = json.dumps(contact_channels, ensure_ascii=False) if not isinstance(contact_channels, str) else contact_channels
+            except Exception:
+                ch_json = None
+        ch_e = ch_json.replace("'", "''") if ch_json else None
+        dev_e = device.replace("'", "''") if device else None
+        ch_sql = f"'{ch_e}'" if ch_e is not None else 'NULL'
+        dev_sql = f"'{dev_e}'" if dev_e is not None else 'NULL'
         cur0.execute(
-            f"INSERT INTO {SCHEMA}.leads_tracking (source, client_name, client_phone, category, description) "
-            f"VALUES ('{src}', '{n_e}', '{p_e}', '{c_e}', '{d_e}') RETURNING id"
+            f"INSERT INTO {SCHEMA}.leads_tracking "
+            f"(source, client_name, client_phone, category, description, contact_channels, device) "
+            f"VALUES ('{src}', '{n_e}', '{p_e}', '{c_e}', '{d_e}', {ch_sql}, {dev_sql}) RETURNING id"
         )
         lead_id = cur0.fetchone()[0]
         cur0.execute(
@@ -251,6 +363,14 @@ def handler(event: dict, context) -> dict:
 
     # Если есть lead_id — добавляем кнопку "Беру в работу" + WhatsApp/Telegram
     photos_b64 = body.get('photos') or ([photo_b64] if photo_b64 else [])
+
+    # Параллельно сохраняем фото в S3 (Telegram продолжает получать как раньше)
+    if lead_id and photos_b64:
+        try:
+            upload_lead_photos_to_s3(lead_id, photos_b64)
+        except Exception as up_err:
+            print(f'[send-lead][S3] {up_err}')
+
     recipients = get_all_recipients(main_chat_id)
     if lead_id:
         kb = build_take_keyboard(lead_id, phone, name, category or desc)
@@ -315,8 +435,10 @@ def handler(event: dict, context) -> dict:
                 f"👤 {name or '—'}\n"
                 f"📞 {phone or '—'}\n"
                 + (f"📋 {category}\n" if category else "")
+                + (f"📱 Устройство: {device}\n" if device else "")
                 + (f"📝 {(desc or '')[:300]}\n" if desc else "")
                 + (f"💰 Цена клиента: {client_price} ₽\n" if client_price else "")
+                + (f"📡 Связь: {channels_str}\n" if channels_str else "")
                 + f"\n_Источник: сайт_"
             )
             requests.post(

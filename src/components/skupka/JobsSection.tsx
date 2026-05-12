@@ -1,5 +1,6 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
+import ContactChannelsBlock from "@/components/forms/ContactChannelsBlock";
 import { ymGoal, Goals } from "@/lib/ym";
 import { formatPhone, isPhoneValid } from "@/lib/phoneFormat";
 
@@ -16,6 +17,8 @@ export default function JobsSection() {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
+  const [contactChannels, setContactChannels] = useState<string[]>([]);
+  const [contactTime, setContactTime] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,6 +36,8 @@ export default function JobsSection() {
           phone: form.phone,
           category: `💼 Вакансия: ${selectedLabel}`,
           desc: "Заявка с раздела «Работа у нас»",
+          contact_channels: contactChannels,
+          contact_time: contactTime,
         }),
       });
       const data = await res.json();
@@ -179,6 +184,13 @@ export default function JobsSection() {
                     className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-3 font-roboto text-sm focus:outline-none focus:border-[#FFD700] transition-colors placeholder:text-white/20"
                   />
                 </div>
+
+                <ContactChannelsBlock
+                  value={contactChannels}
+                  onChange={setContactChannels}
+                  timeNote={contactTime}
+                  onTimeChange={setContactTime}
+                />
 
                 {error && (
                   <div className="font-roboto text-red-400 text-xs">{error}</div>

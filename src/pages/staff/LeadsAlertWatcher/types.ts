@@ -1,4 +1,13 @@
 export const LEADS_URL = "https://functions.poehali.dev/cccc3788-d793-49a5-9254-f194e6d94e18";
+export const PUBLIC_CHAT_URL = "https://functions.poehali.dev/81f2b98f-4c02-4f5a-afce-adf94d25dcac";
+export const MAX_BOT_URL = "https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c";
+
+export type LeadPhoto = {
+  id: number;
+  cdn_url: string;
+  created_at?: string;
+  expires_at?: string;
+};
 
 export type Lead = {
   id: number;
@@ -11,6 +20,9 @@ export type Lead = {
   owner_name: string | null;
   age_minutes: number;
   created_at: string;
+  contact_channels?: string | string[] | null;
+  device?: string | null;
+  photos?: LeadPhoto[];
 };
 
 export type Stats = {

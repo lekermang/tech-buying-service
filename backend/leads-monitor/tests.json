@@ -19,6 +19,18 @@
       "expectedStatus": 200,
       "expectedBody": {"ok": true},
       "bodyMatcher": "partial"
+    },
+    {
+      "name": "client_history без admin токена → 401",
+      "method": "GET",
+      "path": "/?action=client_history&phone=79001234567",
+      "expectedStatus": 401
+    },
+    {
+      "name": "lead_photos без admin токена → 401",
+      "method": "GET",
+      "path": "/?action=lead_photos&lead_id=1",
+      "expectedStatus": 401
     }
   ]
 }

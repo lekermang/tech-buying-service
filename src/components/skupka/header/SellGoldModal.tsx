@@ -1,4 +1,5 @@
 import Icon from "@/components/ui/icon";
+import ContactChannelsBlock from "@/components/forms/ContactChannelsBlock";
 import { formatPhone } from "@/lib/phoneFormat";
 
 export type Probe = { label: string; value: number; coeff: number };
@@ -24,12 +25,17 @@ interface SellGoldModalProps {
   form: { name: string; phone: string };
   setForm: React.Dispatch<React.SetStateAction<{ name: string; phone: string }>>;
   onSubmit: (e: React.FormEvent) => void;
+  contactChannels: string[];
+  setContactChannels: React.Dispatch<React.SetStateAction<string[]>>;
+  contactTime: string;
+  setContactTime: React.Dispatch<React.SetStateAction<string>>;
 }
 
 const SellGoldModal = ({
   open, onClose, probes, clientType, setClientType, probe, setProbe,
   weight, setWeight, goldPrice, activePrice, weightNum, totalPrice,
   sent, sending, form, setForm, onSubmit,
+  contactChannels, setContactChannels, contactTime, setContactTime,
 }: SellGoldModalProps) => {
   if (!open) return null;
 
@@ -144,6 +150,12 @@ const SellGoldModal = ({
                   placeholder="+7 (___) ___-__-__"
                   className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-2.5 font-roboto text-sm focus:outline-none focus:border-[#FFD700] transition-colors" />
               </div>
+              <ContactChannelsBlock
+                value={contactChannels}
+                onChange={setContactChannels}
+                timeNote={contactTime}
+                onTimeChange={setContactTime}
+              />
               <button type="submit" disabled={sending}
                 className="w-full bg-[#FFD700] text-black font-oswald font-bold text-base py-3 uppercase tracking-wide hover:bg-yellow-400 transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
                 <Icon name="Send" size={16} />

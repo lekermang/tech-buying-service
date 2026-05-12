@@ -34,6 +34,8 @@ export default function RepairWidget() {
 
   const [form, setForm] = useState({ name: "", phone: "", model: "", fault: "" });
   const [agreed, setAgreed] = useState(false);
+  const [contactChannels, setContactChannels] = useState<string[]>([]);
+  const [contactTime, setContactTime] = useState("");
 
   const parts = useRepairParts({ model: form.model, phone: form.phone });
   const status = useRepairStatus();
@@ -47,11 +49,15 @@ export default function RepairWidget() {
     extraWorks: parts.extraWorks,
     extraWorksList: parts.extraWorksList,
     grandTotal: parts.grandTotal,
+    contactChannels,
+    contactTime,
   });
 
   const reset = () => {
     setForm({ name: "", phone: "", model: "", fault: "" });
     setAgreed(false);
+    setContactChannels([]);
+    setContactTime("");
     order.resetOrder();
     parts.resetPartsState();
   };
@@ -94,6 +100,10 @@ export default function RepairWidget() {
           onChangeSelection={parts.changeSelection}
           onSubmit={handleSubmit}
           onReset={reset}
+          contactChannels={contactChannels}
+          setContactChannels={setContactChannels}
+          contactTime={contactTime}
+          setContactTime={setContactTime}
           statusId={status.statusId}
           setStatusId={status.setStatusId}
           statusLoading={status.statusLoading}

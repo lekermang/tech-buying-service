@@ -24,7 +24,7 @@ SCHEMA = 't_p31606708_tech_buying_service'
 HEADERS = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, X-Auth-Token, X-Employee-Token',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Auth-Token, X-Employee-Token, X-Admin-Token',
     'Content-Type': 'application/json'
 }
 
@@ -678,6 +678,187 @@ def action_branches_get(_body, _headers):
     return _ok({'ok': True, 'branches': get_branches()})
 
 
+# ───────── CRM: история клиента + фото заявки ─────────
+def _check_admin(headers) -> bool:
+    """Проверка X-Admin-Token / X-Employee-Token."""
+    hl = {str(k).lower(): v for k, v in (headers or {}).items()}
+    token = (hl.get('x-admin-token') or hl.get('x-employee-token') or '').strip()
+    if not token:
+        return False
+    if token == os.environ.get('ADMIN_TOKEN', ''):
+        return True
+    emp_raw = os.environ.get('EMPLOYEE_TOKENS', '')
+    if emp_raw and token in {t.strip() for t in emp_raw.split(',') if t.strip()}:
+        return True
+    try:
+        conn = _conn(); cur = conn.cursor()
+        cur.execute(
+            f"SELECT id FROM {SCHEMA}.employees "
+            f"WHERE auth_token=%s AND token_expires_at>NOW() AND is_active=true",
+            (token,)
+        )
+        row = cur.fetchone()
+        cur.close(); conn.close()
+        return row is not None
+    except Exception:
+        return False
+
+
+def action_client_history(qp, headers):
+    """История клиента по телефону: заявки + фото + ремонты + золото + summary."""
+    if not _check_admin(headers):
+        return _err(401, 'Auth required')
+    phone_raw = (qp.get('phone') or '').strip()
+    if not phone_raw:
+        return _err(400, 'phone required')
+    phone = _normalize_phone(phone_raw)
+    if len(phone) < 11:
+        return _err(400, 'Bad phone')
+    # фронту удобно искать и по локальному 10-знач формату 9XXXXXXXXX
+    phone_short = phone[1:] if phone.startswith('7') and len(phone) == 11 else phone
+
+    conn = _conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    # leads_tracking — все колонки, которые точно есть
+    cur.execute(
+        f"SELECT id, source, client_name, client_phone, category, description, status, "
+        f"owner_name, taken_at, answered_at, created_at, "
+        f"contact_channels, device "
+        f"FROM {SCHEMA}.leads_tracking "
+        f"WHERE client_phone LIKE %s OR client_phone LIKE %s "
+        f"ORDER BY created_at DESC LIMIT 20",
+        (f'%{phone_short}%', f'%{phone}%')
+    )
+    leads = [dict(r) for r in cur.fetchall()]
+
+    # Фото для каждой заявки (только активные: не is_purged и не expired)
+    lead_ids = [int(l['id']) for l in leads if l.get('id')]
+    photos_map = {}
+    if lead_ids:
+        cur.execute(
+            f"SELECT id, lead_id, cdn_url, created_at, expires_at "
+            f"FROM {SCHEMA}.lead_photos "
+            f"WHERE lead_id = ANY(%s) AND is_purged = FALSE AND expires_at > NOW() "
+            f"ORDER BY id ASC",
+            (lead_ids,)
+        )
+        for r in cur.fetchall():
+            photos_map.setdefault(int(r['lead_id']), []).append({
+                'id': r['id'],
+                'cdn_url': r['cdn_url'],
+                'created_at': r['created_at'],
+                'expires_at': r['expires_at'],
+            })
+    for l in leads:
+        l['photos'] = photos_map.get(int(l['id']), [])
+
+    # repair_orders
+    repairs = []
+    try:
+        cur.execute(
+            f"SELECT id, model, repair_type, status, created_at, repair_amount, name "
+            f"FROM {SCHEMA}.repair_orders "
+            f"WHERE phone LIKE %s OR phone LIKE %s "
+            f"ORDER BY created_at DESC LIMIT 20",
+            (f'%{phone_short}%', f'%{phone}%')
+        )
+        repairs = [dict(r) for r in cur.fetchall()]
+    except Exception as e:
+        print(f'[client_history] repair_orders err: {e}')
+
+    # gold_orders
+    gold_orders = []
+    try:
+        cur.execute(
+            f"SELECT id, name, phone, item_name, weight, purity, buy_price, comment, created_at "
+            f"FROM {SCHEMA}.gold_orders "
+            f"WHERE phone LIKE %s OR phone LIKE %s "
+            f"ORDER BY created_at DESC LIMIT 20",
+            (f'%{phone_short}%', f'%{phone}%')
+        )
+        gold_orders = [dict(r) for r in cur.fetchall()]
+    except Exception as e:
+        print(f'[client_history] gold_orders err: {e}')
+
+    # pchat_clients
+    client_row = None
+    try:
+        cur.execute(
+            f"SELECT id, phone, display_name, last_seen_at, created_at "
+            f"FROM {SCHEMA}.pchat_clients WHERE phone=%s LIMIT 1",
+            (phone,)
+        )
+        c = cur.fetchone()
+        if c:
+            client_row = dict(c)
+    except Exception:
+        pass
+
+    cur.close(); conn.close()
+
+    # summary
+    devices = set()
+    for l in leads:
+        if l.get('device'):
+            devices.add(str(l['device']).strip())
+    for r in repairs:
+        if r.get('model'):
+            devices.add(str(r['model']).strip())
+    all_dates = []
+    for l in leads:
+        if l.get('created_at'): all_dates.append(l['created_at'])
+    for r in repairs:
+        if r.get('created_at'): all_dates.append(r['created_at'])
+    for g in gold_orders:
+        if g.get('created_at'): all_dates.append(g['created_at'])
+    first_seen = min(all_dates) if all_dates else None
+    last_seen = max(all_dates) if all_dates else None
+
+    summary = {
+        'total_leads': len(leads),
+        'total_repairs': len(repairs),
+        'total_gold': len(gold_orders),
+        'devices': sorted([d for d in devices if d]),
+        'first_seen': first_seen,
+        'last_seen': last_seen,
+    }
+
+    return _ok({
+        'ok': True,
+        'phone': phone,
+        'leads': leads,
+        'repairs': repairs,
+        'gold_orders': gold_orders,
+        'client': client_row,
+        'summary': summary,
+    })
+
+
+def action_lead_photos(qp, headers):
+    """Фото конкретной заявки (для просмотра в CRM)."""
+    if not _check_admin(headers):
+        return _err(401, 'Auth required')
+    try:
+        lead_id = int(qp.get('lead_id') or 0)
+    except Exception:
+        return _err(400, 'Bad lead_id')
+    if not lead_id:
+        return _err(400, 'lead_id required')
+    conn = _conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        f"SELECT id, cdn_url, created_at, expires_at "
+        f"FROM {SCHEMA}.lead_photos "
+        f"WHERE lead_id=%s AND is_purged=FALSE AND expires_at > NOW() "
+        f"ORDER BY id ASC",
+        (lead_id,)
+    )
+    photos = [dict(r) for r in cur.fetchall()]
+    cur.close(); conn.close()
+    return _ok({'ok': True, 'photos': photos})
+
+
 # ───────── Утренняя сводка ─────────
 def action_morning_digest(_body):
     conn = _conn()
@@ -820,6 +1001,10 @@ def handler(event, context):
             return action_robocall_lead_manual(body, headers)
         if action == 'branches':
             return action_branches_get(body, headers)
+        if action == 'client_history':
+            return action_client_history(qp, headers)
+        if action == 'lead_photos':
+            return action_lead_photos(qp, headers)
         return _err(400, f'Unknown action: {action}')
     except Exception as e:
         return _err(500, f'{type(e).__name__}: {e}')

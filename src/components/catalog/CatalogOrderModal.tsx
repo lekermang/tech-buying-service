@@ -1,5 +1,6 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
+import ContactChannelsBlock from "@/components/forms/ContactChannelsBlock";
 import { CatalogItem, SEND_LEAD_URL, MODEL_PHOTOS, MODEL_PHOTOS_EXTRA, MODEL_COLOR_PHOTOS, CATEGORY_PHOTOS } from "@/pages/catalog.types";
 import { ymGoal, Goals } from "@/lib/ym";
 import { formatPhone, isPhoneValid } from "@/lib/phoneFormat";
@@ -15,6 +16,8 @@ const CatalogOrderModal = ({ item, onClose, markup = 3500 }: Props) => {
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [photoIdx, setPhotoIdx] = useState(0);
+  const [contactChannels, setContactChannels] = useState<string[]>([]);
+  const [contactTime, setContactTime] = useState("");
 
   const title = [item.brand, item.model, item.storage, item.color].filter(Boolean).join(" ");
   const displayPrice = item.price ? (item.price + markup).toLocaleString("ru-RU") + " ₽" : "Цену уточняйте";

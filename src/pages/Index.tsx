@@ -12,6 +12,7 @@ import HolidayBanner from "@/components/holidays/HolidayBanner";
 import HolidayCornerDecor from "@/components/holidays/HolidayCornerDecor";
 import PremiumServicesGrid from "@/components/skupka/PremiumServicesGrid";
 import MaxChannelBanner from "@/components/skupka/MaxChannelBanner";
+import PublicChatFab from "@/components/skupka/PublicChatFab";
 
 const scrollTo = (href: string) => {
   const el = document.querySelector(href);
@@ -388,6 +389,7 @@ const Index = ({ goldOpen = false }: { goldOpen?: boolean }) => {
       <ContactsFooter scrollTo={scrollTo} />
       <ExitPopup onOpenEval={() => setEvalOpen(true)} />
       <CookieBanner />
+      <PublicChatFab />
 
       {/* Sticky нижняя панель — только мобильные */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0D0D0D]/98 backdrop-blur-sm border-t border-[#FFD700]/20 pb-safe">

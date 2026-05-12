@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import Icon from "@/components/ui/icon";
+import ContactChannelsBlock from "@/components/forms/ContactChannelsBlock";
 import { ymGoal, Goals } from "@/lib/ym";
 import { formatPhone, isPhoneValid } from "@/lib/phoneFormat";
 
@@ -17,6 +18,8 @@ const ExitPopup = ({ onOpenEval }: ExitPopupProps) => {
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [contactChannels, setContactChannels] = useState<string[]>([]);
+  const [contactTime, setContactTime] = useState("");
   const triggered = useRef(false);
 
   useEffect(() => {
@@ -85,7 +88,14 @@ const ExitPopup = ({ onOpenEval }: ExitPopupProps) => {
       const res = await fetch(SEND_LEAD_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, name: "Клиент (поп-ап)", category: "", desc: "Оставил номер в поп-апе" }),
+        body: JSON.stringify({
+          phone,
+          name: "Клиент (поп-ап)",
+          category: "",
+          desc: "Оставил номер в поп-апе",
+          contact_channels: contactChannels,
+          contact_time: contactTime,
+        }),
       });
       if (!res.ok) throw new Error();
       setSent(true);
@@ -180,6 +190,13 @@ const ExitPopup = ({ onOpenEval }: ExitPopupProps) => {
                   className="w-full bg-[#1A1A1A] border border-[#333] focus:border-[#FFD700] text-white px-4 py-3 text-sm outline-none transition-colors placeholder:text-white/20"
                 />
                 {error && <p className="text-red-400 text-xs">{error}</p>}
+                <ContactChannelsBlock
+                  value={contactChannels}
+                  onChange={setContactChannels}
+                  timeNote={contactTime}
+                  onTimeChange={setContactTime}
+                  variant="compact"
+                />
                 <button
                   type="submit"
                   disabled={loading}

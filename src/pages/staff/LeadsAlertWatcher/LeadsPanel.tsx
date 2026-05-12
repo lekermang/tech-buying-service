@@ -1,10 +1,13 @@
 import React from "react";
 import Icon from "@/components/ui/icon";
 import { fmtPhone, sourceLabel, type Lead, type Stats } from "./types";
+import LeadPhotoStrip from "./LeadPhotoStrip";
+import { CHANNEL_META, channelHref, parseChannels, type Channel } from "./channelHelpers";
 
 type Props = {
   leads: Lead[];
   stats: Stats | null;
+  token: string;
   onClose: () => void;
   onTake: (id: number) => void;
   onMarkAnswered: (id: number) => void;
@@ -13,11 +16,14 @@ type Props = {
   onInvite: (lead: Lead) => void;
   onInviteMax: (lead: Lead) => void;
   onRobocall: (lead: Lead) => void;
+  onOpenHistory: (lead: Lead) => void;
+  onInviteToChat: (lead: Lead) => void;
 };
 
 export default function LeadsPanel({
   leads,
   stats,
+  token,
   onClose,
   onTake,
   onMarkAnswered,
@@ -26,6 +32,8 @@ export default function LeadsPanel({
   onInvite,
   onInviteMax,
   onRobocall,
+  onOpenHistory,
+  onInviteToChat,
 }: Props) {
   const overdue = stats?.overdue_count || 0;
   const newCount = stats?.new_count || 0;
@@ -110,7 +118,38 @@ export default function LeadsPanel({
                     </div>
                     <div className="mt-1 font-bold text-white text-sm truncate">{l.client_name}</div>
                     <div className="text-[#FFD700] text-sm font-mono">{fmtPhone(l.client_phone)}</div>
+                    {(() => {
+                      const chs: Channel[] = parseChannels(l.contact_channels);
+                      if (chs.length === 0) return null;
+                      return (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {chs.map(ch => {
+                            const m = CHANNEL_META[ch];
+                            return (
+                              <a
+                                key={ch}
+                                href={channelHref(ch, l.client_phone)}
+                                target={ch === "wa" || ch === "tg" ? "_blank" : undefined}
+                                rel={ch === "wa" || ch === "tg" ? "noreferrer" : undefined}
+                                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-roboto border ${m.bg} ${m.ring} hover:opacity-90 active:scale-95 transition-all`}
+                                title={`Открыть ${m.label}`}
+                              >
+                                <span className="leading-none">{m.emoji}</span>
+                                <span className="font-bold">{m.label}</span>
+                              </a>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+                    {l.device && (
+                      <div className="text-[10px] text-white/45 mt-0.5 font-roboto italic">
+                        <Icon name="Smartphone" size={9} className="inline mr-0.5" />
+                        {l.device}
+                      </div>
+                    )}
                     {l.description && <div className="text-xs text-white/55 mt-0.5 line-clamp-2">{l.description}</div>}
+                    <LeadPhotoStrip leadId={l.id} initialPhotos={l.photos} token={token} />
                   </div>
                 </div>
                 <div className="grid grid-cols-4 gap-1 mt-2">
@@ -134,6 +173,22 @@ export default function LeadsPanel({
                     📞
                   </a>
                 </div>
+                <div className="mt-2 grid grid-cols-2 gap-1.5">
+                  <button
+                    onClick={() => onOpenHistory(l)}
+                    className="text-[11px] bg-white/8 hover:bg-white/15 border border-white/15 text-white/85 rounded py-1.5 font-roboto inline-flex items-center justify-center gap-1 active:scale-95 transition-all"
+                    title="Открыть CRM-карточку клиента: все его заявки, ремонты, золото"
+                  >
+                    <Icon name="History" size={12} /> 📇 История клиента
+                  </button>
+                  <button
+                    onClick={() => onInviteToChat(l)}
+                    className="text-[11px] bg-[#FFD700]/15 hover:bg-[#FFD700]/25 border border-[#FFD700]/40 text-[#FFD700] rounded py-1.5 font-roboto font-bold inline-flex items-center justify-center gap-1 active:scale-95 transition-all"
+                    title="Сгенерировать invite-ссылку и отправить клиенту"
+                  >
+                    <Icon name="MessageSquare" size={12} /> 💬 Пригласить в чат
+                  </button>
+                </div>
                 <div className="mt-1 flex items-center justify-between gap-2 flex-wrap">
                   <button
                     onClick={() => onShare(l)}
@@ -145,16 +200,16 @@ export default function LeadsPanel({
                   <button
                     onClick={() => onInvite(l)}
                     className="text-[10px] text-emerald-300/80 hover:text-emerald-200 underline inline-flex items-center gap-1"
-                    title="Отправить SMS со ссылкой на персональный чат"
+                    title="Открыть WhatsApp клиента (быстрый старт диалога)"
                   >
-                    <Icon name="MessageCircle" size={11} /> Пригласить в чат
+                    <Icon name="MessageCircle" size={11} /> WhatsApp
                   </button>
                   <button
                     onClick={() => onInviteMax(l)}
                     className="text-[10px] text-cyan-300/85 hover:text-cyan-200 underline inline-flex items-center gap-1"
-                    title="Открыть мессенджер MAX у сотрудника и параллельно отправить клиенту SMS со ссылкой на MAX-чат"
+                    title="Открыть мессенджер MAX у сотрудника"
                   >
-                    <Icon name="Send" size={11} /> Пригласить в MAX
+                    <Icon name="Send" size={11} /> Открыть MAX
                   </button>
                   <button
                     onClick={() => onRobocall(l)}

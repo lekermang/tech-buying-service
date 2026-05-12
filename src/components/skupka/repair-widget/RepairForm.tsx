@@ -1,4 +1,5 @@
 import Icon from "@/components/ui/icon";
+import ContactChannelsBlock from "@/components/forms/ContactChannelsBlock";
 import { formatPhone } from "@/lib/phoneFormat";
 import { INP, Part, ExtraWork, ClientInfo } from "./types";
 import RepairPartsSelector from "./RepairPartsSelector";
@@ -26,6 +27,10 @@ type Props = {
   onChangeSelection: () => void;
   onSubmit: () => void;
   onReset: () => void;
+  contactChannels: string[];
+  setContactChannels: React.Dispatch<React.SetStateAction<string[]>>;
+  contactTime: string;
+  setContactTime: React.Dispatch<React.SetStateAction<string>>;
   onCheckStatus: () => void;
   setStatusId: (id: string) => void;
   setTab: (tab: "form" | "status") => void;
@@ -36,6 +41,7 @@ export default function RepairForm({
   selectedPart, clientInfo, partsLoading, parts, showPartsList, groupedParts,
   extraWorks, extraWorksList, extraTotal,
   onSelectPart, onToggleExtra, onChangeSelection, onSubmit, onReset,
+  contactChannels, setContactChannels, contactTime, setContactTime,
   onCheckStatus, setStatusId, setTab,
 }: Props) {
   if (orderId) {
@@ -124,6 +130,16 @@ export default function RepairForm({
         onChange={e => setForm(p => ({ ...p, fault: e.target.value }))}
         placeholder="Опишите проблему * (не включается, разбит экран...)"
         className={INP} />
+
+      <div className="mt-1">
+        <ContactChannelsBlock
+          value={contactChannels}
+          onChange={setContactChannels}
+          timeNote={contactTime}
+          onTimeChange={setContactTime}
+          variant="compact"
+        />
+      </div>
 
       <div className="flex items-center justify-between gap-2 mt-1">
         <label className="flex items-start gap-2 cursor-pointer flex-1" onClick={() => setAgreed(v => !v)}>
