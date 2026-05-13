@@ -270,6 +270,8 @@ def handler(event, context):
             emp_id = 0
         if not emp_id:
             return resp(400, {'error': 'employee_id required'})
+        cal_from = params.get('from')
+        cal_to = params.get('to')
         with get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
                 f"""
@@ -279,22 +281,45 @@ def handler(event, context):
                   sl.total, sl.is_paid, sl.paid_at, sl.created_at
                 FROM {SCHEMA}.employee_salary_log sl
                 WHERE sl.employee_id = %s
-                ORDER BY sl.shift_date DESC LIMIT 90
+                ORDER BY sl.shift_date DESC LIMIT 365
                 """,
                 (emp_id,),
             )
             history = cur.fetchall()
 
+            if cal_from and cal_to:
+                cur.execute(
+                    f"""
+                    SELECT shift_date, status FROM {SCHEMA}.employee_shifts
+                    WHERE employee_id = %s AND shift_date >= %s AND shift_date <= %s
+                    ORDER BY shift_date DESC
+                    """,
+                    (emp_id, cal_from, cal_to),
+                )
+            else:
+                cur.execute(
+                    f"""
+                    SELECT shift_date, status FROM {SCHEMA}.employee_shifts
+                    WHERE employee_id = %s AND shift_date >= CURRENT_DATE - INTERVAL '30 days'
+                    ORDER BY shift_date DESC
+                    """,
+                    (emp_id,),
+                )
+            calendar = cur.fetchall()
+
             cur.execute(
                 f"""
-                SELECT shift_date, status FROM {SCHEMA}.employee_shifts
-                WHERE employee_id = %s AND shift_date >= CURRENT_DATE - INTERVAL '30 days'
-                ORDER BY shift_date DESC
+                SELECT
+                  COALESCE(SUM(total), 0) AS total_all,
+                  COALESCE(SUM(CASE WHEN is_paid THEN total ELSE 0 END), 0) AS total_paid,
+                  COALESCE(SUM(CASE WHEN NOT is_paid THEN total ELSE 0 END), 0) AS total_unpaid
+                FROM {SCHEMA}.employee_salary_log
+                WHERE employee_id = %s
                 """,
                 (emp_id,),
             )
-            calendar = cur.fetchall()
-            return resp(200, {'history': history, 'calendar': calendar})
+            summary = cur.fetchone()
+            return resp(200, {'history': history, 'calendar': calendar, 'summary': summary})
 
     if action == 'owner_set_config' and method == 'POST':
         body = json.loads(event.get('body') or '{}')
@@ -374,5 +399,43 @@ def handler(event, context):
             )
             conn.commit()
             return resp(200, {'ok': True})
+
+    if action == 'owner_pay_all' and method == 'POST':
+        # Массовая выплата: помечает все неоплаченные смены сотрудника как выплаченные.
+        # Опционально — только в диапазоне дат (для выплаты за конкретный месяц).
+        body = json.loads(event.get('body') or '{}')
+        try:
+            emp_id = int(body.get('employee_id') or 0)
+        except (TypeError, ValueError):
+            emp_id = 0
+        if not emp_id:
+            return resp(400, {'error': 'employee_id required'})
+        pay_from = body.get('from')
+        pay_to = body.get('to')
+        with get_conn() as conn, conn.cursor() as cur:
+            if pay_from and pay_to:
+                cur.execute(
+                    f"""
+                    UPDATE {SCHEMA}.employee_salary_log
+                    SET is_paid = true, paid_at = NOW()
+                    WHERE employee_id = %s
+                      AND is_paid = false
+                      AND shift_date >= %s
+                      AND shift_date <= %s
+                    """,
+                    (emp_id, pay_from, pay_to),
+                )
+            else:
+                cur.execute(
+                    f"""
+                    UPDATE {SCHEMA}.employee_salary_log
+                    SET is_paid = true, paid_at = NOW()
+                    WHERE employee_id = %s AND is_paid = false
+                    """,
+                    (emp_id,),
+                )
+            affected = cur.rowcount
+            conn.commit()
+            return resp(200, {'ok': True, 'paid_count': affected})
 
     return resp(404, {'error': 'unknown_action', 'action': action})
