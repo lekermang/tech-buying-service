@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import Icon from "@/components/ui/icon";
-import { SALARY_URL, type EmployeeOverview, type SalaryLogEntry } from "@/pages/staff.types";
+import { SALARY_URL, type EmployeeOverview } from "@/pages/staff.types";
 
 interface Props {
   token: string;
@@ -8,16 +8,30 @@ interface Props {
 
 type CalendarDay = { shift_date: string; status: "open" | "closed" | "dayoff" };
 
-type Summary = {
-  total_all: number;
-  total_paid: number;
-  total_unpaid: number;
+type LogRow = {
+  id: number;
+  shift_date: string;
+  hours_worked: number;
+  base_rate: number;
+  personal_profit: number;
+  bonus_percent_at_time: number;
+  bonus_amount: number;
+  total: number;
+  owner_set: boolean;
+};
+
+type PayoutRow = {
+  id: number;
+  payout_date: string;
+  amount: number;
+  note: string | null;
 };
 
 type DetailState = {
-  history: SalaryLogEntry[];
+  history: LogRow[];
   calendar: CalendarDay[];
-  summary: Summary;
+  payouts: PayoutRow[];
+  summary: { total_all: number; total_paid: number; total_unpaid: number };
 };
 
 const MONTHS = [
@@ -26,22 +40,270 @@ const MONTHS = [
 ];
 const WEEKDAYS = ["Пн","Вт","Ср","Чт","Пт","Сб","Вс"];
 
-function isoLocal(d: Date) {
-  // YYYY-MM-DD по локали (не UTC), чтобы не съезжать на день
+const isoLocal = (d: Date) => {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+};
+const startOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
+const endOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth() + 1, 0);
+
+const statusDot = (s: EmployeeOverview["shift_status"]) => {
+  if (s === "open") return { color: "bg-green-400", label: "В работе" };
+  if (s === "closed") return { color: "bg-blue-400", label: "Закрыт" };
+  if (s === "dayoff") return { color: "bg-white/30", label: "Выходной" };
+  return { color: "bg-white/15", label: "Не отмечен" };
+};
+
+// === Модалка редактирования дня ===
+function DayEditModal({
+  open, day, employeeId, defaultRate, defaultPercent, currentLog, token,
+  onClose, onSaved,
+}: {
+  open: boolean;
+  day: string;
+  employeeId: number;
+  defaultRate: number;
+  defaultPercent: number;
+  currentLog: LogRow | null;
+  token: string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [hours, setHours] = useState("8");
+  const [rate, setRate] = useState(String(defaultRate));
+  const [bonus, setBonus] = useState("0");
+  const [profit, setProfit] = useState("0");
+  const [auto, setAuto] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      if (currentLog) {
+        setHours(String(currentLog.hours_worked || 0));
+        setRate(String(currentLog.base_rate || 0));
+        setBonus(String(currentLog.bonus_amount || 0));
+        setProfit(String(currentLog.personal_profit || 0));
+        setAuto(false);
+      } else {
+        setHours("8");
+        setRate(String(defaultRate));
+        setBonus("0");
+        setProfit("0");
+        setAuto(true);
+      }
+    }
+  }, [open, currentLog, defaultRate]);
+
+  if (!open) return null;
+
+  const total = (Number(rate) || 0) + (auto ? 0 : (Number(bonus) || 0));
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      await fetch(`${SALARY_URL}?action=owner_set_day`, {
+        method: "POST",
+        headers: { "X-Employee-Token": token, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          employee_id: employeeId,
+          date: day,
+          hours_worked: Number(hours) || 0,
+          base_rate: Number(rate) || 0,
+          auto_bonus: auto,
+          bonus_amount: auto ? 0 : (Number(bonus) || 0),
+          personal_profit: auto ? 0 : (Number(profit) || 0),
+        }),
+      });
+      onSaved();
+      onClose();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const clearDay = async () => {
+    if (!confirm("Обнулить начисление за этот день?")) return;
+    setBusy(true);
+    try {
+      await fetch(`${SALARY_URL}?action=owner_delete_day`, {
+        method: "POST",
+        headers: { "X-Employee-Token": token, "Content-Type": "application/json" },
+        body: JSON.stringify({ employee_id: employeeId, date: day }),
+      });
+      onSaved();
+      onClose();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const setDayoff = async () => {
+    setBusy(true);
+    try {
+      await fetch(`${SALARY_URL}?action=owner_set_dayoff`, {
+        method: "POST",
+        headers: { "X-Employee-Token": token, "Content-Type": "application/json" },
+        body: JSON.stringify({ employee_id: employeeId, date: day, is_dayoff: true }),
+      });
+      onSaved();
+      onClose();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl bg-[#0D0D0D] border border-[#FFD700]/30 p-5 space-y-4" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="font-oswald font-bold text-white text-lg uppercase">
+            {new Date(day).toLocaleDateString("ru-RU", { day: "2-digit", month: "long", year: "numeric" })}
+          </h3>
+          <button onClick={onClose} className="text-white/50 hover:text-white"><Icon name="X" size={18} /></button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <label>
+            <span className="text-white/50 text-[10px] uppercase font-oswald">Часы</span>
+            <input type="number" step="0.1" value={hours} onChange={e => setHours(e.target.value)}
+              className="w-full mt-1 px-3 py-2 rounded-lg bg-black/40 border border-white/15 text-white font-roboto" />
+          </label>
+          <label>
+            <span className="text-white/50 text-[10px] uppercase font-oswald">Ставка, ₽</span>
+            <input type="number" value={rate} onChange={e => setRate(e.target.value)}
+              className="w-full mt-1 px-3 py-2 rounded-lg bg-black/40 border border-white/15 text-white font-roboto" />
+          </label>
+        </div>
+
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked={auto} onChange={e => setAuto(e.target.checked)} className="w-4 h-4 accent-[#FFD700]" />
+          <span className="text-white/80 text-sm font-roboto">
+            Бонус автоматом: {defaultPercent}% от продаж в Смарт-Ломбарде за этот день
+          </span>
+        </label>
+
+        {!auto && (
+          <div className="grid grid-cols-2 gap-3">
+            <label>
+              <span className="text-white/50 text-[10px] uppercase font-oswald">Прибыль за день, ₽</span>
+              <input type="number" value={profit} onChange={e => setProfit(e.target.value)}
+                className="w-full mt-1 px-3 py-2 rounded-lg bg-black/40 border border-white/15 text-white font-roboto" />
+            </label>
+            <label>
+              <span className="text-white/50 text-[10px] uppercase font-oswald">Бонус, ₽</span>
+              <input type="number" value={bonus} onChange={e => setBonus(e.target.value)}
+                className="w-full mt-1 px-3 py-2 rounded-lg bg-black/40 border border-white/15 text-white font-roboto" />
+            </label>
+          </div>
+        )}
+
+        {!auto && (
+          <div className="text-white/60 text-sm font-roboto">
+            Итого за день: <span className="text-[#FFD700] font-bold font-oswald">{total.toLocaleString("ru-RU")} ₽</span>
+          </div>
+        )}
+        {auto && (
+          <div className="text-white/50 text-xs font-roboto">
+            Итог посчитается при сохранении: ставка + {defaultPercent}% от прибыли Смарт-Ломбарда.
+          </div>
+        )}
+
+        <div className="flex gap-2 pt-2">
+          <button onClick={save} disabled={busy}
+            className="flex-1 py-2 rounded-lg bg-[#FFD700] hover:bg-[#FFE34D] text-black font-oswald font-bold uppercase tracking-wide text-sm disabled:opacity-50">
+            Сохранить
+          </button>
+          <button onClick={setDayoff} disabled={busy}
+            className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/15 text-white/80 font-oswald uppercase tracking-wide text-xs disabled:opacity-50">
+            Выходной
+          </button>
+          {currentLog && (
+            <button onClick={clearDay} disabled={busy}
+              className="px-3 py-2 rounded-lg bg-red-500/15 hover:bg-red-500/25 text-red-300 font-oswald uppercase tracking-wide text-xs disabled:opacity-50">
+              Обнулить
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
-function startOfMonth(d: Date) { return new Date(d.getFullYear(), d.getMonth(), 1); }
-function endOfMonth(d: Date) { return new Date(d.getFullYear(), d.getMonth() + 1, 0); }
+// === Модалка добавления выплаты ===
+function PayoutModal({
+  open, employeeId, token, onClose, onSaved,
+}: {
+  open: boolean;
+  employeeId: number;
+  token: string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [day, setDay] = useState(isoLocal(new Date()));
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
 
-function statusDot(s: EmployeeOverview["shift_status"]) {
-  if (s === "open") return { color: "bg-green-400", label: "В смене" };
-  if (s === "closed") return { color: "bg-blue-400", label: "Смена закрыта" };
-  if (s === "dayoff") return { color: "bg-white/30", label: "Выходной" };
-  return { color: "bg-white/15", label: "Не начал" };
+  useEffect(() => {
+    if (open) {
+      setDay(isoLocal(new Date()));
+      setAmount("");
+      setNote("");
+    }
+  }, [open]);
+
+  if (!open) return null;
+
+  const save = async () => {
+    const amt = Number(amount) || 0;
+    if (amt <= 0) { alert("Введите сумму больше нуля"); return; }
+    setBusy(true);
+    try {
+      await fetch(`${SALARY_URL}?action=owner_add_payout`, {
+        method: "POST",
+        headers: { "X-Employee-Token": token, "Content-Type": "application/json" },
+        body: JSON.stringify({ employee_id: employeeId, date: day, amount: amt, note: note || null }),
+      });
+      onSaved();
+      onClose();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl bg-[#0D0D0D] border border-green-500/30 p-5 space-y-4" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="font-oswald font-bold text-white text-lg uppercase">Записать выплату</h3>
+          <button onClick={onClose} className="text-white/50 hover:text-white"><Icon name="X" size={18} /></button>
+        </div>
+        <label className="block">
+          <span className="text-white/50 text-[10px] uppercase font-oswald">Дата выплаты</span>
+          <input type="date" value={day} onChange={e => setDay(e.target.value)}
+            className="w-full mt-1 px-3 py-2 rounded-lg bg-black/40 border border-white/15 text-white font-roboto" />
+        </label>
+        <label className="block">
+          <span className="text-white/50 text-[10px] uppercase font-oswald">Сумма, ₽</span>
+          <input type="number" value={amount} onChange={e => setAmount(e.target.value)}
+            placeholder="например 20000"
+            className="w-full mt-1 px-3 py-2 rounded-lg bg-black/40 border border-white/15 text-white font-roboto" />
+        </label>
+        <label className="block">
+          <span className="text-white/50 text-[10px] uppercase font-oswald">Заметка (необяз.)</span>
+          <input type="text" value={note} onChange={e => setNote(e.target.value)}
+            placeholder="наличные, аванс и т.п."
+            className="w-full mt-1 px-3 py-2 rounded-lg bg-black/40 border border-white/15 text-white font-roboto" />
+        </label>
+        <button onClick={save} disabled={busy}
+          className="w-full py-2 rounded-lg bg-green-500 hover:bg-green-400 text-black font-oswald font-bold uppercase tracking-wide text-sm disabled:opacity-50">
+          Записать выплату
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export default function OwnerSalaryView({ token }: Props) {
@@ -52,8 +314,9 @@ export default function OwnerSalaryView({ token }: Props) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
-  // Выбранный месяц для просмотра (по умолчанию — текущий, 1-е число)
   const [viewMonth, setViewMonth] = useState<Date>(() => startOfMonth(new Date()));
+  const [dayEdit, setDayEdit] = useState<{ date: string; log: LogRow | null } | null>(null);
+  const [payoutOpen, setPayoutOpen] = useState(false);
 
   const headers = {
     "X-Employee-Token": token,
@@ -119,57 +382,23 @@ export default function OwnerSalaryView({ token }: Props) {
     }
   };
 
-  const toggleDayoff = async (dateStr: string, isDayoff: boolean) => {
-    if (!selected) return;
-    setBusy(true);
-    try {
-      await fetch(`${SALARY_URL}?action=owner_mark_dayoff`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ employee_id: selected.id, date: dateStr, is_dayoff: isDayoff }),
-      });
+  const reloadAfterChange = async () => {
+    if (selected) {
       await fetchDetail(selected.id, viewMonth);
       await fetchOverview();
-    } finally {
-      setBusy(false);
     }
   };
 
-  const markPaid = async (logId: number) => {
-    if (!selected) return;
+  const deletePayout = async (id: number) => {
+    if (!confirm("Отменить эту выплату?")) return;
     setBusy(true);
     try {
-      await fetch(`${SALARY_URL}?action=owner_mark_paid`, {
+      await fetch(`${SALARY_URL}?action=owner_delete_payout`, {
         method: "POST",
         headers,
-        body: JSON.stringify({ log_id: logId }),
+        body: JSON.stringify({ payout_id: id }),
       });
-      await fetchDetail(selected.id, viewMonth);
-      await fetchOverview();
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const payAllMonth = async () => {
-    if (!selected) return;
-    const from = isoLocal(startOfMonth(viewMonth));
-    const to = isoLocal(endOfMonth(viewMonth));
-    const monthLabel = `${MONTHS[viewMonth.getMonth()]} ${viewMonth.getFullYear()}`;
-    if (!confirm(`Пометить все неоплаченные смены за ${monthLabel} как выплаченные?`)) return;
-    setBusy(true);
-    try {
-      const r = await fetch(`${SALARY_URL}?action=owner_pay_all`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ employee_id: selected.id, from, to }),
-      });
-      if (r.ok) {
-        const d = await r.json();
-        alert(`Помечено выплаченными: ${d.paid_count || 0} смен`);
-      }
-      await fetchDetail(selected.id, viewMonth);
-      await fetchOverview();
+      await reloadAfterChange();
     } finally {
       setBusy(false);
     }
@@ -179,47 +408,52 @@ export default function OwnerSalaryView({ token }: Props) {
   const goNextMonth = () => setViewMonth(d => new Date(d.getFullYear(), d.getMonth() + 1, 1));
   const goCurrentMonth = () => setViewMonth(startOfMonth(new Date()));
 
-  // === Сетка календаря для выбранного месяца ===
+  // Сетка месяца, понедельник-первый
   const monthGrid = useMemo(() => {
     const first = startOfMonth(viewMonth);
     const last = endOfMonth(viewMonth);
     const daysInMonth = last.getDate();
-    // День недели первого числа (0=Вс ... 6=Сб) → переводим в Пн-first
     const firstWd = (first.getDay() + 6) % 7;
-    const cells: Array<{ date: string | null; status: CalendarDay["status"] | null }> = [];
-    const map = new Map((detail?.calendar || []).map(d => [d.shift_date.slice(0, 10), d.status]));
-    for (let i = 0; i < firstWd; i++) cells.push({ date: null, status: null });
+    type Cell = { date: string | null; status: CalendarDay["status"] | null; total: number; payout: number };
+    const cells: Cell[] = [];
+    const calMap = new Map((detail?.calendar || []).map(d => [d.shift_date.slice(0, 10), d.status]));
+    const logMap = new Map((detail?.history || []).map(l => [l.shift_date.slice(0, 10), l.total || 0]));
+    const payMap = new Map<string, number>();
+    for (const p of detail?.payouts || []) {
+      const k = p.payout_date.slice(0, 10);
+      payMap.set(k, (payMap.get(k) || 0) + (p.amount || 0));
+    }
+    for (let i = 0; i < firstWd; i++) cells.push({ date: null, status: null, total: 0, payout: 0 });
     for (let d = 1; d <= daysInMonth; d++) {
       const cur = new Date(viewMonth.getFullYear(), viewMonth.getMonth(), d);
       const iso = isoLocal(cur);
-      cells.push({ date: iso, status: map.get(iso) || null });
+      cells.push({
+        date: iso,
+        status: calMap.get(iso) || null,
+        total: logMap.get(iso) || 0,
+        payout: payMap.get(iso) || 0,
+      });
     }
-    // Доводим до полной недели
-    while (cells.length % 7 !== 0) cells.push({ date: null, status: null });
+    while (cells.length % 7 !== 0) cells.push({ date: null, status: null, total: 0, payout: 0 });
     return cells;
-  }, [viewMonth, detail?.calendar]);
+  }, [viewMonth, detail]);
 
-  // История за выбранный месяц
-  const historyMonth = useMemo(() => {
-    if (!detail) return [];
+  const monthSummary = useMemo(() => {
+    if (!detail) return { earned: 0, paid: 0, remaining: 0 };
     const from = isoLocal(startOfMonth(viewMonth));
     const to = isoLocal(endOfMonth(viewMonth));
-    return detail.history.filter(h => {
+    let earned = 0;
+    for (const h of detail.history) {
       const d = h.shift_date.slice(0, 10);
-      return d >= from && d <= to;
-    });
-  }, [detail, viewMonth]);
-
-  // Сумма за выбранный месяц
-  const monthSummary = useMemo(() => {
-    let total = 0, paid = 0, unpaid = 0;
-    for (const h of historyMonth) {
-      total += Number(h.total) || 0;
-      if (h.is_paid) paid += Number(h.total) || 0;
-      else unpaid += Number(h.total) || 0;
+      if (d >= from && d <= to) earned += Number(h.total) || 0;
     }
-    return { total, paid, unpaid };
-  }, [historyMonth]);
+    let paid = 0;
+    for (const p of detail.payouts) {
+      const d = p.payout_date.slice(0, 10);
+      if (d >= from && d <= to) paid += Number(p.amount) || 0;
+    }
+    return { earned, paid, remaining: earned - paid };
+  }, [detail, viewMonth]);
 
   const isCurrentMonth = useMemo(() => {
     const now = new Date();
@@ -227,18 +461,23 @@ export default function OwnerSalaryView({ token }: Props) {
   }, [viewMonth]);
 
   const todayIso = isoLocal(new Date());
+  const logByDate = useMemo(() => {
+    const m = new Map<string, LogRow>();
+    for (const h of detail?.history || []) m.set(h.shift_date.slice(0, 10), h);
+    return m;
+  }, [detail]);
 
   if (loading) {
     return <div className="p-6 text-center text-white/50">Загрузка...</div>;
   }
 
-  // === ЭКРАН СПИСКА СОТРУДНИКОВ ===
+  // === ЭКРАН СПИСКА ===
   if (!selectedId) {
     return (
       <div className="p-4 sm:p-6 max-w-4xl mx-auto">
         <div className="mb-6">
           <h2 className="font-oswald font-bold text-2xl text-white uppercase tracking-wide">Зарплаты</h2>
-          <p className="text-white/50 text-sm mt-1 font-roboto">Управление ставкой, % с продаж, графиком и выплатами</p>
+          <p className="text-white/50 text-sm mt-1 font-roboto">Полное управление: смены, выходные, выплаты</p>
         </div>
 
         {employees.length === 0 ? (
@@ -288,7 +527,7 @@ export default function OwnerSalaryView({ token }: Props) {
     );
   }
 
-  // === ЭКРАН ДЕТАЛЕЙ СОТРУДНИКА ===
+  // === ЭКРАН ДЕТАЛЕЙ ===
   return (
     <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-5">
       <button
@@ -301,7 +540,7 @@ export default function OwnerSalaryView({ token }: Props) {
 
       {selected && (
         <>
-          {/* Шапка: имя + ставка/% */}
+          {/* Шапка */}
           <div className="rounded-xl border border-white/10 bg-white/5 p-4">
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div>
@@ -309,10 +548,8 @@ export default function OwnerSalaryView({ token }: Props) {
                 <div className="text-white/40 text-xs font-roboto">{selected.position || selected.role} · @{selected.login}</div>
               </div>
               {!editing && (
-                <button
-                  onClick={beginEdit}
-                  className="px-3 py-1.5 rounded-lg bg-[#FFD700]/15 hover:bg-[#FFD700]/25 border border-[#FFD700]/30 text-[#FFD700] text-sm font-oswald uppercase tracking-wide flex items-center gap-1.5"
-                >
+                <button onClick={beginEdit}
+                  className="px-3 py-1.5 rounded-lg bg-[#FFD700]/15 hover:bg-[#FFD700]/25 border border-[#FFD700]/30 text-[#FFD700] text-sm font-oswald uppercase tracking-wide flex items-center gap-1.5">
                   <Icon name="Pencil" size={14} />
                   Редактировать
                 </button>
@@ -321,51 +558,36 @@ export default function OwnerSalaryView({ token }: Props) {
 
             {editing ? (
               <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <label className="block">
-                  <span className="text-white/50 text-xs uppercase tracking-wide font-oswald">Ставка за смену, ₽</span>
+                <label>
+                  <span className="text-white/50 text-xs uppercase font-oswald">Ставка по умолчанию, ₽</span>
                   <input type="number" value={editing.daily_rate}
                     onChange={e => setEditing({ ...editing, daily_rate: e.target.value })}
                     className="w-full mt-1 px-3 py-2 rounded-lg bg-black/40 border border-white/15 text-white font-roboto" />
                 </label>
-                <label className="block">
-                  <span className="text-white/50 text-xs uppercase tracking-wide font-oswald">% с продаж</span>
+                <label>
+                  <span className="text-white/50 text-xs uppercase font-oswald">% с продаж</span>
                   <input type="number" step="0.1" value={editing.bonus_percent}
                     onChange={e => setEditing({ ...editing, bonus_percent: e.target.value })}
                     className="w-full mt-1 px-3 py-2 rounded-lg bg-black/40 border border-white/15 text-white font-roboto" />
                 </label>
                 <div className="sm:col-span-2 flex gap-2">
                   <button onClick={saveConfig} disabled={busy}
-                    className="flex-1 py-2 rounded-lg bg-[#FFD700] text-black font-oswald font-bold uppercase tracking-wide text-sm disabled:opacity-50">
-                    Сохранить
-                  </button>
+                    className="flex-1 py-2 rounded-lg bg-[#FFD700] text-black font-oswald font-bold uppercase text-sm disabled:opacity-50">Сохранить</button>
                   <button onClick={() => setEditing(null)}
-                    className="flex-1 py-2 rounded-lg bg-white/10 text-white/70 font-oswald uppercase tracking-wide text-sm">
-                    Отмена
-                  </button>
+                    className="flex-1 py-2 rounded-lg bg-white/10 text-white/70 font-oswald uppercase text-sm">Отмена</button>
                 </div>
-                <p className="sm:col-span-2 text-white/40 text-[11px] font-roboto">
-                  Изменение применится к будущим сменам. Старые записи в логе не пересчитываются.
-                </p>
               </div>
             ) : (
               <div className="mt-3 flex gap-6 text-sm font-roboto">
-                <div>
-                  <div className="text-white/40 text-[10px] uppercase font-oswald">Ставка</div>
-                  <div className="text-white font-bold tabular-nums">{selected.daily_rate.toLocaleString("ru-RU")} ₽</div>
-                </div>
-                <div>
-                  <div className="text-white/40 text-[10px] uppercase font-oswald">% с продаж</div>
-                  <div className="text-white font-bold">{selected.bonus_percent}%</div>
-                </div>
-                <div>
-                  <div className="text-white/40 text-[10px] uppercase font-oswald">Мин. часов</div>
-                  <div className="text-white font-bold">{selected.min_hours_for_rate} ч</div>
-                </div>
+                <div><div className="text-white/40 text-[10px] uppercase font-oswald">Ставка</div>
+                  <div className="text-white font-bold tabular-nums">{selected.daily_rate.toLocaleString("ru-RU")} ₽</div></div>
+                <div><div className="text-white/40 text-[10px] uppercase font-oswald">% с продаж</div>
+                  <div className="text-white font-bold">{selected.bonus_percent}%</div></div>
               </div>
             )}
           </div>
 
-          {/* Сводка по сотруднику в целом */}
+          {/* Сводки */}
           {detail?.summary && (
             <div className="grid grid-cols-3 gap-2">
               <div className="rounded-xl border border-white/10 bg-white/5 p-3">
@@ -410,7 +632,6 @@ export default function OwnerSalaryView({ token }: Props) {
               </button>
             </div>
 
-            {/* Календарь */}
             <div className="grid grid-cols-7 gap-1 mb-1">
               {WEEKDAYS.map(w => (
                 <div key={w} className="text-center text-[10px] text-white/40 font-oswald uppercase tracking-wide py-1">{w}</div>
@@ -420,128 +641,113 @@ export default function OwnerSalaryView({ token }: Props) {
               {monthGrid.map((cell, i) => {
                 if (!cell.date) return <div key={`e-${i}`} className="aspect-square" />;
                 const isToday = cell.date === todayIso;
-                const isPast = cell.date < todayIso;
-                const color =
-                  cell.status === "open" ? "bg-green-500/30 border-green-400/50 text-green-200"
-                  : cell.status === "closed" ? "bg-blue-500/20 border-blue-400/40 text-blue-200"
-                  : cell.status === "dayoff" ? "bg-white/10 border-white/20 text-white/40"
-                  : "bg-black/30 border-white/10 text-white/40";
-                const canToggle = cell.status !== "closed" && !isPast;
+                const baseColor =
+                  cell.status === "dayoff" ? "bg-white/8 border-white/15 text-white/40"
+                  : cell.total > 0 ? "bg-green-500/15 border-green-400/40 text-green-100"
+                  : "bg-black/30 border-white/10 text-white/55";
                 const dayNum = Number(cell.date.slice(8, 10));
                 return (
                   <button
                     key={cell.date}
-                    onClick={() => canToggle && cell.date && toggleDayoff(cell.date, cell.status !== "dayoff")}
-                    disabled={!canToggle || busy}
-                    title={canToggle ? (cell.status === "dayoff" ? "Снять выходной" : "Отметить выходным") : "Закрытые смены и прошлые дни не меняются"}
-                    className={`aspect-square rounded-md border ${color} text-[11px] font-oswald tabular-nums flex flex-col items-center justify-center ${canToggle ? "hover:scale-105 cursor-pointer" : "cursor-not-allowed opacity-70"} ${isToday ? "ring-2 ring-[#FFD700]/60" : ""}`}
+                    onClick={() => cell.date && setDayEdit({ date: cell.date, log: logByDate.get(cell.date) || null })}
+                    disabled={busy}
+                    title="Кликни чтобы вписать часы и сумму"
+                    className={`aspect-square rounded-md border ${baseColor} text-[10px] font-oswald tabular-nums flex flex-col items-center justify-center hover:scale-105 transition-transform cursor-pointer relative ${isToday ? "ring-2 ring-[#FFD700]/60" : ""}`}
                   >
-                    <span className="font-bold">{dayNum}</span>
-                    {cell.status === "dayoff" && <Icon name="Sunrise" size={9} />}
-                    {cell.status === "closed" && <Icon name="Check" size={9} />}
+                    <span className="font-bold text-[11px]">{dayNum}</span>
+                    {cell.status === "dayoff" && <Icon name="Sunrise" size={9} className="text-white/40" />}
+                    {cell.total > 0 && (
+                      <span className="text-[8px] text-[#FFD700] font-bold leading-none">
+                        {cell.total >= 1000 ? `${(cell.total / 1000).toFixed(cell.total % 1000 === 0 ? 0 : 1)}к` : cell.total}
+                      </span>
+                    )}
+                    {cell.payout > 0 && (
+                      <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-green-400" title={`Выплата ${cell.payout} ₽`} />
+                    )}
                   </button>
                 );
               })}
             </div>
             <div className="mt-3 flex flex-wrap gap-3 text-[10px] text-white/50 font-roboto">
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-green-500/40" />Открыта</span>
-              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-blue-500/30" />Закрыта</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-green-500/40" />Рабочий день</span>
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-white/20" />Выходной</span>
-              <span className="text-white/35">Клик — отметить/снять выходной</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400" />Выплата</span>
+              <span className="text-white/35">Клик по дню — вписать часы и сумму</span>
             </div>
           </div>
 
-          {/* Сводка за выбранный месяц + кнопка выплаты */}
+          {/* Сводка месяца */}
           <div className="rounded-xl border border-[#FFD700]/30 bg-gradient-to-br from-[#FFD700]/8 to-transparent p-4">
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="flex gap-6 text-sm font-roboto">
-                <div>
-                  <div className="text-white/40 text-[10px] uppercase font-oswald">Начислено за {MONTHS[viewMonth.getMonth()]}</div>
-                  <div className="text-white font-bold tabular-nums font-oswald text-lg">
-                    {monthSummary.total.toLocaleString("ru-RU")} ₽
-                  </div>
-                </div>
-                <div>
-                  <div className="text-green-300/60 text-[10px] uppercase font-oswald">Выплачено</div>
-                  <div className="text-green-300 font-bold tabular-nums font-oswald text-lg">
-                    {monthSummary.paid.toLocaleString("ru-RU")} ₽
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[#FFD700]/70 text-[10px] uppercase font-oswald">К выплате</div>
-                  <div className="text-[#FFD700] font-bold tabular-nums font-oswald text-lg">
-                    {monthSummary.unpaid.toLocaleString("ru-RU")} ₽
-                  </div>
-                </div>
+                <div><div className="text-white/40 text-[10px] uppercase font-oswald">Начислено в {MONTHS[viewMonth.getMonth()].toLowerCase()}</div>
+                  <div className="text-white font-bold tabular-nums font-oswald text-lg">{monthSummary.earned.toLocaleString("ru-RU")} ₽</div></div>
+                <div><div className="text-green-300/60 text-[10px] uppercase font-oswald">Выплачено</div>
+                  <div className="text-green-300 font-bold tabular-nums font-oswald text-lg">{monthSummary.paid.toLocaleString("ru-RU")} ₽</div></div>
+                <div><div className="text-[#FFD700]/70 text-[10px] uppercase font-oswald">Остаток</div>
+                  <div className="text-[#FFD700] font-bold tabular-nums font-oswald text-lg">{monthSummary.remaining.toLocaleString("ru-RU")} ₽</div></div>
               </div>
-              <button
-                onClick={payAllMonth}
-                disabled={busy || monthSummary.unpaid === 0}
-                className="px-4 py-2 rounded-lg bg-[#FFD700] hover:bg-[#FFE34D] text-black font-oswald font-bold uppercase tracking-wide text-sm disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
-              >
-                <Icon name="Wallet" size={14} />
-                Выплатить за месяц
+              <button onClick={() => setPayoutOpen(true)}
+                className="px-4 py-2 rounded-lg bg-green-500 hover:bg-green-400 text-black font-oswald font-bold uppercase tracking-wide text-sm flex items-center gap-1.5">
+                <Icon name="Plus" size={14} />
+                Записать выплату
               </button>
             </div>
           </div>
 
-          {/* История зарплат за выбранный месяц */}
-          <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-            <div className="font-oswald font-bold text-white text-sm uppercase tracking-wide mb-3">
-              Смены за {MONTHS[viewMonth.getMonth()]} {viewMonth.getFullYear()}
-            </div>
-            {!detail ? (
-              <div className="text-white/40 text-center py-4 font-roboto">Загрузка...</div>
-            ) : historyMonth.length === 0 ? (
-              <div className="text-white/40 text-center py-4 font-roboto">В этом месяце нет закрытых смен</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm font-roboto">
-                  <thead>
-                    <tr className="text-white/40 text-[10px] uppercase tracking-wide font-oswald">
-                      <th className="text-left py-2 px-1">Дата</th>
-                      <th className="text-right py-2 px-1">Часы</th>
-                      <th className="text-right py-2 px-1">Ставка</th>
-                      <th className="text-right py-2 px-1">Прибыль</th>
-                      <th className="text-right py-2 px-1">%</th>
-                      <th className="text-right py-2 px-1">Бонус</th>
-                      <th className="text-right py-2 px-1">Итого</th>
-                      <th className="text-right py-2 px-1"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {historyMonth.map(h => (
-                      <tr key={h.id} className="border-t border-white/5">
-                        <td className="py-2 px-1 text-white/80 whitespace-nowrap">
-                          {new Date(h.shift_date).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" })}
-                        </td>
-                        <td className="py-2 px-1 text-right text-white/70 tabular-nums">{Number(h.hours_worked).toFixed(1)}</td>
-                        <td className="py-2 px-1 text-right text-white/70 tabular-nums">{Number(h.base_rate || 0).toLocaleString("ru-RU")}</td>
-                        <td className="py-2 px-1 text-right text-white/70 tabular-nums">{Number(h.personal_profit || 0).toLocaleString("ru-RU")}</td>
-                        <td className="py-2 px-1 text-right text-white/70">{h.bonus_percent_at_time}%</td>
-                        <td className="py-2 px-1 text-right text-white/70 tabular-nums">{Number(h.bonus_amount || 0).toLocaleString("ru-RU")}</td>
-                        <td className="py-2 px-1 text-right text-[#FFD700] font-bold tabular-nums">{Number(h.total).toLocaleString("ru-RU")}</td>
-                        <td className="py-2 px-1 text-right">
-                          {h.is_paid ? (
-                            <span className="text-green-400 text-[10px] uppercase font-oswald">Выплачено</span>
-                          ) : (
-                            <button
-                              onClick={() => h.id && markPaid(h.id)}
-                              disabled={busy}
-                              className="px-2 py-1 rounded bg-[#FFD700]/15 border border-[#FFD700]/30 text-[#FFD700] text-[10px] uppercase font-oswald hover:bg-[#FFD700]/25"
-                            >
-                              Выплатить
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          {/* Выплаты за месяц */}
+          {detail && detail.payouts.filter(p => p.amount > 0).length > 0 && (
+            <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+              <div className="font-oswald font-bold text-white text-sm uppercase tracking-wide mb-3">Выплаты в {MONTHS[viewMonth.getMonth()].toLowerCase()}</div>
+              <div className="space-y-1.5">
+                {detail.payouts.filter(p => p.amount > 0).map(p => (
+                  <div key={p.id} className="flex items-center justify-between rounded-md bg-green-500/5 border border-green-500/15 px-3 py-2 text-sm font-roboto">
+                    <div className="flex items-center gap-2">
+                      <Icon name="ArrowDownLeft" size={14} className="text-green-300" />
+                      <span className="text-white">
+                        {new Date(p.payout_date).toLocaleDateString("ru-RU", { day: "2-digit", month: "long" })}
+                      </span>
+                      {p.note && <span className="text-white/40 text-xs">· {p.note}</span>}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-green-300 font-bold font-oswald tabular-nums">
+                        {Number(p.amount).toLocaleString("ru-RU")} ₽
+                      </span>
+                      <button onClick={() => deletePayout(p.id)} disabled={busy}
+                        className="text-white/30 hover:text-red-400" title="Отменить">
+                        <Icon name="X" size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </>
+      )}
+
+      {/* Модалки */}
+      {dayEdit && selected && (
+        <DayEditModal
+          open={!!dayEdit}
+          day={dayEdit.date}
+          employeeId={selected.id}
+          defaultRate={selected.daily_rate}
+          defaultPercent={selected.bonus_percent}
+          currentLog={dayEdit.log}
+          token={token}
+          onClose={() => setDayEdit(null)}
+          onSaved={reloadAfterChange}
+        />
+      )}
+      {selected && (
+        <PayoutModal
+          open={payoutOpen}
+          employeeId={selected.id}
+          token={token}
+          onClose={() => setPayoutOpen(false)}
+          onSaved={reloadAfterChange}
+        />
       )}
     </div>
   );

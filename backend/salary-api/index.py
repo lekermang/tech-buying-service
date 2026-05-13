@@ -1,14 +1,16 @@
 """
-Business: API расчёта зарплаты сотрудников.
-         Сотрудник видит только свою смену и итоговую зарплату.
-         Владелец видит всех, настраивает % и ставку, отмечает выходные и выплаты.
+Business: API зарплат. Владелец полностью управляет: сам проставляет дни (часы, ставку,
+         бонус), отмечает выходные, фиксирует выплаты на конкретную дату.
+         Сотрудник видит только: свою ставку, % с продаж, дневной доход, общий доход,
+         сколько уже выплачено и остаток. Сотрудник НЕ закрывает смены сам.
+         Прибыль для авто-бонуса берётся из Смарт-Ломбарда (slshop_operations + slshop_items).
 Args: event - dict с httpMethod, queryStringParameters, body, headers (X-Employee-Token)
       context - объект с request_id, function_name
 Returns: HTTP-ответ с JSON
 """
 import json
 import os
-from datetime import datetime, date, timezone
+from datetime import date
 from decimal import Decimal
 
 import psycopg2
@@ -48,35 +50,51 @@ def get_header(headers, name):
 
 
 def auth_employee(token):
-    """Возвращает (employee_id, role, full_name) или None."""
     if not token:
         return None
     with get_conn() as conn, conn.cursor() as cur:
         cur.execute(
-            f"SELECT id, role, full_name FROM {SCHEMA}.employees "
+            f"SELECT id, role, full_name, auth_token FROM {SCHEMA}.employees "
             f"WHERE auth_token = %s AND is_active = true "
             f"AND (token_expires_at IS NULL OR token_expires_at > NOW())",
             (token,),
         )
         row = cur.fetchone()
-    return row
+    return row  # (id, role, full_name, auth_token)
 
 
-def calc_personal_profit(cur, employee_id, started_at, ended_at):
-    """Чистая прибыль сотрудника за период: SUM(sales.amount_final - goods.purchase_price)."""
+def calc_slshop_profit_for_day(cur, employee_token, day):
+    """Прибыль за день из Смарт-Ломбарда: SUM(op.amount - item.buy_price) для op_type='sale'
+    где employee_token совпадает и created_at в этом дне."""
+    if not employee_token:
+        return 0
     cur.execute(
         f"""
-        SELECT COALESCE(SUM(s.amount_final - g.purchase_price), 0) AS profit
-        FROM {SCHEMA}.sales s
-        JOIN {SCHEMA}.goods g ON g.id = s.good_id
-        WHERE s.employee_id = %s
-          AND s.type = 'goods'
-          AND s.created_at >= %s
-          AND s.created_at <= %s
+        SELECT COALESCE(SUM(op.amount - COALESCE(i.buy_price, 0)), 0) AS profit
+        FROM {SCHEMA}.slshop_operations op
+        LEFT JOIN {SCHEMA}.slshop_items i ON i.id = op.item_id
+        WHERE op.op_type = 'sale'
+          AND op.employee_token = %s
+          AND op.created_at::date = %s
         """,
-        (employee_id, started_at, ended_at),
+        (employee_token, day),
     )
     return int(cur.fetchone()[0] or 0)
+
+
+def ensure_shift(cur, employee_id, day, status='closed'):
+    """Создаёт или обновляет запись смены на конкретный день. Возвращает id смены."""
+    cur.execute(
+        f"""
+        INSERT INTO {SCHEMA}.employee_shifts (employee_id, shift_date, status, started_at)
+        VALUES (%s, %s, %s, NOW())
+        ON CONFLICT (employee_id, shift_date) DO UPDATE
+        SET status = EXCLUDED.status
+        RETURNING id
+        """,
+        (employee_id, day, status),
+    )
+    return cur.fetchone()[0]
 
 
 def handler(event, context):
@@ -89,39 +107,47 @@ def handler(event, context):
     user = auth_employee(token)
     if not user:
         return resp(401, {'error': 'unauthorized'})
-    user_id, role, full_name = user
+    user_id, role, full_name, user_token = user
 
     params = event.get('queryStringParameters') or {}
     action = params.get('action', '')
 
     # =====================================================
-    # СОТРУДНИК: видит только свою смену
+    # СОТРУДНИК: только просмотр
     # =====================================================
     if action == 'my_today':
         with get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             today = date.today()
             cur.execute(
-                f"SELECT daily_rate, bonus_percent, min_hours_for_rate "
-                f"FROM {SCHEMA}.employee_salary_config WHERE employee_id = %s",
+                f"SELECT daily_rate, bonus_percent FROM {SCHEMA}.employee_salary_config "
+                f"WHERE employee_id = %s",
                 (user_id,),
             )
-            cfg = cur.fetchone() or {'daily_rate': 2000, 'bonus_percent': 3.0, 'min_hours_for_rate': 10.0}
+            cfg = cur.fetchone() or {'daily_rate': 2000, 'bonus_percent': 3.0}
 
+            # Запись на сегодня (если владелец уже её проставил)
             cur.execute(
-                f"SELECT id, started_at, ended_at, status FROM {SCHEMA}.employee_shifts "
+                f"SELECT total FROM {SCHEMA}.employee_salary_log "
                 f"WHERE employee_id = %s AND shift_date = %s",
                 (user_id, today),
             )
-            shift = cur.fetchone()
+            r = cur.fetchone()
+            today_total = r['total'] if r else None
 
-            today_total = None
-            if shift and shift['status'] == 'closed':
-                cur.execute(
-                    f"SELECT total FROM {SCHEMA}.employee_salary_log WHERE shift_id = %s",
-                    (shift['id'],),
-                )
-                row = cur.fetchone()
-                today_total = row['total'] if row else None
+            # Общий итог: начислено, выплачено (через payouts), остаток
+            cur.execute(
+                f"SELECT COALESCE(SUM(total), 0) AS total_earned "
+                f"FROM {SCHEMA}.employee_salary_log WHERE employee_id = %s",
+                (user_id,),
+            )
+            total_earned = int(cur.fetchone()['total_earned'] or 0)
+
+            cur.execute(
+                f"SELECT COALESCE(SUM(amount), 0) AS total_paid "
+                f"FROM {SCHEMA}.employee_payouts WHERE employee_id = %s",
+                (user_id,),
+            )
+            total_paid = int(cur.fetchone()['total_paid'] or 0)
 
             return resp(200, {
                 'employee': {'id': user_id, 'name': full_name},
@@ -129,111 +155,40 @@ def handler(event, context):
                     'daily_rate': cfg['daily_rate'],
                     'bonus_percent': float(cfg['bonus_percent']),
                 },
-                'shift': shift,
                 'today_total': today_total,
-            })
-
-    if action == 'shift_start' and method == 'POST':
-        today = date.today()
-        with get_conn() as conn, conn.cursor() as cur:
-            cur.execute(
-                f"SELECT status FROM {SCHEMA}.employee_shifts "
-                f"WHERE employee_id = %s AND shift_date = %s",
-                (user_id, today),
-            )
-            existing = cur.fetchone()
-            if existing:
-                status = existing[0]
-                if status == 'dayoff':
-                    return resp(403, {'error': 'dayoff', 'message': 'Сегодня выходной'})
-                if status == 'open':
-                    return resp(200, {'ok': True, 'message': 'Смена уже открыта'})
-                if status == 'closed':
-                    return resp(403, {'error': 'closed', 'message': 'Смена сегодня уже закрыта'})
-
-            cur.execute(
-                f"INSERT INTO {SCHEMA}.employee_shifts (employee_id, shift_date, status) "
-                f"VALUES (%s, %s, 'open') RETURNING id, started_at",
-                (user_id, today),
-            )
-            shift_id, started = cur.fetchone()
-            conn.commit()
-            return resp(200, {'ok': True, 'shift_id': shift_id, 'started_at': started.isoformat()})
-
-    if action == 'shift_end' and method == 'POST':
-        today = date.today()
-        with get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(
-                f"SELECT id, started_at, status FROM {SCHEMA}.employee_shifts "
-                f"WHERE employee_id = %s AND shift_date = %s",
-                (user_id, today),
-            )
-            shift = cur.fetchone()
-            if not shift or shift['status'] != 'open':
-                return resp(400, {'error': 'no_open_shift', 'message': 'Нет открытой смены'})
-
-            cur.execute(
-                f"SELECT daily_rate, bonus_percent, min_hours_for_rate "
-                f"FROM {SCHEMA}.employee_salary_config WHERE employee_id = %s",
-                (user_id,),
-            )
-            cfg = cur.fetchone() or {
-                'daily_rate': 2000,
-                'bonus_percent': Decimal('3.0'),
-                'min_hours_for_rate': Decimal('10.0'),
-            }
-
-            started_at = shift['started_at']
-            tz = started_at.tzinfo or timezone.utc
-            now = datetime.now(tz)
-            hours = Decimal((now - started_at).total_seconds()) / Decimal(3600)
-            hours = hours.quantize(Decimal('0.01'))
-
-            min_hours = Decimal(str(cfg['min_hours_for_rate']))
-            base_rate = int(cfg['daily_rate']) if hours >= min_hours else 0
-
-            profit = calc_personal_profit(cur, user_id, started_at, now)
-            percent = Decimal(str(cfg['bonus_percent']))
-            bonus = int(Decimal(profit) * percent / Decimal(100))
-            total = base_rate + bonus
-
-            cur.execute(
-                f"UPDATE {SCHEMA}.employee_shifts SET ended_at = %s, status = 'closed' WHERE id = %s",
-                (now, shift['id']),
-            )
-            cur.execute(
-                f"""
-                INSERT INTO {SCHEMA}.employee_salary_log
-                  (shift_id, employee_id, shift_date, hours_worked, base_rate,
-                   personal_profit, bonus_percent_at_time, bonus_amount, total)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                RETURNING id
-                """,
-                (shift['id'], user_id, today, hours, base_rate, profit, percent, bonus, total),
-            )
-            conn.commit()
-            return resp(200, {
-                'ok': True,
-                'hours_worked': float(hours),
-                'total': total,
-                'reached_minimum': base_rate > 0,
+                'total_earned': total_earned,
+                'total_paid': total_paid,
+                'remaining': total_earned - total_paid,
             })
 
     if action == 'my_history':
+        # Сотрудник видит дневные начисления (без расчёта прибыли) + выплаты
         with get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
                 f"""
-                SELECT shift_date, hours_worked, total, is_paid, paid_at
+                SELECT shift_date, hours_worked, total
                 FROM {SCHEMA}.employee_salary_log
                 WHERE employee_id = %s
-                ORDER BY shift_date DESC LIMIT 60
+                ORDER BY shift_date DESC LIMIT 90
                 """,
                 (user_id,),
             )
-            return resp(200, {'history': cur.fetchall()})
+            days = cur.fetchall()
+
+            cur.execute(
+                f"""
+                SELECT id, payout_date, amount, note
+                FROM {SCHEMA}.employee_payouts
+                WHERE employee_id = %s
+                ORDER BY payout_date DESC LIMIT 90
+                """,
+                (user_id,),
+            )
+            payouts = cur.fetchall()
+            return resp(200, {'days': days, 'payouts': payouts})
 
     # =====================================================
-    # ВЛАДЕЛЕЦ: видит всё, управляет
+    # ВЛАДЕЛЕЦ
     # =====================================================
     if role != 'owner':
         return resp(403, {'error': 'forbidden', 'message': 'Только для владельца'})
@@ -250,9 +205,10 @@ def handler(event, context):
                   COALESCE(cfg.min_hours_for_rate, 10.0) AS min_hours_for_rate,
                   sh.id AS shift_id, sh.status AS shift_status,
                   sh.started_at, sh.ended_at,
-                  (SELECT COALESCE(SUM(total), 0)
-                     FROM {SCHEMA}.employee_salary_log
-                     WHERE employee_id = e.id AND is_paid = false) AS unpaid_total
+                  COALESCE((SELECT SUM(total) FROM {SCHEMA}.employee_salary_log
+                            WHERE employee_id = e.id), 0)
+                  - COALESCE((SELECT SUM(amount) FROM {SCHEMA}.employee_payouts
+                              WHERE employee_id = e.id), 0) AS unpaid_total
                 FROM {SCHEMA}.employees e
                 LEFT JOIN {SCHEMA}.employee_salary_config cfg ON cfg.employee_id = e.id
                 LEFT JOIN {SCHEMA}.employee_shifts sh ON sh.employee_id = e.id AND sh.shift_date = %s
@@ -273,20 +229,32 @@ def handler(event, context):
         cal_from = params.get('from')
         cal_to = params.get('to')
         with get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-            cur.execute(
-                f"""
-                SELECT
-                  sl.id, sl.shift_date, sl.hours_worked, sl.base_rate,
-                  sl.personal_profit, sl.bonus_percent_at_time, sl.bonus_amount,
-                  sl.total, sl.is_paid, sl.paid_at, sl.created_at
-                FROM {SCHEMA}.employee_salary_log sl
-                WHERE sl.employee_id = %s
-                ORDER BY sl.shift_date DESC LIMIT 365
-                """,
-                (emp_id,),
-            )
+            # История начислений (за выбранный диапазон если задан, иначе все)
+            if cal_from and cal_to:
+                cur.execute(
+                    f"""
+                    SELECT id, shift_date, hours_worked, base_rate, personal_profit,
+                           bonus_percent_at_time, bonus_amount, total, owner_set, created_at
+                    FROM {SCHEMA}.employee_salary_log
+                    WHERE employee_id = %s AND shift_date >= %s AND shift_date <= %s
+                    ORDER BY shift_date DESC
+                    """,
+                    (emp_id, cal_from, cal_to),
+                )
+            else:
+                cur.execute(
+                    f"""
+                    SELECT id, shift_date, hours_worked, base_rate, personal_profit,
+                           bonus_percent_at_time, bonus_amount, total, owner_set, created_at
+                    FROM {SCHEMA}.employee_salary_log
+                    WHERE employee_id = %s
+                    ORDER BY shift_date DESC LIMIT 365
+                    """,
+                    (emp_id,),
+                )
             history = cur.fetchall()
 
+            # Календарь (все смены за период или последние 30 дней)
             if cal_from and cal_to:
                 cur.execute(
                     f"""
@@ -307,19 +275,233 @@ def handler(event, context):
                 )
             calendar = cur.fetchall()
 
+            # Выплаты за тот же период (или все)
+            if cal_from and cal_to:
+                cur.execute(
+                    f"""
+                    SELECT id, payout_date, amount, note, created_at
+                    FROM {SCHEMA}.employee_payouts
+                    WHERE employee_id = %s AND payout_date >= %s AND payout_date <= %s
+                    ORDER BY payout_date DESC
+                    """,
+                    (emp_id, cal_from, cal_to),
+                )
+            else:
+                cur.execute(
+                    f"""
+                    SELECT id, payout_date, amount, note, created_at
+                    FROM {SCHEMA}.employee_payouts
+                    WHERE employee_id = %s
+                    ORDER BY payout_date DESC LIMIT 365
+                    """,
+                    (emp_id,),
+                )
+            payouts = cur.fetchall()
+
+            # Сводка общая
             cur.execute(
-                f"""
-                SELECT
-                  COALESCE(SUM(total), 0) AS total_all,
-                  COALESCE(SUM(CASE WHEN is_paid THEN total ELSE 0 END), 0) AS total_paid,
-                  COALESCE(SUM(CASE WHEN NOT is_paid THEN total ELSE 0 END), 0) AS total_unpaid
-                FROM {SCHEMA}.employee_salary_log
-                WHERE employee_id = %s
-                """,
+                f"SELECT COALESCE(SUM(total), 0) AS s FROM {SCHEMA}.employee_salary_log WHERE employee_id = %s",
                 (emp_id,),
             )
-            summary = cur.fetchone()
-            return resp(200, {'history': history, 'calendar': calendar, 'summary': summary})
+            total_all = int(cur.fetchone()['s'] or 0)
+            cur.execute(
+                f"SELECT COALESCE(SUM(amount), 0) AS s FROM {SCHEMA}.employee_payouts WHERE employee_id = %s",
+                (emp_id,),
+            )
+            total_paid = int(cur.fetchone()['s'] or 0)
+
+            summary = {
+                'total_all': total_all,
+                'total_paid': total_paid,
+                'total_unpaid': total_all - total_paid,
+            }
+            return resp(200, {
+                'history': history,
+                'calendar': calendar,
+                'payouts': payouts,
+                'summary': summary,
+            })
+
+    if action == 'owner_set_day' and method == 'POST':
+        # Владелец вписывает начисление за конкретный день: часы + сумма (или авто-расчёт)
+        body = json.loads(event.get('body') or '{}')
+        try:
+            emp_id = int(body.get('employee_id') or 0)
+        except (TypeError, ValueError):
+            emp_id = 0
+        day = body.get('date')
+        if not emp_id or not day:
+            return resp(400, {'error': 'employee_id and date required'})
+
+        hours = Decimal(str(body.get('hours_worked', 0) or 0))
+        base_rate = int(body.get('base_rate', 0) or 0)
+        # bonus: либо явно передан, либо auto=true → берём из Смарт-Ломбарда
+        auto_bonus = bool(body.get('auto_bonus', False))
+        bonus_amount = int(body.get('bonus_amount', 0) or 0)
+        personal_profit = int(body.get('personal_profit', 0) or 0)
+
+        with get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            # Конфиг для % по умолчанию
+            cur.execute(
+                f"SELECT daily_rate, bonus_percent FROM {SCHEMA}.employee_salary_config "
+                f"WHERE employee_id = %s",
+                (emp_id,),
+            )
+            cfg = cur.fetchone() or {'daily_rate': 2000, 'bonus_percent': Decimal('3.0')}
+            percent = Decimal(str(cfg['bonus_percent']))
+
+            # Токен сотрудника для расчёта slshop-прибыли
+            cur.execute(f"SELECT auth_token FROM {SCHEMA}.employees WHERE id = %s", (emp_id,))
+            emp_token_row = cur.fetchone()
+            emp_token = emp_token_row['auth_token'] if emp_token_row else None
+
+            if auto_bonus:
+                personal_profit = calc_slshop_profit_for_day(cur, emp_token, day)
+                bonus_amount = int(Decimal(personal_profit) * percent / Decimal(100))
+
+            total = base_rate + bonus_amount
+
+            # Создаём смену (status=closed для рабочего дня)
+            shift_id = ensure_shift(cur, emp_id, day, status='closed')
+
+            # UPSERT в лог по (employee_id, shift_date)
+            cur.execute(
+                f"""
+                INSERT INTO {SCHEMA}.employee_salary_log
+                  (shift_id, employee_id, shift_date, hours_worked, base_rate,
+                   personal_profit, bonus_percent_at_time, bonus_amount, total,
+                   is_paid, owner_set)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, false, true)
+                ON CONFLICT (employee_id, shift_date) DO UPDATE
+                SET hours_worked = EXCLUDED.hours_worked,
+                    base_rate = EXCLUDED.base_rate,
+                    personal_profit = EXCLUDED.personal_profit,
+                    bonus_percent_at_time = EXCLUDED.bonus_percent_at_time,
+                    bonus_amount = EXCLUDED.bonus_amount,
+                    total = EXCLUDED.total,
+                    owner_set = true,
+                    shift_id = EXCLUDED.shift_id
+                """,
+                (shift_id, emp_id, day, hours, base_rate, personal_profit, percent,
+                 bonus_amount, total),
+            )
+            conn.commit()
+            return resp(200, {
+                'ok': True,
+                'total': total,
+                'bonus_amount': bonus_amount,
+                'personal_profit': personal_profit,
+            })
+
+    if action == 'owner_delete_day' and method == 'POST':
+        body = json.loads(event.get('body') or '{}')
+        try:
+            emp_id = int(body.get('employee_id') or 0)
+        except (TypeError, ValueError):
+            emp_id = 0
+        day = body.get('date')
+        if not emp_id or not day:
+            return resp(400, {'error': 'employee_id and date required'})
+        with get_conn() as conn, conn.cursor() as cur:
+            # Обнуляем запись лога (нельзя удалять данные)
+            cur.execute(
+                f"""
+                UPDATE {SCHEMA}.employee_salary_log
+                SET hours_worked = 0, base_rate = 0, personal_profit = 0,
+                    bonus_amount = 0, total = 0, owner_set = true
+                WHERE employee_id = %s AND shift_date = %s
+                """,
+                (emp_id, day),
+            )
+            conn.commit()
+            return resp(200, {'ok': True})
+
+    if action == 'owner_set_dayoff' and method == 'POST':
+        body = json.loads(event.get('body') or '{}')
+        try:
+            emp_id = int(body.get('employee_id') or 0)
+        except (TypeError, ValueError):
+            emp_id = 0
+        day = body.get('date')
+        is_dayoff = bool(body.get('is_dayoff', True))
+        if not emp_id or not day:
+            return resp(400, {'error': 'employee_id and date required'})
+
+        with get_conn() as conn, conn.cursor() as cur:
+            if is_dayoff:
+                # Обнуляем начисление, если было
+                cur.execute(
+                    f"""
+                    UPDATE {SCHEMA}.employee_salary_log
+                    SET hours_worked = 0, base_rate = 0, personal_profit = 0,
+                        bonus_amount = 0, total = 0
+                    WHERE employee_id = %s AND shift_date = %s
+                    """,
+                    (emp_id, day),
+                )
+                cur.execute(
+                    f"""
+                    INSERT INTO {SCHEMA}.employee_shifts (employee_id, shift_date, status, started_at)
+                    VALUES (%s, %s, 'dayoff', NOW())
+                    ON CONFLICT (employee_id, shift_date) DO UPDATE
+                    SET status = 'dayoff'
+                    """,
+                    (emp_id, day),
+                )
+            else:
+                cur.execute(
+                    f"UPDATE {SCHEMA}.employee_shifts SET status = 'open' "
+                    f"WHERE employee_id = %s AND shift_date = %s AND status = 'dayoff'",
+                    (emp_id, day),
+                )
+            conn.commit()
+            return resp(200, {'ok': True})
+
+    if action == 'owner_add_payout' and method == 'POST':
+        body = json.loads(event.get('body') or '{}')
+        try:
+            emp_id = int(body.get('employee_id') or 0)
+        except (TypeError, ValueError):
+            emp_id = 0
+        day = body.get('date')
+        try:
+            amount = int(body.get('amount') or 0)
+        except (TypeError, ValueError):
+            amount = 0
+        note = body.get('note') or None
+        if not emp_id or not day or amount <= 0:
+            return resp(400, {'error': 'employee_id, date and positive amount required'})
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"""
+                INSERT INTO {SCHEMA}.employee_payouts
+                  (employee_id, payout_date, amount, note, created_by)
+                VALUES (%s, %s, %s, %s, %s)
+                RETURNING id
+                """,
+                (emp_id, day, amount, note, user_id),
+            )
+            payout_id = cur.fetchone()[0]
+            conn.commit()
+            return resp(200, {'ok': True, 'payout_id': payout_id})
+
+    if action == 'owner_delete_payout' and method == 'POST':
+        body = json.loads(event.get('body') or '{}')
+        try:
+            payout_id = int(body.get('payout_id') or 0)
+        except (TypeError, ValueError):
+            payout_id = 0
+        if not payout_id:
+            return resp(400, {'error': 'payout_id required'})
+        with get_conn() as conn, conn.cursor() as cur:
+            # Обнуляем сумму вместо удаления (DELETE заблокирован политикой)
+            cur.execute(
+                f"UPDATE {SCHEMA}.employee_payouts SET amount = 0, note = COALESCE(note,'') || ' [отменено]' "
+                f"WHERE id = %s",
+                (payout_id,),
+            )
+            conn.commit()
+            return resp(200, {'ok': True})
 
     if action == 'owner_set_config' and method == 'POST':
         body = json.loads(event.get('body') or '{}')
@@ -350,92 +532,5 @@ def handler(event, context):
             )
             conn.commit()
             return resp(200, {'ok': True})
-
-    if action == 'owner_mark_dayoff' and method == 'POST':
-        body = json.loads(event.get('body') or '{}')
-        try:
-            emp_id = int(body.get('employee_id') or 0)
-        except (TypeError, ValueError):
-            emp_id = 0
-        day = body.get('date')
-        is_dayoff = bool(body.get('is_dayoff', True))
-        if not emp_id or not day:
-            return resp(400, {'error': 'employee_id and date required'})
-
-        with get_conn() as conn, conn.cursor() as cur:
-            if is_dayoff:
-                cur.execute(
-                    f"""
-                    INSERT INTO {SCHEMA}.employee_shifts (employee_id, shift_date, status, started_at)
-                    VALUES (%s, %s, 'dayoff', NOW())
-                    ON CONFLICT (employee_id, shift_date) DO UPDATE
-                    SET status = 'dayoff'
-                    WHERE {SCHEMA}.employee_shifts.status != 'closed'
-                    """,
-                    (emp_id, day),
-                )
-            else:
-                cur.execute(
-                    f"UPDATE {SCHEMA}.employee_shifts SET status = 'open' "
-                    f"WHERE employee_id = %s AND shift_date = %s AND status = 'dayoff'",
-                    (emp_id, day),
-                )
-            conn.commit()
-            return resp(200, {'ok': True})
-
-    if action == 'owner_mark_paid' and method == 'POST':
-        body = json.loads(event.get('body') or '{}')
-        try:
-            log_id = int(body.get('log_id') or 0)
-        except (TypeError, ValueError):
-            log_id = 0
-        if not log_id:
-            return resp(400, {'error': 'log_id required'})
-        with get_conn() as conn, conn.cursor() as cur:
-            cur.execute(
-                f"UPDATE {SCHEMA}.employee_salary_log "
-                f"SET is_paid = true, paid_at = NOW() WHERE id = %s",
-                (log_id,),
-            )
-            conn.commit()
-            return resp(200, {'ok': True})
-
-    if action == 'owner_pay_all' and method == 'POST':
-        # Массовая выплата: помечает все неоплаченные смены сотрудника как выплаченные.
-        # Опционально — только в диапазоне дат (для выплаты за конкретный месяц).
-        body = json.loads(event.get('body') or '{}')
-        try:
-            emp_id = int(body.get('employee_id') or 0)
-        except (TypeError, ValueError):
-            emp_id = 0
-        if not emp_id:
-            return resp(400, {'error': 'employee_id required'})
-        pay_from = body.get('from')
-        pay_to = body.get('to')
-        with get_conn() as conn, conn.cursor() as cur:
-            if pay_from and pay_to:
-                cur.execute(
-                    f"""
-                    UPDATE {SCHEMA}.employee_salary_log
-                    SET is_paid = true, paid_at = NOW()
-                    WHERE employee_id = %s
-                      AND is_paid = false
-                      AND shift_date >= %s
-                      AND shift_date <= %s
-                    """,
-                    (emp_id, pay_from, pay_to),
-                )
-            else:
-                cur.execute(
-                    f"""
-                    UPDATE {SCHEMA}.employee_salary_log
-                    SET is_paid = true, paid_at = NOW()
-                    WHERE employee_id = %s AND is_paid = false
-                    """,
-                    (emp_id,),
-                )
-            affected = cur.rowcount
-            conn.commit()
-            return resp(200, {'ok': True, 'paid_count': affected})
 
     return resp(404, {'error': 'unknown_action', 'action': action})
