@@ -306,6 +306,126 @@ function PayoutModal({
   );
 }
 
+// === Модалка массового заполнения дней по шаблону ===
+function BulkFillModal({
+  open, employeeId, defaultRate, defaultPercent, token, onClose, onSaved,
+}: {
+  open: boolean;
+  employeeId: number;
+  defaultRate: number;
+  defaultPercent: number;
+  token: string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [hours, setHours] = useState("8");
+  const [rate, setRate] = useState(String(defaultRate));
+  const [autoBonus, setAutoBonus] = useState(true);
+  const [weekdaysOnly, setWeekdaysOnly] = useState(false);
+  const [skipExisting, setSkipExisting] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      setFrom(isoLocal(monthStart));
+      setTo(isoLocal(now));
+      setHours("8");
+      setRate(String(defaultRate));
+      setAutoBonus(true);
+      setWeekdaysOnly(false);
+      setSkipExisting(true);
+    }
+  }, [open, defaultRate]);
+
+  if (!open) return null;
+
+  const apply = async () => {
+    if (!from || !to) { alert("Укажи даты"); return; }
+    setBusy(true);
+    try {
+      const r = await fetch(`${SALARY_URL}?action=owner_bulk_fill`, {
+        method: "POST",
+        headers: { "X-Employee-Token": token, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          employee_id: employeeId,
+          from, to,
+          hours_worked: Number(hours) || 0,
+          base_rate: Number(rate) || 0,
+          auto_bonus: autoBonus,
+          weekdays_only: weekdaysOnly,
+          skip_existing: skipExisting,
+        }),
+      });
+      if (r.ok) {
+        const d = await r.json();
+        alert(`Заполнено: ${d.filled} дн., пропущено: ${d.skipped}`);
+      } else {
+        alert("Не удалось заполнить");
+      }
+      onSaved();
+      onClose();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl bg-[#0D0D0D] border border-[#FFD700]/30 p-5 space-y-4" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="font-oswald font-bold text-white text-lg uppercase">Заполнить дни</h3>
+          <button onClick={onClose} className="text-white/50 hover:text-white"><Icon name="X" size={18} /></button>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block">
+            <span className="text-white/50 text-[10px] uppercase font-oswald">С даты</span>
+            <input type="date" value={from} onChange={e => setFrom(e.target.value)}
+              className="w-full mt-1 px-3 py-2 rounded-lg bg-black/40 border border-white/15 text-white font-roboto" />
+          </label>
+          <label className="block">
+            <span className="text-white/50 text-[10px] uppercase font-oswald">По дату</span>
+            <input type="date" value={to} onChange={e => setTo(e.target.value)}
+              className="w-full mt-1 px-3 py-2 rounded-lg bg-black/40 border border-white/15 text-white font-roboto" />
+          </label>
+          <label className="block">
+            <span className="text-white/50 text-[10px] uppercase font-oswald">Часов в день</span>
+            <input type="number" step="0.1" value={hours} onChange={e => setHours(e.target.value)}
+              className="w-full mt-1 px-3 py-2 rounded-lg bg-black/40 border border-white/15 text-white font-roboto" />
+          </label>
+          <label className="block">
+            <span className="text-white/50 text-[10px] uppercase font-oswald">Ставка, ₽</span>
+            <input type="number" value={rate} onChange={e => setRate(e.target.value)}
+              className="w-full mt-1 px-3 py-2 rounded-lg bg-black/40 border border-white/15 text-white font-roboto" />
+          </label>
+        </div>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked={autoBonus} onChange={e => setAutoBonus(e.target.checked)} className="w-4 h-4 accent-[#FFD700]" />
+          <span className="text-white/80 text-sm font-roboto">Авто-бонус {defaultPercent}% от продаж Смарт-Ломбарда</span>
+        </label>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked={weekdaysOnly} onChange={e => setWeekdaysOnly(e.target.checked)} className="w-4 h-4 accent-[#FFD700]" />
+          <span className="text-white/80 text-sm font-roboto">Только будни (Пн–Пт)</span>
+        </label>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked={skipExisting} onChange={e => setSkipExisting(e.target.checked)} className="w-4 h-4 accent-[#FFD700]" />
+          <span className="text-white/80 text-sm font-roboto">Не трогать уже заполненные дни</span>
+        </label>
+        <div className="text-white/40 text-xs font-roboto">
+          Выходные (отмеченные тобой) пропускаются всегда.
+        </div>
+        <button onClick={apply} disabled={busy}
+          className="w-full py-2 rounded-lg bg-[#FFD700] hover:bg-[#FFE34D] text-black font-oswald font-bold uppercase tracking-wide text-sm disabled:opacity-50">
+          {busy ? "Заполняю..." : "Заполнить"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function OwnerSalaryView({ token }: Props) {
   const [employees, setEmployees] = useState<EmployeeOverview[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -317,6 +437,7 @@ export default function OwnerSalaryView({ token }: Props) {
   const [viewMonth, setViewMonth] = useState<Date>(() => startOfMonth(new Date()));
   const [dayEdit, setDayEdit] = useState<{ date: string; log: LogRow | null } | null>(null);
   const [payoutOpen, setPayoutOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   const headers = {
     "X-Employee-Token": token,
@@ -687,11 +808,18 @@ export default function OwnerSalaryView({ token }: Props) {
                 <div><div className="text-[#FFD700]/70 text-[10px] uppercase font-oswald">Остаток</div>
                   <div className="text-[#FFD700] font-bold tabular-nums font-oswald text-lg">{monthSummary.remaining.toLocaleString("ru-RU")} ₽</div></div>
               </div>
-              <button onClick={() => setPayoutOpen(true)}
-                className="px-4 py-2 rounded-lg bg-green-500 hover:bg-green-400 text-black font-oswald font-bold uppercase tracking-wide text-sm flex items-center gap-1.5">
-                <Icon name="Plus" size={14} />
-                Записать выплату
-              </button>
+              <div className="flex gap-2 flex-wrap">
+                <button onClick={() => setBulkOpen(true)}
+                  className="px-3 py-2 rounded-lg bg-[#FFD700]/15 hover:bg-[#FFD700]/25 border border-[#FFD700]/30 text-[#FFD700] font-oswald font-bold uppercase tracking-wide text-xs flex items-center gap-1.5">
+                  <Icon name="CalendarRange" size={14} />
+                  Заполнить дни
+                </button>
+                <button onClick={() => setPayoutOpen(true)}
+                  className="px-3 py-2 rounded-lg bg-green-500 hover:bg-green-400 text-black font-oswald font-bold uppercase tracking-wide text-xs flex items-center gap-1.5">
+                  <Icon name="Plus" size={14} />
+                  Записать выплату
+                </button>
+              </div>
             </div>
           </div>
 
@@ -746,6 +874,17 @@ export default function OwnerSalaryView({ token }: Props) {
           employeeId={selected.id}
           token={token}
           onClose={() => setPayoutOpen(false)}
+          onSaved={reloadAfterChange}
+        />
+      )}
+      {selected && (
+        <BulkFillModal
+          open={bulkOpen}
+          employeeId={selected.id}
+          defaultRate={selected.daily_rate}
+          defaultPercent={selected.bonus_percent}
+          token={token}
+          onClose={() => setBulkOpen(false)}
           onSaved={reloadAfterChange}
         />
       )}

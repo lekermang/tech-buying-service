@@ -63,6 +63,18 @@ def auth_employee(token):
     return row  # (id, role, full_name, auth_token)
 
 
+def _row_value(row, key, idx=0):
+    """Универсальный доступ: row может быть tuple или dict (RealDictCursor)."""
+    if row is None:
+        return None
+    if isinstance(row, dict):
+        return row.get(key)
+    try:
+        return row[idx]
+    except (KeyError, IndexError, TypeError):
+        return None
+
+
 def calc_slshop_profit_for_day(cur, employee_token, day):
     """Прибыль за день из Смарт-Ломбарда: SUM(op.amount - item.buy_price) для op_type='sale'
     где employee_token совпадает и created_at в этом дне."""
@@ -79,7 +91,8 @@ def calc_slshop_profit_for_day(cur, employee_token, day):
         """,
         (employee_token, day),
     )
-    return int(cur.fetchone()[0] or 0)
+    v = _row_value(cur.fetchone(), 'profit', 0)
+    return int(v or 0)
 
 
 def ensure_shift(cur, employee_id, day, status='closed'):
@@ -94,7 +107,8 @@ def ensure_shift(cur, employee_id, day, status='closed'):
         """,
         (employee_id, day, status),
     )
-    return cur.fetchone()[0]
+    v = _row_value(cur.fetchone(), 'id', 0)
+    return int(v) if v is not None else None
 
 
 def handler(event, context):
@@ -392,6 +406,111 @@ def handler(event, context):
                 'bonus_amount': bonus_amount,
                 'personal_profit': personal_profit,
             })
+
+    if action == 'owner_bulk_fill' and method == 'POST':
+        # Массовое заполнение диапазона дат шаблоном (часы + ставка + авто-бонус).
+        # Пропускает дни помеченные dayoff и (если skip_existing=true) уже заполненные.
+        body = json.loads(event.get('body') or '{}')
+        try:
+            emp_id = int(body.get('employee_id') or 0)
+        except (TypeError, ValueError):
+            emp_id = 0
+        date_from = body.get('from')
+        date_to = body.get('to')
+        if not emp_id or not date_from or not date_to:
+            return resp(400, {'error': 'employee_id, from, to required'})
+        hours = Decimal(str(body.get('hours_worked', 8) or 8))
+        base_rate = int(body.get('base_rate', 2000) or 2000)
+        auto_bonus = bool(body.get('auto_bonus', True))
+        skip_existing = bool(body.get('skip_existing', True))
+        weekdays_only = bool(body.get('weekdays_only', False))
+
+        from datetime import datetime as _dt, timedelta as _td
+        try:
+            d_start = _dt.strptime(date_from, '%Y-%m-%d').date()
+            d_end = _dt.strptime(date_to, '%Y-%m-%d').date()
+        except Exception:
+            return resp(400, {'error': 'invalid date format, use YYYY-MM-DD'})
+        if d_end < d_start:
+            return resp(400, {'error': 'to must be >= from'})
+
+        with get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                f"SELECT daily_rate, bonus_percent FROM {SCHEMA}.employee_salary_config WHERE employee_id = %s",
+                (emp_id,),
+            )
+            cfg = cur.fetchone() or {'daily_rate': 2000, 'bonus_percent': Decimal('3.0')}
+            percent = Decimal(str(cfg['bonus_percent']))
+
+            cur.execute(f"SELECT auth_token FROM {SCHEMA}.employees WHERE id = %s", (emp_id,))
+            emp_row = cur.fetchone()
+            emp_token = emp_row['auth_token'] if emp_row else None
+
+            filled = 0
+            skipped = 0
+            cur_day = d_start
+            while cur_day <= d_end:
+                day_str = cur_day.isoformat()
+                # weekdays_only — Пн-Пт (0..4)
+                if weekdays_only and cur_day.weekday() >= 5:
+                    skipped += 1
+                    cur_day += _td(days=1)
+                    continue
+                # Проверяем выходной
+                cur.execute(
+                    f"SELECT status FROM {SCHEMA}.employee_shifts WHERE employee_id = %s AND shift_date = %s",
+                    (emp_id, day_str),
+                )
+                sh = cur.fetchone()
+                if sh and sh['status'] == 'dayoff':
+                    skipped += 1
+                    cur_day += _td(days=1)
+                    continue
+                # Проверяем уже заполненный лог
+                if skip_existing:
+                    cur.execute(
+                        f"SELECT total FROM {SCHEMA}.employee_salary_log WHERE employee_id = %s AND shift_date = %s",
+                        (emp_id, day_str),
+                    )
+                    log = cur.fetchone()
+                    if log and (log['total'] or 0) > 0:
+                        skipped += 1
+                        cur_day += _td(days=1)
+                        continue
+
+                # Считаем
+                personal_profit = 0
+                bonus = 0
+                if auto_bonus:
+                    personal_profit = calc_slshop_profit_for_day(cur, emp_token, day_str)
+                    bonus = int(Decimal(personal_profit) * percent / Decimal(100))
+                total = base_rate + bonus
+
+                shift_id = ensure_shift(cur, emp_id, day_str, status='closed')
+                cur.execute(
+                    f"""
+                    INSERT INTO {SCHEMA}.employee_salary_log
+                      (shift_id, employee_id, shift_date, hours_worked, base_rate,
+                       personal_profit, bonus_percent_at_time, bonus_amount, total,
+                       is_paid, owner_set)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, false, true)
+                    ON CONFLICT (employee_id, shift_date) DO UPDATE
+                    SET hours_worked = EXCLUDED.hours_worked,
+                        base_rate = EXCLUDED.base_rate,
+                        personal_profit = EXCLUDED.personal_profit,
+                        bonus_percent_at_time = EXCLUDED.bonus_percent_at_time,
+                        bonus_amount = EXCLUDED.bonus_amount,
+                        total = EXCLUDED.total,
+                        owner_set = true,
+                        shift_id = EXCLUDED.shift_id
+                    """,
+                    (shift_id, emp_id, day_str, hours, base_rate, personal_profit, percent,
+                     bonus, total),
+                )
+                filled += 1
+                cur_day += _td(days=1)
+            conn.commit()
+            return resp(200, {'ok': True, 'filled': filled, 'skipped': skipped})
 
     if action == 'owner_delete_day' and method == 'POST':
         body = json.loads(event.get('body') or '{}')
