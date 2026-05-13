@@ -4,6 +4,50 @@ export const SALES_URL = "https://functions.poehali.dev/1610b50a-9d00-450f-a2ca-
 export const AUTH_CLIENT_URL = "https://functions.poehali.dev/58edd0bc-cce3-4ece-acca-a003e2260758";
 export const SLSHOP_URL = "https://functions.poehali.dev/538a5bbf-3062-45fa-a438-c5ecdb11965e";
 export const SL_C14D_URL = "https://functions.poehali.dev/03ebbc37-291d-4868-9d2a-d24a261399ae";
+export const SALARY_URL = "https://functions.poehali.dev/0945fb27-103d-4e8f-9e4d-9d22d377e9a8";
+
+// === Зарплатные типы ===
+export type SalaryConfig = {
+  daily_rate: number;
+  bonus_percent: number;
+  min_hours_for_rate?: number;
+};
+
+export type Shift = {
+  id: number;
+  started_at: string;
+  ended_at: string | null;
+  status: 'open' | 'closed' | 'dayoff';
+};
+
+export type SalaryLogEntry = {
+  id?: number;
+  shift_date: string;
+  hours_worked: number;
+  base_rate?: number;
+  personal_profit?: number;
+  bonus_percent_at_time?: number;
+  bonus_amount?: number;
+  total: number;
+  is_paid: boolean;
+  paid_at: string | null;
+};
+
+export type EmployeeOverview = {
+  id: number;
+  full_name: string;
+  login: string;
+  position: string | null;
+  role: string;
+  daily_rate: number;
+  bonus_percent: number;
+  min_hours_for_rate: number;
+  shift_id: number | null;
+  shift_status: 'open' | 'closed' | 'dayoff' | null;
+  started_at: string | null;
+  ended_at: string | null;
+  unpaid_total?: number;
+};
 
 export type Good = { id: number; title: string; category: string; brand: string; model: string; condition: string; color: string; storage: string; imei: string; sell_price: number; purchase_price: number; status: string; description: string };
 export type Sale = { id: number; type: string; amount: number; payment: string; contract: string; date: string; client: string; phone: string; employee: string };

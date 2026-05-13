@@ -13,7 +13,7 @@ import { PROTECTED_TABS, ROLE_BADGE, ROLE_LABEL, getInitials, type StaffTab } fr
 import { FontApplier, MskClock, ThemeBanner, TabErrorBoundary } from "./StaffPwa";
 import {
   GoodsTab, StaffRepairTab, GoldTab, SalesTab, ClientsTab, AnalyticsTab,
-  EmployeesTab, VipChatTab, SmartLombardTab, AvitoProTab, prefetchTab,
+  EmployeesTab, VipChatTab, SmartLombardTab, AvitoProTab, SalaryTab, prefetchTab,
 } from "./StaffLazy";
 import MyProfileModal from "./MyProfileModal";
 import StaffSectionBanner from "./StaffSectionBanner";
@@ -105,6 +105,7 @@ export function StaffMainLayout({
     { k: "repair",       l: "Ремонт",       icon: "Wrench",        tip: "Заявки на ремонт техники: новые, в работе, готовые. Поиск, фото, статусы." },
     { k: "smartlombard", l: "Ломбард",      icon: "Coins",         tip: "СмартЛомбард: скупка и продажа Б/У техники, касса, договоры на 14 дней.", premium: true },
     { k: "chat",         l: "Чат",          icon: "MessageCircle", tip: "Внутренний чат сотрудников и общение с VIP-клиентами.", badge: chatUnread },
+    { k: "salary",       l: "Зарплата",     icon: "Wallet",        tip: "Моя смена и заработок. Владельцу — управление ставкой, %, выходными и выплатами." },
     { k: "clients",      l: "Клиенты",      icon: "Users",         tip: "База клиентов, скидки, СМС-рассылки." },
     { k: "avitopro",     l: "Авито",        icon: "Zap",           tip: "Авито PRO: сводка по объявлениям, статистика просмотров и контактов, авто-действия." },
     { k: "analytics",    l: "Статистика",   icon: "BarChart2",     tip: "Аналитика по продажам, ремонтам и сотрудникам." },
@@ -280,6 +281,7 @@ export function StaffMainLayout({
             {tab === "smartlombard" && <SmartLombardTab token={token} myRole={empRole} />}
             {tab === "avitopro"  && <AvitoProTab token={token} />}
             {tab === "chat"      && <VipChatTab token={token} onUnread={setChatUnread} />}
+            {tab === "salary"    && <SalaryTab role={empRole} token={token} employeeName={empName} />}
           </React.Suspense>
         </TabErrorBoundary>
       </div>

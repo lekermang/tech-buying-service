@@ -4,6 +4,7 @@ import { slApi, fmt, type SLStats, type SLSoldItem, type SLBoughtItem, STATUS_LA
 import { printReceipt } from "./labelPrinter";
 import { useSharedPeriod } from "./useSharedPeriod";
 import { SLTabs } from "./slUI";
+import EmployeeShiftMiniWidget from "@/pages/staffSalary/EmployeeShiftMiniWidget";
 
 const PERIODS = [
   { v: "today", l: "Сегодня" },
@@ -43,6 +44,9 @@ export default function SLDashboard({ token, onNav, empName: _empName }: { token
 
   return (
     <div>
+      {/* Виджет моей смены — компактная плашка вверху, кликабельна для перехода в зарплату */}
+      <EmployeeShiftMiniWidget token={token} />
+
       {/* Период */}
       <div className="mb-2">
         <SLTabs
