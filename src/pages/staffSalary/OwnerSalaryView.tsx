@@ -111,6 +111,29 @@ export default function OwnerSalaryView({ token }: Props) {
     }
   };
 
+  const resyncMonth = async () => {
+    if (!selected) return;
+    const from = isoLocal(startOfMonth(viewMonth));
+    const to = isoLocal(endOfMonth(viewMonth));
+    setBusy(true);
+    try {
+      const r = await fetch(`${SALARY_URL}?action=owner_resync`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ employee_id: selected.id, from, to }),
+      });
+      if (r.ok) {
+        const d = await r.json();
+        alert(`Пересчитано смен: ${d.updated || 0}. Премия начислена по текущему % и продажам Смарт-Ломбарда.`);
+      } else {
+        alert("Не удалось пересчитать");
+      }
+      await reloadAfterChange();
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const goPrevMonth = () => setViewMonth(d => new Date(d.getFullYear(), d.getMonth() - 1, 1));
   const goNextMonth = () => setViewMonth(d => new Date(d.getFullYear(), d.getMonth() + 1, 1));
   const goCurrentMonth = () => setViewMonth(startOfMonth(new Date()));
@@ -121,16 +144,17 @@ export default function OwnerSalaryView({ token }: Props) {
     const last = endOfMonth(viewMonth);
     const daysInMonth = last.getDate();
     const firstWd = (first.getDay() + 6) % 7;
-    type Cell = { date: string | null; status: CalendarDay["status"] | null; total: number; payout: number };
+    type Cell = { date: string | null; status: CalendarDay["status"] | null; total: number; payout: number; bonus: number };
     const cells: Cell[] = [];
     const calMap = new Map((detail?.calendar || []).map(d => [d.shift_date.slice(0, 10), d.status]));
     const logMap = new Map((detail?.history || []).map(l => [l.shift_date.slice(0, 10), l.total || 0]));
+    const bonusMap = new Map((detail?.history || []).map(l => [l.shift_date.slice(0, 10), l.bonus_amount || 0]));
     const payMap = new Map<string, number>();
     for (const p of detail?.payouts || []) {
       const k = p.payout_date.slice(0, 10);
       payMap.set(k, (payMap.get(k) || 0) + (p.amount || 0));
     }
-    for (let i = 0; i < firstWd; i++) cells.push({ date: null, status: null, total: 0, payout: 0 });
+    for (let i = 0; i < firstWd; i++) cells.push({ date: null, status: null, total: 0, payout: 0, bonus: 0 });
     for (let d = 1; d <= daysInMonth; d++) {
       const cur = new Date(viewMonth.getFullYear(), viewMonth.getMonth(), d);
       const iso = isoLocal(cur);
@@ -139,27 +163,32 @@ export default function OwnerSalaryView({ token }: Props) {
         status: calMap.get(iso) || null,
         total: logMap.get(iso) || 0,
         payout: payMap.get(iso) || 0,
+        bonus: bonusMap.get(iso) || 0,
       });
     }
-    while (cells.length % 7 !== 0) cells.push({ date: null, status: null, total: 0, payout: 0 });
+    while (cells.length % 7 !== 0) cells.push({ date: null, status: null, total: 0, payout: 0, bonus: 0 });
     return cells;
   }, [viewMonth, detail]);
 
   const monthSummary = useMemo(() => {
-    if (!detail) return { earned: 0, paid: 0, remaining: 0 };
+    if (!detail) return { earned: 0, paid: 0, remaining: 0, bonus: 0 };
     const from = isoLocal(startOfMonth(viewMonth));
     const to = isoLocal(endOfMonth(viewMonth));
     let earned = 0;
+    let bonus = 0;
     for (const h of detail.history) {
       const d = h.shift_date.slice(0, 10);
-      if (d >= from && d <= to) earned += Number(h.total) || 0;
+      if (d >= from && d <= to) {
+        earned += Number(h.total) || 0;
+        bonus += Number(h.bonus_amount) || 0;
+      }
     }
     let paid = 0;
     for (const p of detail.payouts) {
       const d = p.payout_date.slice(0, 10);
       if (d >= from && d <= to) paid += Number(p.amount) || 0;
     }
-    return { earned, paid, remaining: earned - paid };
+    return { earned, paid, remaining: earned - paid, bonus };
   }, [detail, viewMonth]);
 
   const isCurrentMonth = useMemo(() => {
@@ -215,6 +244,7 @@ export default function OwnerSalaryView({ token }: Props) {
           onOpenBulk={() => setBulkOpen(true)}
           onOpenPayout={() => setPayoutOpen(true)}
           onDeletePayout={deletePayout}
+          onResync={resyncMonth}
         />
       )}
 

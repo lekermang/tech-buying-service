@@ -25,7 +25,13 @@ export type DetailState = {
   history: LogRow[];
   calendar: CalendarDay[];
   payouts: PayoutRow[];
-  summary: { total_all: number; total_paid: number; total_unpaid: number };
+  summary: {
+    total_all: number;
+    total_paid: number;
+    total_unpaid: number;
+    total_bonus?: number;
+    total_profit?: number;
+  };
 };
 
 export const MONTHS = [

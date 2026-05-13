@@ -15,7 +15,7 @@ type TodayState = {
   remaining: number;
 };
 
-type DayRow = { shift_date: string; hours_worked: number; total: number };
+type DayRow = { shift_date: string; hours_worked: number; base_rate?: number; bonus_amount?: number; total: number };
 type PayoutRow = { id: number; payout_date: string; amount: number; note: string | null };
 
 export default function EmployeeSalaryView({ token, employeeName }: Props) {
@@ -81,19 +81,31 @@ export default function EmployeeSalaryView({ token, employeeName }: Props) {
           <div className="text-white/40 text-sm text-center py-4 font-roboto">Пока нет начислений</div>
         ) : (
           <div className="space-y-2">
-            {days.map((h, i) => (
-              <div key={i} className="flex items-center justify-between rounded-lg bg-white/5 border border-white/10 p-3">
-                <div>
-                  <div className="text-white text-sm font-medium font-roboto">
-                    {new Date(h.shift_date).toLocaleDateString("ru-RU", { day: "2-digit", month: "long" })}
+            {days.map((h, i) => {
+              const bonus = Number(h.bonus_amount) || 0;
+              const rate = Number(h.base_rate) || 0;
+              return (
+                <div key={i} className="flex items-center justify-between rounded-lg bg-white/5 border border-white/10 p-3">
+                  <div>
+                    <div className="text-white text-sm font-medium font-roboto">
+                      {new Date(h.shift_date).toLocaleDateString("ru-RU", { day: "2-digit", month: "long" })}
+                    </div>
+                    <div className="text-white/40 text-xs font-roboto flex items-center gap-2 mt-0.5">
+                      <span>{Number(h.hours_worked).toFixed(1)} ч</span>
+                      {rate > 0 && (
+                        <span className="text-white/50">· ставка {rate.toLocaleString("ru-RU")} ₽</span>
+                      )}
+                      {bonus > 0 && (
+                        <span className="text-purple-300 font-bold">· премия +{bonus.toLocaleString("ru-RU")} ₽</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-white/40 text-xs font-roboto">{Number(h.hours_worked).toFixed(1)} ч</div>
+                  <div className="text-[#FFD700] font-bold font-oswald tabular-nums">
+                    {Number(h.total).toLocaleString("ru-RU")} ₽
+                  </div>
                 </div>
-                <div className="text-[#FFD700] font-bold font-oswald tabular-nums">
-                  {Number(h.total).toLocaleString("ru-RU")} ₽
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

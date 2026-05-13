@@ -75,21 +75,24 @@ def _row_value(row, key, idx=0):
         return None
 
 
-def calc_slshop_profit_for_day(cur, employee_token, day):
-    """Прибыль за день из Смарт-Ломбарда: SUM(op.amount - item.buy_price) для op_type='sale'
-    где employee_token совпадает и created_at в этом дне."""
-    if not employee_token:
-        return 0
+def calc_slshop_profit_for_day(cur, employee_token, employee_name, day):
+    """Прибыль за день из Смарт-Ломбарда: SUM(op.amount - item.buy_price)
+    для op_type='sell' (Смарт-Ломбард использует именно 'sell').
+    Матчим в первую очередь по employee_name (большинство операций без токена),
+    с fallback на employee_token."""
     cur.execute(
         f"""
         SELECT COALESCE(SUM(op.amount - COALESCE(i.buy_price, 0)), 0) AS profit
         FROM {SCHEMA}.slshop_operations op
         LEFT JOIN {SCHEMA}.slshop_items i ON i.id = op.item_id
-        WHERE op.op_type = 'sale'
-          AND op.employee_token = %s
+        WHERE op.op_type = 'sell'
           AND op.created_at::date = %s
+          AND (
+                (op.employee_name IS NOT NULL AND op.employee_name = %s)
+             OR (op.employee_token IS NOT NULL AND op.employee_token = %s)
+          )
         """,
-        (employee_token, day),
+        (day, employee_name, employee_token),
     )
     v = _row_value(cur.fetchone(), 'profit', 0)
     return int(v or 0)
@@ -176,11 +179,11 @@ def handler(event, context):
             })
 
     if action == 'my_history':
-        # Сотрудник видит дневные начисления (без расчёта прибыли) + выплаты
+        # Сотрудник видит дневные начисления (ставка + премия, без прибыли) + выплаты
         with get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
                 f"""
-                SELECT shift_date, hours_worked, total
+                SELECT shift_date, hours_worked, base_rate, bonus_amount, total
                 FROM {SCHEMA}.employee_salary_log
                 WHERE employee_id = %s
                 ORDER BY shift_date DESC LIMIT 90
@@ -314,10 +317,14 @@ def handler(event, context):
 
             # Сводка общая
             cur.execute(
-                f"SELECT COALESCE(SUM(total), 0) AS s FROM {SCHEMA}.employee_salary_log WHERE employee_id = %s",
+                f"SELECT COALESCE(SUM(total), 0) AS s, COALESCE(SUM(bonus_amount), 0) AS b, "
+                f"COALESCE(SUM(personal_profit), 0) AS p FROM {SCHEMA}.employee_salary_log WHERE employee_id = %s",
                 (emp_id,),
             )
-            total_all = int(cur.fetchone()['s'] or 0)
+            srow = cur.fetchone()
+            total_all = int(srow['s'] or 0)
+            total_bonus = int(srow['b'] or 0)
+            total_profit = int(srow['p'] or 0)
             cur.execute(
                 f"SELECT COALESCE(SUM(amount), 0) AS s FROM {SCHEMA}.employee_payouts WHERE employee_id = %s",
                 (emp_id,),
@@ -328,6 +335,8 @@ def handler(event, context):
                 'total_all': total_all,
                 'total_paid': total_paid,
                 'total_unpaid': total_all - total_paid,
+                'total_bonus': total_bonus,
+                'total_profit': total_profit,
             }
             return resp(200, {
                 'history': history,
@@ -364,13 +373,14 @@ def handler(event, context):
             cfg = cur.fetchone() or {'daily_rate': 2000, 'bonus_percent': Decimal('3.0')}
             percent = Decimal(str(cfg['bonus_percent']))
 
-            # Токен сотрудника для расчёта slshop-прибыли
-            cur.execute(f"SELECT auth_token FROM {SCHEMA}.employees WHERE id = %s", (emp_id,))
-            emp_token_row = cur.fetchone()
-            emp_token = emp_token_row['auth_token'] if emp_token_row else None
+            # Токен и имя сотрудника для расчёта slshop-прибыли
+            cur.execute(f"SELECT auth_token, full_name FROM {SCHEMA}.employees WHERE id = %s", (emp_id,))
+            emp_row = cur.fetchone()
+            emp_token = emp_row['auth_token'] if emp_row else None
+            emp_name = emp_row['full_name'] if emp_row else None
 
             if auto_bonus:
-                personal_profit = calc_slshop_profit_for_day(cur, emp_token, day)
+                personal_profit = calc_slshop_profit_for_day(cur, emp_token, emp_name, day)
                 bonus_amount = int(Decimal(personal_profit) * percent / Decimal(100))
 
             total = base_rate + bonus_amount
@@ -442,9 +452,10 @@ def handler(event, context):
             cfg = cur.fetchone() or {'daily_rate': 2000, 'bonus_percent': Decimal('3.0')}
             percent = Decimal(str(cfg['bonus_percent']))
 
-            cur.execute(f"SELECT auth_token FROM {SCHEMA}.employees WHERE id = %s", (emp_id,))
+            cur.execute(f"SELECT auth_token, full_name FROM {SCHEMA}.employees WHERE id = %s", (emp_id,))
             emp_row = cur.fetchone()
             emp_token = emp_row['auth_token'] if emp_row else None
+            emp_name = emp_row['full_name'] if emp_row else None
 
             filled = 0
             skipped = 0
@@ -482,7 +493,7 @@ def handler(event, context):
                 personal_profit = 0
                 bonus = 0
                 if auto_bonus:
-                    personal_profit = calc_slshop_profit_for_day(cur, emp_token, day_str)
+                    personal_profit = calc_slshop_profit_for_day(cur, emp_token, emp_name, day_str)
                     bonus = int(Decimal(personal_profit) * percent / Decimal(100))
                 total = base_rate + bonus
 
@@ -511,6 +522,61 @@ def handler(event, context):
                 cur_day += _td(days=1)
             conn.commit()
             return resp(200, {'ok': True, 'filled': filled, 'skipped': skipped})
+
+    if action == 'owner_resync' and method == 'POST':
+        # Пересчитать прибыль из Смарт-Ломбарда и премию для всех заполненных дней
+        # сотрудника в диапазоне. Часы и ставка остаются как есть.
+        body = json.loads(event.get('body') or '{}')
+        try:
+            emp_id = int(body.get('employee_id') or 0)
+        except (TypeError, ValueError):
+            emp_id = 0
+        date_from = body.get('from')
+        date_to = body.get('to')
+        if not emp_id or not date_from or not date_to:
+            return resp(400, {'error': 'employee_id, from, to required'})
+
+        with get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                f"SELECT bonus_percent FROM {SCHEMA}.employee_salary_config WHERE employee_id = %s",
+                (emp_id,),
+            )
+            cfg = cur.fetchone() or {'bonus_percent': Decimal('3.0')}
+            percent = Decimal(str(cfg['bonus_percent']))
+
+            cur.execute(f"SELECT auth_token, full_name FROM {SCHEMA}.employees WHERE id = %s", (emp_id,))
+            emp_row = cur.fetchone()
+            emp_token = emp_row['auth_token'] if emp_row else None
+            emp_name = emp_row['full_name'] if emp_row else None
+
+            cur.execute(
+                f"""
+                SELECT id, shift_date, base_rate FROM {SCHEMA}.employee_salary_log
+                WHERE employee_id = %s AND shift_date >= %s AND shift_date <= %s
+                """,
+                (emp_id, date_from, date_to),
+            )
+            rows = cur.fetchall()
+            updated = 0
+            for row in rows:
+                day_str = row['shift_date'].isoformat() if hasattr(row['shift_date'], 'isoformat') else str(row['shift_date'])
+                profit = calc_slshop_profit_for_day(cur, emp_token, emp_name, day_str)
+                bonus = int(Decimal(profit) * percent / Decimal(100))
+                total = int(row['base_rate'] or 0) + bonus
+                cur.execute(
+                    f"""
+                    UPDATE {SCHEMA}.employee_salary_log
+                    SET personal_profit = %s,
+                        bonus_percent_at_time = %s,
+                        bonus_amount = %s,
+                        total = %s
+                    WHERE id = %s
+                    """,
+                    (profit, percent, bonus, total, row['id']),
+                )
+                updated += 1
+            conn.commit()
+            return resp(200, {'ok': True, 'updated': updated})
 
     if action == 'owner_delete_day' and method == 'POST':
         body = json.loads(event.get('body') or '{}')
