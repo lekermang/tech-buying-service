@@ -5,9 +5,16 @@ import './index.css'
 
 createRoot(document.getElementById("root")!).render(<App />);
 
-// Регистрация Service Worker для PWA
+// Регистрация Service Worker — откладываем на idle,
+// чтобы не конкурировать с первым рендером главной страницы
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
+  const registerSW = () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
-  });
+  };
+  const w = window as unknown as { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => void };
+  if (typeof w.requestIdleCallback === 'function') {
+    w.requestIdleCallback(registerSW, { timeout: 5000 });
+  } else {
+    window.addEventListener('load', () => setTimeout(registerSW, 3000));
+  }
 }
