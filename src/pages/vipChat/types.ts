@@ -1,5 +1,5 @@
 export const VIP_CHAT_URL = "https://functions.poehali.dev/f4a88e67-03e7-4387-a091-32588d90df73";
-export const POLL_INTERVAL_MS = 8000;
+export const POLL_INTERVAL_MS = 60000;
 export const ONLINE_THRESHOLD_MS = 90 * 1000; // 1.5 минуты — считаем онлайн
 
 export type Member = {

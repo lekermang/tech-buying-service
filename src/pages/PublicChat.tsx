@@ -174,10 +174,11 @@ export default function PublicChat() {
     }
   }, [authToken, roomId, loadRoom]);
 
-  // Long-poll каждые 3 сек
+  // Long-poll каждые 30 сек, пропускаем при скрытой вкладке
   useEffect(() => {
     if (!authToken || !roomId) return;
     const id = setInterval(async () => {
+      if (typeof document !== "undefined" && document.hidden) return;
       try {
         const r = await fetch(
           `${PUBLIC_CHAT_URL}?action=poll&room_id=${roomId}&since=${lastIdRef.current}`,
@@ -199,7 +200,7 @@ export default function PublicChat() {
       } catch {
         /* ignore */
       }
-    }, 3000);
+    }, 30000);
     return () => clearInterval(id);
   }, [authToken, roomId, scrollToBottom]);
 
