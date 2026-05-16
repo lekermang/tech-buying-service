@@ -1,7 +1,8 @@
 {
+  "public-chat": "https://functions.poehali.dev/60644856-ff88-4875-b2a9-97c87d32a630",
+  "vip-chat": "https://functions.poehali.dev/9bdac7bc-3f02-4dea-896e-1d5800741003",
   "salary-api": "https://functions.poehali.dev/0945fb27-103d-4e8f-9e4d-9d22d377e9a8",
   "icon-builder": "https://functions.poehali.dev/743789e1-14f8-4e97-b3cf-3d3d38173268",
-  "public-chat": "https://functions.poehali.dev/81f2b98f-4c02-4f5a-afce-adf94d25dcac",
   "photos-cleanup": "https://functions.poehali.dev/e6103202-3434-4ae4-8a44-3ad0543dad60",
   "max-bot": "https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c",
   "leads-monitor": "https://functions.poehali.dev/cccc3788-d793-49a5-9254-f194e6d94e18",
@@ -11,7 +12,6 @@
   "phone-specs-ai": "https://functions.poehali.dev/983744a8-1cfc-42d8-a566-bf31dfa328b2",
   "slshop": "https://functions.poehali.dev/538a5bbf-3062-45fa-a438-c5ecdb11965e",
   "catalog-photos": "https://functions.poehali.dev/06375f20-54a8-439c-921c-6cff0f1cecf2",
-  "vip-chat": "https://functions.poehali.dev/f4a88e67-03e7-4387-a091-32588d90df73",
   "parts-seo": "https://functions.poehali.dev/e662e46d-31e9-438b-8d36-e303d21d85f7",
   "gold-admin": "https://functions.poehali.dev/c4424ec1-93d6-47d7-a71a-6eb30fa21246",
   "import-parts": "https://functions.poehali.dev/71d1796e-9ac1-4330-abfb-b6713d9dfaf5",

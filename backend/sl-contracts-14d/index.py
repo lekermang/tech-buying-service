@@ -103,7 +103,7 @@ def _calc_today(amount, rate, term_days, start_date, paid_total, on_date=None):
     if isinstance(start_date, str):
         start_date = _parse_date(start_date) or today
     days_passed_raw = (today - start_date).days
-    days_passed = max(1, min(int(term_days), days_passed_raw + 1)) if days_passed_raw >= 0 else 1
+    days_passed = max(1, min(int(term_days), days_passed_raw)) if days_passed_raw >= 1 else 1
     is_early = days_passed_raw < int(term_days)
     interest_today = (amount * rate * Decimal(days_passed) / Decimal(100)).quantize(Decimal('0.01'))
     full_due = (amount * (Decimal(1) + rate * Decimal(term_days) / Decimal(100))).quantize(Decimal('0.01'))
