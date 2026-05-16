@@ -3,7 +3,6 @@ import { EMPLOYEE_AUTH_URL } from "./staff.types";
 import { StaffThemeProvider } from "./staffTheme/StaffThemeContext";
 import {
   PRICE_SCHEDULER_URL,
-  VIP_CHAT_URL,
   SECRET_PW,
   PROTECTED_TABS,
   readSavedTab,
@@ -52,7 +51,6 @@ function StaffInner() {
   const [pwError, setPwError] = useState("");
   const [unlocked, setUnlocked] = useState<Record<string, boolean>>({});
   const [themeOpen, setThemeOpen] = useState(false);
-  const [chatUnread, setChatUnread] = useState(0);
 
   useEffect(() => {
     if (!token) return;
@@ -138,7 +136,6 @@ function StaffInner() {
     prefetchTab(tab);
     // Соседние — лениво, после основной отрисовки
     schedule(() => {
-      if (tab !== "chat") prefetchTab("chat");
       if (tab !== "repair") prefetchTab("repair");
     }, 800);
   }, [authed, tab]);
@@ -152,7 +149,7 @@ function StaffInner() {
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
       const isOwnerOrAdminLocal = empRole === "owner" || empRole === "admin";
       const order: Tab[] = [
-        "repair", "chat", "clients", "analytics", "smartlombard",
+        "repair", "clients", "analytics", "smartlombard",
         ...(isOwnerOrAdminLocal ? (["gold", "employees"] as Tab[]) : []),
       ];
       const n = parseInt(e.key, 10);
@@ -166,39 +163,6 @@ function StaffInner() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [authed, empRole, unlocked, setTab]);
-
-  // Фоновый polling счётчика непрочитанных в чате (каждые 30 сек, когда чат не открыт и вкладка видима)
-  useEffect(() => {
-    if (!authed || !token || tab === "chat") return;
-    let cancelled = false;
-    const fetchUnread = () => {
-      if (typeof document !== "undefined" && document.hidden) return;
-      fetch(VIP_CHAT_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Employee-Token": token },
-        body: JSON.stringify({ action: "poll", after_id: -1, limit: 1 }),
-      })
-        .then(r => r.json())
-        .then(d => { if (!cancelled && typeof d.unread === "number") setChatUnread(d.unread); })
-        .catch(() => {});
-    };
-    // Первый запрос отложим до простоя браузера, чтобы не конкурировать с рендером
-    type IdleWin = Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number };
-    const w = window as IdleWin;
-    const startTimer = setTimeout(() => {
-      if (!cancelled) fetchUnread();
-    }, 1500);
-    if (w.requestIdleCallback) {
-      w.requestIdleCallback(() => { if (!cancelled) fetchUnread(); }, { timeout: 3000 });
-    }
-    const t = setInterval(fetchUnread, 30000);
-    const onVisible = () => { if (!document.hidden) fetchUnread(); };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      cancelled = true; clearTimeout(startTimer); clearInterval(t);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-  }, [authed, token, tab]);
 
   const [loginLoading, setLoginLoading] = useState(false);
 
@@ -375,8 +339,6 @@ function StaffInner() {
       sendResult={sendResult}
       sendReminderNow={sendReminderNow}
       logout={logout}
-      chatUnread={chatUnread}
-      setChatUnread={setChatUnread}
     />
   );
 }

@@ -1,25 +1,9 @@
-import { VIP_CHAT_URL } from "@/pages/vipChat/types";
-
 /**
- * Глобальный хелпер: отправить сообщение в общий VIP-чат сотрудников
- * из любой точки приложения (заявки, СмартЛомбард, ремонт и т.д.).
- * Возвращает true при успехе, false при ошибке.
+ * Заглушка после удаления внутреннего VIP-чата сотрудников.
+ * Сохраняется ради совместимости с местами вызова (LeadsAlertWatcher, SLItemDetail) — ничего не делает.
  */
-export async function shareToChat(token: string, text: string, photoUrl?: string | null): Promise<boolean> {
-  try {
-    if (!token) return false;
-    const body: Record<string, unknown> = { action: "send" };
-    if (text) body.text = text;
-    if (photoUrl) body.photo_url = photoUrl;
-    const r = await fetch(VIP_CHAT_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Employee-Token": token },
-      body: JSON.stringify(body),
-    });
-    return r.ok;
-  } catch {
-    return false;
-  }
+export async function shareToChat(_token: string, _text: string, _photoUrl?: string | null): Promise<boolean> {
+  return false;
 }
 
 /** Сформировать текст-карточку заявки для шаринга */

@@ -19,6 +19,20 @@
       "method": "GET",
       "path": "/?action=calculate&amount=25000&days=14&rate=4",
       "expectedStatus": 401
+    },
+    {
+      "name": "Public view requires number",
+      "method": "GET",
+      "path": "/?action=public_view",
+      "expectedStatus": 400,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Public view not found",
+      "method": "GET",
+      "path": "/?action=public_view&number=CON-9999-99999",
+      "expectedStatus": 404
     }
   ]
 }

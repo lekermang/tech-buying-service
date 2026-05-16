@@ -17,7 +17,6 @@ type SectionMeta = {
 
 const SECTION_META: Record<string, SectionMeta> = {
   repair:       { title: "Ремонт",       subtitle: "Заявки, сроки, статусы и история обслуживания",           icon: "Wrench" },
-  chat:         { title: "Чат",          subtitle: "Внутренний чат сотрудников и общение с VIP-клиентами",   icon: "MessageCircle", skip: true },
   clients:      { title: "Клиенты",      subtitle: "База клиентов, скидки и СМС-рассылки",                    icon: "Users" },
   analytics:    { title: "Статистика",   subtitle: "Аналитика по продажам, ремонтам и сотрудникам",           icon: "BarChart2" },
   smartlombard: { title: "СмартЛомбард", subtitle: "Скупка и продажа Б/У техники",                            icon: "Coins", skip: true },

@@ -45,6 +45,7 @@ const RepairDiscount = safeLazy(() => import("./pages/RepairDiscount"));
 const Requisites = safeLazy(() => import("./pages/Requisites"));
 const Act = safeLazy(() => import("./pages/Act"));
 const PublicChat = safeLazy(() => import("./pages/PublicChat"));
+const PublicContract14d = safeLazy(() => import("./pages/PublicContract14d"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -117,6 +118,7 @@ const App = () => {
             <Route path="/requisites" element={<Requisites />} />
             <Route path="/act" element={<Act />} />
             <Route path="/chat" element={<PublicChat />} />
+            <Route path="/p/c/:number" element={<PublicContract14d />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

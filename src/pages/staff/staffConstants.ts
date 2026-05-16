@@ -5,7 +5,6 @@ export type StaffTab =
   | "analytics"
   | "employees"
   | "repair"
-  | "chat"
   | "gold"
   | "smartlombard"
   | "avitopro"
@@ -13,9 +12,6 @@ export type StaffTab =
 
 export const PRICE_SCHEDULER_URL =
   "https://functions.poehali.dev/b09271ea-c662-4225-973f-4dd4c6a0e32c";
-
-export const VIP_CHAT_URL =
-  "https://functions.poehali.dev/f4a88e67-03e7-4387-a091-32588d90df73";
 
 // Пароль для разделов, доступных только сотрудникам по доп. подтверждению
 export const SECRET_PW = "Mark2015N";
@@ -65,7 +61,6 @@ export function readSavedTab(fallback: StaffTab): StaffTab {
       "analytics",
       "employees",
       "repair",
-      "chat",
       "gold",
       "smartlombard",
       "avitopro",

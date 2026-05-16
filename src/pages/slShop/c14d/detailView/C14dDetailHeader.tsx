@@ -1,4 +1,5 @@
 import Icon from "@/components/ui/icon";
+import { toast } from "sonner";
 import {
   fmt, fmtDate, STATUS_BADGE,
   type C14dDetail,
@@ -7,6 +8,28 @@ import { printContract14d } from "../printContract14d";
 import {
   SLSection, SLButton, SLPill, SLStat, SLGrid,
 } from "../../slUI";
+
+async function shareClientLink(contractNumber: string) {
+  const url = `${window.location.origin}/p/c/${contractNumber}`;
+  const text = `Договор ${contractNumber}. Сумма к возврату и сроки: ${url}`;
+  try {
+    const navAny = navigator as Navigator & {
+      share?: (data: { title?: string; text?: string; url?: string }) => Promise<void>;
+    };
+    if (typeof navAny.share === "function") {
+      await navAny.share({ title: `Договор ${contractNumber}`, text, url });
+      return;
+    }
+  } catch {
+    /* пользователь отменил — попробуем скопировать */
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    toast.success("Ссылка скопирована", { description: url });
+  } catch {
+    toast.message("Ссылка для клиента", { description: url });
+  }
+}
 
 type Props = {
   c: C14dDetail;
@@ -33,6 +56,7 @@ export default function C14dDetailHeader({ c, onBack, onPay, onClose, onTerminat
           <SLButton variant="goldOutline" size="sm" icon="Printer" onClick={() => printContract14d(c)}>Печать</SLButton>
           {c.status === "active" && (
             <>
+              <SLButton variant="goldOutline" size="sm" icon="Link2" onClick={() => shareClientLink(c.contract_number)}>Ссылка клиенту</SLButton>
               <SLButton variant="success" size="sm" icon="Wallet" onClick={onPay}>Платёж</SLButton>
               {Number(c.remaining_debt) <= 0 && (
                 <SLButton variant="dark" size="sm" icon="CheckCircle2" onClick={onClose}>Закрыть</SLButton>

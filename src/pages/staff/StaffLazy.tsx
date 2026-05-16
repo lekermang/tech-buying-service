@@ -5,7 +5,6 @@ export const loadGoods         = () => import("../StaffGoodsTab");
 export const loadRepair        = () => import("../StaffRepairTab");
 export const loadGold          = () => import("../GoldTab");
 export const loadOtherTabs     = () => import("../StaffOtherTabs");
-export const loadVipChat       = () => import("../StaffVipChatTab");
 export const loadSmartLombard  = () => import("../slShop/SLShopTab");
 export const loadAvitoPro      = () => import("../StaffAvitoProTab");
 export const loadSalary        = () => import("../staffSalary/StaffSalaryTab");
@@ -17,7 +16,6 @@ export const SalesTab        = lazy(() => loadOtherTabs().then(m => ({ default: 
 export const ClientsTab      = lazy(() => loadOtherTabs().then(m => ({ default: m.ClientsTab })));
 export const AnalyticsTab    = lazy(() => loadOtherTabs().then(m => ({ default: m.AnalyticsTab })));
 export const EmployeesTab    = lazy(() => loadOtherTabs().then(m => ({ default: m.EmployeesTab })));
-export const VipChatTab      = lazy(loadVipChat);
 export const SmartLombardTab = lazy(loadSmartLombard);
 export const AvitoProTab     = lazy(loadAvitoPro);
 export const SalaryTab       = lazy(loadSalary);
@@ -30,7 +28,6 @@ export const TAB_PRELOADERS: Record<string, () => Promise<unknown>> = {
   clients: loadOtherTabs,
   analytics: loadOtherTabs,
   employees: loadOtherTabs,
-  chat: loadVipChat,
   smartlombard: loadSmartLombard,
   avitopro: loadAvitoPro,
   salary: loadSalary,

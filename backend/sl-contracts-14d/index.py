@@ -1009,11 +1009,90 @@ def action_stats():
 
 
 # ============ Handler ============
+def action_public_view(params):
+    """Публичный просмотр договора для клиента по номеру (без авторизации).
+    Возвращает только безопасные поля: сумма к возврату, прошло/осталось дней, дата окончания.
+    """
+    number = (params.get('number') or '').strip().upper()
+    if not number:
+        return _err(400, 'number required')
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        f"SELECT c.contract_number, c.amount, c.interest_rate, c.term_days, "
+        f"c.start_date, c.end_date, c.status, c.paid_total, c.total_due, "
+        f"cl.full_name AS client_name, "
+        f"i.item_type, i.brand AS item_brand, i.model AS item_model "
+        f"FROM {SCHEMA}.contracts_14d c "
+        f"JOIN {SCHEMA}.contracts_14d_clients cl ON cl.id=c.client_id "
+        f"JOIN {SCHEMA}.contracts_14d_items i ON i.id=c.item_id "
+        f"WHERE UPPER(c.contract_number)=%s",
+        (number,)
+    )
+    row = cur.fetchone()
+    cur.close(); conn.close()
+    if not row:
+        return _err(404, 'Договор не найден')
+    contract = dict(row)
+    # Маскируем ФИО: Иванов Иван Иванович -> Иванов И. И.
+    name = (contract.get('client_name') or '').strip()
+    parts = [p for p in name.split() if p]
+    if len(parts) >= 2:
+        masked = parts[0] + ' ' + '. '.join(p[0] for p in parts[1:]) + '.'
+    else:
+        masked = name
+    today = date.today()
+    end_date = contract.get('end_date')
+    start_date = contract.get('start_date')
+    term_days = int(contract.get('term_days') or 14)
+    is_active = contract.get('status') == 'active'
+    today_calc = None
+    days_remaining = None
+    overdue_days = 0
+    if is_active:
+        today_calc = _calc_today(
+            contract.get('amount'),
+            contract.get('interest_rate'),
+            term_days,
+            start_date,
+            contract.get('paid_total'),
+        )
+        if end_date:
+            days_remaining = (end_date - today).days
+            if days_remaining < 0:
+                overdue_days = -days_remaining
+                days_remaining = 0
+    return _ok({
+        'contract_number': contract.get('contract_number'),
+        'status': contract.get('status'),
+        'amount': float(contract.get('amount') or 0),
+        'interest_rate': float(contract.get('interest_rate') or 0),
+        'term_days': term_days,
+        'start_date': start_date.isoformat() if start_date else None,
+        'end_date': end_date.isoformat() if end_date else None,
+        'days_remaining': days_remaining,
+        'overdue_days': overdue_days,
+        'client_name_masked': masked,
+        'item_brand': contract.get('item_brand'),
+        'item_model': contract.get('item_model'),
+        'today_calc': today_calc,
+        'paid_total': float(contract.get('paid_total') or 0),
+        'total_due': float(contract.get('total_due') or 0),
+    })
+
+
 def handler(event: dict, context) -> dict:
-    """Договоры продажи на 14 дней (СмартЛомбард). Действия: list, get, create, calculate, payment, terminate, close, stats, upload_photo."""
+    """Договоры продажи на 14 дней (СмартЛомбард). Действия: list, get, create, calculate, payment, terminate, close, stats, upload_photo, public_view."""
     method = event.get('httpMethod', 'GET')
     if method == 'OPTIONS':
         return {'statusCode': 200, 'headers': HEADERS, 'body': ''}
+
+    qs = event.get('queryStringParameters') or {}
+    action = (qs.get('action') or '').strip()
+
+    # Публичный action — без авторизации
+    if method == 'GET' and action == 'public_view':
+        return action_public_view(qs)
 
     headers = event.get('headers') or {}
     token = headers.get('X-Employee-Token') or headers.get('x-employee-token') or ''
@@ -1022,9 +1101,6 @@ def handler(event: dict, context) -> dict:
         return _err(401, 'Не авторизован')
     if actor.get('role') not in ALLOWED_ROLES:
         return _err(403, 'Нет доступа к разделу')
-
-    qs = event.get('queryStringParameters') or {}
-    action = (qs.get('action') or '').strip()
 
     body = {}
     raw = event.get('body') or ''

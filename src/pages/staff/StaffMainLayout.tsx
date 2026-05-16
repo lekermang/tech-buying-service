@@ -13,13 +13,12 @@ import { PROTECTED_TABS, ROLE_BADGE, ROLE_LABEL, getInitials, type StaffTab } fr
 import { FontApplier, MskClock, ThemeBanner, TabErrorBoundary } from "./StaffPwa";
 import {
   GoodsTab, StaffRepairTab, GoldTab, SalesTab, ClientsTab, AnalyticsTab,
-  EmployeesTab, VipChatTab, SmartLombardTab, AvitoProTab, SalaryTab, prefetchTab,
+  EmployeesTab, SmartLombardTab, AvitoProTab, SalaryTab, prefetchTab,
 } from "./StaffLazy";
 import MyProfileModal from "./MyProfileModal";
 import StaffSectionBanner from "./StaffSectionBanner";
 import { SLTooltip } from "../slShop/slUI";
 import LeadsAlertWatcher from "./LeadsAlertWatcher";
-import ChatAlertWatcher from "./ChatAlertWatcher";
 
 type Tab = StaffTab;
 
@@ -46,8 +45,6 @@ type Props = {
   sendResult: null | boolean;
   sendReminderNow: () => void;
   logout: () => void;
-  chatUnread: number;
-  setChatUnread: (n: number) => void;
 };
 
 export function StaffMainLayout({
@@ -56,7 +53,6 @@ export function StaffMainLayout({
   themeOpen, setThemeOpen,
   pwModal, setPwModal, pwInput, setPwInput, pwError, setPwError, submitPw,
   sending, sendResult, sendReminderNow, logout,
-  chatUnread, setChatUnread,
 }: Props) {
   const [profileOpen, setProfileOpen] = React.useState(false);
   const [myAvatar, setMyAvatar] = React.useState<string | null>(null);
@@ -104,7 +100,6 @@ export function StaffMainLayout({
   const TABS: { k: Tab; l: string; icon: string; badge?: number; tip?: string; premium?: boolean }[] = [
     { k: "repair",       l: "Ремонт",       icon: "Wrench",        tip: "Заявки на ремонт техники: новые, в работе, готовые. Поиск, фото, статусы." },
     { k: "smartlombard", l: "Ломбард",      icon: "Coins",         tip: "СмартЛомбард: скупка и продажа Б/У техники, касса, договоры на 14 дней.", premium: true },
-    { k: "chat",         l: "Чат",          icon: "MessageCircle", tip: "Внутренний чат сотрудников и общение с VIP-клиентами.", badge: chatUnread },
     { k: "salary",       l: "Зарплата",     icon: "Wallet",        tip: "Моя смена и заработок. Владельцу — управление ставкой, %, выходными и выплатами." },
     { k: "clients",      l: "Клиенты",      icon: "Users",         tip: "База клиентов, скидки, СМС-рассылки." },
     { k: "avitopro",     l: "Авито",        icon: "Zap",           tip: "Авито PRO: сводка по объявлениям, статистика просмотров и контактов, авто-действия." },
@@ -280,7 +275,6 @@ export function StaffMainLayout({
             {tab === "employees" && isOwnerOrAdmin && <EmployeesTab token={token} myRole={empRole} />}
             {tab === "smartlombard" && <SmartLombardTab token={token} myRole={empRole} />}
             {tab === "avitopro"  && <AvitoProTab token={token} />}
-            {tab === "chat"      && <VipChatTab token={token} onUnread={setChatUnread} />}
             {tab === "salary"    && <SalaryTab role={empRole} token={token} employeeName={empName} />}
           </React.Suspense>
         </TabErrorBoundary>
@@ -368,9 +362,6 @@ export function StaffMainLayout({
 
       {/* Глобальный watcher горящих заявок: всплывающие toast'ы + плавающая кнопка */}
       <LeadsAlertWatcher token={token} empName={empName} />
-
-      {/* Watcher VIP-чата: всплывающие toast'ы при новых сообщениях когда чат закрыт */}
-      <ChatAlertWatcher token={token} isChatOpen={tab === "chat"} onOpenChat={() => setTab("chat")} />
 
       {/* Модалка пароля для сотрудников */}
       {pwModal && (
