@@ -73,6 +73,8 @@ export default function QuickClientForm({ token, onCreated, onCancel }: Props) {
   const [info, setInfo] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const input2Ref = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
+  const gallery2Ref = useRef<HTMLInputElement>(null);
 
   // Записываем в state только пустые поля — не затираем то, что сотрудник уже исправил
   const applyPassportData = (pd: PassportData) => {
@@ -189,24 +191,50 @@ export default function QuickClientForm({ token, onCreated, onCancel }: Props) {
             )}
           </div>
         ) : (
-          <button
-            onClick={() => inputRef.current?.click()}
-            disabled={photoBusy}
-            className="w-full bg-gradient-to-br from-[#FFD700]/12 to-transparent border-2 border-dashed border-[#FFD700]/40 rounded-lg py-5 flex flex-col items-center gap-1 hover:border-[#FFD700] active:scale-[0.98] transition-all disabled:opacity-50">
-            <Icon name={photoBusy ? "Loader2" : "Camera"} size={22} className={`text-[#FFD700] ${photoBusy ? "animate-spin" : ""}`} />
-            <div className="font-bold text-[#FFD700] text-[12px] uppercase tracking-wide">
-              {photoBusy ? (ocrBusy ? "Распознаю данные…" : "Загружаю…") : "Сделать фото"}
+          <div className="bg-gradient-to-br from-[#FFD700]/12 to-transparent border-2 border-dashed border-[#FFD700]/40 rounded-lg p-3">
+            <div className="flex flex-col items-center gap-0.5 mb-2.5">
+              <Icon name={photoBusy ? "Loader2" : "Sparkles"} size={20} className={`text-[#FFD700] ${photoBusy ? "animate-spin" : ""}`} />
+              <div className="font-bold text-[#FFD700] text-[12px] uppercase tracking-wide">
+                {photoBusy ? (ocrBusy ? "Распознаю данные…" : "Загружаю…") : "Распознать паспорт"}
+              </div>
+              <div className="text-[9px] text-white/55 text-center px-2 leading-tight">
+                ИИ автоматически прочитает ФИО, серию, номер,<br />кем выдан и адрес из фото
+              </div>
             </div>
-            <div className="text-[9px] text-white/55 text-center px-2 leading-tight">
-              ИИ автоматически прочитает ФИО, серию, номер,<br />кем выдан и адрес из фото
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => inputRef.current?.click()}
+                disabled={photoBusy}
+                className="inline-flex items-center justify-center gap-1.5 bg-[#FFD700] hover:bg-[#FFE34D] disabled:opacity-50 text-black font-bold text-[11px] uppercase tracking-wide rounded-md py-2.5 active:scale-[0.98] transition-all"
+              >
+                <Icon name="Camera" size={14} />
+                Снять
+              </button>
+              <button
+                type="button"
+                onClick={() => galleryRef.current?.click()}
+                disabled={photoBusy}
+                className="inline-flex items-center justify-center gap-1.5 bg-[#FFD700]/12 hover:bg-[#FFD700]/20 border border-[#FFD700]/40 disabled:opacity-50 text-[#FFD700] font-bold text-[11px] uppercase tracking-wide rounded-md py-2.5 active:scale-[0.98] transition-all"
+              >
+                <Icon name="Image" size={14} />
+                Из галереи
+              </button>
             </div>
-          </button>
+          </div>
         )}
         <input
           ref={inputRef}
           type="file"
           accept="image/*"
           capture="environment"
+          hidden
+          onChange={e => { const f = e.target.files?.[0]; if (f) onPhoto(f, "passport_photo_url"); e.target.value = ""; }}
+        />
+        <input
+          ref={galleryRef}
+          type="file"
+          accept="image/*"
           hidden
           onChange={e => { const f = e.target.files?.[0]; if (f) onPhoto(f, "passport_photo_url"); e.target.value = ""; }}
         />
@@ -226,22 +254,48 @@ export default function QuickClientForm({ token, onCreated, onCancel }: Props) {
               </div>
             </div>
           ) : (
-            <button
-              onClick={() => input2Ref.current?.click()}
-              disabled={photo2Busy}
-              className="w-full bg-[#0E0E0E] border border-dashed border-white/15 rounded-lg py-3 flex flex-col items-center gap-0.5 hover:border-[#FFD700]/40 active:scale-[0.98] transition-all disabled:opacity-50">
-              <Icon name={photo2Busy ? "Loader2" : "MapPin"} size={16} className={`text-white/55 ${photo2Busy ? "animate-spin" : ""}`} />
-              <div className="font-semibold text-white/70 text-[11px]">
-                {photo2Busy ? "Распознаю прописку…" : "Добавить фото с пропиской"}
+            <div className="bg-[#0E0E0E] border border-dashed border-white/15 rounded-lg p-2.5">
+              <div className="flex flex-col items-center gap-0.5 mb-2">
+                <Icon name={photo2Busy ? "Loader2" : "MapPin"} size={16} className={`text-white/55 ${photo2Busy ? "animate-spin" : ""}`} />
+                <div className="font-semibold text-white/70 text-[11px]">
+                  {photo2Busy ? "Распознаю прописку…" : "Фото с пропиской (необязательно)"}
+                </div>
+                <div className="text-[9px] text-white/40">ИИ дочитает адрес регистрации</div>
               </div>
-              <div className="text-[9px] text-white/40">ИИ дочитает адрес регистрации</div>
-            </button>
+              <div className="grid grid-cols-2 gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => input2Ref.current?.click()}
+                  disabled={photo2Busy}
+                  className="inline-flex items-center justify-center gap-1 bg-[#1A1A1A] hover:bg-[#222] border border-white/10 disabled:opacity-50 text-white/80 font-semibold text-[10px] uppercase tracking-wide rounded py-1.5 active:scale-[0.98] transition-all"
+                >
+                  <Icon name="Camera" size={12} />
+                  Снять
+                </button>
+                <button
+                  type="button"
+                  onClick={() => gallery2Ref.current?.click()}
+                  disabled={photo2Busy}
+                  className="inline-flex items-center justify-center gap-1 bg-[#1A1A1A] hover:bg-[#222] border border-white/10 disabled:opacity-50 text-white/80 font-semibold text-[10px] uppercase tracking-wide rounded py-1.5 active:scale-[0.98] transition-all"
+                >
+                  <Icon name="Image" size={12} />
+                  Из галереи
+                </button>
+              </div>
+            </div>
           )}
           <input
             ref={input2Ref}
             type="file"
             accept="image/*"
             capture="environment"
+            hidden
+            onChange={e => { const f = e.target.files?.[0]; if (f) onPhoto(f, "passport_photo2_url"); e.target.value = ""; }}
+          />
+          <input
+            ref={gallery2Ref}
+            type="file"
+            accept="image/*"
             hidden
             onChange={e => { const f = e.target.files?.[0]; if (f) onPhoto(f, "passport_photo2_url"); e.target.value = ""; }}
           />

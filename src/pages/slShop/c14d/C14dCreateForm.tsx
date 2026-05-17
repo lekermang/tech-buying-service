@@ -70,7 +70,8 @@ export default function C14dCreateForm({ token, onCreated, onCancel, prefill }: 
   const [scanBusy, setScanBusy] = useState(false);
   const [scanInfo, setScanInfo] = useState<string | null>(null);
   const [recognizedFields, setRecognizedFields] = useState<Set<string>>(new Set());
-  const scanInputRef = useRef<HTMLInputElement>(null);
+  const scanCameraRef = useRef<HTMLInputElement>(null);
+  const scanGalleryRef = useRef<HTMLInputElement>(null);
 
   const applyPassportData = (pd: PassportData) => {
     const filled = new Set<string>(recognizedFields);
@@ -231,34 +232,58 @@ export default function C14dCreateForm({ token, onCreated, onCancel, prefill }: 
       <SLSection icon="User" title="Клиент">
         {/* ИИ-сканер паспорта */}
         <div className="mb-3">
-          <button
-            type="button"
-            onClick={() => scanInputRef.current?.click()}
-            disabled={scanBusy}
-            className="w-full bg-gradient-to-br from-[#FFD700]/12 to-transparent border-2 border-dashed border-[#FFD700]/40 rounded-lg py-4 px-3 flex items-center gap-3 hover:border-[#FFD700] active:scale-[0.99] transition-all disabled:opacity-50"
-          >
-            <div className="w-10 h-10 rounded-md bg-[#FFD700]/15 flex items-center justify-center shrink-0">
-              <Icon name={scanBusy ? "Loader2" : "Camera"} size={20} className={`text-[#FFD700] ${scanBusy ? "animate-spin" : ""}`} />
-            </div>
-            <div className="text-left flex-1 min-w-0">
-              <div className="font-bold text-[#FFD700] text-[12px] uppercase tracking-wide flex items-center gap-1.5">
-                {scanBusy ? "Распознаю данные…" : "Сфотографировать паспорт"}
-                {!scanBusy && (
-                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 normal-case tracking-normal font-semibold">
-                    ИИ
-                  </span>
-                )}
+          <div className="bg-gradient-to-br from-[#FFD700]/12 to-transparent border-2 border-dashed border-[#FFD700]/40 rounded-lg p-3">
+            <div className="flex items-center gap-3 mb-2.5">
+              <div className="w-10 h-10 rounded-md bg-[#FFD700]/15 flex items-center justify-center shrink-0">
+                <Icon name={scanBusy ? "Loader2" : "Sparkles"} size={20} className={`text-[#FFD700] ${scanBusy ? "animate-spin" : ""}`} />
               </div>
-              <div className="text-[10px] text-white/55 leading-tight mt-0.5">
-                ИИ сам заполнит ФИО, серию, номер, кем выдан, дату выдачи и дату рождения
+              <div className="text-left flex-1 min-w-0">
+                <div className="font-bold text-[#FFD700] text-[12px] uppercase tracking-wide flex items-center gap-1.5">
+                  {scanBusy ? "Распознаю данные…" : "Распознать паспорт"}
+                  {!scanBusy && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 normal-case tracking-normal font-semibold">
+                      ИИ
+                    </span>
+                  )}
+                </div>
+                <div className="text-[10px] text-white/55 leading-tight mt-0.5">
+                  ИИ сам заполнит ФИО, серию, номер, кем выдан, дату выдачи и дату рождения
+                </div>
               </div>
             </div>
-          </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => scanCameraRef.current?.click()}
+                disabled={scanBusy}
+                className="inline-flex items-center justify-center gap-1.5 bg-[#FFD700] hover:bg-[#FFE34D] disabled:opacity-50 text-black font-bold text-[11px] uppercase tracking-wide rounded-md py-2.5 active:scale-[0.98] transition-all"
+              >
+                <Icon name="Camera" size={14} />
+                Снять с камеры
+              </button>
+              <button
+                type="button"
+                onClick={() => scanGalleryRef.current?.click()}
+                disabled={scanBusy}
+                className="inline-flex items-center justify-center gap-1.5 bg-[#FFD700]/12 hover:bg-[#FFD700]/20 border border-[#FFD700]/40 disabled:opacity-50 text-[#FFD700] font-bold text-[11px] uppercase tracking-wide rounded-md py-2.5 active:scale-[0.98] transition-all"
+              >
+                <Icon name="Image" size={14} />
+                Из галереи
+              </button>
+            </div>
+          </div>
           <input
-            ref={scanInputRef}
+            ref={scanCameraRef}
             type="file"
             accept="image/*"
             capture="environment"
+            hidden
+            onChange={e => { const f = e.target.files?.[0]; if (f) handleScanPassport(f); e.target.value = ""; }}
+          />
+          <input
+            ref={scanGalleryRef}
+            type="file"
+            accept="image/*"
             hidden
             onChange={e => { const f = e.target.files?.[0]; if (f) handleScanPassport(f); e.target.value = ""; }}
           />
