@@ -236,3 +236,65 @@ export const fileToBase64 = (file: File): Promise<string> =>
     r.onerror = rej;
     r.readAsDataURL(file);
   });
+
+/**
+ * Сжимает картинку на клиенте: ресайз по большей стороне до maxSide,
+ * JPEG-качество quality. Возвращает чистый base64 (без data:... префикса).
+ * Если файл не изображение или сжатие не удалось — fallback к fileToBase64.
+ * Дополнительно итеративно уменьшает качество, пока не уложится в maxBytes.
+ */
+export const compressImage = async (
+  file: File,
+  opts: { maxSide?: number; quality?: number; maxBytes?: number } = {},
+): Promise<string> => {
+  const maxSide = opts.maxSide ?? 1600;
+  let quality = opts.quality ?? 0.8;
+  const maxBytes = opts.maxBytes ?? 1_500_000; // ~1.5 МБ в base64
+
+  if (!file.type.startsWith("image/")) {
+    return fileToBase64(file);
+  }
+
+  try {
+    const dataUrl: string = await new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(r.result as string);
+      r.onerror = rej;
+      r.readAsDataURL(file);
+    });
+
+    const img: HTMLImageElement = await new Promise((res, rej) => {
+      const i = new Image();
+      i.onload = () => res(i);
+      i.onerror = rej;
+      i.src = dataUrl;
+    });
+
+    let w = img.naturalWidth || img.width;
+    let h = img.naturalHeight || img.height;
+    if (Math.max(w, h) > maxSide) {
+      const k = maxSide / Math.max(w, h);
+      w = Math.round(w * k);
+      h = Math.round(h * k);
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return fileToBase64(file);
+    ctx.drawImage(img, 0, 0, w, h);
+
+    // Понижаем качество, пока не уложимся в maxBytes (минимум 0.4)
+    let out = canvas.toDataURL("image/jpeg", quality);
+    let raw = out.split(",")[1] || "";
+    while (raw.length > maxBytes && quality > 0.4) {
+      quality -= 0.1;
+      out = canvas.toDataURL("image/jpeg", quality);
+      raw = out.split(",")[1] || "";
+    }
+    return raw;
+  } catch {
+    return fileToBase64(file);
+  }
+};

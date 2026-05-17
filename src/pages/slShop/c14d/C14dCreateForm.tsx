@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import {
   c14dApi,
-  fileToBase64,
+  compressImage,
   fmt,
   ITEM_TYPES,
   ACCESSORIES_OPTIONS,
@@ -92,11 +92,12 @@ export default function C14dCreateForm({ token, onCreated, onCancel, prefill }: 
   };
 
   const handleScanPassport = async (file: File) => {
-    if (file.size > 8 * 1024 * 1024) { setError("Файл больше 8 МБ"); return; }
+    if (file.size > 30 * 1024 * 1024) { setError("Файл больше 30 МБ"); return; }
     setError(null);
     setScanBusy(true);
     try {
-      const b64 = await fileToBase64(file);
+      // Сжимаем до ~1.5 МБ — иначе backend режет HTTP 413
+      const b64 = await compressImage(file, { maxSide: 1800, quality: 0.82, maxBytes: 1_500_000 });
       const r = await slApi<{ url: string; passport_data?: PassportData }>(token, "client_passport_upload", {
         method: "POST",
         body: { image_base64: b64, field: "passport_photo_url", recognize: true },
@@ -152,16 +153,17 @@ export default function C14dCreateForm({ token, onCreated, onCancel, prefill }: 
   const toggleAcc = (a: string) => setAccessories(p => p.includes(a) ? p.filter(x => x !== a) : [...p, a]);
 
   const handleFile = async (file: File, photo_type: "passport" | "device") => {
-    if (file.size > 5 * 1024 * 1024) { setError("Файл больше 5 МБ"); return; }
+    if (file.size > 30 * 1024 * 1024) { setError("Файл больше 30 МБ"); return; }
     const ext = file.name.split(".").pop()?.toLowerCase() || "";
-    if (!["jpg", "jpeg", "png", "webp"].includes(ext)) { setError("Формат: JPG/PNG/WEBP"); return; }
+    if (!["jpg", "jpeg", "png", "webp", "heic", "heif"].includes(ext)) { setError("Формат: JPG/PNG/WEBP"); return; }
     setError(null);
     setUploading(photo_type);
     try {
-      const b64 = await fileToBase64(file);
+      // Сжимаем до ~1.5 МБ перед отправкой (HTTP 413 fix)
+      const b64 = await compressImage(file, { maxSide: 1800, quality: 0.82, maxBytes: 1_500_000 });
       const r = await c14dApi<{ file_url: string; s3_key: string }>(token, "upload_photo", {
         method: "POST",
-        body: { photo_type, file_base64: b64, filename: file.name },
+        body: { photo_type, file_base64: b64, filename: file.name.replace(/\.(heic|heif)$/i, ".jpg") },
       });
       if (!r.ok || !r.data) { setError(r.error || "Ошибка загрузки"); return; }
       setPhotos(p => [...p.filter(x => x.photo_type !== photo_type), { photo_type, file_url: r.data!.file_url, s3_key: r.data!.s3_key }]);
