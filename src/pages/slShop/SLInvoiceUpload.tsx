@@ -22,6 +22,7 @@ type Props = {
 /** Модалка «Загрузить накладную»: фото → ИИ → таблица для проверки → массовый импорт. */
 export default function SLInvoiceUpload({ token, onClose, onDone }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [err, setErr] = useState<string | null>(null);
@@ -152,25 +153,51 @@ export default function SLInvoiceUpload({ token, onClose, onDone }: Props) {
         <div className="space-y-2">
           {/* Фото накладной */}
           {items.length === 0 && !result && (
-            <button
-              onClick={() => inputRef.current?.click()}
-              disabled={photoBusy}
-              className="w-full bg-gradient-to-br from-[#FFD700]/12 to-transparent border-2 border-dashed border-[#FFD700]/40 rounded-xl py-6 flex flex-col items-center gap-1.5 hover:border-[#FFD700] active:scale-[0.98] transition-all disabled:opacity-50">
-              <Icon name={photoBusy ? "Loader2" : "Camera"} size={26} className={`text-[#FFD700] ${photoBusy ? "animate-spin" : ""}`} />
-              <div className="font-bold text-[#FFD700] text-[13px] uppercase tracking-wide">
-                {photoBusy ? "Распознаю…" : "Сфотографировать накладную"}
+            <div className="bg-gradient-to-br from-[#FFD700]/12 to-transparent border-2 border-dashed border-[#FFD700]/40 rounded-xl p-4">
+              <div className="flex flex-col items-center gap-1 mb-3">
+                <Icon name={photoBusy ? "Loader2" : "Sparkles"} size={26} className={`text-[#FFD700] ${photoBusy ? "animate-spin" : ""}`} />
+                <div className="font-bold text-[#FFD700] text-[13px] uppercase tracking-wide">
+                  {photoBusy ? "Распознаю…" : "Распознать накладную"}
+                </div>
+                <div className="text-[10px] text-white/55 text-center px-3 leading-tight max-w-md">
+                  ИИ прочитает все строки: наименование, количество, цену.<br />
+                  Розница рассчитается автоматически (≤500₽ × 3, иначе × 2)
+                </div>
               </div>
-              <div className="text-[10px] text-white/55 text-center px-3 leading-tight max-w-md">
-                ИИ прочитает все строки: наименование, количество, цену.<br />
-                Розница рассчитается автоматически (≤500₽ × 3, иначе × 2)
+              <div className="grid grid-cols-2 gap-2 max-w-md mx-auto">
+                <button
+                  type="button"
+                  onClick={() => inputRef.current?.click()}
+                  disabled={photoBusy}
+                  className="inline-flex items-center justify-center gap-1.5 bg-[#FFD700] hover:bg-[#FFE34D] disabled:opacity-50 text-black font-bold text-[12px] uppercase tracking-wide rounded-md py-2.5 active:scale-[0.98] transition-all"
+                >
+                  <Icon name="Camera" size={14} />
+                  Снять с камеры
+                </button>
+                <button
+                  type="button"
+                  onClick={() => galleryRef.current?.click()}
+                  disabled={photoBusy}
+                  className="inline-flex items-center justify-center gap-1.5 bg-[#FFD700]/12 hover:bg-[#FFD700]/20 border border-[#FFD700]/40 disabled:opacity-50 text-[#FFD700] font-bold text-[12px] uppercase tracking-wide rounded-md py-2.5 active:scale-[0.98] transition-all"
+                >
+                  <Icon name="Image" size={14} />
+                  Из галереи
+                </button>
               </div>
-            </button>
+            </div>
           )}
           <input
             ref={inputRef}
             type="file"
             accept="image/*"
             capture="environment"
+            hidden
+            onChange={e => { const f = e.target.files?.[0]; if (f) onPhoto(f); e.target.value = ""; }}
+          />
+          <input
+            ref={galleryRef}
+            type="file"
+            accept="image/*"
             hidden
             onChange={e => { const f = e.target.files?.[0]; if (f) onPhoto(f); e.target.value = ""; }}
           />

@@ -1,4 +1,4 @@
-import { RefObject } from "react";
+import { RefObject, useRef } from "react";
 import Icon from "@/components/ui/icon";
 
 type Props = {
@@ -36,6 +36,7 @@ export default function EditModalPhotos({
   onDrop,
   onDragEnd,
 }: Props) {
+  const galleryRef = useRef<HTMLInputElement>(null);
   return (
     <div className="mb-4">
       <div className="flex items-center justify-between mb-2">
@@ -48,14 +49,26 @@ export default function EditModalPhotos({
           </div>
         </div>
         {totalPhotosLeft > 0 && (
-          <button
-            onClick={() => fileRef.current?.click()}
-            disabled={busy}
-            className="flex items-center gap-1 bg-gradient-to-r from-[#FFD700] to-[#FFE55C] text-black font-oswald font-bold text-[11px] px-2.5 py-1.5 rounded uppercase tracking-wide hover:shadow-[0_0_12px_rgba(255,215,0,0.4)] disabled:opacity-50 transition-all"
-          >
-            <Icon name="Camera" size={12} />
-            + Добавить ({totalPhotosLeft})
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={busy}
+              className="flex items-center gap-1 bg-gradient-to-r from-[#FFD700] to-[#FFE55C] text-black font-oswald font-bold text-[11px] px-2.5 py-1.5 rounded uppercase tracking-wide hover:shadow-[0_0_12px_rgba(255,215,0,0.4)] disabled:opacity-50 transition-all"
+              title="Снять с камеры"
+            >
+              <Icon name="Camera" size={12} />
+              Камера
+            </button>
+            <button
+              onClick={() => galleryRef.current?.click()}
+              disabled={busy}
+              className="flex items-center gap-1 bg-[#FFD700]/15 border border-[#FFD700]/40 text-[#FFD700] font-oswald font-bold text-[11px] px-2.5 py-1.5 rounded uppercase tracking-wide hover:bg-[#FFD700]/25 disabled:opacity-50 transition-all"
+              title="Выбрать из галереи"
+            >
+              <Icon name="Image" size={12} />
+              Галерея ({totalPhotosLeft})
+            </button>
+          </div>
         )}
       </div>
       <input
@@ -63,6 +76,18 @@ export default function EditModalPhotos({
         type="file"
         accept="image/*"
         capture="environment"
+        multiple
+        className="hidden"
+        onChange={e => {
+          const fs = e.target.files;
+          if (fs && fs.length) onPickFiles(fs);
+          e.target.value = "";
+        }}
+      />
+      <input
+        ref={galleryRef}
+        type="file"
+        accept="image/*"
         multiple
         className="hidden"
         onChange={e => {
@@ -93,15 +118,31 @@ export default function EditModalPhotos({
       )}
 
       {photos.length === 0 ? (
-        <button
-          onClick={() => fileRef.current?.click()}
-          disabled={busy}
-          className="w-full aspect-video rounded-lg border-2 border-dashed border-[#FFD700]/30 hover:border-[#FFD700] hover:bg-[#FFD700]/5 flex flex-col items-center justify-center gap-2 text-white/60 hover:text-[#FFD700] transition-all disabled:opacity-50 group"
-        >
-          <Icon name="ImagePlus" size={36} className="group-hover:scale-110 transition-transform" />
-          <div className="font-oswald font-bold text-sm uppercase tracking-wide">Сфотографировать товар</div>
-          <div className="text-[10px] text-white/40">Камера или несколько фото из галереи</div>
-        </button>
+        <div className="w-full rounded-lg border-2 border-dashed border-[#FFD700]/30 hover:border-[#FFD700]/60 p-4 transition-all">
+          <div className="flex flex-col items-center justify-center gap-1.5 text-white/60 mb-3">
+            <Icon name="ImagePlus" size={32} className="text-[#FFD700]/70" />
+            <div className="font-oswald font-bold text-sm uppercase tracking-wide text-white/80">Добавить фото товара</div>
+            <div className="text-[10px] text-white/40">До 5 фото · с камеры или из галереи</div>
+          </div>
+          <div className="grid grid-cols-2 gap-2 max-w-sm mx-auto">
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={busy}
+              className="inline-flex items-center justify-center gap-1.5 bg-gradient-to-r from-[#FFD700] to-[#FFE55C] text-black font-oswald font-bold text-[11px] px-3 py-2 rounded uppercase tracking-wide hover:shadow-[0_0_12px_rgba(255,215,0,0.4)] disabled:opacity-50 transition-all"
+            >
+              <Icon name="Camera" size={13} />
+              Снять
+            </button>
+            <button
+              onClick={() => galleryRef.current?.click()}
+              disabled={busy}
+              className="inline-flex items-center justify-center gap-1.5 bg-[#FFD700]/15 border border-[#FFD700]/40 text-[#FFD700] font-oswald font-bold text-[11px] px-3 py-2 rounded uppercase tracking-wide hover:bg-[#FFD700]/25 disabled:opacity-50 transition-all"
+            >
+              <Icon name="Image" size={13} />
+              Из галереи
+            </button>
+          </div>
+        </div>
       ) : (
         <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
           {photos.map((url, i) => (
@@ -170,9 +211,10 @@ export default function EditModalPhotos({
           ))}
           {totalPhotosLeft > 0 && (
             <button
-              onClick={() => fileRef.current?.click()}
+              onClick={() => galleryRef.current?.click()}
               disabled={busy}
               className="aspect-square rounded border-2 border-dashed border-[#FFD700]/30 hover:border-[#FFD700] hover:bg-[#FFD700]/5 flex flex-col items-center justify-center gap-1 text-white/50 hover:text-[#FFD700] transition-all disabled:opacity-50"
+              title="Добавить из галереи"
             >
               <Icon name="Plus" size={20} />
               <span className="text-[9px] font-roboto uppercase tracking-wide">+{totalPhotosLeft}</span>
