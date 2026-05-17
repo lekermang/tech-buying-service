@@ -166,9 +166,6 @@ export default function PublicContract14d() {
 
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4 space-y-2 text-sm">
           <Row k="Сумма выдачи" v={`${fmt(c.amount)} ₽`} />
-          <Row k="Ставка" v={`${c.interest_rate}% / день`} />
-          <Row k="Срок" v={`${c.term_days} дн.`} />
-          {tc && <Row k="Проценты за факт. дни" v={`${fmt(tc.interest_today)} ₽`} accent="orange" />}
           {c.paid_total > 0 && <Row k="Оплачено" v={`${fmt(c.paid_total)} ₽`} accent="emerald" />}
           <Row k="Клиент" v={c.client_name_masked} />
           {itemTitle && <Row k="Имущество" v={itemTitle} />}

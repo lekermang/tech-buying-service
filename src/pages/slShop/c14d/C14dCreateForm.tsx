@@ -10,7 +10,19 @@ import {
   type C14dPhoto,
   type C14dCashAccount,
 } from "./types";
+import { slApi } from "../types";
 import { SLSection, SLField, SLInput, SLTextarea, SLSelect, SLButton, SLCheckbox, SLGrid } from "../slUI";
+
+type PassportData = {
+  full_name?: string;
+  series?: string;
+  number?: string;
+  issued_by?: string;
+  issued_date?: string | null;
+  birth_date?: string | null;
+  address?: string;
+  _ocr_error?: string;
+};
 
 type Props = {
   token: string;
@@ -53,6 +65,57 @@ export default function C14dCreateForm({ token, onCreated, onCancel, prefill }: 
   const [uploading, setUploading] = useState<"passport" | "device" | null>(null);
   const passInputRef = useRef<HTMLInputElement>(null);
   const deviceInputRef = useRef<HTMLInputElement>(null);
+
+  // ИИ-сканер паспорта (как в скупке)
+  const [scanBusy, setScanBusy] = useState(false);
+  const [scanInfo, setScanInfo] = useState<string | null>(null);
+  const [recognizedFields, setRecognizedFields] = useState<Set<string>>(new Set());
+  const scanInputRef = useRef<HTMLInputElement>(null);
+
+  const applyPassportData = (pd: PassportData) => {
+    const filled = new Set<string>(recognizedFields);
+    if (pd.full_name && !fullName.trim()) { setFullName(pd.full_name); filled.add("fullName"); }
+    if (pd.series && !passSeries.trim()) { setPassSeries(pd.series); filled.add("series"); }
+    if (pd.number && !passNumber.trim()) { setPassNumber(pd.number); filled.add("number"); }
+    if (pd.issued_by && !passIssuedBy.trim()) { setPassIssuedBy(pd.issued_by); filled.add("issuedBy"); }
+    if (pd.issued_date && !passIssueDate) { setPassIssueDate(pd.issued_date); filled.add("issuedDate"); }
+    if (pd.birth_date && !birthDate) { setBirthDate(pd.birth_date); filled.add("birthDate"); }
+    setRecognizedFields(filled);
+    if (filled.size > recognizedFields.size) {
+      setScanInfo(`ИИ распознал данные паспорта: ${filled.size} полей. Проверь и поправь, если нужно.`);
+      setTimeout(() => setScanInfo(null), 6000);
+    } else if (pd._ocr_error) {
+      setScanInfo("Фото сохранено, но автоматически распознать данные не удалось. Заполни вручную.");
+      setTimeout(() => setScanInfo(null), 6000);
+    }
+  };
+
+  const handleScanPassport = async (file: File) => {
+    if (file.size > 8 * 1024 * 1024) { setError("Файл больше 8 МБ"); return; }
+    setError(null);
+    setScanBusy(true);
+    try {
+      const b64 = await fileToBase64(file);
+      const r = await slApi<{ url: string; passport_data?: PassportData }>(token, "client_passport_upload", {
+        method: "POST",
+        body: { image_base64: b64, field: "passport_photo_url", recognize: true },
+      });
+      if (!r.ok || !r.data) { setError(r.error || "Ошибка распознавания"); return; }
+      // Подкладываем загруженное фото в общий список фото договора
+      if (r.data.url) {
+        setPhotos(p => [...p.filter(x => x.photo_type !== "passport"), { photo_type: "passport", file_url: r.data!.url, s3_key: null }]);
+      }
+      if (r.data.passport_data) applyPassportData(r.data.passport_data);
+    } finally {
+      setScanBusy(false);
+    }
+  };
+
+  const aiBadge = (key: string) => recognizedFields.has(key) ? (
+    <span className="inline-flex items-center gap-0.5 ml-1 text-[8px] uppercase tracking-wider font-bold px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 align-middle">
+      <Icon name="Sparkles" size={8} /> ИИ
+    </span>
+  ) : null;
 
   const [accounts, setAccounts] = useState<C14dCashAccount[]>([]);
   const [cashAccountId, setCashAccountId] = useState<string>("");
@@ -166,14 +229,55 @@ export default function C14dCreateForm({ token, onCreated, onCancel, prefill }: 
 
       {/* Клиент */}
       <SLSection icon="User" title="Клиент">
+        {/* ИИ-сканер паспорта */}
+        <div className="mb-3">
+          <button
+            type="button"
+            onClick={() => scanInputRef.current?.click()}
+            disabled={scanBusy}
+            className="w-full bg-gradient-to-br from-[#FFD700]/12 to-transparent border-2 border-dashed border-[#FFD700]/40 rounded-lg py-4 px-3 flex items-center gap-3 hover:border-[#FFD700] active:scale-[0.99] transition-all disabled:opacity-50"
+          >
+            <div className="w-10 h-10 rounded-md bg-[#FFD700]/15 flex items-center justify-center shrink-0">
+              <Icon name={scanBusy ? "Loader2" : "Camera"} size={20} className={`text-[#FFD700] ${scanBusy ? "animate-spin" : ""}`} />
+            </div>
+            <div className="text-left flex-1 min-w-0">
+              <div className="font-bold text-[#FFD700] text-[12px] uppercase tracking-wide flex items-center gap-1.5">
+                {scanBusy ? "Распознаю данные…" : "Сфотографировать паспорт"}
+                {!scanBusy && (
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 normal-case tracking-normal font-semibold">
+                    ИИ
+                  </span>
+                )}
+              </div>
+              <div className="text-[10px] text-white/55 leading-tight mt-0.5">
+                ИИ сам заполнит ФИО, серию, номер, кем выдан, дату выдачи и дату рождения
+              </div>
+            </div>
+          </button>
+          <input
+            ref={scanInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            hidden
+            onChange={e => { const f = e.target.files?.[0]; if (f) handleScanPassport(f); e.target.value = ""; }}
+          />
+          {scanInfo && (
+            <div className="mt-2 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 px-2 py-1.5 text-[11px] flex items-start gap-1.5">
+              <Icon name="Sparkles" size={11} className="mt-0.5 shrink-0 text-emerald-300" />
+              <span>{scanInfo}</span>
+            </div>
+          )}
+        </div>
+
         <SLGrid cols={2}>
-          <SLField label="ФИО" required className="sm:col-span-2"><SLInput value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Иванов Иван Иванович" /></SLField>
-          <SLField label="Дата рождения"><SLInput type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} /></SLField>
+          <SLField label={<>ФИО{aiBadge("fullName")}</>} required className="sm:col-span-2"><SLInput value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Иванов Иван Иванович" /></SLField>
+          <SLField label={<>Дата рождения{aiBadge("birthDate")}</>}><SLInput type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} /></SLField>
           <SLField label="Телефон"><SLInput type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+7 (___) ___-__-__" /></SLField>
-          <SLField label="Серия"><SLInput value={passSeries} onChange={e => setPassSeries(e.target.value)} placeholder="0000" maxLength={5} /></SLField>
-          <SLField label="Номер"><SLInput value={passNumber} onChange={e => setPassNumber(e.target.value)} placeholder="000000" maxLength={7} /></SLField>
-          <SLField label="Кем выдан" className="sm:col-span-2"><SLInput value={passIssuedBy} onChange={e => setPassIssuedBy(e.target.value)} placeholder="ОУФМС России…" /></SLField>
-          <SLField label="Дата выдачи"><SLInput type="date" value={passIssueDate} onChange={e => setPassIssueDate(e.target.value)} /></SLField>
+          <SLField label={<>Серия{aiBadge("series")}</>}><SLInput value={passSeries} onChange={e => setPassSeries(e.target.value)} placeholder="0000" maxLength={5} /></SLField>
+          <SLField label={<>Номер{aiBadge("number")}</>}><SLInput value={passNumber} onChange={e => setPassNumber(e.target.value)} placeholder="000000" maxLength={7} /></SLField>
+          <SLField label={<>Кем выдан{aiBadge("issuedBy")}</>} className="sm:col-span-2"><SLInput value={passIssuedBy} onChange={e => setPassIssuedBy(e.target.value)} placeholder="ОУФМС России…" /></SLField>
+          <SLField label={<>Дата выдачи{aiBadge("issuedDate")}</>}><SLInput type="date" value={passIssueDate} onChange={e => setPassIssueDate(e.target.value)} /></SLField>
           <SLField label="E-mail"><SLInput type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="ivan@mail.ru" /></SLField>
         </SLGrid>
       </SLSection>
