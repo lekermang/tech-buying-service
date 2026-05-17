@@ -57,11 +57,118 @@ def check_token(event: dict) -> bool:
     return row[0] in ('owner', 'admin')
 
 
+def _investor_public(conn, cur, share_token: str) -> dict:
+    """Публичные данные для инвестора по share_token (без авторизации)."""
+    t = ''.join(ch for ch in (share_token or '') if ch.isalnum())[:64]
+    if not t:
+        return {'statusCode': 400, 'headers': HEADERS,
+                'body': json.dumps({'error': 'Нужен token'}, ensure_ascii=False)}
+    cur.execute(
+        f"SELECT id, investor_name, money_in_safe, default_profit_per_gram, share_token "
+        f"FROM {SCHEMA}.gold_investor_settings WHERE share_token='{t}' AND is_active=TRUE LIMIT 1"
+    )
+    s = cur.fetchone()
+    if not s:
+        return {'statusCode': 404, 'headers': HEADERS,
+                'body': json.dumps({'error': 'Ссылка недействительна'}, ensure_ascii=False)}
+    settings = {
+        'investor_name': s[1],
+        'money_in_safe': float(s[2] or 0),
+        'default_profit_per_gram': float(s[3] or 0),
+        'share_token': s[4],
+    }
+    # Все сделки, отмеченные инвестором
+    cur.execute(f"""
+        SELECT id, item_name, weight, purity, buy_price, sell_price, sell_price_per_gram,
+               investor_profit_per_gram, status, created_at, completed_at
+        FROM {SCHEMA}.gold_orders
+        WHERE is_investor_money = TRUE
+        ORDER BY created_at DESC
+    """)
+    rows = cur.fetchall()
+    deals = []
+    total_grams = 0.0
+    total_spent = 0
+    total_profit_locked = 0  # отложенная прибыль (по покупке)
+    total_sold_profit = 0    # прибыль по реально проданным
+    for r in rows:
+        w = float(r[2]) if r[2] is not None else 0.0
+        bp = int(r[4] or 0)
+        spg = float(r[6]) if r[6] is not None else None
+        ipg = float(r[7]) if r[7] is not None else 0.0
+        profit = int(round(w * ipg))
+        deals.append({
+            'id': r[0],
+            'item_name': r[1],
+            'weight': w,
+            'purity': r[3],
+            'buy_price': bp,
+            'sell_price': r[5],
+            'sell_price_per_gram': spg,
+            'investor_profit_per_gram': ipg,
+            'profit': profit,
+            'status': r[8],
+            'created_at': r[9].isoformat() if r[9] else None,
+            'completed_at': r[10].isoformat() if r[10] else None,
+        })
+        total_grams += w
+        total_spent += bp
+        total_profit_locked += profit
+        if r[8] == 'done':
+            total_sold_profit += profit
+    # Аналитика по датам (последние 30 дней)
+    cur.execute(f"""
+        SELECT
+            DATE(COALESCE(completed_at, created_at) + INTERVAL '3 hours') AS d,
+            COALESCE(SUM(weight), 0) AS grams,
+            COALESCE(SUM(buy_price), 0) AS spent,
+            COALESCE(SUM(weight * investor_profit_per_gram), 0) AS profit
+        FROM {SCHEMA}.gold_orders
+        WHERE is_investor_money = TRUE
+          AND COALESCE(completed_at, created_at) >= NOW() - INTERVAL '30 days'
+        GROUP BY d
+        ORDER BY d
+    """)
+    daily = []
+    for dr in cur.fetchall():
+        daily.append({
+            'date': dr[0].isoformat() if dr[0] else None,
+            'grams': float(dr[1] or 0),
+            'spent': int(dr[2] or 0),
+            'profit': int(dr[3] or 0),
+        })
+    return {
+        'statusCode': 200, 'headers': HEADERS,
+        'body': json.dumps({
+            'settings': settings,
+            'totals': {
+                'grams': round(total_grams, 3),
+                'spent': total_spent,
+                'profit_total': total_profit_locked,
+                'profit_realized': total_sold_profit,
+                'in_safe': settings['money_in_safe'],
+                'invested_now': total_spent,  # деньги сейчас в металле
+            },
+            'deals': deals,
+            'daily': daily,
+        }, ensure_ascii=False, default=str)
+    }
+
+
 def handler(event: dict, context) -> dict:
     """Управление заявками на скупку золота — CRUD + аналитика. Только для owner/admin."""
 
     if event.get('httpMethod') == 'OPTIONS':
         return {'statusCode': 200, 'headers': HEADERS, 'body': ''}
+
+    # Публичная страница инвестора — без авторизации (по share_token)
+    params0 = event.get('queryStringParameters') or {}
+    if event.get('httpMethod') == 'GET' and params0.get('action') == 'investor_public':
+        conn = get_conn(); cur = conn.cursor()
+        try:
+            return _investor_public(conn, cur, params0.get('token', ''))
+        finally:
+            cur.close(); conn.close()
 
     if not check_token(event):
         return {'statusCode': 401, 'headers': HEADERS, 'body': json.dumps({'error': 'Unauthorized'}, ensure_ascii=False)}
@@ -81,6 +188,27 @@ def handler(event: dict, context) -> dict:
     # ─── GET ──────────────────────────────────────────────────────────────────
     if method == 'GET':
         action = params.get('action', '')
+
+        # Настройки инвестора (для админа)
+        if action == 'investor_settings':
+            cur.execute(
+                f"SELECT id, share_token, investor_name, money_in_safe, default_profit_per_gram "
+                f"FROM {SCHEMA}.gold_investor_settings ORDER BY id ASC LIMIT 1"
+            )
+            r = cur.fetchone()
+            cur.close(); conn.close()
+            if not r:
+                return {'statusCode': 404, 'headers': HEADERS,
+                        'body': json.dumps({'error': 'Settings not found'}, ensure_ascii=False)}
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({
+                'settings': {
+                    'id': r[0],
+                    'share_token': r[1],
+                    'investor_name': r[2],
+                    'money_in_safe': float(r[3] or 0),
+                    'default_profit_per_gram': float(r[4] or 0),
+                }
+            }, ensure_ascii=False)}
 
         # Аналитика за период
         if action == 'analytics':
@@ -320,7 +448,7 @@ def handler(event: dict, context) -> dict:
         cur.execute(f"""
             SELECT id, name, phone, item_name, weight, purity, buy_price, sell_price, profit,
                    comment, status, status_updated_at, created_at, admin_note, completed_at, payment_method,
-                   sell_price_per_gram
+                   sell_price_per_gram, is_investor_money, investor_profit_per_gram
             FROM {SCHEMA}.gold_orders
             {where_clause}
             ORDER BY created_at DESC
@@ -342,12 +470,59 @@ def handler(event: dict, context) -> dict:
                 'completed_at': r[14].isoformat() if r[14] else None,
                 'payment_method': r[15],
                 'sell_price_per_gram': float(r[16]) if r[16] is not None else None,
+                'is_investor_money': bool(r[17]),
+                'investor_profit_per_gram': float(r[18]) if r[18] is not None else 200.0,
             })
         return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'orders': orders}, ensure_ascii=False)}
 
     # ─── POST ─────────────────────────────────────────────────────────────────
     if method == 'POST':
         action = body.get('action', '')
+
+        # Обновить настройки инвестора (имя, деньги в сейфе, ставка по умолчанию)
+        if action == 'investor_settings':
+            sets = []
+            if body.get('investor_name') is not None:
+                v = str(body['investor_name']).replace("'", "''")[:200]
+                sets.append(f"investor_name = '{v}'")
+            if body.get('money_in_safe') is not None:
+                try:
+                    sets.append(f"money_in_safe = {float(body['money_in_safe'])}")
+                except Exception:
+                    pass
+            if body.get('default_profit_per_gram') is not None:
+                try:
+                    sets.append(f"default_profit_per_gram = {float(body['default_profit_per_gram'])}")
+                except Exception:
+                    pass
+            if body.get('regenerate_token'):
+                # Перегенерация публичной ссылки
+                sets.append("share_token = md5(random()::text || clock_timestamp()::text) || md5(random()::text)")
+            if not sets:
+                cur.close(); conn.close()
+                return {'statusCode': 400, 'headers': HEADERS,
+                        'body': json.dumps({'error': 'Нет данных'}, ensure_ascii=False)}
+            sets.append("updated_at = NOW()")
+            cur.execute(
+                f"UPDATE {SCHEMA}.gold_investor_settings SET {', '.join(sets)} "
+                f"WHERE id = (SELECT id FROM {SCHEMA}.gold_investor_settings ORDER BY id ASC LIMIT 1) "
+                f"RETURNING share_token, investor_name, money_in_safe, default_profit_per_gram"
+            )
+            r = cur.fetchone()
+            conn.commit()
+            cur.close(); conn.close()
+            if not r:
+                return {'statusCode': 404, 'headers': HEADERS,
+                        'body': json.dumps({'error': 'Settings not found'}, ensure_ascii=False)}
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({
+                'ok': True,
+                'settings': {
+                    'share_token': r[0],
+                    'investor_name': r[1],
+                    'money_in_safe': float(r[2] or 0),
+                    'default_profit_per_gram': float(r[3] or 0),
+                }
+            }, ensure_ascii=False)}
 
         # Удалить заявку
         if action == 'delete':
@@ -489,14 +664,21 @@ def handler(event: dict, context) -> dict:
             sell_sql = str(int(sell_price)) if sell_price is not None else 'NULL'
             spg_sql = str(float(sell_price_per_gram)) if sell_price_per_gram not in (None, '', 0) else 'NULL'
             profit_sql = str(profit_val) if profit_val is not None else 'NULL'
+            is_inv = 'TRUE' if body.get('is_investor_money') else 'FALSE'
+            try:
+                ipg = float(body.get('investor_profit_per_gram')) if body.get('investor_profit_per_gram') not in (None, '') else 200.0
+            except Exception:
+                ipg = 200.0
 
             cur.execute(f"""
                 INSERT INTO {SCHEMA}.gold_orders
-                    (name, phone, item_name, weight, purity, buy_price, sell_price, sell_price_per_gram, profit, comment)
+                    (name, phone, item_name, weight, purity, buy_price, sell_price, sell_price_per_gram, profit, comment,
+                     is_investor_money, investor_profit_per_gram)
                 VALUES
                     ('{name_e}', '{phone_e}',
                      '{item_name}', {weight_sql}, '{purity}',
-                     {buy_sql}, {sell_sql}, {spg_sql}, {profit_sql}, '{comment}')
+                     {buy_sql}, {sell_sql}, {spg_sql}, {profit_sql}, '{comment}',
+                     {is_inv}, {ipg})
                 RETURNING id
             """)
             order_id = cur.fetchone()[0]
@@ -596,6 +778,13 @@ def handler(event: dict, context) -> dict:
             sets.append(f"name = '{str(upd_name).replace(chr(39), chr(39)*2)}'")
         if upd_phone is not None:
             sets.append(f"phone = '{str(upd_phone).replace(chr(39), chr(39)*2)}'")
+        if 'is_investor_money' in body:
+            sets.append(f"is_investor_money = {'TRUE' if body.get('is_investor_money') else 'FALSE'}")
+        if body.get('investor_profit_per_gram') is not None:
+            try:
+                sets.append(f"investor_profit_per_gram = {float(body['investor_profit_per_gram'])}")
+            except Exception:
+                pass
 
         if not sets:
             cur.close(); conn.close()

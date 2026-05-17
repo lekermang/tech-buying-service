@@ -13,6 +13,22 @@
       "method": "OPTIONS",
       "path": "/",
       "expectedStatus": 200
+    },
+    {
+      "name": "Investor public without token returns 400",
+      "method": "GET",
+      "path": "/?action=investor_public",
+      "expectedStatus": 400,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Investor public with bad token returns 404",
+      "method": "GET",
+      "path": "/?action=investor_public&token=zzzz",
+      "expectedStatus": 404,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
     }
   ]
 }

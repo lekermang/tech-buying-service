@@ -1,6 +1,6 @@
 import Icon from "@/components/ui/icon";
 
-type View = "list" | "analytics";
+type View = "list" | "analytics" | "investor";
 
 type Props = {
   view: View;
@@ -28,6 +28,7 @@ export default function GoldTabHeader({
           {[
             { k: "list", l: "Заявки", icon: "List" },
             { k: "analytics", l: "Аналитика", icon: "BarChart2" },
+            { k: "investor", l: "Инвестор", icon: "Briefcase" },
           ].map(v => {
             const active = view === v.k;
             return (

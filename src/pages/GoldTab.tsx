@@ -8,8 +8,9 @@ import GoldTabHeader from "./gold/GoldTabHeader";
 import GoldTabStatusFilter from "./gold/GoldTabStatusFilter";
 import GoldTabCreateForm from "./gold/GoldTabCreateForm";
 import GoldTabList from "./gold/GoldTabList";
+import GoldInvestorTab from "./gold/GoldInvestorTab";
 
-type View = "list" | "analytics";
+type View = "list" | "analytics" | "investor";
 type Period = "day" | "yesterday" | "week" | "month" | "year" | "all" | "custom";
 
 type EditForm = {
@@ -77,8 +78,8 @@ export default function GoldTab({ token }: { token: string }) {
   }, [token]);
 
   useEffect(() => {
-    if (view === "list") loadOrders();
-    else loadAnalytics(period, periodFrom, periodTo);
+    if (view === "list" || view === "investor") loadOrders();
+    else if (view === "analytics") loadAnalytics(period, periodFrom, periodTo);
   }, [view, loadOrders, loadAnalytics, period, periodFrom, periodTo]);
 
   const createOrder = async () => {
@@ -189,6 +190,16 @@ export default function GoldTab({ token }: { token: string }) {
           onRefresh={() => loadAnalytics(period, periodFrom, periodTo)}
           token={token}
           onSold={() => loadAnalytics(period, periodFrom, periodTo)}
+        />
+      )}
+
+      {/* Инвестор */}
+      {view === "investor" && (
+        <GoldInvestorTab
+          token={token}
+          orders={orders}
+          loadingOrders={loading}
+          onReload={loadOrders}
         />
       )}
 

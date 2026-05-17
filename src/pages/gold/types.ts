@@ -41,6 +41,47 @@ export type GoldOrder = {
   admin_note: string | null;
   completed_at: string | null;
   payment_method: string | null;
+  is_investor_money?: boolean;
+  investor_profit_per_gram?: number;
+};
+
+export type GoldInvestorSettings = {
+  share_token: string;
+  investor_name: string;
+  money_in_safe: number;
+  default_profit_per_gram: number;
+};
+
+export type GoldInvestorPublic = {
+  settings: {
+    investor_name: string;
+    money_in_safe: number;
+    default_profit_per_gram: number;
+    share_token: string;
+  };
+  totals: {
+    grams: number;
+    spent: number;
+    profit_total: number;
+    profit_realized: number;
+    in_safe: number;
+    invested_now: number;
+  };
+  deals: {
+    id: number;
+    item_name: string | null;
+    weight: number;
+    purity: string | null;
+    buy_price: number;
+    sell_price: number | null;
+    sell_price_per_gram: number | null;
+    investor_profit_per_gram: number;
+    profit: number;
+    status: string;
+    created_at: string | null;
+    completed_at: string | null;
+  }[];
+  daily: { date: string; grams: number; spent: number; profit: number }[];
 };
 
 export type GoldDayStat = {
