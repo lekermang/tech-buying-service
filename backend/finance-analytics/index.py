@@ -99,12 +99,14 @@ def compute_pl(cur, d_from: date, d_to: date):
         'total': int(r[4] or 0),
     }
 
-    # Золото: выручка = sell_price, COGS = buy_price
+    # Золото: в P&L попадает ТОЛЬКО фактически проданное (status='done').
+    # Выручка = sell_price, COGS = buy_price проданных позиций.
+    # Дата привязки — completed_at (день продажи), а не created_at (день скупки).
     cur.execute(
         f"""SELECT
-              COALESCE(SUM(sell_price), 0),
-              COALESCE(SUM(buy_price), 0),
-              COALESCE(SUM(weight), 0),
+              COALESCE(SUM(sell_price) FILTER (WHERE status='done'), 0),
+              COALESCE(SUM(buy_price)  FILTER (WHERE status='done'), 0),
+              COALESCE(SUM(weight)     FILTER (WHERE status='done'), 0),
               COUNT(*) FILTER (WHERE status='done'),
               COUNT(*)
            FROM {SCHEMA}.gold_orders

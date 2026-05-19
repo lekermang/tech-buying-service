@@ -43,9 +43,13 @@ export default function AnalyticsTotalDay({
   slRevenue, slExpense, slSalesTotal, slSalesCount, slBuyoutTotal, slBuyoutCount,
 }: Props) {
   const repairPart = repairNetProfit;
-  const goldPart = goldForecastProfit;
+  // В статистику идёт ТОЛЬКО фактическая прибыль по проданному золоту
+  // (gold_orders.profit при status='done'). Прогноз — отдельным блоком ниже.
+  const goldPart = goldProfit;
   const slPart = slPeriodProfit;
   const totalDay = repairPart + goldPart + slPart;
+  // Прогноз остатка — справочно (не входит в "Итого")
+  const goldForecastExtra = goldForecastProfit;
   const periodLabel =
     period === "today" ? "сегодня" :
     period === "yesterday" ? "вчера" :
@@ -76,16 +80,19 @@ export default function AnalyticsTotalDay({
     title: "🥇 Золото — детализация",
     emoji: "🥇",
     total: goldPart,
-    totalLabel: `прогноз прибыли по цене ${goldForecastPriceNum.toLocaleString("ru-RU")} ₽/г`,
+    totalLabel: "фактическая прибыль с проданного золота",
     accentColor: "gold",
     periodLabel,
     rows: [
-      { icon: "Scale", label: "Принято золота 585 пробы", value: goldData?.period_weight585 ? `${goldData.period_weight585.toFixed(2)} г` : "—", color: "text-white/85", hint: `${goldData?.period_buy_count ?? 0} скупок за период` },
-      { icon: "ArrowDownCircle", label: "Закупка (потрачено)", value: -(goldData?.period_buy_sum ?? 0), color: "text-orange-400" },
-      { icon: "TrendingUp", label: `Прогноз продажи (по ${goldForecastPriceNum.toLocaleString("ru-RU")} ₽/г)`, value: goldData?.period_weight585 ? Math.round(goldData.period_weight585 * goldForecastPriceNum) : 0, color: "text-[#FFD700]" },
-      { icon: "Equal", label: "Прогнозная прибыль", value: goldPart, color: goldPart >= 0 ? "text-emerald-300" : "text-red-300", divider: true },
-      ...(goldData && goldData.total_weight > 0
-        ? [{ icon: "Package", label: "Уже продано (фактически)", value: goldProfit, color: "text-emerald-300/80", hint: `вес: ${goldData.total_weight.toFixed(2)} г, выручка: ${goldRevenue.toLocaleString("ru-RU")} ₽` } as const]
+      { icon: "TrendingUp", label: "Выручка (фактически продано)", value: goldRevenue, color: "text-[#FFD700]", hint: goldData?.total_weight ? `вес: ${goldData.total_weight.toFixed(2)} г` : undefined },
+      { icon: "ArrowDownCircle", label: "Закупка проданного", value: -goldCosts, color: "text-orange-400" },
+      { icon: "Equal", label: "Фактическая прибыль", value: goldPart, color: goldPart >= 0 ? "text-emerald-300" : "text-red-300", divider: true },
+      // Прогноз по непроданному остатку — справочно, не входит в итог
+      ...(goldData?.period_weight585
+        ? [
+            { icon: "Scale", label: "Принято за период (585)", value: `${goldData.period_weight585.toFixed(2)} г`, color: "text-white/55", hint: `${goldData.period_buy_count ?? 0} скупок · закупка ${(goldData.period_buy_sum ?? 0).toLocaleString("ru-RU")} ₽` } as const,
+            { icon: "TrendingUp", label: `Прогноз по остатку (по ${goldForecastPriceNum.toLocaleString("ru-RU")} ₽/г)`, value: goldForecastExtra, color: "text-white/55", hint: "справочно, не входит в итог" } as const,
+          ]
         : []),
     ],
   });
@@ -113,7 +120,7 @@ export default function AnalyticsTotalDay({
     periodLabel,
     rows: [
       { icon: "Wrench", label: "🔧 Ремонт", value: repairPart, color: repairPart >= 0 ? "text-emerald-300" : "text-red-300", hint: "чистая прибыль с выданных" },
-      { icon: "Coins", label: "🥇 Золото (прогноз)", value: goldPart, color: goldPart >= 0 ? "text-emerald-300" : "text-red-300", hint: `по ${goldForecastPriceNum.toLocaleString("ru-RU")} ₽/г` },
+      { icon: "Coins", label: "🥇 Золото (продано)", value: goldPart, color: goldPart >= 0 ? "text-emerald-300" : "text-red-300", hint: goldData?.total_weight ? `${goldData.total_weight.toFixed(2)} г фактически продано` : "только фактические продажи" },
       { icon: "Package", label: "📦 Б/У техника", value: slPart, color: slPart >= 0 ? "text-emerald-300" : "text-red-300", hint: `${slSalesCount} продаж · ${slBuyoutCount} скупок` },
       { icon: "Equal", label: "Итого", value: totalDay, color: totalDay >= 0 ? "text-emerald-300" : "text-red-300", divider: true },
     ],
@@ -169,7 +176,7 @@ export default function AnalyticsTotalDay({
                 {goldPart >= 0 ? "+" : ""}{goldPart.toLocaleString("ru-RU")}
               </div>
               <div className="font-roboto text-white/30 text-[9px] tabular-nums mt-0.5 group-hover:text-[#FFD700]/70 transition-colors">
-                по {goldForecastPriceNum.toLocaleString("ru-RU")} ₽/г
+                {goldData?.total_weight ? `${goldData.total_weight.toFixed(2)} г продано` : "только факт"}
               </div>
             </button>
             <button
