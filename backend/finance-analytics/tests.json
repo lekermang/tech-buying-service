@@ -1,0 +1,26 @@
+{
+  "tests": [
+    {
+      "name": "Без токена — 401",
+      "method": "GET",
+      "path": "/?action=analytics&period=d30",
+      "expectedStatus": 401,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "OPTIONS CORS",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Неизвестный action без авторизации",
+      "method": "GET",
+      "path": "/?action=foobar",
+      "expectedStatus": 401,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

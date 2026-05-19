@@ -9,6 +9,7 @@ import AnalyticsSmartlombard, { type SmartlombardStats } from "./staffAnalytics/
 import AnalyticsRepairAndStaff from "./staffAnalytics/AnalyticsRepairAndStaff";
 import PeriodPicker from "./staffAnalytics/PeriodPicker";
 import { SLSHOP_URL } from "./staff.types";
+import FinanceTab from "./staffAnalytics/finance/FinanceTab";
 
 type RepairAnalytics = {
   total: number; done: number; revenue: number; costs: number;
@@ -17,6 +18,12 @@ type RepairAnalytics = {
 };
 
 export function AnalyticsTab({ token }: { token: string }) {
+  const [view, setView] = useState<"overview" | "finance">(() => {
+    try { return (localStorage.getItem("staff_analytics_view") as "overview" | "finance") || "overview"; }
+    catch { return "overview"; }
+  });
+  useEffect(() => { try { localStorage.setItem("staff_analytics_view", view); } catch {/* */} }, [view]);
+
   const [period, setPeriod] = useState("week");
   const [customRange, setCustomRange] = useState<{ from: string; to: string } | null>(null);
   const [data, setData] = useState<Analytics | null>(null);
@@ -140,7 +147,36 @@ export function AnalyticsTab({ token }: { token: string }) {
 
   return (
     <div className="p-3">
-      {/* Премиум переключатель периода */}
+      {/* Переключатель Обзор / Финансы */}
+      <div className="inline-flex mb-3 p-1 rounded-full bg-gradient-to-br from-[#0E0E0E] to-[#080808] border border-[#1F1F1F]">
+        <button
+          onClick={() => setView("overview")}
+          className={`px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition inline-flex items-center gap-1.5 ${
+            view === "overview"
+              ? "bg-gradient-to-b from-[#FFE34D] to-[#d4a017] text-black shadow-[0_3px_10px_rgba(255,215,0,0.4)]"
+              : "text-white/55 hover:text-[#FFD700]"
+          }`}
+        >
+          <Icon name="LayoutDashboard" size={12} />
+          Обзор
+        </button>
+        <button
+          onClick={() => setView("finance")}
+          className={`px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition inline-flex items-center gap-1.5 ${
+            view === "finance"
+              ? "bg-gradient-to-b from-[#FFE34D] to-[#d4a017] text-black shadow-[0_3px_10px_rgba(255,215,0,0.4)]"
+              : "text-white/55 hover:text-[#FFD700]"
+          }`}
+        >
+          <Icon name="LineChart" size={12} />
+          Финансы
+        </button>
+      </div>
+
+      {view === "finance" && <FinanceTab token={token} />}
+
+      {view === "overview" && (
+      <>
       <PeriodPicker
         period={period}
         setPeriod={setPeriod}
@@ -226,6 +262,8 @@ export function AnalyticsTab({ token }: { token: string }) {
             TYPE_LABELS={TYPE_LABELS}
           />
         </>
+      )}
+      </>
       )}
     </div>
   );
