@@ -15,6 +15,20 @@ type RepairAnalytics = {
   total: number; done: number; revenue: number; costs: number;
   profit: number; master_total: number;
   daily: { day: string; revenue: number; costs: number; profit: number; done: number }[];
+  done_items?: {
+    id: number;
+    model: string;
+    repair_type: string;
+    client_name: string;
+    master_name: string;
+    revenue: number;
+    costs: number;
+    master_income: number;
+    profit: number;
+    done_at: string | null;
+    created_at: string | null;
+    status: string;
+  }[];
 };
 
 export function AnalyticsTab({ token }: { token: string }) {
@@ -99,6 +113,8 @@ export function AnalyticsTab({ token }: { token: string }) {
           sales_count: Number(d.sold_count) || 0,
           buyout_total: spent,
           buyout_count: Number(d.bought_count) || 0,
+          sold_items: Array.isArray(d.sold_items) ? d.sold_items : [],
+          bought_items: Array.isArray(d.bought_items) ? d.bought_items : [],
           cached: false,
         });
       } else {
@@ -233,6 +249,7 @@ export function AnalyticsTab({ token }: { token: string }) {
             slSalesCount={slData?.sales_count || 0}
             slBuyoutTotal={slData?.buyout_total || 0}
             slBuyoutCount={slData?.buyout_count || 0}
+            slData={slData}
           />
 
           <AnalyticsGoldForecast

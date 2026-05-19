@@ -2,12 +2,35 @@ import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import { type Analytics } from "../staff.types";
 import { type GoldAnalytics } from "../gold/types";
-import AnalyticsBreakdownModal, { type BreakdownContent } from "./AnalyticsBreakdownModal";
+import { type SmartlombardStats } from "./AnalyticsSmartlombard";
+import AnalyticsBreakdownModal, { type BreakdownContent, type BreakdownItem } from "./AnalyticsBreakdownModal";
 
 type RepairAnalytics = {
   total: number; done: number; revenue: number; costs: number;
   profit: number; master_total: number;
   daily: { day: string; revenue: number; costs: number; profit: number; done: number }[];
+  done_items?: {
+    id: number;
+    model: string;
+    repair_type: string;
+    client_name: string;
+    master_name: string;
+    revenue: number;
+    costs: number;
+    master_income: number;
+    profit: number;
+    done_at: string | null;
+    created_at: string | null;
+    status: string;
+  }[];
+};
+
+const fmtDate = (iso: string | null | undefined): string | undefined => {
+  if (!iso) return undefined;
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  } catch { return undefined; }
 };
 
 type Props = {
@@ -34,13 +57,14 @@ type Props = {
   slSalesCount: number;
   slBuyoutTotal: number;
   slBuyoutCount: number;
+  slData?: SmartlombardStats | null;
 };
 
 export default function AnalyticsTotalDay({
   period, data, repairData, goldData,
   repairNetProfit, goldForecastProfit, goldForecastPriceNum, slPeriodProfit,
   totalRevenue, totalProfit, repairRevenue, repairCosts, goldRevenue, goldCosts, goldProfit, masterIncome,
-  slRevenue, slExpense, slSalesTotal, slSalesCount, slBuyoutTotal, slBuyoutCount,
+  slRevenue, slExpense, slSalesTotal, slSalesCount, slBuyoutTotal, slBuyoutCount, slData,
 }: Props) {
   const repairPart = repairNetProfit;
   // В статистику идёт ТОЛЬКО фактическая прибыль по проданному золоту
@@ -59,6 +83,19 @@ export default function AnalyticsTotalDay({
   const [breakdown, setBreakdown] = useState<BreakdownContent | null>(null);
 
   // Сборка детализации для каждого направления
+  const repairItems: BreakdownItem[] = (repairData?.done_items || []).map(it => ({
+    title: it.model || it.repair_type || `Заявка №${it.id}`,
+    subtitle: [it.repair_type, it.client_name, it.master_name && `мастер: ${it.master_name}`].filter(Boolean).join(" · "),
+    date: fmtDate(it.done_at),
+    metrics: [
+      { label: "выручка", value: it.revenue, color: "text-[#FFD700]" },
+      ...(it.costs > 0 ? [{ label: "запчасти", value: -it.costs, color: "text-orange-400" } as const] : []),
+      ...(it.master_income > 0 ? [{ label: "мастер", value: -it.master_income, color: "text-blue-300" } as const] : []),
+    ],
+    totalValue: it.profit,
+    totalLabel: "прибыль",
+  }));
+
   const showRepairBreakdown = () => setBreakdown({
     title: "🔧 Ремонт — детализация",
     emoji: "🔧",
@@ -74,7 +111,31 @@ export default function AnalyticsTotalDay({
         : []),
       { icon: "Equal", label: "Чистая прибыль владельца", value: repairPart, color: repairPart >= 0 ? "text-emerald-300" : "text-red-300", divider: true },
     ],
+    groups: [
+      {
+        title: `Выданные заявки · ${repairItems.length} шт`,
+        icon: "Wrench",
+        items: repairItems,
+        emptyText: "В этом периоде нет выданных заявок",
+      },
+    ],
   });
+
+  const goldItems: BreakdownItem[] = (goldData?.sold_items || []).map(it => ({
+    title: it.item_name || `Лот №${it.id}`,
+    subtitle: [
+      it.weight ? `${it.weight.toFixed(2)} г` : null,
+      it.purity ? `${it.purity} проба` : null,
+      it.client_name || null,
+    ].filter(Boolean).join(" · "),
+    date: fmtDate(it.sold_at),
+    metrics: [
+      { label: "куплено", value: -it.buy_price, color: "text-orange-400" },
+      { label: "продано", value: it.sell_price, color: "text-[#FFD700]" },
+    ],
+    totalValue: it.profit,
+    totalLabel: "прибыль",
+  }));
 
   const showGoldBreakdown = () => setBreakdown({
     title: "🥇 Золото — детализация",
@@ -95,7 +156,35 @@ export default function AnalyticsTotalDay({
           ]
         : []),
     ],
+    groups: [
+      {
+        title: `Проданные позиции · ${goldItems.length} шт`,
+        icon: "Coins",
+        items: goldItems,
+        emptyText: "В этом периоде нет проданного золота",
+      },
+    ],
   });
+
+  const slSoldItems: BreakdownItem[] = (slData?.sold_items || []).map(it => ({
+    title: it.name || `Товар №${it.id}`,
+    subtitle: it.sku ? `SKU: ${it.sku}` : undefined,
+    date: fmtDate(it.sold_at),
+    metrics: [
+      { label: "куплено", value: -it.buy_price, color: "text-orange-400" },
+      { label: "продано", value: it.sell_price, color: "text-[#FFD700]" },
+    ],
+    totalValue: it.profit,
+    totalLabel: "прибыль",
+  }));
+  const slBoughtItems: BreakdownItem[] = (slData?.bought_items || []).map(it => ({
+    title: it.name || `Товар №${it.id}`,
+    subtitle: it.sku ? `SKU: ${it.sku}` : undefined,
+    date: fmtDate(it.bought_at),
+    totalValue: -it.buy_price,
+    totalColor: "text-orange-400",
+    totalLabel: "закупка",
+  }));
 
   const showSlBreakdown = () => setBreakdown({
     title: "📦 Б/У техника — детализация",
@@ -108,6 +197,20 @@ export default function AnalyticsTotalDay({
       { icon: "TrendingUp", label: "Продажи (выручка)", value: slSalesTotal || slRevenue, color: "text-[#FFD700]", hint: `${slSalesCount} продаж` },
       { icon: "ShoppingBag", label: "Скупка / выкуп", value: -(slBuyoutTotal || slExpense), color: "text-orange-400", hint: `${slBuyoutCount} скупок` },
       { icon: "Equal", label: "Прибыль", value: slPart, color: slPart >= 0 ? "text-emerald-300" : "text-red-300", divider: true },
+    ],
+    groups: [
+      {
+        title: `Проданные товары · ${slSoldItems.length} шт`,
+        icon: "Package",
+        items: slSoldItems,
+        emptyText: "В этом периоде нет продаж",
+      },
+      {
+        title: `Скупка · ${slBoughtItems.length} шт`,
+        icon: "ShoppingBag",
+        items: slBoughtItems,
+        emptyText: "В этом периоде нет скупок",
+      },
     ],
   });
 

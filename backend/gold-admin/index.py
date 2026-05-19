@@ -228,11 +228,11 @@ def handler(event: dict, context) -> dict:
                 conds_p = []
                 conds_b = []
                 if df:
-                    conds_p.append(f"COALESCE(status_updated_at, created_at) >= ('{df}'::date - INTERVAL '3 hours')")
+                    conds_p.append(f"COALESCE(completed_at, status_updated_at, created_at) >= ('{df}'::date - INTERVAL '3 hours')")
                     conds_b.append(f"created_at >= ('{df}'::date - INTERVAL '3 hours')")
                 if dt:
                     # включаем весь день dt
-                    conds_p.append(f"COALESCE(status_updated_at, created_at) < (('{dt}'::date + INTERVAL '1 day') - INTERVAL '3 hours')")
+                    conds_p.append(f"COALESCE(completed_at, status_updated_at, created_at) < (('{dt}'::date + INTERVAL '1 day') - INTERVAL '3 hours')")
                     conds_b.append(f"created_at < (('{dt}'::date + INTERVAL '1 day') - INTERVAL '3 hours')")
                 period_where = ' AND '.join(conds_p) if conds_p else 'TRUE'
                 buy_period_where = ' AND '.join(conds_b) if conds_b else 'TRUE'
@@ -241,17 +241,17 @@ def handler(event: dict, context) -> dict:
                 buy_period_where = 'TRUE'
             elif period == 'year':
                 period_where = """
-                    COALESCE(status_updated_at, created_at) >= (
+                    COALESCE(completed_at, status_updated_at, created_at) >= (
                         DATE_TRUNC('year', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours'
                     )
                 """
                 buy_period_where = "created_at >= (DATE_TRUNC('year', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours')"
             elif period == 'yesterday':
                 period_where = """
-                    COALESCE(status_updated_at, created_at) >= (
+                    COALESCE(completed_at, status_updated_at, created_at) >= (
                         DATE_TRUNC('day', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours' - INTERVAL '1 day'
                     )
-                    AND COALESCE(status_updated_at, created_at) < (
+                    AND COALESCE(completed_at, status_updated_at, created_at) < (
                         DATE_TRUNC('day', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours'
                     )
                 """
@@ -261,14 +261,14 @@ def handler(event: dict, context) -> dict:
                 """
             elif period == 'day':
                 period_where = """
-                    COALESCE(status_updated_at, created_at) >= (
+                    COALESCE(completed_at, status_updated_at, created_at) >= (
                         DATE_TRUNC('day', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours'
                     )
                 """
                 buy_period_where = "created_at >= (DATE_TRUNC('day', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours')"
             elif period == 'week':
                 period_where = """
-                    COALESCE(status_updated_at, created_at) >= (
+                    COALESCE(completed_at, status_updated_at, created_at) >= (
                         DATE_TRUNC('day', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours' - INTERVAL '6 days'
                     )
                 """
@@ -276,7 +276,7 @@ def handler(event: dict, context) -> dict:
             else:
                 # month — последние 30 дней
                 period_where = """
-                    COALESCE(status_updated_at, created_at) >= (
+                    COALESCE(completed_at, status_updated_at, created_at) >= (
                         DATE_TRUNC('day', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours' - INTERVAL '29 days'
                     )
                 """
@@ -354,7 +354,7 @@ def handler(event: dict, context) -> dict:
 
             cur.execute(f"""
                 SELECT
-                    DATE(COALESCE(status_updated_at, created_at) + INTERVAL '3 hours') as work_day,
+                    DATE(COALESCE(completed_at, status_updated_at, created_at) + INTERVAL '3 hours') as work_day,
                     COUNT(*) as done,
                     COALESCE(SUM(buy_price), 0) as total_buy,
                     COALESCE(SUM(sell_price), 0) as total_sell,
@@ -376,6 +376,33 @@ def handler(event: dict, context) -> dict:
                 }
                 for r in daily_rows
             ]
+            # Список проданных позиций за период (для модалки с деталями)
+            cur.execute(f"""
+                SELECT id, item_name, weight, purity,
+                       buy_price, sell_price, profit,
+                       COALESCE(completed_at, status_updated_at, created_at) AS sold_at,
+                       created_at, name
+                FROM {SCHEMA}.gold_orders
+                WHERE status = 'done' AND {period_where}
+                ORDER BY COALESCE(completed_at, status_updated_at, created_at) DESC
+                LIMIT 200
+            """)
+            sold_rows = cur.fetchall()
+            sold_items = [
+                {
+                    'id': r[0],
+                    'item_name': r[1] or '',
+                    'weight': float(r[2]) if r[2] else 0,
+                    'purity': r[3] or '',
+                    'buy_price': int(r[4]) if r[4] else 0,
+                    'sell_price': int(r[5]) if r[5] else 0,
+                    'profit': int(r[6]) if r[6] else 0,
+                    'sold_at': r[7].isoformat() if r[7] else None,
+                    'created_at': r[8].isoformat() if r[8] else None,
+                    'client_name': r[9] or '',
+                }
+                for r in sold_rows
+            ]
             cur.close(); conn.close()
             return {
                 'statusCode': 200, 'headers': HEADERS,
@@ -396,6 +423,7 @@ def handler(event: dict, context) -> dict:
                     'period_weight585': period_weight585,
                     'period_buy_count': period_buy_count,
                     'daily': daily,
+                    'sold_items': sold_items,
                 }, ensure_ascii=False)
             }
 
@@ -403,7 +431,7 @@ def handler(event: dict, context) -> dict:
         if action == 'daily_stats':
             cur.execute(f"""
                 SELECT
-                    DATE(COALESCE(status_updated_at, created_at) + INTERVAL '3 hours') as work_day,
+                    DATE(COALESCE(completed_at, status_updated_at, created_at) + INTERVAL '3 hours') as work_day,
                     COUNT(*) as total,
                     COUNT(*) FILTER (WHERE status = 'done') as done,
                     COALESCE(SUM(buy_price) FILTER (WHERE status = 'done'), 0) as total_buy,

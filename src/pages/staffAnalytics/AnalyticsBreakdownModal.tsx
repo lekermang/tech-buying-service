@@ -15,6 +15,30 @@ type Row = {
   divider?: boolean;
 };
 
+/** Одна позиция в списке "что продали / купили / починили" */
+export type BreakdownItem = {
+  /** Заголовок позиции (модель / название) */
+  title: string;
+  /** Дата (форматированная) — выводится мелко справа от заголовка */
+  date?: string;
+  /** Доп. подпись слева (тип/проба/клиент) */
+  subtitle?: string;
+  /** Строки с цифрами: "куплено / продано / мастер / прибыль" */
+  metrics?: Array<{ label: string; value: number; color?: string }>;
+  /** Главное число справа (например, прибыль) */
+  totalValue?: number;
+  totalColor?: string;
+  totalLabel?: string;
+};
+
+/** Группа — заголовок и список позиций (например, "Продано 3 шт") */
+export type BreakdownGroup = {
+  title: string;
+  icon?: string;
+  emptyText?: string;
+  items: BreakdownItem[];
+};
+
 export type BreakdownContent = {
   /** Заголовок модалки */
   title: string;
@@ -28,6 +52,8 @@ export type BreakdownContent = {
   accentColor?: "emerald" | "gold" | "purple" | "blue" | "red";
   /** Список строк с детализацией: «за что» */
   rows: Row[];
+  /** Группы со списком позиций (под строками) */
+  groups?: BreakdownGroup[];
   /** Период, к которому относятся цифры */
   periodLabel: string;
   /** Дополнительная нижняя ссылка (например, открыть полный отчёт) */
@@ -131,6 +157,70 @@ export default function AnalyticsBreakdownModal({ content, onClose }: Props) {
               <div className={`font-oswald font-bold text-sm tabular-nums shrink-0 ${r.color || "text-white/85"}`}>
                 {fmt(r.value)}
               </div>
+            </div>
+          ))}
+
+          {/* Группы со списком позиций (детализация по штукам) */}
+          {content.groups?.map((g, gi) => (
+            <div key={`g-${gi}`} className="mt-3 pt-3 border-t border-white/8">
+              <div className="flex items-center gap-1.5 mb-2 px-1">
+                {g.icon && <Icon name={g.icon} size={12} className={ACCENT_TEXT[accent]} />}
+                <div className={`font-roboto text-[11px] uppercase tracking-wider ${ACCENT_TEXT[accent]}`}>
+                  {g.title}
+                </div>
+              </div>
+              {g.items.length === 0 ? (
+                <div className="text-center py-3 text-white/25 font-roboto text-[11px]">
+                  {g.emptyText || "Пусто"}
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {g.items.map((it, ii) => (
+                    <div
+                      key={ii}
+                      className="rounded-md bg-black/30 border border-white/5 px-2.5 py-2 hover:bg-black/50 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <div className="min-w-0 flex-1">
+                          <div className="font-roboto text-[12px] text-white/90 font-medium truncate">
+                            {it.title}
+                          </div>
+                          {it.subtitle && (
+                            <div className="font-roboto text-[10px] text-white/40 mt-0.5 truncate">
+                              {it.subtitle}
+                            </div>
+                          )}
+                        </div>
+                        <div className="text-right shrink-0">
+                          {typeof it.totalValue === "number" && (
+                            <div className={`font-oswald font-bold text-[14px] tabular-nums ${it.totalColor || (it.totalValue >= 0 ? "text-emerald-300" : "text-red-300")}`}>
+                              {it.totalValue >= 0 ? "+" : ""}{it.totalValue.toLocaleString("ru-RU")} ₽
+                            </div>
+                          )}
+                          {it.totalLabel && (
+                            <div className="font-roboto text-[9px] text-white/35 mt-0.5">{it.totalLabel}</div>
+                          )}
+                          {it.date && (
+                            <div className="font-roboto text-[9px] text-white/30 mt-0.5">{it.date}</div>
+                          )}
+                        </div>
+                      </div>
+                      {it.metrics && it.metrics.length > 0 && (
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5">
+                          {it.metrics.map((m, mi) => (
+                            <div key={mi} className="font-roboto text-[10px] flex items-baseline gap-1">
+                              <span className="text-white/40">{m.label}:</span>
+                              <span className={`font-oswald tabular-nums font-semibold ${m.color || "text-white/80"}`}>
+                                {m.value.toLocaleString("ru-RU")} ₽
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>

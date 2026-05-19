@@ -17,6 +17,22 @@ export type SmartlombardStats = {
   buyout_total?: number;
   buyout_count?: number;
   cached?: boolean;
+  sold_items?: {
+    id: number;
+    name: string;
+    sku?: string;
+    sell_price: number;
+    buy_price: number;
+    profit: number;
+    sold_at: string | null;
+  }[];
+  bought_items?: {
+    id: number;
+    name: string;
+    sku?: string;
+    buy_price: number;
+    bought_at: string | null;
+  }[];
 };
 
 type Props = {

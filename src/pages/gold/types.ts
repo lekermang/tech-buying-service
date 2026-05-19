@@ -114,6 +114,18 @@ export type GoldAnalytics = {
   period_weight585?: number;
   period_buy_count?: number;
   daily: { day: string; done: number; buy: number; sell: number; profit: number; weight: number }[];
+  sold_items?: {
+    id: number;
+    item_name: string;
+    weight: number;
+    purity: string;
+    buy_price: number;
+    sell_price: number;
+    profit: number;
+    sold_at: string | null;
+    created_at: string | null;
+    client_name: string;
+  }[];
 };
 
 export const EMPTY_GOLD_FORM = {

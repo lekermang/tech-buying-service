@@ -2521,6 +2521,65 @@ def stats(params):
         contract_active_issued = float(r2.get('issued') or 0)
     except Exception:
         pass
+    # Список проданных позиций за период (для модалки с деталями)
+    sold_items = []
+    try:
+        cur.execute(
+            f"SELECT o.id AS op_id, o.item_id, o.amount AS sell_amount, o.created_at AS sold_at, "
+            f"i.title, i.brand, i.model, i.sku, COALESCE(i.buy_price, 0) AS buy_price "
+            f"FROM {SCHEMA}.slshop_operations o "
+            f"LEFT JOIN {SCHEMA}.slshop_items i ON i.id = o.item_id "
+            f"WHERE o.op_type='sell' AND o.created_at>={_esc(date_from)} "
+            f"AND o.created_at<{_esc(date_to)}::date + INTERVAL '1 day' "
+            f"ORDER BY o.created_at DESC LIMIT 200"
+        )
+        for r in cur.fetchall():
+            sell = float(r.get('sell_amount') or 0)
+            buy = float(r.get('buy_price') or 0)
+            title = r.get('title') or ''
+            brand = r.get('brand') or ''
+            model_v = r.get('model') or ''
+            name = title or ' '.join(x for x in [brand, model_v] if x).strip() or 'Товар'
+            sold_items.append({
+                'id': r.get('op_id'),
+                'item_id': r.get('item_id'),
+                'name': name,
+                'sku': r.get('sku') or '',
+                'sell_price': sell,
+                'buy_price': buy,
+                'profit': sell - buy,
+                'sold_at': r['sold_at'].isoformat() if r.get('sold_at') else None,
+            })
+    except Exception:
+        pass
+    # Список купленных позиций (скупка) за период
+    bought_items = []
+    try:
+        cur.execute(
+            f"SELECT o.id AS op_id, o.item_id, o.amount AS buy_amount, o.created_at AS bought_at, "
+            f"i.title, i.brand, i.model, i.sku "
+            f"FROM {SCHEMA}.slshop_operations o "
+            f"LEFT JOIN {SCHEMA}.slshop_items i ON i.id = o.item_id "
+            f"WHERE o.op_type='buy' AND o.created_at>={_esc(date_from)} "
+            f"AND o.created_at<{_esc(date_to)}::date + INTERVAL '1 day' "
+            f"ORDER BY o.created_at DESC LIMIT 200"
+        )
+        for r in cur.fetchall():
+            amt = float(r.get('buy_amount') or 0)
+            title = r.get('title') or ''
+            brand = r.get('brand') or ''
+            model_v = r.get('model') or ''
+            name = title or ' '.join(x for x in [brand, model_v] if x).strip() or 'Товар'
+            bought_items.append({
+                'id': r.get('op_id'),
+                'item_id': r.get('item_id'),
+                'name': name,
+                'sku': r.get('sku') or '',
+                'buy_price': amt,
+                'bought_at': r['bought_at'].isoformat() if r.get('bought_at') else None,
+            })
+    except Exception:
+        pass
     cur.close(); conn.close()
     revenue = float(sold['s'])
     spent = float(bought['s'])
@@ -2552,6 +2611,8 @@ def stats(params):
         'by_category': by_category,
         'top_models': top_models,
         'daily': daily,
+        'sold_items': sold_items,
+        'bought_items': bought_items,
     })
 
 
