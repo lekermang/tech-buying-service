@@ -1,0 +1,27 @@
+{
+  "tests": [
+    {
+      "name": "Без токена — 401",
+      "method": "GET",
+      "path": "/?action=my-day",
+      "expectedStatus": 401,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "OPTIONS CORS",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Toggle без токена — 401",
+      "method": "POST",
+      "path": "/?action=toggle",
+      "body": {"task_key": "r1", "is_done": true},
+      "expectedStatus": 401,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

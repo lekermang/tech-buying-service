@@ -25,6 +25,7 @@ const SECTION_META: Record<string, SectionMeta> = {
   employees:    { title: "Команда",      subtitle: "Управление сотрудниками, ролями и графиками",             icon: "UserCog" },
   goods:        { title: "Товары",       subtitle: "Каталог товаров в наличии",                               icon: "Package" },
   sales:        { title: "Продажи",      subtitle: "История продаж и операций",                               icon: "Receipt" },
+  myday:        { title: "Мой день",     subtitle: "Чек-лист, сигналы и узкие места на сегодня",              icon: "Sunrise", skip: true },
 };
 
 export default function StaffSectionBanner({ tab }: { tab: StaffTab }) {
