@@ -686,35 +686,39 @@ def handler(event: dict, context) -> dict:
             ]
 
             # Список выданных заявок за период (для модалки с деталями)
-            cur.execute(f"""
-                SELECT id, model, repair_type, name, master_name,
-                       COALESCE(repair_amount, 0), COALESCE(purchase_amount, 0),
-                       COALESCE(master_income, 0),
-                       COALESCE(status_updated_at, created_at) AS done_at,
-                       created_at, status
-                FROM {SCHEMA}.repair_orders
-                WHERE status IN ('done','warranty') AND {period_where}
-                ORDER BY COALESCE(status_updated_at, created_at) DESC
-                LIMIT 200
-            """)
-            rep_rows = cur.fetchall()
+            # Колонки master_name в схеме нет — мастер пока пустой.
             done_items = []
-            for rr in rep_rows:
-                rev = int(rr[5] or 0); cog = int(rr[6] or 0); mi = int(rr[7] or 0)
-                done_items.append({
-                    'id': rr[0],
-                    'model': rr[1] or '',
-                    'repair_type': rr[2] or '',
-                    'client_name': rr[3] or '',
-                    'master_name': rr[4] or '',
-                    'revenue': rev,
-                    'costs': cog,
-                    'master_income': mi,
-                    'profit': rev - cog - mi,
-                    'done_at': rr[8].isoformat() if rr[8] else None,
-                    'created_at': rr[9].isoformat() if rr[9] else None,
-                    'status': rr[10] or '',
-                })
+            try:
+                cur.execute(f"""
+                    SELECT id, model, repair_type, name,
+                           COALESCE(repair_amount, 0), COALESCE(purchase_amount, 0),
+                           COALESCE(master_income, 0),
+                           COALESCE(status_updated_at, created_at) AS done_at,
+                           created_at, status, parts_name
+                    FROM {SCHEMA}.repair_orders
+                    WHERE status IN ('done','warranty') AND {period_where}
+                    ORDER BY COALESCE(status_updated_at, created_at) DESC
+                    LIMIT 200
+                """)
+                for rr in cur.fetchall():
+                    rev = int(rr[4] or 0); cog = int(rr[5] or 0); mi = int(rr[6] or 0)
+                    done_items.append({
+                        'id': rr[0],
+                        'model': rr[1] or '',
+                        'repair_type': rr[2] or '',
+                        'client_name': rr[3] or '',
+                        'master_name': '',
+                        'revenue': rev,
+                        'costs': cog,
+                        'master_income': mi,
+                        'profit': rev - cog - mi,
+                        'done_at': rr[7].isoformat() if rr[7] else None,
+                        'created_at': rr[8].isoformat() if rr[8] else None,
+                        'status': rr[9] or '',
+                        'parts_name': rr[10] or '',
+                    })
+            except Exception:
+                done_items = []
 
             cur.close(); conn.close()
             return {
