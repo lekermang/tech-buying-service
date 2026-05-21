@@ -1,0 +1,37 @@
+{
+  "build": {
+    "beforeBuildCommand": "npm run build",
+    "devPath": "http://localhost:8080",
+    "distDir": "../dist"
+  },
+  "package": {
+    "productName": "Скупка 24",
+    "version": "0.1.0"
+  },
+  "tauri": {
+    "allowlist": { "all": false, "shell": { "all": false, "open": true } },
+    "bundle": {
+      "active": true,
+      "category": "Business",
+      "copyright": "Скупка 24",
+      "identifier": "com.skupka24.app",
+      "shortDescription": "Скупка 24",
+      "longDescription": "Скупка 24",
+      "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.ico", "icons/icon.png"],
+      "targets": ["nsis"],
+      "windows": { "digestAlgorithm": "sha256", "timestampUrl": "" }
+    },
+    "security": { "csp": null },
+    "updater": { "active": false },
+    "windows": [{
+      "title": "Скупка 24",
+      "width": 1280,
+      "height": 800,
+      "minWidth": 800,
+      "minHeight": 600,
+      "resizable": true,
+      "fullscreen": false,
+      "url": "https://skypka24.com"
+    }]
+  }
+}
