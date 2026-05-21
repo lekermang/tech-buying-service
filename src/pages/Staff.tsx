@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { EMPLOYEE_AUTH_URL } from "./staff.types";
 import { StaffThemeProvider } from "./staffTheme/StaffThemeContext";
+import { useOfflineClientsSync } from "@/hooks/useOfflineClientsSync";
 import {
   PRICE_SCHEDULER_URL,
   SECRET_PW,
@@ -51,6 +52,9 @@ function StaffInner() {
   const [pwError, setPwError] = useState("");
   const [unlocked, setUnlocked] = useState<Record<string, boolean>>({});
   const [themeOpen, setThemeOpen] = useState(false);
+
+  // Офлайн-кэш последних 200 клиентов (для работы без интернета)
+  useOfflineClientsSync(authed ? token : "");
 
   useEffect(() => {
     if (!token) return;

@@ -7,6 +7,7 @@ import SearchAndAddPanel from "./staff/clients/SearchAndAddPanel";
 import DiscountClientsPanel, { type DiscountClient } from "./staff/clients/DiscountClientsPanel";
 import SmsBlastPanel, { type Group } from "./staff/clients/SmsBlastPanel";
 import AllContactsPanel, { type Contact, type Source } from "./staff/clients/AllContactsPanel";
+import { searchOffline } from "@/lib/offlineClients";
 
 const REPAIR_ADMIN_URL = "https://functions.poehali.dev/a105aede-d55d-4b99-9d3e-5e977887aa04";
 
@@ -64,10 +65,26 @@ export function ClientsTab({ token }: { token: string }) {
         setFound(data);
         toast.success(`Найден: ${data.full_name || "клиент"}`);
       } else {
-        toast.error("Клиент не найден");
+        // Если онлайн не нашёл — пробуем офлайн-кэш
+        const offline = await searchOffline(phone);
+        if (offline.length) {
+          const c = offline[0];
+          setFound({ id: c.id, full_name: c.full_name, phone: c.phone, email: c.email, _offline: true });
+          toast.info(`Найден в офлайн-базе: ${c.full_name || "клиент"}`);
+        } else {
+          toast.error("Клиент не найден");
+        }
       }
     } catch {
-      toast.error("Ошибка поиска. Проверьте интернет.");
+      // Нет сети — ищем только в офлайн-базе
+      const offline = await searchOffline(phone);
+      if (offline.length) {
+        const c = offline[0];
+        setFound({ id: c.id, full_name: c.full_name, phone: c.phone, email: c.email, _offline: true });
+        toast.info(`Офлайн-режим: ${c.full_name || "клиент"}`);
+      } else {
+        toast.error("Нет сети и в офлайн-базе клиент не найден");
+      }
     } finally {
       setSearching(false);
     }
@@ -82,7 +99,21 @@ export function ClientsTab({ token }: { token: string }) {
       setContacts(list);
     } catch (e) {
       if ((e as { name?: string })?.name !== "AbortError") {
-        toast.error("Не удалось загрузить базу клиентов");
+        // Фоллбэк — подгружаем последние 200 из офлайн-кэша
+        const offline = await searchOffline("");
+        if (offline.length) {
+          setContacts(
+            offline.map((c) => ({
+              id: String(c.id),
+              full_name: c.full_name,
+              phone: c.phone,
+              source: (c.source === "registered" ? "registered" : c.source === "wh" ? "wh" : "repair") as Source,
+            }))
+          );
+          toast.info(`Офлайн-режим: показываю ${offline.length} клиентов из кэша`);
+        } else {
+          toast.error("Не удалось загрузить базу клиентов");
+        }
       }
     } finally {
       setLoadingContacts(false);

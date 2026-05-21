@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import Icon from "@/components/ui/icon";
+import { getOfflineCount, getLastSync } from "@/lib/offlineClients";
 
 export function OfflineBanner() {
   const [online, setOnline] = useState<boolean>(() =>
     typeof navigator === "undefined" ? true : navigator.onLine,
   );
+  const [cacheCount, setCacheCount] = useState<number>(0);
+  const [lastSync, setLastSync] = useState<number | null>(null);
 
   useEffect(() => {
     const on = () => setOnline(true);
@@ -17,14 +20,40 @@ export function OfflineBanner() {
     };
   }, []);
 
+  useEffect(() => {
+    if (online) return;
+    (async () => {
+      try {
+        const [c, ls] = await Promise.all([getOfflineCount(), getLastSync()]);
+        setCacheCount(c);
+        setLastSync(ls);
+      } catch {/* ignore */}
+    })();
+  }, [online]);
+
   if (online) return null;
+
+  const ago = lastSync ? formatAgo(Date.now() - lastSync) : "ещё не было";
 
   return (
     <div className="w-full py-1.5 px-3 text-center text-[11px] font-roboto font-bold bg-red-500/15 text-red-300 border-b border-red-500/20 flex items-center justify-center gap-2">
       <Icon name="WifiOff" size={12} />
-      Нет подключения к интернету — работаем в режиме офлайн
+      Нет интернета · {cacheCount > 0
+        ? <>в кэше <b>{cacheCount}</b> клиентов · синхр. {ago}</>
+        : <>работаем офлайн</>}
     </div>
   );
+}
+
+function formatAgo(ms: number): string {
+  const sec = Math.floor(ms / 1000);
+  if (sec < 60) return "только что";
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min} мин назад`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr} ч назад`;
+  const d = Math.floor(hr / 24);
+  return `${d} дн назад`;
 }
 
 export function UpdateAvailableBanner() {
