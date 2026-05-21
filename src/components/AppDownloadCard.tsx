@@ -8,8 +8,12 @@ import Icon from "@/components/ui/icon";
  *  - на главной странице сайта
  */
 
-const WIN_URL = "https://github.com/lekermang/tech-buying-service/releases/latest";
-const APK_URL = "https://github.com/lekermang/tech-buying-service/releases/latest";
+// Прямые ссылки на файлы из последнего релиза.
+// GitHub автоматически отдаёт файл с тегом "latest" по фиксированному имени.
+const REPO = "https://github.com/lekermang/tech-buying-service";
+const WIN_URL = `${REPO}/releases/latest/download/Skupka24-Setup.exe`;
+const APK_URL = `${REPO}/releases/latest/download/Skupka24.apk`;
+const RELEASES_PAGE = `${REPO}/releases/latest`;
 
 type Props = {
   /** Компактный вариант (одна строка) */
@@ -41,11 +45,10 @@ export default function AppDownloadCard({
         </div>
 
         <div className={`grid ${compact ? "grid-cols-3" : "grid-cols-1 sm:grid-cols-3"} gap-2`}>
-          {/* Windows */}
+          {/* Windows — прямое скачивание .exe */}
           <a
             href={WIN_URL}
-            target="_blank"
-            rel="noopener noreferrer"
+            download="Skupka24-Setup.exe"
             className="group flex items-center gap-2 px-3 py-2.5 rounded-lg bg-[#FFD700]/10 hover:bg-[#FFD700]/20 border border-[#FFD700]/30 transition-colors active:scale-[0.98]"
           >
             <div className="w-7 h-7 rounded-md bg-black/40 flex items-center justify-center shrink-0">
@@ -57,11 +60,10 @@ export default function AppDownloadCard({
             </div>
           </a>
 
-          {/* Android */}
+          {/* Android — прямое скачивание .apk */}
           <a
             href={APK_URL}
-            target="_blank"
-            rel="noopener noreferrer"
+            download="Skupka24.apk"
             className="group flex items-center gap-2 px-3 py-2.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-400/30 transition-colors active:scale-[0.98]"
           >
             <div className="w-7 h-7 rounded-md bg-black/40 flex items-center justify-center shrink-0">
@@ -87,6 +89,16 @@ export default function AppDownloadCard({
             </div>
           </div>
         </div>
+
+        {/* Запасная ссылка — если файл не скачался напрямую */}
+        <a
+          href={RELEASES_PAGE}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block mt-2 text-center text-[10px] font-roboto text-white/35 hover:text-[#FFD700] transition-colors"
+        >
+          Все версии и история обновлений →
+        </a>
       </div>
     </div>
   );
