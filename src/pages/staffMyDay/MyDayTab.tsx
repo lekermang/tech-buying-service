@@ -4,6 +4,7 @@ import Checklist from "./Checklist";
 import RepairSignalsCard from "./RepairSignalsCard";
 import SalesSignalsCard from "./SalesSignalsCard";
 import OwnerSummaryCard from "./OwnerSummaryCard";
+import AppDownloadCard from "@/components/AppDownloadCard";
 import { STAFF_DAILY_URL, type MyDayResponse, type DailyRole, type RepairSignals, type SalesSignals } from "./types";
 
 const ROLE_LABEL: Record<DailyRole, string> = {
@@ -158,6 +159,12 @@ export default function MyDayTab({ token }: { token: string }) {
           </div>
         </div>
       )}
+
+      {/* Скачать нативное приложение */}
+      <AppDownloadCard
+        title="Установи приложение"
+        subtitle="Работает быстрее сайта · офлайн-поиск клиентов"
+      />
     </div>
   );
 }
