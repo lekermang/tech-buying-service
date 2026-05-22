@@ -55,7 +55,7 @@ jobs:
 
       - name: Build Tauri
         working-directory: src-tauri
-        run: cargo tauri build
+        run: npx --yes @tauri-apps/cli@^1 build
 
       - name: Rename installer
         shell: bash
