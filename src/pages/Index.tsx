@@ -14,6 +14,7 @@ import PremiumServicesGrid from "@/components/skupka/PremiumServicesGrid";
 import MaxChannelBanner from "@/components/skupka/MaxChannelBanner";
 import PublicChatFab from "@/components/skupka/PublicChatFab";
 import AppDownloadCard from "@/components/AppDownloadCard";
+import EasierWithUsBlock from "@/components/EasierWithUsBlock";
 
 const scrollTo = (href: string) => {
   const el = document.querySelector(href);
@@ -388,23 +389,8 @@ const Index = ({ goldOpen = false }: { goldOpen?: boolean }) => {
       <JobsSection />
       <MaxChannelBanner />
 
-      {/* Скачать наше приложение */}
-      <section className="py-8 px-4 bg-gradient-to-b from-transparent via-[#FFD700]/[0.02] to-transparent">
-        <div className="max-w-2xl mx-auto">
-          <div className="text-center mb-4">
-            <div className="font-oswald font-bold text-2xl md:text-3xl text-white uppercase tracking-wide">
-              Скачай <span className="text-[#FFD700]">приложение</span>
-            </div>
-            <div className="font-roboto text-white/55 text-sm mt-1">
-              Скупка 24 у тебя в кармане — быстрее, удобнее, с офлайн-режимом
-            </div>
-          </div>
-          <AppDownloadCard
-            title="Скупка 24"
-            subtitle="Оценка, цены на золото, чат с менеджером"
-          />
-        </div>
-      </section>
+      {/* С нами стало проще — большой блок с преимуществами и кнопками скачивания */}
+      <EasierWithUsBlock />
 
       <ContactsFooter scrollTo={scrollTo} />
       <ExitPopup onOpenEval={() => setEvalOpen(true)} />

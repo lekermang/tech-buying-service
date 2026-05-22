@@ -22,6 +22,7 @@ import LeadsAlertWatcher from "./LeadsAlertWatcher";
 import MyDayTab from "../staffMyDay/MyDayTab";
 import VipChatTab from "../staffChat/VipChatTab";
 import AppUpdateBanner from "@/components/AppUpdateBanner";
+import AppSettingsMenu from "@/components/AppSettingsMenu";
 
 type Tab = StaffTab;
 
@@ -239,6 +240,7 @@ export function StaffMainLayout({
             )}
             <InstallPwaButton />
             <HolidayShowAgainButton />
+            <AppSettingsMenu />
             <SLTooltip content={<><b>Мой профиль</b><br/>Изменить аватар, имя, пин-код</>} placement="bottom">
               <button onClick={() => setProfileOpen(true)}
                 className="text-white/40 hover:text-[#FFD700] active:text-[#FFD700] transition-all p-2 rounded-md hover:bg-[#FFD700]/10 hover:shadow-[0_0_10px_rgba(255,215,0,0.15)]">

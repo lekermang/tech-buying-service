@@ -84,6 +84,71 @@ def handler(event: dict, context) -> dict:
                     'address': row[10],
                     'registered_at': row[11].isoformat() if row[11] else None})
 
+    # POST /login_register — регистрация по логину и паролю
+    if method == 'POST' and body.get('action') == 'login_register':
+        login_v = (body.get('login') or '').strip()
+        password = (body.get('password') or '').strip()
+        full_name = (body.get('full_name') or '').strip()
+        phone = (body.get('phone') or '').strip()
+        email = (body.get('email') or '').strip()
+        if not login_v or not password or not full_name or not phone:
+            return _err(400, 'Логин, пароль, ФИО и телефон обязательны')
+        if len(password) < 6:
+            return _err(400, 'Пароль минимум 6 символов')
+        if len(login_v) < 3:
+            return _err(400, 'Логин минимум 3 символа')
+        conn = get_conn(); cur = conn.cursor()
+        # проверка уникальности логина
+        cur.execute(f"SELECT id FROM {SCHEMA}.clients WHERE LOWER(login)=LOWER(%s)", (login_v,))
+        if cur.fetchone():
+            cur.close(); conn.close()
+            return _err(400, 'Логин уже занят')
+        # проверка по телефону — если уже зарегистрирован, привязываем логин
+        cur.execute(f"SELECT id FROM {SCHEMA}.clients WHERE phone=%s", (phone,))
+        existing = cur.fetchone()
+        token = make_token()
+        expires = datetime.utcnow() + timedelta(days=90)
+        pwd_hash = hashlib.sha256(password.encode('utf-8')).hexdigest()
+        if existing:
+            cur.execute(f"""UPDATE {SCHEMA}.clients
+                SET login=%s, password_hash=%s, full_name=%s, email=%s,
+                    auth_token=%s, token_expires_at=%s, last_login_at=NOW(), updated_at=NOW()
+                WHERE id=%s
+                RETURNING id, discount_pct""",
+                (login_v, pwd_hash, full_name, email or None, token, expires, existing[0]))
+        else:
+            cur.execute(f"""INSERT INTO {SCHEMA}.clients
+                (full_name, phone, email, login, password_hash, auth_token, token_expires_at, last_login_at)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,NOW())
+                RETURNING id, discount_pct""",
+                (full_name, phone, email or None, login_v, pwd_hash, token, expires))
+        row = cur.fetchone()
+        conn.commit(); cur.close(); conn.close()
+        return _ok({'token': token, 'is_new': not bool(existing), 'client_id': row[0],
+                    'discount_pct': row[1], 'message': 'Регистрация успешна!'})
+
+    # POST /login_signin — вход по логину и паролю
+    if method == 'POST' and body.get('action') == 'login_signin':
+        login_v = (body.get('login') or '').strip()
+        password = (body.get('password') or '').strip()
+        if not login_v or not password:
+            return _err(400, 'Логин и пароль обязательны')
+        pwd_hash = hashlib.sha256(password.encode('utf-8')).hexdigest()
+        conn = get_conn(); cur = conn.cursor()
+        cur.execute(f"""SELECT id, password_hash, full_name FROM {SCHEMA}.clients
+                        WHERE LOWER(login)=LOWER(%s)""", (login_v,))
+        row = cur.fetchone()
+        if not row or row[1] != pwd_hash:
+            cur.close(); conn.close()
+            return _err(401, 'Неверный логин или пароль')
+        token = make_token()
+        expires = datetime.utcnow() + timedelta(days=90)
+        cur.execute(f"""UPDATE {SCHEMA}.clients
+                        SET auth_token=%s, token_expires_at=%s, last_login_at=NOW()
+                        WHERE id=%s""", (token, expires, row[0]))
+        conn.commit(); cur.close(); conn.close()
+        return _ok({'token': token, 'client_id': row[0], 'full_name': row[2]})
+
     # POST /register — регистрация по телефону
     if method == 'POST' and body.get('action') == 'register':
         phone = body.get('phone', '').strip()

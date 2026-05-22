@@ -1,4 +1,6 @@
 {
+  "client-auth": "https://functions.poehali.dev/420ad7e7-26c9-4540-9369-6bca5d26d3aa",
+  "client-cabinet": "https://functions.poehali.dev/9a959adf-cac1-47c2-9ce8-0e229a64287f",
   "notify-push": "https://functions.poehali.dev/0a041e7f-92ab-4dbf-86f0-cd09e3eabfbd",
   "staff-daily": "https://functions.poehali.dev/be89689d-a156-4e0e-bf96-11e5e715f3c1",
   "finance-analytics": "https://functions.poehali.dev/41aae5ce-14d4-4c12-8522-59fcf9ae1b6a",
