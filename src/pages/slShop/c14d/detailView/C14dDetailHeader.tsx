@@ -37,10 +37,11 @@ type Props = {
   onPay: () => void;
   onClose: () => void;
   onTerminate: () => void;
+  onExtend?: () => void;
   onPhotoClick: (url: string) => void;
 };
 
-export default function C14dDetailHeader({ c, onBack, onPay, onClose, onTerminate, onPhotoClick }: Props) {
+export default function C14dDetailHeader({ c, onBack, onPay, onClose, onTerminate, onExtend, onPhotoClick }: Props) {
   const badge = STATUS_BADGE[c.status];
   const passport = c.passport_series ? `${c.passport_series} ${c.passport_number || ""}` : "";
   const passportFull = c.passport_issued_by ? `${passport}, ${c.passport_issued_by} ${fmtDate(c.passport_issue_date)}` : passport;
@@ -58,6 +59,13 @@ export default function C14dDetailHeader({ c, onBack, onPay, onClose, onTerminat
             <>
               <SLButton variant="goldOutline" size="sm" icon="Link2" onClick={() => shareClientLink(c.contract_number)}>Ссылка клиенту</SLButton>
               <SLButton variant="success" size="sm" icon="Wallet" onClick={onPay}>Платёж</SLButton>
+              {onExtend && (
+                c.extended ? (
+                  <SLButton variant="goldOutline" size="sm" icon="TimerOff" onClick={onExtend}>Снять продление</SLButton>
+                ) : (
+                  <SLButton variant="goldOutline" size="sm" icon="Timer" onClick={onExtend}>Продлить</SLButton>
+                )
+              )}
               {Number(c.remaining_debt) <= 0 && (
                 <SLButton variant="dark" size="sm" icon="CheckCircle2" onClick={onClose}>Закрыть</SLButton>
               )}
@@ -72,8 +80,16 @@ export default function C14dDetailHeader({ c, onBack, onPay, onClose, onTerminat
         <div className="font-oswald font-bold text-[16px] uppercase tracking-wide text-[#FFD700]">{c.contract_number}</div>
         <span className={`text-[9px] px-2 py-0.5 rounded-full border uppercase tracking-wide font-bold ${badge.cls}`}>{badge.l}</span>
         {c.overdue && <SLPill color="red" icon="AlertCircle">Просрочка {c.overdue_days} дн.</SLPill>}
+        {c.extended && <SLPill color="orange" icon="Timer">Продление активно</SLPill>}
         <div className="text-[10px] text-white/40 ml-auto">{fmtDate(c.created_at)} · {c.created_by || "—"}</div>
       </div>
+
+      {c.extended && c.extended_note && (
+        <div className="rounded-md bg-orange-500/10 border border-orange-500/30 px-2.5 py-1 text-[11px] text-orange-200">
+          <Icon name="MessageSquare" size={11} className="inline mr-1" />
+          Комментарий по продлению: {c.extended_note}
+        </div>
+      )}
 
       {/* Финансы */}
       <SLGrid cols={4}>
@@ -85,20 +101,37 @@ export default function C14dDetailHeader({ c, onBack, onPay, onClose, onTerminat
 
       {/* Сумма на сегодня */}
       {c.status === "active" && c.today_calc && (
-        <div className="rounded-xl bg-gradient-to-br from-emerald-500/15 via-[#FFD700]/4 to-transparent border border-emerald-500/30 p-2.5 sm:p-3">
+        <div className={`rounded-xl border p-2.5 sm:p-3 ${
+          c.today_calc.is_extended
+            ? "bg-gradient-to-br from-orange-500/15 via-[#FFD700]/4 to-transparent border-orange-500/30"
+            : "bg-gradient-to-br from-emerald-500/15 via-[#FFD700]/4 to-transparent border-emerald-500/30"
+        }`}>
           <div className="flex items-center gap-1.5 mb-1.5">
-            <Icon name="Zap" size={12} className="text-emerald-300" />
-            <h3 className="font-oswald uppercase text-[12px] tracking-wide font-bold text-emerald-300">
-              {c.today_calc.is_early ? "Досрочный выкуп · сегодня" : "Сумма на сегодня"}
+            <Icon name={c.today_calc.is_extended ? "Timer" : "Zap"} size={12} className={c.today_calc.is_extended ? "text-orange-300" : "text-emerald-300"} />
+            <h3 className={`font-oswald uppercase text-[12px] tracking-wide font-bold ${c.today_calc.is_extended ? "text-orange-300" : "text-emerald-300"}`}>
+              {c.today_calc.is_extended
+                ? (c.today_calc.is_overdue_extended ? "Продление · проценты капают" : "Продление · сумма на сегодня")
+                : (c.today_calc.is_early ? "Досрочный выкуп · сегодня" : "Сумма на сегодня")}
             </h3>
           </div>
           <div className="grid grid-cols-4 gap-1.5">
-            <SLStat label="Прошло дней" value={`${Math.max(0, c.today_calc.days_passed_raw)}/${c.term_days}`} />
+            <SLStat
+              label="Прошло дней"
+              value={c.today_calc.is_extended
+                ? `${Math.max(0, c.today_calc.days_passed_raw)}`
+                : `${Math.max(0, c.today_calc.days_passed_raw)}/${c.term_days}`}
+              color={c.today_calc.is_overdue_extended ? "orange" : "white"}
+            />
             <SLStat label="% за факт. дни" value={`${fmt(c.today_calc.interest_today)} ₽`} color="orange" />
             <SLStat label="К возврату сегодня" value={`${fmt(c.today_calc.today_due_full)} ₽`} color="green" />
             <SLStat label="Доплатить" value={`${fmt(c.today_calc.today_remaining)} ₽`} color={c.today_calc.today_remaining > 0 ? "gold" : "green"} />
           </div>
-          {c.today_calc.is_early && c.today_calc.saving > 0 && (
+          {c.today_calc.is_overdue_extended && (c.today_calc.overdue_days ?? 0) > 0 && (
+            <div className="mt-1.5 text-[10px] text-orange-300/90 flex items-center gap-1">
+              <Icon name="AlertCircle" size={10} /> Срок истёк <b>{c.today_calc.overdue_days}</b> дн. назад — клиент предупредил, проценты продолжают начисляться.
+            </div>
+          )}
+          {!c.today_calc.is_extended && c.today_calc.is_early && c.today_calc.saving > 0 && (
             <div className="mt-1.5 text-[10px] text-emerald-300/85 flex items-center gap-1">
               <Icon name="Sparkles" size={10} /> Экономия <b>{fmt(c.today_calc.saving)} ₽</b> vs полный срок ({fmt(c.today_calc.full_due)} ₽)
             </div>

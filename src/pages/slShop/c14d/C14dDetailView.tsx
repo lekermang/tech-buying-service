@@ -153,6 +153,28 @@ export default function C14dDetailView({ token, contractId, onBack }: Props) {
     reload();
   };
 
+  const toggleExtend = async () => {
+    if (!c) return;
+    const enable = !c.extended;
+    let note: string | null = null;
+    if (enable) {
+      const n = window.prompt(
+        "Клиент предупредил, что заберёт позже. Комментарий (необязательно):",
+        "",
+      );
+      if (n === null) return; // отмена
+      note = n.trim() || null;
+    } else {
+      if (!window.confirm("Выключить режим продления? Проценты после срока перестанут начисляться.")) return;
+    }
+    const r = await c14dApi(token, "extend", {
+      method: "POST",
+      body: { contract_id: c.id, enable, note },
+    });
+    if (!r.ok) { setErr(r.error || "Не удалось изменить режим продления"); return; }
+    reload();
+  };
+
   if (loading) return <div className="text-center py-8 text-white/40"><Icon name="Loader2" size={18} className="animate-spin inline" /></div>;
   if (err && !c) return (
     <div className="text-center py-6">
@@ -170,6 +192,7 @@ export default function C14dDetailView({ token, contractId, onBack }: Props) {
         onPay={() => setPayOpen(true)}
         onClose={() => setConfirm({ kind: "close" })}
         onTerminate={() => setConfirm({ kind: "terminate" })}
+        onExtend={toggleExtend}
         onPhotoClick={setPhotoSrc}
       />
 

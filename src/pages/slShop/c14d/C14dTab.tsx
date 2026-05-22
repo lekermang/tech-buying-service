@@ -188,6 +188,7 @@ function ContractsList({
                   <div className="font-oswald font-bold text-[13px] text-[#FFD700]">{it.contract_number}</div>
                   <span className={`text-[9px] px-1.5 py-0 rounded-full border uppercase tracking-wide font-bold ${badge.cls}`}>{badge.l}</span>
                   {it.overdue && <SLPill color="red">Просрочка {it.overdue_days} дн.</SLPill>}
+                  {it.extended && <SLPill color="orange">Продление</SLPill>}
                 </div>
                 <div className="text-[12px] text-white/85 truncate leading-tight">{it.client_name}</div>
                 <div className="text-[10px] text-white/45 truncate leading-tight">{item}</div>

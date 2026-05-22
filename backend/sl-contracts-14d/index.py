@@ -90,11 +90,13 @@ def _calc(amount: Decimal, rate: Decimal, days: int):
     }
 
 
-def _calc_today(amount, rate, term_days, start_date, paid_total, on_date=None):
+def _calc_today(amount, rate, term_days, start_date, paid_total, on_date=None, extended=False):
     """
     Сумма к возврату на текущую дату (для досрочного выкупа).
     Проценты — только за фактически прошедшие дни (минимум 1 день),
     но не больше term_days (после срока — полная сумма).
+    Если extended=True — проценты продолжают начисляться и после окончания срока
+    (для клиентов, которые предупредили, что заберут позже).
     """
     amount = Decimal(str(amount))
     rate = Decimal(str(rate))
@@ -103,13 +105,19 @@ def _calc_today(amount, rate, term_days, start_date, paid_total, on_date=None):
     if isinstance(start_date, str):
         start_date = _parse_date(start_date) or today
     days_passed_raw = (today - start_date).days
-    days_passed = max(1, min(int(term_days), days_passed_raw)) if days_passed_raw >= 1 else 1
+    if extended:
+        # В режиме продления — считаем все фактически прошедшие дни без верхней границы
+        days_passed = max(1, days_passed_raw) if days_passed_raw >= 1 else 1
+    else:
+        days_passed = max(1, min(int(term_days), days_passed_raw)) if days_passed_raw >= 1 else 1
     is_early = days_passed_raw < int(term_days)
+    is_overdue_extended = bool(extended) and (days_passed_raw > int(term_days))
+    overdue_days = max(0, days_passed_raw - int(term_days))
     interest_today = (amount * rate * Decimal(days_passed) / Decimal(100)).quantize(Decimal('0.01'))
     full_due = (amount * (Decimal(1) + rate * Decimal(term_days) / Decimal(100))).quantize(Decimal('0.01'))
     today_due_full = (amount + interest_today).quantize(Decimal('0.01'))
-    # После истечения срока — фиксируем полную сумму договора
-    if not is_early:
+    # После истечения срока — фиксируем полную сумму договора (если не в режиме продления)
+    if not is_early and not extended:
         today_due_full = full_due
     today_remaining = today_due_full - paid_total
     if today_remaining < Decimal('0'):
@@ -121,6 +129,9 @@ def _calc_today(amount, rate, term_days, start_date, paid_total, on_date=None):
         'days_passed': int(days_passed),
         'days_passed_raw': int(days_passed_raw),
         'is_early': bool(is_early),
+        'is_extended': bool(extended),
+        'is_overdue_extended': bool(is_overdue_extended),
+        'overdue_days': int(overdue_days),
         'interest_today': float(interest_today),
         'today_due_full': float(today_due_full),
         'today_remaining': float(today_remaining),
@@ -438,6 +449,7 @@ def action_list(params):
     cur.execute(
         f"SELECT c.id, c.contract_number, c.amount, c.total_due, c.paid_total, c.remaining_debt, "
         f"c.start_date, c.end_date, c.status, c.created_at, c.created_by, "
+        f"c.extended, c.extended_at, c.extended_note, "
         f"cl.full_name AS client_name, cl.phone AS client_phone, "
         f"i.brand AS item_brand, i.model AS item_model, i.item_type "
         f"FROM {SCHEMA}.contracts_14d c "
@@ -516,7 +528,7 @@ def action_get(params):
     contract['overdue'] = bool(contract['status'] == 'active' and ed and ed < today)
     contract['overdue_days'] = (today - ed).days if (ed and ed < today) else 0
 
-    # Расчёт суммы на сегодня (досрочный выкуп)
+    # Расчёт суммы на сегодня (досрочный выкуп / продление)
     if contract['status'] == 'active':
         today_calc = _calc_today(
             contract.get('amount'),
@@ -524,6 +536,7 @@ def action_get(params):
             contract.get('term_days') or 14,
             contract.get('start_date'),
             contract.get('paid_total'),
+            extended=bool(contract.get('extended')),
         )
         contract['today_calc'] = today_calc
     cur.close(); conn.close()
@@ -565,7 +578,7 @@ def action_payment(body, actor):
     try:
         cur.execute(
             f"SELECT total_due, paid_total, status, amount, contract_number, "
-            f"interest_rate, term_days, start_date "
+            f"interest_rate, term_days, start_date, extended "
             f"FROM {SCHEMA}.contracts_14d WHERE id=%s FOR UPDATE",
             (cid,)
         )
@@ -580,13 +593,14 @@ def action_payment(body, actor):
         rate = Decimal(str(row[5]))
         term_days = int(row[6])
         sd = row[7]
+        extended = bool(row[8])
         if status != 'active':
             return _err(400, 'Платёж можно вносить только по активному договору')
 
         # При досрочном выкупе считаем сумму к возврату на дату операции
         # (если сотрудник проводит платёж задним числом — проценты считаются на эту дату)
         op_date = paid_at_value.date() if paid_at_value is not None else date.today()
-        today_calc = _calc_today(principal, rate, term_days, sd, paid_total, on_date=op_date)
+        today_calc = _calc_today(principal, rate, term_days, sd, paid_total, on_date=op_date, extended=extended)
         today_due_full = Decimal(str(today_calc['today_due_full']))
         is_early = bool(today_calc['is_early'])
 
@@ -598,8 +612,8 @@ def action_payment(body, actor):
             # если клиент сам ввёл сумму — округляем к target
             amount = target_amount
 
-        # Эффективный «потолок» долга — на сегодня (для досрочки) или total_due (после срока)
-        effective_due = today_due_full if is_early else total_due
+        # Эффективный «потолок» долга — на сегодня (для досрочки/продления) или total_due (после срока без продления)
+        effective_due = today_due_full if (is_early or extended) else total_due
         new_paid = paid_total + amount
         if new_paid > effective_due + Decimal('0.01'):
             new_paid = effective_due
@@ -748,7 +762,7 @@ def action_payment_cancel(body, actor):
             f"SELECT p.contract_id, p.amount, p.payment_type, p.cash_account_id, p.cash_movement_id, "
             f"p.paid_at, p.recorded_by, "
             f"c.amount AS principal, c.paid_total, c.remaining_debt, c.total_due, c.status, "
-            f"c.interest_rate, c.term_days, c.start_date "
+            f"c.interest_rate, c.term_days, c.start_date, c.extended "
             f"FROM {SCHEMA}.contracts_14d_payments p "
             f"JOIN {SCHEMA}.contracts_14d c ON c.id=p.contract_id "
             f"WHERE p.id=%s",
@@ -768,6 +782,7 @@ def action_payment_cancel(body, actor):
         rate = Decimal(str(row[12]))
         term_days = int(row[13])
         sd = row[14]
+        c_extended = bool(row[15])
 
         # 2. Откатываем кассу — создаём обратное движение 'out' той же датой
         if cash_id and movement_id:
@@ -796,8 +811,8 @@ def action_payment_cancel(body, actor):
         if new_paid_total < Decimal('0'):
             new_paid_total = Decimal('0')
 
-        # Пересчёт суммы к возврату на сегодня (для досрочки) или полная (после срока)
-        today_calc = _calc_today(principal, rate, term_days, sd, new_paid_total)
+        # Пересчёт суммы к возврату на сегодня (для досрочки/продления) или полная (после срока)
+        today_calc = _calc_today(principal, rate, term_days, sd, new_paid_total, extended=c_extended)
         is_early_now = bool(today_calc['is_early'])
         # Восстанавливаем total_due: если договор был закрыт досрочно — total_due был пересчитан
         # на день закрытия, теперь надо вернуть оригинальный total
@@ -1022,7 +1037,7 @@ def action_public_view(params):
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cur.execute(
         f"SELECT c.contract_number, c.amount, c.interest_rate, c.term_days, "
-        f"c.start_date, c.end_date, c.status, c.paid_total, c.total_due, "
+        f"c.start_date, c.end_date, c.status, c.paid_total, c.total_due, c.extended, "
         f"cl.full_name AS client_name, "
         f"i.item_type, i.brand AS item_brand, i.model AS item_model "
         f"FROM {SCHEMA}.contracts_14d c "
@@ -1058,6 +1073,7 @@ def action_public_view(params):
             term_days,
             start_date,
             contract.get('paid_total'),
+            extended=bool(contract.get('extended')),
         )
         if end_date:
             days_remaining = (end_date - today).days
@@ -1074,6 +1090,7 @@ def action_public_view(params):
         'end_date': end_date.isoformat() if end_date else None,
         'days_remaining': days_remaining,
         'overdue_days': overdue_days,
+        'extended': bool(contract.get('extended')),
         'client_name_masked': masked,
         'item_brand': contract.get('item_brand'),
         'item_model': contract.get('item_model'),
@@ -1083,8 +1100,60 @@ def action_public_view(params):
     })
 
 
+# ============ Extend (продление договора после срока) ============
+def action_extend(body, actor):
+    """Включить/выключить продление договора.
+    В режиме продления проценты продолжают капать после окончания term_days
+    (для клиентов, которые предупредили, что заберут позже)."""
+    cid = body.get('contract_id')
+    if not cid:
+        return _err(400, 'contract_id required')
+    try:
+        cid = int(cid)
+    except Exception:
+        return _err(400, 'contract_id must be integer')
+    enable = bool(body.get('enable', True))
+    note = (body.get('note') or '').strip() or None
+
+    conn = get_conn(); cur = conn.cursor()
+    try:
+        cur.execute(
+            f"SELECT status, extended FROM {SCHEMA}.contracts_14d WHERE id=%s FOR UPDATE",
+            (cid,)
+        )
+        row = cur.fetchone()
+        if not row:
+            return _err(404, 'Договор не найден')
+        status, current = row[0], bool(row[1])
+        if status != 'active':
+            return _err(400, 'Продление доступно только для активного договора')
+        if enable:
+            cur.execute(
+                f"UPDATE {SCHEMA}.contracts_14d "
+                f"SET extended=TRUE, extended_at=COALESCE(extended_at, NOW()), "
+                f"extended_note=COALESCE(%s, extended_note), updated_at=NOW() "
+                f"WHERE id=%s",
+                (note, cid)
+            )
+            _log(cur, cid, 'extend_enable', {'note': note}, actor)
+        else:
+            cur.execute(
+                f"UPDATE {SCHEMA}.contracts_14d "
+                f"SET extended=FALSE, updated_at=NOW() WHERE id=%s",
+                (cid,)
+            )
+            _log(cur, cid, 'extend_disable', {'note': note}, actor)
+        conn.commit()
+        return _ok({'contract_id': cid, 'extended': enable, 'note': note})
+    except Exception as e:
+        conn.rollback()
+        return _err(500, f'Ошибка продления: {e}')
+    finally:
+        cur.close(); conn.close()
+
+
 def handler(event: dict, context) -> dict:
-    """Договоры продажи на 14 дней (СмартЛомбард). Действия: list, get, create, calculate, payment, terminate, close, stats, upload_photo, public_view."""
+    """Договоры продажи на 14 дней (СмартЛомбард). Действия: list, get, create, calculate, payment, terminate, close, stats, upload_photo, public_view, extend."""
     method = event.get('httpMethod', 'GET')
     if method == 'OPTIONS':
         return {'statusCode': 200, 'headers': HEADERS, 'body': ''}
@@ -1142,6 +1211,8 @@ def handler(event: dict, context) -> dict:
             return action_close(body, actor)
         if action == 'upload_photo':
             return action_upload_photo(body, actor)
+        if action == 'extend':
+            return action_extend(body, actor)
         return _err(400, f'Unknown POST action: {action}')
 
     return _err(405, 'Method not allowed')

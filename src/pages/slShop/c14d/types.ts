@@ -92,12 +92,18 @@ export type C14dListItem = {
   item_type?: string | null;
   overdue?: boolean;
   overdue_days?: number;
+  extended?: boolean;
+  extended_at?: string | null;
+  extended_note?: string | null;
 };
 
 export type C14dTodayCalc = {
   days_passed: number;
   days_passed_raw: number;
   is_early: boolean;
+  is_extended?: boolean;
+  is_overdue_extended?: boolean;
+  overdue_days?: number;
   interest_today: number;
   today_due_full: number;
   today_remaining: number;
