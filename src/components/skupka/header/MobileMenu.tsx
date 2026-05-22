@@ -43,9 +43,9 @@ const MobileMenu = ({ open, navLinks, onNav }: MobileMenuProps) => {
             <Icon name="Download" size={18} className="text-[#FFD700]" />
           </button>
         )}
-        <a href="/cabinet" className="flex items-center justify-between w-full py-4 font-roboto text-white/80 hover:text-[#FFD700] border-b border-white/5 uppercase tracking-wide text-base">
-          <span className="flex items-center gap-2"><Icon name="User" size={16} />Личный кабинет клиента</span>
-          <Icon name="ChevronRight" size={16} className="text-white/20" />
+        <a href="/client" className="flex items-center justify-between w-full py-4 mt-2 px-3 -mx-3 rounded-lg bg-gradient-to-r from-[#FFD700]/15 via-[#FFD700]/8 to-transparent border border-[#FFD700]/30 font-roboto uppercase tracking-wide text-base font-bold text-[#FFD700]">
+          <span className="flex items-center gap-2"><Icon name="UserCircle" size={18} />Кабинет клиента</span>
+          <Icon name="ChevronRight" size={16} className="text-[#FFD700]/60" />
         </a>
       </div>
       <div className="px-4 pt-4 pb-8 space-y-3">
