@@ -142,17 +142,6 @@ const MainNav = ({ navLinks, menuOpen, onToggleMenu, onNav }: MainNavProps) => {
               <span className="hidden lg:inline">Приложение</span>
             </button>
           )}
-          <a href="/client"
-            title="Личный кабинет клиента"
-            className="hidden md:flex items-center gap-1.5 bg-gradient-to-b from-[#FFE34D] to-[#d4a017] text-black font-roboto font-bold text-xs px-2.5 py-1.5 rounded-md hover:brightness-110 active:scale-95 transition-all">
-            <Icon name="UserCircle" size={13} />
-            <span className="hidden lg:inline">Кабинет</span>
-          </a>
-          <a href="/staff"
-            className="hidden md:flex items-center gap-1.5 border border-[#FFD700]/25 hover:border-[#FFD700]/60 text-[#FFD700]/70 hover:text-[#FFD700] font-roboto text-xs px-2.5 py-1.5 rounded-md hover:bg-[#FFD700]/5 transition-all">
-            <Icon name="LogIn" size={13} />
-            <span className="hidden lg:inline">Сотрудник</span>
-          </a>
           <button onClick={onToggleMenu} className="md:hidden p-2 text-white hover:text-[#FFD700] active:scale-95 transition-all">
             <Icon name={menuOpen ? "X" : "Menu"} size={26} />
           </button>

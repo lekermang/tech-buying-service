@@ -158,7 +158,7 @@ const GoldTicker = ({
             </button>
           )}
 
-          {/* Вход клиента — десктоп */}
+          {/* Клиент / Сотрудник — сразу после кнопки S */}
           <a
             href="/cabinet"
             title="Личный кабинет клиента"
@@ -168,7 +168,6 @@ const GoldTicker = ({
             <Icon name="User" size={13} className="text-[#FFD700]" />
             <span className="font-oswald font-bold text-[#FFD700] text-[11px] uppercase tracking-wide whitespace-nowrap">Клиент</span>
           </a>
-          {/* Вход сотрудника — десктоп */}
           <a
             href="/staff"
             title="Кабинет сотрудника"
@@ -178,7 +177,7 @@ const GoldTicker = ({
             <Icon name="ShieldCheck" size={13} className="text-[#FFD700]" />
             <span className="font-oswald font-bold text-[#FFD700] text-[11px] uppercase tracking-wide whitespace-nowrap">Сотрудник</span>
           </a>
-          {/* Вход клиента — мобилка */}
+          {/* Мобилка: компактные иконки */}
           <a
             href="/cabinet"
             title="Кабинет клиента"
@@ -187,7 +186,6 @@ const GoldTicker = ({
           >
             <Icon name="User" size={14} className="text-[#FFD700]" />
           </a>
-          {/* Вход сотрудника — мобилка */}
           <a
             href="/staff"
             title="Кабинет сотрудника"
