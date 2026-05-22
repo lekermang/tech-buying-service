@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef } from "react";
 import Icon from "@/components/ui/icon";
 import { PROBES_DISPLAY, type MarketStatus } from "./goldTickerUtils";
 
@@ -12,7 +13,7 @@ interface GoldTickerRatesRowProps {
 
 /**
  * Строка 1 — Курсы (компакт-премиум).
- * Высота h-7, тонкие 1px-рамки, монохром, аккуратные разделители.
+ * Поповеры управляются через useState (правильно работают на тач-устройствах).
  */
 const GoldTickerRatesRow = ({
   goldPrice,
@@ -22,8 +23,26 @@ const GoldTickerRatesRow = ({
   flash,
   compact,
 }: GoldTickerRatesRowProps) => {
+  const [openPopover, setOpenPopover] = useState<"probes" | "market" | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // Клик вне — закрыть
+  useEffect(() => {
+    if (!openPopover) return;
+    const onClick = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpenPopover(null);
+      }
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [openPopover]);
+
   return (
-    <div className={`relative max-w-7xl mx-auto px-3 sm:px-5 flex items-center gap-2 transition-[padding] duration-300 ${compact ? "py-1" : "py-1.5"}`}>
+    <div
+      ref={rootRef}
+      className={`relative max-w-7xl mx-auto px-3 sm:px-5 flex items-center gap-2 transition-[padding] duration-300 ${compact ? "py-1" : "py-1.5"}`}
+    >
       {/* Медальон */}
       {!compact && (
         <div
@@ -44,40 +63,46 @@ const GoldTickerRatesRow = ({
       )}
 
       {/* Золото 999 ₽/г */}
-      <div
-        className={`relative flex items-center h-7 bg-black/70 border px-2.5 rounded-md group/probes cursor-help transition-all duration-500 ${
-          flash === "up"
-            ? "border-emerald-400/70 shadow-[0_0_12px_rgba(34,197,94,0.4)]"
-            : flash === "down"
-            ? "border-red-400/70 shadow-[0_0_12px_rgba(239,68,68,0.4)]"
-            : "border-[#FFD700]/40"
-        }`}
-      >
-        {flash && (
-          <span className={`absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold border border-[#0A0A0A] ${
-            flash === "up" ? "bg-emerald-400 text-black" : "bg-red-400 text-black"
-          }`}>
-            {flash === "up" ? "▲" : "▼"}
-          </span>
-        )}
+      <div className="relative">
+        <button
+          type="button"
+          onMouseEnter={() => setOpenPopover("probes")}
+          onMouseLeave={() => setOpenPopover(p => (p === "probes" ? null : p))}
+          onClick={() => setOpenPopover(p => (p === "probes" ? null : "probes"))}
+          className={`relative flex items-center h-7 bg-black/70 border px-2.5 rounded-md cursor-pointer transition-all duration-500 ${
+            flash === "up"
+              ? "border-emerald-400/70 shadow-[0_0_12px_rgba(34,197,94,0.4)]"
+              : flash === "down"
+              ? "border-red-400/70 shadow-[0_0_12px_rgba(239,68,68,0.4)]"
+              : "border-[#FFD700]/40"
+          }`}
+        >
+          {flash && (
+            <span className={`absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold border border-[#0A0A0A] ${
+              flash === "up" ? "bg-emerald-400 text-black" : "bg-red-400 text-black"
+            }`}>
+              {flash === "up" ? "▲" : "▼"}
+            </span>
+          )}
 
-        <span className="font-oswald font-bold text-[9px] uppercase tracking-[0.18em] text-[#FFD700]/60 whitespace-nowrap mr-2">999</span>
-        {goldPrice?.buy ? (
-          <span className={`font-oswald font-bold text-[14px] sm:text-[15px] tracking-tight whitespace-nowrap leading-none transition-colors duration-500 ${
-            flash === "up" ? "text-emerald-300" : flash === "down" ? "text-red-300" : "text-[#FFD700]"
-          }`}>
-            {goldPrice.buy.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}
-            <span className={`text-[9px] font-bold ml-0.5 ${
-              flash === "up" ? "text-emerald-300/60" : flash === "down" ? "text-red-300/60" : "text-[#FFD700]/55"
-            }`}>₽/г</span>
-          </span>
-        ) : (
-          <span className="text-white/40 font-roboto text-xs">—</span>
-        )}
+          <span className="font-oswald font-bold text-[9px] uppercase tracking-[0.18em] text-[#FFD700]/60 whitespace-nowrap mr-2">999</span>
+          {goldPrice?.buy ? (
+            <span className={`font-oswald font-bold text-[14px] sm:text-[15px] tracking-tight whitespace-nowrap leading-none transition-colors duration-500 ${
+              flash === "up" ? "text-emerald-300" : flash === "down" ? "text-red-300" : "text-[#FFD700]"
+            }`}>
+              {goldPrice.buy.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}
+              <span className={`text-[9px] font-bold ml-0.5 ${
+                flash === "up" ? "text-emerald-300/60" : flash === "down" ? "text-red-300/60" : "text-[#FFD700]/55"
+              }`}>₽/г</span>
+            </span>
+          ) : (
+            <span className="text-white/40 font-roboto text-xs">—</span>
+          )}
+        </button>
 
         {/* Поповер: раскладка по пробам */}
-        {goldPrice?.buy && priceRetail999 && (
-          <div className="pointer-events-none absolute top-full left-0 mt-1.5 z-50 opacity-0 translate-y-1 group-hover/probes:opacity-100 group-hover/probes:translate-y-0 transition-all duration-200 w-64">
+        {openPopover === "probes" && goldPrice?.buy && priceRetail999 && (
+          <div className="absolute top-full left-0 mt-1.5 z-[60] w-64 animate-in fade-in slide-in-from-top-1 duration-150">
             <div className="relative bg-[#0F0F0F] border border-[#FFD700]/30 rounded-md shadow-[0_8px_24px_rgba(0,0,0,0.6)] p-2.5">
               <div className="absolute -top-1.5 left-5 w-3 h-3 rotate-45 bg-[#0F0F0F] border-l border-t border-[#FFD700]/30" />
               <div className="font-oswald font-bold text-[9px] uppercase tracking-[0.2em] text-[#FFD700]/70 mb-2 flex items-center gap-1.5">
@@ -126,9 +151,13 @@ const GoldTickerRatesRow = ({
 
       {/* Статус биржи (справа) */}
       <div className="ml-auto flex items-center gap-2">
-        <div className="group/market relative">
-          <div
-            className={`hidden sm:flex items-center gap-1.5 h-7 px-2.5 rounded-md border transition-colors ${
+        <div className="relative">
+          <button
+            type="button"
+            onMouseEnter={() => setOpenPopover("market")}
+            onMouseLeave={() => setOpenPopover(p => (p === "market" ? null : p))}
+            onClick={() => setOpenPopover(p => (p === "market" ? null : "market"))}
+            className={`hidden sm:flex items-center gap-1.5 h-7 px-2.5 rounded-md border cursor-pointer transition-colors ${
               market.fixing
                 ? "bg-[#FFD700]/10 border-[#FFD700]/40"
                 : market.open
@@ -153,45 +182,46 @@ const GoldTickerRatesRow = ({
                 {updatedAgo}
               </span>
             )}
-          </div>
+          </button>
 
-          {/* Tooltip с расписанием */}
-          <div className="pointer-events-none absolute top-full right-0 mt-1.5 z-50 opacity-0 translate-y-1 group-hover/market:opacity-100 group-hover/market:translate-y-0 transition-all duration-200 w-64">
-            <div className="relative bg-[#0F0F0F] border border-[#FFD700]/30 rounded-md shadow-[0_8px_24px_rgba(0,0,0,0.6)] p-2.5">
-              <div className="absolute -top-1.5 right-5 w-3 h-3 rotate-45 bg-[#0F0F0F] border-l border-t border-[#FFD700]/30" />
-              <div className="font-oswald font-bold text-[9px] uppercase tracking-[0.2em] text-[#FFD700]/70 mb-2 flex items-center gap-1.5">
-                <Icon name="Clock" size={10} />
-                Рынок золота
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center justify-between bg-black/40 rounded px-2 py-1">
-                  <span className="text-[9px] text-white/55 font-roboto">Статус:</span>
-                  <span className={`text-[10px] font-oswald font-bold ${
-                    market.fixing ? "text-[#FFD700]" : market.open ? "text-emerald-300" : "text-white/60"
-                  }`}>
-                    {market.label}
-                  </span>
+          {openPopover === "market" && (
+            <div className="absolute top-full right-0 mt-1.5 z-[60] w-64 animate-in fade-in slide-in-from-top-1 duration-150">
+              <div className="relative bg-[#0F0F0F] border border-[#FFD700]/30 rounded-md shadow-[0_8px_24px_rgba(0,0,0,0.6)] p-2.5">
+                <div className="absolute -top-1.5 right-5 w-3 h-3 rotate-45 bg-[#0F0F0F] border-l border-t border-[#FFD700]/30" />
+                <div className="font-oswald font-bold text-[9px] uppercase tracking-[0.2em] text-[#FFD700]/70 mb-2 flex items-center gap-1.5">
+                  <Icon name="Clock" size={10} />
+                  Рынок золота
                 </div>
-                <div className="flex items-center justify-between bg-black/40 rounded px-2 py-1">
-                  <span className="text-[9px] text-white/55 font-roboto">Площадка:</span>
-                  <span className="text-[10px] font-oswald font-bold text-white/85">{market.sublabel}</span>
-                </div>
-                {market.nextChange && (
-                  <div className="flex items-center justify-between bg-[#FFD700]/5 border border-[#FFD700]/15 rounded px-2 py-1">
-                    <span className="text-[9px] text-[#FFD700]/70 font-roboto">Далее:</span>
-                    <span className="text-[10px] font-oswald font-bold text-[#FFD700]">{market.nextChange}</span>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between bg-black/40 rounded px-2 py-1">
+                    <span className="text-[9px] text-white/55 font-roboto">Статус:</span>
+                    <span className={`text-[10px] font-oswald font-bold ${
+                      market.fixing ? "text-[#FFD700]" : market.open ? "text-emerald-300" : "text-white/60"
+                    }`}>
+                      {market.label}
+                    </span>
                   </div>
-                )}
-              </div>
-              <div className="mt-2 pt-1.5 border-t border-white/10 text-[8px] text-white/35 font-roboto leading-relaxed">
-                CME COMEX: Вс 23:00 → Пт 22:00 GMT<br />
-                LBMA фиксинг: 10:30 · 15:00 GMT (Пн–Пт)
+                  <div className="flex items-center justify-between bg-black/40 rounded px-2 py-1">
+                    <span className="text-[9px] text-white/55 font-roboto">Площадка:</span>
+                    <span className="text-[10px] font-oswald font-bold text-white/85">{market.sublabel}</span>
+                  </div>
+                  {market.nextChange && (
+                    <div className="flex items-center justify-between bg-[#FFD700]/5 border border-[#FFD700]/15 rounded px-2 py-1">
+                      <span className="text-[9px] text-[#FFD700]/70 font-roboto">Далее:</span>
+                      <span className="text-[10px] font-oswald font-bold text-[#FFD700]">{market.nextChange}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-2 pt-1.5 border-t border-white/10 text-[8px] text-white/35 font-roboto leading-relaxed">
+                  CME COMEX: Вс 23:00 → Пт 22:00 GMT<br />
+                  LBMA фиксинг: 10:30 · 15:00 GMT (Пн–Пт)
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* Мобилка: компактный значок */}
+        {/* Мобилка */}
         <div className={`sm:hidden flex items-center gap-1 h-7 px-2 rounded-md border ${
           market.fixing ? "bg-[#FFD700]/10 border-[#FFD700]/40"
             : market.open ? "bg-emerald-500/8 border-emerald-400/25"
