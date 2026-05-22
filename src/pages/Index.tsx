@@ -386,11 +386,12 @@ const Index = ({ goldOpen = false }: { goldOpen?: boolean }) => {
       <HeroSection scrollTo={scrollTo} externalModalOpen={evalOpen} onExternalModalClose={() => setEvalOpen(false)} />
       <PremiumServicesGrid />
       <InfoSections />
+
+      {/* С нами стало проще — премиум-блок (приложения + преимущества), стиль Trade In */}
+      <EasierWithUsBlock />
+
       <JobsSection />
       <MaxChannelBanner />
-
-      {/* С нами стало проще — большой блок с преимуществами и кнопками скачивания */}
-      <EasierWithUsBlock />
 
       <ContactsFooter scrollTo={scrollTo} />
       <ExitPopup onOpenEval={() => setEvalOpen(true)} />
