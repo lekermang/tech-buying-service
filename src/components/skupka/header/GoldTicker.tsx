@@ -87,7 +87,7 @@ const GoldTicker = ({
               </div>
             )}
 
-            {/* Мини-график 7 дней с заливкой + дельта% — на md+ */}
+            {/* Мини-график 7 дней с заливкой + дельта% + поповер — на md+ */}
             {goldPrice?.buy && goldHistory.length >= 2 && (() => {
               const W = 72, H = 24, pad = 2;
               const prices = goldHistory.map(h => h.price);
@@ -108,8 +108,16 @@ const GoldTicker = ({
               const fadeColor = up ? 'rgba(34,197,94,0.25)' : 'rgba(239,68,68,0.25)';
               const lastPt = xy[xy.length - 1];
               const deltaPct = Math.abs(((last - first) / first) * 100).toFixed(1);
+              const deltaRub = Math.abs(last - first);
+              const lastDate = goldHistory[goldHistory.length - 1]?.date || goldPrice.date;
+              const firstDate = goldHistory[0]?.date;
+              const fmtDate = (s?: string) => {
+                if (!s) return '';
+                try { return new Date(s).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }); }
+                catch { return s; }
+              };
               return (
-                <div className="relative hidden md:flex items-center gap-2 pl-3 lg:pl-4 border-l border-[#FFD700]/15" title="Изменение цены за 7 дней">
+                <div className="relative hidden md:flex items-center gap-2 pl-3 lg:pl-4 border-l border-[#FFD700]/15 group/chart cursor-help">
                   <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="overflow-visible">
                     <defs>
                       <linearGradient id="g7d" x1="0" y1="0" x2="0" y2="1">
@@ -126,6 +134,46 @@ const GoldTicker = ({
                       {up ? '▲' : '▼'} {deltaPct}%
                     </span>
                     <span className="text-[8px] text-white/35 mt-0.5 uppercase tracking-wider font-oswald font-bold">7 дней</span>
+                  </div>
+
+                  {/* Поповер при наведении — мин/макс/дельта/дата */}
+                  <div className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 opacity-0 translate-y-1 group-hover/chart:opacity-100 group-hover/chart:translate-y-0 transition-all duration-200 w-56">
+                    <div className="relative bg-[#0F0F0F] border border-[#FFD700]/30 rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.6),0_0_0_1px_rgba(255,215,0,0.06)] p-3">
+                      {/* Хвостик */}
+                      <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 rotate-45 bg-[#0F0F0F] border-l border-t border-[#FFD700]/30" />
+
+                      <div className="font-oswald font-bold text-[10px] uppercase tracking-[0.2em] text-[#FFD700]/70 mb-2">
+                        Динамика · 7 дней
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 mb-2">
+                        <div className="flex flex-col leading-tight bg-emerald-500/10 border border-emerald-400/20 rounded-md px-2 py-1.5">
+                          <span className="text-[8px] text-emerald-300/70 uppercase tracking-wider font-bold">Макс</span>
+                          <span className="font-oswald font-bold text-emerald-300 text-[12px] mt-0.5 whitespace-nowrap">
+                            {max.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽
+                          </span>
+                        </div>
+                        <div className="flex flex-col leading-tight bg-red-500/10 border border-red-400/20 rounded-md px-2 py-1.5">
+                          <span className="text-[8px] text-red-300/70 uppercase tracking-wider font-bold">Мин</span>
+                          <span className="font-oswald font-bold text-red-300 text-[12px] mt-0.5 whitespace-nowrap">
+                            {min.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between bg-black/40 border border-white/10 rounded-md px-2 py-1.5 mb-2">
+                        <span className="text-[9px] text-white/50 uppercase tracking-wider font-bold">Изменение</span>
+                        <span className="font-oswald font-bold text-[12px] flex items-center gap-1" style={{ color }}>
+                          {up ? '▲' : '▼'} {deltaRub.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽ ({deltaPct}%)
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-[9px] text-white/40 font-roboto">
+                        <span>{fmtDate(firstDate)}</span>
+                        <span className="text-white/30">→</span>
+                        <span>{fmtDate(lastDate)}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               );
