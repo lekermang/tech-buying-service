@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import GoldTickerRatesRow from "./GoldTickerRatesRow";
 import GoldTickerPricesRow from "./GoldTickerPricesRow";
 import GoldTickerActionsRow from "./GoldTickerActionsRow";
+import GoldTickerMobile from "./GoldTickerMobile";
 import { getMarketStatus, timeAgo, type Period } from "./goldTickerUtils";
 
 interface GoldTickerProps {
@@ -72,33 +73,50 @@ const GoldTicker = ({
         <div className="absolute bottom-0 left-0 right-0 h-px bg-[linear-gradient(90deg,transparent,rgba(255,215,0,0.6),transparent)] bg-[length:50%_100%] animate-gold-shimmer" />
       </div>
 
-      {/* ═══════ СТРОКА 1 — Курсы ═══════ */}
-      <GoldTickerRatesRow
+      {/* ═══════ МОБИЛЬНАЯ ВЕРСИЯ — 1 строка с раскрывающейся панелью ═══════ */}
+      <GoldTickerMobile
         goldPrice={goldPrice}
         priceRetail999={priceRetail999}
+        priceWholesale999={priceWholesale999}
         market={market}
         updatedAgo={updatedAgo}
         flash={flash}
-        compact={compact}
+        onSellClick={onSellClick}
       />
 
-      {/* ═══════ СТРОКА 2 — Цены физлица/опт + график (скрывается при скролле) ═══════ */}
-      {!compact && goldPrice?.buy && (
-        <GoldTickerPricesRow
+      {/* ═══════ ДЕСКТОП: СТРОКА 1 — Курсы ═══════ */}
+      <div className="hidden md:block">
+        <GoldTickerRatesRow
           goldPrice={goldPrice}
           priceRetail999={priceRetail999}
-          priceWholesale999={priceWholesale999}
-          filteredHistory={filteredHistory}
-          period={period}
-          setPeriod={setPeriod}
+          market={market}
+          updatedAgo={updatedAgo}
+          flash={flash}
+          compact={compact}
         />
+      </div>
+
+      {/* ═══════ ДЕСКТОП: СТРОКА 2 — Цены физлица/опт + график (скрывается при скролле) ═══════ */}
+      {!compact && goldPrice?.buy && (
+        <div className="hidden md:block">
+          <GoldTickerPricesRow
+            goldPrice={goldPrice}
+            priceRetail999={priceRetail999}
+            priceWholesale999={priceWholesale999}
+            filteredHistory={filteredHistory}
+            period={period}
+            setPeriod={setPeriod}
+          />
+        </div>
       )}
 
-      {/* ═══════ СТРОКА 3 — Действия ═══════ */}
-      <GoldTickerActionsRow
-        onSellClick={onSellClick}
-        compact={compact}
-      />
+      {/* ═══════ ДЕСКТОП: СТРОКА 3 — Действия ═══════ */}
+      <div className="hidden md:block">
+        <GoldTickerActionsRow
+          onSellClick={onSellClick}
+          compact={compact}
+        />
+      </div>
     </div>
   );
 };
