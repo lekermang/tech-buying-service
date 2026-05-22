@@ -92,10 +92,11 @@ def _calc(amount: Decimal, rate: Decimal, days: int):
 
 def _calc_today(amount, rate, term_days, start_date, paid_total, on_date=None, extended=False):
     """
-    Сумма к возврату на текущую дату (для досрочного выкупа).
-    Проценты — только за фактически прошедшие дни (минимум 1 день),
-    но не больше term_days (после срока — полная сумма).
-    Если extended=True — проценты продолжают начисляться и после окончания срока
+    Сумма к возврату на текущую дату.
+    Проценты начисляются ПО КАЛЕНДАРНЫМ ДАТАМ, а не по 24-часовым суткам:
+    как только наступила новая дата — добавляется ещё один процентный день.
+    Пример: выдан 21.05 в 19:30 → 21.05 = 1 день, 22.05 = 2 дня, 23.05 = 3 дня.
+    Если extended=True — проценты продолжают капать и после term_days
     (для клиентов, которые предупредили, что заберут позже).
     """
     amount = Decimal(str(amount))
@@ -104,12 +105,17 @@ def _calc_today(amount, rate, term_days, start_date, paid_total, on_date=None, e
     today = on_date or date.today()
     if isinstance(start_date, str):
         start_date = _parse_date(start_date) or today
-    days_passed_raw = (today - start_date).days
+    # Сколько раз сменилась дата с момента выдачи (0 — тот же день)
+    date_diff = (today - start_date).days
+    # Каждый календарный день засчитываем как процентный.
+    # День выдачи = 1-й день (1 процент), следующий = 2-й, и т.д.
+    days_passed_raw = max(1, date_diff + 1)
     if extended:
-        # В режиме продления — считаем все фактически прошедшие дни без верхней границы
-        days_passed = max(1, days_passed_raw) if days_passed_raw >= 1 else 1
+        # В режиме продления — без верхней границы
+        days_passed = days_passed_raw
     else:
-        days_passed = max(1, min(int(term_days), days_passed_raw)) if days_passed_raw >= 1 else 1
+        # До конца срока — растущие дни, после срока — фиксируем term_days
+        days_passed = min(int(term_days), days_passed_raw)
     is_early = days_passed_raw < int(term_days)
     is_overdue_extended = bool(extended) and (days_passed_raw > int(term_days))
     overdue_days = max(0, days_passed_raw - int(term_days))
