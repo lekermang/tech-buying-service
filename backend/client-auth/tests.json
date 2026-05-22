@@ -1,0 +1,24 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS — CORS",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Без action — 400",
+      "method": "POST",
+      "path": "/",
+      "body": {},
+      "expectedStatus": 400
+    },
+    {
+      "name": "me без токена — 401",
+      "method": "POST",
+      "path": "/",
+      "body": {"action": "me"},
+      "expectedStatus": 401
+    }
+  ]
+}
