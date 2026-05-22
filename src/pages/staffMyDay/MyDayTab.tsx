@@ -136,7 +136,9 @@ export default function MyDayTab({ token }: { token: string }) {
           <div className="lg:col-span-1">
             <Checklist
               checklist={data.checklist}
+              token={token}
               onToggle={toggle}
+              onRefresh={() => load(view)}
               accent={data.role === "repair" ? "blue" : data.role === "owner" ? "violet" : "gold"}
             />
           </div>
