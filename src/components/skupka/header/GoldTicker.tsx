@@ -26,13 +26,78 @@ const PROBES_DISPLAY: { label: string; value: number; coeff: number }[] = [
   { label: "999", value: 999, coeff: 0.999 },
 ];
 
-function getMarketStatus(): { open: boolean; label: string } {
+/**
+ * Реальное расписание мирового рынка золота:
+ *  - CME COMEX (электронные торги GC, формируют мировую цену):
+ *      Воскресенье 18:00 EST → Пятница 17:00 EST, с дневным перерывом 17:00–18:00 EST.
+ *      В UTC: Вс 23:00 → Пт 22:00, перерыв 22:00–23:00 UTC.
+ *  - LBMA Лондонский фиксинг: Пн–Пт 10:30 GMT (auction) и 15:00 GMT (PM fix).
+ *  - Биржа SHFE (Шанхай): ночные торги (важны для азиатской сессии).
+ *
+ * Логика статуса:
+ *   open      — идут электронные торги CME (основное окно)
+ *   fixing    — идёт лондонский AM/PM-фиксинг (под подсветку)
+ *   weekend   — выходной (Сб целиком и часть Вс/Пт)
+ *   break     — суточный технический перерыв CME (22:00–23:00 UTC)
+ */
+function getMarketStatus(): {
+  open: boolean;
+  fixing: boolean;
+  label: string;
+  sublabel: string;
+  nextChange: string;
+} {
   const now = new Date();
-  const utcDay = now.getUTCDay();
-  const utcMin = now.getUTCHours() * 60 + now.getUTCMinutes();
-  const isWeekday = utcDay >= 1 && utcDay <= 5;
-  const open = isWeekday && utcMin >= 7 * 60 && utcMin < 21 * 60;
-  return { open, label: open ? "Биржа открыта" : "Биржа закрыта" };
+  const utcDay = now.getUTCDay(); // 0=Вс, 1=Пн, ... 6=Сб
+  const utcH = now.getUTCHours();
+  const utcM = now.getUTCMinutes();
+  const utcMin = utcH * 60 + utcM;
+
+  // Лондонский AM/PM фиксинг
+  const fixingAM = utcDay >= 1 && utcDay <= 5 && utcH === 10 && utcM >= 30 && utcM < 50;
+  const fixingPM = utcDay >= 1 && utcDay <= 5 && utcH === 15 && utcM < 20;
+  const fixing = fixingAM || fixingPM;
+
+  // Технический перерыв CME (22:00–23:00 UTC по будням и Пт→Сб)
+  const inDailyBreak = utcH === 22;
+
+  // Выходные: Сб полностью + Пт после 22:00 + Вс до 23:00
+  const isWeekend =
+    utcDay === 6 ||
+    (utcDay === 5 && utcMin >= 22 * 60) ||
+    (utcDay === 0 && utcMin < 23 * 60);
+
+  const open = !isWeekend && !inDailyBreak;
+
+  let label = "Биржа закрыта";
+  let sublabel = "выходной";
+  let nextChange = "";
+
+  if (fixing) {
+    label = "Лондонский фиксинг";
+    sublabel = fixingAM ? "AM fix · 10:30 GMT" : "PM fix · 15:00 GMT";
+  } else if (open) {
+    label = "Биржа открыта";
+    sublabel = "торги CME COMEX";
+    // До следующего фиксинга или закрытия
+    if (utcDay >= 1 && utcDay <= 5) {
+      if (utcMin < 10 * 60 + 30) nextChange = "AM-фиксинг в 10:30 GMT";
+      else if (utcMin < 15 * 60) nextChange = "PM-фиксинг в 15:00 GMT";
+      else if (utcMin < 22 * 60) nextChange = "перерыв в 22:00 GMT";
+    }
+  } else if (inDailyBreak) {
+    label = "Перерыв";
+    sublabel = "технический · 1 час";
+    nextChange = "торги в 23:00 GMT";
+  } else if (isWeekend) {
+    label = "Биржа закрыта";
+    sublabel = "выходной";
+    if (utcDay === 6) nextChange = "торги: Вс 23:00 GMT";
+    else if (utcDay === 0) nextChange = "торги в 23:00 GMT";
+    else if (utcDay === 5) nextChange = "торги: Вс 23:00 GMT";
+  }
+
+  return { open, fixing, label, sublabel, nextChange };
 }
 
 function timeAgo(iso?: string): string {
@@ -65,14 +130,29 @@ const GoldTicker = ({
 }: GoldTickerProps) => {
   const [period, setPeriod] = useState<Period>(7);
 
+  // Обновляем статус биржи и "обновлено N мин назад" каждые 5 секунд в реалтайме
   const [, setTick] = useState(0);
   useEffect(() => {
-    const id = setInterval(() => setTick(t => t + 1), 60000);
+    const id = setInterval(() => setTick(t => t + 1), 5000);
     return () => clearInterval(id);
   }, []);
 
   const market = getMarketStatus();
   const updatedAgo = timeAgo(goldPrice?.date);
+
+  // Подсветка-вспышка при изменении цены
+  const [flash, setFlash] = useState<"up" | "down" | null>(null);
+  const [prevBuy, setPrevBuy] = useState<number | null>(null);
+  useEffect(() => {
+    if (!goldPrice?.buy) return;
+    if (prevBuy !== null && goldPrice.buy !== prevBuy) {
+      setFlash(goldPrice.buy > prevBuy ? "up" : "down");
+      const t = setTimeout(() => setFlash(null), 1500);
+      setPrevBuy(goldPrice.buy);
+      return () => clearTimeout(t);
+    }
+    if (prevBuy === null) setPrevBuy(goldPrice.buy);
+  }, [goldPrice?.buy, prevBuy]);
 
   const filteredHistory = useMemo(() => {
     if (!goldHistory.length) return [];
@@ -97,20 +177,56 @@ const GoldTicker = ({
             title={market.label}
           >
             <span className="text-sm drop-shadow-sm">🥇</span>
+            {/* Статус-точка биржи: зелёная (open) / золотая (fixing) / серая */}
             <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#0A0A0A] ${
-              market.open ? "bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.7)] animate-pulse" : "bg-gray-500"
+              market.fixing
+                ? "bg-[#FFD700] shadow-[0_0_8px_rgba(255,215,0,0.9)] animate-pulse"
+                : market.open
+                ? "bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.7)] animate-pulse"
+                : "bg-gray-500"
             }`} />
           </div>
         )}
 
-        {/* Золото 999 ₽/г с поповером по пробам */}
-        <div className="relative flex items-center gap-2 h-9 bg-gradient-to-br from-[#1A1A1A] to-[#0F0F0F] border border-[#FFD700]/30 px-3 rounded-lg shadow-[inset_0_1px_0_rgba(255,215,0,0.12)] group/probes cursor-help">
+        {/* Золото 999 ₽/г — с flash-анимацией при обновлении и поповером по пробам */}
+        <div
+          className={`relative flex items-center gap-2 h-9 bg-gradient-to-br from-[#1A1A1A] to-[#0F0F0F] border px-3 rounded-lg shadow-[inset_0_1px_0_rgba(255,215,0,0.12)] group/probes cursor-help transition-all duration-500 ${
+            flash === "up"
+              ? "border-emerald-400/80 shadow-[0_0_20px_rgba(34,197,94,0.45),inset_0_0_12px_rgba(34,197,94,0.2)]"
+              : flash === "down"
+              ? "border-red-400/80 shadow-[0_0_20px_rgba(239,68,68,0.45),inset_0_0_12px_rgba(239,68,68,0.2)]"
+              : "border-[#FFD700]/30"
+          }`}
+        >
+          {/* Бегущий блик при обновлении */}
+          {flash && (
+            <span className={`pointer-events-none absolute inset-0 rounded-lg overflow-hidden`}>
+              <span className={`absolute inset-0 bg-[linear-gradient(115deg,transparent_30%,${flash === "up" ? "rgba(34,197,94,0.35)" : "rgba(239,68,68,0.35)"}_50%,transparent_70%)] animate-[shimmer_1.2s_ease-out]`} style={{ backgroundSize: "200% 100%" }} />
+            </span>
+          )}
+          {/* Стрелка направления при flash */}
+          {flash && (
+            <span className={`absolute -top-2 -right-2 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold border-2 border-[#0A0A0A] animate-bounce ${
+              flash === "up" ? "bg-emerald-400 text-black" : "bg-red-400 text-black"
+            }`}>
+              {flash === "up" ? "▲" : "▼"}
+            </span>
+          )}
+
           <div className="flex flex-col leading-none justify-center">
             <span className="font-oswald font-bold text-[9px] uppercase tracking-[0.2em] text-[#FFD700]/70 whitespace-nowrap">Золото 999</span>
             {goldPrice?.buy ? (
-              <span className="font-oswald font-bold text-[#FFD700] text-base sm:text-lg mt-0.5 tracking-tight whitespace-nowrap leading-none drop-shadow-[0_0_6px_rgba(255,215,0,0.4)]">
+              <span className={`font-oswald font-bold text-base sm:text-lg mt-0.5 tracking-tight whitespace-nowrap leading-none transition-all duration-500 ${
+                flash === "up"
+                  ? "text-emerald-300 drop-shadow-[0_0_10px_rgba(34,197,94,0.6)]"
+                  : flash === "down"
+                  ? "text-red-300 drop-shadow-[0_0_10px_rgba(239,68,68,0.6)]"
+                  : "text-[#FFD700] drop-shadow-[0_0_6px_rgba(255,215,0,0.4)]"
+              }`}>
                 {goldPrice.buy.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}
-                <span className="text-[#FFD700]/60 text-[10px] font-bold ml-0.5">₽/г</span>
+                <span className={`text-[10px] font-bold ml-0.5 ${
+                  flash === "up" ? "text-emerald-300/70" : flash === "down" ? "text-red-300/70" : "text-[#FFD700]/60"
+                }`}>₽/г</span>
               </span>
             ) : (
               <span className="text-white/40 font-roboto text-xs mt-0.5">загрузка...</span>
@@ -171,26 +287,92 @@ const GoldTicker = ({
         )}
 
         <div className="ml-auto flex items-center gap-2">
-          <div
-            className={`hidden sm:flex items-center gap-1.5 h-9 px-2.5 rounded-md border ${
-              market.open ? "bg-emerald-500/10 border-emerald-400/25" : "bg-black/40 border-white/10"
-            }`}
-            title={market.label}
-          >
-            <span className={`w-1.5 h-1.5 rounded-full ${market.open ? "bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.7)] animate-pulse" : "bg-gray-500"}`} />
-            <div className="flex flex-col leading-none">
-              <span className={`text-[8px] uppercase tracking-wider font-oswald font-bold ${market.open ? "text-emerald-300/80" : "text-white/45"}`}>
-                {market.label}
-              </span>
-              {updatedAgo && (
-                <span className="text-[9px] text-white/45 font-roboto mt-0.5 whitespace-nowrap">обновлено {updatedAgo}</span>
-              )}
+          {/* Десктоп/планшет: расширенная плашка статуса биржи + tooltip с расписанием */}
+          <div className="group/market relative">
+            <div
+              className={`hidden sm:flex items-center gap-2 h-9 px-3 rounded-md border transition-colors ${
+                market.fixing
+                  ? "bg-[#FFD700]/15 border-[#FFD700]/45"
+                  : market.open
+                  ? "bg-emerald-500/10 border-emerald-400/30"
+                  : "bg-black/40 border-white/10"
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full ${
+                market.fixing
+                  ? "bg-[#FFD700] shadow-[0_0_8px_rgba(255,215,0,0.9)] animate-pulse"
+                  : market.open
+                  ? "bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse"
+                  : "bg-gray-500"
+              }`} />
+              <div className="flex flex-col leading-none">
+                <span className={`text-[10px] uppercase tracking-wider font-oswald font-bold whitespace-nowrap ${
+                  market.fixing ? "text-[#FFD700]" : market.open ? "text-emerald-300" : "text-white/55"
+                }`}>
+                  {market.label}
+                </span>
+                <span className="text-[9px] text-white/50 font-roboto mt-0.5 whitespace-nowrap">
+                  {updatedAgo ? `обновлено ${updatedAgo}` : market.sublabel}
+                </span>
+              </div>
+            </div>
+
+            {/* Tooltip с подробным расписанием */}
+            <div className="pointer-events-none absolute top-full right-0 mt-2 z-50 opacity-0 translate-y-1 group-hover/market:opacity-100 group-hover/market:translate-y-0 transition-all duration-200 w-72">
+              <div className="relative bg-[#0F0F0F] border border-[#FFD700]/30 rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.6)] p-3">
+                <div className="absolute -top-1.5 right-6 w-3 h-3 rotate-45 bg-[#0F0F0F] border-l border-t border-[#FFD700]/30" />
+                <div className="font-oswald font-bold text-[10px] uppercase tracking-[0.2em] text-[#FFD700]/70 mb-2 flex items-center gap-2">
+                  <Icon name="Clock" size={11} />
+                  Рынок золота · реальное время
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between bg-black/40 rounded-md px-2 py-1.5">
+                    <span className="text-[10px] text-white/60 font-roboto">Сейчас:</span>
+                    <span className={`text-[11px] font-oswald font-bold flex items-center gap-1 ${
+                      market.fixing ? "text-[#FFD700]" : market.open ? "text-emerald-300" : "text-white/55"
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${
+                        market.fixing ? "bg-[#FFD700]" : market.open ? "bg-emerald-400 animate-pulse" : "bg-gray-500"
+                      }`} />
+                      {market.label}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between bg-black/40 rounded-md px-2 py-1.5">
+                    <span className="text-[10px] text-white/60 font-roboto">Площадка:</span>
+                    <span className="text-[11px] font-oswald font-bold text-white/85">{market.sublabel}</span>
+                  </div>
+                  {market.nextChange && (
+                    <div className="flex items-center justify-between bg-[#FFD700]/5 border border-[#FFD700]/15 rounded-md px-2 py-1.5">
+                      <span className="text-[10px] text-[#FFD700]/70 font-roboto">Далее:</span>
+                      <span className="text-[11px] font-oswald font-bold text-[#FFD700]">{market.nextChange}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-2 pt-2 border-t border-white/10 text-[9px] text-white/40 font-roboto leading-relaxed">
+                  CME COMEX: Вс 23:00 → Пт 22:00 GMT<br />
+                  LBMA фиксинг: 10:30 и 15:00 GMT (Пн–Пт)
+                </div>
+              </div>
             </div>
           </div>
-          <div className="sm:hidden flex items-center gap-1 h-9 px-2 rounded-md bg-black/40 border border-white/10">
-            <span className={`w-1.5 h-1.5 rounded-full ${market.open ? "bg-emerald-400 animate-pulse" : "bg-gray-500"}`} />
-            <span className={`text-[9px] uppercase font-oswald font-bold tracking-wider ${market.open ? "text-emerald-300/80" : "text-white/45"}`}>
-              {market.open ? "торги" : "закрыто"}
+
+          {/* Мобилка: компактный значок */}
+          <div className={`sm:hidden flex items-center gap-1 h-9 px-2 rounded-md border ${
+            market.fixing ? "bg-[#FFD700]/15 border-[#FFD700]/40"
+              : market.open ? "bg-emerald-500/10 border-emerald-400/25"
+              : "bg-black/40 border-white/10"
+          }`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${
+              market.fixing ? "bg-[#FFD700] animate-pulse"
+                : market.open ? "bg-emerald-400 animate-pulse"
+                : "bg-gray-500"
+            }`} />
+            <span className={`text-[9px] uppercase font-oswald font-bold tracking-wider ${
+              market.fixing ? "text-[#FFD700]"
+                : market.open ? "text-emerald-300/85"
+                : "text-white/50"
+            }`}>
+              {market.fixing ? "фиксинг" : market.open ? "торги" : "закрыто"}
             </span>
           </div>
         </div>
