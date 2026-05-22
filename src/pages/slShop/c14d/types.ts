@@ -142,6 +142,8 @@ export type C14dStats = {
   draft_count: number;
   total_active_debt: number;
   total_active_amount: number;
+  avg_days_active?: number;
+  max_days_active?: number;
 };
 
 export const ITEM_TYPES = [

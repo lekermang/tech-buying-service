@@ -12,6 +12,15 @@ import { SLStat, SLPill, SLInput, SLButton, SLGrid, SLTabs } from "../slUI";
 type View = "active" | "archive" | "create" | "search" | "reports";
 type Props = { token: string };
 
+function pluralDays(n: number): string {
+  const a = Math.abs(n) % 100;
+  const b = a % 10;
+  if (a > 10 && a < 20) return "дней";
+  if (b > 1 && b < 5) return "дня";
+  if (b === 1) return "день";
+  return "дней";
+}
+
 export default function C14dTab({ token }: Props) {
   const [view, setView] = useState<View>("active");
   const [items, setItems] = useState<C14dListItem[]>([]);
@@ -78,12 +87,28 @@ export default function C14dTab({ token }: Props) {
           </div>
         </div>
         {stats && (
-          <SLGrid cols={4} className="mt-2">
-            <SLStat label="Активных" value={String(stats.active_count)} color="green" icon="CheckCircle2" />
-            <SLStat label="Просрочка" value={String(stats.overdue_count)} color="red" icon="AlertTriangle" />
-            <SLStat label="В архиве" value={String(stats.archive_count)} color="blue" icon="Archive" />
-            <SLStat label="Долг" value={`${fmt(stats.total_active_debt)} ₽`} color="gold" icon="Coins" />
-          </SLGrid>
+          <>
+            <SLGrid cols={4} className="mt-2">
+              <SLStat label="Активных" value={String(stats.active_count)} color="green" icon="CheckCircle2" />
+              <SLStat label="Просрочка" value={String(stats.overdue_count)} color="red" icon="AlertTriangle" />
+              <SLStat label="В архиве" value={String(stats.archive_count)} color="blue" icon="Archive" />
+              <SLStat label="Долг" value={`${fmt(stats.total_active_debt)} ₽`} color="gold" icon="Coins" />
+            </SLGrid>
+            <SLGrid cols={2} className="mt-2">
+              <SLStat
+                label="Средний срок"
+                value={`${stats.avg_days_active ?? 0} ${pluralDays(stats.avg_days_active ?? 0)}`}
+                color="orange"
+                icon="Clock"
+              />
+              <SLStat
+                label="Макс. срок"
+                value={`${stats.max_days_active ?? 0} ${pluralDays(stats.max_days_active ?? 0)}`}
+                color="orange"
+                icon="History"
+              />
+            </SLGrid>
+          </>
         )}
       </div>
 

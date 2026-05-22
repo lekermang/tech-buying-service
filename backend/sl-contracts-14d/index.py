@@ -1000,7 +1000,9 @@ def action_stats():
         f"COUNT(*) FILTER (WHERE status IN ('closed','terminated')) AS archive_count, "
         f"COUNT(*) FILTER (WHERE status='draft') AS draft_count, "
         f"COALESCE(SUM(remaining_debt) FILTER (WHERE status='active'), 0) AS total_active_debt, "
-        f"COALESCE(SUM(amount) FILTER (WHERE status='active'), 0) AS total_active_amount "
+        f"COALESCE(SUM(amount) FILTER (WHERE status='active'), 0) AS total_active_amount, "
+        f"COALESCE(ROUND(AVG((CURRENT_DATE - start_date)) FILTER (WHERE status='active')), 0)::int AS avg_days_active, "
+        f"COALESCE(MAX((CURRENT_DATE - start_date)) FILTER (WHERE status='active'), 0)::int AS max_days_active "
         f"FROM {SCHEMA}.contracts_14d"
     )
     row = dict(cur.fetchone() or {})
