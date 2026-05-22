@@ -97,18 +97,22 @@ const MainNav = ({ navLinks, menuOpen, onToggleMenu, onNav, compact = false }: M
         </a>
 
         {/* ── ЦЕНТР: навигация ── */}
-        {/* Планшет (md-lg): компактная */}
-        <nav
-          className="hidden md:flex lg:hidden items-center gap-4 min-w-0 overflow-x-auto"
-          style={{ scrollbarWidth: "none" }}
-        >
-          {navLinks.slice(0, 4).map(l => (
+        {/* Планшет md-lg: 3 пункта */}
+        <nav className="hidden md:flex lg:hidden items-center gap-3 mx-3">
+          {navLinks.slice(0, 3).map(l => (
             <NavItem key={l.href} link={l} active={active === l.href} onClick={() => onNav(l.href)} compact />
           ))}
         </nav>
 
-        {/* Десктоп (lg+): полная */}
-        <nav className="hidden lg:flex items-center gap-5 xl:gap-6 min-w-0">
+        {/* Десктоп lg–xl: 5 пунктов */}
+        <nav className="hidden lg:flex xl:hidden items-center gap-4 mx-4">
+          {navLinks.slice(0, 5).map(l => (
+            <NavItem key={l.href} link={l} active={active === l.href} onClick={() => onNav(l.href)} compact />
+          ))}
+        </nav>
+
+        {/* Большой десктоп xl+: все 8 пунктов */}
+        <nav className="hidden xl:flex items-center gap-5 mx-4">
           {navLinks.map(l => (
             <NavItem key={l.href} link={l} active={active === l.href} onClick={() => onNav(l.href)} />
           ))}
