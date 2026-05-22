@@ -58,6 +58,15 @@ const Header = ({ scrollTo, goldOpen = false }: HeaderProps) => {
     if (goldOpen) setSellOpen(true);
   }, [goldOpen]);
 
+  // Компактная шапка при скролле > 60px
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setCompact(window.scrollY > 60);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   useEffect(() => {
     const load = () => {
       fetch(GOLD_PRICE_URL)
@@ -147,13 +156,16 @@ const Header = ({ scrollTo, goldOpen = false }: HeaderProps) => {
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50">
+    <header
+      className={`fixed top-0 left-0 right-0 z-50 transition-shadow duration-300 ${compact ? "shadow-[0_4px_18px_rgba(0,0,0,0.45)]" : ""}`}
+    >
       <GoldTicker
         goldPrice={goldPrice}
         goldHistory={goldHistory}
         priceRetail999={priceRetail999}
         priceWholesale999={priceWholesale999}
         onSellClick={() => { setSellOpen(true); setSent(false); setForm({ name: "", phone: "" }); }}
+        compact={compact}
       />
 
       <MainNav
@@ -161,6 +173,7 @@ const Header = ({ scrollTo, goldOpen = false }: HeaderProps) => {
         menuOpen={menuOpen}
         onToggleMenu={() => setMenuOpen(!menuOpen)}
         onNav={handleNav}
+        compact={compact}
       />
 
       <MobileMenu

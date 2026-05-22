@@ -7,6 +7,8 @@ interface GoldTickerProps {
   priceRetail999: number | null;
   priceWholesale999: number | null;
   onSellClick: () => void;
+  /** При скролле — компактная версия */
+  compact?: boolean;
 }
 
 const APK_URL = "https://github.com/lekermang/tech-buying-service/releases/latest/download/Skupka24.apk";
@@ -29,6 +31,7 @@ const GoldTicker = ({
   priceRetail999,
   priceWholesale999,
   onSellClick,
+  compact = false,
 }: GoldTickerProps) => {
   return (
     <div className="relative overflow-hidden bg-[#0A0A0A] border-b border-[#FFD700]/20">
@@ -39,15 +42,17 @@ const GoldTicker = ({
       <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-px bg-[linear-gradient(90deg,transparent,rgba(255,215,0,0.6),transparent)] bg-[length:50%_100%] animate-gold-shimmer" />
 
       {/* ─────────────  ПЕРВАЯ СТРОКА  ───────────── */}
-      <div className="relative max-w-7xl mx-auto px-3 sm:px-5 py-2 flex items-center justify-between gap-3">
+      <div className={`relative max-w-7xl mx-auto px-3 sm:px-5 flex items-center justify-between gap-3 transition-[padding] duration-300 ${compact ? "py-1" : "py-2"}`}>
         {/* ЛЕВО — цена золота */}
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          {/* Медальон */}
-          <div className="relative shrink-0 w-9 h-9 rounded-full flex items-center justify-center
-                          bg-[radial-gradient(circle_at_30%_30%,#fff3a0,#ffd700_45%,#b8860b_100%)]
-                          shadow-[0_0_12px_rgba(255,215,0,0.35),inset_0_1px_0_rgba(255,255,255,0.4)]">
-            <span className="text-sm drop-shadow-sm">🥇</span>
-          </div>
+          {/* Медальон — прячется при скролле */}
+          {!compact && (
+            <div className="relative shrink-0 w-9 h-9 rounded-full flex items-center justify-center
+                            bg-[radial-gradient(circle_at_30%_30%,#fff3a0,#ffd700_45%,#b8860b_100%)]
+                            shadow-[0_0_12px_rgba(255,215,0,0.35),inset_0_1px_0_rgba(255,255,255,0.4)]">
+              <span className="text-sm drop-shadow-sm">🥇</span>
+            </div>
+          )}
 
           {/* Цена + график */}
           <div className="flex items-center gap-2 sm:gap-3 h-9 bg-black/60 border border-[#FFD700]/25 px-2.5 sm:px-3 rounded-md">
@@ -195,8 +200,8 @@ const GoldTicker = ({
         </div>
       </div>
 
-      {/* ─────────────  ВТОРАЯ СТРОКА (только мобилка) ───────────── */}
-      <div className="md:hidden relative border-t border-[#FFD700]/10 bg-black/40 px-3 py-1.5 grid grid-cols-3 gap-1.5">
+      {/* ─────────────  ВТОРАЯ СТРОКА (только мобилка, скрыта при scroll) ───────────── */}
+      <div className={`md:hidden relative border-t border-[#FFD700]/10 bg-black/40 px-3 grid grid-cols-3 gap-1.5 overflow-hidden transition-[max-height,padding] duration-300 ${compact ? "max-h-0 py-0 border-t-0" : "max-h-20 py-1.5"}`}>
         <a
           href="/cabinet"
           className="flex items-center justify-center gap-1.5 h-8 rounded-md bg-black/50 border border-[#FFD700]/25 text-[#FFD700] active:scale-95 transition-all"
@@ -221,9 +226,9 @@ const GoldTicker = ({
         </a>
       </div>
 
-      {/* Цены физлица/опт — на sm-lg (xl выше уже в первой строке) */}
+      {/* Цены физлица/опт — на sm-lg (xl выше уже в первой строке, в compact — скрыто) */}
       {goldPrice?.buy && (
-        <div className="xl:hidden relative border-t border-[#FFD700]/10 bg-black/40 px-3 sm:px-5 py-1.5 flex items-center justify-center gap-3 sm:gap-4 flex-wrap">
+        <div className={`xl:hidden relative border-t border-[#FFD700]/10 bg-black/40 px-3 sm:px-5 flex items-center justify-center gap-3 sm:gap-4 flex-wrap overflow-hidden transition-[max-height,padding] duration-300 ${compact ? "max-h-0 py-0 border-t-0" : "max-h-12 py-1.5"}`}>
           <div className="flex items-center gap-1.5">
             <Icon name="User" size={11} className="text-[#FFD700]/50" />
             <span className="text-[#FFD700]/55 text-[9px] uppercase tracking-[0.15em] font-oswald font-bold">Физлица</span>

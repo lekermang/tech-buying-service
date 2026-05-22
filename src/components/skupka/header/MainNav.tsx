@@ -9,6 +9,8 @@ interface MainNavProps {
   menuOpen: boolean;
   onToggleMenu: () => void;
   onNav: (href: string) => void;
+  /** При скролле — компактная версия */
+  compact?: boolean;
 }
 
 /** Scroll-spy: какой якорь сейчас в зоне просмотра */
@@ -57,7 +59,7 @@ const NavItem = ({ link, active, onClick, compact }: NavItemProps) => (
  * Главная навигация сайта (вторая строка шапки).
  * Переделана с нуля: всё чёткое, единая высота, ничего не уезжает.
  */
-const MainNav = ({ navLinks, menuOpen, onToggleMenu, onNav }: MainNavProps) => {
+const MainNav = ({ navLinks, menuOpen, onToggleMenu, onNav, compact = false }: MainNavProps) => {
   const hrefs = navLinks.map(l => l.href);
   const active = useActiveSection(hrefs);
 
@@ -69,12 +71,12 @@ const MainNav = ({ navLinks, menuOpen, onToggleMenu, onNav }: MainNavProps) => {
       <div className="pointer-events-none absolute -bottom-16 right-10 w-60 h-60 rounded-full blur-3xl" style={{ background: "rgba(255,184,0,0.04)" }} />
       <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-px bg-[linear-gradient(90deg,transparent,rgba(255,215,0,0.35),transparent)]" />
 
-      <div className="relative max-w-7xl mx-auto px-3 sm:px-4 h-14 sm:h-16 flex items-center justify-between gap-3">
+      <div className={`relative max-w-7xl mx-auto px-3 sm:px-4 flex items-center justify-between gap-3 transition-[height] duration-300 ${compact ? "h-12 sm:h-12" : "h-14 sm:h-16"}`}>
         {/* ── ЛЕВО: логотип ── */}
         <a href="/" className="flex items-center gap-2.5 shrink-0 group">
-          <div className="relative shrink-0 w-10 h-10 rounded-full p-[1.5px]
+          <div className={`relative shrink-0 rounded-full p-[1.5px] transition-[width,height] duration-300
                           bg-[conic-gradient(from_0deg,#b8860b,#ffd700,#fff3a0,#ffd700,#b8860b)]
-                          shadow-[0_0_14px_rgba(255,215,0,0.25)]">
+                          shadow-[0_0_14px_rgba(255,215,0,0.25)] ${compact ? "w-8 h-8" : "w-10 h-10"}`}>
             <img
               src="https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/9c9b4fca-bfd7-4841-a827-eb0354dad8da.JPG"
               alt="Скупка24"
@@ -84,11 +86,13 @@ const MainNav = ({ navLinks, menuOpen, onToggleMenu, onNav }: MainNavProps) => {
             />
           </div>
           <div className="leading-tight">
-            <span className="font-oswald font-bold text-lg sm:text-xl tracking-wider animate-shimmer block">СКУПКА24</span>
-            <div className="font-roboto text-white/40 text-[10px] hidden sm:flex items-center gap-1">
-              <Icon name="MapPin" size={9} className="text-[#FFD700]/60" />
-              Кирова 7/47 · Кирова 11
-            </div>
+            <span className={`font-oswald font-bold tracking-wider animate-shimmer block transition-[font-size] duration-300 ${compact ? "text-base sm:text-lg" : "text-lg sm:text-xl"}`}>СКУПКА24</span>
+            {!compact && (
+              <div className="font-roboto text-white/40 text-[10px] hidden sm:flex items-center gap-1">
+                <Icon name="MapPin" size={9} className="text-[#FFD700]/60" />
+                Кирова 7/47 · Кирова 11
+              </div>
+            )}
           </div>
         </a>
 
