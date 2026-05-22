@@ -141,6 +141,8 @@ def handler(event: dict, context) -> dict:
         return _action_update_avatar(me, body)
     if action == 'admin_set_avatar':
         return _action_admin_set_avatar(me, body)
+    if action == 'dialogs':
+        return _action_dialogs(me, body)
 
     return _err(f'unknown action: {action}')
 
@@ -148,23 +150,37 @@ def handler(event: dict, context) -> dict:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _action_poll(me: dict, body: dict) -> dict:
-    """Получить последние сообщения + участники + непрочитанное."""
-    after_id = int(body.get('after_id') or 0)
+    """Получить сообщения + участники + непрочитанные.
+    peer_id: 0 (или нет) = общий чат, иначе ID собеседника (личка).
+    """
+    after_id = int(body.get('after_id') or body.get('last_id') or 0)
     limit    = max(1, min(int(body.get('limit') or 80), 200))
+    peer_id  = int(body.get('peer_id') or 0)
+    me_id    = int(me['id'])
 
     conn = _connect()
     cur = conn.cursor()
     try:
-        _touch_last_seen(cur, me['id'])
+        _touch_last_seen(cur, me_id)
 
-        # Сообщения (либо новые после after_id, либо последние limit)
+        # WHERE по типу чата
+        if peer_id > 0:
+            # Личка: сообщения между me и peer (в обе стороны), исключая удалённые
+            where_chat = (
+                f"((m.employee_id={me_id} AND m.recipient_id={peer_id}) "
+                f" OR (m.employee_id={peer_id} AND m.recipient_id={me_id}))"
+            )
+        else:
+            # Общий чат: recipient_id IS NULL
+            where_chat = "m.recipient_id IS NULL"
+
         if after_id > 0:
             cur.execute(f"""
                 SELECT m.id, m.employee_id, e.full_name, e.avatar_url, e.role,
-                       m.text, m.photo_url, m.created_at
+                       m.text, m.photo_url, m.created_at, m.recipient_id
                 FROM {SCHEMA}.vip_chat_messages m
                 JOIN {SCHEMA}.employees e ON e.id = m.employee_id
-                WHERE m.id > {after_id}
+                WHERE m.id > {after_id} AND {where_chat} AND m.erased_at IS NULL
                 ORDER BY m.id ASC
                 LIMIT {limit}
             """)
@@ -172,9 +188,10 @@ def _action_poll(me: dict, body: dict) -> dict:
             cur.execute(f"""
                 SELECT * FROM (
                     SELECT m.id, m.employee_id, e.full_name, e.avatar_url, e.role,
-                           m.text, m.photo_url, m.created_at
+                           m.text, m.photo_url, m.created_at, m.recipient_id
                     FROM {SCHEMA}.vip_chat_messages m
                     JOIN {SCHEMA}.employees e ON e.id = m.employee_id
+                    WHERE {where_chat} AND m.erased_at IS NULL
                     ORDER BY m.id DESC
                     LIMIT {limit}
                 ) t ORDER BY id ASC
@@ -182,45 +199,89 @@ def _action_poll(me: dict, body: dict) -> dict:
         msgs = []
         for r in cur.fetchall():
             msgs.append({
-                'id': r[0], 'employee_id': r[1], 'full_name': r[2],
-                'avatar_url': r[3], 'role': r[4],
+                'id': r[0],
+                'employee_id': r[1], 'author_id': r[1],
+                'full_name': r[2], 'author_name': r[2],
+                'avatar_url': r[3], 'author_avatar': r[3],
+                'role': r[4],
                 'text': r[5], 'photo_url': r[6],
                 'created_at': r[7].isoformat() if r[7] else None,
+                'recipient_id': r[8],
             })
 
-        # Участники
+        # Участники: все активные сотрудники + считаем непрочитанные в личке от каждого
         cur.execute(f"""
-            SELECT id, full_name, role, avatar_url, last_seen_at, is_active
-            FROM {SCHEMA}.employees
-            WHERE is_active = true
-            ORDER BY (CASE WHEN last_seen_at IS NULL THEN 1 ELSE 0 END), last_seen_at DESC
+            SELECT e.id, e.full_name, e.role, e.avatar_url, e.last_seen_at, e.is_active
+            FROM {SCHEMA}.employees e
+            WHERE e.is_active = true
+            ORDER BY (CASE WHEN e.last_seen_at IS NULL THEN 1 ELSE 0 END), e.last_seen_at DESC
         """)
+        members_raw = cur.fetchall()
+
+        # Получаем last_read для всех диалогов me
+        cur.execute(f"""
+            SELECT peer_id, last_read_msg_id FROM {SCHEMA}.vip_chat_dialog_reads
+            WHERE employee_id = {me_id}
+        """)
+        reads_map = {row[0]: row[1] for row in cur.fetchall()}
+
+        # Считаем unread для каждого peer и общего чата
         members = []
-        for r in cur.fetchall():
+        for r in members_raw:
+            peer = r[0]
+            if peer == me_id:
+                unread_p = 0
+            else:
+                last_read_p = reads_map.get(peer, 0)
+                cur.execute(f"""
+                    SELECT COUNT(*) FROM {SCHEMA}.vip_chat_messages
+                    WHERE employee_id={peer} AND recipient_id={me_id}
+                      AND id > {last_read_p} AND erased_at IS NULL
+                """)
+                unread_p = cur.fetchone()[0]
             members.append({
                 'id': r[0], 'full_name': r[1], 'role': r[2],
                 'avatar_url': r[3],
                 'last_seen_at': r[4].isoformat() if r[4] else None,
                 'is_active': r[5],
+                'unread': unread_p,
             })
 
-        # Непрочитанные
-        cur.execute(f"SELECT last_read_msg_id FROM {SCHEMA}.vip_chat_reads WHERE employee_id={me['id']}")
-        rd = cur.fetchone()
-        last_read = rd[0] if rd else 0
-        cur.execute(f"SELECT COUNT(*) FROM {SCHEMA}.vip_chat_messages WHERE id > {last_read} AND employee_id <> {me['id']}")
-        unread = cur.fetchone()[0]
+        # Непрочитанные в ОБЩЕМ чате (peer_id=0)
+        last_read_common = reads_map.get(0, 0)
+        # Backfill из старой таблицы vip_chat_reads (для совместимости)
+        if last_read_common == 0:
+            cur.execute(f"SELECT last_read_msg_id FROM {SCHEMA}.vip_chat_reads WHERE employee_id={me_id}")
+            rd = cur.fetchone()
+            if rd:
+                last_read_common = rd[0]
+        cur.execute(f"""
+            SELECT COUNT(*) FROM {SCHEMA}.vip_chat_messages
+            WHERE recipient_id IS NULL AND id > {last_read_common}
+              AND employee_id <> {me_id} AND erased_at IS NULL
+        """)
+        unread_common = cur.fetchone()[0]
 
         cur.execute(f"SELECT COALESCE(MAX(id), 0) FROM {SCHEMA}.vip_chat_messages")
         max_id = cur.fetchone()[0] or 0
 
+        # last_id текущего диалога — для клиента
+        if msgs:
+            last_id_chat = msgs[-1]['id']
+        else:
+            last_id_chat = after_id
+
         conn.commit()
         return _ok({
-            'me': {'id': me['id'], 'role': me['role'], 'full_name': me['full_name']},
+            'me': {'id': me_id, 'role': me['role'], 'full_name': me['full_name']},
             'messages': msgs,
             'members': members,
-            'unread': unread,
+            'participants': members,  # alias для старого фронта
+            'unread': unread_common,
+            'unread_common': unread_common,
             'max_id': max_id,
+            'last_id': last_id_chat,
+            'peer_id': peer_id,
         })
     except Exception as e:
         conn.rollback()
@@ -229,31 +290,104 @@ def _action_poll(me: dict, body: dict) -> dict:
         cur.close(); conn.close()
 
 
+def _action_dialogs(me: dict, body: dict) -> dict:
+    """Список диалогов + последнее сообщение + счётчик непрочитанных по каждому."""
+    me_id = int(me['id'])
+    conn = _connect()
+    cur = conn.cursor()
+    try:
+        # Все сотрудники
+        cur.execute(f"""
+            SELECT id, full_name, role, avatar_url, last_seen_at, is_active
+            FROM {SCHEMA}.employees
+            WHERE is_active=true AND id<>{me_id}
+            ORDER BY (CASE WHEN last_seen_at IS NULL THEN 1 ELSE 0 END), last_seen_at DESC
+        """)
+        users = cur.fetchall()
+
+        # Карта прочитанного по диалогам
+        cur.execute(f"""
+            SELECT peer_id, last_read_msg_id FROM {SCHEMA}.vip_chat_dialog_reads
+            WHERE employee_id={me_id}
+        """)
+        reads = {r[0]: r[1] for r in cur.fetchall()}
+
+        dialogs = []
+        for u in users:
+            peer = u[0]
+            # последнее сообщение
+            cur.execute(f"""
+                SELECT id, text, photo_url, created_at, employee_id
+                FROM {SCHEMA}.vip_chat_messages
+                WHERE erased_at IS NULL AND
+                  ((employee_id={me_id} AND recipient_id={peer})
+                    OR (employee_id={peer} AND recipient_id={me_id}))
+                ORDER BY id DESC LIMIT 1
+            """)
+            last = cur.fetchone()
+            last_read = reads.get(peer, 0)
+            cur.execute(f"""
+                SELECT COUNT(*) FROM {SCHEMA}.vip_chat_messages
+                WHERE employee_id={peer} AND recipient_id={me_id}
+                  AND id>{last_read} AND erased_at IS NULL
+            """)
+            unread = cur.fetchone()[0]
+            dialogs.append({
+                'peer_id': peer,
+                'full_name': u[1], 'role': u[2], 'avatar_url': u[3],
+                'last_seen_at': u[4].isoformat() if u[4] else None,
+                'last_message': ({
+                    'id': last[0],
+                    'text': last[1],
+                    'photo_url': last[2],
+                    'created_at': last[3].isoformat() if last[3] else None,
+                    'mine': last[4] == me_id,
+                } if last else None),
+                'unread': unread,
+            })
+        return _ok({'dialogs': dialogs})
+    except Exception as e:
+        return _err(f'dialogs failed: {e}', 500)
+    finally:
+        cur.close(); conn.close()
+
+
 def _action_send(me: dict, body: dict) -> dict:
     text = (body.get('text') or '').strip()
     photo_url = (body.get('photo_url') or '').strip() or None
+    recipient_id = int(body.get('recipient_id') or body.get('peer_id') or 0) or None
     if not text and not photo_url:
         return _err('Сообщение пустое')
     if text and len(text) > 4000:
         text = text[:4000]
+    me_id = int(me['id'])
 
     conn = _connect()
     cur = conn.cursor()
     try:
         cur.execute(
-            f"INSERT INTO {SCHEMA}.vip_chat_messages (employee_id, text, photo_url) "
-            f"VALUES (%s, %s, %s) RETURNING id, created_at",
-            (me['id'], text or None, photo_url)
+            f"INSERT INTO {SCHEMA}.vip_chat_messages (employee_id, text, photo_url, recipient_id) "
+            f"VALUES (%s, %s, %s, %s) RETURNING id, created_at",
+            (me_id, text or None, photo_url, recipient_id)
         )
         new_id, created_at = cur.fetchone()
-        # Своё прочитанное двигаем
+        # Своё прочитанное в этом диалоге двигаем
+        peer_for_read = recipient_id if recipient_id else 0
         cur.execute(f"""
-            INSERT INTO {SCHEMA}.vip_chat_reads (employee_id, last_read_msg_id, updated_at)
-            VALUES ({me['id']}, {new_id}, NOW())
-            ON CONFLICT (employee_id) DO UPDATE
+            INSERT INTO {SCHEMA}.vip_chat_dialog_reads (employee_id, peer_id, last_read_msg_id, updated_at)
+            VALUES ({me_id}, {peer_for_read}, {new_id}, NOW())
+            ON CONFLICT (employee_id, peer_id) DO UPDATE
               SET last_read_msg_id = EXCLUDED.last_read_msg_id, updated_at = NOW()
         """)
-        _touch_last_seen(cur, me['id'])
+        # Совместимость со старой таблицей (для общего чата)
+        if not recipient_id:
+            cur.execute(f"""
+                INSERT INTO {SCHEMA}.vip_chat_reads (employee_id, last_read_msg_id, updated_at)
+                VALUES ({me_id}, {new_id}, NOW())
+                ON CONFLICT (employee_id) DO UPDATE
+                  SET last_read_msg_id = EXCLUDED.last_read_msg_id, updated_at = NOW()
+            """)
+        _touch_last_seen(cur, me_id)
         conn.commit()
     except Exception as e:
         conn.rollback()
@@ -261,18 +395,27 @@ def _action_send(me: dict, body: dict) -> dict:
         return _err(f'send failed: {e}', 500)
     cur.close(); conn.close()
 
-    # Рассылка push всем подписанным сотрудникам, кроме автора
+    # Рассылка push
     preview = text[:120] if text else ('📷 Фото' if photo_url else 'Новое сообщение')
+    if recipient_id:
+        title = f"{me['full_name']} · личное"
+        url = f"/staff?tab=chat&peer={recipient_id}"
+    else:
+        title = f"{me['full_name']} · СКУПКА24Vip"
+        url = '/staff?tab=chat'
     payload = {
-        'title': f"{me['full_name']} · СКУПКА24Vip",
+        'title': title,
         'body': preview,
-        'url': '/staff?tab=chat',
-        'tag': 'vip-chat',
+        'url': url,
+        'tag': f'vip-chat-{recipient_id or "all"}',
         'photo': photo_url,
         'msg_id': new_id,
     }
     try:
-        _send_push_to_all_except(me['id'], payload)
+        if recipient_id:
+            _send_push_to_employee(recipient_id, payload)
+        else:
+            _send_push_to_all_except(me_id, payload)
     except Exception:
         pass
 
@@ -318,20 +461,31 @@ def _action_upload_photo(me: dict, body: dict) -> dict:
 
 
 def _action_mark_read(me: dict, body: dict) -> dict:
-    msg_id = int(body.get('msg_id') or 0)
+    msg_id = int(body.get('msg_id') or body.get('last_id') or 0)
+    peer_id = int(body.get('peer_id') or 0)
     if msg_id <= 0:
         return _err('msg_id обязателен')
+    me_id = int(me['id'])
     conn = _connect()
     cur = conn.cursor()
     try:
         cur.execute(f"""
-            INSERT INTO {SCHEMA}.vip_chat_reads (employee_id, last_read_msg_id, updated_at)
-            VALUES ({me['id']}, {msg_id}, NOW())
-            ON CONFLICT (employee_id) DO UPDATE
-              SET last_read_msg_id = GREATEST({SCHEMA}.vip_chat_reads.last_read_msg_id, EXCLUDED.last_read_msg_id),
+            INSERT INTO {SCHEMA}.vip_chat_dialog_reads (employee_id, peer_id, last_read_msg_id, updated_at)
+            VALUES ({me_id}, {peer_id}, {msg_id}, NOW())
+            ON CONFLICT (employee_id, peer_id) DO UPDATE
+              SET last_read_msg_id = GREATEST({SCHEMA}.vip_chat_dialog_reads.last_read_msg_id, EXCLUDED.last_read_msg_id),
                   updated_at = NOW()
         """)
-        _touch_last_seen(cur, me['id'])
+        if peer_id == 0:
+            # совместимость со старой таблицей
+            cur.execute(f"""
+                INSERT INTO {SCHEMA}.vip_chat_reads (employee_id, last_read_msg_id, updated_at)
+                VALUES ({me_id}, {msg_id}, NOW())
+                ON CONFLICT (employee_id) DO UPDATE
+                  SET last_read_msg_id = GREATEST({SCHEMA}.vip_chat_reads.last_read_msg_id, EXCLUDED.last_read_msg_id),
+                      updated_at = NOW()
+            """)
+        _touch_last_seen(cur, me_id)
         conn.commit()
         return _ok({'ok': True})
     except Exception as e:
@@ -480,6 +634,54 @@ def _send_push_to_all_except(author_id: int, payload: dict) -> int:
             cur.executemany(
                 f"UPDATE {SCHEMA}.vip_chat_push_subs SET p256dh='', auth='', updated_at=NOW() WHERE endpoint=%s",
                 [(e,) for e in dead_endpoints]
+            )
+            conn.commit()
+    except Exception:
+        pass
+    finally:
+        cur.close(); conn.close()
+    return sent
+
+
+def _send_push_to_employee(employee_id: int, payload: dict) -> int:
+    """Отправляет push конкретному сотруднику (для личных сообщений)."""
+    if not HAS_WEBPUSH:
+        return 0
+    private_key = os.environ.get('VAPID_PRIVATE_KEY', '')
+    public_key = os.environ.get('VAPID_PUBLIC_KEY', '')
+    if not private_key or not public_key:
+        return 0
+    vapid_claims = {'sub': 'mailto:lekermany@yandex.ru'}
+    conn = _connect()
+    cur = conn.cursor()
+    sent = 0
+    dead: list[str] = []
+    try:
+        cur.execute(f"""
+            SELECT endpoint, p256dh, auth FROM {SCHEMA}.vip_chat_push_subs
+             WHERE employee_id = %s AND p256dh <> '' AND auth <> ''
+        """, (employee_id,))
+        body_str = json.dumps(payload, ensure_ascii=False)
+        for endpoint, p256dh, auth in cur.fetchall():
+            try:
+                webpush(
+                    subscription_info={'endpoint': endpoint, 'keys': {'p256dh': p256dh, 'auth': auth}},
+                    data=body_str,
+                    vapid_private_key=private_key,
+                    vapid_claims=vapid_claims,
+                    timeout=4,
+                )
+                sent += 1
+            except WebPushException as e:
+                code = getattr(e.response, 'status_code', 0) if e.response else 0
+                if code in (404, 410):
+                    dead.append(endpoint)
+            except Exception:
+                pass
+        if dead:
+            cur.executemany(
+                f"UPDATE {SCHEMA}.vip_chat_push_subs SET p256dh='', auth='', updated_at=NOW() WHERE endpoint=%s",
+                [(e,) for e in dead]
             )
             conn.commit()
     except Exception:
