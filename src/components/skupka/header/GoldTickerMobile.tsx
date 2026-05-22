@@ -50,9 +50,9 @@ const GoldTickerMobile = ({
   }, [openDetails]);
 
   return (
-    <div ref={rootRef} className="lg:hidden relative">
-      {/* ── Адаптивная строка: мобилка | планшет ── */}
-      <div className="relative max-w-7xl mx-auto px-3 sm:px-4 py-1.5 flex items-center gap-2">
+    <div ref={rootRef} className="relative">
+      {/* ── Адаптивная строка: мобилка | планшет | средний десктоп ── */}
+      <div className="relative max-w-7xl mx-auto px-3 sm:px-4 lg:px-5 py-1.5 flex items-center gap-2">
         {/* Медальон со статусом */}
         <div
           className="relative shrink-0 w-8 h-8 rounded-full flex items-center justify-center
@@ -98,13 +98,25 @@ const GoldTickerMobile = ({
           <Icon name={openDetails ? "ChevronUp" : "ChevronDown"} size={14} className="text-[#FFD700]/60 shrink-0 ml-2" />
         </button>
 
-        {/* Цена «Физлица» — появляется на sm+ (≥640px) */}
+        {/* Цена «Физлица» — sm+ (≥640px) */}
         {priceRetail999 && (
           <div className="hidden sm:flex items-center gap-1.5 h-9 px-3 rounded-md bg-black/50 border border-[#FFD700]/20 shrink-0">
             <Icon name="User" size={11} className="text-[#FFD700]/55" />
             <span className="text-[#FFD700]/55 text-[9px] uppercase tracking-wider font-oswald font-bold">Физ</span>
             <span className="text-[#FFD700] font-oswald font-bold text-[13px] whitespace-nowrap leading-none">
               {priceRetail999.toLocaleString('ru-RU')}
+              <span className="text-[9px] text-[#FFD700]/55 ml-0.5">₽/г</span>
+            </span>
+          </div>
+        )}
+
+        {/* Цена «Опт» — lg+ (≥1024px) */}
+        {priceWholesale999 && (
+          <div className="hidden lg:flex items-center gap-1.5 h-9 px-3 rounded-md bg-black/50 border border-[#FFD700]/20 shrink-0">
+            <Icon name="Package" size={11} className="text-[#FFD700]/55" />
+            <span className="text-[#FFD700]/55 text-[9px] uppercase tracking-wider font-oswald font-bold">Опт</span>
+            <span className="text-[#FFD700] font-oswald font-bold text-[13px] whitespace-nowrap leading-none">
+              {priceWholesale999.toLocaleString('ru-RU')}
               <span className="text-[9px] text-[#FFD700]/55 ml-0.5">₽/г</span>
             </span>
           </div>
@@ -117,6 +129,17 @@ const GoldTickerMobile = ({
             <span className="font-oswald font-semibold text-white/85 text-[12px] whitespace-nowrap leading-none">
               ${goldPrice.xau_usd.toLocaleString('en-US', { maximumFractionDigits: 0 })}
               <span className="text-white/35 text-[9px] font-bold ml-0.5">/oz</span>
+            </span>
+          </div>
+        )}
+
+        {/* USD/RUB — на lg+ (≥1024px) */}
+        {goldPrice?.usd_rub && (
+          <div className="hidden lg:flex items-center h-9 px-3 rounded-md bg-black/40 border border-white/10 shrink-0">
+            <span className="font-oswald font-semibold text-[9px] uppercase tracking-[0.18em] text-white/40 mr-1.5">USD</span>
+            <span className="font-oswald font-semibold text-white/85 text-[12px] whitespace-nowrap leading-none">
+              {goldPrice.usd_rub.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}
+              <span className="text-white/35 text-[9px] font-bold ml-0.5">₽</span>
             </span>
           </div>
         )}
@@ -141,14 +164,22 @@ const GoldTickerMobile = ({
           </span>
         </div>
 
-        {/* Телефон — иконка на sm+ (≥640px) */}
+        {/* Телефон — на sm+ иконка, на lg+ полный с подписью */}
         <a
           href="tel:88006006833"
           onClick={() => ymGoal(Goals.CALL_CLICK, { place: "ticker_mobile" })}
           title="Позвонить"
-          className="hidden sm:inline-flex items-center justify-center w-9 h-9 rounded-md bg-black/60 border border-[#FFD700]/30 text-[#FFD700] active:scale-95 transition-all shrink-0 ml-auto"
+          className="hidden sm:inline-flex lg:hidden items-center justify-center w-9 h-9 rounded-md bg-black/60 border border-[#FFD700]/30 text-[#FFD700] active:scale-95 transition-all shrink-0 ml-auto"
         >
           <Icon name="Phone" size={14} />
+        </a>
+        <a
+          href="tel:88006006833"
+          onClick={() => ymGoal(Goals.CALL_CLICK, { place: "ticker_mobile" })}
+          className="hidden lg:inline-flex items-center gap-2 h-9 px-3 rounded-md bg-black/60 hover:bg-black/80 border border-[#FFD700]/25 hover:border-[#FFD700]/55 active:scale-95 transition-all shrink-0 ml-auto"
+        >
+          <Icon name="Phone" size={13} className="text-[#FFD700]" />
+          <span className="font-oswald font-bold text-[#FFD700] text-[12px] tracking-wide whitespace-nowrap">8 800 600-68-33</span>
         </a>
 
         {/* Продать — главный CTA */}
