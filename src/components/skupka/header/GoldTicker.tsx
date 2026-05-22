@@ -54,14 +54,18 @@ const GoldTicker = ({
             </div>
           )}
 
-          {/* Цена + график */}
-          <div className="flex items-center gap-2 sm:gap-3 h-9 bg-black/60 border border-[#FFD700]/25 px-2.5 sm:px-3 rounded-md">
-            <div className="flex flex-col leading-none justify-center h-full">
-              <span className="font-oswald font-bold text-[9px] uppercase tracking-[0.2em] text-[#FFD700]/70">
+          {/* Цена + график — расширенная премиум-панель */}
+          <div className="flex items-stretch gap-3 sm:gap-4 h-9 bg-gradient-to-br from-[#1A1A1A] via-[#0F0F0F] to-[#1A1A1A] border border-[#FFD700]/30 px-3 sm:px-4 rounded-lg shadow-[inset_0_1px_0_rgba(255,215,0,0.12),0_2px_8px_rgba(0,0,0,0.4)] relative overflow-hidden">
+            {/* Внутреннее свечение */}
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,215,0,0.08),transparent_70%)]" />
+
+            {/* Цена ₽/г */}
+            <div className="relative flex flex-col leading-none justify-center">
+              <span className="font-oswald font-bold text-[9px] uppercase tracking-[0.2em] text-[#FFD700]/70 whitespace-nowrap">
                 Золото 999
               </span>
               {goldPrice?.buy ? (
-                <span className="font-oswald font-bold text-[#FFD700] text-base sm:text-lg mt-0.5 tracking-tight whitespace-nowrap leading-none">
+                <span className="font-oswald font-bold text-[#FFD700] text-base sm:text-lg mt-0.5 tracking-tight whitespace-nowrap leading-none drop-shadow-[0_0_6px_rgba(255,215,0,0.4)]">
                   {goldPrice.buy.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}
                   <span className="text-[#FFD700]/60 text-[10px] font-bold ml-0.5">₽/г</span>
                 </span>
@@ -70,30 +74,59 @@ const GoldTicker = ({
               )}
             </div>
 
-            {/* Мини-график 7 дней — только на >=md */}
+            {/* XAU/USD за унцию — показываем на sm+ */}
+            {goldPrice?.xau_usd && (
+              <div className="relative hidden sm:flex flex-col leading-none justify-center pl-3 sm:pl-4 border-l border-[#FFD700]/15">
+                <span className="font-oswald font-semibold text-[9px] uppercase tracking-[0.18em] text-white/40 whitespace-nowrap">
+                  XAU/USD
+                </span>
+                <span className="font-oswald font-semibold text-white/85 text-[12px] sm:text-[13px] mt-0.5 whitespace-nowrap leading-none">
+                  ${goldPrice.xau_usd.toLocaleString('en-US', { maximumFractionDigits: 2 })}
+                  <span className="text-white/40 text-[9px] font-bold ml-0.5">/oz</span>
+                </span>
+              </div>
+            )}
+
+            {/* Мини-график 7 дней с заливкой + дельта% — на md+ */}
             {goldPrice?.buy && goldHistory.length >= 2 && (() => {
-              const W = 44, H = 20, pad = 2;
+              const W = 72, H = 24, pad = 2;
               const prices = goldHistory.map(h => h.price);
               const min = Math.min(...prices);
               const max = Math.max(...prices);
               const range = max - min || 1;
-              const pts = prices.map((p, i) => {
+              const xy = prices.map((p, i) => {
                 const x = pad + (i / (prices.length - 1)) * (W - pad * 2);
                 const y = H - pad - ((p - min) / range) * (H - pad * 2);
-                return `${x.toFixed(1)},${y.toFixed(1)}`;
-              }).join(' ');
+                return { x, y };
+              });
+              const pts = xy.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+              const fill = `${xy[0].x.toFixed(1)},${H - pad} ${pts} ${xy[xy.length - 1].x.toFixed(1)},${H - pad}`;
               const last = prices[prices.length - 1];
               const first = prices[0];
               const up = last >= first;
               const color = up ? '#22c55e' : '#ef4444';
+              const fadeColor = up ? 'rgba(34,197,94,0.25)' : 'rgba(239,68,68,0.25)';
+              const lastPt = xy[xy.length - 1];
+              const deltaPct = Math.abs(((last - first) / first) * 100).toFixed(1);
               return (
-                <div className="hidden md:flex items-center gap-1.5 pl-2.5 border-l border-[#FFD700]/20" title="Изменение за 7 дней">
+                <div className="relative hidden md:flex items-center gap-2 pl-3 lg:pl-4 border-l border-[#FFD700]/15" title="Изменение цены за 7 дней">
                   <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="overflow-visible">
+                    <defs>
+                      <linearGradient id="g7d" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={fadeColor} />
+                        <stop offset="100%" stopColor="rgba(0,0,0,0)" />
+                      </linearGradient>
+                    </defs>
+                    <polygon points={fill} fill="url(#g7d)" />
                     <polyline points={pts} fill="none" stroke={color} strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" />
+                    <circle cx={lastPt.x} cy={lastPt.y} r="2.2" fill={color} stroke="#0A0A0A" strokeWidth="1" />
                   </svg>
-                  <span className="text-[10px] font-oswald font-bold" style={{ color }}>
-                    {up ? '▲' : '▼'}{Math.abs(((last - first) / first) * 100).toFixed(1)}%
-                  </span>
+                  <div className="flex flex-col leading-none">
+                    <span className="text-[10px] font-oswald font-bold flex items-center gap-0.5" style={{ color }}>
+                      {up ? '▲' : '▼'} {deltaPct}%
+                    </span>
+                    <span className="text-[8px] text-white/35 mt-0.5 uppercase tracking-wider font-oswald font-bold">7 дней</span>
+                  </div>
                 </div>
               );
             })()}
