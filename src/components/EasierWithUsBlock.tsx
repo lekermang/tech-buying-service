@@ -87,10 +87,13 @@ export default function EasierWithUsBlock() {
               предложения и уведомления о каждом изменении.
             </p>
             <p className="font-roboto text-white/60 text-sm md:text-base leading-relaxed mb-6 md:mb-8">
-              Работает на{" "}
-              <span className="text-emerald-400 font-semibold">Android и Windows</span>,
-              а также как PWA в любом браузере. Авторизация по SMS, личная скидка и баллы
-              копятся автоматически.
+              Нативное приложение есть для{" "}
+              <span className="text-emerald-400 font-semibold">Android и Windows</span>.
+              Для <span className="text-[#FFD700] font-semibold">iPhone</span> временно нет
+              отдельного приложения — открой сайт в{" "}
+              <span className="text-white font-semibold">Safari</span> и добавь на экран
+              «Домой»: будет работать как обычное приложение, без отличий. Вход по SMS,
+              скидка и баллы копятся автоматически.
             </p>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 md:gap-3 mb-6 md:mb-8">
@@ -203,31 +206,49 @@ export default function EasierWithUsBlock() {
                     />
                   </button>
 
-                  {/* iOS / Браузер — PWA */}
-                  <a
-                    href="/client"
-                    className="w-full group relative overflow-hidden bg-[#0A0A0A] border border-[#FFD700]/15 hover:border-[#FFD700]/60 transition-all p-4 flex items-center gap-4 text-left"
-                  >
-                    <div className="w-12 h-12 bg-gradient-to-br from-[#FFD700]/25 to-[#FFD700]/5 border border-[#FFD700]/30 flex items-center justify-center shrink-0">
-                      <Icon name="Globe" size={22} className="text-[#FFD700]" />
+                  {/* iOS — пока временно через Safari (PWA) */}
+                  <div className="relative bg-[#0A0A0A] border border-[#FFD700]/15 hover:border-[#FFD700]/60 transition-all">
+                    <a
+                      href="/client"
+                      className="w-full group p-4 flex items-center gap-4 text-left"
+                    >
+                      <div className="w-12 h-12 bg-gradient-to-br from-[#FFD700]/25 to-[#FFD700]/5 border border-[#FFD700]/30 flex items-center justify-center shrink-0 relative">
+                        <Icon name="Apple" size={22} className="text-[#FFD700]" />
+                        <span className="absolute -top-1.5 -right-1.5 text-[8px] font-bold uppercase tracking-wider bg-[#FFD700] text-black px-1 rounded-sm">
+                          Soon
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-roboto text-[10px] text-white/40 uppercase tracking-widest">
+                          Для iPhone · iOS
+                        </div>
+                        <div className="font-oswald font-bold text-white text-base md:text-lg uppercase leading-tight">
+                          Открыть в Safari
+                        </div>
+                        <div className="font-roboto text-white/55 text-[11px] truncate">
+                          Нативное приложение в разработке — пока веб-версия
+                        </div>
+                      </div>
+                      <Icon
+                        name="ArrowRight"
+                        size={18}
+                        className="text-[#FFD700]/60 group-hover:text-[#FFD700] group-hover:translate-x-1 transition-all shrink-0"
+                      />
+                    </a>
+                    {/* Мини-инструкция «На экран Домой» */}
+                    <div className="px-4 pb-3 pt-0 -mt-1 flex items-center gap-1.5 flex-wrap text-[10.5px] font-roboto text-white/50">
+                      <span className="text-white/40">Добавь на экран:</span>
+                      <span className="inline-flex items-center gap-1 bg-[#FFD700]/8 border border-[#FFD700]/20 px-1.5 py-0.5 rounded">
+                        <Icon name="Share" size={10} className="text-[#FFD700]" />
+                        Поделиться
+                      </span>
+                      <Icon name="ChevronRight" size={10} className="text-white/30" />
+                      <span className="inline-flex items-center gap-1 bg-[#FFD700]/8 border border-[#FFD700]/20 px-1.5 py-0.5 rounded">
+                        <Icon name="PlusSquare" size={10} className="text-[#FFD700]" />
+                        На экран «Домой»
+                      </span>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-roboto text-[10px] text-white/40 uppercase tracking-widest">
-                        Открыть в браузере
-                      </div>
-                      <div className="font-oswald font-bold text-white text-base md:text-lg uppercase leading-tight">
-                        iOS / Web
-                      </div>
-                      <div className="font-roboto text-white/55 text-[11px] truncate">
-                        Без установки · Добавь на главный экран
-                      </div>
-                    </div>
-                    <Icon
-                      name="ArrowRight"
-                      size={18}
-                      className="text-[#FFD700]/60 group-hover:text-[#FFD700] group-hover:translate-x-1 transition-all shrink-0"
-                    />
-                  </a>
+                  </div>
                 </div>
 
                 {/* Полоска доверия */}
