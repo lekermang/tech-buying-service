@@ -144,25 +144,91 @@ function NewOfferModal({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  // Сжимаем большие фото перед отправкой (особенно важно для Android-камер и iPhone HEIC)
+  const compressImage = async (file: File): Promise<{ blob: Blob; mime: string }> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const reader = new FileReader();
+      reader.onload = () => {
+        img.onload = () => {
+          const MAX = 1600;
+          let { width, height } = img;
+          if (width > MAX || height > MAX) {
+            if (width > height) {
+              height = Math.round((height * MAX) / width);
+              width = MAX;
+            } else {
+              width = Math.round((width * MAX) / height);
+              height = MAX;
+            }
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            reject(new Error("Не удалось обработать фото"));
+            return;
+          }
+          ctx.drawImage(img, 0, 0, width, height);
+          canvas.toBlob(
+            (b) => (b ? resolve({ blob: b, mime: "image/jpeg" }) : reject(new Error("Сжатие не удалось"))),
+            "image/jpeg",
+            0.85,
+          );
+        };
+        img.onerror = () => reject(new Error("Файл не похож на картинку"));
+        img.src = String(reader.result || "");
+      };
+      reader.onerror = () => reject(new Error("Не удалось прочитать файл"));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const blobToBase64 = (blob: Blob): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result || "").split(",")[1] || "");
+      r.onerror = () => reject(new Error("Не удалось прочитать файл"));
+      r.readAsDataURL(blob);
+    });
 
   const uploadPhoto = async (file: File) => {
+    setError(null);
+    setUploadingPhoto(true);
     try {
-      const b64 = await new Promise<string>((resolve, reject) => {
-        const r = new FileReader();
-        r.onload = () => resolve(String(r.result || "").split(",")[1] || "");
-        r.onerror = reject;
-        r.readAsDataURL(file);
-      });
+      // Размер до сжатия > 12 МБ — отказ
+      if (file.size > 12 * 1024 * 1024) {
+        setError("Фото больше 12 МБ — выбери поменьше");
+        return;
+      }
+      // Сжимаем (заодно конвертируем HEIC/PNG/WebP в JPEG)
+      let blob: Blob = file;
+      let mime: string = file.type || "image/jpeg";
+      try {
+        const c = await compressImage(file);
+        blob = c.blob;
+        mime = c.mime;
+      } catch {
+        // Если canvas не сработал (APK WebView), отправим как есть
+      }
+      const b64 = await blobToBase64(blob);
       const r = await fetch(URL, {
         method: "POST",
         headers: { "X-Client-Token": token, "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "upload_photo", base64: b64, mime_type: file.type }),
+        body: JSON.stringify({ action: "upload_photo", base64: b64, mime_type: mime }),
       });
       const d = await r.json();
       if (d.error) setError(d.error);
       else if (d.photo_url) setPhotos((p) => [...p, d.photo_url]);
     } catch (e) {
-      setError(String(e));
+      setError((e as Error)?.message || "Не удалось загрузить фото");
+    } finally {
+      setUploadingPhoto(false);
     }
   };
 
@@ -296,17 +362,47 @@ function NewOfferModal({
                 </div>
               ))}
               {photos.length < 10 && (
-                <button
-                  onClick={() => fileRef.current?.click()}
-                  className="w-16 h-16 rounded-lg border border-dashed border-[#FFD700]/40 text-[#FFD700] flex items-center justify-center hover:bg-[#FFD700]/5"
-                >
-                  <Icon name="Camera" size={20} />
-                </button>
+                <>
+                  <button
+                    onClick={() => fileRef.current?.click()}
+                    disabled={uploadingPhoto}
+                    className="w-16 h-16 rounded-lg border border-dashed border-[#FFD700]/40 text-[#FFD700] flex flex-col items-center justify-center gap-0.5 hover:bg-[#FFD700]/5 disabled:opacity-50"
+                  >
+                    {uploadingPhoto ? (
+                      <Icon name="Loader" size={18} className="animate-spin" />
+                    ) : (
+                      <>
+                        <Icon name="Image" size={18} />
+                        <span className="text-[8px] uppercase tracking-wider">Галерея</span>
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => cameraRef.current?.click()}
+                    disabled={uploadingPhoto}
+                    className="w-16 h-16 rounded-lg border border-dashed border-[#FFD700]/40 text-[#FFD700] flex flex-col items-center justify-center gap-0.5 hover:bg-[#FFD700]/5 disabled:opacity-50"
+                  >
+                    <Icon name="Camera" size={18} />
+                    <span className="text-[8px] uppercase tracking-wider">Снять</span>
+                  </button>
+                </>
               )}
               <input
                 ref={fileRef}
                 type="file"
                 accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) uploadPhoto(f);
+                  e.target.value = "";
+                }}
+              />
+              <input
+                ref={cameraRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
                 className="hidden"
                 onChange={(e) => {
                   const f = e.target.files?.[0];

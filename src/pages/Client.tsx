@@ -5,24 +5,30 @@ import ClientAuthScreen from "./client/ClientAuthScreen";
 import ClientRepairs from "./client/ClientRepairs";
 import ClientContracts from "./client/ClientContracts";
 import ClientOffers from "./client/ClientOffers";
+import ClientChat from "./client/ClientChat";
 import ClientNotificationsBanner from "./client/ClientNotificationsBanner";
 import { ClientProfile } from "./client/clientTypes";
 
 const AUTH_URL = (funcUrls as Record<string, string>)["client-auth"];
 const CAB_URL = (funcUrls as Record<string, string>)["client-cabinet"];
 
-type Tab = "repairs" | "contracts" | "offers";
+type Tab = "repairs" | "contracts" | "offers" | "chat";
 
 const TABS: { id: Tab; label: string; icon: string; desc: string }[] = [
   { id: "repairs", label: "Ремонты", icon: "Wrench", desc: "Что в работе" },
   { id: "contracts", label: "Залоги 14 дней", icon: "ScrollText", desc: "Договоры ломбарда" },
   { id: "offers", label: "Предложения", icon: "Send", desc: "Что я хочу сдать" },
+  { id: "chat", label: "Чат", icon: "MessageCircle", desc: "Связь с менеджером" },
 ];
 
 export default function Client() {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem("client_token"));
   const [profile, setProfile] = useState<ClientProfile | null>(null);
-  const [tab, setTab] = useState<Tab>("repairs");
+  const [tab, setTab] = useState<Tab>(() => {
+    const p = new URLSearchParams(window.location.search);
+    const t = p.get("tab") as Tab | null;
+    return (t && ["repairs", "contracts", "offers", "chat"].includes(t)) ? t : "repairs";
+  });
   const [loading, setLoading] = useState(false);
 
   const loadProfile = useCallback(async (t: string) => {
@@ -156,6 +162,7 @@ export default function Client() {
         {tab === "repairs" && <ClientRepairs token={token} />}
         {tab === "contracts" && <ClientContracts token={token} />}
         {tab === "offers" && <ClientOffers token={token} />}
+        {tab === "chat" && <ClientChat token={token} />}
       </main>
 
       {/* Футер */}

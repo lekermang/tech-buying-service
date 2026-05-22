@@ -15,6 +15,7 @@ import MaxChannelBanner from "@/components/skupka/MaxChannelBanner";
 import PublicChatFab from "@/components/skupka/PublicChatFab";
 import AppDownloadCard from "@/components/AppDownloadCard";
 import EasierWithUsBlock from "@/components/EasierWithUsBlock";
+import QuickContactSection from "@/components/QuickContactSection";
 
 const scrollTo = (href: string) => {
   const el = document.querySelector(href);
@@ -389,6 +390,9 @@ const Index = ({ goldOpen = false }: { goldOpen?: boolean }) => {
 
       {/* С нами стало проще — премиум-блок (приложения + преимущества), стиль Trade In */}
       <EasierWithUsBlock />
+
+      {/* Быстрая связь — 4 канала: телефон, чат, telegram, офисы */}
+      <QuickContactSection />
 
       <JobsSection />
       <MaxChannelBanner />

@@ -16,6 +16,7 @@ CORS: Access-Control-Allow-Origin: *
 import json
 import os
 import re
+import base64
 import secrets
 from typing import Any
 
@@ -227,23 +228,51 @@ def _ensure_room_for_client(client_id: int) -> int:
 
 
 def _post_message(room_id: int, author_type: str, author_id: int, author_name: str,
-                  text: str, is_system: bool = False) -> dict:
+                  text: str, is_system: bool = False, photo_url: str = None) -> dict:
     """INSERT в pchat_messages + обновление last_message_at у комнаты."""
     conn = _conn()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cur.execute(
         f"INSERT INTO {SCHEMA}.pchat_messages "
-        f"(room_id, author_type, author_id, author_name, text, is_system) "
-        f"VALUES (%s, %s, %s, %s, %s, %s) RETURNING id, created_at",
-        (room_id, author_type, author_id, author_name, text, is_system)
+        f"(room_id, author_type, author_id, author_name, text, photo_url, is_system) "
+        f"VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id, created_at",
+        (room_id, author_type, author_id, author_name, text, photo_url, is_system)
     )
     row = cur.fetchone()
+    preview = (text or '').strip()
+    if not preview and photo_url:
+        preview = '📷 Фото'
     cur.execute(
         f"UPDATE {SCHEMA}.pchat_rooms SET last_message_at=NOW(), last_message_text=%s WHERE id=%s",
-        ((text or '')[:500], room_id)
+        (preview[:500], room_id)
     )
     conn.commit(); cur.close(); conn.close()
     return dict(row)
+
+
+def _upload_chat_photo(b64: str, mime: str = 'image/jpeg') -> str:
+    """Сохраняет фото в S3, возвращает CDN-URL."""
+    import boto3
+    from botocore.client import Config as BotoConfig
+    try:
+        data = base64.b64decode(b64)
+    except Exception:
+        raise ValueError('bad_base64')
+    if len(data) > 12 * 1024 * 1024:
+        raise ValueError('too_big')
+    ext_map = {'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png',
+               'image/webp': 'webp', 'image/heic': 'heic'}
+    ext = ext_map.get(mime.lower(), 'jpg')
+    key = f'chat/{secrets.token_hex(12)}.{ext}'
+    s3 = boto3.client(
+        's3',
+        endpoint_url='https://bucket.poehali.dev',
+        aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
+        aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
+        config=BotoConfig(signature_version='s3v4'),
+    )
+    s3.put_object(Bucket='files', Key=key, Body=data, ContentType=mime)
+    return f"https://cdn.poehali.dev/projects/{os.environ['AWS_ACCESS_KEY_ID']}/bucket/{key}"
 
 
 # ─────────────────────── notification helpers ───────────────────────
@@ -503,7 +532,7 @@ def action_room(event, qp):
         return _err(403, 'Forbidden')
 
     cur.execute(
-        f"SELECT id, author_type, author_id, author_name, text, is_system, created_at "
+        f"SELECT id, author_type, author_id, author_name, text, photo_url, is_system, created_at "
         f"FROM {SCHEMA}.pchat_messages WHERE room_id=%s ORDER BY id DESC LIMIT 100",
         (room_id,)
     )
@@ -538,8 +567,21 @@ def action_send(event, body):
     except Exception:
         return _err(400, 'Bad room_id')
     text = (body.get('text') or '').strip()
-    if not room_id or not text:
-        return _err(400, 'room_id and text required')
+    photo_b64 = (body.get('photo_base64') or '').strip()
+    photo_mime = (body.get('photo_mime') or 'image/jpeg').strip()
+    if not room_id:
+        return _err(400, 'room_id required')
+    if not text and not photo_b64:
+        return _err(400, 'text or photo_base64 required')
+
+    photo_url = None
+    if photo_b64:
+        try:
+            photo_url = _upload_chat_photo(photo_b64, photo_mime)
+        except ValueError as ve:
+            return _err(400, f'photo: {ve}')
+        except Exception as e:
+            return _err(500, f'photo upload failed: {e}')
 
     # Проверка доступа
     conn = _conn()
@@ -580,7 +622,7 @@ def action_send(event, body):
         author_id = client['id']
         author_name = client.get('display_name') or client['phone']
 
-    msg = _post_message(room_id, author_type, author_id, author_name, text)
+    msg = _post_message(room_id, author_type, author_id, author_name, text, photo_url=photo_url)
 
     # Дублирование
     try:
@@ -636,7 +678,7 @@ def action_poll(event, qp):
         return _err(403, 'Forbidden')
 
     cur.execute(
-        f"SELECT id, author_type, author_id, author_name, text, is_system, created_at "
+        f"SELECT id, author_type, author_id, author_name, text, photo_url, is_system, created_at "
         f"FROM {SCHEMA}.pchat_messages WHERE room_id=%s AND id > %s "
         f"ORDER BY id ASC LIMIT 200",
         (room_id, since)

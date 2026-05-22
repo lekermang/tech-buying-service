@@ -13,6 +13,7 @@ import json
 import uuid
 import base64
 import hashlib
+import secrets
 from datetime import datetime, timezone
 import psycopg2
 import boto3
@@ -118,8 +119,70 @@ def handler(event: dict, context) -> dict:
         return _push_unsubscribe(me, body)
     if action == 'check_updates':
         return _check_updates(me)
+    if action == 'chat_init':
+        return _chat_init(me)
 
     return _err(f'unknown action: {action}')
+
+
+def _chat_init(me):
+    """Создаёт/находит pchat-клиента и direct-комнату для клиента кабинета.
+    Возвращает X-Auth-Token для public-chat и room_id."""
+    phone = _normalize_phone(me.get('phone') or '')
+    if len(phone) < 11:
+        # дополнить до 11 (если 10 цифр)
+        if len(phone) == 10:
+            phone = '7' + phone
+        else:
+            return _err('Некорректный телефон клиента', 400)
+    name = me.get('full_name') or ''
+    conn = _connect()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            f"SELECT id, auth_token, display_name FROM {SCHEMA}.pchat_clients WHERE phone=%s LIMIT 1",
+            (phone,)
+        )
+        row = cur.fetchone()
+        if row:
+            pc_id, auth_token, display_name = row
+            if name and not display_name:
+                cur.execute(
+                    f"UPDATE {SCHEMA}.pchat_clients SET display_name=%s WHERE id=%s",
+                    (name, pc_id)
+                )
+        else:
+            auth_token = secrets.token_urlsafe(40)[:40]
+            cur.execute(
+                f"INSERT INTO {SCHEMA}.pchat_clients (phone, display_name, auth_token, auth_method) "
+                f"VALUES (%s, %s, %s, 'cabinet') RETURNING id",
+                (phone, name or None, auth_token)
+            )
+            pc_id = cur.fetchone()[0]
+
+        # direct-комната
+        cur.execute(
+            f"SELECT id FROM {SCHEMA}.pchat_rooms WHERE client_id=%s AND type='direct' "
+            f"ORDER BY id ASC LIMIT 1",
+            (pc_id,)
+        )
+        rrow = cur.fetchone()
+        if rrow:
+            room_id = int(rrow[0])
+        else:
+            cur.execute(
+                f"INSERT INTO {SCHEMA}.pchat_rooms (type, title, client_id) "
+                f"VALUES ('direct', %s, %s) RETURNING id",
+                (name or f'Клиент #{pc_id}', pc_id)
+            )
+            room_id = int(cur.fetchone()[0])
+        conn.commit()
+        return _ok({'ok': True, 'auth_token': auth_token, 'room_id': room_id})
+    except Exception as e:
+        conn.rollback()
+        return _err(f'chat_init failed: {e}', 500)
+    finally:
+        cur.close(); conn.close()
 
 
 def _my_repairs(me):
