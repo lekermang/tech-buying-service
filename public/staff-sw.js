@@ -1,4 +1,4 @@
-const CACHE_NAME = 'staff-v2';
+const CACHE_NAME = 'staff-v3';
 const STATIC_ASSETS = ['/staff'];
 
 self.addEventListener('install', e => {
@@ -31,5 +31,44 @@ self.addEventListener('fetch', e => {
         return r;
       })
       .catch(() => caches.match(request).then(cached => cached || caches.match('/staff')))
+  );
+});
+
+// === PUSH-уведомления ===
+self.addEventListener('push', (event) => {
+  let data = { title: 'Скупка 24', body: 'Новое уведомление', url: '/staff' };
+  try {
+    if (event.data) {
+      const raw = event.data.text();
+      try { data = { ...data, ...JSON.parse(raw) }; } catch { data.body = raw; }
+    }
+  } catch {}
+  const options = {
+    body: data.body,
+    icon: data.icon || '/favicon.ico',
+    badge: data.badge || '/favicon.ico',
+    tag: data.tag || 'skupka24',
+    renotify: true,
+    data: { url: data.url || '/staff' },
+    vibrate: [100, 50, 100],
+  };
+  event.waitUntil(self.registration.showNotification(data.title, options));
+});
+
+// Клик по уведомлению — открыть/сфокусировать /staff
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = (event.notification.data && event.notification.data.url) || '/staff';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((cls) => {
+      for (const c of cls) {
+        if (c.url.includes('/staff')) {
+          c.focus();
+          if (c.navigate) c.navigate(targetUrl);
+          return;
+        }
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(targetUrl);
+    })
   );
 });

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import Icon from "@/components/ui/icon";
 
 /**
@@ -14,6 +15,27 @@ const REPO = "https://github.com/lekermang/tech-buying-service";
 const WIN_URL = `${REPO}/releases/latest/download/Skupka24-Setup.exe`;
 const APK_URL = `${REPO}/releases/latest/download/Skupka24.apk`;
 const RELEASES_PAGE = `${REPO}/releases/latest`;
+const GITHUB_API = "https://api.github.com/repos/lekermang/tech-buying-service/releases/latest";
+
+/** Получает последнюю опубликованную версию релиза с GitHub. */
+function useLatestVersion() {
+  const [version, setVersion] = useState<string | null>(null);
+  const [publishedAt, setPublishedAt] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch(GITHUB_API, { headers: { Accept: "application/vnd.github+json" } })
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled) return;
+        const tag = d?.tag_name || d?.name || null;
+        if (tag) setVersion(String(tag));
+        if (d?.published_at) setPublishedAt(d.published_at);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+  return { version, publishedAt };
+}
 
 type Props = {
   /** Компактный вариант (одна строка) */
@@ -29,6 +51,7 @@ export default function AppDownloadCard({
   title = "Приложение Скупка 24",
   subtitle = "Работает быстрее сайта, есть офлайн-режим",
 }: Props) {
+  const { version, publishedAt } = useLatestVersion();
   return (
     <div className={`relative bg-gradient-to-br from-[#1A1A1A] via-[#141414] to-[#0E0E0E] border border-[#FFD700]/20 rounded-2xl overflow-hidden ${compact ? "p-3" : "p-4 sm:p-5"}`}>
       <div className="absolute -top-10 -right-10 text-[140px] opacity-[0.04] select-none">⬇️</div>
@@ -90,14 +113,16 @@ export default function AppDownloadCard({
           </div>
         </div>
 
-        {/* Запасная ссылка — если файл не скачался напрямую */}
+        {/* Запасная ссылка + версия */}
         <a
           href={RELEASES_PAGE}
           target="_blank"
           rel="noopener noreferrer"
           className="block mt-2 text-center text-[10px] font-roboto text-white/35 hover:text-[#FFD700] transition-colors"
         >
-          Все версии и история обновлений →
+          {version
+            ? `Версия ${version}${publishedAt ? " · " + new Date(publishedAt).toLocaleDateString("ru-RU") : ""} · все версии →`
+            : "Все версии и история обновлений →"}
         </a>
       </div>
     </div>

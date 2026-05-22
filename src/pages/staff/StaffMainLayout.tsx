@@ -20,6 +20,8 @@ import StaffSectionBanner from "./StaffSectionBanner";
 import { SLTooltip } from "../slShop/slUI";
 import LeadsAlertWatcher from "./LeadsAlertWatcher";
 import MyDayTab from "../staffMyDay/MyDayTab";
+import VipChatTab from "../staffChat/VipChatTab";
+import AppUpdateBanner from "@/components/AppUpdateBanner";
 
 type Tab = StaffTab;
 
@@ -100,6 +102,7 @@ export function StaffMainLayout({
   // редко используемые (золото/команда) — на правом краю для админов.
   const TABS: { k: Tab; l: string; icon: string; badge?: number; tip?: string; premium?: boolean }[] = [
     { k: "myday",        l: "Мой день",     icon: "Sunrise",       tip: "Чек-лист дня, мёртвые деньги, Авито-индекс, узкие места. Персонально для тебя." },
+    { k: "chat",         l: "Чат",          icon: "MessagesSquare", tip: "Чат команды Скупка 24: переписка, фото, push-уведомления о новых сообщениях." },
     { k: "repair",       l: "Ремонт",       icon: "Wrench",        tip: "Заявки на ремонт техники: новые, в работе, готовые. Поиск, фото, статусы." },
     { k: "smartlombard", l: "Ломбард",      icon: "Coins",         tip: "СмартЛомбард: скупка и продажа Б/У техники, касса, договоры на 14 дней.", premium: true },
     { k: "salary",       l: "Зарплата",     icon: "Wallet",        tip: "Моя смена и заработок. Владельцу — управление ставкой, %, выходными и выплатами." },
@@ -153,6 +156,8 @@ export function StaffMainLayout({
       )}
       {/* Системный баннер офлайн (постоянный, пока нет сети) */}
       <OfflineBanner />
+      {/* Баннер «доступно обновление» — виден только в нативном .exe / .apk */}
+      <AppUpdateBanner />
       {/* Праздничный баннер (показывается за N дней до и после праздника) */}
       <HolidayBanner className="z-20" />
       {/* Угловое праздничное украшение (Георгиевская лента 9 мая, снежинки на НГ и т.д.) */}
@@ -269,6 +274,7 @@ export function StaffMainLayout({
         <TabErrorBoundary key={tab}>
           <React.Suspense fallback={<div className="flex items-center justify-center py-16 text-white/20 font-roboto text-sm"><Icon name="Loader" size={16} className="animate-spin mr-2" />Загружаю...</div>}>
             {tab === "myday"     && <MyDayTab token={token} />}
+            {tab === "chat"      && <VipChatTab token={token} />}
             {tab === "repair"    && <StaffRepairTab token={token} isOwner={empRole === "owner"} />}
             {tab === "goods"     && <GoodsTab token={token} />}
             {tab === "sales"     && <SalesTab token={token} />}
