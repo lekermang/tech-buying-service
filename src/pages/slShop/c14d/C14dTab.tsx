@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 import {
   c14dApi, fmt, fmtDate, STATUS_BADGE,
-  type C14dListItem, type C14dStats,
+  type C14dListItem, type C14dStats, type C14dDailyProfit,
 } from "./types";
 import C14dCreateForm from "./C14dCreateForm";
 import C14dDetailView from "./C14dDetailView";
@@ -19,6 +19,46 @@ function pluralDays(n: number): string {
   if (b > 1 && b < 5) return "дня";
   if (b === 1) return "день";
   return "дней";
+}
+
+function DailyProfitPanel({ daily }: { daily: C14dDailyProfit[] }) {
+  const maxProfit = Math.max(1, ...daily.map(d => d.profit));
+  const todayIso = new Date().toISOString().slice(0, 10);
+  return (
+    <div className="mt-2 rounded-xl bg-[#101010] border border-[#1A1A1A] p-2 sm:p-2.5">
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <Icon name="BarChart3" size={12} className="text-[#FFD700]" />
+        <h3 className="font-oswald uppercase text-[11px] tracking-wide font-bold text-white/85">
+          Прибыль по дням · последние 14 дней
+        </h3>
+      </div>
+      <div className="space-y-0.5">
+        {daily.map(d => {
+          const isToday = d.day === todayIso;
+          const w = Math.max(2, Math.round((d.profit / maxProfit) * 100));
+          return (
+            <div key={d.day} className="flex items-center gap-2 text-[11px]">
+              <div className={`w-16 shrink-0 ${isToday ? "text-[#FFD700] font-bold" : "text-white/55"}`}>
+                {fmtDate(d.day)}
+              </div>
+              <div className="flex-1 min-w-0 relative h-4 bg-white/5 rounded-sm overflow-hidden">
+                <div
+                  className={`absolute inset-y-0 left-0 ${isToday ? "bg-[#FFD700]/70" : "bg-emerald-500/45"}`}
+                  style={{ width: `${w}%` }}
+                />
+              </div>
+              <div className="w-16 shrink-0 text-right text-white/65">
+                {d.count} шт
+              </div>
+              <div className={`w-24 shrink-0 text-right font-bold ${isToday ? "text-[#FFD700]" : "text-emerald-300"}`}>
+                {fmt(d.profit)} ₽
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 export default function C14dTab({ token }: Props) {
@@ -94,6 +134,32 @@ export default function C14dTab({ token }: Props) {
               <SLStat label="В архиве" value={String(stats.archive_count)} color="blue" icon="Archive" />
               <SLStat label="Долг" value={`${fmt(stats.total_active_debt)} ₽`} color="gold" icon="Coins" />
             </SLGrid>
+            <SLGrid cols={4} className="mt-2">
+              <SLStat
+                label="Забрали сегодня"
+                value={String(stats.closed_today_count ?? 0)}
+                color="green"
+                icon="PackageCheck"
+              />
+              <SLStat
+                label="Прибыль сегодня"
+                value={`${fmt(stats.profit_today ?? 0)} ₽`}
+                color="gold"
+                icon="TrendingUp"
+              />
+              <SLStat
+                label={`За месяц (${stats.closed_month_count ?? 0} шт)`}
+                value={`${fmt(stats.profit_month ?? 0)} ₽`}
+                color="gold"
+                icon="CalendarCheck"
+              />
+              <SLStat
+                label={`Всего (${stats.closed_total_count ?? 0} шт)`}
+                value={`${fmt(stats.profit_total ?? 0)} ₽`}
+                color="gold"
+                icon="Wallet"
+              />
+            </SLGrid>
             <SLGrid cols={2} className="mt-2">
               <SLStat
                 label="Средний срок"
@@ -108,6 +174,9 @@ export default function C14dTab({ token }: Props) {
                 icon="History"
               />
             </SLGrid>
+            {stats.daily && stats.daily.length > 0 && (
+              <DailyProfitPanel daily={stats.daily} />
+            )}
           </>
         )}
       </div>

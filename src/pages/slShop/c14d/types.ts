@@ -141,6 +141,12 @@ export type C14dCalc = {
   daily_payment: number;
 };
 
+export type C14dDailyProfit = {
+  day: string;
+  count: number;
+  profit: number;
+};
+
 export type C14dStats = {
   active_count: number;
   overdue_count: number;
@@ -150,6 +156,13 @@ export type C14dStats = {
   total_active_amount: number;
   avg_days_active?: number;
   max_days_active?: number;
+  closed_today_count?: number;
+  profit_today?: number;
+  closed_month_count?: number;
+  profit_month?: number;
+  closed_total_count?: number;
+  profit_total?: number;
+  daily?: C14dDailyProfit[];
 };
 
 export const ITEM_TYPES = [

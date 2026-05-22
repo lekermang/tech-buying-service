@@ -1006,8 +1006,16 @@ def action_late(params):
 
 # ============ Stats ============
 def action_stats():
+    """Сводная статистика по договорам 14 дней.
+    Включает агрегаты по активным/архивным договорам и финансовые показатели:
+    - сколько залогов клиенты выкупили сегодня (closed)
+    - прибыль за сегодня (проценты, полученные по выкупленным договорам)
+    - прибыль за текущий месяц
+    """
     conn = get_conn()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    # Базовая статистика
     cur.execute(
         f"SELECT "
         f"COUNT(*) FILTER (WHERE status='active') AS active_count, "
@@ -1017,10 +1025,48 @@ def action_stats():
         f"COALESCE(SUM(remaining_debt) FILTER (WHERE status='active'), 0) AS total_active_debt, "
         f"COALESCE(SUM(amount) FILTER (WHERE status='active'), 0) AS total_active_amount, "
         f"COALESCE(ROUND(AVG((CURRENT_DATE - start_date)) FILTER (WHERE status='active')), 0)::int AS avg_days_active, "
-        f"COALESCE(MAX((CURRENT_DATE - start_date)) FILTER (WHERE status='active'), 0)::int AS max_days_active "
+        f"COALESCE(MAX((CURRENT_DATE - start_date)) FILTER (WHERE status='active'), 0)::int AS max_days_active, "
+        # Сегодня выкупили (договоры со статусом closed и closed_at = сегодня)
+        f"COUNT(*) FILTER (WHERE status='closed' AND closed_at::date = CURRENT_DATE) AS closed_today_count, "
+        # Прибыль с выкупленных сегодня = полученные проценты (paid_total - amount), не меньше 0
+        f"COALESCE(SUM(GREATEST(paid_total - amount, 0)) "
+        f"  FILTER (WHERE status='closed' AND closed_at::date = CURRENT_DATE), 0) AS profit_today, "
+        # Прибыль за месяц
+        f"COUNT(*) FILTER (WHERE status='closed' AND closed_at >= date_trunc('month', CURRENT_DATE)) AS closed_month_count, "
+        f"COALESCE(SUM(GREATEST(paid_total - amount, 0)) "
+        f"  FILTER (WHERE status='closed' AND closed_at >= date_trunc('month', CURRENT_DATE)), 0) AS profit_month, "
+        # Прибыль за всё время (только по выкупленным)
+        f"COUNT(*) FILTER (WHERE status='closed') AS closed_total_count, "
+        f"COALESCE(SUM(GREATEST(paid_total - amount, 0)) FILTER (WHERE status='closed'), 0) AS profit_total "
         f"FROM {SCHEMA}.contracts_14d"
     )
     row = dict(cur.fetchone() or {})
+
+    # Прибыль по дням за последние 14 дней (для графика/таблицы)
+    cur.execute(
+        f"SELECT closed_at::date AS day, "
+        f"COUNT(*) AS count, "
+        f"COALESCE(SUM(GREATEST(paid_total - amount, 0)), 0) AS profit "
+        f"FROM {SCHEMA}.contracts_14d "
+        f"WHERE status='closed' AND closed_at >= CURRENT_DATE - INTERVAL '13 days' "
+        f"GROUP BY closed_at::date "
+        f"ORDER BY day DESC"
+    )
+    daily = [
+        {
+            'day': r['day'].isoformat() if r.get('day') else None,
+            'count': int(r['count'] or 0),
+            'profit': float(r['profit'] or 0),
+        }
+        for r in cur.fetchall()
+    ]
+    row['daily'] = daily
+
+    # Нормализуем числа
+    for k in ('total_active_debt', 'total_active_amount', 'profit_today', 'profit_month', 'profit_total'):
+        if k in row and row[k] is not None:
+            row[k] = float(row[k])
+
     cur.close(); conn.close()
     return _ok(row)
 
