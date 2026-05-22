@@ -3,6 +3,9 @@ name: Build Windows EXE
 on:
   push:
     branches: [main]
+    paths:
+      - 'src-tauri/**'
+      - '.github/workflows/build-windows.yml'
   workflow_dispatch:
 
 permissions:
@@ -13,57 +16,60 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
         with:
-          workspaces: src-tauri -> target
+          workspaces: src-tauri
+
+      - name: Install Tauri CLI
+        run: npm install -g @tauri-apps/cli@^1
 
       - name: Prepare dummy dist
+        shell: bash
+        run: |
+          mkdir -p tauri-dist
+          echo '<!DOCTYPE html><html><body>Redirecting...</body></html>' > tauri-dist/index.html
+
+      - name: Generate placeholder icons
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path tauri-dist | Out-Null
-          Set-Content -Path tauri-dist/index.html -Value "<html><body>Скупка 24</body></html>"
+          $iconDir = "src-tauri/icons"
+          New-Item -ItemType Directory -Force -Path $iconDir | Out-Null
+          # Скачиваем иконку с CDN проекта
+          Invoke-WebRequest -Uri "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/5861d7c7-1191-429c-9433-e85e74cc215b.jpg" -OutFile "$iconDir/source.jpg"
+          # Конвертируем через ImageMagick (есть в windows-latest)
+          choco install imagemagick.app -y --no-progress
+          magick "$iconDir/source.jpg" -resize 32x32 "$iconDir/32x32.png"
+          magick "$iconDir/source.jpg" -resize 128x128 "$iconDir/128x128.png"
+          magick "$iconDir/source.jpg" -resize 256x256 "$iconDir/128x128@2x.png"
+          magick "$iconDir/source.jpg" -resize 512x512 "$iconDir/icon.png"
+          magick "$iconDir/source.jpg" -define icon:auto-resize=256,128,64,48,32,16 "$iconDir/icon.ico"
 
-      - name: Download icon
-        shell: pwsh
+      - name: Build Tauri
+        working-directory: src-tauri
+        run: cargo tauri build
+
+      - name: Rename installer
+        shell: bash
         run: |
-          New-Item -ItemType Directory -Force -Path src-tauri/icons | Out-Null
-          Invoke-WebRequest -Uri "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/5861d7c7-1191-429c-9433-e85e74cc215b.jpg" -OutFile icon.jpg
+          mkdir -p out
+          find src-tauri/target/release/bundle/nsis -name "*.exe" -exec cp {} out/Skupka24-Setup.exe \;
+          ls -la out/
 
-      - run: npm install -g @tauri-apps/cli@^1
-      - run: tauri icon icon.jpg --output src-tauri/icons
-      - run: tauri build
-
-      - name: Rename to ASCII filename
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path out | Out-Null
-          $exe = Get-ChildItem -Path src-tauri/target/release/bundle/nsis -Filter *.exe | Select-Object -First 1
-          Copy-Item $exe.FullName "out/Skupka24-Setup.exe"
-          Write-Host "Saved: out/Skupka24-Setup.exe"
-
-      - name: Read version
-        id: ver
-        shell: pwsh
-        run: |
-          $json = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
-          $v = $json.package.version
-          echo "version=$v" >> $env:GITHUB_OUTPUT
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: skupka24-windows
-          path: out/Skupka24-Setup.exe
-
-      - name: Publish/Update latest release
+      - name: Publish to latest release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
           name: "Скупка 24 — последняя версия"
-          body: "Автоматическая сборка. Версия ${{ steps.ver.outputs.version }}"
+          body: "Автоматическая сборка Windows-версии. Push-уведомления, чат команды, авто-обновление."
           files: out/Skupka24-Setup.exe
           prerelease: false
           make_latest: "true"
