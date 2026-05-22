@@ -10,6 +10,31 @@ HEADERS = {'Access-Control-Allow-Origin': '*'}
 SCHEMA = 't_p31606708_tech_buying_service'
 AD_FOOTER = "\n\n🌐 skypka24.com\n📲 https://t.me/ProService40"
 
+# URL пуш-хаба для уведомлений сотрудников (см. backend/notify-push)
+PUSH_URL = "https://functions.poehali.dev/0a041e7f-92ab-4dbf-86f0-cd09e3eabfbd"
+
+
+def _send_push_event(title: str, body: str, url: str = "/staff", tag: str = "skupka24",
+                     roles=None, logins=None) -> None:
+    """Шлёт push-уведомление сотрудникам через notify-push. Тихо игнорирует ошибки."""
+    try:
+        admin = os.environ.get('ADMIN_TOKEN', '')
+        if not admin:
+            return
+        payload = {'title': title, 'body': body, 'url': url, 'tag': tag}
+        if roles:
+            payload['roles'] = roles
+        if logins:
+            payload['logins'] = logins
+        requests.post(
+            PUSH_URL,
+            json=payload,
+            headers={'X-Service-Token': admin, 'Content-Type': 'application/json'},
+            timeout=3,
+        )
+    except Exception:
+        pass
+
 STATUS_LABEL = {
     'in_progress':   'В работе',
     'waiting_parts': 'Ждём запчасть',
@@ -1181,6 +1206,19 @@ def handler(event: dict, context) -> dict:
         order_id = cur.fetchone()[0]
         conn.commit()
         cur.close()
+        # Push сотрудникам о новом ремонте
+        _push_title = f"Новый ремонт №{order_id}"
+        _push_body_parts = []
+        if model: _push_body_parts.append(str(model)[:50])
+        if repair_type: _push_body_parts.append(str(repair_type)[:50])
+        if price: _push_body_parts.append(f"{int(price):,} ₽".replace(',', ' '))
+        _push_body = " · ".join(_push_body_parts) if _push_body_parts else f"{name} · {phone}"
+        _send_push_event(
+            title=_push_title,
+            body=_push_body,
+            url=f"/staff?tab=repair&order={order_id}",
+            tag=f"repair-{order_id}",
+        )
     except Exception as db_err:
         if conn:
             try:

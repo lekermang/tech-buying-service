@@ -21,6 +21,25 @@ HEADERS = {
 }
 SCHEMA = 't_p31606708_tech_buying_service'
 
+# URL пуш-хаба (см. backend/notify-push)
+PUSH_URL = "https://functions.poehali.dev/0a041e7f-92ab-4dbf-86f0-cd09e3eabfbd"
+
+
+def _send_push_event(title: str, body: str, url: str = "/staff", tag: str = "slshop") -> None:
+    """Шлёт push сотрудникам через notify-push. Тихо игнорирует ошибки."""
+    try:
+        admin = os.environ.get('ADMIN_TOKEN', '')
+        if not admin:
+            return
+        data = json.dumps({'title': title, 'body': body, 'url': url, 'tag': tag}).encode('utf-8')
+        req = urllib.request.Request(
+            PUSH_URL, data=data, method='POST',
+            headers={'X-Service-Token': admin, 'Content-Type': 'application/json'},
+        )
+        urllib.request.urlopen(req, timeout=3).read()
+    except Exception:
+        pass
+
 
 def get_conn():
     return psycopg2.connect(os.environ['DATABASE_URL'])
@@ -1788,6 +1807,18 @@ def create_item(body, employee):
             })
         except Exception:
             pass
+    # Push сотрудникам о новой скупке (только если это реальная скупка с ценой)
+    try:
+        if data.get('source', 'buyout') == 'buyout' and unit_buy_price > 0:
+            _qty_str = f" × {qty} шт" if qty > 1 else ""
+            _send_push_event(
+                title=f"Скупка №{item_id}",
+                body=f"{title[:60]}{_qty_str} · {total_buy:g} ₽",
+                url=f"/staff?tab=smartlombard&item={item_id}",
+                tag=f"slshop-{item_id}",
+            )
+    except Exception:
+        pass
     return _ok({'id': item_id, 'sku': sku})
 
 

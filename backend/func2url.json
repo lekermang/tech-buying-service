@@ -1,4 +1,5 @@
 {
+  "notify-push": "https://functions.poehali.dev/0a041e7f-92ab-4dbf-86f0-cd09e3eabfbd",
   "staff-daily": "https://functions.poehali.dev/be89689d-a156-4e0e-bf96-11e5e715f3c1",
   "finance-analytics": "https://functions.poehali.dev/41aae5ce-14d4-4c12-8522-59fcf9ae1b6a",
   "public-chat": "https://functions.poehali.dev/60644856-ff88-4875-b2a9-97c87d32a630",

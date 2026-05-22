@@ -12,6 +12,25 @@ SCHEMA = 't_p31606708_tech_buying_service'
 S3_BUCKET = 'files'
 S3_ENDPOINT = 'https://bucket.poehali.dev'
 
+# URL пуш-хаба (см. backend/notify-push)
+PUSH_URL = "https://functions.poehali.dev/0a041e7f-92ab-4dbf-86f0-cd09e3eabfbd"
+
+
+def _send_push_event(title: str, body: str, url: str = "/staff", tag: str = "lead") -> None:
+    """Шлёт push сотрудникам через notify-push. Тихо игнорирует ошибки."""
+    try:
+        admin = os.environ.get('ADMIN_TOKEN', '')
+        if not admin:
+            return
+        requests.post(
+            PUSH_URL,
+            json={'title': title, 'body': body, 'url': url, 'tag': tag},
+            headers={'X-Service-Token': admin, 'Content-Type': 'application/json'},
+            timeout=3,
+        )
+    except Exception:
+        pass
+
 CHANNEL_LABELS = {
     'call': '📞 Звонок',
     'phone': '📞 Звонок',
@@ -358,6 +377,17 @@ def handler(event: dict, context) -> dict:
             f"INSERT INTO {SCHEMA}.leads_tracking_log (lead_id, action, note) VALUES ({lead_id}, 'created', '{src}')"
         )
         conn0.commit(); cur0.close(); conn0.close()
+        # Push сотрудникам о новой заявке
+        _push_body = " · ".join(p for p in [str(category)[:40] if category else None,
+                                            str(desc)[:60] if desc else None,
+                                            str(name)[:30] if name else None,
+                                            str(phone)[:20] if phone else None] if p)
+        _send_push_event(
+            title=f"Новая заявка #{lead_id}",
+            body=_push_body or "Заявка с сайта",
+            url=f"/staff?tab=clients&lead={lead_id}",
+            tag=f"lead-{lead_id}",
+        )
     except Exception:
         lead_id = None
 

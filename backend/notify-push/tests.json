@@ -1,0 +1,26 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS CORS",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Без токена — 403",
+      "method": "POST",
+      "path": "/",
+      "body": {"title": "x", "body": "y"},
+      "expectedStatus": 403,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "GET не разрешён",
+      "method": "GET",
+      "path": "/",
+      "headers": {"X-Service-Token": "wrong"},
+      "expectedStatus": 403
+    }
+  ]
+}
