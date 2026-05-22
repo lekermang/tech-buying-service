@@ -158,6 +158,45 @@ const GoldTicker = ({
             </button>
           )}
 
+          {/* Вход клиента — десктоп */}
+          <a
+            href="/cabinet"
+            title="Личный кабинет клиента"
+            aria-label="Вход клиента"
+            className="hidden sm:flex items-center gap-1.5 bg-black/60 hover:bg-black/80 border border-[#FFD700]/25 hover:border-[#FFD700]/55 active:scale-95 transition-all px-2.5 py-1.5 rounded-md"
+          >
+            <Icon name="User" size={13} className="text-[#FFD700]" />
+            <span className="font-oswald font-bold text-[#FFD700] text-[11px] uppercase tracking-wide whitespace-nowrap">Клиент</span>
+          </a>
+          {/* Вход сотрудника — десктоп */}
+          <a
+            href="/staff"
+            title="Кабинет сотрудника"
+            aria-label="Вход сотрудника"
+            className="hidden sm:flex items-center gap-1.5 bg-black/60 hover:bg-black/80 border border-[#FFD700]/25 hover:border-[#FFD700]/55 active:scale-95 transition-all px-2.5 py-1.5 rounded-md"
+          >
+            <Icon name="ShieldCheck" size={13} className="text-[#FFD700]" />
+            <span className="font-oswald font-bold text-[#FFD700] text-[11px] uppercase tracking-wide whitespace-nowrap">Сотрудник</span>
+          </a>
+          {/* Вход клиента — мобилка */}
+          <a
+            href="/cabinet"
+            title="Кабинет клиента"
+            aria-label="Вход клиента"
+            className="sm:hidden flex items-center justify-center w-9 h-9 rounded-md bg-black/60 border border-[#FFD700]/25 active:scale-95 transition-all"
+          >
+            <Icon name="User" size={14} className="text-[#FFD700]" />
+          </a>
+          {/* Вход сотрудника — мобилка */}
+          <a
+            href="/staff"
+            title="Кабинет сотрудника"
+            aria-label="Вход сотрудника"
+            className="sm:hidden flex items-center justify-center w-9 h-9 rounded-md bg-black/60 border border-[#FFD700]/25 active:scale-95 transition-all"
+          >
+            <Icon name="ShieldCheck" size={14} className="text-[#FFD700]" />
+          </a>
+
           {/* Десктоп: большой телефон с подписью */}
           <a href="tel:88006006833"
             onClick={() => ymGoal(Goals.CALL_CLICK, { place: "ticker" })}
