@@ -3,7 +3,8 @@ export type ClientProfile = {
   full_name: string;
   phone: string;
   email: string | null;
-  login: string | null;
+  email_verified?: boolean;
+  login?: string | null;
   avatar_url: string | null;
   discount_pct: number;
   loyalty_points: number;

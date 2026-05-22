@@ -7,6 +7,7 @@ import SearchAndAddPanel from "./staff/clients/SearchAndAddPanel";
 import DiscountClientsPanel, { type DiscountClient } from "./staff/clients/DiscountClientsPanel";
 import SmsBlastPanel, { type Group } from "./staff/clients/SmsBlastPanel";
 import AllContactsPanel, { type Contact, type Source } from "./staff/clients/AllContactsPanel";
+import CabinetClientsPanel from "./staff/clients/CabinetClientsPanel";
 import { searchOffline } from "@/lib/offlineClients";
 
 const REPAIR_ADMIN_URL = "https://functions.poehali.dev/a105aede-d55d-4b99-9d3e-5e977887aa04";
@@ -293,6 +294,8 @@ export function ClientsTab({ token }: { token: string }) {
 
   return (
     <div className="p-3 space-y-4">
+      <CabinetClientsPanel token={token} />
+
       <SearchAndAddPanel
         phone={phone}
         setPhone={setPhone}
