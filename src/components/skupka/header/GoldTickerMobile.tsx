@@ -50,9 +50,9 @@ const GoldTickerMobile = ({
   }, [openDetails]);
 
   return (
-    <div ref={rootRef} className="md:hidden relative">
-      {/* ── Одна строка ── */}
-      <div className="relative max-w-7xl mx-auto px-3 py-1.5 flex items-center gap-2">
+    <div ref={rootRef} className="lg:hidden relative">
+      {/* ── Адаптивная строка: мобилка | планшет ── */}
+      <div className="relative max-w-7xl mx-auto px-3 sm:px-4 py-1.5 flex items-center gap-2">
         {/* Медальон со статусом */}
         <div
           className="relative shrink-0 w-8 h-8 rounded-full flex items-center justify-center
@@ -74,7 +74,7 @@ const GoldTickerMobile = ({
         <button
           type="button"
           onClick={() => setOpenDetails(o => !o)}
-          className={`flex-1 min-w-0 flex items-center justify-between h-9 px-3 rounded-md border transition-all duration-300 ${
+          className={`flex-1 sm:flex-initial min-w-0 flex items-center justify-between h-9 px-3 rounded-md border transition-all duration-300 ${
             flash === "up"
               ? "bg-emerald-500/10 border-emerald-400/60"
               : flash === "down"
@@ -97,6 +97,59 @@ const GoldTickerMobile = ({
           </div>
           <Icon name={openDetails ? "ChevronUp" : "ChevronDown"} size={14} className="text-[#FFD700]/60 shrink-0 ml-2" />
         </button>
+
+        {/* Цена «Физлица» — появляется на sm+ (≥640px) */}
+        {priceRetail999 && (
+          <div className="hidden sm:flex items-center gap-1.5 h-9 px-3 rounded-md bg-black/50 border border-[#FFD700]/20 shrink-0">
+            <Icon name="User" size={11} className="text-[#FFD700]/55" />
+            <span className="text-[#FFD700]/55 text-[9px] uppercase tracking-wider font-oswald font-bold">Физ</span>
+            <span className="text-[#FFD700] font-oswald font-bold text-[13px] whitespace-nowrap leading-none">
+              {priceRetail999.toLocaleString('ru-RU')}
+              <span className="text-[9px] text-[#FFD700]/55 ml-0.5">₽/г</span>
+            </span>
+          </div>
+        )}
+
+        {/* XAU/USD — на md+ (≥768px) */}
+        {goldPrice?.xau_usd && (
+          <div className="hidden md:flex items-center h-9 px-3 rounded-md bg-black/40 border border-white/10 shrink-0">
+            <span className="font-oswald font-semibold text-[9px] uppercase tracking-[0.18em] text-white/40 mr-1.5">XAU</span>
+            <span className="font-oswald font-semibold text-white/85 text-[12px] whitespace-nowrap leading-none">
+              ${goldPrice.xau_usd.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+              <span className="text-white/35 text-[9px] font-bold ml-0.5">/oz</span>
+            </span>
+          </div>
+        )}
+
+        {/* Статус биржи (точка + текст) — на sm+ */}
+        <div className={`hidden sm:flex items-center gap-1.5 h-9 px-2.5 rounded-md border shrink-0 ${
+          market.fixing ? "bg-[#FFD700]/10 border-[#FFD700]/40"
+            : market.open ? "bg-emerald-500/10 border-emerald-400/25"
+            : "bg-black/40 border-white/10"
+        }`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${
+            market.fixing ? "bg-[#FFD700] animate-pulse"
+              : market.open ? "bg-emerald-400 animate-pulse"
+              : "bg-gray-500"
+          }`} />
+          <span className={`text-[10px] uppercase tracking-wider font-oswald font-bold whitespace-nowrap ${
+            market.fixing ? "text-[#FFD700]"
+              : market.open ? "text-emerald-300"
+              : "text-white/55"
+          }`}>
+            {market.fixing ? "Фиксинг" : market.open ? "Торги" : "Закрыто"}
+          </span>
+        </div>
+
+        {/* Телефон — иконка на sm+ (≥640px) */}
+        <a
+          href="tel:88006006833"
+          onClick={() => ymGoal(Goals.CALL_CLICK, { place: "ticker_mobile" })}
+          title="Позвонить"
+          className="hidden sm:inline-flex items-center justify-center w-9 h-9 rounded-md bg-black/60 border border-[#FFD700]/30 text-[#FFD700] active:scale-95 transition-all shrink-0 ml-auto"
+        >
+          <Icon name="Phone" size={14} />
+        </a>
 
         {/* Продать — главный CTA */}
         <button

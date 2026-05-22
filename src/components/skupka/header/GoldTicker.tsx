@@ -84,8 +84,8 @@ const GoldTicker = ({
         onSellClick={onSellClick}
       />
 
-      {/* ═══════ ДЕСКТОП: СТРОКА 1 — Курсы ═══════ */}
-      <div className="hidden md:block">
+      {/* ═══════ ДЕСКТОП lg+ : СТРОКА 1 — Курсы ═══════ */}
+      <div className="hidden lg:block">
         <GoldTickerRatesRow
           goldPrice={goldPrice}
           priceRetail999={priceRetail999}
@@ -96,9 +96,9 @@ const GoldTicker = ({
         />
       </div>
 
-      {/* ═══════ ДЕСКТОП: СТРОКА 2 — Цены физлица/опт + график (скрывается при скролле) ═══════ */}
+      {/* ═══════ ДЕСКТОП lg+ : СТРОКА 2 — Цены физлица/опт + график (скрывается при скролле) ═══════ */}
       {!compact && goldPrice?.buy && (
-        <div className="hidden md:block">
+        <div className="hidden lg:block">
           <GoldTickerPricesRow
             goldPrice={goldPrice}
             priceRetail999={priceRetail999}
@@ -110,8 +110,8 @@ const GoldTicker = ({
         </div>
       )}
 
-      {/* ═══════ ДЕСКТОП: СТРОКА 3 — Действия ═══════ */}
-      <div className="hidden md:block">
+      {/* ═══════ ДЕСКТОП lg+ : СТРОКА 3 — Действия ═══════ */}
+      <div className="hidden lg:block">
         <GoldTickerActionsRow
           onSellClick={onSellClick}
           compact={compact}
