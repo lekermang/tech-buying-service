@@ -5,9 +5,11 @@ import ClientAuthScreen from "./client/ClientAuthScreen";
 import ClientRepairs from "./client/ClientRepairs";
 import ClientContracts from "./client/ClientContracts";
 import ClientOffers from "./client/ClientOffers";
+import ClientNotificationsBanner from "./client/ClientNotificationsBanner";
 import { ClientProfile } from "./client/clientTypes";
 
 const AUTH_URL = (funcUrls as Record<string, string>)["client-auth"];
+const CAB_URL = (funcUrls as Record<string, string>)["client-cabinet"];
 
 type Tab = "repairs" | "contracts" | "offers";
 
@@ -48,6 +50,21 @@ export default function Client() {
   useEffect(() => {
     if (token) loadProfile(token);
   }, [token, loadProfile]);
+
+  // Каждые 60 сек проверяем статусы → бэк сам пошлёт push если что-то изменилось
+  useEffect(() => {
+    if (!token) return;
+    const fire = () => {
+      fetch(CAB_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Client-Token": token },
+        body: JSON.stringify({ action: "check_updates" }),
+      }).catch(() => {});
+    };
+    fire();
+    const id = setInterval(fire, 60_000);
+    return () => clearInterval(id);
+  }, [token]);
 
   const onAuth = (t: string) => {
     localStorage.setItem("client_token", t);
@@ -135,6 +152,7 @@ export default function Client() {
 
       {/* Контент */}
       <main className="max-w-3xl mx-auto px-3 py-4 pb-24">
+        <ClientNotificationsBanner token={token} />
         {tab === "repairs" && <ClientRepairs token={token} />}
         {tab === "contracts" && <ClientContracts token={token} />}
         {tab === "offers" && <ClientOffers token={token} />}

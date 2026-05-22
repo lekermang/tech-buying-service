@@ -18,6 +18,12 @@ import psycopg2
 import boto3
 from botocore.client import Config as BotoConfig
 
+try:
+    from pywebpush import webpush, WebPushException  # type: ignore
+    HAS_WEBPUSH = True
+except Exception:
+    HAS_WEBPUSH = False
+
 SCHEMA = 't_p31606708_tech_buying_service'
 
 CORS = {
@@ -104,6 +110,14 @@ def handler(event: dict, context) -> dict:
         return _upload_photo(me, body)
     if action == 'summary':
         return _summary(me)
+    if action == 'vapid_public':
+        return _ok({'public_key': os.environ.get('VAPID_PUBLIC_KEY', '')})
+    if action == 'push_subscribe':
+        return _push_subscribe(me, body)
+    if action == 'push_unsubscribe':
+        return _push_unsubscribe(me, body)
+    if action == 'check_updates':
+        return _check_updates(me)
 
     return _err(f'unknown action: {action}')
 
@@ -336,3 +350,174 @@ def _summary(me):
         return _err(f'summary failed: {e}', 500)
     finally:
         cur.close(); conn.close()
+
+
+# ─── Web Push ──────────────────────────────────────────────────────────────────
+
+def _push_subscribe(me, body):
+    """Сохранить web push подписку браузера клиента."""
+    sub = body.get('subscription') or {}
+    endpoint = (sub.get('endpoint') or '').strip()
+    keys = sub.get('keys') or {}
+    p256dh = (keys.get('p256dh') or '').strip()
+    auth = (keys.get('auth') or '').strip()
+    user_agent = (body.get('user_agent') or '')[:500]
+    if not endpoint or not p256dh or not auth:
+        return _err('Нужны endpoint и keys.{p256dh,auth}')
+    conn = _connect()
+    cur = conn.cursor()
+    try:
+        cur.execute(f"""
+            INSERT INTO {SCHEMA}.client_push_subs (client_id, endpoint, p256dh, auth, user_agent, updated_at)
+            VALUES (%s, %s, %s, %s, %s, NOW())
+            ON CONFLICT (endpoint) DO UPDATE SET
+              client_id=EXCLUDED.client_id, p256dh=EXCLUDED.p256dh,
+              auth=EXCLUDED.auth, user_agent=EXCLUDED.user_agent, updated_at=NOW()
+        """, (me['id'], endpoint, p256dh, auth, user_agent))
+        conn.commit()
+        return _ok({'ok': True})
+    except Exception as e:
+        conn.rollback()
+        return _err(f'push_subscribe failed: {e}', 500)
+    finally:
+        cur.close(); conn.close()
+
+
+def _push_unsubscribe(me, body):
+    endpoint = (body.get('endpoint') or '').strip()
+    if not endpoint:
+        return _err('endpoint обязателен')
+    conn = _connect()
+    cur = conn.cursor()
+    try:
+        cur.execute(f"""
+            UPDATE {SCHEMA}.client_push_subs SET p256dh='', auth='', updated_at=NOW()
+            WHERE endpoint=%s AND client_id=%s
+        """, (endpoint, me['id']))
+        conn.commit()
+        return _ok({'ok': True})
+    except Exception as e:
+        conn.rollback()
+        return _err(f'push_unsubscribe failed: {e}', 500)
+    finally:
+        cur.close(); conn.close()
+
+
+def _check_updates(me):
+    """Проверяет смену статусов ремонтов и новые ответы менеджера → шлёт push.
+    Вызывается клиентом при poll'е или сотрудником после изменений.
+    """
+    sent = 0
+    phone = _normalize_phone(me['phone'])
+    last10 = phone[-10:] if len(phone) >= 10 else phone
+    conn = _connect()
+    cur = conn.cursor()
+    try:
+        # 1. Ремонты со сменой статуса
+        cur.execute(f"""
+            SELECT id, status, last_push_status, model, repair_type, admin_note
+            FROM {SCHEMA}.repair_orders
+            WHERE REGEXP_REPLACE(phone, '[^0-9]', '', 'g') LIKE %s
+              AND (last_push_status IS NULL OR last_push_status <> status)
+              AND status IN ('in_progress','waiting_parts','ready','done','completed','cancelled')
+        """, ('%' + last10,))
+        repairs = cur.fetchall()
+        for r in repairs:
+            rid, status, _last, model, rtype, note = r
+            title = "Скупка 24 · Ремонт"
+            body_txt = _repair_status_text(status, model or rtype or 'устройство')
+            url = f"/client?tab=repairs"
+            _send_to_client(me['id'], {
+                'title': title, 'body': body_txt, 'url': url,
+                'tag': f'repair-{rid}', 'badge': '/icon-192.png',
+            })
+            cur.execute(f"UPDATE {SCHEMA}.repair_orders SET last_push_status=%s, last_push_at=NOW() WHERE id=%s", (status, rid))
+            sent += 1
+
+        # 2. Предложения с новым ответом
+        cur.execute(f"""
+            SELECT id, title, admin_reply, last_push_reply_hash
+            FROM {SCHEMA}.client_offers
+            WHERE client_id=%s AND admin_reply IS NOT NULL AND admin_reply <> ''
+        """, (me['id'],))
+        offers = cur.fetchall()
+        for o in offers:
+            oid, title, reply, prev_hash = o
+            h = hashlib.sha256((reply or '').encode('utf-8')).hexdigest()[:16]
+            if h == prev_hash:
+                continue
+            _send_to_client(me['id'], {
+                'title': f"Скупка 24 · {title}"[:80],
+                'body': (reply or '')[:160],
+                'url': '/client?tab=offers',
+                'tag': f'offer-{oid}',
+            })
+            cur.execute(f"UPDATE {SCHEMA}.client_offers SET last_push_reply_hash=%s, last_push_at=NOW() WHERE id=%s", (h, oid))
+            sent += 1
+        conn.commit()
+        return _ok({'ok': True, 'sent': sent})
+    except Exception as e:
+        conn.rollback()
+        return _err(f'check_updates failed: {e}', 500)
+    finally:
+        cur.close(); conn.close()
+
+
+def _repair_status_text(status: str, device: str) -> str:
+    texts = {
+        'in_progress': f'Мастер приступил к ремонту: {device}',
+        'waiting_parts': f'Ждём запчасть для: {device}',
+        'ready': f'Готов к выдаче: {device} 🎉',
+        'done': f'Ремонт выдан: {device}',
+        'completed': f'Ремонт выдан: {device}',
+        'cancelled': f'Заявка отменена: {device}',
+    }
+    return texts.get(status, f'Статус ремонта обновлён: {device}')
+
+
+def _send_to_client(client_id: int, payload: dict) -> int:
+    """Шлёт push всем подпискам клиента."""
+    if not HAS_WEBPUSH:
+        return 0
+    private_key = os.environ.get('VAPID_PRIVATE_KEY', '')
+    public_key = os.environ.get('VAPID_PUBLIC_KEY', '')
+    if not private_key or not public_key:
+        return 0
+    vapid_claims = {'sub': 'mailto:lekermany@yandex.ru'}
+    conn = _connect()
+    cur = conn.cursor()
+    sent = 0
+    dead = []
+    try:
+        cur.execute(f"""
+            SELECT endpoint, p256dh, auth FROM {SCHEMA}.client_push_subs
+            WHERE client_id=%s AND p256dh<>'' AND auth<>''
+        """, (client_id,))
+        body_str = json.dumps(payload, ensure_ascii=False)
+        for endpoint, p256dh, auth in cur.fetchall():
+            try:
+                webpush(
+                    subscription_info={'endpoint': endpoint, 'keys': {'p256dh': p256dh, 'auth': auth}},
+                    data=body_str,
+                    vapid_private_key=private_key,
+                    vapid_claims=vapid_claims,
+                    timeout=4,
+                )
+                sent += 1
+            except WebPushException as e:
+                code = getattr(e.response, 'status_code', 0) if e.response else 0
+                if code in (404, 410):
+                    dead.append(endpoint)
+            except Exception:
+                pass
+        if dead:
+            cur.executemany(
+                f"UPDATE {SCHEMA}.client_push_subs SET p256dh='', auth='', updated_at=NOW() WHERE endpoint=%s",
+                [(e,) for e in dead]
+            )
+            conn.commit()
+    except Exception:
+        pass
+    finally:
+        cur.close(); conn.close()
+    return sent
