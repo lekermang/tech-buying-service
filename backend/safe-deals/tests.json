@@ -1,0 +1,68 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS CORS",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Unknown GET action",
+      "method": "GET",
+      "path": "/?action=unknown",
+      "expectedStatus": 400,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Get by token requires token",
+      "method": "GET",
+      "path": "/?action=get_by_token",
+      "expectedStatus": 400,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Get by qr requires code",
+      "method": "GET",
+      "path": "/?action=get_by_qr",
+      "expectedStatus": 400,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Get by qr not found",
+      "method": "GET",
+      "path": "/?action=get_by_qr&code=ZZZZZZZZ",
+      "expectedStatus": 404
+    },
+    {
+      "name": "Create requires name",
+      "method": "POST",
+      "path": "/?action=create",
+      "body": {},
+      "expectedStatus": 400,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Create deal happy path",
+      "method": "POST",
+      "path": "/?action=create",
+      "body": {
+        "sellerName": "Иван Тестов",
+        "sellerPhone": "9001234567",
+        "productTitle": "iPhone 12 Pro 128GB",
+        "price": 35000,
+        "productCondition": "Хорошее"
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "dealNumber": "string",
+        "sellerToken": "string",
+        "qrCode": "string"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

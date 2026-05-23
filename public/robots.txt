@@ -4,6 +4,7 @@ Allow: /catalog
 Allow: /repair-discount
 Allow: /transfer
 Allow: /transfer/guide
+Allow: /safe-deals
 Disallow: /admin
 Disallow: /cabinet
 Disallow: /staff

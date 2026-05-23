@@ -84,6 +84,17 @@ const SERVICES: ServiceButton[] = [
     cta: "Перенести данные",
     accent: "rgba(180,140,255,0.22)",
   },
+  {
+    action: { type: "link", href: "/safe-deals" },
+    icon: "Shield",
+    badge: "Безопасно",
+    title: "Безопасная сделка",
+    subtitle: "Продайте технику через гаранта · комиссия 10%",
+    guaranteeIcon: "Shield",
+    guarantee: "Гарант Скупка24 · QR-сделка",
+    cta: "Подать заявку",
+    accent: "rgba(255,200,100,0.22)",
+  },
 ];
 
 export default function PremiumServicesGrid() {
@@ -176,7 +187,7 @@ export default function PremiumServicesGrid() {
         </p>
 
         {/* Сетка КНОПОК */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 sm:gap-5">
           {SERVICES.map((s, i) => (
             <ServiceTile key={s.title} card={s} delay={i * 80} onClick={() => handleAction(s.action)} />
           ))}
