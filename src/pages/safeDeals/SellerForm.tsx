@@ -7,57 +7,20 @@
  * - Скан паспорта (OCR через GPT-4o)
  * - Категории из БД (slshop_categories)
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import Icon from "@/components/ui/icon";
 import {
-  apiCall, COMMISSION_PCT, OFFICE_ADDRESS, REALIZATION_DAYS, fmtRub, saveSellerToken,
+  apiCall, COMMISSION_PCT, OFFICE_ADDRESS, REALIZATION_DAYS, saveSellerToken,
   listCategories, uploadTempPhoto, aiFill, aiCheck, scanPassport, getYandexConfig, yandexAuth, aiPrice,
   type CreateResponse, type CategoryItem, type AiCheckResult, type AvitoParsed, type PassportData, type AiPriceResult,
 } from "./api";
 import AvitoImportModal from "./AvitoImportModal";
-
-const CONDITIONS = ["Новое (в упаковке)", "Отличное", "Хорошее", "Удовлетворительное"];
-
-async function fileToBase64Compressed(file: File): Promise<string> {
-  if (!file.type.startsWith("image/")) {
-    return new Promise((res, rej) => {
-      const r = new FileReader();
-      r.onload = () => res((r.result as string).split(",")[1] || "");
-      r.onerror = rej;
-      r.readAsDataURL(file);
-    });
-  }
-  const dataUrl: string = await new Promise((res, rej) => {
-    const r = new FileReader();
-    r.onload = () => res(r.result as string);
-    r.onerror = rej;
-    r.readAsDataURL(file);
-  });
-  const img: HTMLImageElement = await new Promise((res, rej) => {
-    const i = new Image();
-    i.onload = () => res(i);
-    i.onerror = rej;
-    i.src = dataUrl;
-  });
-  const maxSide = 1600;
-  let w = img.naturalWidth || img.width;
-  let h = img.naturalHeight || img.height;
-  if (Math.max(w, h) > maxSide) {
-    const k = maxSide / Math.max(w, h);
-    w = Math.round(w * k);
-    h = Math.round(h * k);
-  }
-  const canvas = document.createElement("canvas");
-  canvas.width = w; canvas.height = h;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return dataUrl.split(",")[1] || "";
-  ctx.drawImage(img, 0, 0, w, h);
-  const out = canvas.toDataURL("image/jpeg", 0.82);
-  return out.split(",")[1] || "";
-}
-
-type PhotoItem = { url: string; preview?: string };
+import { fileToBase64Compressed, type PhotoItem } from "./sellerForm/primitives";
+import { QuickStartBlock, SellerInfoSection } from "./sellerForm/SellerInfoSection";
+import {
+  PhotoUploadSection, ProductFieldsSection, PriceSection, AiCheckSection,
+} from "./sellerForm/ProductSections";
 
 export default function SellerForm({ onSubmitted }: { onSubmitted: (token: string, resp: CreateResponse) => void }) {
   // ─── seller fields ───
@@ -87,12 +50,10 @@ export default function SellerForm({ onSubmitted }: { onSubmitted: (token: strin
   // ─── photos ───
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [photoUploading, setPhotoUploading] = useState(false);
-  const photoInputRef = useRef<HTMLInputElement>(null);
 
   // ─── passport ───
   const [passport, setPassport] = useState<PassportData | null>(null);
   const [passportScanning, setPassportScanning] = useState(false);
-  const passportInputRef = useRef<HTMLInputElement>(null);
 
   // ─── ai check ───
   const [aiResult, setAiResult] = useState<AiCheckResult | null>(null);
@@ -324,226 +285,55 @@ export default function SellerForm({ onSubmitted }: { onSubmitted: (token: strin
 
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-5 py-6 space-y-5">
-      {/* Быстрый старт */}
-      <div className="bg-gradient-to-br from-[#FFD700]/[0.08] to-transparent border border-[#FFD700]/25 rounded-2xl p-3.5">
-        <div className="text-xs uppercase tracking-wider font-bold text-[#FFD700] mb-2">⚡ Быстрый старт</div>
-        <div className="grid grid-cols-2 gap-2">
-          {yandexAvailable && (
-            <button onClick={openYandexAuth}
-              className="flex items-center justify-center gap-2 py-3 rounded-xl bg-[#FF0000] text-white font-bold text-sm hover:bg-[#cc0000] transition">
-              <Icon name="LogIn" size={16} /> Войти через Яндекс ID
-            </button>
-          )}
-          <button onClick={() => setAvitoModalOpen(true)}
-            className={`flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-[#0AF] to-[#0080FF] text-white font-bold text-sm hover:opacity-90 transition ${!yandexAvailable ? "col-span-2" : ""}`}>
-            <Icon name="Download" size={16} /> Импорт с Авито
-          </button>
-        </div>
-        <div className="text-[10px] text-[#777] mt-2 text-center">
-          За 5 секунд — без ручного ввода
-        </div>
-      </div>
+      <QuickStartBlock
+        yandexAvailable={yandexAvailable}
+        onYandex={openYandexAuth}
+        onAvito={() => setAvitoModalOpen(true)}
+      />
 
-      <Section title="О вас" icon="User">
-        <div className="grid sm:grid-cols-2 gap-3">
-          <Field label="Ваше имя*">
-            <input value={sellerName} onChange={e => setSellerName(e.target.value)}
-              className="input" placeholder="Иван Иванов" />
-          </Field>
-          <Field label="Телефон*">
-            <input value={sellerPhone} onChange={e => setSellerPhone(e.target.value)}
-              className="input" placeholder="+7 900 123-45-67" type="tel" />
-          </Field>
-          <Field label="Email (необязательно)" full>
-            <input value={sellerEmail} onChange={e => setSellerEmail(e.target.value)}
-              className="input" placeholder="you@mail.ru" type="email" />
-          </Field>
-        </div>
+      <SellerInfoSection
+        sellerName={sellerName} setSellerName={setSellerName}
+        sellerPhone={sellerPhone} setSellerPhone={setSellerPhone}
+        sellerEmail={sellerEmail} setSellerEmail={setSellerEmail}
+        passport={passport} setPassport={setPassport}
+        passportScanning={passportScanning}
+        onScanPassport={handleScanPassport}
+      />
 
-        {/* Скан паспорта */}
-        <div className="mt-4 pt-4 border-t border-[#2A2A2A]">
-          <input ref={passportInputRef} type="file" accept="image/*" style={{ display: "none" }}
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleScanPassport(f); e.target.value = ""; }} />
-          {!passport && (
-            <button onClick={() => passportInputRef.current?.click()} disabled={passportScanning}
-              className="w-full py-3 rounded-xl border-2 border-dashed border-[#FFD700]/40 text-[#FFD700] font-bold text-sm hover:border-[#FFD700] transition flex items-center justify-center gap-2 disabled:opacity-50">
-              {passportScanning
-                ? (<><Icon name="Loader2" size={14} className="animate-spin" /> Распознаём паспорт...</>)
-                : (<><Icon name="ScanLine" size={14} /> Загрузить и распознать паспорт (ИИ)</>)}
-            </button>
-          )}
-          {passport && (
-            <div className="bg-emerald-500/[0.06] border border-emerald-500/30 rounded-xl p-3">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold text-emerald-300 uppercase tracking-wider">
-                  <Icon name="CheckCircle2" size={12} className="inline mr-1" /> Паспорт загружен
-                </span>
-                <button onClick={() => setPassport(null)} className="text-xs text-[#777] hover:text-[#FF453A]">
-                  Заменить
-                </button>
-              </div>
-              <div className="text-xs text-[#bbb] space-y-1">
-                {passport.fullName && <div>ФИО: <span className="text-white">{passport.fullName}</span></div>}
-                {(passport.series || passport.number) && <div>Серия/номер: <span className="text-white">{passport.series} {passport.number}</span></div>}
-                {passport.issuedBy && <div>Кем выдан: <span className="text-white">{passport.issuedBy}</span></div>}
-              </div>
-            </div>
-          )}
-          <div className="text-[10px] text-[#666] mt-2 text-center">
-            Паспорт нужен сотруднику для оформления при сделке. Видит только админ.
-          </div>
-        </div>
-      </Section>
+      <PhotoUploadSection
+        photos={photos}
+        onAddPhotos={addPhotos}
+        onRemovePhoto={removePhoto}
+        photoUploading={photoUploading}
+        aiFilling={aiFilling}
+        onAiFill={handleAiFill}
+      />
 
-      <Section title="Фото товара" icon="Camera">
-        <input ref={photoInputRef} type="file" multiple accept="image/*" style={{ display: "none" }}
-          onChange={e => { addPhotos(Array.from(e.target.files || [])); e.target.value = ""; }} />
-        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-          {photos.map((p, i) => (
-            <div key={i} className="relative aspect-square rounded-lg overflow-hidden bg-[#1C1C1C]">
-              <img src={p.preview || p.url} alt="" className="absolute inset-0 w-full h-full object-cover" />
-              <button onClick={() => removePhoto(i)}
-                className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/70 text-white flex items-center justify-center">
-                <Icon name="X" size={12} />
-              </button>
-            </div>
-          ))}
-          {photos.length < 6 && (
-            <button onClick={() => photoInputRef.current?.click()} disabled={photoUploading}
-              className="aspect-square rounded-lg border-2 border-dashed border-[#2A2A2A] flex flex-col items-center justify-center text-[#777] hover:border-[#FFD700] hover:text-[#FFD700] transition disabled:opacity-50">
-              {photoUploading
-                ? <Icon name="Loader2" size={18} className="animate-spin" />
-                : <><Icon name="Plus" size={20} /><span className="text-[10px] mt-1">Фото</span></>}
-            </button>
-          )}
-        </div>
+      <ProductFieldsSection
+        productTitle={productTitle} setProductTitle={setProductTitle}
+        productCategoryId={productCategoryId} setProductCategoryId={setProductCategoryId}
+        setProductCategoryName={setProductCategoryName}
+        productCondition={productCondition} setProductCondition={setProductCondition}
+        productBrand={productBrand} setProductBrand={setProductBrand}
+        productModel={productModel} setProductModel={setProductModel}
+        productSerial={productSerial} setProductSerial={setProductSerial}
+        description={description} setDescription={setDescription}
+        categories={categories}
+      />
 
-        {photos.length > 0 && (
-          <button onClick={handleAiFill} disabled={aiFilling}
-            className="mt-3 w-full py-3 rounded-xl bg-gradient-to-r from-[#B8A4FF] to-[#7AB8FF] text-black font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50">
-            {aiFilling
-              ? (<><Icon name="Loader2" size={14} className="animate-spin" /> Распознаём товар...</>)
-              : (<><Icon name="Sparkles" size={14} /> Распознать по фото (ИИ заполнит поля)</>)}
-          </button>
-        )}
-      </Section>
+      <PriceSection
+        price={price} setPrice={setPrice}
+        priceNum={priceNum} commission={commission} payout={payout}
+        priceResult={priceResult} priceLoading={priceLoading} onAiPrice={handleAiPrice}
+        paymentMethod={paymentMethod} setPaymentMethod={setPaymentMethod}
+        payoutMethod={payoutMethod} setPayoutMethod={setPayoutMethod}
+        payoutDetails={payoutDetails} setPayoutDetails={setPayoutDetails}
+      />
 
-      <Section title="Товар" icon="Package">
-        <div className="grid sm:grid-cols-2 gap-3">
-          <Field label="Название*" full>
-            <input value={productTitle} onChange={e => setProductTitle(e.target.value)}
-              className="input" placeholder="iPhone 13 Pro 256GB" />
-          </Field>
-          <Field label="Категория">
-            <select
-              value={productCategoryId || ""}
-              onChange={(e) => {
-                const id = e.target.value ? Number(e.target.value) : null;
-                setProductCategoryId(id);
-                const c = categories.find(x => x.id === id);
-                setProductCategoryName(c?.name || "");
-              }}
-              className="input"
-            >
-              <option value="">— Выберите —</option>
-              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </Field>
-          <Field label="Состояние">
-            <select value={productCondition} onChange={e => setProductCondition(e.target.value)} className="input">
-              <option value="">—</option>
-              {CONDITIONS.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </Field>
-          <Field label="Бренд">
-            <input value={productBrand} onChange={e => setProductBrand(e.target.value)} className="input" placeholder="Apple" />
-          </Field>
-          <Field label="Модель">
-            <input value={productModel} onChange={e => setProductModel(e.target.value)} className="input" placeholder="iPhone 13 Pro" />
-          </Field>
-          <Field label="Серийный/IMEI (необязательно)" full>
-            <input value={productSerial} onChange={e => setProductSerial(e.target.value)} className="input" />
-          </Field>
-          <Field label="Описание / комплектация" full>
-            <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} className="input resize-none"
-              placeholder="Использовался 1 год, коробка, зарядка, царапин нет..." />
-          </Field>
-        </div>
-      </Section>
-
-      <Section title="Цена и расчёт" icon="Wallet">
-        <Field label="Желаемая цена продажи (₽)*" full>
-          <input value={price} onChange={e => setPrice(e.target.value.replace(/\D/g, ""))}
-            className="input text-2xl font-extrabold text-[#FFD700]"
-            placeholder="35 000" inputMode="numeric" />
-        </Field>
-
-        {/* ИИ-оценка цены */}
-        <button onClick={handleAiPrice} disabled={priceLoading}
-          className="mt-3 w-full py-3 rounded-xl bg-gradient-to-r from-[#FFD700] via-[#FFE033] to-[#FFD700] text-black font-bold text-sm hover:shadow-[0_8px_25px_-8px_rgba(255,215,0,0.6)] transition disabled:opacity-50 flex items-center justify-center gap-2">
-          {priceLoading
-            ? (<><Icon name="Loader2" size={14} className="animate-spin" /> Оцениваем по рынку...</>)
-            : (<><Icon name="Sparkles" size={14} /> ИИ-оценка: сколько просить?</>)}
-        </button>
-
-        {priceResult && (
-          <div className="mt-3 bg-gradient-to-br from-[#FFD700]/[0.08] to-transparent border border-[#FFD700]/30 rounded-xl p-3">
-            <div className="text-xs font-bold text-[#FFD700] uppercase tracking-wider mb-2 flex items-center gap-1.5">
-              <Icon name="TrendingUp" size={12} /> Рыночная оценка
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <PriceOpt label="Быстро (1-3 дня)" value={priceResult.fast_price} color="#3DDC84" onClick={() => setPrice(String(priceResult.fast_price))} />
-              <PriceOpt label="Справедливо" value={priceResult.fair_price} color="#FFD700" onClick={() => setPrice(String(priceResult.fair_price))} highlighted />
-              <PriceOpt label="Максимум" value={priceResult.top_price} color="#FF7AB8" onClick={() => setPrice(String(priceResult.top_price))} />
-            </div>
-            <div className="text-[11px] text-[#bbb] mt-2 leading-relaxed">
-              <Icon name="Clock" size={10} className="inline mr-1 text-[#FFD700]" />
-              По справедливой цене продаётся за ~<b>{priceResult.days_to_sell} дней</b>. {priceResult.summary}
-            </div>
-          </div>
-        )}
-
-        {priceNum > 0 && (
-          <div className="mt-3 grid grid-cols-3 gap-2">
-            <Stat label="Цена" value={fmtRub(priceNum)} color="#FFD700" />
-            <Stat label={`Комиссия ${COMMISSION_PCT}%`} value={fmtRub(commission)} color="#FF7AB8" />
-            <Stat label="К выплате вам" value={fmtRub(payout)} color="#3DDC84" />
-          </div>
-        )}
-        <div className="grid sm:grid-cols-2 gap-3 mt-3">
-          <Field label="Как покупатель платит">
-            <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value as "cash" | "transfer")} className="input">
-              <option value="cash">Наличными в офисе</option>
-              <option value="transfer">Переводом</option>
-            </select>
-          </Field>
-          <Field label="Как получить деньги">
-            <select value={payoutMethod} onChange={e => setPayoutMethod(e.target.value as "cash" | "transfer")} className="input">
-              <option value="cash">Наличными в офисе</option>
-              <option value="transfer">На карту/счёт</option>
-            </select>
-          </Field>
-          {payoutMethod === "transfer" && (
-            <Field label="Реквизиты для перевода" full>
-              <input value={payoutDetails} onChange={e => setPayoutDetails(e.target.value)} className="input"
-                placeholder="Номер карты или СБП по телефону" />
-            </Field>
-          )}
-        </div>
-      </Section>
-
-      {/* AI Check */}
-      {productTitle && priceNum > 0 && (
-        <Section title="ИИ-проверка качества заявки" icon="Sparkles">
-          <button onClick={handleAiCheck} disabled={aiChecking}
-            className="w-full py-3 rounded-xl border-2 border-[#FFD700]/40 text-[#FFD700] font-bold text-sm hover:border-[#FFD700] transition flex items-center justify-center gap-2 disabled:opacity-50">
-            {aiChecking
-              ? (<><Icon name="Loader2" size={14} className="animate-spin" /> Анализируем...</>)
-              : (<><Icon name="ShieldCheck" size={14} /> Проверить заявку ИИ-модератором</>)}
-          </button>
-          {aiResult && <AiCheckBlock result={aiResult} />}
-        </Section>
-      )}
+      <AiCheckSection
+        productTitle={productTitle} priceNum={priceNum}
+        aiResult={aiResult} aiChecking={aiChecking} onAiCheck={handleAiCheck}
+      />
 
       <div className="bg-[#FFD700]/[0.06] border border-[#FFD700]/[0.2] rounded-2xl px-4 py-3.5 text-sm text-[#ddd] leading-relaxed">
         <Icon name="Shield" size={14} className="inline mr-1.5 text-[#FFD700]" />
@@ -574,98 +364,5 @@ export default function SellerForm({ onSubmitted }: { onSubmitted: (token: strin
         />
       )}
     </div>
-  );
-}
-
-function AiCheckBlock({ result }: { result: AiCheckResult }) {
-  const colorCls = {
-    low: { bg: "bg-emerald-500/[0.06]", border: "border-emerald-500/30", text: "text-emerald-300", icon: "ShieldCheck" },
-    medium: { bg: "bg-orange-500/[0.06]", border: "border-orange-500/30", text: "text-orange-300", icon: "AlertTriangle" },
-    high: { bg: "bg-red-500/[0.06]", border: "border-red-500/30", text: "text-red-300", icon: "AlertCircle" },
-    unknown: { bg: "bg-white/[0.04]", border: "border-white/15", text: "text-white/70", icon: "HelpCircle" },
-  }[result.risk_level];
-  const label = {
-    low: "Всё отлично",
-    medium: "Можно улучшить",
-    high: "Есть подозрения",
-    unknown: "Базовая проверка",
-  }[result.risk_level];
-  return (
-    <div className={`mt-3 ${colorCls.bg} ${colorCls.border} border rounded-xl p-3.5`}>
-      <div className={`text-xs font-bold uppercase tracking-wider ${colorCls.text} mb-2 flex items-center gap-1.5`}>
-        <Icon name={colorCls.icon} size={13} /> {label}
-      </div>
-      <p className="text-sm text-[#ddd] mb-2">{result.summary}</p>
-      {result.warnings.length > 0 && (
-        <ul className="space-y-1 text-xs text-[#bbb]">
-          {result.warnings.map((w, i) => (
-            <li key={i} className="flex items-start gap-1.5">
-              <Icon name="AlertCircle" size={11} className={`mt-0.5 shrink-0 ${colorCls.text}`} />
-              <span>{w}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-      {result.suggestions.length > 0 && (
-        <div className="mt-2 pt-2 border-t border-white/10">
-          <div className="text-[10px] uppercase tracking-wider text-[#777] mb-1">Рекомендации</div>
-          <ul className="space-y-1 text-xs text-[#bbb]">
-            {result.suggestions.map((s, i) => (
-              <li key={i} className="flex items-start gap-1.5">
-                <Icon name="Sparkles" size={11} className="mt-0.5 text-[#FFD700] shrink-0" />
-                <span>{s}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function Section({ title, icon, children }: { title: string; icon: string; children: React.ReactNode }) {
-  return (
-    <section className="bg-[#141414] border border-[#2A2A2A] rounded-2xl p-4 sm:p-5">
-      <h2 className="text-sm font-bold text-[#FFD700] uppercase tracking-wider mb-3 flex items-center gap-2">
-        <Icon name={icon} size={14} /> {title}
-      </h2>
-      {children}
-    </section>
-  );
-}
-
-function Field({ label, children, full }: { label: string; children: React.ReactNode; full?: boolean }) {
-  return (
-    <label className={`block ${full ? "sm:col-span-2" : ""}`}>
-      <span className="block text-xs text-[#888] mb-1">{label}</span>
-      {children}
-    </label>
-  );
-}
-
-function Stat({ label, value, color }: { label: string; value: string; color: string }) {
-  return (
-    <div className="bg-[#1C1C1C] border border-[#2A2A2A] rounded-xl px-3 py-2.5 text-center">
-      <div className="text-[10px] uppercase tracking-wider text-[#777] mb-0.5">{label}</div>
-      <div className="text-sm font-extrabold" style={{ color }}>{value}</div>
-    </div>
-  );
-}
-
-function PriceOpt({ label, value, color, onClick, highlighted }: {
-  label: string;
-  value: number;
-  color: string;
-  onClick: () => void;
-  highlighted?: boolean;
-}) {
-  return (
-    <button onClick={onClick}
-      className={`rounded-xl px-2 py-2.5 text-center transition active:scale-[0.96] ${
-        highlighted ? "bg-[#FFD700]/[0.15] border-2 border-[#FFD700]" : "bg-[#1C1C1C] border border-[#2A2A2A] hover:border-[#FFD700]/40"
-      }`}>
-      <div className="text-[9px] uppercase tracking-wider text-[#999] mb-0.5 leading-tight">{label}</div>
-      <div className="text-sm font-extrabold leading-tight" style={{ color }}>{(value || 0).toLocaleString("ru-RU")} ₽</div>
-    </button>
   );
 }
