@@ -189,6 +189,97 @@ export default function SafeDealDetail({ token, dealId, onBack }: {
         </SLSection>
       )}
 
+      {/* ИИ-проверка */}
+      {deal.ai_check && deal.ai_check.summary && (
+        <SLSection icon="Sparkles" title="ИИ-проверка заявки">
+          <div className={`rounded-md border px-3 py-2 mb-2 ${
+            deal.ai_check.risk_level === "high" ? "bg-red-500/10 border-red-500/30 text-red-300"
+            : deal.ai_check.risk_level === "medium" ? "bg-orange-500/10 border-orange-500/30 text-orange-300"
+            : "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+          }`}>
+            <div className="text-[10px] uppercase tracking-wider font-bold mb-1">
+              Уровень риска: {deal.ai_check.risk_level || "—"}
+            </div>
+            <div className="text-[12px]">{deal.ai_check.summary}</div>
+          </div>
+          {deal.ai_check.warnings && deal.ai_check.warnings.length > 0 && (
+            <div className="mb-2">
+              <div className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-1">Предупреждения</div>
+              <ul className="text-[12px] text-white/80 space-y-0.5">
+                {deal.ai_check.warnings.map((w, i) => (
+                  <li key={i} className="flex items-start gap-1.5">
+                    <Icon name="AlertCircle" size={11} className="mt-0.5 text-orange-400 shrink-0" />
+                    <span>{w}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {deal.ai_check.suggestions && deal.ai_check.suggestions.length > 0 && (
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-white/40 font-bold mb-1">Рекомендации</div>
+              <ul className="text-[12px] text-white/80 space-y-0.5">
+                {deal.ai_check.suggestions.map((s, i) => (
+                  <li key={i} className="flex items-start gap-1.5">
+                    <Icon name="Sparkles" size={11} className="mt-0.5 text-[#FFD700] shrink-0" />
+                    <span>{s}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </SLSection>
+      )}
+
+      {/* Паспорт продавца */}
+      {(deal.seller_passport || deal.seller_passport_photo_url) && (
+        <SLSection icon="ScanLine" title="Паспорт продавца">
+          <SLGrid cols={2}>
+            <Row l="ФИО" v={deal.seller_passport?.fullName} />
+            <Row l="Серия/номер" v={`${deal.seller_passport?.series || ""} ${deal.seller_passport?.number || ""}`.trim()} />
+            <Row l="Кем выдан" v={deal.seller_passport?.issuedBy} />
+            <Row l="Дата выдачи" v={deal.seller_passport?.issuedDate} />
+            <Row l="Дата рождения" v={deal.seller_passport?.birthDate} />
+          </SLGrid>
+          {deal.seller_passport_photo_url && (
+            <a href={deal.seller_passport_photo_url} target="_blank" rel="noopener noreferrer"
+              className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-[#FFD700] hover:underline">
+              <Icon name="Image" size={11} /> Открыть фото паспорта
+            </a>
+          )}
+        </SLSection>
+      )}
+
+      {/* Авито и Яндекс ID */}
+      {(deal.avito_url || deal.seller_yandex_id) && (
+        <SLSection icon="ExternalLink" title="Внешние данные">
+          {deal.avito_url && (
+            <div className="mb-2 text-[12px]">
+              <span className="text-white/40 mr-2">Импорт с Авито:</span>
+              <a href={deal.avito_url} target="_blank" rel="noopener noreferrer" className="text-[#FFD700] hover:underline break-all">
+                {deal.avito_url}
+              </a>
+            </div>
+          )}
+          {deal.seller_yandex_id && (
+            <div className="text-[12px]">
+              <span className="text-white/40 mr-2">Яндекс ID:</span>
+              <span className="text-white/85">{deal.seller_yandex_id}</span>
+              <span className="ml-2 px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 text-[9px] font-bold uppercase">верифицирован</span>
+            </div>
+          )}
+        </SLSection>
+      )}
+
+      {/* Премиум-карточка */}
+      {deal.is_featured && (
+        <SLSection icon="Crown" title="Премиум-карточка">
+          <div className="text-[12px] text-[#FFD700]">
+            ⭐ Товар выделен в топе витрины {deal.featured_until ? `до ${fmtDate(deal.featured_until)}` : ""}
+          </div>
+        </SLSection>
+      )}
+
       {/* Отчёт о проверке */}
       {deal.office_check_notes && (
         <SLSection icon="ClipboardCheck" title="Отчёт о проверке">

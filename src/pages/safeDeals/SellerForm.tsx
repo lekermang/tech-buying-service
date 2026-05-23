@@ -12,8 +12,8 @@ import { toast } from "sonner";
 import Icon from "@/components/ui/icon";
 import {
   apiCall, COMMISSION_PCT, OFFICE_ADDRESS, REALIZATION_DAYS, fmtRub, saveSellerToken,
-  listCategories, uploadTempPhoto, aiFill, aiCheck, scanPassport, getYandexConfig, yandexAuth,
-  type CreateResponse, type CategoryItem, type AiCheckResult, type AvitoParsed, type PassportData,
+  listCategories, uploadTempPhoto, aiFill, aiCheck, scanPassport, getYandexConfig, yandexAuth, aiPrice,
+  type CreateResponse, type CategoryItem, type AiCheckResult, type AvitoParsed, type PassportData, type AiPriceResult,
 } from "./api";
 import AvitoImportModal from "./AvitoImportModal";
 
@@ -99,6 +99,10 @@ export default function SellerForm({ onSubmitted }: { onSubmitted: (token: strin
   const [aiChecking, setAiChecking] = useState(false);
   const [aiFilling, setAiFilling] = useState(false);
 
+  // ─── ai price ───
+  const [priceResult, setPriceResult] = useState<AiPriceResult | null>(null);
+  const [priceLoading, setPriceLoading] = useState(false);
+
   // ─── ui state ───
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [avitoModalOpen, setAvitoModalOpen] = useState(false);
@@ -149,7 +153,7 @@ export default function SellerForm({ onSubmitted }: { onSubmitted: (token: strin
   // ─── handlers ───
   const openYandexAuth = () => {
     if (!yandexAvailable || !yandexClientId) {
-      toast.error("Яндекс ID временно недоступен");
+      toast.error("Яндекс ID временно недоступен. Войдите вручную или используйте Импорт с Авито.");
       return;
     }
     const redirectUri = `${window.location.origin}/safe-deals/yandex-callback`;
@@ -158,7 +162,9 @@ export default function SellerForm({ onSubmitted }: { onSubmitted: (token: strin
       `&client_id=${encodeURIComponent(yandexClientId)}` +
       `&redirect_uri=${encodeURIComponent(redirectUri)}`;
     const popup = window.open(authUrl, "yandex_oauth", "width=520,height=640");
-    if (!popup) toast.error("Браузер заблокировал попап");
+    if (!popup) {
+      toast.error("Браузер заблокировал попап. Разрешите всплывающие окна для сайта.");
+    }
   };
 
   const addPhotos = async (incoming: File[]) => {
@@ -208,6 +214,27 @@ export default function SellerForm({ onSubmitted }: { onSubmitted: (token: strin
     if (d.description && !description) setDescription(d.description);
     if (d.price_hint && !price) setPrice(String(d.price_hint));
     toast.success("ИИ заполнил поля");
+  };
+
+  const handleAiPrice = async () => {
+    if (!productTitle.trim() && !productModel.trim()) {
+      toast.error("Сначала укажите название или модель"); return;
+    }
+    setPriceLoading(true);
+    const r = await aiPrice({
+      productTitle, productBrand, productModel, productCondition,
+      productDescription: description,
+      photoUrls: photos.map(p => p.url),
+    });
+    setPriceLoading(false);
+    if (!r.ok || !r.data) { toast.error(r.error || "Ошибка"); return; }
+    setPriceResult(r.data);
+    if (!price && r.data.fair_price) {
+      setPrice(String(r.data.fair_price));
+      toast.success("Цена установлена по рынку");
+    } else {
+      toast.success("Оценка готова");
+    }
   };
 
   const handleAiCheck = async () => {
@@ -450,6 +477,32 @@ export default function SellerForm({ onSubmitted }: { onSubmitted: (token: strin
             className="input text-2xl font-extrabold text-[#FFD700]"
             placeholder="35 000" inputMode="numeric" />
         </Field>
+
+        {/* ИИ-оценка цены */}
+        <button onClick={handleAiPrice} disabled={priceLoading}
+          className="mt-3 w-full py-3 rounded-xl bg-gradient-to-r from-[#FFD700] via-[#FFE033] to-[#FFD700] text-black font-bold text-sm hover:shadow-[0_8px_25px_-8px_rgba(255,215,0,0.6)] transition disabled:opacity-50 flex items-center justify-center gap-2">
+          {priceLoading
+            ? (<><Icon name="Loader2" size={14} className="animate-spin" /> Оцениваем по рынку...</>)
+            : (<><Icon name="Sparkles" size={14} /> ИИ-оценка: сколько просить?</>)}
+        </button>
+
+        {priceResult && (
+          <div className="mt-3 bg-gradient-to-br from-[#FFD700]/[0.08] to-transparent border border-[#FFD700]/30 rounded-xl p-3">
+            <div className="text-xs font-bold text-[#FFD700] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <Icon name="TrendingUp" size={12} /> Рыночная оценка
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <PriceOpt label="Быстро (1-3 дня)" value={priceResult.fast_price} color="#3DDC84" onClick={() => setPrice(String(priceResult.fast_price))} />
+              <PriceOpt label="Справедливо" value={priceResult.fair_price} color="#FFD700" onClick={() => setPrice(String(priceResult.fair_price))} highlighted />
+              <PriceOpt label="Максимум" value={priceResult.top_price} color="#FF7AB8" onClick={() => setPrice(String(priceResult.top_price))} />
+            </div>
+            <div className="text-[11px] text-[#bbb] mt-2 leading-relaxed">
+              <Icon name="Clock" size={10} className="inline mr-1 text-[#FFD700]" />
+              По справедливой цене продаётся за ~<b>{priceResult.days_to_sell} дней</b>. {priceResult.summary}
+            </div>
+          </div>
+        )}
+
         {priceNum > 0 && (
           <div className="mt-3 grid grid-cols-3 gap-2">
             <Stat label="Цена" value={fmtRub(priceNum)} color="#FFD700" />
@@ -596,5 +649,23 @@ function Stat({ label, value, color }: { label: string; value: string; color: st
       <div className="text-[10px] uppercase tracking-wider text-[#777] mb-0.5">{label}</div>
       <div className="text-sm font-extrabold" style={{ color }}>{value}</div>
     </div>
+  );
+}
+
+function PriceOpt({ label, value, color, onClick, highlighted }: {
+  label: string;
+  value: number;
+  color: string;
+  onClick: () => void;
+  highlighted?: boolean;
+}) {
+  return (
+    <button onClick={onClick}
+      className={`rounded-xl px-2 py-2.5 text-center transition active:scale-[0.96] ${
+        highlighted ? "bg-[#FFD700]/[0.15] border-2 border-[#FFD700]" : "bg-[#1C1C1C] border border-[#2A2A2A] hover:border-[#FFD700]/40"
+      }`}>
+      <div className="text-[9px] uppercase tracking-wider text-[#999] mb-0.5 leading-tight">{label}</div>
+      <div className="text-sm font-extrabold leading-tight" style={{ color }}>{(value || 0).toLocaleString("ru-RU")} ₽</div>
+    </button>
   );
 }

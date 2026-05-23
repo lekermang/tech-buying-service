@@ -7,6 +7,7 @@ import {
   apiCall, fmtDate, fmtRub, OFFICE_ADDRESS, STATUS_LABEL,
   type SafeDealDetail,
 } from "./api";
+import { FeatureUpgradeCTA } from "./LandingExtras";
 
 export default function SellerCabinet({ token, onBack }: { token: string; onBack: () => void }) {
   const [deal, setDeal] = useState<SafeDealDetail | null>(null);
@@ -92,6 +93,11 @@ export default function SellerCabinet({ token, onBack }: { token: string; onBack
           <Icon name="Link2" size={13} className="inline mr-1" /> Скопировать ссылку
         </button>
       </section>
+
+      {/* Платный апгрейд — только для активных */}
+      {["on_shelf", "submitted", "review"].includes(deal.status) && (
+        <FeatureUpgradeCTA token={token} />
+      )}
 
       {/* Финансы */}
       <section className="bg-[#141414] border border-[#2A2A2A] rounded-2xl p-4 sm:p-5">

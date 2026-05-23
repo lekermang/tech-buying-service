@@ -73,6 +73,28 @@ export type AdminDeal = AdminListItem & {
   reservation_until?: string | null;
   cancel_reason?: string | null;
   events: { id: number; event_type: string; details: Record<string, unknown>; actor?: string | null; created_at: string }[];
+
+  // Расширенные поля
+  seller_passport?: {
+    fullName?: string;
+    series?: string;
+    number?: string;
+    issuedBy?: string;
+    issuedDate?: string;
+    birthDate?: string;
+  } | null;
+  seller_passport_photo_url?: string | null;
+  seller_yandex_id?: string | null;
+  avito_url?: string | null;
+  ai_check?: {
+    risk_level?: "low" | "medium" | "high" | "unknown";
+    warnings?: string[];
+    suggestions?: string[];
+    summary?: string;
+  } | null;
+  category_id?: number | null;
+  is_featured?: boolean;
+  featured_until?: string | null;
 };
 
 export async function sdApi<T = unknown>(

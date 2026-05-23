@@ -234,6 +234,12 @@ def action_create(body, event):
     conn = _get_conn()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     try:
+        # Проверка чёрного списка
+        bl = _check_blacklist(cur, phone=seller_phone, yandex_id=seller_yandex_id or '')
+        if bl.get('in_blacklist'):
+            cur.close(); conn.close()
+            return _err(403, f"Заявки от этого аккаунта не принимаются. Причина: {bl.get('reason', 'не указана')}. Обратитесь в офис.")
+
         # Уникальность QR
         for _ in range(5):
             cur.execute(f"SELECT 1 FROM {SCHEMA}.safe_deals WHERE qr_code=%s", (qr_code,))
@@ -604,22 +610,86 @@ def action_categories():
 
 # ============ PUBLIC: SHOP (витрина проверенных товаров) ============
 def action_shop():
-    """Публичная витрина: сделки в статусе on_shelf и reserved."""
-    q = ''  # без фильтров пока — только активные
+    """Публичная витрина: сделки в статусе on_shelf и reserved.
+    Сначала идут featured (платная карточка в топе), потом по дате проверки."""
     conn = _get_conn()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cur.execute(
         f"SELECT id, deal_number, qr_code, status, "
         f"product_title, product_brand, product_model, product_category, product_condition, product_description, "
-        f"price, photos, seller_name, office_check_notes, office_checked_at, created_at "
+        f"price, photos, seller_name, office_check_notes, office_checked_at, created_at, "
+        f"is_featured, featured_until "
         f"FROM {SCHEMA}.safe_deals "
         f"WHERE status IN ('on_shelf', 'reserved') "
-        f"ORDER BY office_checked_at DESC NULLS LAST, created_at DESC LIMIT 100"
+        f"ORDER BY "
+        f"  CASE WHEN is_featured = TRUE AND (featured_until IS NULL OR featured_until > NOW()) THEN 0 ELSE 1 END, "
+        f"  office_checked_at DESC NULLS LAST, created_at DESC LIMIT 100"
     )
     rows = [_deal_to_dict(r) for r in cur.fetchall()]
     cur.close(); conn.close()
-    items = [_public_view(r) for r in rows]
+    items = []
+    for r in rows:
+        v = _public_view(r)
+        v['isFeatured'] = bool(r.get('is_featured')) and (
+            r.get('featured_until') is None or
+            (r.get('featured_until') and r['featured_until'] > datetime.now(timezone.utc).isoformat())
+        )
+        items.append(v)
     return _ok({'items': items, 'count': len(items)})
+
+
+# ============ PUBLIC: FEATURE DEAL (платный апгрейд) ============
+def action_feature_deal(body):
+    """Включает «золотую карточку в топе» на 7 дней. MVP — без оплаты, просто помечаем флагом.
+    Реальная оплата подключится позже через ЮКассу."""
+    token = (body.get('token') or '').strip()
+    if not token:
+        return _err(400, 'token required')
+    conn = _get_conn()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            f"UPDATE {SCHEMA}.safe_deals SET "
+            f"is_featured=TRUE, "
+            f"featured_until=NOW() + INTERVAL '7 days', "
+            f"featured_paid_amount=100.00 "
+            f"WHERE seller_token=%s RETURNING id",
+            (token,)
+        )
+        row = cur.fetchone()
+        if not row:
+            return _err(404, 'Сделка не найдена')
+        _log(cur, row[0], 'featured_enabled', {'amount': 100, 'days': 7}, actor='self')
+        conn.commit()
+        return _ok({'ok': True, 'amount': 100, 'days': 7})
+    except Exception as e:
+        conn.rollback()
+        return _err(500, f'Ошибка: {e}')
+    finally:
+        cur.close(); conn.close()
+
+
+# ============ PUBLIC: CHECK BLACKLIST ============
+def _check_blacklist(cur, phone: str = '', yandex_id: str = '') -> dict:
+    """Проверяет, есть ли продавец в чёрном списке. Возвращает { in_blacklist, reason }."""
+    if not phone and not yandex_id:
+        return {'in_blacklist': False}
+    conds = []
+    params = []
+    if phone:
+        conds.append("(kind='phone' AND value=%s)")
+        params.append(phone)
+    if yandex_id:
+        conds.append("(kind='yandex_id' AND value=%s)")
+        params.append(yandex_id)
+    cur.execute(
+        f"SELECT reason FROM {SCHEMA}.safe_deals_blacklist WHERE " + ' OR '.join(conds),
+        params,
+    )
+    row = cur.fetchone()
+    if not row:
+        return {'in_blacklist': False}
+    return {'in_blacklist': True, 'reason': row[0] if not isinstance(row, dict) else row.get('reason')}
 
 
 # ============ PUBLIC: PARSE AVITO ============
@@ -808,6 +878,77 @@ def action_ai_check(body):
             'suggestions': [],
             'summary': f'ИИ-проверка не выполнена: {e}',
         })
+
+
+# ============ PUBLIC: AI PRICE (оценка рынка) ============
+def action_ai_price(body):
+    """ИИ-оценка рыночной цены и времени продажи на основе фото и описания.
+    Использует GPT-4o-mini с данными о российском рынке Б/У техники.
+    Возвращает: { fair_price, fast_price, top_price, days_to_sell, summary }.
+    """
+    title = (body.get('productTitle') or '').strip()
+    description = (body.get('productDescription') or '').strip()
+    brand = (body.get('productBrand') or '').strip()
+    model = (body.get('productModel') or '').strip()
+    condition = (body.get('productCondition') or '').strip()
+    photo_urls = body.get('photoUrls') or []
+
+    if not title and not model:
+        return _err(400, 'productTitle или productModel обязательны')
+
+    api_key = os.environ.get('POLZA_AI_API_KEY', '')
+    if not api_key:
+        return _err(503, 'AI недоступен')
+
+    prompt = (
+        "Ты — эксперт по российскому рынку Б/У техники (Калуга, Москва, регионы). "
+        "Оцени реальную рыночную цену устройства для быстрой продажи. Учти: бренд, модель, "
+        "состояние, типичный износ для Б/У, средние цены на Авито/Юла.\n\n"
+        f"Название: {title}\n"
+        f"Бренд: {brand or '—'}\n"
+        f"Модель: {model or '—'}\n"
+        f"Состояние: {condition or '—'}\n"
+        f"Описание: {description or '—'}\n\n"
+        "Ответь СТРОГО в JSON:\n"
+        '{"fast_price": число — цена для продажи за 1-3 дня (-15% от рынка),\n'
+        ' "fair_price": число — справедливая рыночная цена (продажа за 7-14 дней),\n'
+        ' "top_price": число — максимальная цена (продажа от 2-4 недель),\n'
+        ' "days_to_sell": число — типичное время продажи по справедливой цене,\n'
+        ' "summary": "1-2 предложения с обоснованием"}'
+    )
+
+    try:
+        import urllib.request as _urlreq
+        content: list = [{"type": "text", "text": prompt}]
+        for u in photo_urls[:3]:
+            if isinstance(u, str) and u.startswith('http'):
+                content.append({"type": "image_url", "image_url": {"url": u}})
+
+        req_body = {
+            "model": "gpt-4o-mini",
+            "messages": [{"role": "user", "content": content}],
+            "max_tokens": 400,
+            "temperature": 0.3,
+            "response_format": {"type": "json_object"},
+        }
+        req = _urlreq.Request(
+            'https://api.polza.ai/v1/chat/completions',
+            data=json.dumps(req_body).encode('utf-8'),
+            headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
+            method='POST',
+        )
+        with _urlreq.urlopen(req, timeout=30) as resp:
+            ai_resp = json.loads(resp.read().decode('utf-8'))
+        parsed = json.loads(ai_resp['choices'][0]['message']['content'])
+        return _ok({
+            'fast_price': int(parsed.get('fast_price') or 0),
+            'fair_price': int(parsed.get('fair_price') or 0),
+            'top_price': int(parsed.get('top_price') or 0),
+            'days_to_sell': int(parsed.get('days_to_sell') or 14),
+            'summary': parsed.get('summary') or '',
+        })
+    except Exception as e:
+        return _err(502, f'ИИ ошибка: {e}')
 
 
 # ============ PUBLIC: AI FILL ============
@@ -1200,12 +1341,16 @@ def handler(event: dict, context) -> dict:
             return action_ai_check(body)
         if action == 'ai_fill':
             return action_ai_fill(body)
+        if action == 'ai_price':
+            return action_ai_price(body)
         if action == 'upload_photo':
             return action_upload_photo(body)
         if action == 'yandex_auth':
             return action_yandex_auth(body)
         if action == 'scan_passport':
             return action_scan_passport(body)
+        if action == 'feature_deal':
+            return action_feature_deal(body)
         return _err(400, f'Unknown POST action: {action}')
 
     return _err(405, 'Method not allowed')

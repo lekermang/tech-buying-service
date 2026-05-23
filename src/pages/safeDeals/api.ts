@@ -75,6 +75,7 @@ export type SafeDealPublic = {
   officeCheckNotes?: string | null;
   officeCheckedAt?: string | null;
   createdAt: string;
+  isFeatured?: boolean;
 };
 
 export type CreateResponse = {
@@ -224,6 +225,32 @@ export async function scanPassport(fileBase64: string) {
   return apiCall<PassportData>("scan_passport", {
     method: "POST",
     body: { fileBase64 },
+  });
+}
+
+export type AiPriceResult = {
+  fast_price: number;
+  fair_price: number;
+  top_price: number;
+  days_to_sell: number;
+  summary: string;
+};
+
+export async function aiPrice(params: {
+  productTitle: string;
+  productBrand?: string;
+  productModel?: string;
+  productCondition?: string;
+  productDescription?: string;
+  photoUrls?: string[];
+}) {
+  return apiCall<AiPriceResult>("ai_price", { method: "POST", body: params });
+}
+
+export async function featureDeal(token: string) {
+  return apiCall<{ ok: boolean; amount: number; days: number }>("feature_deal", {
+    method: "POST",
+    body: { token },
   });
 }
 

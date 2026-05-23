@@ -8,6 +8,7 @@ import Icon from "@/components/ui/icon";
 import SellerForm from "./safeDeals/SellerForm";
 import SellerCabinet from "./safeDeals/SellerCabinet";
 import CompareWithAvito from "./safeDeals/CompareWithAvito";
+import { UtpBlock, SafetyRules } from "./safeDeals/LandingExtras";
 import {
   COMMISSION_PCT, OFFICE_ADDRESS, REALIZATION_DAYS,
   loadSellerTokens,
@@ -210,8 +211,14 @@ function Landing({ myDeals, onStart, onOpenDeal }: {
         </button>
       </div>
 
+      {/* UTP-блок */}
+      <UtpBlock />
+
       {/* Сравнение с Авито */}
       <CompareWithAvito />
+
+      {/* Правила безопасности */}
+      <SafetyRules />
     </div>
   );
 }
