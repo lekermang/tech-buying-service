@@ -79,6 +79,36 @@
         "qrCode": "string"
       },
       "bodyMatcher": "partial"
+    },
+    {
+      "name": "Public categories",
+      "method": "GET",
+      "path": "/?action=categories",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Public shop list",
+      "method": "GET",
+      "path": "/?action=shop",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Parse avito requires url",
+      "method": "POST",
+      "path": "/?action=parse_avito",
+      "body": {},
+      "expectedStatus": 400,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "AI check requires title",
+      "method": "POST",
+      "path": "/?action=ai_check",
+      "body": {},
+      "expectedStatus": 400,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
     }
   ]
 }

@@ -7,6 +7,7 @@ import { useSearchParams } from "react-router-dom";
 import Icon from "@/components/ui/icon";
 import SellerForm from "./safeDeals/SellerForm";
 import SellerCabinet from "./safeDeals/SellerCabinet";
+import CompareWithAvito from "./safeDeals/CompareWithAvito";
 import {
   COMMISSION_PCT, OFFICE_ADDRESS, REALIZATION_DAYS,
   loadSellerTokens,
@@ -128,6 +129,9 @@ function Landing({ myDeals, onStart, onOpenDeal }: {
           <Icon name="Shield" size={18} /> Подать заявку
         </button>
         <div className="mt-3 text-xs text-[#666]">Бесплатно · без регистрации · 2 минуты</div>
+        <a href="/safe-deals/shop" className="mt-2 inline-flex items-center gap-1 text-xs text-[#FFD700] hover:underline">
+          <Icon name="Store" size={12} /> Посмотреть витрину товаров
+        </a>
       </div>
 
       {/* Мои сделки */}
@@ -205,6 +209,9 @@ function Landing({ myDeals, onStart, onOpenDeal }: {
           <Icon name="ArrowRight" size={16} /> Подать заявку сейчас
         </button>
       </div>
+
+      {/* Сравнение с Авито */}
+      <CompareWithAvito />
     </div>
   );
 }

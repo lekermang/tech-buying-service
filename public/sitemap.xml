@@ -64,6 +64,12 @@
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
+  <url>
+    <loc>https://skypka24.com/safe-deals/shop</loc>
+    <lastmod>2026-05-24</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
 
   <!-- Якорные посадочные секции главной (Яндекс/Google индексируют как разделы) -->
   <url>

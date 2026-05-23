@@ -191,6 +191,20 @@ def action_create(body, event):
     payout_method = (body.get('payoutMethod') or 'cash').strip()
     payout_details = (body.get('payoutDetails') or '').strip() or None
     photos_b64 = body.get('photos') or []  # массив base64
+    photo_urls_in = body.get('photoUrls') or []  # уже загруженные URL (от ai_fill/upload_photo)
+    # Доп. поля
+    seller_passport = body.get('sellerPassport')  # dict с полями паспорта
+    seller_passport_photo_url = (body.get('sellerPassportPhotoUrl') or '').strip() or None
+    seller_yandex_id = (body.get('sellerYandexId') or '').strip() or None
+    avito_url = (body.get('avitoUrl') or '').strip() or None
+    ai_check_data = body.get('aiCheck')  # результат ИИ-проверки
+    category_id_raw = body.get('categoryId')
+    category_id = None
+    try:
+        if category_id_raw:
+            category_id = int(category_id_raw)
+    except Exception:
+        category_id = None
 
     if not seller_name or len(seller_name) < 3:
         return _err(400, 'Укажите ваше имя')
@@ -235,9 +249,12 @@ def action_create(body, event):
             f"product_title, product_brand, product_model, product_category, product_condition, "
             f"product_description, product_serial, "
             f"price, commission_pct, commission_amount, seller_payout, "
-            f"payment_method, payout_method, payout_details) "
+            f"payment_method, payout_method, payout_details, "
+            f"seller_passport, seller_passport_photo_url, seller_yandex_id, "
+            f"avito_url, ai_check, category_id) "
             f"VALUES (%s, %s, %s, 'submitted', "
-            f"%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+            f"%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, "
+            f"%s::jsonb, %s, %s, %s, %s::jsonb, %s) RETURNING id",
             (
                 deal_number, seller_token, qr_code,
                 seller_name, seller_phone, seller_email,
@@ -245,23 +262,35 @@ def action_create(body, event):
                 description, serial,
                 price, commission_pct, commission_amount, seller_payout,
                 payment_method, payout_method, payout_details,
+                json.dumps(seller_passport, ensure_ascii=False) if seller_passport else None,
+                seller_passport_photo_url, seller_yandex_id,
+                avito_url,
+                json.dumps(ai_check_data, ensure_ascii=False) if ai_check_data else None,
+                category_id,
             )
         )
         deal_id = cur.fetchone()['id']
 
         photo_urls = []
-        if isinstance(photos_b64, list) and photos_b64:
-            for i, b in enumerate(photos_b64[:6]):  # макс 6 фото
+        # Уже загруженные URL (например через ai_fill/upload_photo)
+        if isinstance(photo_urls_in, list):
+            for u in photo_urls_in[:6]:
+                if isinstance(u, str) and u.startswith('http'):
+                    photo_urls.append({'url': u, 'uploaded_at': datetime.now(timezone.utc).isoformat()})
+        # base64 фото
+        if isinstance(photos_b64, list) and photos_b64 and len(photo_urls) < 6:
+            slots = 6 - len(photo_urls)
+            for i, b in enumerate(photos_b64[:slots]):
                 try:
                     url = _upload_photo_b64(deal_id, b, i)
                     photo_urls.append({'url': url, 'uploaded_at': datetime.now(timezone.utc).isoformat()})
                 except Exception:
                     continue
-            if photo_urls:
-                cur.execute(
-                    f"UPDATE {SCHEMA}.safe_deals SET photos=%s::jsonb WHERE id=%s",
-                    (json.dumps(photo_urls), deal_id)
-                )
+        if photo_urls:
+            cur.execute(
+                f"UPDATE {SCHEMA}.safe_deals SET photos=%s::jsonb WHERE id=%s",
+                (json.dumps(photo_urls), deal_id)
+            )
 
         _log(cur, deal_id, 'submitted', {'price': float(price), 'photos': len(photo_urls)}, actor=seller_name)
         ip = ((event.get('requestContext') or {}).get('identity') or {}).get('sourceIp')
@@ -427,6 +456,453 @@ def action_cancel_by_token(body):
         return _err(500, f'Ошибка: {e}')
     finally:
         cur.close(); conn.close()
+
+
+# ============ PUBLIC: YANDEX OAUTH (быстрая регистрация продавца) ============
+def action_yandex_config():
+    """Отдаёт публичный YANDEX_CLIENT_ID для фронта (нужен для OAuth flow)."""
+    cid = os.environ.get('YANDEX_CLIENT_ID', '')
+    return _ok({'clientId': cid, 'available': bool(cid)})
+
+
+def action_yandex_auth(body):
+    """Принимает code от Yandex OAuth → возвращает данные пользователя для авто-заполнения формы.
+    Не создаёт клиента (это не регистрация на сайте, а просто заполнение формы)."""
+    import urllib.request as _urlreq
+    import urllib.parse as _urlparse
+
+    code = (body.get('code') or '').strip()
+    redirect_uri = (body.get('redirect_uri') or '').strip()
+    if not code:
+        return _err(400, 'code required')
+
+    client_id = os.environ.get('YANDEX_CLIENT_ID', '')
+    client_secret = os.environ.get('YANDEX_CLIENT_SECRET', '')
+    if not client_id or not client_secret:
+        return _err(503, 'Яндекс OAuth не настроен')
+
+    try:
+        # Обмен code на access_token
+        data = _urlparse.urlencode({
+            'grant_type': 'authorization_code',
+            'code': code,
+            'client_id': client_id,
+            'client_secret': client_secret,
+            'redirect_uri': redirect_uri,
+        }).encode('utf-8')
+        req = _urlreq.Request('https://oauth.yandex.ru/token', data=data, method='POST')
+        with _urlreq.urlopen(req, timeout=10) as resp:
+            token_data = json.loads(resp.read().decode('utf-8'))
+        ya_token = token_data.get('access_token')
+        if not ya_token:
+            return _err(400, 'Не удалось получить токен Яндекса')
+
+        # Получение данных пользователя
+        info_req = _urlreq.Request(
+            'https://login.yandex.ru/info?format=json',
+            headers={'Authorization': f'OAuth {ya_token}'},
+        )
+        with _urlreq.urlopen(info_req, timeout=10) as resp:
+            info = json.loads(resp.read().decode('utf-8'))
+
+        return _ok({
+            'fullName': info.get('real_name') or info.get('display_name') or '',
+            'email': info.get('default_email') or '',
+            'phone': (info.get('default_phone') or {}).get('number', '') if info.get('default_phone') else '',
+            'yandexId': str(info.get('id') or ''),
+        })
+    except Exception as e:
+        return _err(502, f'Яндекс ошибка: {e}')
+
+
+# ============ PUBLIC: SCAN PASSPORT ============
+def action_scan_passport(body):
+    """Распознаёт паспорт по фото — выдёргивает ФИО, серию/номер, кем выдан, дату.
+    Используем тот же GPT-4o-mini (Polza.ai), что и в slshop."""
+    b64 = body.get('fileBase64') or ''
+    if not b64:
+        return _err(400, 'fileBase64 required')
+
+    api_key = os.environ.get('POLZA_AI_API_KEY', '')
+    if not api_key:
+        return _err(503, 'OCR временно недоступен')
+
+    # Сначала загрузим в S3 (нужен URL для vision API)
+    try:
+        if ',' in b64:
+            b64 = b64.split(',', 1)[1]
+        data = base64.b64decode(b64)
+        if len(data) > MAX_PHOTO_BYTES * 2:  # паспорт может быть 8 МБ
+            return _err(413, 'Фото больше 8 МБ')
+        mime = 'image/jpeg'
+        if data[:4] == b'\x89PNG':
+            mime = 'image/png'
+        ext = 'jpg' if mime == 'image/jpeg' else 'png'
+        key = f"safe-deals/tmp/passport_{int(datetime.now().timestamp()*1000)}_{secrets.token_hex(4)}.{ext}"
+        s3 = _get_s3()
+        s3.put_object(Bucket='files', Key=key, Body=data, ContentType=mime)
+        url = f"https://cdn.poehali.dev/projects/{os.environ['AWS_ACCESS_KEY_ID']}/bucket/{key}"
+    except Exception as e:
+        return _err(500, f'Не удалось загрузить фото: {e}')
+
+    prompt = (
+        "Перед тобой страница российского паспорта. Распознай и верни СТРОГО в JSON:\n"
+        '{ "full_name": "Фамилия Имя Отчество", "series": "0000", "number": "000000", '
+        '"issued_by": "кем выдан", "issued_date": "YYYY-MM-DD", "birth_date": "YYYY-MM-DD" }\n'
+        "Если какое-то поле не видно — пустая строка. Не выдумывай данные.\n"
+    )
+
+    try:
+        import urllib.request as _urlreq
+        req_body = {
+            "model": "gpt-4o-mini",
+            "messages": [{"role": "user", "content": [
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": {"url": url}},
+            ]}],
+            "max_tokens": 400,
+            "temperature": 0.1,
+            "response_format": {"type": "json_object"},
+        }
+        req = _urlreq.Request(
+            'https://api.polza.ai/v1/chat/completions',
+            data=json.dumps(req_body).encode('utf-8'),
+            headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
+            method='POST',
+        )
+        with _urlreq.urlopen(req, timeout=30) as resp:
+            ai_resp = json.loads(resp.read().decode('utf-8'))
+        parsed = json.loads(ai_resp['choices'][0]['message']['content'])
+        return _ok({
+            'fullName': parsed.get('full_name') or '',
+            'series': parsed.get('series') or '',
+            'number': parsed.get('number') or '',
+            'issuedBy': parsed.get('issued_by') or '',
+            'issuedDate': parsed.get('issued_date') or '',
+            'birthDate': parsed.get('birth_date') or '',
+            'photoUrl': url,  # храним для проверки сотрудником
+        })
+    except Exception as e:
+        return _err(502, f'OCR ошибка: {e}')
+
+
+# ============ PUBLIC: CATEGORIES ============
+def action_categories():
+    """Публичный список категорий товаров из slshop_categories.
+    Используется в форме подачи заявки и витрине."""
+    conn = _get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        f"SELECT id, name, slug, icon, color, parent_id, depth "
+        f"FROM {SCHEMA}.slshop_categories "
+        f"WHERE is_active=true ORDER BY sort_order, name"
+    )
+    items = [dict(r) for r in cur.fetchall()]
+    cur.close(); conn.close()
+    return _ok({'items': items})
+
+
+# ============ PUBLIC: SHOP (витрина проверенных товаров) ============
+def action_shop():
+    """Публичная витрина: сделки в статусе on_shelf и reserved."""
+    q = ''  # без фильтров пока — только активные
+    conn = _get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        f"SELECT id, deal_number, qr_code, status, "
+        f"product_title, product_brand, product_model, product_category, product_condition, product_description, "
+        f"price, photos, seller_name, office_check_notes, office_checked_at, created_at "
+        f"FROM {SCHEMA}.safe_deals "
+        f"WHERE status IN ('on_shelf', 'reserved') "
+        f"ORDER BY office_checked_at DESC NULLS LAST, created_at DESC LIMIT 100"
+    )
+    rows = [_deal_to_dict(r) for r in cur.fetchall()]
+    cur.close(); conn.close()
+    items = [_public_view(r) for r in rows]
+    return _ok({'items': items, 'count': len(items)})
+
+
+# ============ PUBLIC: PARSE AVITO ============
+def action_parse_avito(body):
+    """Парсит URL объявления Авито через мобильное API (без авторизации).
+    Возвращает: title, price, photos, description, category, address."""
+    import re as _re
+    import urllib.request as _urlreq
+
+    url = (body.get('url') or '').strip()
+    if not url:
+        return _err(400, 'url required')
+
+    # Извлекаем ID объявления из URL
+    m = _re.search(r'_(\d{6,})(?:\?|$|/)', url)
+    if not m:
+        m = _re.search(r'/(\d{6,})(?:\?|$|/)', url)
+    if not m:
+        return _err(400, 'Не удалось извлечь ID объявления из URL')
+    item_id = m.group(1)
+
+    endpoints = [
+        f'https://m.avito.ru/api/16/items/{item_id}',
+        f'https://m.avito.ru/api/15/items/{item_id}',
+        f'https://www.avito.ru/api/15/items/{item_id}',
+    ]
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 10) Mobile',
+        'Accept': 'application/json',
+    }
+    data = None
+    last_err = None
+    for ep in endpoints:
+        try:
+            req = _urlreq.Request(ep, headers=headers)
+            with _urlreq.urlopen(req, timeout=10) as resp:
+                if resp.status == 200:
+                    data = json.loads(resp.read().decode('utf-8'))
+                    break
+        except Exception as e:
+            last_err = str(e)
+            continue
+    if not data:
+        return _err(502, f'Не удалось получить объявление: {last_err or "недоступно"}')
+
+    # Парсим ответ Авито (структура мобильного API)
+    title = data.get('title') or ''
+    price = 0
+    try:
+        price_obj = data.get('price') or {}
+        price = int(price_obj.get('value') or price_obj.get('price') or 0)
+    except Exception:
+        price = 0
+    description = data.get('description') or ''
+    category_obj = data.get('category') or {}
+    category = category_obj.get('name') if isinstance(category_obj, dict) else None
+
+    photos = []
+    for img in (data.get('images') or []):
+        if isinstance(img, dict):
+            # Берём самое большое разрешение
+            variants = img.get('variants') or img.get('variantsList') or {}
+            best = None
+            if isinstance(variants, dict):
+                # Ищем ключи типа '1280x960', '640x480' и т.п.
+                for key in ['1280x960', '640x480', 'orig', 'original', '1024x768']:
+                    if variants.get(key):
+                        best = variants[key]
+                        break
+                if not best:
+                    # Берём любое значение
+                    for v in variants.values():
+                        if isinstance(v, str):
+                            best = v
+                            break
+            if best:
+                photos.append(best)
+        elif isinstance(img, str):
+            photos.append(img)
+    photos = photos[:6]
+
+    return _ok({
+        'title': title.strip(),
+        'price': price,
+        'description': description.strip(),
+        'category': category,
+        'photos': photos,
+        'url': url,
+    })
+
+
+# ============ PUBLIC: AI CHECK PHOTOS ============
+def action_ai_check(body):
+    """ИИ-проверка фото и описания на признаки мошенничества (через Polza.ai GPT-4o).
+    Возвращает: { risk_level, warnings[], suggestions[], summary }.
+    Используется на этапе подачи заявки для предупреждения продавца.
+    """
+    title = (body.get('productTitle') or '').strip()
+    description = (body.get('productDescription') or '').strip()
+    price = body.get('price')
+    photo_urls = body.get('photoUrls') or []  # уже загруженные URLs
+
+    if not title:
+        return _err(400, 'productTitle required')
+
+    api_key = os.environ.get('POLZA_AI_API_KEY', '')
+    if not api_key:
+        # Без ИИ просто базовая проверка
+        warnings = []
+        try:
+            p = int(price or 0)
+            if p > 0 and p < 5000:
+                warnings.append('Цена подозрительно низкая — мы порекомендуем покупателю проверить лично')
+        except Exception:
+            pass
+        if len(description) < 20:
+            warnings.append('Описание короткое — добавьте детали о состоянии и комплектации')
+        if len(photo_urls) < 2:
+            warnings.append('Загружено мало фото — нужно минимум 3 (общий вид, экран, состояние)')
+        return _ok({
+            'risk_level': 'unknown',
+            'warnings': warnings,
+            'suggestions': [],
+            'summary': 'ИИ-проверка временно недоступна, выполнена базовая проверка.',
+        })
+
+    prompt = (
+        "Ты — модератор-эксперт по предотвращению мошенничества на сервисе купли-продажи Б/У техники в России.\n"
+        "Проверь объявление по фото и описанию. Найди признаки мошенничества/обмана:\n"
+        "- размытые/некачественные/одинаковые фото (могут быть скачаны)\n"
+        "- подозрительно низкая цена (минимум 30% ниже рынка)\n"
+        "- противоречия в описании (название не совпадает с фото)\n"
+        "- неполная информация (нет фото коробки, серийника, экрана включённого)\n"
+        "- общие фразы вместо конкретных деталей\n\n"
+        f"Название: {title}\n"
+        f"Цена: {price or '—'} ₽\n"
+        f"Описание: {description or '(не указано)'}\n"
+        f"Кол-во фото: {len(photo_urls)}\n\n"
+        "Ответь СТРОГО в JSON:\n"
+        '{"risk_level": "low|medium|high", "warnings": ["..."], "suggestions": ["..."], "summary": "1-2 предложения"}\n'
+        "Где warnings — что вызывает подозрение (максимум 4 пункта), suggestions — что улучшить (максимум 3 пункта).\n"
+        "Если всё хорошо — risk_level=low, warnings=[], summary='Объявление выглядит честно.'"
+    )
+
+    try:
+        import urllib.request as _urlreq
+        # GPT-4o-mini принимает image_url в content
+        content: list = [{"type": "text", "text": prompt}]
+        for u in photo_urls[:4]:
+            if isinstance(u, str) and u.startswith('http'):
+                content.append({"type": "image_url", "image_url": {"url": u}})
+
+        req_body = {
+            "model": "gpt-4o-mini",
+            "messages": [{"role": "user", "content": content}],
+            "max_tokens": 600,
+            "temperature": 0.2,
+            "response_format": {"type": "json_object"},
+        }
+        req = _urlreq.Request(
+            'https://api.polza.ai/v1/chat/completions',
+            data=json.dumps(req_body).encode('utf-8'),
+            headers={
+                'Authorization': f'Bearer {api_key}',
+                'Content-Type': 'application/json',
+            },
+            method='POST',
+        )
+        with _urlreq.urlopen(req, timeout=25) as resp:
+            ai_resp = json.loads(resp.read().decode('utf-8'))
+        raw = ai_resp['choices'][0]['message']['content']
+        parsed = json.loads(raw)
+        risk = parsed.get('risk_level') or 'low'
+        if risk not in ('low', 'medium', 'high'):
+            risk = 'medium'
+        return _ok({
+            'risk_level': risk,
+            'warnings': parsed.get('warnings') or [],
+            'suggestions': parsed.get('suggestions') or [],
+            'summary': parsed.get('summary') or '',
+        })
+    except Exception as e:
+        return _ok({
+            'risk_level': 'unknown',
+            'warnings': [],
+            'suggestions': [],
+            'summary': f'ИИ-проверка не выполнена: {e}',
+        })
+
+
+# ============ PUBLIC: AI FILL ============
+def action_ai_fill(body):
+    """ИИ распознаёт фото товара и предлагает название, бренд, модель, состояние, категорию, цену.
+    Возвращает: { title, brand, model, category, condition, description, price_hint }.
+    """
+    photo_urls = body.get('photoUrls') or []
+    if not photo_urls or not isinstance(photo_urls, list):
+        return _err(400, 'photoUrls required')
+
+    api_key = os.environ.get('POLZA_AI_API_KEY', '')
+    if not api_key:
+        return _err(503, 'AI временно недоступен')
+
+    prompt = (
+        "Ты — эксперт по Б/У технике в России. Посмотри на фото и определи:\n"
+        "- title: точное название устройства (например 'iPhone 13 Pro 256GB' или 'Apple MacBook Air M2 13')\n"
+        "- brand: бренд (Apple, Samsung, Xiaomi и т.д.)\n"
+        "- model: модель ('iPhone 13 Pro', 'MacBook Air M2')\n"
+        "- category: одна из: Смартфон, Ноутбук, Планшет, Часы, Игровая консоль, Аудиотехника, Фотоаппарат, Другое\n"
+        "- condition: одно из: Новое (в упаковке), Отличное, Хорошее, Удовлетворительное\n"
+        "- description: краткое описание (состояние, видимые особенности, комплектация — что видно на фото). 2-3 предложения.\n"
+        "- price_hint: примерная рыночная цена за Б/У в рублях (число, для ориентира)\n\n"
+        "Ответь СТРОГО в JSON: { title, brand, model, category, condition, description, price_hint }.\n"
+        "Если не уверен — оставь поле пустой строкой или null."
+    )
+
+    try:
+        import urllib.request as _urlreq
+        content: list = [{"type": "text", "text": prompt}]
+        for u in photo_urls[:4]:
+            if isinstance(u, str) and u.startswith('http'):
+                content.append({"type": "image_url", "image_url": {"url": u}})
+
+        req_body = {
+            "model": "gpt-4o-mini",
+            "messages": [{"role": "user", "content": content}],
+            "max_tokens": 600,
+            "temperature": 0.2,
+            "response_format": {"type": "json_object"},
+        }
+        req = _urlreq.Request(
+            'https://api.polza.ai/v1/chat/completions',
+            data=json.dumps(req_body).encode('utf-8'),
+            headers={
+                'Authorization': f'Bearer {api_key}',
+                'Content-Type': 'application/json',
+            },
+            method='POST',
+        )
+        with _urlreq.urlopen(req, timeout=30) as resp:
+            ai_resp = json.loads(resp.read().decode('utf-8'))
+        raw = ai_resp['choices'][0]['message']['content']
+        parsed = json.loads(raw)
+        return _ok({
+            'title': parsed.get('title') or '',
+            'brand': parsed.get('brand') or '',
+            'model': parsed.get('model') or '',
+            'category': parsed.get('category') or '',
+            'condition': parsed.get('condition') or '',
+            'description': parsed.get('description') or '',
+            'price_hint': parsed.get('price_hint') or 0,
+        })
+    except Exception as e:
+        return _err(502, f'ИИ ошибка: {e}')
+
+
+# ============ PUBLIC: UPLOAD PHOTO (отдельный аплоад, чтобы потом скормить ИИ) ============
+def action_upload_photo(body):
+    """Загружает одно фото в S3 (без привязки к сделке) — для ИИ-проверки до отправки формы.
+    Возвращает: { url, s3_key }.
+    """
+    b64 = body.get('fileBase64') or ''
+    if not b64:
+        return _err(400, 'fileBase64 required')
+    try:
+        if ',' in b64:
+            b64 = b64.split(',', 1)[1]
+        data = base64.b64decode(b64)
+        if len(data) > MAX_PHOTO_BYTES:
+            return _err(413, 'Файл больше 4 МБ')
+        mime = 'image/jpeg'
+        if data[:4] == b'\x89PNG':
+            mime = 'image/png'
+        elif data[:4] == b'RIFF':
+            mime = 'image/webp'
+        ext = {'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp'}[mime]
+        key = f"safe-deals/tmp/{int(datetime.now().timestamp()*1000)}_{secrets.token_hex(4)}.{ext}"
+        s3 = _get_s3()
+        s3.put_object(Bucket='files', Key=key, Body=data, ContentType=mime)
+        url = f"https://cdn.poehali.dev/projects/{os.environ['AWS_ACCESS_KEY_ID']}/bucket/{key}"
+        return _ok({'url': url, 's3_key': key})
+    except Exception as e:
+        return _err(500, f'Ошибка загрузки: {e}')
 
 
 # ============ ADMIN: LIST ============
@@ -703,6 +1179,12 @@ def handler(event: dict, context) -> dict:
             return action_get_by_token(qs)
         if action == 'get_by_qr':
             return action_get_by_qr(qs)
+        if action == 'categories':
+            return action_categories()
+        if action == 'shop':
+            return action_shop()
+        if action == 'yandex_config':
+            return action_yandex_config()
         return _err(400, f'Unknown GET action: {action}')
 
     if method == 'POST':
@@ -712,6 +1194,18 @@ def handler(event: dict, context) -> dict:
             return action_confirm_by_qr(body)
         if action == 'cancel_by_token':
             return action_cancel_by_token(body)
+        if action == 'parse_avito':
+            return action_parse_avito(body)
+        if action == 'ai_check':
+            return action_ai_check(body)
+        if action == 'ai_fill':
+            return action_ai_fill(body)
+        if action == 'upload_photo':
+            return action_upload_photo(body)
+        if action == 'yandex_auth':
+            return action_yandex_auth(body)
+        if action == 'scan_passport':
+            return action_scan_passport(body)
         return _err(400, f'Unknown POST action: {action}')
 
     return _err(405, 'Method not allowed')

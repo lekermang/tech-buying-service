@@ -52,6 +52,8 @@ const Transfer = safeLazy(() => import("./pages/Transfer"));
 const TransferGuide = safeLazy(() => import("./pages/TransferGuide"));
 const SafeDeals = safeLazy(() => import("./pages/SafeDeals"));
 const SafeDealQR = safeLazy(() => import("./pages/SafeDealQR"));
+const SafeDealsShop = safeLazy(() => import("./pages/SafeDealsShop"));
+const SafeDealsYandexCallback = safeLazy(() => import("./pages/SafeDealsYandexCallback"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -130,7 +132,9 @@ const App = () => {
             <Route path="/transfer" element={<Transfer />} />
             <Route path="/transfer/guide" element={<TransferGuide />} />
             <Route path="/safe-deals" element={<SafeDeals />} />
+            <Route path="/safe-deals/shop" element={<SafeDealsShop />} />
             <Route path="/safe-deals/qr/:code" element={<SafeDealQR />} />
+            <Route path="/safe-deals/yandex-callback" element={<SafeDealsYandexCallback />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

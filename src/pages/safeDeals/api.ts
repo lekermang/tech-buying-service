@@ -122,6 +122,111 @@ export const fmtDate = (s: string | null | undefined): string => {
   try { return new Date(s).toLocaleString("ru-RU"); } catch { return s; }
 };
 
+export type CategoryItem = {
+  id: number;
+  name: string;
+  slug: string;
+  icon: string;
+  color: string;
+  parent_id?: number | null;
+  depth?: number;
+};
+
+export type AvitoParsed = {
+  title: string;
+  price: number;
+  description: string;
+  category?: string | null;
+  photos: string[];
+  url: string;
+};
+
+export type AiCheckResult = {
+  risk_level: "low" | "medium" | "high" | "unknown";
+  warnings: string[];
+  suggestions: string[];
+  summary: string;
+};
+
+export type AiFillResult = {
+  title: string;
+  brand: string;
+  model: string;
+  category: string;
+  condition: string;
+  description: string;
+  price_hint: number;
+};
+
+export type ShopItem = SafeDealPublic;
+
+export async function parseAvitoUrl(url: string) {
+  return apiCall<AvitoParsed>("parse_avito", { method: "POST", body: { url } });
+}
+
+export async function aiCheck(params: {
+  productTitle: string;
+  productDescription?: string;
+  price?: number;
+  photoUrls?: string[];
+}) {
+  return apiCall<AiCheckResult>("ai_check", { method: "POST", body: params });
+}
+
+export async function aiFill(photoUrls: string[]) {
+  return apiCall<AiFillResult>("ai_fill", { method: "POST", body: { photoUrls } });
+}
+
+export async function uploadTempPhoto(fileBase64: string) {
+  return apiCall<{ url: string; s3_key: string }>("upload_photo", {
+    method: "POST",
+    body: { fileBase64 },
+  });
+}
+
+export async function listCategories() {
+  return apiCall<{ items: CategoryItem[] }>("categories");
+}
+
+export async function listShop() {
+  return apiCall<{ items: ShopItem[] }>("shop");
+}
+
+export async function getYandexConfig() {
+  return apiCall<{ clientId: string; available: boolean }>("yandex_config");
+}
+
+export type YandexAuthData = {
+  fullName: string;
+  email: string;
+  phone: string;
+  yandexId: string;
+};
+
+export async function yandexAuth(code: string, redirectUri: string) {
+  return apiCall<YandexAuthData>("yandex_auth", {
+    method: "POST",
+    body: { code, redirect_uri: redirectUri },
+  });
+}
+
+export type PassportData = {
+  fullName: string;
+  series: string;
+  number: string;
+  issuedBy: string;
+  issuedDate: string;
+  birthDate: string;
+  photoUrl: string;
+};
+
+export async function scanPassport(fileBase64: string) {
+  return apiCall<PassportData>("scan_passport", {
+    method: "POST",
+    body: { fileBase64 },
+  });
+}
+
 /** localStorage — храним токены продавца, чтобы при возврате сразу видеть свои сделки. */
 const LS_KEY = "skupka_safe_deals_tokens";
 export function loadSellerTokens(): { token: string; dealNumber: string; title: string; createdAt: string }[] {
