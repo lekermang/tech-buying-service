@@ -46,6 +46,22 @@
       "bodyMatcher": "partial"
     },
     {
+      "name": "Admin list requires auth",
+      "method": "GET",
+      "path": "/?action=admin_list",
+      "expectedStatus": 401,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Admin stats requires auth",
+      "method": "GET",
+      "path": "/?action=admin_stats",
+      "expectedStatus": 401,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    },
+    {
       "name": "Create deal happy path",
       "method": "POST",
       "path": "/?action=create",

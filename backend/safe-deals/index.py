@@ -26,14 +26,33 @@ SCHEMA = 't_p31606708_tech_buying_service'
 COMMISSION_PCT = Decimal('10.00')
 REALIZATION_DAYS = 14
 MAX_PHOTO_BYTES = 4 * 1024 * 1024
+ALLOWED_ROLES = {'owner', 'admin', 'staff', 'manager', 'master'}
 
 HEADERS = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Employee-Token',
     'Access-Control-Max-Age': '86400',
     'Content-Type': 'application/json',
 }
+
+
+def _get_employee(token: str):
+    if not token:
+        return None
+    conn = _get_conn(); cur = conn.cursor()
+    try:
+        cur.execute(
+            f"SELECT id, full_name, login, role FROM {SCHEMA}.employees "
+            f"WHERE auth_token=%s AND token_expires_at>NOW() AND is_active=true",
+            (token,)
+        )
+        row = cur.fetchone()
+        if not row:
+            return None
+        return {'id': row[0], 'full_name': row[1], 'login': row[2], 'role': row[3]}
+    finally:
+        cur.close(); conn.close()
 
 
 def _ok(data):
@@ -410,9 +429,231 @@ def action_cancel_by_token(body):
         cur.close(); conn.close()
 
 
+# ============ ADMIN: LIST ============
+def action_admin_list(qs):
+    """Список сделок для админки. Фильтры: status, q (поиск), from/to."""
+    status = (qs.get('status') or '').strip()
+    q = (qs.get('q') or '').strip()
+    date_from = (qs.get('from') or '').strip()
+    date_to = (qs.get('to') or '').strip()
+    limit = min(int(qs.get('limit') or 200), 500)
+
+    conds = []
+    params = []
+    if status and status != 'all':
+        conds.append('status = %s')
+        params.append(status)
+    if q:
+        like = f'%{q}%'
+        conds.append('(deal_number ILIKE %s OR seller_name ILIKE %s OR seller_phone ILIKE %s OR product_title ILIKE %s)')
+        params.extend([like, like, like, like])
+    if date_from:
+        conds.append('created_at::date >= %s')
+        params.append(date_from)
+    if date_to:
+        conds.append('created_at::date <= %s')
+        params.append(date_to)
+    where = ('WHERE ' + ' AND '.join(conds)) if conds else ''
+
+    conn = _get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        f"SELECT id, deal_number, qr_code, status, "
+        f"seller_name, seller_phone, "
+        f"product_title, product_brand, product_model, product_condition, product_category, "
+        f"price, commission_amount, seller_payout, "
+        f"buyer_name, buyer_phone, "
+        f"created_at, updated_at, expires_at, completed_at, "
+        f"jsonb_array_length(photos) AS photos_count "
+        f"FROM {SCHEMA}.safe_deals {where} ORDER BY created_at DESC LIMIT {limit}",
+        params
+    )
+    rows = [dict(r) for r in cur.fetchall()]
+    cur.close(); conn.close()
+    # нормализация
+    for r in rows:
+        for k in ('price', 'commission_amount', 'seller_payout'):
+            if isinstance(r.get(k), Decimal):
+                r[k] = float(r[k])
+        for k in ('created_at', 'updated_at', 'expires_at', 'completed_at'):
+            if isinstance(r.get(k), datetime):
+                r[k] = r[k].isoformat()
+    return _ok({'items': rows, 'count': len(rows)})
+
+
+# ============ ADMIN: GET BY ID ============
+def action_admin_get(qs):
+    deal_id = qs.get('id')
+    if not deal_id:
+        return _err(400, 'id required')
+    try:
+        deal_id = int(deal_id)
+    except Exception:
+        return _err(400, 'id must be integer')
+    conn = _get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(f"SELECT * FROM {SCHEMA}.safe_deals WHERE id=%s", (deal_id,))
+    row = cur.fetchone()
+    if not row:
+        cur.close(); conn.close()
+        return _err(404, 'Сделка не найдена')
+    deal = _deal_to_dict(row)
+    cur.execute(
+        f"SELECT id, event_type, details, actor, created_at FROM {SCHEMA}.safe_deal_events "
+        f"WHERE deal_id=%s ORDER BY created_at DESC LIMIT 100",
+        (deal_id,)
+    )
+    events = []
+    for r in cur.fetchall():
+        e = dict(r)
+        if isinstance(e['created_at'], datetime):
+            e['created_at'] = e['created_at'].isoformat()
+        events.append(e)
+    cur.close(); conn.close()
+    deal['events'] = events
+    return _ok(deal)
+
+
+# ============ ADMIN: UPDATE STATUS ============
+_VALID_STATUSES = {'submitted', 'review', 'on_shelf', 'reserved', 'completed', 'cancelled', 'returned'}
+
+
+def action_admin_set_status(body, actor):
+    deal_id = body.get('id')
+    new_status = (body.get('status') or '').strip()
+    note = (body.get('note') or '').strip() or None
+    if not deal_id or new_status not in _VALID_STATUSES:
+        return _err(400, 'id и status обязательны')
+    conn = _get_conn(); cur = conn.cursor()
+    try:
+        cur.execute(
+            f"UPDATE {SCHEMA}.safe_deals SET status=%s, updated_at=NOW() "
+            f"WHERE id=%s RETURNING id",
+            (new_status, int(deal_id))
+        )
+        if not cur.fetchone():
+            return _err(404, 'Сделка не найдена')
+        _log(cur, int(deal_id), f'status_changed', {'to': new_status, 'note': note}, actor=actor.get('full_name'))
+        conn.commit()
+        return _ok({'ok': True, 'status': new_status})
+    except Exception as e:
+        conn.rollback()
+        return _err(500, f'Ошибка: {e}')
+    finally:
+        cur.close(); conn.close()
+
+
+# ============ ADMIN: SET OFFICE CHECK ============
+def action_admin_set_check(body, actor):
+    """Сотрудник зафиксировал результат осмотра в офисе. Переводит сделку в on_shelf."""
+    deal_id = body.get('id')
+    notes = (body.get('notes') or '').strip() or None
+    if not deal_id:
+        return _err(400, 'id required')
+    conn = _get_conn(); cur = conn.cursor()
+    try:
+        cur.execute(
+            f"UPDATE {SCHEMA}.safe_deals SET "
+            f"office_check_notes=%s, office_checked_by=%s, office_checked_at=NOW(), "
+            f"status=CASE WHEN status IN ('submitted','review') THEN 'on_shelf' ELSE status END, "
+            f"updated_at=NOW() WHERE id=%s RETURNING id",
+            (notes, actor.get('full_name'), int(deal_id))
+        )
+        if not cur.fetchone():
+            return _err(404, 'Сделка не найдена')
+        _log(cur, int(deal_id), 'office_checked', {'notes': notes}, actor=actor.get('full_name'))
+        conn.commit()
+        return _ok({'ok': True})
+    except Exception as e:
+        conn.rollback()
+        return _err(500, f'Ошибка: {e}')
+    finally:
+        cur.close(); conn.close()
+
+
+# ============ ADMIN: RESERVE ============
+def action_admin_reserve(body, actor):
+    deal_id = body.get('id')
+    buyer_name = (body.get('buyerName') or '').strip()
+    buyer_phone = _phone_normalize(body.get('buyerPhone') or '')
+    hours = int(body.get('hours') or 24)
+    if not deal_id:
+        return _err(400, 'id required')
+    conn = _get_conn(); cur = conn.cursor()
+    try:
+        cur.execute(
+            f"UPDATE {SCHEMA}.safe_deals SET "
+            f"status='reserved', buyer_name=%s, buyer_phone=%s, "
+            f"reservation_until=NOW() + (%s || ' hours')::interval, "
+            f"updated_at=NOW() WHERE id=%s RETURNING id",
+            (buyer_name or None, buyer_phone or None, str(hours), int(deal_id))
+        )
+        if not cur.fetchone():
+            return _err(404, 'Сделка не найдена')
+        _log(cur, int(deal_id), 'reserved', {
+            'buyer_name': buyer_name, 'buyer_phone': buyer_phone, 'hours': hours,
+        }, actor=actor.get('full_name'))
+        conn.commit()
+        return _ok({'ok': True})
+    except Exception as e:
+        conn.rollback()
+        return _err(500, f'Ошибка: {e}')
+    finally:
+        cur.close(); conn.close()
+
+
+# ============ ADMIN: STATS ============
+def action_admin_stats(qs):
+    """Сводка: счётчики статусов, выручка комиссии (день/месяц/всего), активные сделки."""
+    conn = _get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        f"SELECT "
+        f"COUNT(*) FILTER (WHERE status='submitted') AS submitted_count, "
+        f"COUNT(*) FILTER (WHERE status='review') AS review_count, "
+        f"COUNT(*) FILTER (WHERE status='on_shelf') AS on_shelf_count, "
+        f"COUNT(*) FILTER (WHERE status='reserved') AS reserved_count, "
+        f"COUNT(*) FILTER (WHERE status='completed') AS completed_count, "
+        f"COUNT(*) FILTER (WHERE status='cancelled') AS cancelled_count, "
+        f"COUNT(*) FILTER (WHERE status='returned') AS returned_count, "
+        f"COALESCE(SUM(commission_amount) FILTER (WHERE status='completed' AND completed_at::date = CURRENT_DATE), 0) AS commission_today, "
+        f"COALESCE(SUM(commission_amount) FILTER (WHERE status='completed' AND completed_at >= date_trunc('month', CURRENT_DATE)), 0) AS commission_month, "
+        f"COALESCE(SUM(commission_amount) FILTER (WHERE status='completed'), 0) AS commission_total, "
+        f"COALESCE(SUM(price) FILTER (WHERE status='completed' AND completed_at::date = CURRENT_DATE), 0) AS turnover_today, "
+        f"COALESCE(SUM(price) FILTER (WHERE status='completed' AND completed_at >= date_trunc('month', CURRENT_DATE)), 0) AS turnover_month, "
+        f"COALESCE(SUM(price) FILTER (WHERE status='completed'), 0) AS turnover_total, "
+        f"COUNT(*) FILTER (WHERE status='completed' AND completed_at::date = CURRENT_DATE) AS completed_today, "
+        f"COUNT(*) FILTER (WHERE status='completed' AND completed_at >= date_trunc('month', CURRENT_DATE)) AS completed_month "
+        f"FROM {SCHEMA}.safe_deals"
+    )
+    row = dict(cur.fetchone() or {})
+    # Прибыль по дням за 14 дней
+    cur.execute(
+        f"SELECT completed_at::date AS day, "
+        f"COUNT(*) AS count, "
+        f"COALESCE(SUM(commission_amount), 0) AS commission "
+        f"FROM {SCHEMA}.safe_deals "
+        f"WHERE status='completed' AND completed_at >= CURRENT_DATE - INTERVAL '13 days' "
+        f"GROUP BY completed_at::date ORDER BY day DESC"
+    )
+    daily = []
+    for r in cur.fetchall():
+        daily.append({
+            'day': r['day'].isoformat() if r.get('day') else None,
+            'count': int(r['count'] or 0),
+            'commission': float(r['commission'] or 0),
+        })
+    row['daily'] = daily
+    for k in ('commission_today', 'commission_month', 'commission_total', 'turnover_today', 'turnover_month', 'turnover_total'):
+        if isinstance(row.get(k), Decimal):
+            row[k] = float(row[k])
+    cur.close(); conn.close()
+    return _ok(row)
+
+
 # ============ HANDLER ============
 def handler(event: dict, context) -> dict:
-    """Безопасные сделки: ?action=create|get_by_token|get_by_qr|confirm_by_qr|cancel_by_token."""
+    """Безопасные сделки: ?action=create|get_by_token|get_by_qr|confirm_by_qr|cancel_by_token|admin_*."""
     method = event.get('httpMethod', 'GET')
     if method == 'OPTIONS':
         return {'statusCode': 200, 'headers': HEADERS, 'body': ''}
@@ -427,6 +668,35 @@ def handler(event: dict, context) -> dict:
             body = json.loads(raw) if isinstance(raw, str) else (raw or {})
         except Exception:
             body = {}
+
+    # Админ-экшены — требуют X-Employee-Token
+    admin_actions = {
+        'admin_list', 'admin_get', 'admin_stats',
+        'admin_set_status', 'admin_set_check', 'admin_reserve',
+    }
+    if action in admin_actions:
+        headers = event.get('headers') or {}
+        token = headers.get('X-Employee-Token') or headers.get('x-employee-token') or ''
+        actor = _get_employee(token)
+        if not actor:
+            return _err(401, 'Не авторизован')
+        if actor.get('role') not in ALLOWED_ROLES:
+            return _err(403, 'Нет доступа')
+        if method == 'GET':
+            if action == 'admin_list':
+                return action_admin_list(qs)
+            if action == 'admin_get':
+                return action_admin_get(qs)
+            if action == 'admin_stats':
+                return action_admin_stats(qs)
+        if method == 'POST':
+            if action == 'admin_set_status':
+                return action_admin_set_status(body, actor)
+            if action == 'admin_set_check':
+                return action_admin_set_check(body, actor)
+            if action == 'admin_reserve':
+                return action_admin_reserve(body, actor)
+        return _err(400, f'Unknown admin action: {action}')
 
     if method == 'GET':
         if action == 'get_by_token':

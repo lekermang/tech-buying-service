@@ -18,6 +18,7 @@ import SLJournal from "./SLJournal";
 import SLAnalytics from "./SLAnalytics";
 import SLBookkeeping from "./SLBookkeeping";
 import C14dTab from "./c14d/C14dTab";
+import SafeDealsTab from "./safeDeals/SafeDealsTab";
 import SLAvitoShowcase from "./SLAvitoShowcase";
 import { slApi, can, type SLMyPermissions } from "./types";
 import { SLTabsGrid } from "./slUI";
@@ -39,6 +40,7 @@ type SubTab =
   | "categories"
   | "documents"
   | "contracts14d"
+  | "safedeals"
   | "avito"
   | "roles";
 
@@ -48,6 +50,7 @@ const ALL_TABS: TabDef[] = [
   { k: "dashboard",     l: "Сводка",         icon: "LayoutDashboard", tip: "Главная сводка: купили, продали, прибыль, склад за выбранный период." },
   { k: "buy",           l: "Скупка",         icon: "Plus", perm: "shop_buy", tip: "Принять Б/У товар у клиента — скупка или комиссия с печатью договора." },
   { k: "contracts14d",  l: "Договор 14 дн.", icon: "Handshake", featured: true, tip: "Скупка с правом обратного выкупа. Ставка 4 % в день, срок 14 дней." },
+  { k: "safedeals",     l: "Безоп. сделка", icon: "Shield", featured: true, tip: "Комиссионка с гарантом: продавец → офис → проверка → QR → покупатель. Комиссия 10%." },
   { k: "avito",         l: "Витрина Авито",  icon: "Sparkles", featured: true, tip: "Загружай фото с телефона к товарам с Авито — превращай объявления в премиум-карточки на сайте." },
   { k: "stock",         l: "Склад",          icon: "Package", perm: "shop_view", tip: "Товары на складе и витрине: фильтры, поиск, ценники, продажа." },
   { k: "cash",          l: "Касса",          icon: "Wallet", perm: "cashflow_view", tip: "Кассы наличных по филиалам, приход/расход, история движений." },
@@ -144,6 +147,7 @@ export default function SLShopTab({ token, myRole }: { token: string; myRole?: s
       {tab === "import"     && <SLImportExport token={token} />}
       {tab === "documents"  && <SLDocuments token={token} isOwner={isOwner} />}
       {tab === "contracts14d" && <C14dTab token={token} />}
+      {tab === "safedeals"  && <SafeDealsTab token={token} />}
       {tab === "avito"      && <SLAvitoShowcase token={token} />}
       {tab === "categories" && <SLCategories token={token} />}
       {tab === "roles"      && <SLRoles token={token} isOwner={isOwner} />}
