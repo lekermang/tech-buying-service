@@ -2,6 +2,8 @@ User-agent: *
 Allow: /
 Allow: /catalog
 Allow: /repair-discount
+Allow: /transfer
+Allow: /transfer/guide
 Disallow: /admin
 Disallow: /cabinet
 Disallow: /staff
@@ -15,6 +17,8 @@ User-agent: Yandex
 Allow: /
 Allow: /catalog
 Allow: /repair-discount
+Allow: /transfer
+Allow: /transfer/guide
 Disallow: /admin
 Disallow: /cabinet
 Disallow: /staff
@@ -27,6 +31,8 @@ User-agent: YandexAdditionalBot
 Allow: /
 Allow: /catalog
 Allow: /repair-discount
+Allow: /transfer
+Allow: /transfer/guide
 Disallow: /admin
 Disallow: /cabinet
 Disallow: /staff
@@ -38,6 +44,8 @@ User-agent: Googlebot
 Allow: /
 Allow: /catalog
 Allow: /repair-discount
+Allow: /transfer
+Allow: /transfer/guide
 Disallow: /admin
 Disallow: /cabinet
 Disallow: /staff

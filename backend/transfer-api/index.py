@@ -121,6 +121,12 @@ def action_status(qs):
         'hasContacts': s['has_contacts'],
         'hasPhotos': s['has_photos'],
         'hasDocs': s['has_docs'],
+        'hasNotes': s.get('has_notes', False),
+        'hasBookmarks': s.get('has_bookmarks', False),
+        'hasWifi': s.get('has_wifi', False),
+        'hasCalendar': s.get('has_calendar', False),
+        'hasAudio': s.get('has_audio', False),
+        'hasMessengers': s.get('has_messengers', False),
         'receiverConnected': s['receiver_connected'],
         'downloadStarted': s['download_started'],
         'downloadCompleted': s['download_completed'],
@@ -145,6 +151,124 @@ def action_find(qs):
         'sessionId': str(s['id']),
         'status': s['status'],
     })
+
+
+_KIND_TO_FLAG = {
+    'contacts': 'has_contacts',
+    'photos': 'has_photos',
+    'docs': 'has_docs',
+    'notes': 'has_notes',
+    'bookmarks': 'has_bookmarks',
+    'wifi': 'has_wifi',
+    'calendar': 'has_calendar',
+    'audio': 'has_audio',
+    'messengers': 'has_messengers',
+}
+
+
+def action_init_upload(body):
+    """Выдаёт pre-signed PUT URL для прямой загрузки файла в S3 без прохода через функцию.
+    Подходит для больших файлов (видео, архивы, ZIP экспорта мессенджеров) и для переноса с ПК.
+    Возвращает: { uploadUrl, s3Key } — фронт делает PUT напрямую в uploadUrl, затем зовёт complete_upload.
+    """
+    sid = (body.get('sessionId') or '').strip()
+    file_name = (body.get('fileName') or '').strip()
+    mime = body.get('mimeType') or 'application/octet-stream'
+    if not sid or not file_name:
+        return _err(400, 'sessionId и fileName обязательны')
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    s = _get_session(cur, session_id=sid)
+    cur.close(); conn.close()
+    if not s:
+        return _err(404, 'Сессия не найдена')
+    if s['status'] in ('expired', 'cancelled'):
+        return _err(400, 'Сессия завершена')
+    safe = ''.join(c if c.isalnum() or c in '._-' else '_' for c in file_name)
+    s3_key = f"transfer/{sid}/{int(datetime.now().timestamp()*1000)}_{safe}"
+    s3 = get_s3()
+    url = s3.generate_presigned_url(
+        ClientMethod='put_object',
+        Params={
+            'Bucket': 'files',
+            'Key': s3_key,
+            'ContentType': mime,
+        },
+        ExpiresIn=3600,
+    )
+    return _ok({'uploadUrl': url, 's3Key': s3_key})
+
+
+def action_complete_upload(body):
+    """Регистрирует файл, загруженный напрямую в S3 через pre-signed URL."""
+    sid = (body.get('sessionId') or '').strip()
+    file_name = (body.get('fileName') or '').strip()
+    mime = body.get('mimeType') or 'application/octet-stream'
+    s3_key = (body.get('s3Key') or '').strip()
+    size = int(body.get('size') or 0)
+    kind = (body.get('kind') or 'docs').strip()
+    if not sid or not file_name or not s3_key:
+        return _err(400, 'sessionId, fileName, s3Key обязательны')
+
+    flag_col = _KIND_TO_FLAG.get(kind, 'has_docs')
+
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    s = _get_session(cur, session_id=sid)
+    if not s:
+        cur.close(); conn.close()
+        return _err(404, 'Сессия не найдена')
+    if s['status'] in ('expired', 'cancelled'):
+        cur.close(); conn.close()
+        return _err(400, 'Сессия завершена')
+
+    # Если size = 0 — пробуем уточнить через HEAD у S3
+    if size <= 0:
+        try:
+            s3 = get_s3()
+            head = s3.head_object(Bucket='files', Key=s3_key)
+            size = int(head.get('ContentLength') or 0)
+        except Exception:
+            size = 0
+
+    cur.execute(
+        f"INSERT INTO {SCHEMA}.transfer_files (session_id, file_name, mime_type, size_bytes, s3_key) "
+        f"VALUES (%s, %s, %s, %s, %s) RETURNING id",
+        (sid, file_name, mime, size, s3_key)
+    )
+    file_id = cur.fetchone()['id']
+    cur.execute(
+        f"UPDATE {SCHEMA}.transfer_sessions SET "
+        f"files_count = files_count + 1, "
+        f"total_bytes = total_bytes + %s, "
+        f"{flag_col} = TRUE "
+        f"WHERE id=%s",
+        (size, sid)
+    )
+    conn.commit()
+    cur.close(); conn.close()
+    return _ok({'fileId': file_id, 'size': size})
+
+
+def action_set_flags(body):
+    """Помечает категории, которые не дают файла (Wi-Fi QR, инструкция WA и т.п.)."""
+    sid = (body.get('sessionId') or '').strip()
+    if not sid:
+        return _err(400, 'sessionId required')
+    updates = []
+    for kind, flag in _KIND_TO_FLAG.items():
+        if body.get(kind) is True:
+            updates.append(f"{flag} = TRUE")
+    if not updates:
+        return _ok({'ok': True})
+    conn = get_conn(); cur = conn.cursor()
+    cur.execute(
+        f"UPDATE {SCHEMA}.transfer_sessions SET " + ", ".join(updates) + " WHERE id=%s",
+        (sid,)
+    )
+    conn.commit()
+    cur.close(); conn.close()
+    return _ok({'ok': True})
 
 
 def action_upload(body, qs):
@@ -191,11 +315,7 @@ def action_upload(body, qs):
     )
     file_id = cur.fetchone()['id']
     # Обновляем агрегаты в сессии и флаги
-    flag_col = {
-        'contacts': 'has_contacts',
-        'photos': 'has_photos',
-        'docs': 'has_docs',
-    }.get(kind, 'has_docs')
+    flag_col = _KIND_TO_FLAG.get(kind, 'has_docs')
     cur.execute(
         f"UPDATE {SCHEMA}.transfer_sessions SET "
         f"files_count = files_count + 1, "
@@ -260,6 +380,12 @@ def action_files(qs):
         'hasContacts': s['has_contacts'],
         'hasPhotos': s['has_photos'],
         'hasDocs': s['has_docs'],
+        'hasNotes': s.get('has_notes', False),
+        'hasBookmarks': s.get('has_bookmarks', False),
+        'hasWifi': s.get('has_wifi', False),
+        'hasCalendar': s.get('has_calendar', False),
+        'hasAudio': s.get('has_audio', False),
+        'hasMessengers': s.get('has_messengers', False),
     })
 
 
@@ -424,6 +550,12 @@ def handler(event: dict, context) -> dict:
             return action_create(event)
         if action == 'upload':
             return action_upload(body, qs)
+        if action == 'init_upload':
+            return action_init_upload(body)
+        if action == 'complete_upload':
+            return action_complete_upload(body)
+        if action == 'set_flags':
+            return action_set_flags(body)
         if action == 'mark_ready':
             return action_mark_ready(qs)
         if action == 'mark_connected':

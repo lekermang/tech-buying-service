@@ -2,12 +2,28 @@ import Icon from "@/components/ui/icon";
 
 export const API = "https://functions.poehali.dev/d3550608-e324-4580-b568-6ba80c9c37b5";
 export const MAX_FILE_BYTES = 25 * 1024 * 1024;
+/** Граница, после которой идём через pre-signed S3 PUT (без base64 через функцию). */
+export const PRESIGNED_THRESHOLD = 4 * 1024 * 1024;
 
-export type Role = "select" | "sender" | "receiver";
+export type Role = "select" | "sender" | "receiver" | "pc";
 export type SenderStep = "choose" | "uploading" | "wait" | "sending" | "done";
 export type ReceiverStep = "code" | "wait" | "ready" | "downloading" | "done";
 
+/** Все категории данных, которые поддерживает перенос. */
+export type DataKind =
+  | "contacts"
+  | "photos"
+  | "docs"
+  | "selfie"
+  | "audio"
+  | "messengers"
+  | "notes"
+  | "bookmarks"
+  | "wifi"
+  | "calendar";
+
 export type SessionFile = { id: number; name: string; mime: string | null; size: number };
+
 export type SessionStatus = {
   sessionId: string;
   code: string;
@@ -15,6 +31,12 @@ export type SessionStatus = {
   hasContacts: boolean;
   hasPhotos: boolean;
   hasDocs: boolean;
+  hasNotes?: boolean;
+  hasBookmarks?: boolean;
+  hasWifi?: boolean;
+  hasCalendar?: boolean;
+  hasAudio?: boolean;
+  hasMessengers?: boolean;
   receiverConnected: boolean;
   downloadStarted: boolean;
   downloadCompleted: boolean;
@@ -22,6 +44,83 @@ export type SessionStatus = {
   totalBytes: number;
   expiresAt: string;
 };
+
+/**
+ * Загружает файл: если меньше PRESIGNED_THRESHOLD — base64-JSON через функцию,
+ * иначе — pre-signed PUT прямо в S3, минуя Cloud Function.
+ * onProgress(0..100) — прогресс одного файла.
+ */
+export async function uploadFileSmart(
+  sessionId: string,
+  file: File,
+  kind: DataKind,
+  onProgress?: (pct: number) => void,
+): Promise<void> {
+  const mime = file.type || "application/octet-stream";
+  if (file.size <= PRESIGNED_THRESHOLD) {
+    const b64 = await fileToBase64(file);
+    const r = await fetch(`${API}?action=upload&id=${sessionId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId, fileName: file.name, mimeType: mime, fileBase64: b64, kind,
+      }),
+    });
+    if (!r.ok) {
+      const ed = await r.json().catch(() => ({}));
+      throw new Error(ed.error || `Ошибка загрузки ${file.name}`);
+    }
+    onProgress?.(100);
+    return;
+  }
+  // Pre-signed PUT для больших файлов
+  const initR = await fetch(`${API}?action=init_upload`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sessionId, fileName: file.name, mimeType: mime }),
+  });
+  const initD = await initR.json();
+  if (!initR.ok) throw new Error(initD.error || "init_upload failed");
+  const { uploadUrl, s3Key } = initD as { uploadUrl: string; s3Key: string };
+  // PUT в S3 c прогрессом через XHR
+  await new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", uploadUrl, true);
+    xhr.setRequestHeader("Content-Type", mime);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      else reject(new Error(`S3 PUT ${xhr.status}`));
+    };
+    xhr.onerror = () => reject(new Error("Ошибка сети при загрузке в S3"));
+    xhr.send(file);
+  });
+  // Регистрация файла
+  const compR = await fetch(`${API}?action=complete_upload`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sessionId, fileName: file.name, mimeType: mime, s3Key, size: file.size, kind,
+    }),
+  });
+  if (!compR.ok) {
+    const ed = await compR.json().catch(() => ({}));
+    throw new Error(ed.error || "complete_upload failed");
+  }
+}
+
+/** Помечает в сессии «нефайловую» категорию (Wi-Fi-QR, инструкция WA и т.п.). */
+export async function setSessionFlag(sessionId: string, flag: DataKind): Promise<void> {
+  await fetch(`${API}?action=set_flags`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sessionId, [flag]: true }),
+  });
+}
 
 export function fmtBytes(b: number): string {
   if (b < 1024) return `${b} Б`;
@@ -63,38 +162,99 @@ export function TopBar() {
 
 export function RoleScreen({ onSelect }: { onSelect: (r: Role) => void }) {
   return (
-    <div className="max-w-md mx-auto px-5 pt-10 pb-6 flex flex-col items-center gap-6 text-center">
-      <div>
-        <h2 className="text-[22px] font-extrabold leading-tight">Перенос данных</h2>
-        <p className="text-sm text-[#777] mt-2 leading-relaxed">
-          Это <b className="text-[#F0F0F0]">старое</b> устройство, с которого переносим?<br />
-          Или <b className="text-[#F0F0F0]">новое</b>, на которое получаем?
+    <div className="max-w-lg mx-auto px-5 pt-8 pb-10 flex flex-col items-center gap-7 text-center">
+      <div className="relative">
+        <div
+          aria-hidden
+          className="absolute -inset-12 blur-3xl opacity-50 pointer-events-none"
+          style={{ background: "radial-gradient(circle, rgba(255,215,0,0.25), transparent 65%)" }}
+        />
+        <div className="relative inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#FFD700]/[0.1] border border-[#FFD700]/30 text-[11px] font-bold tracking-wider uppercase text-[#FFD700] mb-3">
+          <Icon name="Shield" size={12} /> Безопасный перенос
+        </div>
+        <h1 className="text-[28px] sm:text-[32px] font-extrabold leading-tight">
+          Перенесите данные<br />
+          <span className="bg-gradient-to-r from-[#FFD700] via-[#fff3a0] to-[#FFD700] bg-clip-text text-transparent">за 2 минуты</span>
+        </h1>
+        <p className="text-sm text-[#999] mt-3 leading-relaxed max-w-md mx-auto">
+          С iPhone, Android, любого браузера. Контакты, фото, видео, документы,
+          голосовые, чаты WhatsApp, Wi-Fi и календарь — в один клик, без приложений.
         </p>
       </div>
 
       <div className="w-full max-w-sm flex flex-col gap-3">
-        <button
+        <RoleBtn
           onClick={() => onSelect("sender")}
-          className="w-full py-4 rounded-2xl bg-[#FFD700] text-black font-bold text-[15px] flex items-center justify-center gap-2.5 transition active:scale-[0.97] hover:bg-[#FFE033]"
-        >
-          <Icon name="ArrowUpFromLine" size={18} />
-          Старое устройство
-          <span className="text-[11px] font-normal opacity-70">(отправить)</span>
-        </button>
-        <button
+          icon="Smartphone"
+          arrow="ArrowUpFromLine"
+          variant="gold"
+          title="Старый телефон"
+          desc="Отправить данные"
+        />
+        <RoleBtn
           onClick={() => onSelect("receiver")}
-          className="w-full py-4 rounded-2xl bg-transparent border-2 border-[#2A2A2A] text-[#F0F0F0] font-bold text-[15px] flex items-center justify-center gap-2.5 transition active:scale-[0.97] hover:border-[#FFD700] hover:text-[#FFD700]"
-        >
-          <Icon name="ArrowDownToLine" size={18} />
-          Новое устройство
-          <span className="text-[11px] font-normal opacity-70">(получить)</span>
-        </button>
+          icon="Smartphone"
+          arrow="ArrowDownToLine"
+          variant="outline"
+          title="Новый телефон"
+          desc="Получить данные"
+        />
+        <RoleBtn
+          onClick={() => onSelect("pc")}
+          icon="Monitor"
+          arrow="ArrowUpFromLine"
+          variant="outline"
+          title="С компьютера"
+          desc="Большие видео и архивы без ограничений"
+        />
       </div>
 
-      <div className="w-full max-w-sm bg-[#FFD700]/[0.06] border border-[#FFD700]/[0.15] rounded-xl px-3.5 py-3 text-sm text-[#ccc] text-left">
-        <Icon name="Info" size={14} className="inline mr-1.5 text-[#FFD700]" />
-        <b>Без сторонних приложений.</b> Всё работает в браузере. Данные хранятся на сервере не более 30 минут и удаляются автоматически.
+      <div className="w-full max-w-sm grid grid-cols-3 gap-2 text-[10px] uppercase tracking-wider text-[#777]">
+        <Feature icon="Lock" text="Шифрование" />
+        <Feature icon="Timer" text="30 мин и удалено" />
+        <Feature icon="Zap" text="Без приложений" />
       </div>
+    </div>
+  );
+}
+
+function RoleBtn({ onClick, icon, arrow, variant, title, desc }: {
+  onClick: () => void;
+  icon: string;
+  arrow: string;
+  variant: "gold" | "outline";
+  title: string;
+  desc: string;
+}) {
+  const isGold = variant === "gold";
+  return (
+    <button
+      onClick={onClick}
+      className={`group relative w-full p-4 rounded-2xl transition-all duration-300 active:scale-[0.97] flex items-center gap-3.5 text-left overflow-hidden ${
+        isGold
+          ? "bg-gradient-to-br from-[#FFD700] via-[#FFE033] to-[#FFD700] text-black hover:shadow-[0_15px_40px_-10px_rgba(255,215,0,0.6)]"
+          : "bg-[#141414] border-2 border-[#2A2A2A] text-[#F0F0F0] hover:border-[#FFD700]/60"
+      }`}
+    >
+      <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
+        isGold ? "bg-black/15" : "bg-[#FFD700]/[0.1] text-[#FFD700]"
+      }`}>
+        <Icon name={icon} size={22} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-[15px] font-bold leading-tight">{title}</div>
+        <div className={`text-xs mt-0.5 ${isGold ? "opacity-70" : "text-[#777]"}`}>{desc}</div>
+      </div>
+      <Icon name={arrow} size={18} className={isGold ? "" : "text-[#FFD700] opacity-70 group-hover:translate-x-0.5 transition-transform"} />
+    </button>
+  );
+}
+
+function Feature({ icon, text }: { icon: string; text: string }) {
+  return (
+    <div className="flex flex-col items-center gap-1 py-2 px-1 rounded-lg bg-[#FFD700]/[0.04] border border-[#FFD700]/[0.1]">
+      <Icon name={icon} size={14} className="text-[#FFD700]" />
+      <span className="text-center leading-tight">{text}</span>
     </div>
   );
 }
