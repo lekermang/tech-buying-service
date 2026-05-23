@@ -1,4 +1,5 @@
 {
+  "transfer-api": "https://functions.poehali.dev/d3550608-e324-4580-b568-6ba80c9c37b5",
   "staff-clients": "https://functions.poehali.dev/9c054e9c-68a0-426f-9841-d979a65faa0c",
   "client-auth": "https://functions.poehali.dev/420ad7e7-26c9-4540-9369-6bca5d26d3aa",
   "client-cabinet": "https://functions.poehali.dev/9a959adf-cac1-47c2-9ce8-0e229a64287f",

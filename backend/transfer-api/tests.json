@@ -1,0 +1,41 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS CORS",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Unknown GET action",
+      "method": "GET",
+      "path": "/?action=unknown",
+      "expectedStatus": 400,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Find without code",
+      "method": "GET",
+      "path": "/?action=find",
+      "expectedStatus": 400,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Find unknown code",
+      "method": "GET",
+      "path": "/?action=find&code=ZZZZZZ",
+      "expectedStatus": 404
+    },
+    {
+      "name": "Create session",
+      "method": "POST",
+      "path": "/?action=create",
+      "body": {},
+      "expectedStatus": 200,
+      "expectedBody": {"sessionId": "string", "code": "string"},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

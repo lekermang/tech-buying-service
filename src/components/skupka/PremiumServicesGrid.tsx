@@ -73,6 +73,17 @@ const SERVICES: ServiceButton[] = [
     cta: "Смотреть каталог",
     accent: "rgba(120,255,180,0.20)",
   },
+  {
+    action: { type: "link", href: "/transfer" },
+    icon: "ArrowLeftRight",
+    badge: "Новинка",
+    title: "Перенос данных",
+    subtitle: "Фото, контакты, файлы — на новый телефон",
+    guaranteeIcon: "Lock",
+    guarantee: "Без приложений · в браузере",
+    cta: "Перенести данные",
+    accent: "rgba(180,140,255,0.22)",
+  },
 ];
 
 export default function PremiumServicesGrid() {
@@ -165,7 +176,7 @@ export default function PremiumServicesGrid() {
         </p>
 
         {/* Сетка КНОПОК */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 sm:gap-5">
           {SERVICES.map((s, i) => (
             <ServiceTile key={s.title} card={s} delay={i * 80} onClick={() => handleAction(s.action)} />
           ))}

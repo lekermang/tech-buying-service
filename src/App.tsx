@@ -48,6 +48,7 @@ const PublicChat = safeLazy(() => import("./pages/PublicChat"));
 const PublicContract14d = safeLazy(() => import("./pages/PublicContract14d"));
 const PublicInvestor = safeLazy(() => import("./pages/PublicInvestor"));
 const Client = safeLazy(() => import("./pages/Client"));
+const Transfer = safeLazy(() => import("./pages/Transfer"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -123,6 +124,7 @@ const App = () => {
             <Route path="/p/c/:number" element={<PublicContract14d />} />
             <Route path="/investor/:token" element={<PublicInvestor />} />
             <Route path="/client" element={<Client />} />
+            <Route path="/transfer" element={<Transfer />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
