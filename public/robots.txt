@@ -5,6 +5,12 @@ Allow: /repair-discount
 Allow: /transfer
 Allow: /transfer/guide
 Allow: /safe-deals
+Allow: /safe-deals/shop
+Allow: /safe-deals/checklist
+Allow: /safe-deals/blacklist
+Allow: /safe-deals/kupit-iphone-kaluga
+Allow: /safe-deals/srochno-prodat-telefon
+Allow: /safe-deals/vykup-noutbukov
 Disallow: /admin
 Disallow: /cabinet
 Disallow: /staff

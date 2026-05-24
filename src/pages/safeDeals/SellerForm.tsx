@@ -47,6 +47,11 @@ export default function SellerForm({ onSubmitted }: { onSubmitted: (token: strin
   const [payoutDetails, setPayoutDetails] = useState("");
   const [agree, setAgree] = useState(false);
 
+  // ─── courier (выкуп за 1 час) + реферал ───
+  const [courierPickup, setCourierPickup] = useState(false);
+  const [courierAddress, setCourierAddress] = useState("");
+  const [referrerToken, setReferrerToken] = useState<string | null>(null);
+
   // ─── photos ───
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [photoUploading, setPhotoUploading] = useState(false);
@@ -90,6 +95,10 @@ export default function SellerForm({ onSubmitted }: { onSubmitted: (token: strin
         setYandexClientId(r.data.clientId);
       }
     });
+    // Реферальный токен из URL ?ref=XXXX
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref");
+    if (ref) setReferrerToken(ref);
   }, []);
 
   // Принимаем code от Яндекса (popup закроется и postMessage)
@@ -269,6 +278,9 @@ export default function SellerForm({ onSubmitted }: { onSubmitted: (token: strin
         sellerPassportPhotoUrl: passport?.photoUrl || null,
         avitoUrl,
         aiCheck: aiResult,
+        referrerToken,
+        courierPickup,
+        courierAddress: courierPickup ? courierAddress.trim() : null,
       },
     });
     setLoading(false);
@@ -335,11 +347,40 @@ export default function SellerForm({ onSubmitted }: { onSubmitted: (token: strin
         aiResult={aiResult} aiChecking={aiChecking} onAiCheck={handleAiCheck}
       />
 
+      {/* Выкуп за 1 час — курьер */}
+      <div className="bg-gradient-to-br from-orange-500/[0.08] to-transparent border border-orange-500/30 rounded-2xl p-4">
+        <label className="flex items-start gap-2.5 cursor-pointer">
+          <input type="checkbox" checked={courierPickup} onChange={e => setCourierPickup(e.target.checked)} className="mt-0.5" />
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              <Icon name="Truck" size={14} className="text-orange-300" />
+              <span className="text-sm font-bold text-orange-300">Выкуп за 1 час · курьер к вам</span>
+              <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-orange-500/15 text-orange-300 font-bold">+400 ₽</span>
+            </div>
+            <div className="text-xs text-[#999] leading-relaxed">
+              Не можете приехать в офис? Наш курьер заберёт товар у вас в течение часа. Калуга и пригороды.
+            </div>
+          </div>
+        </label>
+        {courierPickup && (
+          <input value={courierAddress} onChange={e => setCourierAddress(e.target.value)}
+            placeholder="Адрес: улица, дом, квартира"
+            className="input mt-3" />
+        )}
+      </div>
+
       <div className="bg-[#FFD700]/[0.06] border border-[#FFD700]/[0.2] rounded-2xl px-4 py-3.5 text-sm text-[#ddd] leading-relaxed">
         <Icon name="Shield" size={14} className="inline mr-1.5 text-[#FFD700]" />
         Срок реализации — <b>{REALIZATION_DAYS} дней</b>. Сделки проходят только в офисе{" "}
         <b>{OFFICE_ADDRESS}</b>. Если товар не продан — забираете его обратно без штрафов.
       </div>
+
+      {referrerToken && (
+        <div className="bg-emerald-500/[0.06] border border-emerald-500/30 rounded-2xl px-4 py-2.5 text-xs text-emerald-300">
+          <Icon name="Users" size={12} className="inline mr-1.5" />
+          Реферал активирован. Друг, который пригласил вас, получит бонус с этой сделки.
+        </div>
+      )}
 
       <label className="flex items-start gap-2.5 text-sm text-[#ccc] cursor-pointer">
         <input type="checkbox" checked={agree} onChange={e => setAgree(e.target.checked)} className="mt-0.5" />

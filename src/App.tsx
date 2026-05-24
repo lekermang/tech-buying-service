@@ -54,6 +54,9 @@ const SafeDeals = safeLazy(() => import("./pages/SafeDeals"));
 const SafeDealQR = safeLazy(() => import("./pages/SafeDealQR"));
 const SafeDealsShop = safeLazy(() => import("./pages/SafeDealsShop"));
 const SafeDealsYandexCallback = safeLazy(() => import("./pages/SafeDealsYandexCallback"));
+const SafeDealsBlacklist = safeLazy(() => import("./pages/SafeDealsBlacklist"));
+const SafeDealsLanding = safeLazy(() => import("./pages/SafeDealsLanding"));
+const SafeDealsChecklist = safeLazy(() => import("./pages/SafeDealsChecklist"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -135,6 +138,9 @@ const App = () => {
             <Route path="/safe-deals/shop" element={<SafeDealsShop />} />
             <Route path="/safe-deals/qr/:code" element={<SafeDealQR />} />
             <Route path="/safe-deals/yandex-callback" element={<SafeDealsYandexCallback />} />
+            <Route path="/safe-deals/blacklist" element={<SafeDealsBlacklist />} />
+            <Route path="/safe-deals/checklist" element={<SafeDealsChecklist />} />
+            <Route path="/safe-deals/:slug" element={<SafeDealsLanding />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

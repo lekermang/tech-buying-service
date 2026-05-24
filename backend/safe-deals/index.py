@@ -198,6 +198,10 @@ def action_create(body, event):
     seller_yandex_id = (body.get('sellerYandexId') or '').strip() or None
     avito_url = (body.get('avitoUrl') or '').strip() or None
     ai_check_data = body.get('aiCheck')  # результат ИИ-проверки
+    referrer_token = (body.get('referrerToken') or '').strip() or None
+    courier_pickup = bool(body.get('courierPickup'))
+    courier_address = (body.get('courierAddress') or '').strip() or None
+    courier_fee = Decimal('400.00') if courier_pickup else Decimal('0.00')
     category_id_raw = body.get('categoryId')
     category_id = None
     try:
@@ -205,6 +209,8 @@ def action_create(body, event):
             category_id = int(category_id_raw)
     except Exception:
         category_id = None
+    # Реферальный код продавца (для его последующего шеринга)
+    referral_code = (uuid.uuid4().hex[:8]).upper()
 
     if not seller_name or len(seller_name) < 3:
         return _err(400, 'Укажите ваше имя')
@@ -257,10 +263,12 @@ def action_create(body, event):
             f"price, commission_pct, commission_amount, seller_payout, "
             f"payment_method, payout_method, payout_details, "
             f"seller_passport, seller_passport_photo_url, seller_yandex_id, "
-            f"avito_url, ai_check, category_id) "
+            f"avito_url, ai_check, category_id, "
+            f"referral_code, referrer_token, courier_pickup, courier_address, courier_fee) "
             f"VALUES (%s, %s, %s, 'submitted', "
             f"%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, "
-            f"%s::jsonb, %s, %s, %s, %s::jsonb, %s) RETURNING id",
+            f"%s::jsonb, %s, %s, %s, %s::jsonb, %s, "
+            f"%s, %s, %s, %s, %s) RETURNING id",
             (
                 deal_number, seller_token, qr_code,
                 seller_name, seller_phone, seller_email,
@@ -273,6 +281,8 @@ def action_create(body, event):
                 avito_url,
                 json.dumps(ai_check_data, ensure_ascii=False) if ai_check_data else None,
                 category_id,
+                referral_code, referrer_token,
+                courier_pickup, courier_address, courier_fee,
             )
         )
         deal_id = cur.fetchone()['id']
@@ -590,6 +600,62 @@ def action_scan_passport(body):
         })
     except Exception as e:
         return _err(502, f'OCR ошибка: {e}')
+
+
+# ============ PUBLIC: BLACKLIST (анонимный) ============
+def action_blacklist_public():
+    """Публичный анонимизированный чёрный список: показывает только маскированные данные."""
+    conn = _get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        f"SELECT id, kind, value, reason, role, incidents_count, created_at "
+        f"FROM {SCHEMA}.safe_deals_blacklist "
+        f"WHERE is_public=TRUE ORDER BY created_at DESC LIMIT 200"
+    )
+    rows = cur.fetchall()
+    cur.close(); conn.close()
+    items = []
+    for r in rows:
+        val = (r.get('value') or '')
+        # Маскируем телефоны/идентификаторы
+        if r.get('kind') == 'phone' and len(val) >= 8:
+            masked = val[:2] + '*' * (len(val) - 6) + val[-4:]
+        elif len(val) > 6:
+            masked = val[:2] + '*' * 4 + val[-2:]
+        else:
+            masked = '****'
+        items.append({
+            'id': r['id'],
+            'kind': r.get('kind'),
+            'masked': masked,
+            'reason': r.get('reason'),
+            'role': r.get('role') or 'seller',
+            'incidents': int(r.get('incidents_count') or 1),
+            'createdAt': r['created_at'].isoformat() if isinstance(r.get('created_at'), datetime) else None,
+        })
+    return _ok({'items': items, 'count': len(items)})
+
+
+# ============ PUBLIC: LEAD (подписка на чек-лист) ============
+def action_subscribe_lead(body):
+    """Сохраняет контакт за бесплатный чек-лист. Возвращает ссылку на PDF/HTML."""
+    contact = (body.get('contact') or '').strip()
+    source = (body.get('source') or 'checklist').strip()
+    if not contact or len(contact) < 4:
+        return _err(400, 'Укажите email или телефон')
+    conn = _get_conn(); cur = conn.cursor()
+    try:
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.safe_deals_leads (contact, source) VALUES (%s, %s) RETURNING id",
+            (contact, source),
+        )
+        conn.commit()
+        return _ok({'ok': True, 'downloadUrl': '/safe-deals/checklist.pdf'})
+    except Exception as e:
+        conn.rollback()
+        return _err(500, f'Ошибка: {e}')
+    finally:
+        cur.close(); conn.close()
 
 
 # ============ PUBLIC: CATEGORIES ============
@@ -1326,6 +1392,8 @@ def handler(event: dict, context) -> dict:
             return action_shop()
         if action == 'yandex_config':
             return action_yandex_config()
+        if action == 'blacklist_public':
+            return action_blacklist_public()
         return _err(400, f'Unknown GET action: {action}')
 
     if method == 'POST':
@@ -1351,6 +1419,8 @@ def handler(event: dict, context) -> dict:
             return action_scan_passport(body)
         if action == 'feature_deal':
             return action_feature_deal(body)
+        if action == 'subscribe_lead':
+            return action_subscribe_lead(body)
         return _err(400, f'Unknown POST action: {action}')
 
     return _err(405, 'Method not allowed')

@@ -254,6 +254,27 @@ export async function featureDeal(token: string) {
   });
 }
 
+export type BlacklistEntry = {
+  id: number;
+  kind: string;
+  masked: string;
+  reason: string | null;
+  role: "seller" | "buyer";
+  incidents: number;
+  createdAt: string | null;
+};
+
+export async function listBlacklist() {
+  return apiCall<{ items: BlacklistEntry[]; count: number }>("blacklist_public");
+}
+
+export async function subscribeLead(contact: string, source = "checklist") {
+  return apiCall<{ ok: boolean; downloadUrl: string }>("subscribe_lead", {
+    method: "POST",
+    body: { contact, source },
+  });
+}
+
 /** localStorage — храним токены продавца, чтобы при возврате сразу видеть свои сделки. */
 const LS_KEY = "skupka_safe_deals_tokens";
 export function loadSellerTokens(): { token: string; dealNumber: string; title: string; createdAt: string }[] {

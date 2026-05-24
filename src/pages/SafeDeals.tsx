@@ -130,9 +130,17 @@ function Landing({ myDeals, onStart, onOpenDeal }: {
           <Icon name="Shield" size={18} /> Подать заявку
         </button>
         <div className="mt-3 text-xs text-[#666]">Бесплатно · без регистрации · 2 минуты</div>
-        <a href="/safe-deals/shop" className="mt-2 inline-flex items-center gap-1 text-xs text-[#FFD700] hover:underline">
-          <Icon name="Store" size={12} /> Посмотреть витрину товаров
-        </a>
+        <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs">
+          <a href="/safe-deals/shop" className="inline-flex items-center gap-1 text-[#FFD700] hover:underline">
+            <Icon name="Store" size={12} /> Витрина
+          </a>
+          <a href="/safe-deals/checklist" className="inline-flex items-center gap-1 text-[#FFD700] hover:underline">
+            <Icon name="Gift" size={12} /> Чек-лист
+          </a>
+          <a href="/safe-deals/blacklist" className="inline-flex items-center gap-1 text-[#FFD700] hover:underline">
+            <Icon name="ShieldAlert" size={12} /> Чёрный список
+          </a>
+        </div>
       </div>
 
       {/* Мои сделки */}

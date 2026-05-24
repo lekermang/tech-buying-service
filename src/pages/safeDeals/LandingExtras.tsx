@@ -8,6 +8,48 @@ import { toast } from "sonner";
 import Icon from "@/components/ui/icon";
 import { featureDeal } from "./api";
 
+export function ReferralBlock({ token }: { token: string }) {
+  const refLink = `${window.location.origin}/safe-deals?ref=${token}`;
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(refLink);
+      toast.success("Ссылка скопирована");
+    } catch {
+      toast.message(refLink);
+    }
+  };
+  const share = async () => {
+    const nav = navigator as Navigator & { share?: (data: { title?: string; text?: string; url?: string }) => Promise<void> };
+    const text = "Продайте Б/У технику безопасно через гаранта Скупка24 — деньги сразу, без обмана!";
+    if (typeof nav.share === "function") {
+      try { await nav.share({ title: "Скупка24 · Безопасная сделка", text, url: refLink }); return; } catch { /* отменили */ }
+    }
+    copy();
+  };
+  return (
+    <div className="bg-gradient-to-br from-emerald-500/[0.08] via-[#0D0D0D] to-emerald-500/[0.04] border border-emerald-500/30 rounded-2xl p-4">
+      <div className="flex items-center gap-2 mb-2">
+        <Icon name="Users" size={16} className="text-emerald-300" />
+        <h3 className="text-sm font-extrabold text-emerald-300">Пригласи друга — получи 50% от его комиссии</h3>
+      </div>
+      <p className="text-xs text-[#999] leading-relaxed mb-3">
+        Поделитесь ссылкой. Когда друг сдаст товар через вашу ссылку — вам автоматически начислится 50% от нашей комиссии с его сделки.
+      </p>
+      <div className="bg-[#1C1C1C] border border-[#2A2A2A] rounded-xl px-3 py-2.5 mb-3 text-xs text-white/85 break-all font-mono">
+        {refLink}
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <button onClick={copy} className="py-2.5 rounded-xl border-2 border-[#2A2A2A] text-xs font-bold text-[#F0F0F0] hover:border-[#FFD700] transition flex items-center justify-center gap-1.5">
+          <Icon name="Copy" size={12} /> Скопировать
+        </button>
+        <button onClick={share} className="py-2.5 rounded-xl bg-emerald-500 text-black font-bold text-xs flex items-center justify-center gap-1.5">
+          <Icon name="Share2" size={12} /> Поделиться
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function UtpBlock() {
   return (
     <section className="max-w-3xl mx-auto px-4 sm:px-5 py-10 border-t border-[#1A1A1A]">
