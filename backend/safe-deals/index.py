@@ -676,8 +676,9 @@ def action_categories():
 
 # ============ PUBLIC: SHOP (витрина проверенных товаров) ============
 def action_shop():
-    """Публичная витрина: сделки в статусе on_shelf и reserved.
-    Сначала идут featured (платная карточка в топе), потом по дате проверки."""
+    """Публичная витрина. Показывает все активные товары (кроме отменённых/возвратов/завершённых).
+    Статусы submitted/review помечаются «На проверке», on_shelf/reserved — «Проверено».
+    Сначала идут featured (платная карточка в топе)."""
     conn = _get_conn()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cur.execute(
@@ -686,22 +687,52 @@ def action_shop():
         f"price, photos, seller_name, office_check_notes, office_checked_at, created_at, "
         f"is_featured, featured_until "
         f"FROM {SCHEMA}.safe_deals "
-        f"WHERE status IN ('on_shelf', 'reserved') "
+        f"WHERE status IN ('submitted', 'review', 'on_shelf', 'reserved') "
+        f"  AND expires_at > NOW() "
         f"ORDER BY "
         f"  CASE WHEN is_featured = TRUE AND (featured_until IS NULL OR featured_until > NOW()) THEN 0 ELSE 1 END, "
-        f"  office_checked_at DESC NULLS LAST, created_at DESC LIMIT 100"
+        f"  CASE WHEN status='on_shelf' THEN 0 WHEN status='reserved' THEN 1 ELSE 2 END, "
+        f"  office_checked_at DESC NULLS LAST, created_at DESC LIMIT 200"
     )
     rows = [_deal_to_dict(r) for r in cur.fetchall()]
     cur.close(); conn.close()
     items = []
+    now_iso = datetime.now(timezone.utc).isoformat()
     for r in rows:
         v = _public_view(r)
         v['isFeatured'] = bool(r.get('is_featured')) and (
             r.get('featured_until') is None or
-            (r.get('featured_until') and r['featured_until'] > datetime.now(timezone.utc).isoformat())
+            (r.get('featured_until') and str(r['featured_until']) > now_iso)
         )
         items.append(v)
     return _ok({'items': items, 'count': len(items)})
+
+
+# ============ PUBLIC: ITEM VIEW (страница одного товара) ============
+def action_item_view(qs):
+    """Публичная страница товара по номеру сделки. Показывает все детали + маскированного продавца."""
+    number = (qs.get('number') or '').strip().upper()
+    if not number:
+        return _err(400, 'number required')
+    conn = _get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        f"SELECT * FROM {SCHEMA}.safe_deals WHERE UPPER(deal_number)=%s",
+        (number,)
+    )
+    row = cur.fetchone()
+    cur.close(); conn.close()
+    if not row:
+        return _err(404, 'Товар не найден')
+    deal = _deal_to_dict(row)
+    v = _public_view(deal)
+    v['isFeatured'] = bool(deal.get('is_featured'))
+    # Дополнительные поля для карточки
+    v['qrCode'] = deal.get('qr_code')
+    v['paymentMethod'] = deal.get('payment_method')
+    v['payoutMethod'] = deal.get('payout_method')
+    v['expiresAt'] = deal.get('expires_at')
+    return _ok(v)
 
 
 # ============ PUBLIC: FEATURE DEAL (платный апгрейд) ============
@@ -1394,6 +1425,8 @@ def handler(event: dict, context) -> dict:
             return action_yandex_config()
         if action == 'blacklist_public':
             return action_blacklist_public()
+        if action == 'item_view':
+            return action_item_view(qs)
         return _err(400, f'Unknown GET action: {action}')
 
     if method == 'POST':

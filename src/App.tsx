@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 /**
  * Безопасный lazy-импорт: если после деплоя браузер запросил старый chunk,
@@ -57,6 +57,7 @@ const SafeDealsYandexCallback = safeLazy(() => import("./pages/SafeDealsYandexCa
 const SafeDealsBlacklist = safeLazy(() => import("./pages/SafeDealsBlacklist"));
 const SafeDealsLanding = safeLazy(() => import("./pages/SafeDealsLanding"));
 const SafeDealsChecklist = safeLazy(() => import("./pages/SafeDealsChecklist"));
+const SafeDealsItem = safeLazy(() => import("./pages/SafeDealsItem"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -140,7 +141,12 @@ const App = () => {
             <Route path="/safe-deals/yandex-callback" element={<SafeDealsYandexCallback />} />
             <Route path="/safe-deals/blacklist" element={<SafeDealsBlacklist />} />
             <Route path="/safe-deals/checklist" element={<SafeDealsChecklist />} />
+            <Route path="/safe-deals/item/:dealNumber" element={<SafeDealsItem />} />
             <Route path="/safe-deals/:slug" element={<SafeDealsLanding />} />
+            {/* Удобные алиасы */}
+            <Route path="/blacklist" element={<Navigate to="/safe-deals/blacklist" replace />} />
+            <Route path="/checklist" element={<Navigate to="/safe-deals/checklist" replace />} />
+            <Route path="/qr/:code" element={<SafeDealQR />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

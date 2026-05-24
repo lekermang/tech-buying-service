@@ -15,6 +15,7 @@ export default function SafeDealQR() {
   const [deal, setDeal] = useState<SafeDealPublic | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [blocked, setBlocked] = useState(false);
 
   const [buyerName, setBuyerName] = useState("");
   const [buyerPhone, setBuyerPhone] = useState("");
@@ -24,15 +25,69 @@ export default function SafeDealQR() {
   const [done, setDone] = useState(false);
 
   useEffect(() => {
+    // Защита от брутфорса: считаем попытки ввода невалидного кода
+    const codeRe = /^[A-Z0-9]{6,10}$/;
+    if (!codeRe.test(codeUp)) {
+      setErr("Неверный формат кода");
+      setLoading(false);
+      return;
+    }
+    const attemptsKey = "sd_qr_attempts";
+    const failKey = `sd_qr_fail_${codeUp}`;
+    const totalAttempts = Number(localStorage.getItem(attemptsKey) || "0");
+    if (totalAttempts > 20) {
+      setBlocked(true);
+      setLoading(false);
+      return;
+    }
+
     document.title = "Проверка сделки — Скупка24";
     (async () => {
       setLoading(true);
       const r = await apiCall<SafeDealPublic>("get_by_qr", { params: { code: codeUp } });
       setLoading(false);
-      if (!r.ok || !r.data) { setErr(r.error || "Сделка не найдена"); return; }
+      if (!r.ok || !r.data) {
+        const fails = Number(localStorage.getItem(failKey) || "0") + 1;
+        localStorage.setItem(failKey, String(fails));
+        localStorage.setItem(attemptsKey, String(totalAttempts + 1));
+        setErr(r.error || "Сделка не найдена");
+        return;
+      }
+      // Сброс счётчика при успехе
+      localStorage.removeItem(failKey);
       setDeal(r.data); setErr(null);
+
+      // OG-превью для шеринга в Telegram/WhatsApp
+      const ogTitle = `Сделка Скупка24: ${r.data.productTitle}`;
+      const ogDesc = `Сумма: ${r.data.price.toLocaleString("ru-RU")} ₽. Продавец: ${r.data.sellerNameMasked}. Скан QR-кода в офисе завершает сделку.`;
+      const setMeta = (n: string, c: string, p = true) => {
+        const sel = p ? `meta[property="${n}"]` : `meta[name="${n}"]`;
+        let el = document.head.querySelector<HTMLMetaElement>(sel);
+        if (!el) { el = document.createElement("meta"); if (p) el.setAttribute("property", n); else el.setAttribute("name", n); document.head.appendChild(el); }
+        el.setAttribute("content", c); return el;
+      };
+      const tags = [
+        setMeta("og:title", ogTitle),
+        setMeta("og:description", ogDesc),
+        setMeta("og:image", r.data.photos[0]?.url || ""),
+        setMeta("og:type", "website"),
+      ];
+      return () => tags.forEach(t => t.remove());
     })();
   }, [codeUp]);
+
+  if (blocked) {
+    return (
+      <Page>
+        <div className="max-w-md mx-auto px-5 py-12 text-center">
+          <Icon name="ShieldAlert" size={36} className="text-[#FF453A] mx-auto mb-2" />
+          <h2 className="text-base font-bold text-red-300">Слишком много попыток</h2>
+          <p className="text-sm text-[#999] mt-2">Доступ временно заблокирован. Попробуйте позже или обратитесь в офис.</p>
+          <a href="/safe-deals" className="inline-block mt-5 px-5 py-2.5 rounded-xl bg-[#FFD700] text-black font-bold text-sm">На главную</a>
+        </div>
+      </Page>
+    );
+  }
 
   const confirm = async () => {
     if (!buyerName.trim()) { toast.error("Укажите имя"); return; }

@@ -183,7 +183,7 @@ export default function SafeDealsLanding() {
             <h2 className="text-xl font-extrabold text-center mb-4">Доступно сейчас в Калуге</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {items.slice(0, 9).map(it => (
-                <a key={it.dealNumber} href="/safe-deals/shop"
+                <a key={it.dealNumber} href={`/safe-deals/item/${it.dealNumber}`}
                   className="bg-[#141414] border border-[#2A2A2A] rounded-2xl overflow-hidden hover:border-[#FFD700]/40 transition">
                   <div className="aspect-square bg-[#1C1C1C] relative overflow-hidden">
                     {it.photos[0] ? (

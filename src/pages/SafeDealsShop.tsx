@@ -90,39 +90,46 @@ export default function SafeDealsShop() {
 
         {!loading && filtered.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-            {filtered.map(it => (
-              <article key={it.dealNumber}
-                className="bg-[#141414] border border-[#2A2A2A] rounded-2xl overflow-hidden hover:border-[#FFD700]/40 hover:shadow-[0_10px_30px_-15px_rgba(255,215,0,0.4)] transition-all duration-300">
-                <div className="aspect-square bg-[#1C1C1C] relative overflow-hidden">
-                  {it.photos[0] ? (
-                    <img src={it.photos[0].url} alt={it.productTitle} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
-                  ) : (
-                    <div className="absolute inset-0 flex items-center justify-center text-[#444]">
-                      <Icon name="Package" size={36} />
+            {filtered.map(it => {
+              const badgeText =
+                it.status === "on_shelf" ? { text: "Проверено", cls: "bg-emerald-500/90", icon: "ShieldCheck" } :
+                it.status === "reserved" ? { text: "Забронировано", cls: "bg-purple-500/90", icon: "Bookmark" } :
+                it.status === "review" ? { text: "На проверке", cls: "bg-orange-500/90", icon: "Eye" } :
+                { text: "Новинка", cls: "bg-blue-500/90", icon: "Sparkles" };
+              return (
+                <a key={it.dealNumber} href={`/safe-deals/item/${it.dealNumber}`}
+                  className="bg-[#141414] border border-[#2A2A2A] rounded-2xl overflow-hidden hover:border-[#FFD700]/40 hover:shadow-[0_10px_30px_-15px_rgba(255,215,0,0.4)] transition-all duration-300 active:scale-[0.98] block no-underline">
+                  <div className="aspect-square bg-[#1C1C1C] relative overflow-hidden">
+                    {it.photos[0] ? (
+                      <img src={it.photos[0].url} alt={it.productTitle} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center text-[#444]">
+                        <Icon name="Package" size={36} />
+                      </div>
+                    )}
+                    {it.isFeatured && (
+                      <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-[#FFD700] text-black text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1">
+                        <Icon name="Crown" size={10} /> Топ
+                      </div>
+                    )}
+                    <div className={`absolute bottom-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-full ${badgeText.cls} text-white text-[10px] font-bold uppercase tracking-wider w-fit`}>
+                      <Icon name={badgeText.icon} size={10} /> {badgeText.text}
                     </div>
-                  )}
-                  {it.status === "reserved" && (
-                    <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-purple-500/90 text-white text-[10px] font-bold uppercase tracking-wider">
-                      Забронировано
+                  </div>
+                  <div className="p-3">
+                    <div className="text-[10px] text-[#777] uppercase tracking-wider mb-0.5">{it.productCategory || "Товар"}</div>
+                    <h3 className="text-sm font-bold text-white leading-tight mb-1.5 line-clamp-2">{it.productTitle}</h3>
+                    {it.productCondition && (
+                      <div className="text-[10px] text-[#999] mb-2">Состояние: {it.productCondition}</div>
+                    )}
+                    <div className="flex items-end justify-between gap-2">
+                      <div className="text-lg font-extrabold text-[#FFD700] leading-none">{fmtRub(it.price)}</div>
+                      <div className="text-[10px] text-[#666] uppercase tracking-wider">{it.dealNumber}</div>
                     </div>
-                  )}
-                  <div className="absolute bottom-2 left-2 right-2 flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/90 text-white text-[10px] font-bold uppercase tracking-wider w-fit">
-                    <Icon name="ShieldCheck" size={10} /> Проверено
                   </div>
-                </div>
-                <div className="p-3">
-                  <div className="text-[10px] text-[#777] uppercase tracking-wider mb-0.5">{it.productCategory || "Товар"}</div>
-                  <h3 className="text-sm font-bold text-white leading-tight mb-1.5 line-clamp-2">{it.productTitle}</h3>
-                  {it.productCondition && (
-                    <div className="text-[10px] text-[#999] mb-2">Состояние: {it.productCondition}</div>
-                  )}
-                  <div className="flex items-end justify-between gap-2">
-                    <div className="text-lg font-extrabold text-[#FFD700] leading-none">{fmtRub(it.price)}</div>
-                    <div className="text-[10px] text-[#666] uppercase tracking-wider">{it.dealNumber}</div>
-                  </div>
-                </div>
-              </article>
-            ))}
+                </a>
+              );
+            })}
           </div>
         )}
 

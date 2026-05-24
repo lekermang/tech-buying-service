@@ -268,6 +268,17 @@ export async function listBlacklist() {
   return apiCall<{ items: BlacklistEntry[]; count: number }>("blacklist_public");
 }
 
+export type ShopItemFull = ShopItem & {
+  qrCode?: string;
+  paymentMethod?: string;
+  payoutMethod?: string;
+  expiresAt?: string;
+};
+
+export async function getItemByNumber(number: string) {
+  return apiCall<ShopItemFull>("item_view", { params: { number } });
+}
+
 export async function subscribeLead(contact: string, source = "checklist") {
   return apiCall<{ ok: boolean; downloadUrl: string }>("subscribe_lead", {
     method: "POST",

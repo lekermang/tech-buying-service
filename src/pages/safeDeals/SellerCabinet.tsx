@@ -68,6 +68,10 @@ export default function SellerCabinet({ token, onBack }: { token: string; onBack
             <div className="text-xs uppercase tracking-wider text-[#777] mb-1">Сделка</div>
             <div className="text-xl font-extrabold text-[#FFD700] tracking-wide">{deal.deal_number}</div>
             <div className="text-sm text-[#bbb] mt-2 truncate">{deal.product_title}</div>
+            <a href={`/safe-deals/item/${deal.deal_number}`} target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-[#FFD700] hover:underline mt-2">
+              <Icon name="ExternalLink" size={11} /> Посмотреть как видит покупатель
+            </a>
           </div>
           <span className={`text-[10px] px-2.5 py-1 rounded-full border uppercase tracking-wider font-bold ${status.cls} flex items-center gap-1 shrink-0`}>
             <Icon name={status.icon} size={10} /> {status.label}
