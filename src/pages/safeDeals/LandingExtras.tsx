@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import Icon from "@/components/ui/icon";
-import { featureDeal } from "./api";
+import { featureDeal, createPayment } from "./api";
 
 export function ReferralBlock({ token }: { token: string }) {
   const refLink = `${window.location.origin}/safe-deals?ref=${token}`;
@@ -160,13 +160,26 @@ export function FeatureUpgradeCTA({ token }: { token: string }) {
   const [enabled, setEnabled] = useState(false);
 
   const submit = async () => {
-    if (!window.confirm("Включить «Золотую карточку» — товар будет в топе витрины 7 дней за 100 ₽. Подтвердить?")) return;
+    if (!window.confirm("Включить «Золотую карточку» — товар будет в топе витрины 7 дней за 100 ₽. Перейти к оплате через ЮKassa?")) return;
     setLoading(true);
-    const r = await featureDeal(token);
+    // Сначала пробуем через ЮKassa
+    const returnUrl = `${window.location.origin}/safe-deals?token=${token}&paid=feature`;
+    const yk = await createPayment("feature", token, returnUrl);
+    if (yk.ok && yk.data?.confirmationUrl) {
+      window.location.href = yk.data.confirmationUrl;
+      return;
+    }
+    // Fallback: если ЮKassa не настроена — старый бесплатный режим (тест)
+    if (yk.error && /не настроена|YOOKASSA/i.test(yk.error)) {
+      const r = await featureDeal(token);
+      setLoading(false);
+      if (!r.ok) { toast.error(r.error || "Ошибка"); return; }
+      setEnabled(true);
+      toast.success("Карточка теперь в топе! (тест-режим)");
+      return;
+    }
     setLoading(false);
-    if (!r.ok) { toast.error(r.error || "Ошибка"); return; }
-    setEnabled(true);
-    toast.success("Карточка теперь в топе!");
+    toast.error(yk.error || "Не удалось создать платёж");
   };
 
   if (enabled) {
@@ -188,9 +201,40 @@ export function FeatureUpgradeCTA({ token }: { token: string }) {
         </div>
         <div className="flex-1 min-w-0">
           <div className="text-sm font-bold text-[#FFD700]">Золотая карточка в топе · 100 ₽</div>
-          <div className="text-[11px] text-[#999] mt-0.5">Ваш товар будет показан первым на витрине 7 дней — быстрее найдётся покупатель</div>
+          <div className="text-[11px] text-[#999] mt-0.5">Ваш товар будет показан первым на витрине 7 дней. Оплата через ЮKassa.</div>
         </div>
         <Icon name="ArrowRight" size={16} className="text-[#FFD700] shrink-0" />
+      </div>
+    </button>
+  );
+}
+
+export function CourierPaymentCTA({ token }: { token: string }) {
+  const [loading, setLoading] = useState(false);
+  const submit = async () => {
+    if (!window.confirm("Заказать выезд курьера за 400 ₽? Перейти к оплате через ЮKassa.")) return;
+    setLoading(true);
+    const returnUrl = `${window.location.origin}/safe-deals?token=${token}&paid=courier`;
+    const r = await createPayment("courier", token, returnUrl);
+    setLoading(false);
+    if (r.ok && r.data?.confirmationUrl) {
+      window.location.href = r.data.confirmationUrl;
+      return;
+    }
+    toast.error(r.error || "Не удалось создать платёж");
+  };
+  return (
+    <button onClick={submit} disabled={loading}
+      className="w-full bg-gradient-to-r from-orange-500/[0.1] to-transparent border border-orange-500/40 hover:border-orange-500 rounded-2xl p-3.5 text-left transition active:scale-[0.98] disabled:opacity-50">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-orange-500/15 text-orange-300 flex items-center justify-center shrink-0">
+          <Icon name="Truck" size={20} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-bold text-orange-300">Курьер «Выкуп за 1 час» · 400 ₽</div>
+          <div className="text-[11px] text-[#999] mt-0.5">Не можете в офис? Курьер приедет и заберёт товар. Оплата через ЮKassa.</div>
+        </div>
+        <Icon name="ArrowRight" size={16} className="text-orange-300 shrink-0" />
       </div>
     </button>
   );

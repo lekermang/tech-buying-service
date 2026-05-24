@@ -735,6 +735,185 @@ def action_item_view(qs):
     return _ok(v)
 
 
+# ============ ЮKassa ============
+def _yookassa_create(amount_rub, purpose: str, description: str, return_url: str, metadata: dict) -> dict:
+    """Создаёт платёж в ЮKassa. Возвращает {id, confirmation_url, status}."""
+    import urllib.request as _urlreq
+    import base64 as _b64
+    shop_id = os.environ.get('YOOKASSA_SHOP_ID', '')
+    secret = os.environ.get('YOOKASSA_SECRET_KEY', '')
+    if not shop_id or not secret:
+        raise Exception('ЮKassa не настроена (нет YOOKASSA_SHOP_ID или YOOKASSA_SECRET_KEY)')
+
+    idem = uuid.uuid4().hex
+    auth = _b64.b64encode(f'{shop_id}:{secret}'.encode('utf-8')).decode('ascii')
+    body = {
+        'amount': {'value': f'{Decimal(str(amount_rub)).quantize(Decimal("0.01"))}', 'currency': 'RUB'},
+        'capture': True,
+        'confirmation': {'type': 'redirect', 'return_url': return_url},
+        'description': description[:128],
+        'metadata': metadata or {},
+    }
+    req = _urlreq.Request(
+        'https://api.yookassa.ru/v3/payments',
+        data=json.dumps(body).encode('utf-8'),
+        headers={
+            'Authorization': f'Basic {auth}',
+            'Idempotence-Key': idem,
+            'Content-Type': 'application/json',
+        },
+        method='POST',
+    )
+    with _urlreq.urlopen(req, timeout=15) as resp:
+        result = json.loads(resp.read().decode('utf-8'))
+    return result
+
+
+def action_yookassa_create_payment(body):
+    """Создаёт платёж в ЮKassa и сохраняет в нашу БД.
+    Параметры: purpose ('feature'|'courier'), token (seller_token), returnUrl."""
+    purpose = (body.get('purpose') or '').strip()
+    token = (body.get('token') or '').strip()
+    return_url = (body.get('returnUrl') or '').strip()
+    if purpose not in ('feature', 'courier'):
+        return _err(400, 'purpose must be feature|courier')
+    if not token:
+        return _err(400, 'token required')
+    if not return_url:
+        return _err(400, 'returnUrl required')
+
+    amount_map = {'feature': Decimal('100.00'), 'courier': Decimal('400.00')}
+    amount = amount_map[purpose]
+    desc_map = {
+        'feature': 'Золотая карточка в топе витрины (7 дней)',
+        'courier': 'Курьер «Выкуп за 1 час» — выезд к продавцу',
+    }
+
+    # Находим сделку по токену
+    conn = _get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        cur.execute(
+            f"SELECT id, deal_number FROM {SCHEMA}.safe_deals WHERE seller_token=%s",
+            (token,)
+        )
+        row = cur.fetchone()
+        if not row:
+            return _err(404, 'Сделка не найдена')
+        related_id = row['id']
+
+        try:
+            yk = _yookassa_create(
+                amount_rub=amount,
+                purpose=purpose,
+                description=f"{desc_map[purpose]} ({row['deal_number']})",
+                return_url=return_url,
+                metadata={'purpose': purpose, 'token': token, 'deal_id': related_id, 'deal_number': row['deal_number']},
+            )
+        except Exception as e:
+            return _err(502, f'ЮKassa ошибка: {e}')
+
+        pid = yk.get('id')
+        confirm_url = (yk.get('confirmation') or {}).get('confirmation_url')
+        status = yk.get('status') or 'pending'
+
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.yookassa_payments "
+            f"(payment_id, purpose, amount, status, related_token, related_id, metadata) "
+            f"VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb)",
+            (pid, purpose, amount, status, token, related_id, json.dumps(yk, ensure_ascii=False, default=str)),
+        )
+        conn.commit()
+        return _ok({'paymentId': pid, 'confirmationUrl': confirm_url, 'status': status, 'amount': float(amount)})
+    finally:
+        cur.close(); conn.close()
+
+
+def action_yookassa_webhook(body):
+    """Webhook от ЮKassa: при succeeded — активируем услугу."""
+    event = body.get('event') or ''
+    obj = body.get('object') or {}
+    pid = obj.get('id')
+    status = obj.get('status')
+    metadata = obj.get('metadata') or {}
+    if not pid:
+        return _ok({'ok': True})
+
+    conn = _get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    try:
+        cur.execute(
+            f"SELECT id, purpose, related_id, related_token, status AS cur_status "
+            f"FROM {SCHEMA}.yookassa_payments WHERE payment_id=%s",
+            (pid,)
+        )
+        row = cur.fetchone()
+        if not row:
+            # неизвестный платёж — записываем для аудита
+            cur.execute(
+                f"INSERT INTO {SCHEMA}.yookassa_payments "
+                f"(payment_id, purpose, amount, status, metadata) VALUES (%s, %s, %s, %s, %s::jsonb)",
+                (pid, metadata.get('purpose') or 'unknown', Decimal(str((obj.get('amount') or {}).get('value') or 0)),
+                 status or 'unknown', json.dumps(obj, ensure_ascii=False, default=str)),
+            )
+            conn.commit()
+            return _ok({'ok': True, 'noted': True})
+
+        cur.execute(
+            f"UPDATE {SCHEMA}.yookassa_payments SET status=%s, updated_at=NOW(), "
+            f"paid_at=CASE WHEN %s='succeeded' THEN NOW() ELSE paid_at END WHERE id=%s",
+            (status, status, row['id'])
+        )
+
+        # Активируем услугу при успешной оплате
+        if event == 'payment.succeeded' or status == 'succeeded':
+            purpose = row['purpose']
+            deal_id = row['related_id']
+            if purpose == 'feature' and deal_id:
+                cur.execute(
+                    f"UPDATE {SCHEMA}.safe_deals SET "
+                    f"is_featured=TRUE, "
+                    f"featured_until=NOW() + INTERVAL '7 days', "
+                    f"featured_paid_amount=100.00, "
+                    f"featured_paid_via='yookassa' "
+                    f"WHERE id=%s",
+                    (deal_id,)
+                )
+                _log(cur, deal_id, 'featured_paid', {'via': 'yookassa', 'payment_id': pid}, actor='ЮKassa')
+            elif purpose == 'courier' and deal_id:
+                cur.execute(
+                    f"UPDATE {SCHEMA}.safe_deals SET "
+                    f"courier_paid_via='yookassa', "
+                    f"courier_paid_at=NOW(), "
+                    f"courier_status='paid' "
+                    f"WHERE id=%s",
+                    (deal_id,)
+                )
+                _log(cur, deal_id, 'courier_paid', {'via': 'yookassa', 'payment_id': pid}, actor='ЮKassa')
+        conn.commit()
+        return _ok({'ok': True})
+    finally:
+        cur.close(); conn.close()
+
+
+def action_yookassa_status(qs):
+    """Проверка статуса платежа со стороны фронта (после возврата с return_url)."""
+    pid = (qs.get('payment_id') or '').strip()
+    if not pid:
+        return _err(400, 'payment_id required')
+    conn = _get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        f"SELECT status, purpose, amount FROM {SCHEMA}.yookassa_payments WHERE payment_id=%s",
+        (pid,)
+    )
+    row = cur.fetchone()
+    cur.close(); conn.close()
+    if not row:
+        return _err(404, 'Платёж не найден')
+    return _ok({'status': row['status'], 'purpose': row['purpose'], 'amount': float(row['amount'])})
+
+
 # ============ PUBLIC: FEATURE DEAL (платный апгрейд) ============
 def action_feature_deal(body):
     """Включает «золотую карточку в топе» на 7 дней. MVP — без оплаты, просто помечаем флагом.
@@ -890,64 +1069,130 @@ def action_parse_avito(body):
         return _err(400, 'Не удалось извлечь ID объявления из URL')
     item_id = m.group(1)
 
-    endpoints = [
-        f'https://m.avito.ru/api/16/items/{item_id}',
-        f'https://m.avito.ru/api/15/items/{item_id}',
-        f'https://www.avito.ru/api/15/items/{item_id}',
-    ]
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 10) Mobile',
+    # Авито часто меняет API — пробуем несколько способов
+    headers_api = {
+        'User-Agent': 'Avito/4.81.0 (iPhone; iOS 17.0)',
         'Accept': 'application/json',
+        'X-Source': 'mobile-app',
+        'Accept-Language': 'ru-RU,ru;q=0.9',
     }
+    headers_desktop = {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'ru-RU,ru;q=0.9,en;q=0.8',
+        'Cache-Control': 'no-cache',
+    }
+
     data = None
     last_err = None
-    for ep in endpoints:
+    title = ''
+    description = ''
+    price = 0
+    category = None
+    photos: list = []
+
+    # Способ 1: мобильное API (старый формат — может работать)
+    for ep in [
+        f'https://m.avito.ru/api/19/items/{item_id}',
+        f'https://m.avito.ru/api/18/items/{item_id}',
+        f'https://m.avito.ru/api/17/items/{item_id}',
+        f'https://m.avito.ru/api/16/items/{item_id}',
+    ]:
         try:
-            req = _urlreq.Request(ep, headers=headers)
+            req = _urlreq.Request(ep, headers=headers_api)
             with _urlreq.urlopen(req, timeout=10) as resp:
-                if resp.status == 200:
-                    data = json.loads(resp.read().decode('utf-8'))
+                raw = resp.read().decode('utf-8', errors='ignore')
+                data = json.loads(raw)
+                if data:
                     break
         except Exception as e:
             last_err = str(e)
             continue
-    if not data:
-        return _err(502, f'Не удалось получить объявление: {last_err or "недоступно"}')
 
-    # Парсим ответ Авито (структура мобильного API)
-    title = data.get('title') or ''
-    price = 0
-    try:
-        price_obj = data.get('price') or {}
-        price = int(price_obj.get('value') or price_obj.get('price') or 0)
-    except Exception:
-        price = 0
-    description = data.get('description') or ''
-    category_obj = data.get('category') or {}
-    category = category_obj.get('name') if isinstance(category_obj, dict) else None
+    if data:
+        title = data.get('title') or ''
+        try:
+            price_obj = data.get('price') or {}
+            if isinstance(price_obj, dict):
+                price = int(price_obj.get('value') or price_obj.get('price') or 0)
+            else:
+                price = int(price_obj or 0)
+        except Exception:
+            price = 0
+        description = data.get('description') or ''
+        category_obj = data.get('category') or {}
+        category = category_obj.get('name') if isinstance(category_obj, dict) else None
+        for img in (data.get('images') or []):
+            if isinstance(img, dict):
+                variants = img.get('variants') or img.get('variantsList') or {}
+                best = None
+                if isinstance(variants, dict):
+                    for key in ['1280x960', '640x480', 'orig', 'original', '1024x768']:
+                        if variants.get(key):
+                            best = variants[key]; break
+                    if not best:
+                        for v in variants.values():
+                            if isinstance(v, str):
+                                best = v; break
+                if best:
+                    photos.append(best)
+            elif isinstance(img, str):
+                photos.append(img)
 
-    photos = []
-    for img in (data.get('images') or []):
-        if isinstance(img, dict):
-            # Берём самое большое разрешение
-            variants = img.get('variants') or img.get('variantsList') or {}
-            best = None
-            if isinstance(variants, dict):
-                # Ищем ключи типа '1280x960', '640x480' и т.п.
-                for key in ['1280x960', '640x480', 'orig', 'original', '1024x768']:
-                    if variants.get(key):
-                        best = variants[key]
-                        break
-                if not best:
-                    # Берём любое значение
-                    for v in variants.values():
-                        if isinstance(v, str):
-                            best = v
-                            break
-            if best:
-                photos.append(best)
-        elif isinstance(img, str):
-            photos.append(img)
+    # Способ 2: парсим HTML страницы и достаём данные из OG-meta + JSON-LD
+    if not data or (not title and not photos):
+        try:
+            req = _urlreq.Request(url, headers=headers_desktop)
+            with _urlreq.urlopen(req, timeout=12) as resp:
+                html = resp.read().decode('utf-8', errors='ignore')
+
+            ld_match = _re.search(r'<script[^>]*type="application/ld\+json"[^>]*>(.+?)</script>', html, _re.S)
+            ld_data = None
+            if ld_match:
+                try:
+                    ld_data = json.loads(ld_match.group(1))
+                except Exception:
+                    ld_data = None
+            if isinstance(ld_data, dict):
+                if not title:
+                    title = ld_data.get('name') or title
+                if not description:
+                    description = ld_data.get('description') or description
+                if not price:
+                    offers = ld_data.get('offers') or {}
+                    if isinstance(offers, dict):
+                        try: price = int(offers.get('price') or 0)
+                        except Exception: pass
+                if not category:
+                    cat = ld_data.get('category')
+                    if isinstance(cat, str):
+                        category = cat
+                imgs_ld = ld_data.get('image')
+                if isinstance(imgs_ld, list):
+                    photos.extend(imgs_ld)
+                elif isinstance(imgs_ld, str):
+                    photos.append(imgs_ld)
+
+            if not title:
+                og_t = _re.search(r'<meta\s+property="og:title"\s+content="([^"]+)"', html)
+                if og_t: title = og_t.group(1)
+            if not description:
+                og_d = _re.search(r'<meta\s+property="og:description"\s+content="([^"]+)"', html)
+                if og_d: description = og_d.group(1)
+            if not price:
+                pm = _re.search(r'<meta[^>]+itemprop="price"[^>]+content="(\d+)"', html)
+                if pm:
+                    try: price = int(pm.group(1))
+                    except Exception: pass
+            if not photos:
+                photos = _re.findall(r'<meta\s+property="og:image"\s+content="([^"]+)"', html)
+            data = data or {'_from': 'html'}
+        except Exception as e:
+            last_err = str(e)
+
+    if not title and not photos:
+        return _err(502, f'Не удалось получить объявление с Авито (Авито мог изменить защиту). Попробуйте позже или заполните вручную. Деталь: {last_err or "пустой ответ"}')
+
     photos = photos[:6]
 
     # Перекачиваем фото в наш S3 с водяной маркой «Скупка24» — убираем чужой бренд
@@ -1517,6 +1762,8 @@ def handler(event: dict, context) -> dict:
             return action_blacklist_public()
         if action == 'item_view':
             return action_item_view(qs)
+        if action == 'payment_status':
+            return action_yookassa_status(qs)
         return _err(400, f'Unknown GET action: {action}')
 
     if method == 'POST':
@@ -1544,6 +1791,10 @@ def handler(event: dict, context) -> dict:
             return action_feature_deal(body)
         if action == 'subscribe_lead':
             return action_subscribe_lead(body)
+        if action == 'create_payment':
+            return action_yookassa_create_payment(body)
+        if action == 'yookassa_webhook':
+            return action_yookassa_webhook(body)
         return _err(400, f'Unknown POST action: {action}')
 
     return _err(405, 'Method not allowed')

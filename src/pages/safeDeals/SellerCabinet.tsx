@@ -7,7 +7,7 @@ import {
   apiCall, fmtDate, fmtRub, OFFICE_ADDRESS, STATUS_LABEL,
   type SafeDealDetail,
 } from "./api";
-import { FeatureUpgradeCTA, ReferralBlock } from "./LandingExtras";
+import { FeatureUpgradeCTA, ReferralBlock, CourierPaymentCTA } from "./LandingExtras";
 
 export default function SellerCabinet({ token, onBack }: { token: string; onBack: () => void }) {
   const [deal, setDeal] = useState<SafeDealDetail | null>(null);
@@ -100,7 +100,10 @@ export default function SellerCabinet({ token, onBack }: { token: string; onBack
 
       {/* Платный апгрейд — только для активных */}
       {["on_shelf", "submitted", "review"].includes(deal.status) && (
-        <FeatureUpgradeCTA token={token} />
+        <>
+          <FeatureUpgradeCTA token={token} />
+          <CourierPaymentCTA token={token} />
+        </>
       )}
 
       {/* Реферальная программа */}

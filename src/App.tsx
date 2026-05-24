@@ -58,6 +58,7 @@ const SafeDealsBlacklist = safeLazy(() => import("./pages/SafeDealsBlacklist"));
 const SafeDealsLanding = safeLazy(() => import("./pages/SafeDealsLanding"));
 const SafeDealsChecklist = safeLazy(() => import("./pages/SafeDealsChecklist"));
 const SafeDealsItem = safeLazy(() => import("./pages/SafeDealsItem"));
+const StaffSafeDeals = safeLazy(() => import("./pages/StaffSafeDeals"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -142,6 +143,7 @@ const App = () => {
             <Route path="/safe-deals/blacklist" element={<SafeDealsBlacklist />} />
             <Route path="/safe-deals/checklist" element={<SafeDealsChecklist />} />
             <Route path="/safe-deals/item/:dealNumber" element={<SafeDealsItem />} />
+            <Route path="/staff/safe-deals" element={<StaffSafeDeals />} />
             <Route path="/safe-deals/:slug" element={<SafeDealsLanding />} />
             {/* Удобные алиасы */}
             <Route path="/blacklist" element={<Navigate to="/safe-deals/blacklist" replace />} />

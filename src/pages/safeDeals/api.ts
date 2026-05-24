@@ -286,6 +286,22 @@ export async function subscribeLead(contact: string, source = "checklist") {
   });
 }
 
+export type PaymentPurpose = "feature" | "courier";
+
+export async function createPayment(purpose: PaymentPurpose, token: string, returnUrl: string) {
+  return apiCall<{ paymentId: string; confirmationUrl: string; status: string; amount: number }>(
+    "create_payment",
+    { method: "POST", body: { purpose, token, returnUrl } }
+  );
+}
+
+export async function paymentStatus(paymentId: string) {
+  return apiCall<{ status: string; purpose: string; amount: number }>(
+    "payment_status",
+    { params: { payment_id: paymentId } }
+  );
+}
+
 /** localStorage — храним токены продавца, чтобы при возврате сразу видеть свои сделки. */
 const LS_KEY = "skupka_safe_deals_tokens";
 export function loadSellerTokens(): { token: string; dealNumber: string; title: string; createdAt: string }[] {
