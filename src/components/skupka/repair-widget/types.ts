@@ -52,6 +52,10 @@ export type Part = {
 export type OrderStatus = {
   id: number; name: string; model: string; repair_type: string;
   status: string; status_label: string; admin_note: string | null;
+  /** Сумма к оплате (если задана) */
+  total_price?: number | null;
+  /** Оплачено через ЮKassa */
+  paid?: boolean;
 };
 
 export type ClientInfo = { found: boolean; full_name?: string; discount_pct: number };

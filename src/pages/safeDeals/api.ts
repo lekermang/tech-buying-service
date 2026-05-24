@@ -302,6 +302,23 @@ export async function paymentStatus(paymentId: string) {
   );
 }
 
+/** Универсальная оплата ЮКассой — для любого purpose с произвольной суммой.
+ * После оплаты webhook от ЮKassa приходит на сервер; фронт может проверить
+ * статус через paymentStatus(paymentId). */
+export async function createUniversalPayment(params: {
+  purpose: string;
+  amount: number;
+  description: string;
+  returnUrl: string;
+  contextId?: string;
+  contactInfo?: string;
+}) {
+  return apiCall<{ paymentId: string; confirmationUrl: string; status: string; amount: number }>(
+    "create_payment_any",
+    { method: "POST", body: params }
+  );
+}
+
 /** localStorage — храним токены продавца, чтобы при возврате сразу видеть свои сделки. */
 const LS_KEY = "skupka_safe_deals_tokens";
 export function loadSellerTokens(): { token: string; dealNumber: string; title: string; createdAt: string }[] {

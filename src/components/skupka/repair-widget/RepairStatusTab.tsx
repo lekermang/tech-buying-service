@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import { INP, STATUS_COLOR, OrderStatus } from "./types";
+import PayButton from "@/components/payment/PayButton";
 
 type Props = {
   statusId: string;
@@ -72,6 +73,32 @@ function OrderCard({ o }: { o: OrderStatus }) {
         <div className="mt-2 font-roboto text-white/60 text-xs bg-[#FFD700]/5 border border-[#FFD700]/20 px-2.5 py-2">
           <span className="text-[#FFD700]/60 text-[9px] font-oswald uppercase tracking-wide block mb-0.5">Комментарий мастера</span>
           {o.admin_note}
+        </div>
+      )}
+
+      {/* Онлайн-оплата ремонта */}
+      {o.total_price && o.total_price > 0 && !o.paid && (o.status === "ready" || o.status === "in_progress" || o.status === "done") && (
+        <div className="mt-2 bg-gradient-to-br from-[#FFD700]/[0.08] to-transparent border border-[#FFD700]/30 rounded-md px-2.5 py-2">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[#FFD700]/80 text-[10px] uppercase tracking-wide font-bold">Сумма к оплате</span>
+            <span className="text-[#FFD700] font-extrabold text-base">{o.total_price.toLocaleString("ru-RU")} ₽</span>
+          </div>
+          <PayButton
+            purpose="repair"
+            amount={o.total_price}
+            description={`Ремонт №${o.id}${o.model ? " · " + o.model : ""}`}
+            contextId={String(o.id)}
+            size="sm"
+            className="w-full"
+          >
+            Оплатить онлайн
+          </PayButton>
+        </div>
+      )}
+
+      {o.paid && (
+        <div className="mt-2 bg-emerald-500/10 border border-emerald-500/30 rounded-md px-2.5 py-1.5 text-emerald-300 text-[11px] flex items-center gap-1.5">
+          <Icon name="CheckCircle2" size={12} /> Оплачено онлайн
         </div>
       )}
     </div>

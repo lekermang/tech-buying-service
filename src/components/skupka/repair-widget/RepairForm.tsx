@@ -3,6 +3,7 @@ import ContactChannelsBlock from "@/components/forms/ContactChannelsBlock";
 import { formatPhone } from "@/lib/phoneFormat";
 import { INP, Part, ExtraWork, ClientInfo } from "./types";
 import RepairPartsSelector from "./RepairPartsSelector";
+import PayButton from "@/components/payment/PayButton";
 
 type Props = {
   form: { name: string; phone: string; model: string; fault: string };
@@ -76,6 +77,43 @@ export default function RepairForm({
             Написать боту → #{orderId}
           </a>
         </div>
+
+        {/* Доп. опции: предоплата / срочный ремонт */}
+        {grandTotal > 0 && (
+          <div className="bg-[#FFD700]/5 border border-[#FFD700]/20 px-3 py-3 mb-3 space-y-2">
+            <div className="flex items-center gap-2 mb-1">
+              <Icon name="Zap" size={13} className="text-[#FFD700]" />
+              <span className="font-oswald font-bold text-white text-xs">Хотите оплатить онлайн?</span>
+            </div>
+            <p className="font-roboto text-white/45 text-[10px] mb-2">
+              Подтвердите заказ предоплатой 30% — мы зарезервируем запчасть и ускорим работу.
+            </p>
+            <PayButton
+              purpose="repair_prepay"
+              amount={Math.round(grandTotal * 0.3)}
+              description={`Предоплата 30% за ремонт №${orderId} · ${form.model}`}
+              contextId={String(orderId)}
+              contactInfo={form.phone}
+              size="sm"
+              className="w-full"
+            >
+              Внести предоплату 30% · {Math.round(grandTotal * 0.3).toLocaleString("ru-RU")} ₽
+            </PayButton>
+            <PayButton
+              purpose="repair_urgent"
+              amount={500}
+              description={`Срочный ремонт (приоритет) №${orderId}`}
+              contextId={String(orderId)}
+              contactInfo={form.phone}
+              variant="outline"
+              size="sm"
+              icon="Zap"
+              className="w-full"
+            >
+              Срочный ремонт (+500 ₽) — без очереди
+            </PayButton>
+          </div>
+        )}
 
         {/* Нижние кнопки */}
         <div className="flex gap-3">

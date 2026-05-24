@@ -5,6 +5,7 @@ import { useParams } from "react-router-dom";
 import { toast } from "sonner";
 import Icon from "@/components/ui/icon";
 import { getItemByNumber, fmtRub, OFFICE_ADDRESS, type ShopItemFull } from "./safeDeals/api";
+import PayButton from "@/components/payment/PayButton";
 
 const STATUS_BADGE: Record<string, { label: string; cls: string; icon: string }> = {
   submitted:  { label: "Новинка",        cls: "bg-blue-500/15 text-blue-300 border-blue-500/30", icon: "Sparkles" },
@@ -173,6 +174,42 @@ export default function SafeDealsItem() {
             {!isAvailable && (
               <div className="bg-red-500/[0.06] border border-red-500/30 rounded-2xl px-3 py-2 text-sm text-red-300">
                 <Icon name="X" size={12} className="inline mr-1" /> Товар уже недоступен
+              </div>
+            )}
+
+            {/* Онлайн-оплата: полная покупка или бронь 10% */}
+            {isAvailable && item.price > 0 && (
+              <div className="bg-gradient-to-br from-emerald-500/[0.08] to-transparent border border-emerald-500/30 rounded-2xl p-4 space-y-2">
+                <div className="text-xs uppercase tracking-wider text-emerald-300 font-bold mb-2 flex items-center gap-1">
+                  <Icon name="Zap" size={11} /> Купить онлайн
+                </div>
+                <p className="text-xs text-[#bbb] mb-2">
+                  Можете полностью оплатить онлайн или забронировать товар за 10% — заберёте в офисе.
+                </p>
+                <PayButton
+                  purpose="buy_item"
+                  amount={item.price}
+                  description={`Покупка: ${item.productTitle} (${item.dealNumber})`}
+                  contextId={item.dealNumber}
+                  variant="green"
+                  size="md"
+                  className="w-full"
+                  icon="ShoppingBag"
+                >
+                  Купить за {fmtRub(item.price)}
+                </PayButton>
+                <PayButton
+                  purpose="reserve_item"
+                  amount={Math.max(Math.round(item.price * 0.1), 500)}
+                  description={`Бронь 10%: ${item.productTitle} (${item.dealNumber})`}
+                  contextId={item.dealNumber}
+                  variant="outline"
+                  size="md"
+                  className="w-full"
+                  icon="Bookmark"
+                >
+                  Забронировать за {fmtRub(Math.max(Math.round(item.price * 0.1), 500))}
+                </PayButton>
               </div>
             )}
 

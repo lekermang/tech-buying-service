@@ -19,6 +19,31 @@ export default function SafeDealsTab({ token }: { token: string }) {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [openId, setOpenId] = useState<number | null>(null);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [bulkLoading, setBulkLoading] = useState<string | null>(null);
+
+  const toggleSelect = (id: number) => setSelected(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const selectAll = () => setSelected(new Set(items.map(i => i.id)));
+  const clearSelection = () => setSelected(new Set());
+
+  const bulkAction = async (op: "cancel" | "delete" | "restore" | "feature" | "unfeature", confirmMsg?: string) => {
+    if (selected.size === 0) return;
+    if (confirmMsg && !window.confirm(`${confirmMsg}\n\nВыбрано: ${selected.size}`)) return;
+    setBulkLoading(op);
+    const r = await sdApi<{ affected: number }>(token, "admin_bulk", {
+      method: "POST",
+      body: { action: op, ids: Array.from(selected) },
+    });
+    setBulkLoading(null);
+    if (!r.ok) { alert(r.error || "Ошибка"); return; }
+    clearSelection();
+    load();
+    fetchStats();
+  };
 
   const fetchStats = useCallback(async () => {
     const r = await sdApi<AdminStats>(token, "admin_stats");
@@ -143,17 +168,58 @@ export default function SafeDealsTab({ token }: { token: string }) {
       {view === "stats" && stats && <StatsView stats={stats} />}
 
       {view !== "stats" && (
-        <DealsList items={items} loading={loading} err={err} onOpen={setOpenId} />
+        <>
+          {/* Bulk-панель */}
+          {items.length > 0 && (
+            <div className="rounded-xl bg-[#101010] border border-[#1A1A1A] p-2 flex items-center gap-1.5 flex-wrap text-[11px]">
+              <button onClick={selected.size === items.length ? clearSelection : selectAll}
+                className="px-2 py-1 rounded border border-[#2A2A2A] text-white/60 hover:text-white hover:border-[#FFD700]/30">
+                {selected.size === items.length ? "Снять всё" : "Выбрать все"}
+              </button>
+              <span className="text-white/45 mr-auto">Выбрано: <b className="text-white">{selected.size}</b></span>
+              {selected.size > 0 && (
+                <>
+                  <button onClick={() => bulkAction("feature", "Включить «Топ» для выбранных?")} disabled={bulkLoading !== null}
+                    className="px-2 py-1 rounded bg-[#FFD700]/10 border border-[#FFD700]/30 text-[#FFD700] hover:bg-[#FFD700]/20 disabled:opacity-40">
+                    <Icon name="Crown" size={11} className="inline mr-1" /> В топ
+                  </button>
+                  <button onClick={() => bulkAction("unfeature")} disabled={bulkLoading !== null}
+                    className="px-2 py-1 rounded border border-[#2A2A2A] text-white/60 hover:text-white disabled:opacity-40">
+                    Снять топ
+                  </button>
+                  <button onClick={() => bulkAction("restore")} disabled={bulkLoading !== null}
+                    className="px-2 py-1 rounded border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-40">
+                    <Icon name="RotateCcw" size={11} className="inline mr-1" /> Восстановить
+                  </button>
+                  <button onClick={() => bulkAction("cancel", "Скрыть выбранные сделки с витрины?")} disabled={bulkLoading !== null}
+                    className="px-2 py-1 rounded border border-orange-500/30 text-orange-300 hover:bg-orange-500/10 disabled:opacity-40">
+                    <Icon name="EyeOff" size={11} className="inline mr-1" /> Скрыть
+                  </button>
+                  <button onClick={() => bulkAction("delete", "УДАЛИТЬ выбранные сделки навсегда?")} disabled={bulkLoading !== null}
+                    className="px-2 py-1 rounded border border-red-500/30 text-red-300 hover:bg-red-500/10 disabled:opacity-40">
+                    <Icon name="Trash2" size={11} className="inline mr-1" /> Удалить
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+          <DealsList
+            items={items} loading={loading} err={err} onOpen={setOpenId}
+            selected={selected} onToggle={toggleSelect}
+          />
+        </>
       )}
     </div>
   );
 }
 
-function DealsList({ items, loading, err, onOpen }: {
+function DealsList({ items, loading, err, onOpen, selected, onToggle }: {
   items: AdminListItem[];
   loading: boolean;
   err: string | null;
   onOpen: (id: number) => void;
+  selected: Set<number>;
+  onToggle: (id: number) => void;
 }) {
   if (loading) return (
     <div className="text-center py-8 text-white/40">
@@ -174,14 +240,25 @@ function DealsList({ items, loading, err, onOpen }: {
       {items.map(it => {
         const badge = STATUS_LABEL[it.status];
         const item = [it.product_brand, it.product_model].filter(Boolean).join(" ") || it.product_title;
+        const isSel = selected.has(it.id);
         return (
-          <button
+          <div
             key={it.id}
-            onClick={() => onOpen(it.id)}
-            className="w-full text-left rounded-lg bg-[#101010] border border-[#1A1A1A] hover:border-[#FFD700]/40 hover:bg-[#131313] px-2.5 py-2 transition active:scale-[0.99]"
+            className={`rounded-lg border px-2.5 py-2 transition ${isSel ? "bg-[#FFD700]/[0.06] border-[#FFD700]/40" : "bg-[#101010] border-[#1A1A1A] hover:border-[#FFD700]/40 hover:bg-[#131313]"}`}
           >
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex-1 min-w-0">
+            <div className="flex items-start gap-2">
+              <button
+                onClick={() => onToggle(it.id)}
+                className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition ${
+                  isSel ? "bg-[#FFD700] border-[#FFD700] text-black" : "border-[#333] hover:border-[#FFD700]"
+                }`}
+              >
+                {isSel && <Icon name="Check" size={12} />}
+              </button>
+              <button
+                onClick={() => onOpen(it.id)}
+                className="flex-1 min-w-0 text-left"
+              >
                 <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
                   <div className="font-oswald font-bold text-[13px] text-[#FFD700]">{it.deal_number}</div>
                   <span className={`text-[9px] px-1.5 py-0 rounded-full border uppercase tracking-wide font-bold ${badge.cls}`}>
@@ -195,7 +272,7 @@ function DealsList({ items, loading, err, onOpen }: {
                 <div className="text-[10px] text-white/45 truncate leading-tight">
                   {it.seller_name} · {it.seller_phone}
                 </div>
-              </div>
+              </button>
               <div className="text-right shrink-0">
                 <div className="font-oswald font-bold text-[14px] text-white leading-tight">{fmtRub(it.price)}</div>
                 <div className="text-[9px] text-[#FFD700]/80 leading-tight">комиссия {fmtRub(it.commission_amount)}</div>
@@ -204,7 +281,7 @@ function DealsList({ items, loading, err, onOpen }: {
                 </div>
               </div>
             </div>
-          </button>
+          </div>
         );
       })}
     </div>

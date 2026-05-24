@@ -896,6 +896,58 @@ def action_yookassa_webhook(body):
         cur.close(); conn.close()
 
 
+def action_yookassa_create_universal(body):
+    """Универсальный платёж ЮKassa для любого purpose с произвольной суммой и контекстом.
+    Поддерживает: repair, repair_prepay, repair_urgent, buy_item, reserve_item, transfer_pro, custom.
+    Параметры: purpose, amount, description, returnUrl, contextId (опц.), contactInfo (опц.).
+    """
+    purpose = (body.get('purpose') or 'custom').strip()
+    try:
+        amount = Decimal(str(body.get('amount') or 0)).quantize(Decimal('0.01'))
+    except Exception:
+        return _err(400, 'amount должен быть числом')
+    if amount <= 0:
+        return _err(400, 'amount должна быть больше 0')
+    description = (body.get('description') or f'Оплата · {purpose}').strip()
+    return_url = (body.get('returnUrl') or '').strip()
+    context_id = (body.get('contextId') or '').strip() or None
+    contact = (body.get('contactInfo') or '').strip() or None
+    if not return_url:
+        return _err(400, 'returnUrl required')
+
+    try:
+        yk = _yookassa_create(
+            amount_rub=amount,
+            purpose=purpose,
+            description=description,
+            return_url=return_url,
+            metadata={
+                'purpose': purpose,
+                'context_id': context_id,
+                'contact': contact,
+            },
+        )
+    except Exception as e:
+        return _err(502, f'ЮKassa ошибка: {e}')
+
+    pid = yk.get('id')
+    confirm_url = (yk.get('confirmation') or {}).get('confirmation_url')
+    status = yk.get('status') or 'pending'
+
+    conn = _get_conn(); cur = conn.cursor()
+    try:
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.yookassa_payments "
+            f"(payment_id, purpose, amount, status, related_token, metadata) "
+            f"VALUES (%s, %s, %s, %s, %s, %s::jsonb)",
+            (pid, purpose, amount, status, context_id or contact, json.dumps(yk, ensure_ascii=False, default=str)),
+        )
+        conn.commit()
+    finally:
+        cur.close(); conn.close()
+    return _ok({'paymentId': pid, 'confirmationUrl': confirm_url, 'status': status, 'amount': float(amount)})
+
+
 def action_yookassa_status(qs):
     """Проверка статуса платежа со стороны фронта (после возврата с return_url)."""
     pid = (qs.get('payment_id') or '').strip()
@@ -1141,10 +1193,30 @@ def action_parse_avito(body):
 
     # Способ 2: парсим HTML страницы и достаём данные из OG-meta + JSON-LD
     if not data or (not title and not photos):
+        html = ''
+        # 2a: прямой запрос с десктопными хедерами
         try:
             req = _urlreq.Request(url, headers=headers_desktop)
             with _urlreq.urlopen(req, timeout=12) as resp:
                 html = resp.read().decode('utf-8', errors='ignore')
+        except Exception as e:
+            last_err = f'direct: {e}'
+
+        # 2b: если 403/блок — через r.jina.ai (бесплатный публичный web-proxy, обходит блокировки)
+        if not html or len(html) < 500:
+            try:
+                proxy_url = 'https://r.jina.ai/' + url
+                req = _urlreq.Request(proxy_url, headers={
+                    'User-Agent': 'Mozilla/5.0',
+                    'X-Return-Format': 'html',
+                    'Accept': 'text/html,application/json',
+                })
+                with _urlreq.urlopen(req, timeout=20) as resp:
+                    html = resp.read().decode('utf-8', errors='ignore')
+            except Exception as e:
+                last_err = f'jina: {e}'
+
+        try:
 
             ld_match = _re.search(r'<script[^>]*type="application/ld\+json"[^>]*>(.+?)</script>', html, _re.S)
             ld_data = None
@@ -1191,9 +1263,25 @@ def action_parse_avito(body):
             last_err = str(e)
 
     if not title and not photos:
-        return _err(502, f'Не удалось получить объявление с Авито (Авито мог изменить защиту). Попробуйте позже или заполните вручную. Деталь: {last_err or "пустой ответ"}')
+        return _err(502, f'Не удалось получить объявление с Авито (защита). Попробуйте позже или заполните вручную. Деталь: {last_err or "пустой ответ"}')
 
-    photos = photos[:6]
+    # Нормализуем URL фото (могут быть без схемы или относительные)
+    norm_photos = []
+    seen = set()
+    for p in photos:
+        if not isinstance(p, str):
+            continue
+        if p.startswith('//'):
+            p = 'https:' + p
+        elif p.startswith('/'):
+            p = 'https://www.avito.ru' + p
+        elif not p.startswith('http'):
+            continue
+        if p in seen:
+            continue
+        seen.add(p)
+        norm_photos.append(p)
+    photos = norm_photos[:6]
 
     # Перекачиваем фото в наш S3 с водяной маркой «Скупка24» — убираем чужой бренд
     our_photos = []
@@ -1592,6 +1680,73 @@ def action_admin_set_status(body, actor):
         cur.close(); conn.close()
 
 
+# ============ ADMIN: BULK ACTIONS ============
+def action_admin_bulk(body, actor):
+    """Массовое действие над сделками. action: cancel|restore|feature|unfeature|delete.
+    ids: список ID сделок. delete = жёсткое скрытие (status='returned')."""
+    op = (body.get('action') or '').strip()
+    ids = body.get('ids') or []
+    if op not in ('cancel', 'restore', 'feature', 'unfeature', 'delete'):
+        return _err(400, 'action must be cancel|restore|feature|unfeature|delete')
+    if not isinstance(ids, list) or not ids:
+        return _err(400, 'ids required (non-empty array)')
+    try:
+        ids_int = [int(x) for x in ids]
+    except Exception:
+        return _err(400, 'ids must be integers')
+
+    placeholders = ','.join(['%s'] * len(ids_int))
+    conn = _get_conn(); cur = conn.cursor()
+    try:
+        if op == 'cancel':
+            cur.execute(
+                f"UPDATE {SCHEMA}.safe_deals SET status='cancelled', "
+                f"cancel_reason='Скрыто администратором', updated_at=NOW() "
+                f"WHERE id IN ({placeholders}) AND status NOT IN ('completed') RETURNING id",
+                tuple(ids_int)
+            )
+        elif op == 'delete':
+            cur.execute(
+                f"UPDATE {SCHEMA}.safe_deals SET status='returned', "
+                f"cancel_reason='Удалено администратором', updated_at=NOW() "
+                f"WHERE id IN ({placeholders}) RETURNING id",
+                tuple(ids_int)
+            )
+        elif op == 'restore':
+            cur.execute(
+                f"UPDATE {SCHEMA}.safe_deals SET status='submitted', "
+                f"cancel_reason=NULL, updated_at=NOW() "
+                f"WHERE id IN ({placeholders}) AND status IN ('cancelled', 'returned') RETURNING id",
+                tuple(ids_int)
+            )
+        elif op == 'feature':
+            cur.execute(
+                f"UPDATE {SCHEMA}.safe_deals SET is_featured=TRUE, "
+                f"featured_until=NOW() + INTERVAL '7 days', updated_at=NOW() "
+                f"WHERE id IN ({placeholders}) RETURNING id",
+                tuple(ids_int)
+            )
+        elif op == 'unfeature':
+            cur.execute(
+                f"UPDATE {SCHEMA}.safe_deals SET is_featured=FALSE, "
+                f"featured_until=NULL, updated_at=NOW() "
+                f"WHERE id IN ({placeholders}) RETURNING id",
+                tuple(ids_int)
+            )
+        affected_rows = cur.fetchall()
+        affected_count = len(affected_rows)
+        # Лог по каждой
+        for r in affected_rows:
+            _log(cur, r[0], f'bulk_{op}', {'by': actor.get('full_name')}, actor=actor.get('full_name'))
+        conn.commit()
+        return _ok({'ok': True, 'affected': affected_count, 'action': op})
+    except Exception as e:
+        conn.rollback()
+        return _err(500, f'Ошибка: {e}')
+    finally:
+        cur.close(); conn.close()
+
+
 # ============ ADMIN: SET OFFICE CHECK ============
 def action_admin_set_check(body, actor):
     """Сотрудник зафиксировал результат осмотра в офисе. Переводит сделку в on_shelf."""
@@ -1722,6 +1877,7 @@ def handler(event: dict, context) -> dict:
     admin_actions = {
         'admin_list', 'admin_get', 'admin_stats',
         'admin_set_status', 'admin_set_check', 'admin_reserve',
+        'admin_bulk',
     }
     if action in admin_actions:
         headers = event.get('headers') or {}
@@ -1745,6 +1901,8 @@ def handler(event: dict, context) -> dict:
                 return action_admin_set_check(body, actor)
             if action == 'admin_reserve':
                 return action_admin_reserve(body, actor)
+            if action == 'admin_bulk':
+                return action_admin_bulk(body, actor)
         return _err(400, f'Unknown admin action: {action}')
 
     if method == 'GET':
@@ -1793,6 +1951,8 @@ def handler(event: dict, context) -> dict:
             return action_subscribe_lead(body)
         if action == 'create_payment':
             return action_yookassa_create_payment(body)
+        if action == 'create_payment_any':
+            return action_yookassa_create_universal(body)
         if action == 'yookassa_webhook':
             return action_yookassa_webhook(body)
         return _err(400, f'Unknown POST action: {action}')

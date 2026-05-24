@@ -214,7 +214,46 @@ export function RoleScreen({ onSelect }: { onSelect: (r: Role) => void }) {
         <Feature icon="Timer" text="30 мин и удалено" />
         <Feature icon="Zap" text="Без приложений" />
       </div>
+
+      <TransferProBlock />
     </div>
+  );
+}
+
+function TransferProBlock() {
+  // Динамически импортируем чтобы не было кругового импорта
+  const handle = async () => {
+    const { createUniversalPayment } = await import("@/pages/safeDeals/api");
+    const r = await createUniversalPayment({
+      purpose: "transfer_pro",
+      amount: 500,
+      description: "Перенос данных PRO · безлимитный объём + приоритет",
+      returnUrl: window.location.href,
+    });
+    if (r.ok && r.data?.confirmationUrl) {
+      window.location.href = r.data.confirmationUrl;
+    } else {
+      alert(r.error || "Не удалось создать платёж");
+    }
+  };
+  return (
+    <button
+      onClick={handle}
+      className="w-full max-w-sm rounded-2xl p-4 bg-gradient-to-br from-[#FFD700]/[0.12] via-[#FFD700]/[0.04] to-transparent border-2 border-[#FFD700]/40 hover:border-[#FFD700] transition active:scale-[0.98] text-left"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-[#FFD700] text-black flex items-center justify-center shrink-0">
+            <Icon name="Crown" size={20} />
+          </div>
+          <div>
+            <div className="text-sm font-extrabold text-[#FFD700]">PRO тариф · 500 ₽</div>
+            <div className="text-[10px] text-[#999] mt-0.5">Безлимитный объём, приоритетная скорость, сессия 24 часа</div>
+          </div>
+        </div>
+        <Icon name="ArrowRight" size={16} className="text-[#FFD700] shrink-0" />
+      </div>
+    </button>
   );
 }
 
