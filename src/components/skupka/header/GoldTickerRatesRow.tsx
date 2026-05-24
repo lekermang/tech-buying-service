@@ -127,25 +127,30 @@ const GoldTickerRatesRow = ({
         )}
       </div>
 
-      {/* XAU/USD */}
-      {goldPrice?.xau_usd && (
-        <div className="hidden sm:flex items-center h-7 px-2.5 rounded-md bg-black/50 border border-white/10">
-          <span className="font-oswald font-semibold text-[9px] uppercase tracking-[0.18em] text-white/40 whitespace-nowrap mr-1.5">XAU</span>
-          <span className="font-oswald font-semibold text-white/85 text-[12px] whitespace-nowrap leading-none">
-            ${goldPrice.xau_usd.toLocaleString('en-US', { maximumFractionDigits: 0 })}
-            <span className="text-white/35 text-[9px] font-bold ml-0.5">/oz</span>
-          </span>
-        </div>
-      )}
-
-      {/* USD/RUB */}
-      {goldPrice?.usd_rub && (
-        <div className="hidden md:flex items-center h-7 px-2.5 rounded-md bg-black/50 border border-white/10">
-          <span className="font-oswald font-semibold text-[9px] uppercase tracking-[0.18em] text-white/40 whitespace-nowrap mr-1.5">USD</span>
-          <span className="font-oswald font-semibold text-white/85 text-[12px] whitespace-nowrap leading-none">
-            {goldPrice.usd_rub.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}
-            <span className="text-white/35 text-[9px] font-bold ml-0.5">₽</span>
-          </span>
+      {/* Курсы XAU + USD — в одной капсуле для зрительной плотности */}
+      {(goldPrice?.xau_usd || goldPrice?.usd_rub) && (
+        <div className="hidden sm:inline-flex h-7 rounded-md bg-black/50 border border-white/10 overflow-hidden">
+          {goldPrice?.xau_usd && (
+            <div className="flex items-center px-2.5">
+              <span className="font-oswald font-semibold text-[9px] uppercase tracking-[0.18em] text-white/40 whitespace-nowrap mr-1.5">XAU</span>
+              <span className="font-oswald font-semibold text-white/85 text-[12px] whitespace-nowrap leading-none">
+                ${goldPrice.xau_usd.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                <span className="text-white/35 text-[9px] font-bold ml-0.5">/oz</span>
+              </span>
+            </div>
+          )}
+          {goldPrice?.xau_usd && goldPrice?.usd_rub && (
+            <span className="w-px self-stretch bg-white/10" aria-hidden />
+          )}
+          {goldPrice?.usd_rub && (
+            <div className="hidden md:flex items-center px-2.5">
+              <span className="font-oswald font-semibold text-[9px] uppercase tracking-[0.18em] text-white/40 whitespace-nowrap mr-1.5">USD</span>
+              <span className="font-oswald font-semibold text-white/85 text-[12px] whitespace-nowrap leading-none">
+                {goldPrice.usd_rub.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}
+                <span className="text-white/35 text-[9px] font-bold ml-0.5">₽</span>
+              </span>
+            </div>
+          )}
         </div>
       )}
 

@@ -39,22 +39,23 @@ const GoldTickerPricesRow = ({
 
   return (
     <div className="relative max-w-7xl mx-auto px-3 sm:px-5 py-1.5 flex items-center gap-2 border-t border-[#FFD700]/10">
-      {/* Физлица */}
-      <div className="flex items-center gap-1.5 h-7 bg-black/60 border border-[#FFD700]/20 px-2.5 rounded-md">
-        <Icon name="User" size={11} className="text-[#FFD700]/55" />
-        <span className="text-[#FFD700]/55 text-[9px] uppercase tracking-wider font-oswald font-bold">Физ</span>
-        <span className="text-[#FFD700] font-oswald font-bold text-[12px] whitespace-nowrap leading-none">
-          {priceRetail999?.toLocaleString('ru-RU')} <span className="text-[9px] text-[#FFD700]/55">₽/г</span>
-        </span>
-      </div>
-
-      {/* Опт */}
-      <div className="flex items-center gap-1.5 h-7 bg-black/60 border border-[#FFD700]/20 px-2.5 rounded-md">
-        <Icon name="Package" size={11} className="text-[#FFD700]/55" />
-        <span className="text-[#FFD700]/55 text-[9px] uppercase tracking-wider font-oswald font-bold">Опт</span>
-        <span className="text-[#FFD700] font-oswald font-bold text-[12px] whitespace-nowrap leading-none">
-          {priceWholesale999?.toLocaleString('ru-RU')} <span className="text-[9px] text-[#FFD700]/55">₽/г</span>
-        </span>
+      {/* Физлица + Опт — единая капсула с разделителем */}
+      <div className="inline-flex h-7 rounded-md border border-[#FFD700]/20 bg-black/60 overflow-hidden">
+        <div className="flex items-center gap-1.5 px-2.5">
+          <Icon name="User" size={11} className="text-[#FFD700]/55" />
+          <span className="text-[#FFD700]/55 text-[9px] uppercase tracking-wider font-oswald font-bold">Физ</span>
+          <span className="text-[#FFD700] font-oswald font-bold text-[12px] whitespace-nowrap leading-none">
+            {priceRetail999?.toLocaleString('ru-RU')} <span className="text-[9px] text-[#FFD700]/55">₽/г</span>
+          </span>
+        </div>
+        <span className="w-px self-stretch bg-[#FFD700]/15" aria-hidden />
+        <div className="flex items-center gap-1.5 px-2.5">
+          <Icon name="Package" size={11} className="text-[#FFD700]/55" />
+          <span className="text-[#FFD700]/55 text-[9px] uppercase tracking-wider font-oswald font-bold">Опт</span>
+          <span className="text-[#FFD700] font-oswald font-bold text-[12px] whitespace-nowrap leading-none">
+            {priceWholesale999?.toLocaleString('ru-RU')} <span className="text-[9px] text-[#FFD700]/55">₽/г</span>
+          </span>
+        </div>
       </div>
 
       {/* График + дельта + переключатель */}
