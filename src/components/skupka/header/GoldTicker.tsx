@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import GoldTickerRatesRow from "./GoldTickerRatesRow";
-import GoldTickerPricesRow from "./GoldTickerPricesRow";
-import GoldTickerActionsRow from "./GoldTickerActionsRow";
 import GoldTickerMobile from "./GoldTickerMobile";
+import GoldTickerDesktopCompact from "./GoldTickerDesktopCompact";
 import { getMarketStatus, timeAgo, type Period } from "./goldTickerUtils";
 
 interface GoldTickerProps {
@@ -86,37 +84,20 @@ const GoldTicker = ({
         />
       </div>
 
-      {/* ═══════ БОЛЬШОЙ ПК xl+ : 3 строки ═══════ */}
-      <div className="hidden xl:block">
-        <GoldTickerRatesRow
-          goldPrice={goldPrice}
-          priceRetail999={priceRetail999}
-          market={market}
-          updatedAgo={updatedAgo}
-          flash={flash}
-          compact={compact}
-        />
-      </div>
-
-      {!compact && goldPrice?.buy && (
-        <div className="hidden xl:block">
-          <GoldTickerPricesRow
-            goldPrice={goldPrice}
-            priceRetail999={priceRetail999}
-            priceWholesale999={priceWholesale999}
-            filteredHistory={filteredHistory}
-            period={period}
-            setPeriod={setPeriod}
-          />
-        </div>
-      )}
-
-      <div className="hidden xl:block">
-        <GoldTickerActionsRow
-          onSellClick={onSellClick}
-          compact={compact}
-        />
-      </div>
+      {/* ═══════ БОЛЬШОЙ ПК xl+ : ОДНА компактная строка + раскрывающаяся панель ═══════ */}
+      <GoldTickerDesktopCompact
+        goldPrice={goldPrice}
+        priceRetail999={priceRetail999}
+        priceWholesale999={priceWholesale999}
+        filteredHistory={filteredHistory}
+        period={period}
+        setPeriod={setPeriod}
+        market={market}
+        updatedAgo={updatedAgo}
+        flash={flash}
+        onSellClick={onSellClick}
+        compact={compact}
+      />
     </div>
   );
 };
