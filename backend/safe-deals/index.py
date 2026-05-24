@@ -789,10 +789,92 @@ def _check_blacklist(cur, phone: str = '', yandex_id: str = '') -> dict:
     return {'in_blacklist': True, 'reason': row[0] if not isinstance(row, dict) else row.get('reason')}
 
 
+# ============ Перекачка фото с водяной маркой «Скупка24» ============
+def _download_url(url: str, timeout: int = 12) -> bytes:
+    """Скачивает картинку по URL."""
+    import urllib.request as _urlreq
+    req = _urlreq.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Linux; Android 10)'})
+    with _urlreq.urlopen(req, timeout=timeout) as resp:
+        return resp.read()
+
+
+def _watermark_image(data: bytes) -> bytes:
+    """Накладывает водяную марку «Скупка24» в правом нижнем углу. Если Pillow недоступен — возвращает исходник."""
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        import io as _io
+        img = Image.open(_io.BytesIO(data)).convert('RGBA')
+        # ограничим макс. сторону
+        max_side = 1600
+        w, h = img.size
+        if max(w, h) > max_side:
+            k = max_side / max(w, h)
+            img = img.resize((int(w * k), int(h * k)), Image.LANCZOS)
+            w, h = img.size
+
+        overlay = Image.new('RGBA', img.size, (0, 0, 0, 0))
+        draw = ImageDraw.Draw(overlay)
+
+        text = 'СКУПКА24'
+        font_size = max(20, int(min(w, h) * 0.05))
+        font = None
+        for fp in (
+            '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
+            '/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf',
+            '/usr/share/fonts/TTF/DejaVuSans-Bold.ttf',
+        ):
+            try:
+                font = ImageFont.truetype(fp, font_size)
+                break
+            except Exception:
+                continue
+        if font is None:
+            font = ImageFont.load_default()
+
+        try:
+            bbox = draw.textbbox((0, 0), text, font=font)
+            tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+        except Exception:
+            tw, th = font_size * len(text) // 2, font_size
+
+        pad = int(font_size * 0.5)
+        x0 = w - tw - pad * 3
+        y0 = h - th - pad * 3
+        x1 = w - pad
+        y1 = h - pad
+        # подложка-пилюля
+        draw.rounded_rectangle([x0, y0, x1, y1], radius=int(pad * 1.2), fill=(0, 0, 0, 175))
+        # текст золотом
+        draw.text((x0 + pad, y0 + int(pad * 0.5)), text, font=font, fill=(255, 215, 0, 255))
+
+        out = Image.alpha_composite(img, overlay).convert('RGB')
+        buf = _io.BytesIO()
+        out.save(buf, format='JPEG', quality=86, optimize=True)
+        return buf.getvalue()
+    except Exception:
+        return data
+
+
+def _reupload_to_our_s3(url: str, sub: str = 'imported') -> str:
+    """Скачивает картинку с любого внешнего URL, накладывает наш ватермарк,
+    загружает в наш S3. Возвращает CDN-URL (если ошибка — исходный URL)."""
+    try:
+        data = _download_url(url)
+        if not data or len(data) > 15 * 1024 * 1024:
+            return url
+        wm = _watermark_image(data)
+        key = f"safe-deals/{sub}/{int(datetime.now().timestamp()*1000)}_{secrets.token_hex(4)}.jpg"
+        s3 = _get_s3()
+        s3.put_object(Bucket='files', Key=key, Body=wm, ContentType='image/jpeg')
+        return f"https://cdn.poehali.dev/projects/{os.environ['AWS_ACCESS_KEY_ID']}/bucket/{key}"
+    except Exception:
+        return url
+
+
 # ============ PUBLIC: PARSE AVITO ============
 def action_parse_avito(body):
     """Парсит URL объявления Авито через мобильное API (без авторизации).
-    Возвращает: title, price, photos, description, category, address."""
+    Возвращает: title, price, photos (перекачанные в наш S3 с водяной маркой Скупка24), description, category, address."""
     import re as _re
     import urllib.request as _urlreq
 
@@ -867,6 +949,14 @@ def action_parse_avito(body):
         elif isinstance(img, str):
             photos.append(img)
     photos = photos[:6]
+
+    # Перекачиваем фото в наш S3 с водяной маркой «Скупка24» — убираем чужой бренд
+    our_photos = []
+    for src in photos:
+        new_url = _reupload_to_our_s3(src, sub='avito')
+        if new_url:
+            our_photos.append(new_url)
+    photos = our_photos or photos
 
     return _ok({
         'title': title.strip(),

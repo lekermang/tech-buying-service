@@ -9,6 +9,7 @@ import SellerForm from "./safeDeals/SellerForm";
 import SellerCabinet from "./safeDeals/SellerCabinet";
 import CompareWithAvito from "./safeDeals/CompareWithAvito";
 import { UtpBlock, SafetyRules } from "./safeDeals/LandingExtras";
+import ShopPreview from "./safeDeals/ShopPreview";
 import {
   COMMISSION_PCT, OFFICE_ADDRESS, REALIZATION_DAYS,
   loadSellerTokens,
@@ -125,10 +126,16 @@ function Landing({ myDeals, onStart, onOpenDeal }: {
         <p className="text-sm sm:text-base text-[#999] mt-4 max-w-xl mx-auto leading-relaxed">
           Без обмана, без рисков, без потери времени. Привозите товар к нам — мы проверяем, находим покупателя, проводим сделку и передаём вам деньги. Комиссия {COMMISSION_PCT}%, срок {REALIZATION_DAYS} дней.
         </p>
-        <button onClick={onStart}
-          className="mt-7 inline-flex items-center gap-2 px-7 py-4 rounded-2xl bg-gradient-to-br from-[#FFD700] via-[#FFE033] to-[#FFD700] text-black font-bold text-base shadow-[0_15px_40px_-10px_rgba(255,215,0,0.5)] hover:shadow-[0_20px_50px_-10px_rgba(255,215,0,0.7)] transition active:scale-[0.97]">
-          <Icon name="Shield" size={18} /> Подать заявку
-        </button>
+        <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+          <button onClick={onStart}
+            className="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-gradient-to-br from-[#FFD700] via-[#FFE033] to-[#FFD700] text-black font-bold text-base shadow-[0_15px_40px_-10px_rgba(255,215,0,0.5)] hover:shadow-[0_20px_50px_-10px_rgba(255,215,0,0.7)] transition active:scale-[0.97]">
+            <Icon name="Shield" size={18} /> Продать товар
+          </button>
+          <a href="/safe-deals/shop"
+            className="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl border-2 border-[#FFD700]/40 text-[#FFD700] font-bold text-base hover:border-[#FFD700] hover:bg-[#FFD700]/[0.05] transition no-underline">
+            <Icon name="Store" size={18} /> Купить товар
+          </a>
+        </div>
         <div className="mt-3 text-xs text-[#666]">Бесплатно · без регистрации · 2 минуты</div>
         <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs">
           <a href="/safe-deals/shop" className="inline-flex items-center gap-1 text-[#FFD700] hover:underline">
@@ -142,6 +149,9 @@ function Landing({ myDeals, onStart, onOpenDeal }: {
           </a>
         </div>
       </div>
+
+      {/* Витрина товаров других пользователей */}
+      <ShopPreview />
 
       {/* Мои сделки */}
       {myDeals.length > 0 && (
