@@ -111,6 +111,17 @@ const EvaluateModal = ({ onClose }: { onClose: () => void }) => {
       });
       if (!res.ok) throw new Error("bad_status");
       ymGoal(Goals.FORM_SUCCESS, { category: formData.category });
+      // Аналитика /staff/analytics: фиксируем конверсию
+      try {
+        (window as unknown as { skypkaConvert?: (d: Record<string, unknown>) => void }).skypkaConvert?.({
+          type: "evaluate_skupka",
+          form_type: "evaluate_skupka",
+          phone: formData.phone,
+          amount: formData.client_price ? Number(String(formData.client_price).replace(/\D/g, "")) : null,
+          category: formData.category,
+          name: formData.name,
+        });
+      } catch { /* noop */ }
       setSubmitted(true);
       // Потом тихо досылаем фото если есть (не блокируем UX)
       const readyPhotos = photos.map(p => p.base64).filter(Boolean);

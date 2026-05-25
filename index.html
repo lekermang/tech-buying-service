@@ -80,6 +80,22 @@
     </script>
     <noscript><div><img src="https://mc.yandex.ru/watch/108421419" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
 
+    <!-- Скупка24 — собственный трекер посетителей в реальном времени (для /staff/analytics) -->
+    <script>
+      (function () {
+        var loadTracker = function () {
+          if (document.querySelector('script[src="/tracker.js"]')) return;
+          var s = document.createElement('script');
+          s.src = '/tracker.js';
+          s.async = true;
+          document.head.appendChild(s);
+        };
+        if ('requestIdleCallback' in window) requestIdleCallback(loadTracker, { timeout: 3000 });
+        else if (document.readyState === 'complete') setTimeout(loadTracker, 1200);
+        else window.addEventListener('load', function () { setTimeout(loadTracker, 1200); });
+      })();
+    </script>
+
     <!-- Schema.org LocalBusiness -->
     <script type="application/ld+json">
     {

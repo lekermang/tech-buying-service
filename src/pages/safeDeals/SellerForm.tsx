@@ -291,6 +291,18 @@ export default function SellerForm({ onSubmitted }: { onSubmitted: (token: strin
       title: productTitle,
       createdAt: new Date().toISOString(),
     });
+    // Аналитика /staff/analytics: фиксируем конверсию (безопасная сделка)
+    try {
+      (window as unknown as { skypkaConvert?: (d: Record<string, unknown>) => void }).skypkaConvert?.({
+        type: "safe_deal",
+        form_type: "safe_deal",
+        phone: sellerPhone.trim(),
+        amount: priceNum,
+        deal_number: r.data.dealNumber,
+        name: sellerName.trim(),
+        product: productTitle.trim(),
+      });
+    } catch { /* noop */ }
     toast.success(`Заявка ${r.data.dealNumber} принята!`);
     onSubmitted(r.data.sellerToken, r.data);
   };

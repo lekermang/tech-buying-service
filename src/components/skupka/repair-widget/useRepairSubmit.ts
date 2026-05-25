@@ -74,6 +74,18 @@ export function useRepairSubmit() {
           model: form.model,
           total: selectedPart ? grandTotal : null,
         });
+        // Аналитика /staff/analytics: фиксируем конверсию
+        try {
+          (window as unknown as { skypkaConvert?: (d: Record<string, unknown>) => void }).skypkaConvert?.({
+            type: "repair_order",
+            form_type: "repair_order",
+            phone: form.phone,
+            amount: totalToSubmit > 0 ? totalToSubmit : null,
+            order_id: data.order_id,
+            model: form.model,
+            name: form.name,
+          });
+        } catch { /* noop */ }
       }
     } catch (_e) { /* ignore */ }
     setSending(false);

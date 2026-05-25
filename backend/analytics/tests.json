@@ -1,0 +1,38 @@
+{
+  "tests": [
+    { "name": "OPTIONS CORS", "method": "OPTIONS", "path": "/", "expectedStatus": 200 },
+    { "name": "Unknown action", "method": "GET", "path": "/?action=foo", "expectedStatus": 400, "expectedBody": {"error": "string"}, "bodyMatcher": "partial" },
+    { "name": "Track requires fields", "method": "POST", "path": "/?action=track", "body": {}, "expectedStatus": 400, "expectedBody": {"error": "string"}, "bodyMatcher": "partial" },
+    { "name": "Convert requires visitor_id", "method": "POST", "path": "/?action=convert", "body": {}, "expectedStatus": 400, "expectedBody": {"error": "string"}, "bodyMatcher": "partial" },
+    { "name": "Online requires auth", "method": "GET", "path": "/?action=online", "expectedStatus": 401, "expectedBody": {"error": "string"}, "bodyMatcher": "partial" },
+    { "name": "Stats requires auth", "method": "GET", "path": "/?action=stats_today", "expectedStatus": 401, "expectedBody": {"error": "string"}, "bodyMatcher": "partial" },
+    { "name": "Search requires auth", "method": "GET", "path": "/?action=search&phone=123", "expectedStatus": 401, "expectedBody": {"error": "string"}, "bodyMatcher": "partial" },
+    {
+      "name": "Track happy path (session_start)",
+      "method": "POST", "path": "/?action=track",
+      "body": {
+        "visitor_id": "test-visitor-1",
+        "session_id": "test-session-1",
+        "event_type": "session_start",
+        "page_url": "https://skupka24.com/?utm_source=test",
+        "page_title": "Главная — Скупка24",
+        "referrer": "https://yandex.ru/search/?text=iphone+калуга"
+      },
+      "expectedStatus": 200,
+      "expectedBody": {"ok": true},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Track happy path (heartbeat)",
+      "method": "POST", "path": "/?action=track",
+      "body": {
+        "visitor_id": "test-visitor-1",
+        "session_id": "test-session-1",
+        "event_type": "heartbeat"
+      },
+      "expectedStatus": 200,
+      "expectedBody": {"ok": true},
+      "bodyMatcher": "partial"
+    }
+  ]
+}
