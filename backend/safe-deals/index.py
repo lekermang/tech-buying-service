@@ -736,12 +736,13 @@ def action_item_view(qs):
 
 
 # ============ ЮKassa ============
-def _yookassa_create(amount_rub, purpose: str, description: str, return_url: str, metadata: dict) -> dict:
-    """Создаёт платёж в ЮKassa. Возвращает {id, confirmation_url, status}."""
+def _yookassa_create(amount_rub, purpose: str, description: str, return_url: str, metadata: dict, contact: str = None) -> dict:
+    """Создаёт платёж в ЮKassa. Возвращает {id, confirmation_url, status}.
+    contact — email или телефон (+7...) покупателя для чека (обязательно если включён receipt).
+    """
     import urllib.request as _urlreq
     import urllib.error as _urlerr
     import base64 as _b64
-    # strip() защищает от случайных пробелов/переносов в секрете
     shop_id = (os.environ.get('YOOKASSA_SHOP_ID') or '').strip()
     secret = (os.environ.get('YOOKASSA_SECRET_KEY') or '').strip()
     if not shop_id or not secret:
@@ -749,13 +750,43 @@ def _yookassa_create(amount_rub, purpose: str, description: str, return_url: str
 
     idem = uuid.uuid4().hex
     auth = _b64.b64encode(f'{shop_id}:{secret}'.encode('utf-8')).decode('ascii')
+    amount_str = f'{Decimal(str(amount_rub)).quantize(Decimal("0.01"))}'
+
     body = {
-        'amount': {'value': f'{Decimal(str(amount_rub)).quantize(Decimal("0.01"))}', 'currency': 'RUB'},
+        'amount': {'value': amount_str, 'currency': 'RUB'},
         'capture': True,
         'confirmation': {'type': 'redirect', 'return_url': return_url},
         'description': description[:128],
         'metadata': metadata or {},
     }
+
+    # Чек обязателен если у магазина включена онлайн-касса.
+    # Определяем тип контакта: email или телефон.
+    if contact:
+        c = contact.strip()
+        if '@' in c:
+            customer = {'email': c}
+        else:
+            # нормализуем телефон до +7XXXXXXXXXX
+            digits = ''.join(filter(str.isdigit, c))
+            if len(digits) == 11:
+                digits = digits  # уже 11 цифр
+            elif len(digits) == 10:
+                digits = '7' + digits
+            phone = '+' + digits if digits else None
+            customer = {'phone': phone} if phone else {}
+        if customer:
+            body['receipt'] = {
+                'customer': customer,
+                'items': [{
+                    'description': description[:128],
+                    'quantity': '1.00',
+                    'amount': {'value': amount_str, 'currency': 'RUB'},
+                    'vat_code': 1,  # без НДС
+                    'payment_mode': 'full_payment',
+                    'payment_subject': 'service',
+                }],
+            }
     req = _urlreq.Request(
         'https://api.yookassa.ru/v3/payments',
         data=json.dumps(body).encode('utf-8'),
@@ -936,6 +967,7 @@ def action_yookassa_create_universal(body):
                 'context_id': context_id,
                 'contact': contact,
             },
+            contact=contact,
         )
     except Exception as e:
         return _err(502, f'ЮKassa ошибка: {e}')
