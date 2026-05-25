@@ -62,7 +62,8 @@ const CatalogOrderModal = ({ item, onClose, markup = 3500 }: Props) => {
           name: form.fullName,
           phone: form.phone,
           category: item.category,
-          desc: `Заявка на покупку: ${title}, цена: ${displayPrice}. ${deliveryText}`,
+          desc: `Заявка на покупку: ${title}, цена: ${displayPrice}`,
+          delivery_info: deliveryText,
         }),
       });
       setSent(true);

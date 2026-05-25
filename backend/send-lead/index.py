@@ -314,6 +314,7 @@ def handler(event: dict, context) -> dict:
     phone = body.get('phone', '').strip()
     category = body.get('category', '').strip()
     desc = body.get('desc', '').strip()
+    delivery_info = (body.get('delivery_info') or '').strip()
     photo_b64 = body.get('photo')
     contact_channels = body.get('contact_channels')  # массив ["call","tg","max","wa"]
     device = (body.get('device') or '').strip()
@@ -335,6 +336,7 @@ def handler(event: dict, context) -> dict:
         f"🏷 *Категория:* {category or '—'}\n"
         + (f"📱 *Устройство:* {device}\n" if device else "")
         + f"📝 *Описание:* {desc or '—'}"
+        + (f"\n🚚 *Доставка:* {delivery_info}" if delivery_info else "")
         + (f"\n💵 *Цена клиента:* {client_price} ₽" if client_price and client_price != '0' else "")
         + (f"\n👥 *Тип клиента:* {client_type}" if client_type else "")
         + (f"\n🥇 *Курс золота:* {gold_price} ₽/г" if gold_price else "")
@@ -350,7 +352,8 @@ def handler(event: dict, context) -> dict:
         n_e = name.replace("'", "''")
         p_e = phone.replace("'", "''")
         c_e = (category or '').replace("'", "''")
-        d_e = (desc or '').replace("'", "''")
+        full_desc = desc + (f'. Доставка: {delivery_info}' if delivery_info else '')
+        d_e = full_desc.replace("'", "''")
         src = 'lead'
         if category == 'Золото': src = 'gold'
         elif 'Apple' in (category or ''): src = 'apple'
