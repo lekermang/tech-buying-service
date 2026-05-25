@@ -11,8 +11,17 @@ interface Props {
   markup?: number;
 }
 
+type DeliveryType = "courier" | "pickup_kirova11" | "pickup_kirova7";
+
+const PICKUP_LABELS: Record<DeliveryType, string> = {
+  courier: "Курьером по адресу",
+  pickup_kirova11: "Самовывоз — ул. Кирова, 11",
+  pickup_kirova7: "Самовывоз — ул. Кирова, 7",
+};
+
 const CatalogOrderModal = ({ item, onClose, markup = 3500 }: Props) => {
   const [form, setForm] = useState({ fullName: "", phone: "", address: "" });
+  const [delivery, setDelivery] = useState<DeliveryType>("courier");
   const [loading, setLoading] = useState(false);
   const [payLoading, setPayLoading] = useState(false);
   const [sent, setSent] = useState(false);
@@ -29,10 +38,14 @@ const CatalogOrderModal = ({ item, onClose, markup = 3500 }: Props) => {
   const extraPhotos = MODEL_PHOTOS_EXTRA[item.model] || [];
   const allPhotos = mainPhoto ? [mainPhoto, ...extraPhotos] : extraPhotos;
 
+  const deliveryText = delivery === "courier"
+    ? `Курьером: ${form.address}`
+    : PICKUP_LABELS[delivery];
+
   const validate = (): boolean => {
     if (!form.fullName.trim()) { setError("Введите ФИО"); return false; }
     if (!isPhoneValid(form.phone)) { setError("Введите телефон в формате +7 (___) ___-__-__"); return false; }
-    if (!form.address.trim()) { setError("Введите адрес доставки"); return false; }
+    if (delivery === "courier" && !form.address.trim()) { setError("Введите адрес доставки"); return false; }
     setError("");
     return true;
   };
@@ -49,7 +62,7 @@ const CatalogOrderModal = ({ item, onClose, markup = 3500 }: Props) => {
           name: form.fullName,
           phone: form.phone,
           category: item.category,
-          desc: `Заявка на покупку: ${title}, цена: ${displayPrice}. Адрес доставки: ${form.address}`,
+          desc: `Заявка на покупку: ${title}, цена: ${displayPrice}. ${deliveryText}`,
         }),
       });
       setSent(true);
@@ -66,7 +79,8 @@ const CatalogOrderModal = ({ item, onClose, markup = 3500 }: Props) => {
     const r = await createUniversalPayment({
       purpose: "buy_item",
       amount: totalPrice,
-      description: `Покупка: ${title}`,
+      description: `Покупка: ${title}. ${deliveryText}`,
+      contextId: `${item.id}`,
       contactInfo: form.phone,
       returnUrl: window.location.href,
     });
@@ -200,16 +214,53 @@ const CatalogOrderModal = ({ item, onClose, markup = 3500 }: Props) => {
                 />
               </div>
 
+              {/* Способ получения */}
               <div>
-                <label className="text-xs font-medium text-[#1d1d1f]/50 mb-1 block">Адрес доставки *</label>
-                <input
-                  type="text"
-                  placeholder="г. Москва, ул. Примерная, д. 1, кв. 10"
-                  value={form.address}
-                  onChange={e => { setForm(f => ({ ...f, address: e.target.value })); setError(""); }}
-                  className="w-full border border-black/12 rounded-xl px-3.5 py-2.5 text-sm text-[#1d1d1f] placeholder-black/25 focus:outline-none focus:border-[#0071e3] transition-colors"
-                />
+                <label className="text-xs font-medium text-[#1d1d1f]/50 mb-2 block">Способ получения *</label>
+                <div className="space-y-2">
+                  {(["courier", "pickup_kirova11", "pickup_kirova7"] as DeliveryType[]).map(opt => (
+                    <label key={opt}
+                      className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                        delivery === opt
+                          ? "border-[#0071e3] bg-[#0071e3]/5"
+                          : "border-black/10 hover:border-black/20"
+                      }`}>
+                      <div className={`w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                        delivery === opt ? "border-[#0071e3]" : "border-black/20"
+                      }`}>
+                        {delivery === opt && <div className="w-2 h-2 rounded-full bg-[#0071e3]" />}
+                      </div>
+                      <input type="radio" name="delivery" value={opt} checked={delivery === opt}
+                        onChange={() => { setDelivery(opt); setError(""); }}
+                        className="sr-only" />
+                      <div>
+                        <div className="text-sm font-medium text-[#1d1d1f]">
+                          {opt === "courier" && "Курьером"}
+                          {opt === "pickup_kirova11" && "Самовывоз — ул. Кирова, 11"}
+                          {opt === "pickup_kirova7" && "Самовывоз — ул. Кирова, 7"}
+                        </div>
+                        {opt !== "courier" && (
+                          <div className="text-[11px] text-[#1d1d1f]/40 mt-0.5">Забрать самостоятельно</div>
+                        )}
+                      </div>
+                    </label>
+                  ))}
+                </div>
               </div>
+
+              {/* Адрес доставки — только для курьера */}
+              {delivery === "courier" && (
+                <div>
+                  <label className="text-xs font-medium text-[#1d1d1f]/50 mb-1 block">Адрес доставки *</label>
+                  <input
+                    type="text"
+                    placeholder="г. Калуга, ул. Примерная, д. 1, кв. 10"
+                    value={form.address}
+                    onChange={e => { setForm(f => ({ ...f, address: e.target.value })); setError(""); }}
+                    className="w-full border border-black/12 rounded-xl px-3.5 py-2.5 text-sm text-[#1d1d1f] placeholder-black/25 focus:outline-none focus:border-[#0071e3] transition-colors"
+                  />
+                </div>
+              )}
 
               {error && (
                 <div className="flex items-center gap-2 text-red-500 text-xs bg-red-50 rounded-xl px-3 py-2">
