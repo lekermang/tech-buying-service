@@ -23,10 +23,14 @@ import { BRAND_PRIORITY, sortItems, sortCategories } from "@/components/catalog/
 
 interface CartEntry { item: CatalogItem; qty: number; }
 
+const AUTH_URL = "https://functions.poehali.dev/420ad7e7-26c9-4540-9369-6bca5d26d3aa";
+
 const Catalog = () => {
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [markup, setMarkup] = useState(3500);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
+  const [showLoginBanner, setShowLoginBanner] = useState(false);
   const [activeCategory, setActiveCategory] = useState("iPhone 17/AIR/PRO/MAX");
   const [activeBrand, setActiveBrand] = useState("");
   const [activeStorage, setActiveStorage] = useState("");
@@ -42,6 +46,19 @@ const Catalog = () => {
   const [cart, setCart] = useState<CartEntry[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Проверка авторизации по токену в localStorage
+  useEffect(() => {
+    const token = localStorage.getItem("client_token");
+    if (!token) { setIsLoggedIn(false); return; }
+    fetch(AUTH_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Client-Token": token },
+      body: JSON.stringify({ action: "me" }),
+    }).then(r => r.json()).then(d => {
+      setIsLoggedIn(!!(d && d.id));
+    }).catch(() => setIsLoggedIn(false));
+  }, []);
 
   const load = (cat: string, q: string, avail: string) => {
     setLoading(true);
@@ -261,8 +278,12 @@ const Catalog = () => {
           activeColor={activeColor}
           activeFiltersCount={activeFiltersCount}
           markup={markup}
-          onBuy={setOrderItem}
+          onBuy={(item) => {
+            if (!isLoggedIn) { setShowLoginBanner(true); return; }
+            setOrderItem(item);
+          }}
           onAddToCart={addToCart}
+          isLoggedIn={isLoggedIn}
           onBrandChange={handleBrandChange}
           onStorageReset={() => setActiveStorage("")}
           onColorReset={() => setActiveColor("")}
@@ -279,6 +300,34 @@ const Catalog = () => {
 
       {/* Модалка заказа */}
       {orderItem && <CatalogOrderModal item={orderItem} markup={markup} onClose={() => setOrderItem(null)} />}
+
+      {/* Баннер: нужна авторизация */}
+      {showLoginBanner && (
+        <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
+          onClick={() => setShowLoginBanner(false)}>
+          <div className="bg-[#141414] border border-white/10 w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl"
+            onClick={e => e.stopPropagation()}>
+            <div className="flex justify-center pt-1 pb-4 sm:hidden">
+              <div className="w-10 h-1 rounded-full bg-white/10" />
+            </div>
+            <div className="w-14 h-14 rounded-2xl bg-[#FFD700]/10 flex items-center justify-center mx-auto mb-4">
+              <Icon name="Lock" size={26} className="text-[#FFD700]" />
+            </div>
+            <h3 className="text-white font-bold text-xl text-center mb-2">Войдите, чтобы увидеть цены</h3>
+            <p className="text-white/40 text-sm text-center mb-6 leading-relaxed">
+              Цены и кнопка заказа доступны только зарегистрированным покупателям
+            </p>
+            <a href="/client"
+              className="block w-full bg-[#FFD700] hover:bg-yellow-400 text-black font-bold py-3.5 rounded-xl text-center text-sm transition-colors mb-3">
+              Войти / Зарегистрироваться
+            </a>
+            <button onClick={() => setShowLoginBanner(false)}
+              className="block w-full text-white/40 hover:text-white text-sm py-2 text-center transition-colors">
+              Закрыть
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Корзина */}
       {cartOpen && (

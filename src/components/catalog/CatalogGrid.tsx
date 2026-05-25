@@ -4,7 +4,7 @@ import CatalogProductCard from "@/components/catalog/CatalogProductCard";
 import { CatalogItem, REGION_FLAG, MODEL_PHOTOS, CATEGORY_PHOTOS, getColorHex } from "@/pages/catalog.types";
 
 // ─── Карточка-строка (список) ──────────────────────────────────────
-const ListCard = ({ item, onBuy, markup }: { item: CatalogItem; onBuy: (i: CatalogItem) => void; markup: number }) => {
+const ListCard = ({ item, onBuy, markup, isLoggedIn }: { item: CatalogItem; onBuy: (i: CatalogItem) => void; markup: number; isLoggedIn: boolean }) => {
   const flag = item.region ? (REGION_FLAG[item.region] || "") : "";
   const inStock = item.availability === "in_stock";
   const photo = item.photo_url || MODEL_PHOTOS[item.model] || CATEGORY_PHOTOS[item.category] || null;
@@ -50,7 +50,14 @@ const ListCard = ({ item, onBuy, markup }: { item: CatalogItem; onBuy: (i: Catal
 
       {/* Цена + кнопка */}
       <div className="shrink-0 flex flex-col items-end gap-2">
-        <div className={`text-sm font-bold ${inStock ? "text-[#FFD700]" : "text-white/50"}`}>{price}</div>
+        {isLoggedIn ? (
+          <div className={`text-sm font-bold ${inStock ? "text-[#FFD700]" : "text-white/50"}`}>{price}</div>
+        ) : (
+          <div className="flex items-center gap-1 text-white/25 text-xs">
+            <Icon name="Lock" size={10} />
+            <span>Войдите</span>
+          </div>
+        )}
         <div className="flex items-center gap-1.5">
           <span className={`text-[9px] px-2 py-0.5 rounded-full font-medium ${inStock ? "bg-green-500/15 text-green-400" : "bg-white/8 text-white/35"}`}>
             {inStock ? "В наличии" : "Заказ"}
@@ -59,7 +66,7 @@ const ListCard = ({ item, onBuy, markup }: { item: CatalogItem; onBuy: (i: Catal
             onClick={e => { e.stopPropagation(); onBuy(item); }}
             className="text-[11px] font-bold bg-[#FFD700] text-black px-3 py-1 rounded-lg hover:bg-yellow-400 transition-colors active:scale-95"
           >
-            Купить
+            {isLoggedIn ? "Купить" : "Войти"}
           </button>
         </div>
       </div>
@@ -113,6 +120,7 @@ interface Props {
   activeColor: string;
   activeFiltersCount: number;
   markup: number;
+  isLoggedIn: boolean;
   onBuy: (item: CatalogItem) => void;
   onAddToCart: (item: CatalogItem) => void;
   onBrandChange: (brand: string) => void;
@@ -126,7 +134,7 @@ interface Props {
 export default function CatalogGrid({
   filteredItems, brandsInCategory, loading, search,
   activeBrand, activeCategory, activeStorage, activeColor,
-  activeFiltersCount, markup, onBuy, onAddToCart, onBrandChange,
+  activeFiltersCount, markup, isLoggedIn, onBuy, onAddToCart, onBrandChange,
   onStorageReset, onColorReset, onResetFilters,
 }: Props) {
   const [mode, setMode] = useState<"grid" | "list">("grid");
@@ -195,14 +203,14 @@ export default function CatalogGrid({
         /* ── СПИСОК ── */
         <div className="divide-y divide-white/0">
           {filteredItems.map(item => (
-            <ListCard key={item.id} item={item} onBuy={onBuy} markup={markup} />
+            <ListCard key={item.id} item={item} onBuy={onBuy} markup={markup} isLoggedIn={isLoggedIn} />
           ))}
         </div>
       ) : (
         /* ── СЕТКА ── */
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 p-4">
           {filteredItems.map(item => (
-            <CatalogProductCard key={item.id} item={item} onBuy={onBuy} onAddToCart={onAddToCart} markup={markup} />
+            <CatalogProductCard key={item.id} item={item} onBuy={onBuy} onAddToCart={onAddToCart} markup={markup} isLoggedIn={isLoggedIn} />
           ))}
         </div>
       )}

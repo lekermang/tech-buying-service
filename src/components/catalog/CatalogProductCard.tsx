@@ -7,9 +7,10 @@ interface Props {
   onBuy: (item: CatalogItem) => void;
   onAddToCart?: (item: CatalogItem) => void;
   markup?: number;
+  isLoggedIn?: boolean;
 }
 
-const CatalogProductCard = memo(function CatalogProductCard({ item, onBuy, onAddToCart, markup = 3500 }: Props) {
+const CatalogProductCard = memo(function CatalogProductCard({ item, onBuy, onAddToCart, markup = 3500, isLoggedIn = false }: Props) {
   const flag = item.region ? (REGION_FLAG[item.region] || "") : "";
   const inStock = item.availability === "in_stock";
 
@@ -152,9 +153,16 @@ const CatalogProductCard = memo(function CatalogProductCard({ item, onBuy, onAdd
 
         {/* Цена */}
         <div className="mt-2.5 flex items-center justify-between gap-2">
-          <div className={`font-bold text-base ${inStock ? "text-[#FFD700]" : "text-white/40"}`}>
-            {price}
-          </div>
+          {isLoggedIn ? (
+            <div className={`font-bold text-base ${inStock ? "text-[#FFD700]" : "text-white/40"}`}>
+              {price}
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 text-white/25 text-xs">
+              <Icon name="Lock" size={11} />
+              <span>Войдите для цены</span>
+            </div>
+          )}
           {item.region && (
             <span className="text-[10px] text-white/20">{item.region}</span>
           )}
@@ -162,18 +170,30 @@ const CatalogProductCard = memo(function CatalogProductCard({ item, onBuy, onAdd
 
         {/* Кнопки */}
         <div className="mt-2.5 flex gap-2">
-          <button
-            onClick={e => { e.stopPropagation(); onBuy(item); }}
-            className="flex-1 bg-[#FFD700] hover:bg-yellow-400 active:bg-yellow-300 text-black text-[13px] font-bold py-2.5 rounded-xl transition-colors"
-          >
-            Купить
-          </button>
-          {onAddToCart && (
+          {isLoggedIn ? (
+            <>
+              <button
+                onClick={e => { e.stopPropagation(); onBuy(item); }}
+                className="flex-1 bg-[#FFD700] hover:bg-yellow-400 active:bg-yellow-300 text-black text-[13px] font-bold py-2.5 rounded-xl transition-colors"
+              >
+                Купить
+              </button>
+              {onAddToCart && (
+                <button
+                  onClick={e => { e.stopPropagation(); onAddToCart(item); }}
+                  className="w-10 h-10 flex items-center justify-center bg-white/6 hover:bg-white/12 active:bg-white/18 rounded-xl transition-colors"
+                >
+                  <Icon name="ShoppingCart" size={15} className="text-white/50" />
+                </button>
+              )}
+            </>
+          ) : (
             <button
-              onClick={e => { e.stopPropagation(); onAddToCart(item); }}
-              className="w-10 h-10 flex items-center justify-center bg-white/6 hover:bg-white/12 active:bg-white/18 rounded-xl transition-colors"
+              onClick={e => { e.stopPropagation(); onBuy(item); }}
+              className="flex-1 border border-white/15 hover:border-[#FFD700]/50 text-white/50 hover:text-[#FFD700] text-[13px] font-medium py-2.5 rounded-xl transition-colors flex items-center justify-center gap-1.5"
             >
-              <Icon name="ShoppingCart" size={15} className="text-white/50" />
+              <Icon name="Lock" size={13} />
+              Войти
             </button>
           )}
         </div>
