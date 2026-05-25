@@ -44,15 +44,29 @@ type NavItemProps = {
 const NavItem = ({ link, active, onClick, compact }: NavItemProps) => (
   <button
     onClick={onClick}
-    className={`relative font-roboto ${compact ? "text-[11px]" : "text-sm"} uppercase tracking-wide transition-colors px-1 py-1 group whitespace-nowrap
-                ${active ? "text-[#FFD700]" : "text-white/80 hover:text-[#FFD700]"}`}
+    className={`relative font-oswald font-bold ${compact ? "text-[11px]" : "text-[13px] xl:text-[13.5px]"} uppercase tracking-[0.08em] transition-all duration-300 px-2 py-1.5 group whitespace-nowrap
+                ${active
+                  ? "text-[#FFD700] drop-shadow-[0_0_8px_rgba(255,215,0,0.45)]"
+                  : "text-white/85 hover:text-[#FFD700] hover:drop-shadow-[0_0_6px_rgba(255,215,0,0.35)]"}`}
   >
     {link.label}
+    {/* Премиум-подчёркивание: золотой градиент с двумя «точками-засечками» */}
     <span
-      className={`pointer-events-none absolute left-0 right-0 -bottom-[9px] h-[2px] bg-[linear-gradient(90deg,transparent,#FFD700,transparent)]
-                  transition-opacity duration-300 ${active ? "opacity-100" : "opacity-0 group-hover:opacity-40"}`}
+      className={`pointer-events-none absolute left-1 right-1 -bottom-[6px] h-[2px] rounded-full
+                  bg-[linear-gradient(90deg,transparent,#FFD700_25%,#fff3a0_50%,#FFD700_75%,transparent)]
+                  transition-all duration-300
+                  ${active ? "opacity-100 scale-x-100 shadow-[0_0_10px_rgba(255,215,0,0.6)]" : "opacity-0 scale-x-50 group-hover:opacity-60 group-hover:scale-x-90"}`}
     />
+    {/* Свечение при активном */}
+    {active && (
+      <span className="pointer-events-none absolute inset-0 -z-0 bg-[radial-gradient(ellipse_at_center,rgba(255,215,0,0.12),transparent_70%)] rounded" />
+    )}
   </button>
+);
+
+/** Тонкий золотой вертикальный разделитель между пунктами. */
+const NavSeparator = () => (
+  <span aria-hidden className="hidden xl:block w-px h-3 bg-gradient-to-b from-transparent via-[#FFD700]/30 to-transparent" />
 );
 
 /**
@@ -122,41 +136,54 @@ const MainNav = ({ navLinks, menuOpen, onToggleMenu, onNav, compact = false }: M
           ))}
         </nav>
 
-        {/* Большой ПК (xl+, 1280px+): все пункты */}
-        <nav className="hidden xl:flex items-center gap-5 mx-4 min-w-0">
-          {navLinks.map(l => (
-            <NavItem key={l.href} link={l} active={active === l.href} onClick={() => onNav(l.href)} />
+        {/* Большой ПК (xl+, 1280px+): все пункты + золотые разделители */}
+        <nav className="hidden xl:flex items-center gap-2.5 mx-4 min-w-0">
+          {navLinks.map((l, i) => (
+            <span key={l.href} className="flex items-center gap-2.5">
+              <NavItem link={l} active={active === l.href} onClick={() => onNav(l.href)} />
+              {i < navLinks.length - 1 && <NavSeparator />}
+            </span>
           ))}
         </nav>
 
         {/* ── ПРАВО: каталог + телефон + бургер ── */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {/* Каталог — на md+ */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Каталог — на md+ : премиум контурная кнопка */}
           <a
             href="/catalog"
-            className="hidden md:inline-flex items-center gap-1.5 h-9 px-2.5 lg:px-3 rounded-md border border-[#FFD700]/30 hover:border-[#FFD700]/60 text-[#FFD700] hover:bg-[#FFD700]/5 active:scale-95 transition-all"
+            className="hidden md:inline-flex items-center gap-1.5 h-9 px-3 lg:px-3.5 rounded-md border border-[#FFD700]/35 hover:border-[#FFD700]/70 text-[#FFD700] hover:bg-[#FFD700]/[0.08] active:scale-95 transition-all hover:shadow-[0_0_15px_rgba(255,215,0,0.25)]"
           >
             <Icon name="ShoppingBag" size={13} />
-            <span className="font-oswald font-bold text-[11px] lg:text-[12px] uppercase tracking-wide">Каталог</span>
+            <span className="font-oswald font-bold text-[11.5px] lg:text-[12.5px] uppercase tracking-wider">Каталог</span>
           </a>
 
-          {/* Телефон — десктоп xl+ с подписью */}
+          {/* Телефон — десктоп xl+ : премиум золотая капсула */}
           <a
             href="tel:+79929990333"
             onClick={() => ymGoal(Goals.CALL_CLICK, { place: "header" })}
-            className="hidden xl:inline-flex items-center gap-2 h-9 px-3 rounded-md text-[#FFD700] hover:bg-[#FFD700]/5 transition-colors"
+            className="hidden xl:inline-flex items-center gap-2 h-9 pl-2 pr-3.5 rounded-md
+                       bg-gradient-to-br from-[#FFD700]/[0.12] via-[#FFD700]/[0.05] to-transparent
+                       border border-[#FFD700]/40 hover:border-[#FFD700]/70 hover:from-[#FFD700]/[0.18]
+                       hover:shadow-[0_0_18px_rgba(255,215,0,0.35)]
+                       transition-all duration-300 group"
           >
-            <div className="w-6 h-6 rounded-full bg-[#FFD700]/10 border border-[#FFD700]/30 flex items-center justify-center">
+            <span className="relative w-6 h-6 rounded-full
+                              bg-[radial-gradient(circle_at_30%_30%,#fff3a0,#ffd700_45%,#b8860b_100%)]
+                              shadow-[0_0_8px_rgba(255,215,0,0.5),inset_0_1px_0_rgba(255,255,255,0.4)]
+                              flex items-center justify-center text-black">
               <Icon name="Phone" size={12} />
-            </div>
-            <span className="font-oswald font-semibold text-[13px] whitespace-nowrap">+7 (992) 999-03-33</span>
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-[#0D0D0D] animate-pulse" aria-hidden />
+            </span>
+            <span className="font-oswald font-extrabold text-[13.5px] text-[#FFD700] tracking-wide whitespace-nowrap drop-shadow-[0_0_5px_rgba(255,215,0,0.35)]">
+              +7 (992) 999-03-33
+            </span>
           </a>
           {/* Телефон — планшет/средний десктоп иконкой */}
           <a
             href="tel:+79929990333"
             onClick={() => ymGoal(Goals.CALL_CLICK, { place: "header" })}
             title="Позвонить"
-            className="hidden md:inline-flex xl:hidden items-center justify-center w-9 h-9 rounded-md border border-[#FFD700]/30 text-[#FFD700] hover:bg-[#FFD700]/10 transition-colors"
+            className="hidden md:inline-flex xl:hidden items-center justify-center w-9 h-9 rounded-md border border-[#FFD700]/35 text-[#FFD700] hover:bg-[#FFD700]/10 hover:border-[#FFD700]/65 hover:shadow-[0_0_12px_rgba(255,215,0,0.3)] transition-all"
           >
             <Icon name="Phone" size={14} />
           </a>
