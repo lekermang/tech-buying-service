@@ -131,7 +131,7 @@ const CatalogProductCard = memo(function CatalogProductCard({ item, onBuy, onAdd
       <div className="px-3.5 pt-3 pb-3.5 flex flex-col flex-1">
 
         {/* Модель */}
-        <div className="text-white font-semibold text-sm leading-snug line-clamp-2 mb-1">
+        <div className="font-oswald font-bold text-white text-[15px] leading-snug line-clamp-2 mb-1 tracking-wide">
           {item.brand} {item.model}
         </div>
 
@@ -174,7 +174,7 @@ const CatalogProductCard = memo(function CatalogProductCard({ item, onBuy, onAdd
             <>
               <button
                 onClick={e => { e.stopPropagation(); onBuy(item); }}
-                className="flex-1 bg-[#FFD700] hover:bg-yellow-400 active:bg-yellow-300 text-black text-[13px] font-bold py-2.5 rounded-xl transition-colors"
+                className="flex-1 btn-gold-premium py-2.5 text-[12px] font-oswald font-bold tracking-wider uppercase rounded-xl"
               >
                 Купить
               </button>
@@ -190,9 +190,9 @@ const CatalogProductCard = memo(function CatalogProductCard({ item, onBuy, onAdd
           ) : (
             <button
               onClick={e => { e.stopPropagation(); onBuy(item); }}
-              className="flex-1 border border-white/15 hover:border-[#FFD700]/50 text-white/50 hover:text-[#FFD700] text-[13px] font-medium py-2.5 rounded-xl transition-colors flex items-center justify-center gap-1.5"
+              className="flex-1 btn-gold-outline py-2.5 text-[11px] font-oswald font-bold tracking-wider uppercase rounded-xl flex items-center justify-center gap-1.5"
             >
-              <Icon name="Lock" size={13} />
+              <Icon name="Lock" size={12} />
               Войти
             </button>
           )}

@@ -117,12 +117,14 @@ export default function CatalogBanners({ onCategory, activeCategory }: Props) {
               {s.badge}
             </span>
           )}
-          <h1 className="text-white font-black text-4xl sm:text-5xl leading-none tracking-tight mb-2">{s.title}</h1>
-          <p className="font-light tracking-widest text-sm mb-3" style={{ color: `${s.color}cc` }}>{s.subtitle}</p>
-          <p className="text-white/40 text-xs mb-6">{s.desc}</p>
+          <h1 className="font-oswald font-bold text-white text-4xl sm:text-5xl lg:text-6xl leading-none tracking-tight mb-2">{s.title}</h1>
+          <p className="font-roboto font-light tracking-widest text-sm mb-3" style={{ color: `${s.color}cc` }}>{s.subtitle}</p>
+          <p className="font-roboto text-white/40 text-xs mb-6">{s.desc}</p>
 
-          <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-5 py-2.5 text-white text-sm font-semibold w-fit hover:bg-white/20 transition-colors">
-            Смотреть цены →
+          <div className="inline-flex items-center gap-2 w-fit">
+            <div className="btn-gold-premium px-5 py-2.5 text-sm font-oswald font-bold tracking-wider uppercase">
+              Смотреть цены
+            </div>
           </div>
         </div>
 
@@ -184,7 +186,7 @@ export default function CatalogBanners({ onCategory, activeCategory }: Props) {
 
               {/* Title */}
               <div className="absolute inset-x-0 bottom-0 pb-2 px-1.5 text-center">
-                <div className={`font-bold leading-tight text-[8px] sm:text-[9px] transition-colors ${isActive ? "text-white" : "text-white/70 group-hover:text-white"}`}>
+                <div className={`font-oswald font-bold leading-tight text-[9px] sm:text-[10px] transition-colors ${isActive ? "text-white" : "text-white/60 group-hover:text-white"}`}>
                   {c.title}
                 </div>
               </div>

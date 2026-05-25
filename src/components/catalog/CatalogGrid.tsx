@@ -32,7 +32,7 @@ const ListCard = ({ item, onBuy, markup, isLoggedIn }: { item: CatalogItem; onBu
             <span className="text-[9px] font-medium px-1.5 py-px rounded bg-white/8 text-white/40">{item.sim_type}</span>
           )}
         </div>
-        <div className="text-white font-medium text-sm leading-tight line-clamp-1">
+        <div className="font-oswald font-bold text-white text-[14px] leading-tight line-clamp-1 tracking-wide">
           {item.brand} {item.model}
         </div>
         <div className="flex items-center gap-2 mt-1">
@@ -64,7 +64,7 @@ const ListCard = ({ item, onBuy, markup, isLoggedIn }: { item: CatalogItem; onBu
           </span>
           <button
             onClick={e => { e.stopPropagation(); onBuy(item); }}
-            className="text-[11px] font-bold bg-[#FFD700] text-black px-3 py-1 rounded-lg hover:bg-yellow-400 transition-colors active:scale-95"
+            className="btn-gold-premium text-[11px] font-oswald font-bold tracking-wider uppercase px-3 py-1.5 rounded-lg active:scale-95"
           >
             {isLoggedIn ? "Купить" : "Войти"}
           </button>
@@ -143,10 +143,10 @@ export default function CatalogGrid({
     <div className="flex-1 min-w-0 min-h-screen bg-black">
 
       {/* ── Шапка ── */}
-      <div className="sticky top-[48px] z-30 bg-black/95 backdrop-blur-xl border-b border-white/5 px-4 py-2.5 flex items-center justify-between">
+      <div className="sticky top-[calc(88px+52px)] md:top-[calc(100px+52px)] lg:top-[calc(116px+52px)] z-30 bg-[#0A0A0A]/95 backdrop-blur-xl border-b border-[#FFD700]/10 px-4 py-2.5 flex items-center justify-between">
         <div className="flex items-center gap-2">
           {!loading && (
-            <span className="text-white/35 text-xs">
+            <span className="font-roboto text-white/35 text-xs">
               {filteredItems.length > 0 ? `${filteredItems.length} товаров` : ""}
             </span>
           )}
@@ -155,10 +155,10 @@ export default function CatalogGrid({
             <div className="flex gap-1 overflow-x-auto scrollbar-hide ml-2">
               {["", ...brandsInCategory].map(b => (
                 <button key={b || "all"} onClick={() => onBrandChange(b)}
-                  className={`shrink-0 text-[11px] font-medium px-2.5 py-1 rounded-full transition-all ${
+                  className={`shrink-0 font-oswald font-bold text-[11px] tracking-wide uppercase px-2.5 py-1 rounded-full transition-all ${
                     activeBrand === b
-                      ? "bg-white text-black"
-                      : "text-white/40 hover:text-white"
+                      ? "bg-[#FFD700] text-black shadow-[0_0_10px_rgba(255,215,0,0.3)]"
+                      : "text-white/40 hover:text-[#FFD700]"
                   }`}>
                   {b || "Все"}
                 </button>
@@ -168,16 +168,16 @@ export default function CatalogGrid({
         </div>
 
         {/* Переключатель вид */}
-        <div className="flex items-center gap-1 bg-white/5 rounded-lg p-0.5 shrink-0">
+        <div className="flex items-center gap-1 bg-white/5 border border-[#FFD700]/10 rounded-lg p-0.5 shrink-0">
           <button
             onClick={() => setMode("grid")}
-            className={`p-1.5 rounded-md transition-all ${mode === "grid" ? "bg-white/15 text-white" : "text-white/30 hover:text-white/60"}`}
+            className={`p-1.5 rounded-md transition-all ${mode === "grid" ? "bg-[#FFD700]/15 text-[#FFD700]" : "text-white/30 hover:text-white/60"}`}
           >
             <Icon name="LayoutGrid" size={14} />
           </button>
           <button
             onClick={() => setMode("list")}
-            className={`p-1.5 rounded-md transition-all ${mode === "list" ? "bg-white/15 text-white" : "text-white/30 hover:text-white/60"}`}
+            className={`p-1.5 rounded-md transition-all ${mode === "list" ? "bg-[#FFD700]/15 text-[#FFD700]" : "text-white/30 hover:text-white/60"}`}
           >
             <Icon name="List" size={14} />
           </button>

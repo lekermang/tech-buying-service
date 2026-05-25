@@ -4,6 +4,8 @@ import CatalogNav from "@/components/catalog/CatalogNav";
 import CatalogSidebar from "@/components/catalog/CatalogSidebar";
 import CatalogGrid from "@/components/catalog/CatalogGrid";
 import CatalogBanners from "@/components/catalog/CatalogBanners";
+import Header from "@/components/skupka/Header";
+import ContactsFooter from "@/components/skupka/ContactsFooter";
 import Icon from "@/components/ui/icon";
 import { CatalogItem, CATALOG_URL } from "@/pages/catalog.types";
 
@@ -201,8 +203,19 @@ const Catalog = () => {
 
   const activeFiltersCount = useMemo(() => [activeBrand, activeStorage, activeColor, activeSimType, filterAvail, modelFilter !== "Все" ? modelFilter : ""].filter(Boolean).length, [activeBrand, activeStorage, activeColor, activeSimType, filterAvail, modelFilter]);
 
+  // Заглушка scrollTo для хедера (на каталоге якорей нет — ведём на главную)
+  const scrollTo = (href: string) => {
+    window.location.href = "/" + href;
+  };
+
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-white">
+
+      {/* Шапка главной */}
+      <Header scrollTo={scrollTo} />
+
+      {/* Отступ под fixed-хедер */}
+      <div className="h-[88px] md:h-[100px] lg:h-[116px]" />
 
       {/* Баннеры + фильтры сверху */}
       <CatalogBanners
@@ -292,11 +305,7 @@ const Catalog = () => {
         />
       </div>
 
-      <footer className="border-t border-white/5 py-5 mt-4">
-        <div className="max-w-[1400px] mx-auto px-4 text-center">
-          <p className="text-white/15 text-xs">Цены актуальны на сегодня · Гарантия 2 года · +7 (992) 999-03-33</p>
-        </div>
-      </footer>
+      <ContactsFooter scrollTo={scrollTo} />
 
       {/* Модалка заказа */}
       {orderItem && <CatalogOrderModal item={orderItem} markup={markup} onClose={() => setOrderItem(null)} />}

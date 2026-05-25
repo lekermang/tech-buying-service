@@ -45,7 +45,7 @@ export default function CatalogNav({
   const hasFilters = activeFiltersCount > 0;
 
   return (
-    <nav className="bg-[#0D0D0D] border-b border-white/5 sticky top-0 z-40">
+    <nav className="bg-[#0D0D0D]/95 backdrop-blur-sm border-b border-[#FFD700]/10 sticky top-[88px] md:top-[100px] lg:top-[116px] z-40">
 
       {/* Строка поиска */}
       <div className="max-w-[1400px] mx-auto px-3 sm:px-4 h-13 flex items-center gap-2 py-2">
