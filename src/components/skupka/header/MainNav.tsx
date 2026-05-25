@@ -127,7 +127,7 @@ const MainNav = ({ navLinks, menuOpen, onToggleMenu, onNav, compact = false }: M
       <div className="pointer-events-none absolute -bottom-16 right-10 w-60 h-60 rounded-full blur-3xl" style={{ background: "rgba(255,184,0,0.04)" }} />
       <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-px bg-[linear-gradient(90deg,transparent,rgba(255,215,0,0.35),transparent)]" />
 
-      <div className={`relative max-w-7xl mx-auto px-3 sm:px-4 flex items-center justify-between gap-3 transition-[height] duration-300 ${
+      <div className={`relative max-w-[1800px] mx-auto px-3 sm:px-4 flex items-center gap-3 transition-[height] duration-300 ${
         compact ? "h-11 md:h-12" : "h-12 md:h-14 lg:h-16"
       }`}>
         {/* ── ЛЕВО: логотип ── */}
@@ -175,7 +175,7 @@ const MainNav = ({ navLinks, menuOpen, onToggleMenu, onNav, compact = false }: M
 
         {/* Большой ПК (xl+, 1280px+): первые 6 пунктов, остальные в «Ещё ▾»;
             на 2xl (1536px+) — все 8 пунктов в одну строку. */}
-        <nav className="hidden xl:flex 2xl:hidden items-center gap-1.5 ml-3 mr-4 min-w-0">
+        <nav className="hidden xl:flex 2xl:hidden items-center gap-1.5 mx-3 flex-1 justify-center overflow-hidden">
           {navLinks.slice(0, 6).map((l, i) => (
             <div key={l.href} className="flex items-center gap-1.5 shrink-0">
               <NavItem link={l} active={active === l.href} onClick={() => onNav(l.href)} />
@@ -187,9 +187,9 @@ const MainNav = ({ navLinks, menuOpen, onToggleMenu, onNav, compact = false }: M
           )}
         </nav>
 
-        <nav className="hidden 2xl:flex items-center gap-2 ml-4 mr-6 min-w-0">
+        <nav className="hidden 2xl:flex items-center gap-1.5 xl:gap-2 mx-3 xl:mx-4 overflow-hidden flex-1 justify-center">
           {navLinks.map((l, i) => (
-            <div key={l.href} className="flex items-center gap-2 shrink-0">
+            <div key={l.href} className="flex items-center gap-1.5 xl:gap-2 shrink-0">
               <NavItem link={l} active={active === l.href} onClick={() => onNav(l.href)} />
               {i < navLinks.length - 1 && <NavSeparator />}
             </div>
@@ -197,7 +197,7 @@ const MainNav = ({ navLinks, menuOpen, onToggleMenu, onNav, compact = false }: M
         </nav>
 
         {/* ── ПРАВО: каталог + телефон + бургер ── */}
-        <div className="flex items-center gap-2 shrink-0 ml-auto">
+        <div className="flex items-center gap-2 shrink-0">
           {/* Каталог — на md+ : премиум контурная кнопка */}
           <a
             href="/catalog"
