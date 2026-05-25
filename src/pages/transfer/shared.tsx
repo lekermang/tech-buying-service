@@ -1,3 +1,4 @@
+import React from "react";
 import Icon from "@/components/ui/icon";
 
 export const API = "https://functions.poehali.dev/d3550608-e324-4580-b568-6ba80c9c37b5";
@@ -221,39 +222,89 @@ export function RoleScreen({ onSelect }: { onSelect: (r: Role) => void }) {
 }
 
 function TransferProBlock() {
-  // Динамически импортируем чтобы не было кругового импорта
-  const handle = async () => {
+  const [showModal, setShowModal] = React.useState(false);
+  const [contact, setContact] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState("");
+
+  const pay = async () => {
+    const c = contact.trim();
+    if (!c) { setError("Введите телефон или email"); return; }
+    setError("");
+    setLoading(true);
     const { createUniversalPayment } = await import("@/pages/safeDeals/api");
     const r = await createUniversalPayment({
       purpose: "transfer_pro",
       amount: 500,
       description: "Перенос данных PRO · безлимитный объём + приоритет",
       returnUrl: window.location.href,
+      contactInfo: c,
     });
+    setLoading(false);
     if (r.ok && r.data?.confirmationUrl) {
       window.location.href = r.data.confirmationUrl;
     } else {
-      alert(r.error || "Не удалось создать платёж");
+      setError(r.error || "Не удалось создать платёж");
     }
   };
+
   return (
-    <button
-      onClick={handle}
-      className="w-full max-w-sm rounded-2xl p-4 bg-gradient-to-br from-[#FFD700]/[0.12] via-[#FFD700]/[0.04] to-transparent border-2 border-[#FFD700]/40 hover:border-[#FFD700] transition active:scale-[0.98] text-left"
-    >
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#FFD700] text-black flex items-center justify-center shrink-0">
-            <Icon name="Crown" size={20} />
+    <>
+      <button
+        onClick={() => setShowModal(true)}
+        className="w-full max-w-sm rounded-2xl p-4 bg-gradient-to-br from-[#FFD700]/[0.12] via-[#FFD700]/[0.04] to-transparent border-2 border-[#FFD700]/40 hover:border-[#FFD700] transition active:scale-[0.98] text-left"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#FFD700] text-black flex items-center justify-center shrink-0">
+              <Icon name="Crown" size={20} />
+            </div>
+            <div>
+              <div className="text-sm font-extrabold text-[#FFD700]">PRO тариф · 500 ₽</div>
+              <div className="text-[10px] text-[#999] mt-0.5">Безлимитный объём, приоритетная скорость, сессия 24 часа</div>
+            </div>
           </div>
-          <div>
-            <div className="text-sm font-extrabold text-[#FFD700]">PRO тариф · 500 ₽</div>
-            <div className="text-[10px] text-[#999] mt-0.5">Безлимитный объём, приоритетная скорость, сессия 24 часа</div>
+          <Icon name="ArrowRight" size={16} className="text-[#FFD700] shrink-0" />
+        </div>
+      </button>
+
+      {showModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm" onClick={() => setShowModal(false)}>
+          <div className="bg-[#141414] border border-[#2A2A2A] rounded-2xl p-5 max-w-xs w-full shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-[#FFD700]/15 flex items-center justify-center shrink-0">
+                <Icon name="Crown" size={18} className="text-[#FFD700]" />
+              </div>
+              <div>
+                <div className="font-bold text-white text-sm">PRO тариф · 500 ₽</div>
+                <div className="text-white/50 text-xs mt-0.5">Для чека укажите контакт</div>
+              </div>
+            </div>
+            <input
+              type="text"
+              placeholder="Телефон (+7...) или email"
+              value={contact}
+              onChange={e => { setContact(e.target.value); setError(""); }}
+              onKeyDown={e => e.key === "Enter" && pay()}
+              className="w-full bg-[#1E1E1E] border border-[#333] rounded-xl px-3 py-2.5 text-white text-sm placeholder-white/30 focus:outline-none focus:border-[#FFD700]/60 mb-1"
+            />
+            {error && <div className="text-red-400 text-xs mb-2">{error}</div>}
+            <div className="text-white/30 text-[10px] mb-4">Нужен для чека ЮKassa — больше ни для чего не используется</div>
+            <div className="flex gap-2">
+              <button onClick={() => setShowModal(false)}
+                className="flex-1 py-2.5 rounded-xl border border-[#333] text-white/60 text-sm font-medium hover:text-white transition">
+                Отмена
+              </button>
+              <button onClick={pay} disabled={loading}
+                className="flex-1 py-2.5 rounded-xl bg-gradient-to-br from-[#FFD700] to-[#FFB800] text-black text-sm font-bold hover:opacity-90 transition disabled:opacity-50 flex items-center justify-center gap-1.5">
+                {loading ? <Icon name="Loader2" size={14} className="animate-spin" /> : null}
+                Оплатить
+              </button>
+            </div>
           </div>
         </div>
-        <Icon name="ArrowRight" size={16} className="text-[#FFD700] shrink-0" />
-      </div>
-    </button>
+      )}
+    </>
   );
 }
 
