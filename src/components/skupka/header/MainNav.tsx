@@ -44,7 +44,7 @@ type NavItemProps = {
 const NavItem = ({ link, active, onClick, compact }: NavItemProps) => (
   <button
     onClick={onClick}
-    className={`relative font-oswald font-bold ${compact ? "text-[11px]" : "text-[13px] xl:text-[13.5px]"} uppercase tracking-[0.08em] transition-all duration-300 px-2 py-1.5 group whitespace-nowrap
+    className={`relative font-oswald font-bold ${compact ? "text-[11px] px-1" : "text-[12px] xl:text-[12.5px] 2xl:text-[13.5px] px-1.5 2xl:px-2"} uppercase tracking-[0.06em] xl:tracking-[0.08em] transition-all duration-300 py-1.5 group whitespace-nowrap shrink-0
                 ${active
                   ? "text-[#FFD700] drop-shadow-[0_0_8px_rgba(255,215,0,0.45)]"
                   : "text-white/85 hover:text-[#FFD700] hover:drop-shadow-[0_0_6px_rgba(255,215,0,0.35)]"}`}
@@ -137,17 +137,17 @@ const MainNav = ({ navLinks, menuOpen, onToggleMenu, onNav, compact = false }: M
         </nav>
 
         {/* Большой ПК (xl+, 1280px+): все пункты + золотые разделители */}
-        <nav className="hidden xl:flex items-center gap-2.5 mx-4 min-w-0">
+        <nav className="hidden xl:flex items-center gap-1.5 2xl:gap-2 ml-4 mr-6 min-w-0 flex-wrap-none">
           {navLinks.map((l, i) => (
-            <span key={l.href} className="flex items-center gap-2.5">
+            <div key={l.href} className="flex items-center gap-1.5 2xl:gap-2 shrink-0">
               <NavItem link={l} active={active === l.href} onClick={() => onNav(l.href)} />
               {i < navLinks.length - 1 && <NavSeparator />}
-            </span>
+            </div>
           ))}
         </nav>
 
         {/* ── ПРАВО: каталог + телефон + бургер ── */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 xl:ml-2">
           {/* Каталог — на md+ : премиум контурная кнопка */}
           <a
             href="/catalog"
