@@ -33,29 +33,41 @@ const fmtDuration = (sec: number) => {
   return `${Math.floor(sec / 3600)}ч ${Math.floor((sec % 3600) / 60)}м`;
 };
 
-export default function StaffAnalytics() {
-  const [token, setToken] = useState("");
-  const [authReady, setAuthReady] = useState(false);
+export default function StaffAnalytics({ embedded, tokenProp }: { embedded?: boolean; tokenProp?: string } = {}) {
+  const [token, setToken] = useState(tokenProp || "");
+  const [authReady, setAuthReady] = useState(!!tokenProp);
 
   useEffect(() => {
+    if (tokenProp) { setToken(tokenProp); setAuthReady(true); return; }
     const t = localStorage.getItem("employee_token") || "";
     setToken(t); setAuthReady(true);
     document.title = "Аналитика посетителей — Скупка24 / Админ";
-  }, []);
+  }, [tokenProp]);
 
   if (!authReady) return null;
   if (!token) {
     return (
-      <div className="min-h-screen bg-[#0D0D0D] text-[#F0F0F0] flex items-center justify-center px-5"
-        style={{ fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" }}>
-        <div className="max-w-md text-center">
+      <div className={embedded ? "p-8 text-center" : "min-h-screen bg-[#0D0D0D] text-[#F0F0F0] flex items-center justify-center px-5"}
+        style={embedded ? undefined : { fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" }}>
+        <div className="max-w-md text-center mx-auto">
           <Icon name="Lock" size={36} className="text-[#FFD700] mx-auto mb-3" />
           <h1 className="text-xl font-extrabold mb-2">Нужна авторизация</h1>
           <p className="text-sm text-[#999] mb-5">Войдите как сотрудник, чтобы открыть аналитику.</p>
-          <a href="/staff" className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-[#FFD700] text-black font-bold text-sm">
-            <Icon name="LogIn" size={16} /> Войти как сотрудник
-          </a>
+          {!embedded && (
+            <a href="/staff" className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-[#FFD700] text-black font-bold text-sm">
+              <Icon name="LogIn" size={16} /> Войти как сотрудник
+            </a>
+          )}
         </div>
+      </div>
+    );
+  }
+
+  // Embedded режим — без TopBar (внутри StaffMainLayout)
+  if (embedded) {
+    return (
+      <div className="p-2 sm:p-4 max-w-[1400px] mx-auto">
+        <AnalyticsDashboard token={token} />
       </div>
     );
   }

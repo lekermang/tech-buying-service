@@ -15,6 +15,7 @@ import {
   GoodsTab, StaffRepairTab, GoldTab, SalesTab, ClientsTab, AnalyticsTab,
   EmployeesTab, SmartLombardTab, AvitoProTab, SalaryTab, prefetchTab,
 } from "./StaffLazy";
+const VisitorsAnalyticsTab = React.lazy(() => import("../StaffAnalytics"));
 import MyProfileModal from "./MyProfileModal";
 import StaffSectionBanner from "./StaffSectionBanner";
 import { SLTooltip } from "../slShop/slUI";
@@ -110,6 +111,7 @@ export function StaffMainLayout({
     { k: "clients",      l: "Клиенты",      icon: "Users",         tip: "База клиентов, скидки, СМС-рассылки." },
     { k: "avitopro",     l: "Авито",        icon: "Zap",           tip: "Авито PRO: сводка по объявлениям, статистика просмотров и контактов, авто-действия." },
     { k: "analytics",    l: "Статистика",   icon: "BarChart2",     tip: "Аналитика по продажам, ремонтам и сотрудникам." },
+    { k: "visitors",     l: "Посетители",   icon: "Activity",      tip: "Кто на сайте сейчас, источники трафика, заявки в реальном времени.", premium: true },
     ...(isOwnerOrAdmin ? [{ k: "gold" as Tab, l: "Золото", icon: "Gem", tip: "Учёт ювелирных изделий и драгметаллов." }] : []),
     ...(isOwnerOrAdmin ? [{ k: "employees" as Tab, l: "Команда", icon: "UserCog", tip: "Управление сотрудниками, роли, графики." }] : []),
   ];
@@ -281,6 +283,7 @@ export function StaffMainLayout({
             {tab === "goods"     && <GoodsTab token={token} />}
             {tab === "sales"     && <SalesTab token={token} />}
             {tab === "clients"   && <ClientsTab token={token} />}
+            {tab === "visitors"  && <VisitorsAnalyticsTab embedded tokenProp={token} />}
             {tab === "analytics" && <AnalyticsTab token={token} />}
             {tab === "gold"      && isOwnerOrAdmin && <GoldTab token={token} />}
             {tab === "employees" && isOwnerOrAdmin && <EmployeesTab token={token} myRole={empRole} />}
