@@ -69,6 +69,43 @@ const NavSeparator = () => (
   <span aria-hidden className="hidden xl:block w-px h-3 bg-gradient-to-b from-transparent via-[#FFD700]/30 to-transparent" />
 );
 
+/** Кнопка «Ещё ▾» с выпадающим списком — для xl (когда не помещается всё). */
+const MoreMenu = ({ items, active, onNav }: { items: NavLink[]; active: string; onNav: (href: string) => void }) => {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const onClick = () => setOpen(false);
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [open]);
+  const hasActive = items.some(i => i.href === active);
+  return (
+    <div className="relative shrink-0" onMouseDown={(e) => e.stopPropagation()}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className={`relative font-oswald font-bold text-[12px] xl:text-[12.5px] uppercase tracking-[0.06em] xl:tracking-[0.08em] px-2 py-1.5 rounded transition-colors whitespace-nowrap inline-flex items-center gap-1
+                    ${open || hasActive ? "text-[#FFD700] drop-shadow-[0_0_8px_rgba(255,215,0,0.45)]" : "text-white/85 hover:text-[#FFD700]"}`}
+      >
+        Ещё <Icon name="ChevronDown" size={11} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-50 min-w-[180px] bg-[#0F0F0F] border border-[#FFD700]/30 rounded-md shadow-[0_10px_30px_rgba(0,0,0,0.5)] py-1 animate-in fade-in slide-in-from-top-1 duration-150">
+          {items.map(l => (
+            <button
+              key={l.href}
+              onClick={() => { onNav(l.href); setOpen(false); }}
+              className={`w-full text-left px-3 py-2 font-oswald font-bold text-[12px] uppercase tracking-wider transition-colors
+                          ${active === l.href ? "text-[#FFD700] bg-[#FFD700]/10" : "text-white/85 hover:text-[#FFD700] hover:bg-[#FFD700]/[0.06]"}`}
+            >
+              {l.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 /**
  * MainNav — главная навигация сайта (вторая строка шапки).
  *
@@ -136,10 +173,23 @@ const MainNav = ({ navLinks, menuOpen, onToggleMenu, onNav, compact = false }: M
           ))}
         </nav>
 
-        {/* Большой ПК (xl+, 1280px+): все пункты + золотые разделители */}
-        <nav className="hidden xl:flex items-center gap-1.5 2xl:gap-2 ml-4 mr-6 min-w-0 flex-wrap-none">
+        {/* Большой ПК (xl+, 1280px+): первые 6 пунктов, остальные в «Ещё ▾»;
+            на 2xl (1536px+) — все 8 пунктов в одну строку. */}
+        <nav className="hidden xl:flex 2xl:hidden items-center gap-1.5 ml-3 mr-4 min-w-0">
+          {navLinks.slice(0, 6).map((l, i) => (
+            <div key={l.href} className="flex items-center gap-1.5 shrink-0">
+              <NavItem link={l} active={active === l.href} onClick={() => onNav(l.href)} />
+              {i < 5 && <NavSeparator />}
+            </div>
+          ))}
+          {navLinks.length > 6 && (
+            <MoreMenu items={navLinks.slice(6)} active={active} onNav={onNav} />
+          )}
+        </nav>
+
+        <nav className="hidden 2xl:flex items-center gap-2 ml-4 mr-6 min-w-0">
           {navLinks.map((l, i) => (
-            <div key={l.href} className="flex items-center gap-1.5 2xl:gap-2 shrink-0">
+            <div key={l.href} className="flex items-center gap-2 shrink-0">
               <NavItem link={l} active={active === l.href} onClick={() => onNav(l.href)} />
               {i < navLinks.length - 1 && <NavSeparator />}
             </div>
@@ -147,7 +197,7 @@ const MainNav = ({ navLinks, menuOpen, onToggleMenu, onNav, compact = false }: M
         </nav>
 
         {/* ── ПРАВО: каталог + телефон + бургер ── */}
-        <div className="flex items-center gap-2 shrink-0 xl:ml-2">
+        <div className="flex items-center gap-2 shrink-0 ml-auto">
           {/* Каталог — на md+ : премиум контурная кнопка */}
           <a
             href="/catalog"
