@@ -739,9 +739,11 @@ def action_item_view(qs):
 def _yookassa_create(amount_rub, purpose: str, description: str, return_url: str, metadata: dict) -> dict:
     """Создаёт платёж в ЮKassa. Возвращает {id, confirmation_url, status}."""
     import urllib.request as _urlreq
+    import urllib.error as _urlerr
     import base64 as _b64
-    shop_id = os.environ.get('YOOKASSA_SHOP_ID', '')
-    secret = os.environ.get('YOOKASSA_SECRET_KEY', '')
+    # strip() защищает от случайных пробелов/переносов в секрете
+    shop_id = (os.environ.get('YOOKASSA_SHOP_ID') or '').strip()
+    secret = (os.environ.get('YOOKASSA_SECRET_KEY') or '').strip()
     if not shop_id or not secret:
         raise Exception('ЮKassa не настроена (нет YOOKASSA_SHOP_ID или YOOKASSA_SECRET_KEY)')
 
@@ -764,9 +766,17 @@ def _yookassa_create(amount_rub, purpose: str, description: str, return_url: str
         },
         method='POST',
     )
-    with _urlreq.urlopen(req, timeout=15) as resp:
-        result = json.loads(resp.read().decode('utf-8'))
-    return result
+    try:
+        with _urlreq.urlopen(req, timeout=15) as resp:
+            result = json.loads(resp.read().decode('utf-8'))
+        return result
+    except _urlerr.HTTPError as e:
+        body_text = ''
+        try:
+            body_text = e.read().decode('utf-8')
+        except Exception:
+            pass
+        raise Exception(f'ЮKassa HTTP {e.code}: {body_text[:300]}')
 
 
 def action_yookassa_create_payment(body):
