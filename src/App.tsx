@@ -63,6 +63,10 @@ const StaffAnalytics = safeLazy(() => import("./pages/StaffAnalytics"));
 const StaffAnalyticsVisitor = safeLazy(() => import("./pages/StaffAnalyticsVisitor"));
 const AncientCoins = safeLazy(() => import("./pages/AncientCoins"));
 const BronzeSculptures = safeLazy(() => import("./pages/BronzeSculptures"));
+const RussianCoins = safeLazy(() => import("./pages/RussianCoins"));
+const RussianIcons = safeLazy(() => import("./pages/RussianIcons"));
+const RussianPorcelain = safeLazy(() => import("./pages/RussianPorcelain"));
+const SovietAntiques = safeLazy(() => import("./pages/SovietAntiques"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -133,6 +137,10 @@ const App = () => {
             <Route path="/staff/share" element={<StaffShare />} />
             <Route path="/ancient-coins" element={<AncientCoins />} />
             <Route path="/bronze-sculptures" element={<BronzeSculptures />} />
+            <Route path="/russian-coins" element={<RussianCoins />} />
+            <Route path="/icons" element={<RussianIcons />} />
+            <Route path="/porcelain" element={<RussianPorcelain />} />
+            <Route path="/soviet-antiques" element={<SovietAntiques />} />
             <Route path="/repair-discount" element={<RepairDiscount />} />
             <Route path="/requisites" element={<Requisites />} />
             <Route path="/act" element={<Act />} />
