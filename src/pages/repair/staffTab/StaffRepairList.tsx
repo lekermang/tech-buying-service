@@ -5,9 +5,16 @@ import StaffRepairOrderCard from "../StaffRepairOrderCard";
 import { EditForm } from "./staffTabTypes";
 
 type SortMode = "urgency" | "date_desc" | "date_asc" | "price_desc" | "price_asc";
-type GroupMode = "none" | "status" | "paid";
+type GroupMode = "none" | "time" | "status" | "paid";
 
-// Возраст принятой заявки в часах (от created_at)
+// Возраст заявки в часах
+function ageHoursAny(o: Order): number {
+  if (!o.created_at) return -1;
+  const t = new Date(o.created_at).getTime();
+  if (!Number.isFinite(t)) return -1;
+  return (Date.now() - t) / 3_600_000;
+}
+
 function ageHours(o: Order): number {
   if (o.status !== "new" || !o.created_at) return -1;
   const t = new Date(o.created_at).getTime();
@@ -26,6 +33,27 @@ function urgencyLevel(o: Order): number {
   if (h >= 3) return 1;
   return 0;
 }
+
+// Временная группа заявки
+type TimeGroup = "critical" | "today" | "yesterday" | "week" | "older";
+function getTimeGroup(o: Order): TimeGroup {
+  const h = ageHoursAny(o);
+  if (h < 0) return "older";
+  // Срочные новые (>6ч без движения)
+  if (o.status === "new" && h >= 6) return "critical";
+  if (h < 24) return "today";
+  if (h < 48) return "yesterday";
+  if (h < 168) return "week";
+  return "older";
+}
+
+const TIME_GROUP_META: Record<TimeGroup, { label: string; color: string; icon: string; desc?: string }> = {
+  critical:  { label: "🚨 Требуют внимания",  color: "#ef4444", icon: "AlertTriangle", desc: "Новые заявки > 6 часов без движения" },
+  today:     { label: "Сегодня",              color: "#FFD700", icon: "Clock",         desc: undefined },
+  yesterday: { label: "Вчера",               color: "#a78bfa", icon: "CalendarDays",  desc: undefined },
+  week:      { label: "Эта неделя",           color: "#60a5fa", icon: "Calendar",      desc: undefined },
+  older:     { label: "Старше недели",        color: "#6b7280", icon: "Archive",       desc: undefined },
+};
 
 type Props = {
   orders: Order[];
@@ -67,11 +95,11 @@ export default function StaffRepairList({
   cardsView = "list",
 }: Props) {
   const [sortMode, setSortMode] = useState<SortMode>("urgency");
-  const [groupMode, setGroupMode] = useState<GroupMode>("none");
+  const [groupMode, setGroupMode] = useState<GroupMode>("time");
 
   const containerCls = cardsView === "grid"
-    ? "px-2 py-2 grid gap-1.5 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
-    : "px-2 py-2 space-y-1.5";
+    ? "px-2 py-1 grid gap-1 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
+    : "px-2 py-1 space-y-1";
 
   const sortedOrders = useMemo(() => {
     return orders
@@ -120,28 +148,40 @@ export default function StaffRepairList({
 
   // Группировка
   const groupedOrders = useMemo(() => {
-    if (groupMode === "none") return [{ key: "", label: "", orders: sortedOrders }];
+    if (groupMode === "none") {
+      return [{ key: "", label: "", color: "", icon: "", desc: "", orders: sortedOrders }];
+    }
+    if (groupMode === "time") {
+      const ORDER: TimeGroup[] = ["critical", "today", "yesterday", "week", "older"];
+      const map = new Map<TimeGroup, Order[]>(ORDER.map(k => [k, []]));
+      for (const o of sortedOrders) map.get(getTimeGroup(o))!.push(o);
+      return ORDER
+        .filter(k => map.get(k)!.length > 0)
+        .map(k => {
+          const meta = TIME_GROUP_META[k];
+          return { key: k, label: meta.label, color: meta.color, icon: meta.icon, desc: meta.desc || "", orders: map.get(k)! };
+        });
+    }
     if (groupMode === "status") {
       const map = new Map<string, Order[]>();
       for (const o of sortedOrders) {
-        const k = o.status;
-        if (!map.has(k)) map.set(k, []);
-        map.get(k)!.push(o);
+        if (!map.has(o.status)) map.set(o.status, []);
+        map.get(o.status)!.push(o);
       }
       return Array.from(map.entries()).map(([key, orders]) => {
         const st = STATUSES.find(s => s.key === key);
-        return { key, label: st?.label || key, orders };
+        return { key, label: st?.label || key, color: "#888", icon: "Circle", desc: "", orders };
       });
     }
     if (groupMode === "paid") {
       const paid = sortedOrders.filter(o => o.is_paid);
       const unpaid = sortedOrders.filter(o => !o.is_paid);
       return [
-        { key: "unpaid", label: "Не оплачено", orders: unpaid },
-        { key: "paid", label: "Оплачено", orders: paid },
+        { key: "unpaid", label: "Не оплачено", color: "#fb923c", icon: "Clock", desc: "", orders: unpaid },
+        { key: "paid",   label: "Оплачено",    color: "#34d399", icon: "CheckCircle", desc: "", orders: paid },
       ].filter(g => g.orders.length > 0);
     }
-    return [{ key: "", label: "", orders: sortedOrders }];
+    return [{ key: "", label: "", color: "", icon: "", desc: "", orders: sortedOrders }];
   }, [sortedOrders, groupMode]);
   return (
     <>
@@ -239,22 +279,19 @@ export default function StaffRepairList({
       {/* ── Панель сортировки и группировки ── */}
       <div className="px-3 pb-2 flex items-center gap-2 flex-wrap">
         {/* Сортировка */}
-        <div className="flex items-center gap-1 bg-[#111] border border-[#1F1F1F] rounded-lg p-0.5">
+        <div className="flex items-center gap-0.5 bg-[#111] border border-[#1F1F1F] rounded-lg p-0.5">
           {([
-            { key: "urgency",   icon: "Flame",      title: "По срочности" },
-            { key: "date_desc", icon: "ArrowDown",  title: "Сначала новые" },
-            { key: "date_asc",  icon: "ArrowUp",    title: "Сначала старые" },
-            { key: "price_desc",icon: "TrendingUp",  title: "Дорогие сначала" },
-            { key: "price_asc", icon: "TrendingDown",title: "Дешёвые сначала" },
+            { key: "urgency",    icon: "Flame",       title: "По срочности" },
+            { key: "date_desc",  icon: "ArrowDown",   title: "Сначала новые" },
+            { key: "date_asc",   icon: "ArrowUp",     title: "Сначала старые" },
+            { key: "price_desc", icon: "TrendingUp",  title: "Дорогие сначала" },
+            { key: "price_asc",  icon: "TrendingDown",title: "Дешёвые сначала" },
           ] as { key: SortMode; icon: string; title: string }[]).map(s => (
-            <button
-              key={s.key}
-              onClick={() => setSortMode(s.key)}
-              title={s.title}
+            <button key={s.key} onClick={() => setSortMode(s.key)} title={s.title}
               className={`w-6 h-6 rounded-md flex items-center justify-center transition-all ${
                 sortMode === s.key
-                  ? "bg-[#FFD700] text-black shadow-[0_0_6px_rgba(255,215,0,0.4)]"
-                  : "text-white/35 hover:text-white/70 hover:bg-white/5"
+                  ? "bg-[#FFD700] text-black"
+                  : "text-white/30 hover:text-white/60 hover:bg-white/5"
               }`}
             >
               <Icon name={s.icon} size={11} />
@@ -263,19 +300,17 @@ export default function StaffRepairList({
         </div>
 
         {/* Группировка */}
-        <div className="flex items-center gap-1 bg-[#111] border border-[#1F1F1F] rounded-lg p-0.5">
+        <div className="flex items-center gap-0.5 bg-[#111] border border-[#1F1F1F] rounded-lg p-0.5">
           {([
-            { key: "none",   icon: "List",      title: "Без группировки" },
-            { key: "status", icon: "Layers",    title: "По статусу" },
-            { key: "paid",   icon: "Banknote",  title: "По оплате" },
+            { key: "time",   icon: "CalendarClock", title: "По времени (сегодня/вчера/неделя)" },
+            { key: "none",   icon: "List",          title: "Без группировки" },
+            { key: "status", icon: "Layers",        title: "По статусу" },
+            { key: "paid",   icon: "Banknote",      title: "По оплате" },
           ] as { key: GroupMode; icon: string; title: string }[]).map(g => (
-            <button
-              key={g.key}
-              onClick={() => setGroupMode(g.key)}
-              title={g.title}
+            <button key={g.key} onClick={() => setGroupMode(g.key)} title={g.title}
               className={`w-6 h-6 rounded-md flex items-center justify-center transition-all ${
                 groupMode === g.key
-                  ? "bg-white/15 text-white shadow-inner"
+                  ? "bg-white/15 text-white"
                   : "text-white/30 hover:text-white/60 hover:bg-white/5"
               }`}
             >
@@ -284,7 +319,7 @@ export default function StaffRepairList({
           ))}
         </div>
 
-        <span className="text-[10px] text-white/25 font-roboto ml-auto">
+        <span className="text-[10px] text-white/25 font-roboto ml-auto tabular-nums">
           {sortedOrders.length} заявок
         </span>
       </div>
@@ -310,15 +345,30 @@ export default function StaffRepairList({
       )}
 
       {!loading && groupedOrders.map(group => (
-        <div key={group.key}>
+        <div key={group.key} className="mb-1">
           {/* Заголовок группы */}
           {groupMode !== "none" && group.label && (
-            <div className="px-3 py-1.5 flex items-center gap-2">
-              <span className="text-[11px] font-oswald font-bold uppercase tracking-wider text-white/50">
+            <div
+              className="mx-2 mb-1 px-3 py-2 rounded-xl flex items-center gap-2.5"
+              style={{
+                background: `${group.color}10`,
+                border: `1px solid ${group.color}25`,
+                borderLeft: `3px solid ${group.color}`,
+              }}
+            >
+              <Icon name={group.icon} size={13} style={{ color: group.color, flexShrink: 0 }} />
+              <span className="font-oswald font-bold text-[12px] uppercase tracking-wider" style={{ color: group.color }}>
                 {group.label}
               </span>
-              <span className="text-[10px] text-white/25 font-roboto">({group.orders.length})</span>
-              <div className="flex-1 h-px bg-white/8" />
+              {group.desc && (
+                <span className="font-roboto text-[10px] text-white/30 hidden sm:block">{group.desc}</span>
+              )}
+              <span
+                className="ml-auto font-oswald font-bold text-[11px] px-2 py-0.5 rounded-md tabular-nums"
+                style={{ background: `${group.color}20`, color: group.color }}
+              >
+                {group.orders.length}
+              </span>
             </div>
           )}
           <div className={containerCls}>

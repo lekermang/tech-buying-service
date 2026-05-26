@@ -47,16 +47,15 @@ export default function StaffRepairOrderCard({
 
   return (
     <div id={`order-${o.id}`} className="relative scroll-mt-24">
-      {/* Тонкая граница: красная пульсирующая для критических НОВЫХ, золотая для раскрытой, обычная для остальных */}
-      <div className={`relative rounded-lg overflow-hidden transition-all duration-200 ${
+      <div className={`relative rounded-xl overflow-hidden transition-all duration-150 ${
         isExpanded
-          ? "border border-[#FFD700]/60 bg-[#0E0E0E] shadow-[0_2px_12px_rgba(255,215,0,0.10)]"
+          ? "shadow-[0_0_0_1px_rgba(255,215,0,0.4),0_4px_20px_rgba(255,215,0,0.08)]"
           : isCritical
-            ? "border border-red-500/55 bg-[#0E0808] hover:border-red-400/80 animate-pulse"
+            ? "shadow-[0_0_0_1px_rgba(239,68,68,0.4)]"
             : isNew
-              ? "border border-orange-500/35 bg-[#100C08] hover:border-orange-400/60"
-              : "border border-[#1F1F1F] bg-[#0F0F0F] hover:border-[#FFD700]/25"
-      }`}>
+              ? "shadow-[0_0_0_1px_rgba(251,146,60,0.25)]"
+              : "shadow-[0_0_0_1px_rgba(255,255,255,0.06)]"
+      } hover:shadow-[0_0_0_1px_rgba(255,215,0,0.2)] bg-[#0D0D0D]`}>
           {/* ── Шапка карточки ── */}
           <OrderCardHeader
             o={o}

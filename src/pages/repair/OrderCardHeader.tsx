@@ -6,60 +6,64 @@ const statusInfo = (key: string) => STATUSES.find(s => s.key === key) || STATUSE
 type UrgencyLevel = 0 | 1 | 2 | 3 | 4 | 5;
 function getUrgencyLevel(createdAt: string | null | undefined): UrgencyLevel {
   if (!createdAt) return 0;
-  const created = new Date(createdAt).getTime();
-  if (!Number.isFinite(created)) return 0;
-  const hours = (Date.now() - created) / 3_600_000;
-  if (hours >= 48) return 5;
-  if (hours >= 24) return 4;
-  if (hours >= 12) return 3;
-  if (hours >= 6) return 2;
-  if (hours >= 3) return 1;
+  const h = (Date.now() - new Date(createdAt).getTime()) / 3_600_000;
+  if (!Number.isFinite(h)) return 0;
+  if (h >= 48) return 5;
+  if (h >= 24) return 4;
+  if (h >= 12) return 3;
+  if (h >= 6)  return 2;
+  if (h >= 3)  return 1;
   return 0;
 }
 
 const URGENCY_TITLES: Record<UrgencyLevel, string> = {
   0: "Только что",
-  1: "Принята более 3 часов назад — пора брать в работу",
-  2: "Принята более 6 часов назад — обратите внимание",
-  3: "Принята более 12 часов назад — задерживается",
-  4: "Принята более суток назад — критично",
-  5: "Принята более 48 часов назад — СРОЧНО, максимальное внимание!",
+  1: "Более 3 ч — пора брать в работу",
+  2: "Более 6 ч — обратите внимание",
+  3: "Более 12 ч — задерживается",
+  4: "Более суток — критично",
+  5: "Более 48 ч — СРОЧНО!",
 };
 
-type StatusAccent = { bar: string; barColor: string; text: string; bg: string; label: string };
-
-function getStatusAccent(status: string): StatusAccent {
+type SA = { barColor: string; text: string; bgCard: string; label: string };
+function getAccent(status: string): SA {
   switch (status) {
-    case "new":              return { bar: "bg-orange-400",   barColor: "#fb923c", text: "text-orange-300",   bg: "bg-orange-500/12",  label: "Новая"      };
-    case "pending_approval": return { bar: "bg-purple-400",   barColor: "#c084fc", text: "text-purple-300",   bg: "bg-purple-500/12",  label: "Согласование" };
-    case "accepted":         return { bar: "bg-violet-400",   barColor: "#a78bfa", text: "text-violet-300",   bg: "bg-violet-500/12",  label: "У мастера"  };
-    case "in_progress":      return { bar: "bg-blue-400",     barColor: "#60a5fa", text: "text-blue-300",     bg: "bg-blue-500/12",    label: "В работе"   };
-    case "waiting_parts":    return { bar: "bg-amber-400",    barColor: "#fbbf24", text: "text-amber-300",    bg: "bg-amber-500/12",   label: "Ждём зап."  };
-    case "ready":            return { bar: "bg-[#FFD700]",    barColor: "#FFD700", text: "text-[#FFD700]",    bg: "bg-[#FFD700]/12",   label: "Готов"      };
-    case "done":             return { bar: "bg-emerald-400",  barColor: "#34d399", text: "text-emerald-300",  bg: "bg-emerald-500/12", label: "Выдан"      };
-    case "warranty":         return { bar: "bg-teal-400",     barColor: "#2dd4bf", text: "text-teal-300",     bg: "bg-teal-500/12",    label: "Гарантия"   };
-    case "cancelled":        return { bar: "bg-red-400",      barColor: "#f87171", text: "text-red-300",      bg: "bg-red-500/12",     label: "Отменено"   };
-    default:                 return { bar: "bg-white/30",     barColor: "#666",    text: "text-white/60",     bg: "bg-white/5",        label: status       };
+    case "new":              return { barColor: "#fb923c", text: "#fb923c", bgCard: "rgba(251,146,60,0.06)",   label: "Новая"         };
+    case "pending_approval": return { barColor: "#c084fc", text: "#c084fc", bgCard: "rgba(192,132,252,0.06)",  label: "Согласование"  };
+    case "accepted":         return { barColor: "#a78bfa", text: "#a78bfa", bgCard: "rgba(167,139,250,0.05)",  label: "У мастера"     };
+    case "in_progress":      return { barColor: "#60a5fa", text: "#60a5fa", bgCard: "rgba(96,165,250,0.05)",   label: "В работе"      };
+    case "waiting_parts":    return { barColor: "#fbbf24", text: "#fbbf24", bgCard: "rgba(251,191,36,0.06)",   label: "Ждём запчасть" };
+    case "ready":            return { barColor: "#FFD700", text: "#FFD700", bgCard: "rgba(255,215,0,0.07)",    label: "Готов"         };
+    case "done":             return { barColor: "#34d399", text: "#34d399", bgCard: "rgba(52,211,153,0.04)",   label: "Выдан"         };
+    case "warranty":         return { barColor: "#2dd4bf", text: "#2dd4bf", bgCard: "rgba(45,212,191,0.04)",   label: "Гарантия"      };
+    case "cancelled":        return { barColor: "#f87171", text: "#f87171", bgCard: "rgba(248,113,113,0.04)",  label: "Отменено"      };
+    default:                 return { barColor: "#555",    text: "#888",    bgCard: "rgba(255,255,255,0.02)",   label: status          };
   }
 }
+
+const STATUS_FLOW: Record<string, string> = {
+  new: "accepted", accepted: "in_progress", in_progress: "ready",
+  waiting_parts: "in_progress", ready: "done",
+};
+const NEXT_LABEL: Record<string, string> = {
+  accepted: "→ Мастер", in_progress: "→ Работа",
+  ready: "→ Готово", done: "→ Выдан", new: "→ Мастер",
+};
 
 type Props = {
   o: Order;
   isExpanded: boolean;
   onToggle: () => void;
-  onQuickCall?: () => void;
   onQuickStatus?: (status: string) => void;
 };
 
-export default function OrderCardHeader({ o, isExpanded, onToggle, onQuickCall, onQuickStatus }: Props) {
-  const st = statusInfo(o.status);
-  const accent = getStatusAccent(o.status);
-  const initials = (o.name || "")
-    .trim().split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase() || "?";
+export default function OrderCardHeader({ o, isExpanded, onToggle, onQuickStatus }: Props) {
+  const accent = getAccent(o.status);
+  const initials = (o.name || "").trim().split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 1).join("").toUpperCase() || "?";
 
   const urgency: UrgencyLevel = o.status === "new" ? getUrgencyLevel(o.created_at) : 0;
-  const isCritical = urgency === 5;
-  const isHot = urgency >= 3;
+  const isCritical = urgency >= 4;
+  const isWarn    = urgency === 3;
 
   const description = o.comment || o.admin_note || "";
 
@@ -68,205 +72,207 @@ export default function OrderCardHeader({ o, isExpanded, onToggle, onQuickCall, 
   const masterCalc = profit != null ? Math.max(0, Math.round(profit * 0.5)) : null;
 
   const mainPrice = o.repair_amount != null
-    ? { v: o.repair_amount, color: "text-emerald-300" }
+    ? { v: o.repair_amount, isReal: true }
     : o.price != null
-      ? { v: o.price, color: "text-[#FFD700]" }
+      ? { v: o.price, isReal: false }
       : null;
 
-  // Следующий «быстрый» статус
-  const STATUS_FLOW: Record<string, string> = {
-    new: "accepted", accepted: "in_progress", in_progress: "ready",
-    waiting_parts: "in_progress", ready: "done",
-  };
   const nextStatus = STATUS_FLOW[o.status];
-  const nextAccent = nextStatus ? getStatusAccent(nextStatus) : null;
+  const nextAccent = nextStatus ? getAccent(nextStatus) : null;
+
+  // Форматирование даты: время если сегодня, иначе дд.мм чч:мм
+  const fmtShort = (iso: string) => {
+    const d = new Date(iso);
+    const now = new Date();
+    const isToday = d.toDateString() === now.toDateString();
+    if (isToday) return d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" }) + " " +
+           d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  };
 
   return (
     <div
-      className={`relative cursor-pointer select-none transition-colors ${isExpanded ? "" : "hover:bg-white/[0.015] active:bg-white/[0.03]"}`}
+      className={`relative cursor-pointer select-none ${isExpanded ? "" : "hover:brightness-110 active:brightness-125"} transition-[filter]`}
       onClick={onToggle}
+      style={{ background: isExpanded ? "rgba(255,215,0,0.03)" : accent.bgCard }}
     >
-      {/* Цветная полоса слева — толщина зависит от срочности */}
+      {/* Левая цветная полоса */}
       <span
-        className={`absolute left-0 top-0 bottom-0 ${isCritical ? "w-[4px] animate-pulse" : isHot ? "w-[4px]" : "w-[3px]"} ${accent.bar}`}
-        style={{ boxShadow: isCritical ? `0 0 8px ${accent.barColor}` : isHot ? `0 0 4px ${accent.barColor}80` : "none" }}
+        className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-sm"
+        style={{
+          background: accent.barColor,
+          boxShadow: isCritical ? `0 0 10px ${accent.barColor}, 0 0 20px ${accent.barColor}60` : `0 0 4px ${accent.barColor}80`,
+          animation: isCritical ? "pulse 1.2s ease-in-out infinite" : "none",
+        }}
       />
 
-      <div className="pl-3 pr-2 py-2">
-        {/* ── СТРОКА 1: аватар · #id · имя · бейдж · цена · быстрые кнопки · шеврон ── */}
-        <div className="flex items-center gap-1.5 min-w-0">
+      <div className="pl-3.5 pr-2 py-2">
+        {/* ── ГЛАВНАЯ СТРОКА ── */}
+        <div className="flex items-center gap-2 min-w-0">
 
-          {/* Аватар с цветным кольцом статуса */}
-          <div className="shrink-0 relative">
-            <div
-              className="w-7 h-7 rounded-lg flex items-center justify-center font-oswald font-bold text-[11px] leading-none"
-              style={{
-                background: `linear-gradient(135deg, ${accent.barColor}25, ${accent.barColor}10)`,
-                border: `1.5px solid ${accent.barColor}50`,
-                color: accent.barColor,
-              }}
-            >
-              {initials}
-            </div>
-            {/* Индикатор оплаты */}
+          {/* Аватар */}
+          <div
+            className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center font-oswald font-black text-[14px] leading-none"
+            style={{ background: `${accent.barColor}22`, color: accent.barColor, border: `1px solid ${accent.barColor}45` }}
+          >
+            {initials}
             {o.is_paid && (
-              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 rounded-full border border-[#0F0F0F] flex items-center justify-center">
-                <Icon name="Check" size={7} className="text-black" />
+              <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-[1.5px] border-[#0F0F0F] flex items-center justify-center">
+                <Icon name="Check" size={8} className="text-black" />
               </span>
             )}
           </div>
 
-          {/* #ID */}
-          <span className="font-oswald text-[9px] text-white/30 tabular-nums shrink-0">#{o.id}</span>
+          {/* Имя + ID */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-baseline gap-1.5 min-w-0">
+              <span className="font-oswald font-bold text-[15px] text-white uppercase tracking-wide truncate leading-tight">
+                {o.name}
+              </span>
+              <span className="font-roboto text-[10px] text-white/30 shrink-0 tabular-nums">#{o.id}</span>
+            </div>
+          </div>
 
-          {/* Имя */}
-          <span className="font-oswald font-bold text-[13px] text-white uppercase tracking-tight truncate flex-1 min-w-0 leading-none">
-            {o.name}
+          {/* Статус-бейдж */}
+          <span
+            className="shrink-0 font-oswald font-bold text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md"
+            title={o.status === "new" ? URGENCY_TITLES[urgency] : accent.label}
+            style={{
+              background: `${accent.barColor}18`,
+              color: accent.barColor,
+              border: `1px solid ${accent.barColor}40`,
+              boxShadow: (isCritical || o.status === "ready") ? `0 0 8px ${accent.barColor}50` : "none",
+              animation: isCritical ? "pulse 1.2s ease-in-out infinite" : "none",
+            }}
+          >
+            {o.status === "new"
+              ? (isCritical ? "🚨 СРОЧНО" : isWarn ? "🔥 ДОЛГО" : "НОВАЯ")
+              : accent.label}
           </span>
-
-          {/* Бейдж срочности/статуса */}
-          {o.status === "new" ? (
-            <span
-              title={URGENCY_TITLES[urgency]}
-              className={`shrink-0 font-oswald font-bold text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-md ${
-                isCritical
-                  ? "bg-red-500/20 text-red-300 border border-red-500/40 animate-pulse"
-                  : isHot
-                    ? "bg-orange-500/15 text-orange-300 border border-orange-500/35"
-                    : "bg-orange-500/10 text-orange-400/80 border border-orange-500/20"
-              }`}
-            >
-              {isCritical ? "🚨 СРОЧНО" : urgency >= 3 ? "🔥" : "NEW"}
-            </span>
-          ) : (
-            <span
-              className={`shrink-0 font-oswald font-bold text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-md ${accent.bg} ${accent.text}`}
-              style={{ border: `1px solid ${accent.barColor}30` }}
-            >
-              {accent.label}
-            </span>
-          )}
 
           {/* Цена */}
           {mainPrice && (
-            <span className={`shrink-0 font-oswald font-bold text-[12px] tabular-nums ${mainPrice.color}`}>
+            <span
+              className="shrink-0 font-oswald font-bold text-[14px] tabular-nums"
+              style={{ color: mainPrice.isReal ? "#34d399" : accent.barColor }}
+            >
               {mainPrice.v.toLocaleString("ru-RU")}₽
             </span>
           )}
 
-          {/* ── Быстрые кнопки (только на закрытой) ── */}
+          {/* Быстрые кнопки (только на закрытой) */}
           {!isExpanded && (
-            <div className="shrink-0 flex items-center gap-0.5" onClick={e => e.stopPropagation()}>
-              {/* Позвонить */}
+            <div className="shrink-0 flex items-center gap-0.5 ml-0.5" onClick={e => e.stopPropagation()}>
               <a
                 href={`tel:${o.phone}`}
-                className="w-6 h-6 rounded-md bg-[#FFD700]/10 hover:bg-[#FFD700]/25 active:scale-90 flex items-center justify-center transition-all"
-                title={`Позвонить: ${o.phone}`}
+                className="w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:scale-110 active:scale-90"
+                style={{ background: `${accent.barColor}18`, color: accent.barColor }}
+                title={`Звонить: ${o.phone}`}
               >
-                <Icon name="Phone" size={11} className="text-[#FFD700]" />
+                <Icon name="Phone" size={12} />
               </a>
-
-              {/* Следующий статус */}
               {nextStatus && nextAccent && onQuickStatus && (
                 <button
                   onClick={() => onQuickStatus(nextStatus)}
-                  className="w-6 h-6 rounded-md hover:bg-white/8 active:scale-90 flex items-center justify-center transition-all"
-                  title={`→ ${nextAccent.label}`}
-                  style={{ color: nextAccent.barColor }}
+                  className="h-7 px-2 rounded-lg flex items-center gap-1 font-oswald font-bold text-[10px] uppercase tracking-wide transition-all hover:scale-105 active:scale-95"
+                  style={{ background: `${nextAccent.barColor}18`, color: nextAccent.barColor, border: `1px solid ${nextAccent.barColor}35` }}
+                  title={NEXT_LABEL[nextStatus] || `→ ${nextAccent.label}`}
                 >
-                  <Icon name="ArrowRight" size={11} />
+                  <Icon name="ArrowRight" size={10} />
+                  {nextAccent.label}
                 </button>
               )}
             </div>
           )}
 
           {/* Шеврон */}
-          <Icon
-            name={isExpanded ? "ChevronUp" : "ChevronDown"}
-            size={13}
-            className={`shrink-0 transition-colors ${isExpanded ? "text-[#FFD700]" : "text-white/25"}`}
+          <Icon name={isExpanded ? "ChevronUp" : "ChevronDown"} size={13}
+            className={`shrink-0 transition-colors ${isExpanded ? "text-[#FFD700]" : "text-white/20"}`}
           />
         </div>
 
-        {/* ── СТРОКА 2: телефон · модель · тип · мастер · аванс · дата ── */}
-        <div className="flex items-center gap-x-2 gap-y-0.5 mt-1 text-[11px] flex-wrap pl-[36px]">
-
+        {/* ── СТРОКА 2: телефон · модель · тип · заработок · дата ── */}
+        <div className="flex items-center gap-x-2.5 mt-1.5 pl-10 text-[11px] flex-wrap gap-y-0.5">
           {/* Телефон */}
-          <a
-            href={`tel:${o.phone}`}
-            onClick={e => e.stopPropagation()}
-            className="font-roboto text-white/45 hover:text-[#FFD700] tabular-nums inline-flex items-center gap-0.5 shrink-0 transition-colors"
-            title="Позвонить"
+          <a href={`tel:${o.phone}`} onClick={e => e.stopPropagation()}
+            className="font-roboto tabular-nums transition-colors shrink-0"
+            style={{ color: `${accent.barColor}cc` }}
           >
             {o.phone}
           </a>
 
-          {/* Разделитель */}
-          <span className="text-white/15 shrink-0">·</span>
+          {/* Модель */}
+          {(o.model || o.repair_type) && (
+            <>
+              <span className="text-white/15 shrink-0">·</span>
+              <span className="text-white/60 truncate min-w-0 inline-flex items-center gap-1">
+                <Icon name="Smartphone" size={9} className="text-white/25 shrink-0" />
+                <span className="truncate">
+                  {o.model}
+                  {o.repair_type && <span className="text-white/45"> · {o.repair_type}</span>}
+                </span>
+              </span>
+            </>
+          )}
 
-          {/* Модель + тип */}
-          <span className="text-white/65 inline-flex items-center gap-1 min-w-0 truncate">
-            <Icon name="Smartphone" size={9} className="text-white/30 shrink-0" />
-            <span className="truncate">
-              {o.model || <span className="text-white/25 italic">без модели</span>}
-              {o.repair_type && (
-                <span style={{ color: accent.barColor + "cc" }}> · {o.repair_type}</span>
-              )}
-            </span>
-          </span>
-
-          {/* Заработок мастера */}
+          {/* Мастер-заработок */}
           {masterCalc != null && masterCalc > 0 && (
-            <span className="text-emerald-400/70 inline-flex items-center gap-0.5 shrink-0 tabular-nums" title="Заработок мастера">
-              <Icon name="TrendingUp" size={9} />
-              {masterCalc.toLocaleString("ru-RU")}₽
-            </span>
+            <>
+              <span className="text-white/15 shrink-0">·</span>
+              <span className="text-emerald-400/70 inline-flex items-center gap-0.5 shrink-0 tabular-nums" title="Заработок мастера">
+                <Icon name="TrendingUp" size={9} />
+                {masterCalc.toLocaleString("ru-RU")}₽
+              </span>
+            </>
           )}
 
           {/* Аванс */}
           {!o.is_paid && o.advance != null && o.advance > 0 && (
-            <span className="text-blue-300/70 inline-flex items-center gap-0.5 shrink-0 tabular-nums" title="Аванс">
-              <Icon name="Wallet" size={9} />
-              {o.advance.toLocaleString("ru-RU")}₽
-            </span>
+            <>
+              <span className="text-white/15 shrink-0">·</span>
+              <span className="text-blue-300/60 inline-flex items-center gap-0.5 shrink-0 tabular-nums" title="Аванс">
+                <Icon name="Wallet" size={9} />
+                {o.advance.toLocaleString("ru-RU")}₽
+              </span>
+            </>
           )}
 
-          {/* Оплата — иконка способа */}
+          {/* Оплачено */}
           {o.is_paid && (
-            <span className="text-emerald-400/80 inline-flex items-center gap-0.5 shrink-0" title={`Оплачено: ${o.payment_method || ""}`}>
-              <Icon
-                name={o.payment_method === "cash" ? "Banknote" : o.payment_method === "card" ? "CreditCard" : o.payment_method === "sbp" ? "Zap" : "CheckCircle"}
-                size={10}
-              />
-              <span className="text-[10px]">оплачено</span>
-            </span>
+            <>
+              <span className="text-white/15 shrink-0">·</span>
+              <span className="text-emerald-400/70 inline-flex items-center gap-0.5 shrink-0" title="Оплачено">
+                <Icon name={o.payment_method === "cash" ? "Banknote" : o.payment_method === "card" ? "CreditCard" : "CheckCircle"} size={9} />
+                <span>оплачено</span>
+              </span>
+            </>
           )}
 
-          {/* Дата — правый край */}
-          <span className="ml-auto text-white/25 font-roboto text-[10px] tabular-nums shrink-0">
-            {fmt(o.created_at)}
+          {/* Дата — ПРАВЫЙ КРАЙ, жирнее */}
+          <span className="ml-auto font-roboto text-[10px] tabular-nums shrink-0 font-semibold" style={{ color: `${accent.barColor}80` }}>
+            {fmtShort(o.created_at)}
           </span>
         </div>
 
-        {/* ── СТРОКА 3: превью неисправности (закрытая) ── */}
+        {/* ── СТРОКА 3: описание неисправности ── */}
         {description && !isExpanded && (
-          <div className="mt-1 pl-[36px] pr-8">
-            <div className="text-[11px] text-white/40 truncate font-roboto leading-tight italic">
+          <div className="mt-1 pl-10 pr-8">
+            <span className="font-roboto text-[11px] italic line-clamp-1" style={{ color: "rgba(255,255,255,0.38)" }}>
               {description}
-            </div>
+            </span>
           </div>
         )}
 
-        {/* ── СТРОКА 4: запчасть в работе ── */}
+        {/* ── СТРОКА 4: запчасть ── */}
         {o.part_name && !isExpanded && (
-          <div className="mt-1 pl-[36px]">
-            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] ${
+          <div className="mt-1 pl-10">
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-roboto ${
               o.part_source === "stock"
-                ? "bg-emerald-500/10 text-emerald-300/80 border border-emerald-500/20"
-                : "bg-amber-500/10 text-amber-300/80 border border-amber-500/20"
+                ? "bg-emerald-500/10 text-emerald-400/80 border border-emerald-500/20"
+                : "bg-amber-500/10 text-amber-400/80 border border-amber-500/20"
             }`}>
               <Icon name={o.part_source === "stock" ? "Zap" : "Truck"} size={9} />
-              {o.part_source === "stock" ? "склад" : "заказ"}: {o.part_name}
+              {o.part_source === "stock" ? "склад" : "под заказ"}: {o.part_name}
             </span>
           </div>
         )}
