@@ -248,6 +248,112 @@ const STATS = [
   { val: "за день", lbl: "оценка и оплата" },
 ];
 
+const SOVIET_PRICES = [
+  {
+    category: "Ордена и медали",
+    icon: "🎖️",
+    color: "#ef4444",
+    items: [
+      { name: "Орден Ленина (ранний, 1930–45)", price: "80 000–150 000 ₽", hot: true },
+      { name: "Орден Красного Знамени (1918–24, I тип)", price: "40 000–100 000 ₽", hot: true },
+      { name: "Звезда Героя Соц. Труда", price: "50 000–120 000 ₽", hot: false },
+      { name: "Орден Октябрьской Революции", price: "20 000–60 000 ₽", hot: false },
+      { name: "Орден Красной Звезды", price: "15 000–50 000 ₽", hot: false },
+      { name: "Медаль «За отвагу» (ранний выпуск)", price: "5 000–20 000 ₽", hot: false },
+    ],
+  },
+  {
+    category: "Плакаты и графика",
+    icon: "🎨",
+    color: "#f97316",
+    items: [
+      { name: "Плакат Родченко (оригинал)", price: "100 000–500 000 ₽", hot: true },
+      { name: "Плакат РОСТА-Окна Маяковского", price: "50 000–200 000 ₽", hot: true },
+      { name: "Авангардный плакат 1920-х (оригинал)", price: "20 000–100 000 ₽", hot: false },
+      { name: "Агитплакат 1930–40-х (оригинал)", price: "5 000–30 000 ₽", hot: false },
+      { name: "Советский киноплакат 1950–60-х", price: "3 000–20 000 ₽", hot: false },
+    ],
+  },
+  {
+    category: "Агитационный фарфор",
+    icon: "🏺",
+    color: "#fb923c",
+    items: [
+      { name: "Тарелка с портретом Ленина (1924)", price: "100 000–300 000 ₽", hot: true },
+      { name: "Агитфарфор ГФЗ 1920–22 гг.", price: "200 000–500 000 ₽", hot: true },
+      { name: "Чашка с лозунгом (1920-е)", price: "80 000–200 000 ₽", hot: false },
+      { name: "Советский фарфор ЛФЗ (1950–60-е)", price: "3 000–50 000 ₽", hot: false },
+    ],
+  },
+  {
+    category: "Мебель и предметы",
+    icon: "🪑",
+    color: "#f59e0b",
+    items: [
+      { name: "Мебель конструктивизма (1920-е)", price: "100 000–500 000 ₽", hot: true },
+      { name: "Мебель сталинского ампира (1930–40-е)", price: "50 000–200 000 ₽", hot: false },
+      { name: "Советский сервант / буфет 1950–60-х", price: "20 000–80 000 ₽", hot: false },
+      { name: "Советские значки (коллекция 200+)", price: "30 000–100 000 ₽", hot: false },
+    ],
+  },
+];
+
+const SOVIET_STORIES = [
+  {
+    title: "Плакат с чердака",
+    tag: "Авангард 1920-х",
+    tagColor: "#f97316",
+    quote:
+      "Дед был художником в 1920-е. После смерти нашли папку с оригинальными плакатами. Думали, это просто старые бумаги.",
+    result: "320 000 ₽",
+    detail:
+      "Три плаката Лисицкого 1923–1925 годов. Оригинальные отпечатки на старой бумаге. Редчайшая находка.",
+  },
+  {
+    title: "Ордена прадеда",
+    tag: "ВОВ",
+    tagColor: "#ef4444",
+    quote:
+      "Прадед прошёл всю войну. Ордена лежали в шкатулке 70 лет. Решили узнать, сколько они стоят.",
+    result: "185 000 ₽",
+    detail:
+      "Орден Ленина (1943), два ордена Красной Звезды + боевые медали с документами к наградам.",
+  },
+  {
+    title: "Стул с чёрно-белой фото",
+    tag: "Конструктивизм",
+    tagColor: "#f59e0b",
+    quote:
+      "На семейной фото 1928 года дед сидит на необычном стуле. Стул сохранился. Решили проверить у антикваров.",
+    result: "240 000 ₽",
+    detail:
+      "Стул конструктивизма, предположительно работы мастерских ВХУТЕМАСа. Фото подтвердило провенанс.",
+  },
+];
+
+const SOVIET_FAQ = [
+  {
+    q: "Значки СССР — это реально деньги?",
+    a: "Отдельные значки стоят 200–5 000 ₽. Но тематическая коллекция 200+ штук — это уже 30 000–100 000 ₽. Особенно ценятся значки 1930–50-х годов, значки ОСОАВИАХИМ, ГТО, авиационные и военные серии.",
+  },
+  {
+    q: "Плакат 1930-х стоит 100 000 ₽?",
+    a: "Оригинальный авангардный плакат — да! Переиздания 1980–90-х годов стоят только 3 000–15 000 ₽. Отличие: оригинал на старой плотной бумаге, печать высокого давления, возраст краски. Нужна экспертиза.",
+  },
+  {
+    q: "Как понять, настоящий ли орден?",
+    a: "На оборотной стороне — номер и клеймо монетного двора. Ранние ордена (1930–40-е) тяжелее, серебро с эмалью. Подделки обычно легче, клейма нечёткие. Документы к ордену (орденская книжка) увеличивают цену на 50–100%.",
+  },
+  {
+    q: "Мебель авангарда — много подделок?",
+    a: "Да, около 70–80% продаваемой «мебели авангарда» — современные копии или реплики. Подлинник имеет естественный износ дерева, старые крепёжные элементы (шурупы, гвозди), характерные следы времени. Лучшее подтверждение — старые фото с предметом.",
+  },
+  {
+    q: "Берёте ли советские деньги и монеты?",
+    a: "Да! Монеты СССР 1921–1957 годов — активный рынок. Серебро 1920-х стоит 500–10 000 ₽ за монету. Редкие разновидности 1930-х доходят до 50 000 ₽. Боны (бумажные деньги) первых лет советской власти — 500–30 000 ₽.",
+  },
+];
+
 export default function SovietAntiques() {
   const [activeTab, setActiveTab] = useState(0);
   const [formOpen, setFormOpen] = useState(false);
@@ -255,6 +361,7 @@ export default function SovietAntiques() {
   const [sent, setSent] = useState(false);
   const [ctaPhone, setCtaPhone] = useState("");
   const [ctaSent, setCtaSent] = useState(false);
+  const [activeFaq, setActiveFaq] = useState<number | null>(null);
 
   const handleModalSend = () => {
     if (phone.replace(/\D/g, "").length < 10) return;
@@ -650,6 +757,207 @@ export default function SovietAntiques() {
               </div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* ══ ЧТО И СКОЛЬКО СТОИТ ══ */}
+      <section className="max-w-6xl mx-auto px-4 py-14 md:py-20">
+        <div className="mb-10">
+          <div
+            className="inline-flex items-center gap-1.5 text-[10px] font-roboto uppercase tracking-widest px-2.5 py-1 rounded-full mb-3 border"
+            style={{
+              background: `${ACCENT}15`,
+              borderColor: `${ACCENT}40`,
+              color: ACCENT,
+            }}
+          >
+            <Icon name="Coins" size={10} />
+            Актуальные цены
+          </div>
+          <h2 className="font-oswald font-bold text-3xl md:text-4xl uppercase">
+            Что и сколько{" "}
+            <span style={{ color: ACCENT }}>стоит</span>
+          </h2>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-5">
+          {SOVIET_PRICES.map((cat, i) => (
+            <div
+              key={i}
+              className="bg-[#0D0D0D] border border-white/[0.06] rounded-xl overflow-hidden"
+              style={{ borderTopColor: cat.color, borderTopWidth: 2 }}
+            >
+              <div className="px-5 pt-5 pb-4 flex items-center gap-2 border-b border-white/[0.05]">
+                <span className="text-xl leading-none">{cat.icon}</span>
+                <span
+                  className="font-oswald font-bold text-base"
+                  style={{ color: cat.color }}
+                >
+                  {cat.category}
+                </span>
+              </div>
+              <div className="p-5 flex flex-col gap-2.5">
+                {cat.items.map((item, j) => (
+                  <div
+                    key={j}
+                    className="flex items-start justify-between gap-3"
+                  >
+                    <span className="font-roboto text-white/60 text-sm leading-relaxed">
+                      {item.name}
+                    </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {item.hot && (
+                        <span
+                          className="font-roboto text-[10px] px-1.5 py-0.5 rounded-full whitespace-nowrap"
+                          style={{
+                            background: `${ACCENT}20`,
+                            color: ACCENT,
+                            border: `1px solid ${ACCENT}40`,
+                          }}
+                        >
+                          🔥 Горячий спрос
+                        </span>
+                      )}
+                      <span
+                        className="font-oswald font-bold text-sm whitespace-nowrap"
+                        style={{ color: cat.color }}
+                      >
+                        {item.price}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ══ РЕАЛЬНЫЕ ИСТОРИИ ══ */}
+      <section
+        className="py-14 md:py-20 border-t"
+        style={{ borderColor: `${ACCENT}15`, background: "#0A0A0A" }}
+      >
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="mb-10">
+            <div
+              className="inline-flex items-center gap-1.5 text-[10px] font-roboto uppercase tracking-widest px-2.5 py-1 rounded-full mb-3 border"
+              style={{
+                background: `${ACCENT}15`,
+                borderColor: `${ACCENT}40`,
+                color: ACCENT,
+              }}
+            >
+              <Icon name="Users" size={10} />
+              Истории клиентов
+            </div>
+            <h2 className="font-oswald font-bold text-3xl md:text-4xl uppercase">
+              Реальные истории{" "}
+              <span style={{ color: ACCENT }}>наших клиентов</span>
+            </h2>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-5">
+            {SOVIET_STORIES.map((s, i) => (
+              <div
+                key={i}
+                className="bg-[#0D0D0D] border border-white/[0.06] p-6 rounded-xl flex flex-col gap-4"
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className="font-roboto text-[10px] uppercase tracking-widest px-2.5 py-1 rounded-full font-bold"
+                    style={{
+                      background: `${s.tagColor}20`,
+                      color: s.tagColor,
+                      border: `1px solid ${s.tagColor}40`,
+                    }}
+                  >
+                    {s.tag}
+                  </span>
+                  <span className="font-oswald font-bold text-sm text-white/70">
+                    {s.title}
+                  </span>
+                </div>
+                <p className="font-roboto text-white/60 text-sm leading-relaxed italic flex-1">
+                  «{s.quote}»
+                </p>
+                <div>
+                  <div
+                    className="font-oswald font-black text-3xl"
+                    style={{ color: ACCENT }}
+                  >
+                    {s.result}
+                  </div>
+                  <div className="font-roboto text-white/35 text-xs mt-1 leading-relaxed">
+                    {s.detail}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ══ ЧАСТЫЕ ВОПРОСЫ ══ */}
+      <section className="max-w-6xl mx-auto px-4 py-14 md:py-20">
+        <div className="mb-10">
+          <div
+            className="inline-flex items-center gap-1.5 text-[10px] font-roboto uppercase tracking-widest px-2.5 py-1 rounded-full mb-3 border"
+            style={{
+              background: `${ACCENT}15`,
+              borderColor: `${ACCENT}40`,
+              color: ACCENT,
+            }}
+          >
+            <Icon name="HelpCircle" size={10} />
+            FAQ
+          </div>
+          <h2 className="font-oswald font-bold text-3xl md:text-4xl uppercase">
+            Частые{" "}
+            <span style={{ color: ACCENT }}>вопросы</span>
+          </h2>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          {SOVIET_FAQ.map((item, i) => {
+            const isOpen = activeFaq === i;
+            return (
+              <div
+                key={i}
+                className="bg-[#0D0D0D] border rounded-xl overflow-hidden transition-colors"
+                style={{
+                  borderColor: isOpen
+                    ? `${ACCENT}40`
+                    : "rgba(255,255,255,0.06)",
+                }}
+              >
+                <button
+                  className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left"
+                  onClick={() => setActiveFaq(isOpen ? null : i)}
+                >
+                  <span className="font-oswald font-bold text-base leading-snug">
+                    {item.q}
+                  </span>
+                  <span
+                    className="shrink-0 transition-transform duration-300"
+                    style={{
+                      color: ACCENT,
+                      transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+                    }}
+                  >
+                    <Icon name="ChevronDown" size={18} />
+                  </span>
+                </button>
+                {isOpen && (
+                  <div className="px-5 pb-5">
+                    <p className="font-roboto text-white/55 text-sm leading-relaxed">
+                      {item.a}
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </section>
 

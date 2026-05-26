@@ -236,6 +236,64 @@ const STATS = [
   { val: "бесплатно", lbl: "оценка при визите" },
 ];
 
+const CONDITION_GRADES = [
+  { grade: "10/10", label: "Идеальное", color: "#4ade80", desc: "Нет сколов, царапин, трещин. Роспись яркая, неповреждённая. Клеймо чёткое.", modifier: "Максимальная цена" },
+  { grade: "8/10", label: "Отличное", color: "#86efac", desc: "Очень мелкие царапины видны только под лупой. Роспись почти как новая.", modifier: "−5–10% от максимума" },
+  { grade: "6/10", label: "Хорошее", color: "#fbbf24", desc: "Видны потёртости, небольшие сколы на краях. Роспись местами потемнела.", modifier: "−20–30% от максимума" },
+  { grade: "4/10", label: "Среднее", color: "#fb923c", desc: "Несколько сколов, требуется деликатная чистка. Роспись повреждена.", modifier: "−40–50% от максимума" },
+  { grade: "2/10", label: "Требует реставрации", color: "#ef4444", desc: "Серьёзные повреждения. Трещины, утраты росписи. Нужна профессиональная реставрация.", modifier: "−60–80% от максимума" },
+];
+
+const STORIES = [
+  {
+    title: "Крестьянка из Брянска",
+    tag: "Гарднер",
+    tagColor: "#3b82f6",
+    quote: "Нашла в сундуке деда статуэтку Гарднера «Крестьянка в сарафане». Дед привёз её с войны, забыл про неё.",
+    result: "180 000 ₽",
+    detail: "Статуэтка Гарднера «Русские типы», 1890-е годы, идеальная сохранность",
+  },
+  {
+    title: "Наследство от бабушки",
+    tag: "ИФЗ",
+    tagColor: "#60a5fa",
+    quote: "После смерти бабушки нашли шкаф, полный фарфоровых вещей. Целая коллекция ИФЗ — чашки, блюдца, вазы.",
+    result: "450 000 ₽",
+    detail: "Чайный сервиз XIX в. (12 предметов) + 3 вазы с видами Петербурга",
+  },
+  {
+    title: "Чердак старого дома",
+    tag: "Гарднер",
+    tagColor: "#3b82f6",
+    quote: "При уборке чердака нашли деревянный ящик. Внутри — три статуэтки Гарднера в отличном состоянии!",
+    result: "530 000 ₽",
+    detail: "Три фигурки «Русских типов»: Музыкант (200 т.р.), Торговец (180 т.р.), Крестьянин (150 т.р.)",
+  },
+];
+
+const FAQ_ITEMS = [
+  {
+    q: "Мой фарфор из советских времён, он ценный?",
+    a: "Советский фарфор ЛФЗ 1950–1970-х стоит 3 000–50 000 ₽ за предмет. Особенно ценятся фигурки балерин, спортсменов и редкие авторские серии. Агитационный фарфор 1920-х — отдельная история, там цены от 50 000 ₽.",
+  },
+  {
+    q: "Фарфор разбит, вы берёте?",
+    a: "Берём при условии, что основные элементы целы. Трещины и склеенные сколы снижают цену на 30–60%, но музейного уровня предметы покупаем даже в повреждённом состоянии — они всё равно ценнее целого массового экземпляра.",
+  },
+  {
+    q: "Как отличить ИФЗ от подделки?",
+    a: "Клеймо ИФЗ наносится под глазурью — его нельзя нанести на готовый предмет. Подлинный фарфор на просвет чисто белый без желтизны. Ручная роспись имеет видимые мазки кисти, деколь (переводная картинка) — механически ровная.",
+  },
+  {
+    q: "Стоит ли чистить старый фарфор перед продажей?",
+    a: "Не чистите сами! Неправильная чистка необратимо повреждает роспись. Профессиональная чистка стоит 2 000–10 000 ₽ за предмет и может поднять цену в 1,5–2 раза. Лучше привезите как есть — мы оцениваем с учётом потенциала.",
+  },
+  {
+    q: "Как перевезти фарфор без риска?",
+    a: "Каждый предмет отдельно заверните в пузырчатую плёнку, затем в мягкую ткань. Никогда не кладите фарфор в одну коробку без разделителей. Мы можем организовать курьерскую доставку с профессиональной упаковкой.",
+  },
+];
+
 export default function RussianPorcelain() {
   const [activeTab, setActiveTab] = useState(0);
   const [formOpen, setFormOpen] = useState(false);
@@ -243,6 +301,7 @@ export default function RussianPorcelain() {
   const [sent, setSent] = useState(false);
   const [ctaPhone, setCtaPhone] = useState("");
   const [ctaSent, setCtaSent] = useState(false);
+  const [activeFaq, setActiveFaq] = useState<number | null>(null);
 
   const handleModalSend = () => {
     if (phone.replace(/\D/g, "").length < 10) return;
@@ -638,6 +697,177 @@ export default function RussianPorcelain() {
               </div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* ══ СОСТОЯНИЕ И ЦЕНА ══ */}
+      <section className="max-w-6xl mx-auto px-4 py-14 md:py-20">
+        <div className="mb-10">
+          <div
+            className="inline-flex items-center gap-1.5 text-[10px] font-roboto uppercase tracking-widest px-2.5 py-1 rounded-full mb-3 border"
+            style={{
+              background: `${ACCENT}15`,
+              borderColor: `${ACCENT}40`,
+              color: ACCENT,
+            }}
+          >
+            <Icon name="Star" size={10} />
+            Оценка сохранности
+          </div>
+          <h2 className="font-oswald font-bold text-3xl md:text-4xl uppercase">
+            Состояние{" "}
+            <span style={{ color: ACCENT }}>определяет цену</span>
+          </h2>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          {CONDITION_GRADES.map((g, i) => (
+            <div
+              key={i}
+              className="flex items-center gap-4 bg-[#0D0D0D] border border-white/[0.06] px-5 py-4 rounded-xl"
+            >
+              <div
+                className="w-14 h-14 rounded-full flex items-center justify-center shrink-0 font-oswald font-black text-sm"
+                style={{ background: `${g.color}20`, color: g.color, border: `2px solid ${g.color}40` }}
+              >
+                {g.grade}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-oswald font-bold text-base mb-0.5" style={{ color: g.color }}>
+                  {g.label}
+                </div>
+                <div className="font-roboto text-white/50 text-sm leading-relaxed">
+                  {g.desc}
+                </div>
+              </div>
+              <div
+                className="font-oswald font-bold text-sm text-right shrink-0 ml-4 whitespace-nowrap"
+                style={{ color: g.color }}
+              >
+                {g.modifier}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ══ РЕАЛЬНЫЕ ИСТОРИИ ══ */}
+      <section
+        className="py-14 md:py-20 border-t"
+        style={{ borderColor: `${ACCENT}15`, background: "#0A0A0A" }}
+      >
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="mb-10">
+            <div
+              className="inline-flex items-center gap-1.5 text-[10px] font-roboto uppercase tracking-widest px-2.5 py-1 rounded-full mb-3 border"
+              style={{
+                background: `${ACCENT}15`,
+                borderColor: `${ACCENT}40`,
+                color: ACCENT,
+              }}
+            >
+              <Icon name="Users" size={10} />
+              Истории клиентов
+            </div>
+            <h2 className="font-oswald font-bold text-3xl md:text-4xl uppercase">
+              Реальные истории{" "}
+              <span style={{ color: ACCENT }}>наших клиентов</span>
+            </h2>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-5">
+            {STORIES.map((s, i) => (
+              <div
+                key={i}
+                className="bg-[#0D0D0D] border border-white/[0.06] p-6 rounded-xl flex flex-col gap-4"
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className="font-roboto text-[10px] uppercase tracking-widest px-2.5 py-1 rounded-full font-bold"
+                    style={{ background: `${s.tagColor}20`, color: s.tagColor, border: `1px solid ${s.tagColor}40` }}
+                  >
+                    {s.tag}
+                  </span>
+                  <span className="font-oswald font-bold text-sm text-white/70">
+                    {s.title}
+                  </span>
+                </div>
+                <p className="font-roboto text-white/60 text-sm leading-relaxed italic flex-1">
+                  «{s.quote}»
+                </p>
+                <div>
+                  <div
+                    className="font-oswald font-black text-3xl"
+                    style={{ color: "#fbbf24" }}
+                  >
+                    {s.result}
+                  </div>
+                  <div className="font-roboto text-white/35 text-xs mt-1 leading-relaxed">
+                    {s.detail}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ══ ЧАСТЫЕ ВОПРОСЫ ══ */}
+      <section className="max-w-6xl mx-auto px-4 py-14 md:py-20">
+        <div className="mb-10">
+          <div
+            className="inline-flex items-center gap-1.5 text-[10px] font-roboto uppercase tracking-widest px-2.5 py-1 rounded-full mb-3 border"
+            style={{
+              background: `${ACCENT}15`,
+              borderColor: `${ACCENT}40`,
+              color: ACCENT,
+            }}
+          >
+            <Icon name="HelpCircle" size={10} />
+            FAQ
+          </div>
+          <h2 className="font-oswald font-bold text-3xl md:text-4xl uppercase">
+            Частые{" "}
+            <span style={{ color: ACCENT }}>вопросы</span>
+          </h2>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          {FAQ_ITEMS.map((item, i) => {
+            const isOpen = activeFaq === i;
+            return (
+              <div
+                key={i}
+                className="bg-[#0D0D0D] border rounded-xl overflow-hidden transition-colors"
+                style={{ borderColor: isOpen ? `${ACCENT}40` : "rgba(255,255,255,0.06)" }}
+              >
+                <button
+                  className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left"
+                  onClick={() => setActiveFaq(isOpen ? null : i)}
+                >
+                  <span className="font-oswald font-bold text-base leading-snug">
+                    {item.q}
+                  </span>
+                  <span
+                    className="shrink-0 transition-transform duration-300"
+                    style={{
+                      color: ACCENT,
+                      transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+                    }}
+                  >
+                    <Icon name="ChevronDown" size={18} />
+                  </span>
+                </button>
+                {isOpen && (
+                  <div className="px-5 pb-5">
+                    <p className="font-roboto text-white/55 text-sm leading-relaxed">
+                      {item.a}
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </section>
 

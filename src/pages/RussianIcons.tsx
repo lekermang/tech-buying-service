@@ -236,6 +236,123 @@ const STATS = [
   { val: "бесплатно", lbl: "оценка при визите" },
 ];
 
+const ICON_PRICES = [
+  {
+    school: "Новгородская школа",
+    period: "XIV–XVII в.",
+    min: "100 000 ₽",
+    max: "1 000 000 ₽",
+    color: "#e2a84b",
+    examples: [
+      "Святой Георгий (XVI в.) — от 300 000 ₽",
+      "Богоматерь Одигитрия (XV в.) — от 400 000 ₽",
+      "Святая Параскева (XVII в.) — от 200 000 ₽",
+    ],
+  },
+  {
+    school: "Московская школа",
+    period: "XV–XIX в.",
+    min: "150 000 ₽",
+    max: "2 000 000 ₽",
+    color: "#fbbf24",
+    examples: [
+      "Школа Рублёва (XV в.) — от 1 000 000 ₽",
+      "Из царского иконостаса (XVII в.) — от 500 000 ₽",
+      "XIX век — от 100 000 ₽",
+    ],
+  },
+  {
+    school: "Строгановская школа",
+    period: "XVI–XVII в.",
+    min: "200 000 ₽",
+    max: "1 500 000 ₽",
+    color: "#f59e0b",
+    examples: [
+      "Святители (XVI в.) — от 300 000 ₽",
+      "С драгоценными камнями — от 800 000 ₽",
+    ],
+  },
+  {
+    school: "Псковская школа",
+    period: "XV–XVI в.",
+    min: "80 000 ₽",
+    max: "800 000 ₽",
+    color: "#d97706",
+    examples: [
+      "Экспрессивный стиль, редкие сюжеты",
+      "Флоровская икона (XVI в.) — от 200 000 ₽",
+    ],
+  },
+  {
+    school: "Домашние иконы XVIII–XIX в.",
+    period: "XVIII–XIX в.",
+    min: "10 000 ₽",
+    max: "100 000 ₽",
+    color: "#92400e",
+    examples: [
+      "Неочищенная (в копоти) — от 10 000 ₽",
+      "После профчистки цена ×2–3",
+      "Казанская, Владимирская — самые популярные",
+    ],
+  },
+];
+
+const ICON_STORIES = [
+  {
+    title: "Икона со стены тётушки",
+    tag: "XVII в.",
+    tagColor: "#e2a84b",
+    quote:
+      "Тётя умерла, остался дом с иконами. Одна выглядела совсем чёрной — думали, это гравюра. Отнесли на экспертизу.",
+    result: "450 000 ₽",
+    detail:
+      "Икона XVII века. Под копотью — красивейшая роспись Московской школы. После профчистки.",
+  },
+  {
+    title: "Нашли в стене при ремонте",
+    tag: "XVI в.",
+    tagColor: "#fbbf24",
+    quote:
+      "При ремонте старого дома в Суздале рабочие нашли икону, заложенную в стену. Хозяева спрятали её в советское время.",
+    result: "850 000 ₽",
+    detail:
+      "Строгановская школа, XVI век. Прекрасная сохранность — стена защитила от света и влаги.",
+  },
+  {
+    title: "Наследство бабушки",
+    tag: "Коллекция",
+    tagColor: "#f59e0b",
+    quote:
+      "Бабушка собирала иконы всю жизнь. После её смерти в доме нашли 15 икон разных периодов. Не знали, что делать.",
+    result: "2 000 000 ₽",
+    detail:
+      "Московская школа XVI в. — 900 т.р., Казанская с окладом XVII в. — 450 т.р., иконы XIX в. — 650 т.р.",
+  },
+];
+
+const ICON_FAQ = [
+  {
+    q: "Как узнать, подлинная ли икона?",
+    a: "Нужна экспертиза. Мы проводим её бесплатно при визите. Проверяем доску (дерево, ковчег, паволока), красочный слой (темпера, левкас), оклад (клеймо мастера, проба). Часто достаточно одного взгляда опытного эксперта.",
+  },
+  {
+    q: "Икона очень чёрная, стоит ли чистить перед продажей?",
+    a: "Не чистите сами! Самостоятельная чистка может необратимо повредить красочный слой. Профессиональная чистка стоит 10 000–30 000 ₽ и поднимает цену в 2–3 раза. Привезите как есть — мы оцениваем потенциал и чистый результат.",
+  },
+  {
+    q: "Икона повреждена — вы всё равно берёте?",
+    a: "Да. Повреждение снижает цену, но иконы высокого художественного уровня покупаем даже в плохом состоянии. После профессиональной реставрации (30 000–150 000 ₽) стоимость вырастает на 200–300%. Это инвестиция.",
+  },
+  {
+    q: "Как определить школу иконописи?",
+    a: "Новгородская — яркие краски, округлые фигуры, архитектурные фоны. Московская — строгие вытянутые фигуры, золотые ассисты. Строгановская — миниатюрные детали, богатый резной фон. Но точно определить школу может только специалист.",
+  },
+  {
+    q: "Можно ли продать икону из церкви или монастыря?",
+    a: "Иконы, принадлежащие действующим храмам, продавать нельзя. Мы работаем только с частными коллекциями и наследством. Происхождение из частного дома — достаточное основание для сделки.",
+  },
+];
+
 export default function RussianIcons() {
   const [activeTab, setActiveTab] = useState(0);
   const [formOpen, setFormOpen] = useState(false);
@@ -243,6 +360,7 @@ export default function RussianIcons() {
   const [sent, setSent] = useState(false);
   const [ctaPhone, setCtaPhone] = useState("");
   const [ctaSent, setCtaSent] = useState(false);
+  const [activeFaq, setActiveFaq] = useState<number | null>(null);
 
   const handleModalSend = () => {
     if (phone.replace(/\D/g, "").length < 10) return;
@@ -653,6 +771,207 @@ export default function RussianIcons() {
               </div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* ══ ЦЕНЫ ПО ШКОЛАМ ══ */}
+      <section className="max-w-6xl mx-auto px-4 py-14 md:py-20">
+        <div className="mb-10">
+          <div
+            className="inline-flex items-center gap-1.5 text-[10px] font-roboto uppercase tracking-widest px-2.5 py-1 rounded-full mb-3 border"
+            style={{
+              background: `${ACCENT}15`,
+              borderColor: `${ACCENT}40`,
+              color: ACCENT,
+            }}
+          >
+            <Icon name="Coins" size={10} />
+            Ценообразование
+          </div>
+          <h2 className="font-oswald font-bold text-3xl md:text-4xl uppercase">
+            Сколько стоит{" "}
+            <span style={{ color: ACCENT }}>ваша икона?</span>
+          </h2>
+        </div>
+
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {ICON_PRICES.map((p, i) => (
+            <div
+              key={i}
+              className="bg-[#0D0D0D] border border-white/[0.06] rounded-xl overflow-hidden flex flex-col"
+              style={{ borderTopColor: p.color, borderTopWidth: 2 }}
+            >
+              <div className="p-5 flex flex-col gap-3 flex-1">
+                <div>
+                  <div className="font-oswald font-bold text-base leading-tight mb-0.5">
+                    {p.school}
+                  </div>
+                  <div
+                    className="font-roboto text-xs"
+                    style={{ color: `${p.color}99` }}
+                  >
+                    {p.period}
+                  </div>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span
+                    className="font-oswald font-black text-2xl leading-none"
+                    style={{ color: p.color }}
+                  >
+                    {p.min}
+                  </span>
+                  <span className="font-roboto text-white/30 text-xs">—</span>
+                  <span
+                    className="font-oswald font-bold text-lg leading-none"
+                    style={{ color: `${p.color}bb` }}
+                  >
+                    {p.max}
+                  </span>
+                </div>
+                <ul className="flex flex-col gap-1 mt-auto">
+                  {p.examples.map((ex, j) => (
+                    <li key={j} className="flex items-start gap-1.5">
+                      <span
+                        className="mt-1.5 w-1 h-1 rounded-full shrink-0"
+                        style={{ background: p.color }}
+                      />
+                      <span className="font-roboto text-white/45 text-xs leading-relaxed">
+                        {ex}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ══ РЕАЛЬНЫЕ ИСТОРИИ ══ */}
+      <section
+        className="py-14 md:py-20 border-t"
+        style={{ borderColor: `${ACCENT}15`, background: "#0A0A0A" }}
+      >
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="mb-10">
+            <div
+              className="inline-flex items-center gap-1.5 text-[10px] font-roboto uppercase tracking-widest px-2.5 py-1 rounded-full mb-3 border"
+              style={{
+                background: `${ACCENT}15`,
+                borderColor: `${ACCENT}40`,
+                color: ACCENT,
+              }}
+            >
+              <Icon name="Users" size={10} />
+              Истории клиентов
+            </div>
+            <h2 className="font-oswald font-bold text-3xl md:text-4xl uppercase">
+              Реальные истории{" "}
+              <span style={{ color: ACCENT }}>наших клиентов</span>
+            </h2>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-5">
+            {ICON_STORIES.map((s, i) => (
+              <div
+                key={i}
+                className="bg-[#0D0D0D] border border-white/[0.06] p-6 rounded-xl flex flex-col gap-4"
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className="font-roboto text-[10px] uppercase tracking-widest px-2.5 py-1 rounded-full font-bold"
+                    style={{
+                      background: `${s.tagColor}20`,
+                      color: s.tagColor,
+                      border: `1px solid ${s.tagColor}40`,
+                    }}
+                  >
+                    {s.tag}
+                  </span>
+                  <span className="font-oswald font-bold text-sm text-white/70">
+                    {s.title}
+                  </span>
+                </div>
+                <p className="font-roboto text-white/60 text-sm leading-relaxed italic flex-1">
+                  «{s.quote}»
+                </p>
+                <div>
+                  <div
+                    className="font-oswald font-black text-3xl"
+                    style={{ color: ACCENT }}
+                  >
+                    {s.result}
+                  </div>
+                  <div className="font-roboto text-white/35 text-xs mt-1 leading-relaxed">
+                    {s.detail}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ══ ЧАСТЫЕ ВОПРОСЫ ══ */}
+      <section className="max-w-6xl mx-auto px-4 py-14 md:py-20">
+        <div className="mb-10">
+          <div
+            className="inline-flex items-center gap-1.5 text-[10px] font-roboto uppercase tracking-widest px-2.5 py-1 rounded-full mb-3 border"
+            style={{
+              background: `${ACCENT}15`,
+              borderColor: `${ACCENT}40`,
+              color: ACCENT,
+            }}
+          >
+            <Icon name="HelpCircle" size={10} />
+            FAQ
+          </div>
+          <h2 className="font-oswald font-bold text-3xl md:text-4xl uppercase">
+            Частые{" "}
+            <span style={{ color: ACCENT }}>вопросы</span>
+          </h2>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          {ICON_FAQ.map((item, i) => {
+            const isOpen = activeFaq === i;
+            return (
+              <div
+                key={i}
+                className="bg-[#0D0D0D] border rounded-xl overflow-hidden transition-colors"
+                style={{
+                  borderColor: isOpen
+                    ? `${ACCENT}40`
+                    : "rgba(255,255,255,0.06)",
+                }}
+              >
+                <button
+                  className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left"
+                  onClick={() => setActiveFaq(isOpen ? null : i)}
+                >
+                  <span className="font-oswald font-bold text-base leading-snug">
+                    {item.q}
+                  </span>
+                  <span
+                    className="shrink-0 transition-transform duration-300"
+                    style={{
+                      color: ACCENT,
+                      transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+                    }}
+                  >
+                    <Icon name="ChevronDown" size={18} />
+                  </span>
+                </button>
+                {isOpen && (
+                  <div className="px-5 pb-5">
+                    <p className="font-roboto text-white/55 text-sm leading-relaxed">
+                      {item.a}
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </section>
 
