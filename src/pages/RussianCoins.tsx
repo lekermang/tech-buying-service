@@ -3,6 +3,8 @@ import Icon from "@/components/ui/icon";
 import Header from "@/components/skupka/Header";
 import ContactsFooter from "@/components/skupka/ContactsFooter";
 
+const SEND_LEAD_URL = "https://functions.poehali.dev/52666ff7-db52-4b6a-a90e-d60aeed699de";
+
 const HERO_IMG =
   "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/cb78bd34-b88a-42fd-9a35-072ba558015a.jpg";
 
@@ -330,13 +332,15 @@ export default function RussianCoins() {
   const [ctaSent, setCtaSent] = useState(false);
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
 
-  const handleModalSend = () => {
+  const handleModalSend = async () => {
     if (phone.replace(/\D/g, "").length < 10) return;
+    fetch(SEND_LEAD_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone, name: "Клиент", category: "Царские монеты", desc: "Заявка с формы оценки монеты" }) }).catch(() => {});
     setSent(true);
   };
 
-  const handleCtaSend = () => {
+  const handleCtaSend = async () => {
     if (ctaPhone.replace(/\D/g, "").length < 10) return;
+    fetch(SEND_LEAD_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone: ctaPhone, name: "Клиент", category: "Царские монеты", desc: "Заявка с CTA блока — Перезвоните мне" }) }).catch(() => {});
     setCtaSent(true);
   };
 

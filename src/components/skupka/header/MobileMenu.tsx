@@ -100,12 +100,12 @@ const MobileMenu = ({ open, navLinks, onNav }: MobileMenuProps) => {
           <Icon name="MessageCircle" size={18} />
           Написать в Telegram
         </a>
-        <a href="https://max.ru/id402810962699_biz"
+        <a href="https://max.ru/id402810962699_bot"
           target="_blank" rel="noopener noreferrer"
           onClick={() => ymGoal(Goals.MAX_CLICK, { place: "mobile_menu" })}
           className="flex items-center justify-center gap-3 w-full border-2 border-[#0077FF]/50 text-[#0077FF] font-oswald font-bold text-base py-3.5 uppercase tracking-wide active:scale-95 transition-all">
           <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#0077FF] text-white text-[10px] font-extrabold tracking-tight">MAX</span>
-          Канал в MAX
+          Написать в MAX
         </a>
         <a href="/staff"
           className="flex items-center justify-center gap-2 w-full border border-[#1F1F1F] bg-[#0A0A0A] text-white/80 hover:text-white hover:border-white/30 font-oswald font-bold text-sm py-3 uppercase tracking-wide rounded-md active:scale-95 transition-all">

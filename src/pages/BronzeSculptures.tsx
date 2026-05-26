@@ -3,6 +3,8 @@ import Icon from "@/components/ui/icon";
 import Header from "@/components/skupka/Header";
 import ContactsFooter from "@/components/skupka/ContactsFooter";
 
+const SEND_LEAD_URL = "https://functions.poehali.dev/52666ff7-db52-4b6a-a90e-d60aeed699de";
+
 const HERO_IMG = "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/13c9f8e4-9437-436b-9adc-52f0be22cfae.jpg";
 
 const CATEGORIES = [
@@ -85,8 +87,9 @@ export default function BronzeSculptures() {
   const [phone, setPhone] = useState("");
   const [sent, setSent] = useState(false);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (phone.replace(/\D/g, "").length < 10) return;
+    fetch(SEND_LEAD_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ phone, name: "Клиент", category: "Бронзовые статуэтки", desc: "Заявка с формы оценки статуэтки" }) }).catch(() => {});
     setSent(true);
   };
 
