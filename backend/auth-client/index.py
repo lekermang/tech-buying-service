@@ -156,24 +156,32 @@ def handler(event: dict, context) -> dict:
         email = body.get('email', '').strip()
         if not phone or not full_name:
             return _err(400, 'Телефон и ФИО обязательны')
-        conn = get_conn(); cur = conn.cursor()
-        cur.execute(f"SELECT id, auth_token FROM {SCHEMA}.clients WHERE phone=%s", (phone,))
-        existing = cur.fetchone()
-        if existing:
-            # уже есть — обновим токен и вернём
-            token = make_token()
-            expires = datetime.utcnow() + timedelta(days=90)
-            cur.execute(f"UPDATE {SCHEMA}.clients SET auth_token=%s, token_expires_at=%s, full_name=%s, email=%s, updated_at=NOW() WHERE phone=%s", (token, expires, full_name, email or None, phone))
-            conn.commit(); cur.close(); conn.close()
-            return _ok({'token': token, 'is_new': False, 'message': 'Добро пожаловать!'})
         token = make_token()
         expires = datetime.utcnow() + timedelta(days=90)
-        cur.execute(f"INSERT INTO {SCHEMA}.clients (full_name, phone, email, auth_token, token_expires_at) VALUES (%s,%s,%s,%s,%s) RETURNING id, discount_pct",
-                    (full_name, phone, email or None, token, expires))
+        conn = get_conn(); cur = conn.cursor()
+        # ON CONFLICT — защита от race condition при двойном нажатии или параллельных запросах
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.clients (full_name, phone, email, auth_token, token_expires_at) "
+            f"VALUES (%s,%s,%s,%s,%s) "
+            f"ON CONFLICT (phone) DO UPDATE SET "
+            f"  auth_token=EXCLUDED.auth_token, "
+            f"  token_expires_at=EXCLUDED.token_expires_at, "
+            f"  full_name=EXCLUDED.full_name, "
+            f"  email=COALESCE(EXCLUDED.email, {SCHEMA}.clients.email), "
+            f"  updated_at=NOW() "
+            f"RETURNING id, discount_pct, (xmax = 0) AS is_inserted",
+            (full_name, phone, email or None, token, expires)
+        )
         row = cur.fetchone()
         conn.commit(); cur.close(); conn.close()
-        return _ok({'token': token, 'is_new': True, 'client_id': row[0], 'discount_pct': row[1],
-                    'message': f'Регистрация успешна! Ваша скидка {row[1]}%'})
+        is_new = bool(row[2])
+        return _ok({
+            'token': token,
+            'is_new': is_new,
+            'client_id': row[0],
+            'discount_pct': row[1],
+            'message': f'Регистрация успешна! Ваша скидка {row[1]}%' if is_new else 'Добро пожаловать!',
+        })
 
     # POST /yandex — авторизация через Яндекс (обмен code на токен)
     if method == 'POST' and body.get('action') == 'yandex':

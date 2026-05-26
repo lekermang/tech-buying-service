@@ -631,11 +631,12 @@ def action_send(event, body):
             if max_id:
                 _notify_max_client(client_phone, f'💬 *{author_name}*:\n{text}')
         elif author_type == 'client':
+            msg_preview = text[:1000] if text else ('📷 Фото' if photo_url else '—')
             preview = (
-                f'💬 *Сообщение в публичный чат*\n\n'
+                f'💬 *Новое сообщение в чате*\n\n'
                 f'👤 {client_name or client_phone or "клиент"}\n'
                 f'📞 {client_phone or "—"}\n'
-                f'🗨 {text[:1000]}\n\n'
+                f'🗨 {msg_preview}\n\n'
                 f'_Комната #{room_id}_'
             )
             _notify_telegram_staff(preview)
