@@ -1,8 +1,11 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Icon from "@/components/ui/icon";
 import { STATUSES, Order, EMPTY_FORM, INP, LBL } from "../types";
 import StaffRepairOrderCard from "../StaffRepairOrderCard";
 import { EditForm } from "./staffTabTypes";
+
+type SortMode = "urgency" | "date_desc" | "date_asc" | "price_desc" | "price_asc";
+type GroupMode = "none" | "status" | "paid";
 
 // Возраст принятой заявки в часах (от created_at)
 function ageHours(o: Order): number {
@@ -63,35 +66,83 @@ export default function StaffRepairList({
   changeStatus, openReadyModal, issueOrder, saveCard, deleteOrder, callRobotReady, inviteToMax,
   cardsView = "list",
 }: Props) {
-  // На мобильном (md и ниже) всегда 1 колонка, на десктопе — зависит от cardsView
+  const [sortMode, setSortMode] = useState<SortMode>("urgency");
+  const [groupMode, setGroupMode] = useState<GroupMode>("none");
+
   const containerCls = cardsView === "grid"
     ? "px-2 py-2 grid gap-1.5 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
     : "px-2 py-2 space-y-1.5";
 
-  // Сортировка: сначала "Принята" по убыванию срочности (старше → выше),
-  // затем остальные по дате создания (свежие выше). Стабильно через index.
   const sortedOrders = useMemo(() => {
     return orders
       .map((o, i) => ({ o, i }))
       .sort((a, b) => {
-        const la = urgencyLevel(a.o);
-        const lb = urgencyLevel(b.o);
-        const aIsNew = la >= 0;
-        const bIsNew = lb >= 0;
-        if (aIsNew && bIsNew) {
-          if (lb !== la) return lb - la; // выше уровень срочности — выше в списке
-          return ageHours(b.o) - ageHours(a.o); // внутри одного уровня — старше выше
+        if (sortMode === "urgency") {
+          const la = urgencyLevel(a.o);
+          const lb = urgencyLevel(b.o);
+          const aIsNew = la >= 0;
+          const bIsNew = lb >= 0;
+          if (aIsNew && bIsNew) {
+            if (lb !== la) return lb - la;
+            return ageHours(b.o) - ageHours(a.o);
+          }
+          if (aIsNew) return -1;
+          if (bIsNew) return 1;
+          const ta = a.o.created_at ? new Date(a.o.created_at).getTime() : 0;
+          const tb = b.o.created_at ? new Date(b.o.created_at).getTime() : 0;
+          if (tb !== ta) return tb - ta;
+          return a.i - b.i;
         }
-        if (aIsNew) return -1;
-        if (bIsNew) return 1;
-        // обе не "Принята" — по дате (свежие выше)
-        const ta = a.o.created_at ? new Date(a.o.created_at).getTime() : 0;
-        const tb = b.o.created_at ? new Date(b.o.created_at).getTime() : 0;
-        if (tb !== ta) return tb - ta;
-        return a.i - b.i; // стабильность
+        if (sortMode === "date_desc") {
+          const ta = a.o.created_at ? new Date(a.o.created_at).getTime() : 0;
+          const tb = b.o.created_at ? new Date(b.o.created_at).getTime() : 0;
+          return tb - ta;
+        }
+        if (sortMode === "date_asc") {
+          const ta = a.o.created_at ? new Date(a.o.created_at).getTime() : 0;
+          const tb = b.o.created_at ? new Date(b.o.created_at).getTime() : 0;
+          return ta - tb;
+        }
+        if (sortMode === "price_desc") {
+          const pa = a.o.repair_amount ?? a.o.price ?? 0;
+          const pb = b.o.repair_amount ?? b.o.price ?? 0;
+          return pb - pa;
+        }
+        if (sortMode === "price_asc") {
+          const pa = a.o.repair_amount ?? a.o.price ?? 0;
+          const pb = b.o.repair_amount ?? b.o.price ?? 0;
+          return pa - pb;
+        }
+        return a.i - b.i;
       })
       .map(x => x.o);
-  }, [orders]);
+  }, [orders, sortMode]);
+
+  // Группировка
+  const groupedOrders = useMemo(() => {
+    if (groupMode === "none") return [{ key: "", label: "", orders: sortedOrders }];
+    if (groupMode === "status") {
+      const map = new Map<string, Order[]>();
+      for (const o of sortedOrders) {
+        const k = o.status;
+        if (!map.has(k)) map.set(k, []);
+        map.get(k)!.push(o);
+      }
+      return Array.from(map.entries()).map(([key, orders]) => {
+        const st = STATUSES.find(s => s.key === key);
+        return { key, label: st?.label || key, orders };
+      });
+    }
+    if (groupMode === "paid") {
+      const paid = sortedOrders.filter(o => o.is_paid);
+      const unpaid = sortedOrders.filter(o => !o.is_paid);
+      return [
+        { key: "unpaid", label: "Не оплачено", orders: unpaid },
+        { key: "paid", label: "Оплачено", orders: paid },
+      ].filter(g => g.orders.length > 0);
+    }
+    return [{ key: "", label: "", orders: sortedOrders }];
+  }, [sortedOrders, groupMode]);
   return (
     <>
       {/* Фильтры статуса — премиум chips с свечениями */}
@@ -185,71 +236,131 @@ export default function StaffRepairList({
         </div>
       )}
 
-      {/* Карточки — премиум-список или сетка (адаптивно по cardsView) */}
-      <div className={containerCls}>
-        {loading && (
-          <div className="col-span-full flex items-center justify-center py-14 gap-2 text-white/50">
-            <div className="relative">
-              <span className="absolute inset-0 rounded-full bg-[#FFD700]/30 blur-md animate-pulse" />
-              <Icon name="Loader" size={20} className="relative animate-spin text-[#FFD700] drop-shadow-[0_0_8px_rgba(255,215,0,0.7)]" />
-            </div>
-            <span className="font-roboto text-sm">Загружаю заявки...</span>
-          </div>
-        )}
-        {!loading && orders.length === 0 && (
-          <div className="col-span-full text-center py-14 px-4">
-            <div className="relative inline-block">
-              <span className="absolute inset-0 rounded-full bg-[#FFD700]/15 blur-2xl pointer-events-none" />
-              <div className="relative w-16 h-16 mx-auto mb-3 rounded-full p-[1.5px] bg-[conic-gradient(from_0deg,#b8860b,#ffd700,#fff3a0,#ffd700,#b8860b)] shadow-[0_0_18px_rgba(255,215,0,0.3)]">
-                <div className="w-full h-full rounded-full bg-gradient-to-br from-[#1A1A1A] to-[#0A0A0A] flex items-center justify-center">
-                  <Icon name="Inbox" size={26} className="text-[#FFD700]/70" />
-                </div>
-              </div>
-            </div>
-            <div className="font-oswald font-bold uppercase text-base mb-1 bg-gradient-to-r from-[#FFD700] via-[#fff3a0] to-[#FFD700] bg-clip-text text-transparent animate-shimmer">
-              Заявок нет
-            </div>
-            <div className="font-roboto text-white/40 text-xs">Попробуйте изменить фильтры или создать новую заявку</div>
-          </div>
-        )}
-        {sortedOrders.map(o => {
-          const isExpanded = expandedId === o.id;
-          const ef = editForm[o.id] || initEditForm(o);
-          // В режиме сетки раскрытая карточка занимает всю ширину строки
-          const wrapCls = cardsView === "grid" && isExpanded ? "md:col-span-full" : "";
-          return (
-            <div key={o.id} className={wrapCls}>
-              <StaffRepairOrderCard
-                o={o}
-                isExpanded={isExpanded}
-                ef={ef}
-                saving={saving}
-                saveError={saveError}
-                isOwner={isOwner}
-                token={token}
-                authHeader="X-Employee-Token"
-                onToggle={() => {
-                  const opening = expandedId !== o.id;
-                  setExpandedId(opening ? o.id : null);
-                  setSaveError(null);
-                  if (opening) setEditForm(prev => ({ ...prev, [o.id]: initEditForm(o) }));
-                }}
-                onEditFormChange={(id, newEf) => setEditForm(prev => ({ ...prev, [id]: newEf }))}
-                onChangeStatus={(id, status, extra) => {
-                  changeStatus(id, status, extra);
-                  setExpandedId(null);
-                }}
-                onOpenReadyModal={openReadyModal}
-                onIssueOrder={issueOrder}
-                onSaveCard={saveCard}
-                onDelete={deleteOrder}
-                onCallRobotReady={callRobotReady}
-                onInviteToMax={inviteToMax}
-              />
-            </div>
-          );
-        })}
+      {/* ── Панель сортировки и группировки ── */}
+      <div className="px-3 pb-2 flex items-center gap-2 flex-wrap">
+        {/* Сортировка */}
+        <div className="flex items-center gap-1 bg-[#111] border border-[#1F1F1F] rounded-lg p-0.5">
+          {([
+            { key: "urgency",   icon: "Flame",      title: "По срочности" },
+            { key: "date_desc", icon: "ArrowDown",  title: "Сначала новые" },
+            { key: "date_asc",  icon: "ArrowUp",    title: "Сначала старые" },
+            { key: "price_desc",icon: "TrendingUp",  title: "Дорогие сначала" },
+            { key: "price_asc", icon: "TrendingDown",title: "Дешёвые сначала" },
+          ] as { key: SortMode; icon: string; title: string }[]).map(s => (
+            <button
+              key={s.key}
+              onClick={() => setSortMode(s.key)}
+              title={s.title}
+              className={`w-6 h-6 rounded-md flex items-center justify-center transition-all ${
+                sortMode === s.key
+                  ? "bg-[#FFD700] text-black shadow-[0_0_6px_rgba(255,215,0,0.4)]"
+                  : "text-white/35 hover:text-white/70 hover:bg-white/5"
+              }`}
+            >
+              <Icon name={s.icon} size={11} />
+            </button>
+          ))}
+        </div>
+
+        {/* Группировка */}
+        <div className="flex items-center gap-1 bg-[#111] border border-[#1F1F1F] rounded-lg p-0.5">
+          {([
+            { key: "none",   icon: "List",      title: "Без группировки" },
+            { key: "status", icon: "Layers",    title: "По статусу" },
+            { key: "paid",   icon: "Banknote",  title: "По оплате" },
+          ] as { key: GroupMode; icon: string; title: string }[]).map(g => (
+            <button
+              key={g.key}
+              onClick={() => setGroupMode(g.key)}
+              title={g.title}
+              className={`w-6 h-6 rounded-md flex items-center justify-center transition-all ${
+                groupMode === g.key
+                  ? "bg-white/15 text-white shadow-inner"
+                  : "text-white/30 hover:text-white/60 hover:bg-white/5"
+              }`}
+            >
+              <Icon name={g.icon} size={11} />
+            </button>
+          ))}
+        </div>
+
+        <span className="text-[10px] text-white/25 font-roboto ml-auto">
+          {sortedOrders.length} заявок
+        </span>
       </div>
+
+      {/* ── Карточки — с группировкой ── */}
+      {loading && (
+        <div className="flex items-center justify-center py-14 gap-2 text-white/50">
+          <span className="relative">
+            <span className="absolute inset-0 rounded-full bg-[#FFD700]/30 blur-md animate-pulse" />
+            <Icon name="Loader" size={20} className="relative animate-spin text-[#FFD700]" />
+          </span>
+          <span className="font-roboto text-sm">Загружаю заявки...</span>
+        </div>
+      )}
+      {!loading && orders.length === 0 && (
+        <div className="text-center py-14 px-4">
+          <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-[#FFD700]/10 border border-[#FFD700]/20 flex items-center justify-center">
+            <Icon name="Inbox" size={24} className="text-[#FFD700]/60" />
+          </div>
+          <div className="font-oswald font-bold uppercase text-base mb-1 text-white/50">Заявок нет</div>
+          <div className="font-roboto text-white/30 text-xs">Попробуйте изменить фильтры или создать новую заявку</div>
+        </div>
+      )}
+
+      {!loading && groupedOrders.map(group => (
+        <div key={group.key}>
+          {/* Заголовок группы */}
+          {groupMode !== "none" && group.label && (
+            <div className="px-3 py-1.5 flex items-center gap-2">
+              <span className="text-[11px] font-oswald font-bold uppercase tracking-wider text-white/50">
+                {group.label}
+              </span>
+              <span className="text-[10px] text-white/25 font-roboto">({group.orders.length})</span>
+              <div className="flex-1 h-px bg-white/8" />
+            </div>
+          )}
+          <div className={containerCls}>
+            {group.orders.map(o => {
+              const isExpanded = expandedId === o.id;
+              const ef = editForm[o.id] || initEditForm(o);
+              const wrapCls = cardsView === "grid" && isExpanded ? "md:col-span-full" : "";
+              return (
+                <div key={o.id} className={wrapCls}>
+                  <StaffRepairOrderCard
+                    o={o}
+                    isExpanded={isExpanded}
+                    ef={ef}
+                    saving={saving}
+                    saveError={saveError}
+                    isOwner={isOwner}
+                    token={token}
+                    authHeader="X-Employee-Token"
+                    onToggle={() => {
+                      const opening = expandedId !== o.id;
+                      setExpandedId(opening ? o.id : null);
+                      setSaveError(null);
+                      if (opening) setEditForm(prev => ({ ...prev, [o.id]: initEditForm(o) }));
+                    }}
+                    onEditFormChange={(id, newEf) => setEditForm(prev => ({ ...prev, [id]: newEf }))}
+                    onChangeStatus={(id, status, extra) => {
+                      changeStatus(id, status, extra);
+                      setExpandedId(null);
+                    }}
+                    onOpenReadyModal={openReadyModal}
+                    onIssueOrder={issueOrder}
+                    onSaveCard={saveCard}
+                    onDelete={deleteOrder}
+                    onCallRobotReady={callRobotReady}
+                    onInviteToMax={inviteToMax}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </>
   );
 }

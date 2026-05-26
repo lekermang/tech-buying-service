@@ -58,7 +58,12 @@ export default function StaffRepairOrderCard({
               : "border border-[#1F1F1F] bg-[#0F0F0F] hover:border-[#FFD700]/25"
       }`}>
           {/* ── Шапка карточки ── */}
-          <OrderCardHeader o={o} isExpanded={isExpanded} onToggle={onToggle} />
+          <OrderCardHeader
+            o={o}
+            isExpanded={isExpanded}
+            onToggle={onToggle}
+            onQuickStatus={(status) => onChangeStatus(o.id, status)}
+          />
 
       {/* ── Раскрытая часть ── */}
       {isExpanded && (
