@@ -65,9 +65,9 @@ export default function PublicChatFab() {
     <a
       href="/chat"
       aria-label="Чат с менеджером"
-      className="fixed z-[60] right-4 bottom-[84px] md:bottom-6 w-14 h-14 rounded-full bg-[#FFD700] text-black flex items-center justify-center shadow-[0_8px_24px_rgba(255,215,0,0.35)] hover:bg-yellow-400 active:scale-95 transition-all"
+      className="fixed z-[60] right-3 bottom-[88px] md:bottom-5 w-10 h-10 rounded-full bg-[#FFD700] text-black flex items-center justify-center shadow-[0_4px_16px_rgba(255,215,0,0.35)] hover:bg-yellow-400 active:scale-95 transition-all"
     >
-      <Icon name="MessageSquare" size={24} />
+      <Icon name="MessageSquare" size={18} />
       {unread && (
         <span className="absolute top-1 right-1 w-3 h-3 rounded-full bg-red-500 border-2 border-[#0D0D0D]" />
       )}

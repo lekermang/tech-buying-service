@@ -116,35 +116,45 @@ export default function PublicChat() {
     if (!text || !roomId || !authToken || sending) return;
     setSending(true);
     setError(null);
-    try {
-      const r = await fetch(`${PUBLIC_CHAT_URL}?action=send`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Auth-Token": authToken },
-        body: JSON.stringify({ room_id: roomId, text }),
-      });
-      const d = await r.json();
-      if (!d || !d.ok) {
-        setError(d?.error || "Ошибка отправки");
+
+    // Пробуем до 2 раз при сетевой ошибке
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const r = await fetch(`${PUBLIC_CHAT_URL}?action=send`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Auth-Token": authToken },
+          body: JSON.stringify({ room_id: roomId, text }),
+        });
+        const d = await r.json();
+        if (!d || !d.ok) {
+          setError(d?.error || "Ошибка отправки. Попробуйте ещё раз.");
+          break;
+        }
+        setDraft("");
+        const optimistic: Message = {
+          id: d.message_id,
+          author_type: "client",
+          author_id: 0,
+          author_name: clientName || "Вы",
+          text,
+          is_system: false,
+          created_at: d.created_at || new Date().toISOString(),
+        };
+        setMessages(prev => [...prev, optimistic]);
+        lastIdRef.current = Math.max(lastIdRef.current, d.message_id || 0);
+        scrollToBottom();
+        setSending(false);
         return;
+      } catch {
+        if (attempt === 0) {
+          // Ждём секунду и повторяем
+          await new Promise(res => setTimeout(res, 1000));
+        } else {
+          setError("Нет связи. Сообщение не отправлено — нажмите ещё раз.");
+        }
       }
-      setDraft("");
-      const optimistic: Message = {
-        id: d.message_id,
-        author_type: "client",
-        author_id: 0,
-        author_name: clientName || "Вы",
-        text,
-        is_system: false,
-        created_at: d.created_at || new Date().toISOString(),
-      };
-      setMessages(prev => [...prev, optimistic]);
-      lastIdRef.current = Math.max(lastIdRef.current, d.message_id || 0);
-      scrollToBottom();
-    } catch {
-      setError("Нет связи. Попробуйте ещё раз.");
-    } finally {
-      setSending(false);
     }
+    setSending(false);
   };
 
   // Инициализация: проверяем invite-токен, или localStorage
@@ -347,27 +357,27 @@ export default function PublicChat() {
               {error}
             </div>
           )}
-          <div className="flex items-end gap-2">
+          <div className="flex items-end gap-1.5">
             <textarea
               value={draft}
               onChange={e => setDraft(e.target.value)}
               onKeyDown={onKeyDown}
               placeholder="Напишите сообщение..."
               rows={1}
-              className="flex-1 bg-[#1A1A1A] border border-[#333] text-white px-3 py-2.5 font-roboto text-sm focus:outline-none focus:border-[#FFD700] transition-colors resize-none rounded-lg max-h-32"
-              style={{ minHeight: 42 }}
+              className="flex-1 bg-[#1A1A1A] border border-[#333] text-white px-3 py-2 font-roboto text-sm focus:outline-none focus:border-[#FFD700] transition-colors resize-none rounded-xl max-h-32"
+              style={{ minHeight: 38 }}
             />
             <button
               type="button"
               onClick={sendMessage}
               disabled={!draft.trim() || sending}
-              className="shrink-0 w-11 h-11 bg-[#FFD700] text-black flex items-center justify-center rounded-lg hover:bg-yellow-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="shrink-0 w-9 h-9 bg-[#FFD700] text-black flex items-center justify-center rounded-xl hover:bg-yellow-400 active:scale-95 transition-all disabled:opacity-35 disabled:cursor-not-allowed"
               aria-label="Отправить"
             >
               {sending ? (
-                <Icon name="Loader" size={18} className="animate-spin" />
+                <Icon name="Loader" size={15} className="animate-spin" />
               ) : (
-                <Icon name="Send" size={18} />
+                <Icon name="Send" size={15} />
               )}
             </button>
           </div>
