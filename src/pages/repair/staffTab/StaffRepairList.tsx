@@ -242,34 +242,72 @@ export default function StaffRepairList({
                 </div>
               </div>
 
+              {/* ── Блок 1: Модель (САМОЕ ВАЖНОЕ — первым) ── */}
               <div className="relative">
-                <label className={LBL}>Имя клиента *</label>
-                <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="Иван Иванов" className={INP} />
+                <label className={LBL}>
+                  Модель устройства <span className="text-[#FFD700]">*</span>
+                </label>
+                <input
+                  value={form.model}
+                  onChange={e => setForm(p => ({ ...p, model: e.target.value }))}
+                  placeholder="iPhone 15 Pro, Samsung S24, Redmi 12..."
+                  className={INP + (!form.model ? " border-[#FFD700]/30" : "")}
+                  autoFocus
+                />
+                {!form.model && (
+                  <span className="absolute right-2 top-7 text-[10px] text-[#FFD700]/60 font-roboto pointer-events-none">обязательно</span>
+                )}
               </div>
-              <div className="relative">
-                <label className={LBL}>Телефон *</label>
-                <input type="tel" value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} placeholder="+7 999 123-45-67" className={INP} />
+
+              {/* ── Блок 2: Клиент ── */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="relative">
+                  <label className={LBL}>Имя клиента <span className="text-white/40">*</span></label>
+                  <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="Иван" className={INP} />
+                </div>
+                <div className="relative">
+                  <label className={LBL}>
+                    Телефон <span className="text-[#FFD700]">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    value={form.phone}
+                    onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
+                    placeholder="+7 999 123-45-67"
+                    className={INP + (!form.phone ? " border-[#FFD700]/30" : "")}
+                  />
+                  {!form.phone && (
+                    <span className="absolute right-2 top-7 text-[10px] text-[#FFD700]/60 font-roboto pointer-events-none">обязательно</span>
+                  )}
+                </div>
               </div>
-              <div className="relative grid grid-cols-2 gap-2">
-                <div><label className={LBL}>Модель</label>
-                  <input value={form.model} onChange={e => setForm(p => ({ ...p, model: e.target.value }))} placeholder="iPhone 14" className={INP} /></div>
-                <div><label className={LBL}>Тип ремонта</label>
-                  <input value={form.repair_type} onChange={e => setForm(p => ({ ...p, repair_type: e.target.value }))} placeholder="Дисплей..." className={INP} /></div>
+
+              {/* ── Блок 3: тип ремонта + стоимость ── */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className={LBL}>Причина / что делать</label>
+                  <input value={form.repair_type} onChange={e => setForm(p => ({ ...p, repair_type: e.target.value }))} placeholder="Дисплей, батарея..." className={INP} />
+                </div>
+                <div>
+                  <label className={LBL}>Стоимость (₽)</label>
+                  <input type="number" inputMode="numeric" value={form.price} onChange={e => setForm(p => ({ ...p, price: e.target.value }))} placeholder="1 500" className={INP} />
+                </div>
               </div>
-              <div className="relative grid grid-cols-2 gap-2">
-                <div><label className={LBL}>Стоимость (₽)</label>
-                  <input type="number" inputMode="numeric" value={form.price} onChange={e => setForm(p => ({ ...p, price: e.target.value }))} placeholder="1500" className={INP} /></div>
-                <div><label className={LBL}>Комментарий</label>
-                  <input value={form.comment} onChange={e => setForm(p => ({ ...p, comment: e.target.value }))} placeholder="Описание..." className={INP} /></div>
+
+              {/* ── Блок 4: комментарий ── */}
+              <div>
+                <label className={LBL}>Описание проблемы</label>
+                <input value={form.comment} onChange={e => setForm(p => ({ ...p, comment: e.target.value }))} placeholder="Не включается, разбит экран..." className={INP} />
               </div>
+
               <button
                 onClick={createOrder}
-                disabled={creating || !form.name || !form.phone}
-                title="Создать заявку и добавить в список"
-                className="relative w-full btn-gold-premium !py-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={creating || !form.name || !form.phone || !form.model}
+                title={!form.model ? "Укажите модель устройства" : !form.phone ? "Укажите телефон клиента" : "Создать заявку"}
+                className="relative w-full btn-gold-premium !py-3 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Icon name={creating ? "Loader" : "Check"} size={15} className={creating ? "animate-spin" : ""} />
-                {creating ? "Создаю..." : "Создать заявку"}
+                {creating ? "Создаю..." : (!form.model ? "Введите модель устройства" : !form.phone ? "Введите телефон клиента" : "Создать заявку")}
               </button>
             </div>
           </div>
