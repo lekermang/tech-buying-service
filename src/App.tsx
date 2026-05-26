@@ -61,6 +61,8 @@ const SafeDealsItem = safeLazy(() => import("./pages/SafeDealsItem"));
 const StaffSafeDeals = safeLazy(() => import("./pages/StaffSafeDeals"));
 const StaffAnalytics = safeLazy(() => import("./pages/StaffAnalytics"));
 const StaffAnalyticsVisitor = safeLazy(() => import("./pages/StaffAnalyticsVisitor"));
+const AncientCoins = safeLazy(() => import("./pages/AncientCoins"));
+const BronzeSculptures = safeLazy(() => import("./pages/BronzeSculptures"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -129,6 +131,8 @@ const App = () => {
             <Route path="/tools-sync" element={<ToolsSync />} />
             <Route path="/staff" element={<Staff />} />
             <Route path="/staff/share" element={<StaffShare />} />
+            <Route path="/ancient-coins" element={<AncientCoins />} />
+            <Route path="/bronze-sculptures" element={<BronzeSculptures />} />
             <Route path="/repair-discount" element={<RepairDiscount />} />
             <Route path="/requisites" element={<Requisites />} />
             <Route path="/act" element={<Act />} />

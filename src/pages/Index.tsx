@@ -18,6 +18,7 @@ import AppDownloadCard from "@/components/AppDownloadCard";
 import EasierWithUsBlock from "@/components/EasierWithUsBlock";
 import QuickContactSection from "@/components/QuickContactSection";
 import WholesaleBanner from "@/components/skupka/WholesaleBanner";
+import AntiquesPreviewBlock from "@/components/skupka/AntiquesPreviewBlock";
 
 const scrollTo = (href: string) => {
   const el = document.querySelector(href);
@@ -391,6 +392,9 @@ const Index = ({ goldOpen = false }: { goldOpen?: boolean }) => {
       <PremiumServicesGrid />
       <WholesaleBanner />
       <InfoSections />
+
+      {/* Антиквариат — 2 блока-превью */}
+      <AntiquesPreviewBlock />
 
       {/* С нами стало проще — премиум-блок (приложения + преимущества), стиль Trade In */}
       <EasierWithUsBlock />
