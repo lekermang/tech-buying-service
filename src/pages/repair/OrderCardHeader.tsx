@@ -25,19 +25,19 @@ const URGENCY_TITLES: Record<UrgencyLevel, string> = {
   5: "Более 48 ч — СРОЧНО!",
 };
 
-type SA = { barColor: string; text: string; bgCard: string; label: string };
+type SA = { barColor: string; bgCard: string; label: string };
 function getAccent(status: string): SA {
   switch (status) {
-    case "new":              return { barColor: "#fb923c", text: "#fb923c", bgCard: "rgba(251,146,60,0.06)",   label: "Новая"         };
-    case "pending_approval": return { barColor: "#c084fc", text: "#c084fc", bgCard: "rgba(192,132,252,0.06)",  label: "Согласование"  };
-    case "accepted":         return { barColor: "#a78bfa", text: "#a78bfa", bgCard: "rgba(167,139,250,0.05)",  label: "У мастера"     };
-    case "in_progress":      return { barColor: "#60a5fa", text: "#60a5fa", bgCard: "rgba(96,165,250,0.05)",   label: "В работе"      };
-    case "waiting_parts":    return { barColor: "#fbbf24", text: "#fbbf24", bgCard: "rgba(251,191,36,0.06)",   label: "Ждём запчасть" };
-    case "ready":            return { barColor: "#FFD700", text: "#FFD700", bgCard: "rgba(255,215,0,0.07)",    label: "Готов"         };
-    case "done":             return { barColor: "#34d399", text: "#34d399", bgCard: "rgba(52,211,153,0.04)",   label: "Выдан"         };
-    case "warranty":         return { barColor: "#2dd4bf", text: "#2dd4bf", bgCard: "rgba(45,212,191,0.04)",   label: "Гарантия"      };
-    case "cancelled":        return { barColor: "#f87171", text: "#f87171", bgCard: "rgba(248,113,113,0.04)",  label: "Отменено"      };
-    default:                 return { barColor: "#555",    text: "#888",    bgCard: "rgba(255,255,255,0.02)",   label: status          };
+    case "new":              return { barColor: "#fb923c", bgCard: "rgba(251,146,60,0.06)",   label: "Новая"         };
+    case "pending_approval": return { barColor: "#c084fc", bgCard: "rgba(192,132,252,0.06)",  label: "Согласование"  };
+    case "accepted":         return { barColor: "#a78bfa", bgCard: "rgba(167,139,250,0.05)",  label: "У мастера"     };
+    case "in_progress":      return { barColor: "#60a5fa", bgCard: "rgba(96,165,250,0.05)",   label: "В работе"      };
+    case "waiting_parts":    return { barColor: "#fbbf24", bgCard: "rgba(251,191,36,0.06)",   label: "Ждём запчасть" };
+    case "ready":            return { barColor: "#FFD700", bgCard: "rgba(255,215,0,0.07)",    label: "Готов"         };
+    case "done":             return { barColor: "#34d399", bgCard: "rgba(52,211,153,0.04)",   label: "Выдан"         };
+    case "warranty":         return { barColor: "#2dd4bf", bgCard: "rgba(45,212,191,0.04)",   label: "Гарантия"      };
+    case "cancelled":        return { barColor: "#f87171", bgCard: "rgba(248,113,113,0.04)",  label: "Отменено"      };
+    default:                 return { barColor: "#555",    bgCard: "rgba(255,255,255,0.02)",   label: status          };
   }
 }
 
@@ -46,9 +46,20 @@ const STATUS_FLOW: Record<string, string> = {
   waiting_parts: "in_progress", ready: "done",
 };
 const NEXT_LABEL: Record<string, string> = {
-  accepted: "→ Мастер", in_progress: "→ Работа",
-  ready: "→ Готово", done: "→ Выдан", new: "→ Мастер",
+  accepted: "Мастер", in_progress: "В работу",
+  ready: "Готово", done: "Выдан", new: "Мастер",
 };
+
+// Форматирование даты: время если сегодня, дд.мм если текущий год, иначе дд.мм.гг
+function fmtDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  const now = new Date();
+  const isToday = d.toDateString() === now.toDateString();
+  if (isToday) return d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" }) + " " +
+         d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+}
 
 type Props = {
   o: Order;
@@ -63,36 +74,20 @@ export default function OrderCardHeader({ o, isExpanded, onToggle, onQuickStatus
 
   const urgency: UrgencyLevel = o.status === "new" ? getUrgencyLevel(o.created_at) : 0;
   const isCritical = urgency >= 4;
-  const isWarn    = urgency === 3;
+  const isWarn     = urgency === 3;
 
   const description = o.comment || o.admin_note || "";
 
-  const profit = o.repair_amount != null && o.purchase_amount != null
-    ? o.repair_amount - o.purchase_amount : null;
-  const masterCalc = profit != null ? Math.max(0, Math.round(profit * 0.5)) : null;
-
-  const mainPrice = o.repair_amount != null
-    ? { v: o.repair_amount, isReal: true }
-    : o.price != null
-      ? { v: o.price, isReal: false }
-      : null;
+  const hasFinance = o.purchase_amount != null || o.repair_amount != null;
+  const isIssued   = o.status === "done" || o.status === "warranty";
+  const issuedAt   = o.picked_up_at || o.completed_at;
 
   const nextStatus = STATUS_FLOW[o.status];
   const nextAccent = nextStatus ? getAccent(nextStatus) : null;
 
-  // Форматирование даты: время если сегодня, иначе дд.мм чч:мм
-  const fmtShort = (iso: string) => {
-    const d = new Date(iso);
-    const now = new Date();
-    const isToday = d.toDateString() === now.toDateString();
-    if (isToday) return d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
-    return d.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" }) + " " +
-           d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
-  };
-
   return (
     <div
-      className={`relative cursor-pointer select-none ${isExpanded ? "" : "hover:brightness-110 active:brightness-125"} transition-[filter]`}
+      className={`relative cursor-pointer select-none transition-[filter] ${isExpanded ? "" : "hover:brightness-[1.08] active:brightness-125"}`}
       onClick={onToggle}
       style={{ background: isExpanded ? "rgba(255,215,0,0.03)" : accent.bgCard }}
     >
@@ -101,21 +96,26 @@ export default function OrderCardHeader({ o, isExpanded, onToggle, onQuickStatus
         className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-sm"
         style={{
           background: accent.barColor,
-          boxShadow: isCritical ? `0 0 10px ${accent.barColor}, 0 0 20px ${accent.barColor}60` : `0 0 4px ${accent.barColor}80`,
+          boxShadow: isCritical
+            ? `0 0 10px ${accent.barColor}, 0 0 20px ${accent.barColor}60`
+            : `0 0 4px ${accent.barColor}80`,
           animation: isCritical ? "pulse 1.2s ease-in-out infinite" : "none",
         }}
       />
 
-      <div className="pl-3.5 pr-2 py-2">
-        {/* ── ГЛАВНАЯ СТРОКА ── */}
+      <div className="pl-3.5 pr-2 pt-2 pb-2">
+
+        {/* ══════════ СТРОКА 1: аватар · имя · модель (ЗОЛОТО) · статус · цена · кнопки ══════════ */}
         <div className="flex items-center gap-2 min-w-0">
 
           {/* Аватар */}
-          <div
-            className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center font-oswald font-black text-[14px] leading-none"
-            style={{ background: `${accent.barColor}22`, color: accent.barColor, border: `1px solid ${accent.barColor}45` }}
-          >
-            {initials}
+          <div className="relative shrink-0">
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center font-oswald font-black text-[14px] leading-none"
+              style={{ background: `${accent.barColor}22`, color: accent.barColor, border: `1px solid ${accent.barColor}45` }}
+            >
+              {initials}
+            </div>
             {o.is_paid && (
               <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 border-[1.5px] border-[#0F0F0F] flex items-center justify-center">
                 <Icon name="Check" size={8} className="text-black" />
@@ -123,23 +123,34 @@ export default function OrderCardHeader({ o, isExpanded, onToggle, onQuickStatus
             )}
           </div>
 
-          {/* Имя + модель */}
-          <div className="flex-1 min-w-0 flex flex-col gap-0">
-            {/* Строка 1: имя + id */}
+          {/* Имя + ID + модель с золотым переливом */}
+          <div className="flex-1 min-w-0 flex flex-col leading-none gap-[3px]">
+            {/* Имя + ID */}
             <div className="flex items-baseline gap-1.5 min-w-0">
-              <span className="font-oswald font-bold text-[14px] text-white uppercase tracking-wide truncate leading-tight">
+              <span className="font-oswald font-bold text-[14px] text-white uppercase tracking-wide truncate">
                 {o.name}
               </span>
               <span className="font-roboto text-[9px] text-white/25 shrink-0 tabular-nums">#{o.id}</span>
             </div>
-            {/* Строка 2: модель — крупно и чётко */}
+
+            {/* Модель — ЗОЛОТОЙ ПЕРЕЛИВ */}
             {(o.model || o.repair_type) && (
-              <div className="flex items-center gap-1.5 min-w-0">
-                <span className="font-oswald font-bold text-[13px] truncate leading-tight" style={{ color: accent.barColor }}>
-                  {o.model || <span className="opacity-40">без модели</span>}
+              <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
+                <span
+                  className="font-oswald font-bold text-[13px] truncate"
+                  style={{
+                    background: "linear-gradient(90deg, #b8860b 0%, #FFD700 30%, #fff7a0 50%, #FFD700 70%, #b8860b 100%)",
+                    backgroundSize: "200% auto",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    backgroundClip: "text",
+                    animation: "goldShimmer 2.8s linear infinite",
+                  }}
+                >
+                  {o.model || "без модели"}
                 </span>
                 {o.repair_type && (
-                  <span className="font-roboto text-[11px] text-white/50 shrink-0 truncate">
+                  <span className="font-roboto text-[10px] text-white/45 shrink-0 truncate">
                     · {o.repair_type}
                   </span>
                 )}
@@ -164,19 +175,9 @@ export default function OrderCardHeader({ o, isExpanded, onToggle, onQuickStatus
               : accent.label}
           </span>
 
-          {/* Цена */}
-          {mainPrice && (
-            <span
-              className="shrink-0 font-oswald font-bold text-[14px] tabular-nums"
-              style={{ color: mainPrice.isReal ? "#34d399" : accent.barColor }}
-            >
-              {mainPrice.v.toLocaleString("ru-RU")}₽
-            </span>
-          )}
-
-          {/* Быстрые кнопки (только на закрытой) */}
+          {/* Быстрые кнопки (на закрытой) */}
           {!isExpanded && (
-            <div className="shrink-0 flex items-center gap-0.5 ml-0.5" onClick={e => e.stopPropagation()}>
+            <div className="shrink-0 flex items-center gap-0.5" onClick={e => e.stopPropagation()}>
               <a
                 href={`tel:${o.phone}`}
                 className="w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:scale-110 active:scale-90"
@@ -188,12 +189,12 @@ export default function OrderCardHeader({ o, isExpanded, onToggle, onQuickStatus
               {nextStatus && nextAccent && onQuickStatus && (
                 <button
                   onClick={() => onQuickStatus(nextStatus)}
-                  className="h-7 px-2 rounded-lg flex items-center gap-1 font-oswald font-bold text-[10px] uppercase tracking-wide transition-all hover:scale-105 active:scale-95"
+                  className="h-7 px-1.5 rounded-lg flex items-center gap-1 font-oswald font-bold text-[10px] uppercase tracking-wide transition-all hover:scale-105 active:scale-95"
                   style={{ background: `${nextAccent.barColor}18`, color: nextAccent.barColor, border: `1px solid ${nextAccent.barColor}35` }}
-                  title={NEXT_LABEL[nextStatus] || `→ ${nextAccent.label}`}
+                  title={NEXT_LABEL[nextStatus]}
                 >
                   <Icon name="ArrowRight" size={10} />
-                  {nextAccent.label}
+                  {NEXT_LABEL[nextStatus]}
                 </button>
               )}
             </div>
@@ -205,67 +206,96 @@ export default function OrderCardHeader({ o, isExpanded, onToggle, onQuickStatus
           />
         </div>
 
-        {/* ── СТРОКА 2: телефон · модель · тип · заработок · дата ── */}
-        <div className="flex items-center gap-x-2.5 mt-1.5 pl-10 text-[11px] flex-wrap gap-y-0.5">
-          {/* Телефон */}
-          <a href={`tel:${o.phone}`} onClick={e => e.stopPropagation()}
-            className="font-roboto tabular-nums transition-colors shrink-0"
-            style={{ color: `${accent.barColor}cc` }}
-          >
-            {o.phone}
-          </a>
+        {/* ══════════ СТРОКА 2: финансовая лента ══════════ */}
+        {!isExpanded && (
+          <div className="mt-1.5 pl-10 flex items-center gap-x-3 gap-y-0.5 flex-wrap">
 
-
-
-          {/* Мастер-заработок */}
-          {masterCalc != null && masterCalc > 0 && (
-            <>
-              <span className="text-white/15 shrink-0">·</span>
-              <span className="text-emerald-400/70 inline-flex items-center gap-0.5 shrink-0 tabular-nums" title="Заработок мастера">
-                <Icon name="TrendingUp" size={9} />
-                {masterCalc.toLocaleString("ru-RU")}₽
+            {/* Дата приёма */}
+            <div className="flex items-center gap-1 shrink-0">
+              <Icon name="CalendarPlus" size={9} className="text-white/30" />
+              <span className="font-roboto text-[10px] text-white/45 tabular-nums">
+                {fmtDate(o.created_at)}
               </span>
-            </>
-          )}
+            </div>
 
-          {/* Аванс */}
-          {!o.is_paid && o.advance != null && o.advance > 0 && (
-            <>
-              <span className="text-white/15 shrink-0">·</span>
-              <span className="text-blue-300/60 inline-flex items-center gap-0.5 shrink-0 tabular-nums" title="Аванс">
-                <Icon name="Wallet" size={9} />
-                {o.advance.toLocaleString("ru-RU")}₽
-              </span>
-            </>
-          )}
+            {/* Дата выдачи (если есть) */}
+            {issuedAt && (
+              <>
+                <span className="text-white/15 text-[10px]">→</span>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Icon name="CalendarCheck" size={9} className="text-emerald-400/60" />
+                  <span className="font-roboto text-[10px] text-emerald-400/70 tabular-nums">
+                    {fmtDate(issuedAt)}
+                  </span>
+                </div>
+              </>
+            )}
 
-          {/* Оплачено */}
-          {o.is_paid && (
-            <>
-              <span className="text-white/15 shrink-0">·</span>
-              <span className="text-emerald-400/70 inline-flex items-center gap-0.5 shrink-0" title="Оплачено">
-                <Icon name={o.payment_method === "cash" ? "Banknote" : o.payment_method === "card" ? "CreditCard" : "CheckCircle"} size={9} />
-                <span>оплачено</span>
-              </span>
-            </>
-          )}
+            {/* Закупка */}
+            {o.purchase_amount != null && (
+              <>
+                <span className="text-white/10 hidden sm:inline">·</span>
+                <div className="flex items-center gap-1 shrink-0" title="Закупка">
+                  <Icon name="ArrowDownLeft" size={9} className="text-red-400/50" />
+                  <span className="font-roboto text-[10px] text-red-400/70 tabular-nums">
+                    {o.purchase_amount.toLocaleString("ru-RU")}₽
+                  </span>
+                </div>
+              </>
+            )}
 
-          {/* Дата — ПРАВЫЙ КРАЙ, жирнее */}
-          <span className="ml-auto font-roboto text-[10px] tabular-nums shrink-0 font-semibold" style={{ color: `${accent.barColor}80` }}>
-            {fmtShort(o.created_at)}
-          </span>
-        </div>
+            {/* Цена выдачи */}
+            {o.repair_amount != null && (
+              <>
+                <span className="text-white/10 hidden sm:inline">·</span>
+                <div className="flex items-center gap-1 shrink-0" title="Цена выдачи">
+                  <Icon name="ArrowUpRight" size={9} className="text-emerald-400/60" />
+                  <span className="font-roboto font-semibold text-[10px] text-emerald-400/90 tabular-nums">
+                    {o.repair_amount.toLocaleString("ru-RU")}₽
+                  </span>
+                </div>
+              </>
+            )}
 
-        {/* ── СТРОКА 3: описание неисправности ── */}
+            {/* Прибыль (если есть обе суммы) */}
+            {o.repair_amount != null && o.purchase_amount != null && (
+              <>
+                <span className="text-white/10">·</span>
+                <div
+                  className="flex items-center gap-1 shrink-0 px-1.5 py-0.5 rounded"
+                  style={{ background: "rgba(255,215,0,0.08)", border: "1px solid rgba(255,215,0,0.18)" }}
+                  title="Прибыль"
+                >
+                  <Icon name="TrendingUp" size={9} className="text-[#FFD700]/70" />
+                  <span className="font-oswald font-bold text-[10px] text-[#FFD700]/90 tabular-nums">
+                    {(o.repair_amount - o.purchase_amount).toLocaleString("ru-RU")}₽
+                  </span>
+                </div>
+              </>
+            )}
+
+            {/* Телефон — справа */}
+            <a
+              href={`tel:${o.phone}`}
+              onClick={e => e.stopPropagation()}
+              className="ml-auto font-roboto text-[10px] tabular-nums transition-colors shrink-0"
+              style={{ color: `${accent.barColor}99` }}
+            >
+              {o.phone}
+            </a>
+          </div>
+        )}
+
+        {/* ══════════ СТРОКА 3: описание (на закрытой) ══════════ */}
         {description && !isExpanded && (
-          <div className="mt-1 pl-10 pr-8">
-            <span className="font-roboto text-[11px] italic line-clamp-1" style={{ color: "rgba(255,255,255,0.38)" }}>
+          <div className="mt-1 pl-10 pr-2">
+            <span className="font-roboto text-[10px] italic line-clamp-1 text-white/35">
               {description}
             </span>
           </div>
         )}
 
-        {/* ── СТРОКА 4: запчасть ── */}
+        {/* ══════════ СТРОКА 4: запчасть ══════════ */}
         {o.part_name && !isExpanded && (
           <div className="mt-1 pl-10">
             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-roboto ${
@@ -279,6 +309,14 @@ export default function OrderCardHeader({ o, isExpanded, onToggle, onQuickStatus
           </div>
         )}
       </div>
+
+      {/* Глобальная CSS-анимация золотого перелива */}
+      <style>{`
+        @keyframes goldShimmer {
+          0%   { background-position: 200% center; }
+          100% { background-position: -200% center; }
+        }
+      `}</style>
     </div>
   );
 }
