@@ -12,6 +12,7 @@ interface MainNavProps {
   onNav: (href: string) => void;
   /** При скролле — компактная версия */
   compact?: boolean;
+  onPayClick?: () => void;
 }
 
 /** Scroll-spy: какой якорь сейчас в зоне просмотра */
@@ -178,7 +179,7 @@ const AntiqueDropdown = ({ compact }: { compact?: boolean }) => {
  *   - Десктоп (lg-xl, 1024-1280px): лого + 6 пунктов + Каталог + телефон-иконка
  *   - Большой ПК (xl+, 1280px+): лого с адресом + все 8 пунктов + Каталог + телефон-капсула
  */
-const MainNav = ({ navLinks, menuOpen, onToggleMenu, onNav, compact = false }: MainNavProps) => {
+const MainNav = ({ navLinks, menuOpen, onToggleMenu, onNav, compact = false, onPayClick }: MainNavProps) => {
   const hrefs = navLinks.map(l => l.href);
   const active = useActiveSection(hrefs);
 
@@ -274,6 +275,18 @@ const MainNav = ({ navLinks, menuOpen, onToggleMenu, onNav, compact = false }: M
             <Icon name="ShoppingBag" size={13} />
             <span className="font-oswald font-bold text-[11.5px] lg:text-[12.5px] uppercase tracking-wider">Каталог</span>
           </a>
+
+          {/* Оплата ЮKassa */}
+          {onPayClick && (
+            <button
+              onClick={onPayClick}
+              className="hidden md:inline-flex items-center gap-1.5 h-9 px-3 lg:px-3.5 rounded-md border border-emerald-500/40 hover:border-emerald-400/70 text-emerald-400 hover:bg-emerald-500/[0.08] active:scale-95 transition-all hover:shadow-[0_0_15px_rgba(52,211,153,0.2)]"
+              title="Оплатить услуги"
+            >
+              <Icon name="CreditCard" size={13} />
+              <span className="font-oswald font-bold text-[11.5px] lg:text-[12.5px] uppercase tracking-wider">Оплата</span>
+            </button>
+          )}
 
           {/* Телефон — десктоп xl+ : премиум золотая капсула */}
           <a

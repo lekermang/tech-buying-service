@@ -17,9 +17,10 @@ interface MobileMenuProps {
   open: boolean;
   navLinks: NavLink[];
   onNav: (href: string) => void;
+  onPayClick?: () => void;
 }
 
-const MobileMenu = ({ open, navLinks, onNav }: MobileMenuProps) => {
+const MobileMenu = ({ open, navLinks, onNav, onPayClick }: MobileMenuProps) => {
   const [installOpen, setInstallOpen] = useState(false);
   const [antiqueOpen, setAntiqueOpen] = useState(false);
   const installed = isStandaloneApp();
@@ -100,6 +101,14 @@ const MobileMenu = ({ open, navLinks, onNav }: MobileMenuProps) => {
           <Icon name="MessageCircle" size={18} />
           Написать в Telegram
         </a>
+        {onPayClick && (
+          <button
+            onClick={onPayClick}
+            className="flex items-center justify-center gap-3 w-full border-2 border-emerald-500/50 text-emerald-400 font-oswald font-bold text-base py-3.5 uppercase tracking-wide active:scale-95 transition-all">
+            <Icon name="CreditCard" size={18} />
+            Оплатить услуги
+          </button>
+        )}
         <a href="https://max.ru/id402810962699_bot"
           target="_blank" rel="noopener noreferrer"
           onClick={() => ymGoal(Goals.MAX_CLICK, { place: "mobile_menu" })}

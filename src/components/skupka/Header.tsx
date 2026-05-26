@@ -3,6 +3,7 @@ import GoldTicker from "./header/GoldTicker";
 import MainNav, { type NavLink } from "./header/MainNav";
 import MobileMenu from "./header/MobileMenu";
 import SellGoldModal, { type ClientType, type Probe } from "./header/SellGoldModal";
+import YooKassaModal from "./YooKassaModal";
 import { isPhoneValid } from "@/lib/phoneFormat";
 
 const GOLD_PRICE_URL = "https://functions.poehali.dev/0e3260ee-7b92-4be2-833b-d3fcc9d2472d";
@@ -45,6 +46,7 @@ const Header = ({ scrollTo, goldOpen = false }: HeaderProps) => {
     bulk_discount: 15, bulk_deduction: 50,
   });
   const [sellOpen, setSellOpen] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
   const [clientType, setClientType] = useState<ClientType>('retail');
   const [probe, setProbe] = useState(585);
   const [weight, setWeight] = useState("");
@@ -174,13 +176,17 @@ const Header = ({ scrollTo, goldOpen = false }: HeaderProps) => {
         onToggleMenu={() => setMenuOpen(!menuOpen)}
         onNav={handleNav}
         compact={compact}
+        onPayClick={() => setPayOpen(true)}
       />
 
       <MobileMenu
         open={menuOpen}
         navLinks={NAV_LINKS}
         onNav={handleNav}
+        onPayClick={() => setPayOpen(true)}
       />
+
+      <YooKassaModal open={payOpen} onClose={() => setPayOpen(false)} />
 
       <SellGoldModal
         open={sellOpen}
