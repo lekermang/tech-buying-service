@@ -121,6 +121,8 @@ def handler(event: dict, context) -> dict:
         return _check_updates(me)
     if action == 'chat_init':
         return _chat_init(me)
+    if action == 'my_sales':
+        return _my_sales(me)
 
     return _err(f'unknown action: {action}')
 
@@ -302,6 +304,42 @@ def _my_offers(me):
         return _ok({'offers': offers})
     except Exception as e:
         return _err(f'my_offers failed: {e}', 500)
+    finally:
+        cur.close(); conn.close()
+
+
+def _my_sales(me):
+    """История сданных устройств (скупка) — по client_id в таблице goods."""
+    conn = _connect()
+    cur = conn.cursor()
+    try:
+        cur.execute(f"""
+            SELECT g.id, g.title, g.category, g.brand, g.model, g.condition,
+                   g.purchase_price, g.sell_price, g.status, g.photo_url,
+                   g.added_at, g.sold_at,
+                   s.amount_final, s.payment_method, s.created_at as sale_date
+            FROM {SCHEMA}.goods g
+            LEFT JOIN {SCHEMA}.sales s ON s.good_id = g.id
+            WHERE g.client_id = %s
+            ORDER BY g.added_at DESC
+            LIMIT 100
+        """, (me['id'],))
+        rows = cur.fetchall()
+        sales = []
+        for r in rows:
+            sales.append({
+                'id': r[0], 'title': r[1], 'category': r[2],
+                'brand': r[3], 'model': r[4], 'condition': r[5],
+                'purchase_price': r[6], 'sell_price': r[7],
+                'status': r[8], 'photo_url': r[9],
+                'added_at': r[10].isoformat() if r[10] else None,
+                'sold_at': r[11].isoformat() if r[11] else None,
+                'sale_amount': r[12], 'payment_method': r[13],
+                'sale_date': r[14].isoformat() if r[14] else None,
+            })
+        return _ok({'sales': sales})
+    except Exception as e:
+        return _err(f'my_sales failed: {{e}}', 500)
     finally:
         cur.close(); conn.close()
 

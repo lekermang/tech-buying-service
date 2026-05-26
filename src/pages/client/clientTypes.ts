@@ -8,6 +8,15 @@ export type ClientProfile = {
   avatar_url: string | null;
   discount_pct: number;
   loyalty_points: number;
+  birth_date?: string | null;
+  passport_series?: string | null;
+  passport_number?: string | null;
+  passport_issued?: string | null;
+  delivery_name?: string | null;
+  delivery_phone?: string | null;
+  delivery_city?: string | null;
+  delivery_address?: string | null;
+  delivery_postal?: string | null;
 };
 
 export type Repair = {

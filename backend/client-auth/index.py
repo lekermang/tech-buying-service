@@ -75,7 +75,9 @@ def _resolve_client(event: dict):
     cur = conn.cursor()
     try:
         cur.execute(
-            f"SELECT id, full_name, phone, email, email_verified, avatar_url, discount_pct, loyalty_points "
+            f"SELECT id, full_name, phone, email, email_verified, avatar_url, discount_pct, loyalty_points, "
+            f"birth_date, passport_series, passport_number, passport_issued, "
+            f"delivery_name, delivery_phone, delivery_city, delivery_address, delivery_postal "
             f"FROM {SCHEMA}.clients "
             f"WHERE auth_token=%s AND token_expires_at>NOW()",
             (token,)
@@ -87,6 +89,10 @@ def _resolve_client(event: dict):
             'id': row[0], 'full_name': row[1], 'phone': row[2],
             'email': row[3], 'email_verified': row[4],
             'avatar_url': row[5], 'discount_pct': row[6], 'loyalty_points': row[7],
+            'birth_date': str(row[8]) if row[8] else None,
+            'passport_series': row[9], 'passport_number': row[10], 'passport_issued': row[11],
+            'delivery_name': row[12], 'delivery_phone': row[13],
+            'delivery_city': row[14], 'delivery_address': row[15], 'delivery_postal': row[16],
         }
     finally:
         cur.close(); conn.close()
@@ -303,15 +309,34 @@ def _update_profile(event, body):
     me = _resolve_client(event)
     if not me:
         return _err('Unauthorized', 401)
-    full_name = (body.get('full_name') or me['full_name']).strip()
+    full_name = (body.get('full_name') or me['full_name'] or '').strip()
     avatar_url = (body.get('avatar_url') or '').strip() or None
+
+    birth_date = (body.get('birth_date') or '').strip() or None
+    passport_series = (body.get('passport_series') or '').strip() or None
+    passport_number = (body.get('passport_number') or '').strip() or None
+    passport_issued = (body.get('passport_issued') or '').strip() or None
+
+    delivery_name = (body.get('delivery_name') or '').strip() or None
+    delivery_phone_raw = _normalize_phone(body.get('delivery_phone') or '')
+    delivery_phone = delivery_phone_raw if len(delivery_phone_raw) >= 10 else ((body.get('delivery_phone') or '').strip() or None)
+    delivery_city = (body.get('delivery_city') or '').strip() or None
+    delivery_address = (body.get('delivery_address') or '').strip() or None
+    delivery_postal = (body.get('delivery_postal') or '').strip() or None
+
     conn = _connect()
     cur = conn.cursor()
     try:
         cur.execute(
             f"UPDATE {SCHEMA}.clients SET full_name=%s, "
-            f"avatar_url=COALESCE(%s,avatar_url), updated_at=NOW() WHERE id=%s",
-            (full_name, avatar_url, me['id'])
+            f"avatar_url=COALESCE(%s,avatar_url), "
+            f"birth_date=%s, passport_series=%s, passport_number=%s, passport_issued=%s, "
+            f"delivery_name=%s, delivery_phone=%s, delivery_city=%s, delivery_address=%s, delivery_postal=%s, "
+            f"updated_at=NOW() WHERE id=%s",
+            (full_name, avatar_url,
+             birth_date, passport_series, passport_number, passport_issued,
+             delivery_name, delivery_phone, delivery_city, delivery_address, delivery_postal,
+             me['id'])
         )
         conn.commit()
         return _ok({'ok': True})
