@@ -106,6 +106,68 @@ const MoreMenu = ({ items, active, onNav }: { items: NavLink[]; active: string; 
   );
 };
 
+const ANTIQUE_ITEMS = [
+  { label: "Царские монеты",          href: "/russian-coins",     icon: "Coins",   color: "#FFD700" },
+  { label: "Православные иконы",       href: "/icons",             icon: "Flame",   color: "#e2a84b" },
+  { label: "Фарфор и хрусталь",        href: "/porcelain",         icon: "Coffee",  color: "#60a5fa" },
+  { label: "Советский антиквариат",    href: "/soviet-antiques",   icon: "Medal",   color: "#ef4444" },
+  { label: "Древние монеты",           href: "/ancient-coins",     icon: "CircleDot", color: "#a3e635" },
+  { label: "Бронзовые статуэтки",      href: "/bronze-sculptures", icon: "Gem",     color: "#a78bfa" },
+];
+
+/** Кнопка «Антиквариат ▾» с выпадающим меню */
+const AntiqueDropdown = ({ compact }: { compact?: boolean }) => {
+  const [open, setOpen] = useState(false);
+  const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
+  const isActive = ANTIQUE_ITEMS.some(i => i.href === currentPath);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = () => setOpen(false);
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div className="relative shrink-0" onMouseDown={e => e.stopPropagation()}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className={`relative font-oswald font-bold ${compact ? "text-[11px] px-1" : "text-[12px] xl:text-[12.5px] px-1.5"} uppercase tracking-[0.06em] xl:tracking-[0.08em] py-1.5 inline-flex items-center gap-1 transition-all duration-300 group whitespace-nowrap
+          ${open || isActive ? "text-[#FFD700] drop-shadow-[0_0_8px_rgba(255,215,0,0.45)]" : "text-white/85 hover:text-[#FFD700] hover:drop-shadow-[0_0_6px_rgba(255,215,0,0.35)]"}`}
+      >
+        Антиквариат
+        <Icon name="ChevronDown" size={10} className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+        <span className={`pointer-events-none absolute left-1 right-1 -bottom-[6px] h-[2px] rounded-full
+          bg-[linear-gradient(90deg,transparent,#FFD700_25%,#fff3a0_50%,#FFD700_75%,transparent)]
+          transition-all duration-300
+          ${open || isActive ? "opacity-100 scale-x-100 shadow-[0_0_10px_rgba(255,215,0,0.6)]" : "opacity-0 scale-x-50 group-hover:opacity-60 group-hover:scale-x-90"}`} />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full mt-2 z-50 w-56 bg-[#0F0F0F] border border-[#FFD700]/25 rounded-xl shadow-[0_16px_40px_rgba(0,0,0,0.6)] py-1.5 animate-in fade-in slide-in-from-top-2 duration-150">
+          <div className="px-3 py-1.5 mb-1 border-b border-white/[0.05]">
+            <span className="font-roboto text-[10px] uppercase tracking-widest text-white/30">Антиквариат · Скупка24</span>
+          </div>
+          {ANTIQUE_ITEMS.map(item => (
+            <a
+              key={item.href}
+              href={item.href}
+              onClick={() => setOpen(false)}
+              className={`flex items-center gap-2.5 px-3 py-2 font-oswald font-bold text-[12px] uppercase tracking-wider transition-colors group/item
+                ${currentPath === item.href ? "text-[#FFD700] bg-[#FFD700]/8" : "text-white/80 hover:text-white hover:bg-white/[0.04]"}`}
+            >
+              <span className="w-5 h-5 rounded flex items-center justify-center shrink-0" style={{ background: `${item.color}18` }}>
+                <Icon name={item.icon} size={11} style={{ color: item.color }} />
+              </span>
+              {item.label}
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 /**
  * MainNav — главная навигация сайта (вторая строка шапки).
  *
@@ -198,6 +260,11 @@ const MainNav = ({ navLinks, menuOpen, onToggleMenu, onNav, compact = false }: M
 
         {/* ── ПРАВО: каталог + телефон + бургер ── */}
         <div className="flex items-center gap-2 shrink-0">
+          {/* Антиквариат — выпадающее меню на md+ */}
+          <div className="hidden md:block">
+            <AntiqueDropdown compact={compact} />
+          </div>
+
           {/* Каталог — на md+ : премиум контурная кнопка */}
           <a
             href="/catalog"

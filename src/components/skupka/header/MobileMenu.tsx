@@ -4,6 +4,15 @@ import { ymGoal, Goals } from "@/lib/ym";
 import type { NavLink } from "./MainNav";
 import InstallAppModal, { isStandaloneApp } from "@/components/InstallAppModal";
 
+const ANTIQUE_ITEMS = [
+  { label: "Царские монеты",       href: "/russian-coins",     color: "#FFD700" },
+  { label: "Православные иконы",    href: "/icons",             color: "#e2a84b" },
+  { label: "Фарфор и хрусталь",     href: "/porcelain",         color: "#60a5fa" },
+  { label: "Советский антиквариат", href: "/soviet-antiques",   color: "#ef4444" },
+  { label: "Древние монеты",        href: "/ancient-coins",     color: "#a3e635" },
+  { label: "Бронзовые статуэтки",   href: "/bronze-sculptures", color: "#a78bfa" },
+];
+
 interface MobileMenuProps {
   open: boolean;
   navLinks: NavLink[];
@@ -12,6 +21,7 @@ interface MobileMenuProps {
 
 const MobileMenu = ({ open, navLinks, onNav }: MobileMenuProps) => {
   const [installOpen, setInstallOpen] = useState(false);
+  const [antiqueOpen, setAntiqueOpen] = useState(false);
   const installed = isStandaloneApp();
   if (!open) return null;
 
@@ -25,6 +35,35 @@ const MobileMenu = ({ open, navLinks, onNav }: MobileMenuProps) => {
             <Icon name="ChevronRight" size={16} className="text-white/20" />
           </button>
         ))}
+
+        {/* Антиквариат — раскрывающийся раздел */}
+        <div className="border-b border-white/5">
+          <button
+            onClick={() => setAntiqueOpen(o => !o)}
+            className="flex items-center justify-between w-full py-4 font-roboto text-[#FFD700] uppercase tracking-wide text-base font-bold"
+          >
+            <span className="flex items-center gap-2">
+              <Icon name="Landmark" size={16} />
+              Антиквариат
+            </span>
+            <Icon name={antiqueOpen ? "ChevronUp" : "ChevronDown"} size={16} className="text-[#FFD700]/50" />
+          </button>
+          {antiqueOpen && (
+            <div className="pb-2 pl-2 flex flex-col gap-0.5">
+              {ANTIQUE_ITEMS.map(item => (
+                <a
+                  key={item.href}
+                  href={item.href}
+                  className="flex items-center gap-2 py-2.5 px-2 rounded-lg font-roboto text-white/70 text-sm uppercase tracking-wide hover:text-white transition-colors"
+                >
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: item.color }} />
+                  {item.label}
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+
         <a href="/catalog" className="flex items-center justify-between w-full py-4 font-roboto text-[#FFD700] border-b border-white/5 uppercase tracking-wide text-base font-bold">
           <span className="flex items-center gap-2"><Icon name="ShoppingBag" size={16} />Каталог техники</span>
           <Icon name="ChevronRight" size={16} className="text-[#FFD700]/40" />
