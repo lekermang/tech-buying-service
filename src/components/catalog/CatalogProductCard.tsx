@@ -153,17 +153,15 @@ const CatalogProductCard = memo(function CatalogProductCard({ item, onBuy, onAdd
 
         {/* Цена */}
         <div className="mt-2.5 flex items-center justify-between gap-2">
-          {isLoggedIn ? (
-            <div className={`font-bold text-base ${inStock ? "text-[#FFD700]" : "text-white/40"}`}>
-              {price}
-            </div>
-          ) : (
-            <div className="flex items-center gap-1.5 text-white/25 text-xs">
-              <Icon name="Lock" size={11} />
-              <span>Войдите для цены</span>
+          <div className={`font-bold text-base ${inStock ? "text-[#FFD700]" : "text-white/40"}`}>
+            {price}
+          </div>
+          {!isLoggedIn && item.price && (
+            <div className="text-[10px] text-[#10B981] font-bold whitespace-nowrap">
+              −1 000 ₽ при рег.
             </div>
           )}
-          {item.region && (
+          {isLoggedIn && item.region && (
             <span className="text-[10px] text-white/20">{item.region}</span>
           )}
         </div>
@@ -192,8 +190,8 @@ const CatalogProductCard = memo(function CatalogProductCard({ item, onBuy, onAdd
               onClick={e => { e.stopPropagation(); onBuy(item); }}
               className="flex-1 btn-gold-outline py-2.5 text-[11px] font-oswald font-bold tracking-wider uppercase rounded-xl flex items-center justify-center gap-1.5"
             >
-              <Icon name="Lock" size={12} />
-              Войти
+              <Icon name="UserPlus" size={12} />
+              Войти и купить
             </button>
           )}
         </div>

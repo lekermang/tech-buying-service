@@ -320,18 +320,27 @@ const Catalog = () => {
               <div className="w-10 h-1 rounded-full bg-white/10" />
             </div>
             <div className="w-14 h-14 rounded-2xl bg-[#FFD700]/10 flex items-center justify-center mx-auto mb-4">
-              <Icon name="Lock" size={26} className="text-[#FFD700]" />
+              <Icon name="Tag" size={26} className="text-[#FFD700]" />
             </div>
-            <h3 className="text-white font-bold text-xl text-center mb-2">Войдите, чтобы увидеть цены</h3>
-            <p className="text-white/40 text-sm text-center mb-6 leading-relaxed">
-              Цены и кнопка заказа доступны только зарегистрированным покупателям
+            <h3 className="text-white font-bold text-xl text-center mb-2">−1 000 ₽ на первый заказ</h3>
+            <p className="text-white/40 text-sm text-center mb-4 leading-relaxed">
+              Зарегистрируйтесь бесплатно — и получите скидку 1 000 ₽ на первую покупку. Цена уже видна, регистрация только для заказа.
             </p>
+            {/* Плашка скидки */}
+            <div className="flex items-center justify-between bg-[#10B981]/10 border border-[#10B981]/30 rounded-xl px-4 py-3 mb-5">
+              <span className="text-[#10B981] text-sm font-bold">Скидка на первый заказ</span>
+              <span className="text-[#10B981] text-xl font-black">−1 000 ₽</span>
+            </div>
             <a href="/client"
-              className="block w-full bg-[#FFD700] hover:bg-yellow-400 text-black font-bold py-3.5 rounded-xl text-center text-sm transition-colors mb-3">
-              Войти / Зарегистрироваться
+              className="block w-full btn-gold-premium py-3.5 rounded-xl text-center text-sm mb-3">
+              Зарегистрироваться бесплатно
+            </a>
+            <a href="/client"
+              className="block w-full text-white/40 hover:text-white text-sm py-2 text-center transition-colors">
+              Уже есть аккаунт — войти
             </a>
             <button onClick={() => setShowLoginBanner(false)}
-              className="block w-full text-white/40 hover:text-white text-sm py-2 text-center transition-colors">
+              className="block w-full text-white/20 hover:text-white/40 text-xs py-1.5 text-center transition-colors">
               Закрыть
             </button>
           </div>

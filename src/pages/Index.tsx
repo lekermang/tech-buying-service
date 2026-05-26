@@ -17,6 +17,7 @@ import PublicChatFab from "@/components/skupka/PublicChatFab";
 import AppDownloadCard from "@/components/AppDownloadCard";
 import EasierWithUsBlock from "@/components/EasierWithUsBlock";
 import QuickContactSection from "@/components/QuickContactSection";
+import WholesaleBanner from "@/components/skupka/WholesaleBanner";
 
 const scrollTo = (href: string) => {
   const el = document.querySelector(href);
@@ -388,6 +389,7 @@ const Index = ({ goldOpen = false }: { goldOpen?: boolean }) => {
       <HeroSection scrollTo={scrollTo} externalModalOpen={evalOpen} onExternalModalClose={() => setEvalOpen(false)} />
       <SafeDealsBanner />
       <PremiumServicesGrid />
+      <WholesaleBanner />
       <InfoSections />
 
       {/* С нами стало проще — премиум-блок (приложения + преимущества), стиль Trade In */}

@@ -50,14 +50,12 @@ const ListCard = ({ item, onBuy, markup, isLoggedIn }: { item: CatalogItem; onBu
 
       {/* Цена + кнопка */}
       <div className="shrink-0 flex flex-col items-end gap-2">
-        {isLoggedIn ? (
-          <div className={`text-sm font-bold ${inStock ? "text-[#FFD700]" : "text-white/50"}`}>{price}</div>
-        ) : (
-          <div className="flex items-center gap-1 text-white/25 text-xs">
-            <Icon name="Lock" size={10} />
-            <span>Войдите</span>
-          </div>
-        )}
+        <div>
+          <div className={`text-sm font-bold text-right ${inStock ? "text-[#FFD700]" : "text-white/50"}`}>{price}</div>
+          {!isLoggedIn && item.price && (
+            <div className="text-[9px] text-[#10B981] font-bold text-right mt-0.5">−1 000 ₽ при рег.</div>
+          )}
+        </div>
         <div className="flex items-center gap-1.5">
           <span className={`text-[9px] px-2 py-0.5 rounded-full font-medium ${inStock ? "bg-green-500/15 text-green-400" : "bg-white/8 text-white/35"}`}>
             {inStock ? "В наличии" : "Заказ"}
