@@ -9,7 +9,7 @@ import { OfflineBanner } from "./StaffStatusBanners";
 import HolidayBanner from "@/components/holidays/HolidayBanner";
 import HolidayCornerDecor from "@/components/holidays/HolidayCornerDecor";
 import HolidayShowAgainButton from "@/components/holidays/HolidayShowAgainButton";
-import { PROTECTED_TABS, ROLE_BADGE, ROLE_LABEL, getInitials, type StaffTab } from "./staffConstants";
+import { PROTECTED_TABS, ROLE_BADGE, ROLE_LABEL, getInitials, canSeeAnalytics, type StaffTab } from "./staffConstants";
 import { FontApplier, MskClock, ThemeBanner, TabErrorBoundary } from "./StaffPwa";
 import {
   GoodsTab, StaffRepairTab, GoldTab, SalesTab, ClientsTab, AnalyticsTab,
@@ -91,6 +91,8 @@ export function StaffMainLayout({
     else setTimeout(run, 1500);
     return () => { cancelled = true; };
   }, [token]);
+  const analyticsAllowed = canSeeAnalytics(empRole, empName);
+
   const requestTab = (t: Tab) => {
     if (isOwner || unlocked[t]) { setTab(t); return; }
     if ((PROTECTED_TABS as readonly string[]).includes(t)) {
@@ -110,7 +112,7 @@ export function StaffMainLayout({
     { k: "salary",       l: "Зарплата",     icon: "Wallet",        tip: "Моя смена и заработок. Владельцу — управление ставкой, %, выходными и выплатами." },
     { k: "clients",      l: "Клиенты",      icon: "Users",         tip: "База клиентов, скидки, СМС-рассылки." },
     { k: "avitopro",     l: "Авито",        icon: "Zap",           tip: "Авито PRO: сводка по объявлениям, статистика просмотров и контактов, авто-действия." },
-    { k: "analytics",    l: "Статистика",   icon: "BarChart2",     tip: "Аналитика по продажам, ремонтам и сотрудникам." },
+    ...(analyticsAllowed ? [{ k: "analytics" as Tab, l: "Статистика", icon: "BarChart2", tip: "Аналитика по продажам, ремонтам и сотрудникам." }] : []),
     { k: "visitors",     l: "Посетители",   icon: "Activity",      tip: "Кто на сайте сейчас, источники трафика, заявки в реальном времени.", premium: true },
     ...(isOwnerOrAdmin ? [{ k: "gold" as Tab, l: "Золото", icon: "Gem", tip: "Учёт ювелирных изделий и драгметаллов." }] : []),
     ...(isOwnerOrAdmin ? [{ k: "employees" as Tab, l: "Команда", icon: "UserCog", tip: "Управление сотрудниками, роли, графики." }] : []),
@@ -284,7 +286,16 @@ export function StaffMainLayout({
             {tab === "sales"     && <SalesTab token={token} />}
             {tab === "clients"   && <ClientsTab token={token} />}
             {tab === "visitors"  && <VisitorsAnalyticsTab embedded tokenProp={token} />}
-            {tab === "analytics" && <AnalyticsTab token={token} />}
+            {tab === "analytics" && analyticsAllowed && <AnalyticsTab token={token} />}
+            {tab === "analytics" && !analyticsAllowed && (
+              <div className="flex flex-col items-center justify-center py-24 px-6 text-center gap-3">
+                <div className="w-14 h-14 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-1">
+                  <Icon name="Lock" size={24} className="text-red-400/70" />
+                </div>
+                <div className="font-oswald font-bold text-lg text-white/60 uppercase tracking-wide">Нет доступа</div>
+                <div className="font-roboto text-sm text-white/30 max-w-xs">Аналитика доступна только владельцу и уполномоченным сотрудникам</div>
+              </div>
+            )}
             {tab === "gold"      && isOwnerOrAdmin && <GoldTab token={token} />}
             {tab === "employees" && isOwnerOrAdmin && <EmployeesTab token={token} myRole={empRole} />}
             {tab === "smartlombard" && <SmartLombardTab token={token} myRole={empRole} />}

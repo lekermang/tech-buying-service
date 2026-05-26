@@ -20,7 +20,17 @@ export const PRICE_SCHEDULER_URL =
 export const SECRET_PW = "Mark2015N";
 
 // Какие вкладки требуют доп. пароль (для НЕ-владельца)
-export const PROTECTED_TABS: ReadonlyArray<StaffTab> = ["gold", "analytics", "employees"];
+export const PROTECTED_TABS: ReadonlyArray<StaffTab> = ["gold", "employees"];
+
+// Сотрудники с доступом к аналитике ремонтов (по имени, регистронезависимо)
+export const ANALYTICS_ALLOWED_NAMES = ["давид", "david"];
+
+// Проверка: может ли сотрудник видеть аналитику
+export function canSeeAnalytics(role: string, name: string): boolean {
+  if (role === "owner" || role === "admin") return true;
+  const n = (name || "").toLowerCase().trim();
+  return ANALYTICS_ALLOWED_NAMES.some(a => n.startsWith(a));
+}
 
 // Тип записи табов в нижней панели
 export type TabConfig = {

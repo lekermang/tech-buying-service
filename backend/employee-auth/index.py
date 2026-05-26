@@ -454,6 +454,30 @@ def handler(event: dict, context) -> dict:
         cur.close(); conn.close()
         return _ok({'ok': True})
 
+    # POST /check_pin — проверка PIN по текущему токену (для закрытых разделов, напр. зарплата)
+    if method == 'POST' and body.get('action') == 'check_pin':
+        if not emp_token:
+            return _err(401, 'Требуется токен')
+        pin = (body.get('pin') or '').strip()
+        if not pin.isdigit() or not (4 <= len(pin) <= 8):
+            return _err(400, 'PIN должен быть 4–8 цифр')
+        conn = get_conn(); cur = conn.cursor()
+        cur.execute(
+            f"SELECT id, pin_hash FROM {SCHEMA}.employees "
+            f"WHERE auth_token=%s AND token_expires_at>NOW() AND is_active=true",
+            (emp_token,)
+        )
+        row = cur.fetchone()
+        cur.close(); conn.close()
+        if not row:
+            return _err(401, 'Токен недействителен')
+        _, stored_pin_hash = row
+        if not stored_pin_hash:
+            return _err(400, 'PIN не установлен')
+        if hash_pin(pin) != stored_pin_hash:
+            return _err(401, 'Неверный PIN')
+        return _ok({'ok': True})
+
     return _err(404, 'Не найдено')
 
 
