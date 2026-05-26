@@ -7,11 +7,7 @@ const BENEFITS = [
     title: "Статус ремонта",
     text: "В реальном времени, без звонков. Push о каждом изменении.",
   },
-  {
-    icon: "ScrollText",
-    title: "Контроль залога",
-    text: "Договор 14 дней, дата выкупа, сумма, проценты — в одном месте.",
-  },
+
   {
     icon: "Send",
     title: "Предложения",
@@ -83,7 +79,7 @@ export default function EasierWithUsBlock() {
             <p className="font-roboto text-white/70 text-sm md:text-base leading-relaxed mb-5 md:mb-6">
               Установи приложение{" "}
               <span className="text-[#FFD700] font-bold">Скупка24</span> — и весь сервис
-              окажется под рукой: статусы ремонтов, залоги по договору 14 дней, твои
+              окажется под рукой: статусы ремонтов, твои
               предложения и уведомления о каждом изменении.
             </p>
             <p className="font-roboto text-white/60 text-sm md:text-base leading-relaxed mb-6 md:mb-8">
