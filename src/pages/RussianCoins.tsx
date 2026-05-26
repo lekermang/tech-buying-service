@@ -215,6 +215,105 @@ const WHY_US = [
   },
 ];
 
+const COIN_PRICES = [
+  {
+    era: "Киевская Русь",
+    color: "#e2c96e",
+    items: [
+      { name: "Злотник Владимира I", price: "от 5 000 000 ₽", hot: true },
+      { name: "Сребреник Ярослава Мудрого", price: "от 1 000 000 ₽", hot: true },
+      { name: "Монеты Святополка II", price: "от 500 000 ₽", hot: false },
+    ],
+  },
+  {
+    era: "Золотая Орда и Московское царство",
+    color: "#c084fc",
+    items: [
+      { name: "Динар Берке-хана (1256–1266)", price: "от 5 000 ₽", hot: false },
+      { name: "Монеты Дмитрия Донского", price: "от 10 000 ₽", hot: false },
+      { name: "Монеты Ивана IV Грозного", price: "от 5 000 ₽", hot: false },
+      { name: "Копейки Смутного времени", price: "от 3 000 ₽", hot: false },
+    ],
+  },
+  {
+    era: "Петровская эпоха",
+    color: "#60a5fa",
+    items: [
+      { name: "Монеты Петра I (обычные)", price: "от 2 000 ₽", hot: false },
+      { name: "Ефимки Петра I", price: "от 10 000 ₽", hot: false },
+      { name: "Монеты 1700 года (редкие)", price: "от 50 000 ₽", hot: true },
+      { name: "Пробные монеты Петра I", price: "от 30 000 ₽", hot: true },
+    ],
+  },
+  {
+    era: "Российская Империя",
+    color: "#FFD700",
+    items: [
+      { name: "Золотые империалы Екатерины II", price: "от 15 000 ₽", hot: false },
+      { name: "Монеты Павла I (редкие!)", price: "от 5 000 ₽", hot: true },
+      { name: "Платиновые монеты Александра III", price: "от 50 000 ₽", hot: true },
+      { name: "Платина Николая II (10 рублей)", price: "от 80 000 ₽", hot: true },
+      { name: "Золото Николая II (обычные)", price: "от 10 000 ₽", hot: false },
+    ],
+  },
+];
+
+const COIN_STORIES = [
+  {
+    title: "Платина Николая II в кошельке деда",
+    tag: "Николай II",
+    tagColor: "#FFD700",
+    quote:
+      "Дед хранил «старую монету» в кошельке на удачу. После его смерти мы решили узнать, что это такое.",
+    result: "220 000 ₽",
+    detail:
+      "Платиновый 6 рублей Николая II (1898), отличная сохранность. Настоящая удача!",
+  },
+  {
+    title: "Монеты Павла I в наследстве",
+    tag: "Павел I",
+    tagColor: "#c084fc",
+    quote:
+      "Разбирая бабушкин комод, нашли жестяную банку с монетами. Некоторые выглядели очень старыми.",
+    result: "380 000 ₽",
+    detail:
+      "12 монет эпохи Павла I (1796–1801), серебро. Редкий набор — монеты чеканились только 4 года.",
+  },
+  {
+    title: "Сребреник на огороде",
+    tag: "Киевская Русь",
+    tagColor: "#e2c96e",
+    quote:
+      "Копали огород в Смоленской области — лопата наткнулась на что-то твёрдое. Оказалась монета.",
+    result: "650 000 ₽",
+    detail:
+      "Сребреник XI века. Требовал осторожной чистки. Был передан в музей — выплата от частного коллекционера.",
+  },
+];
+
+const COIN_FAQ = [
+  {
+    q: "Как понять, что монета ценная, а не просто старая?",
+    a: "Возраст — один из факторов, но не единственный. Ценность определяется: редкостью тиража, состоянием (без чистки!), наличием редких разновидностей и исторической значимостью. Например, монеты Павла I (1796–1801) редки из-за короткого правления, а платиновые монеты ценны из-за материала. Лучший способ — принести на оценку.",
+  },
+  {
+    q: "Нашёл монету металлодетектором — это законно?",
+    a: "Поиск монет без разрешения на исторических землях запрещён (ст. 243.2 УК РФ). Монеты, найденные на своём участке или до принятия закона, продавать можно. Мы не задаём лишних вопросов о происхождении монет из частных коллекций и наследства.",
+  },
+  {
+    q: "Монету почистили — это снизило цену?",
+    a: "Да, чистка — главная ошибка! Неправильная чистка необратимо разрушает патину и царапает металл. Профессиональная чистка у нумизмата (2 000–10 000 ₽) может сохранить или повысить цену. Никогда не чистите монеты зубной пастой, уксусом или содой.",
+  },
+  {
+    q: "Есть ли у вас минимальная сумма выкупа?",
+    a: "Нет. Мы выкупаем от одной монеты стоимостью 500 ₽ до коллекций на миллионы. Но оценку проводим только при визите — удалённо по фото даём только ориентировочную стоимость.",
+  },
+  {
+    q: "Что значит «разновидность» монеты и почему она дороже?",
+    a: "Разновидность — это монета того же года и номинала, но с мелкими отличиями: другая форма орла, число перьев, положение букв. Некоторые разновидности чеканились тысячами, другие — единицами. Редкая разновидность рубля Николая II может стоить в 10 раз дороже обычной той же даты.",
+  },
+];
+
 const STATS = [
   { val: "1 000+", lbl: "лет истории" },
   { val: "от 1 000 ₽", lbl: "минимальная выкупная цена" },
@@ -229,6 +328,7 @@ export default function RussianCoins() {
   const [sent, setSent] = useState(false);
   const [ctaPhone, setCtaPhone] = useState("");
   const [ctaSent, setCtaSent] = useState(false);
+  const [activeFaq, setActiveFaq] = useState<number | null>(null);
 
   const handleModalSend = () => {
     if (phone.replace(/\D/g, "").length < 10) return;
@@ -532,6 +632,183 @@ export default function RussianCoins() {
               </div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* ══ АКТУАЛЬНЫЕ ЦЕНЫ ══ */}
+      <section className="bg-[#0A0A0A] border-y border-white/5 py-14 md:py-20">
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="mb-10">
+            <div className="inline-flex items-center gap-1.5 bg-[#FFD700]/10 border border-[#FFD700]/30 text-[#FFD700] text-[10px] font-roboto uppercase tracking-widest px-2.5 py-1 rounded-full mb-3">
+              <Icon name="TrendingUp" size={10} />
+              Актуальные цены
+            </div>
+            <h2 className="font-oswald font-bold text-3xl md:text-4xl uppercase">
+              Сколько стоят{" "}
+              <span className="text-[#FFD700]">ваши монеты</span>
+            </h2>
+            <p className="font-roboto text-white/45 text-sm mt-1">
+              Ориентировочные цены выкупа — итоговая стоимость зависит от
+              состояния и редкости
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            {COIN_PRICES.map((group) => (
+              <div
+                key={group.era}
+                className="bg-[#0D0D0D] border border-white/[0.07] rounded-xl overflow-hidden"
+                style={{ borderTopColor: group.color, borderTopWidth: 2 }}
+              >
+                <div className="px-5 py-4 border-b border-white/[0.06]">
+                  <span
+                    className="font-oswald font-bold text-base"
+                    style={{ color: group.color }}
+                  >
+                    {group.era}
+                  </span>
+                </div>
+                <div className="divide-y divide-white/[0.04]">
+                  {group.items.map((item) => (
+                    <div
+                      key={item.name}
+                      className="flex items-center justify-between px-5 py-3 hover:bg-white/[0.02] transition-colors"
+                    >
+                      <span className="font-roboto text-sm text-white/75">
+                        {item.name}
+                      </span>
+                      <div className="flex items-center gap-2 shrink-0 ml-4">
+                        <span className="font-oswald font-bold text-sm text-[#FFD700] whitespace-nowrap">
+                          {item.price}
+                        </span>
+                        {item.hot && (
+                          <span
+                            className="text-xs leading-none"
+                            title="Горячий спрос"
+                          >
+                            🔥
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ══ РЕАЛЬНЫЕ ИСТОРИИ ══ */}
+      <section className="max-w-6xl mx-auto px-4 py-14 md:py-20">
+        <div className="mb-10">
+          <div className="inline-flex items-center gap-1.5 bg-white/5 border border-white/10 text-white/50 text-[10px] font-roboto uppercase tracking-widest px-2.5 py-1 rounded-full mb-3">
+            <Icon name="BookOpen" size={10} />
+            Реальные истории
+          </div>
+          <h2 className="font-oswald font-bold text-3xl md:text-4xl uppercase">
+            Находки наших <span className="text-[#FFD700]">клиентов</span>
+          </h2>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-4">
+          {COIN_STORIES.map((story) => (
+            <div
+              key={story.title}
+              className="bg-[#0D0D0D] border border-white/[0.07] hover:border-[#FFD700]/20 transition-colors p-5 rounded-xl flex flex-col gap-4"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="font-oswald font-bold text-base leading-snug">
+                  {story.title}
+                </div>
+                <span
+                  className="shrink-0 font-roboto text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border whitespace-nowrap"
+                  style={{
+                    color: story.tagColor,
+                    borderColor: `${story.tagColor}40`,
+                    background: `${story.tagColor}12`,
+                  }}
+                >
+                  {story.tag}
+                </span>
+              </div>
+
+              <p className="font-roboto text-white/50 text-sm leading-relaxed italic flex-1">
+                &laquo;{story.quote}&raquo;
+              </p>
+
+              <div className="border-t border-white/[0.07] pt-4">
+                <div
+                  className="font-oswald font-black text-2xl mb-1"
+                  style={{ color: "#FFD700" }}
+                >
+                  {story.result}
+                </div>
+                <div className="font-roboto text-white/40 text-xs leading-relaxed">
+                  {story.detail}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ══ ЧАСТЫЕ ВОПРОСЫ ══ */}
+      <section className="bg-[#0A0A0A] border-y border-white/5 py-14 md:py-20">
+        <div className="max-w-3xl mx-auto px-4">
+          <div className="mb-10">
+            <div className="inline-flex items-center gap-1.5 bg-white/5 border border-white/10 text-white/50 text-[10px] font-roboto uppercase tracking-widest px-2.5 py-1 rounded-full mb-3">
+              <Icon name="HelpCircle" size={10} />
+              FAQ
+            </div>
+            <h2 className="font-oswald font-bold text-3xl md:text-4xl uppercase">
+              Частые <span className="text-[#FFD700]">вопросы</span>
+            </h2>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            {COIN_FAQ.map((item, i) => {
+              const isOpen = activeFaq === i;
+              return (
+                <div
+                  key={i}
+                  className="bg-[#0D0D0D] rounded-xl overflow-hidden transition-colors"
+                  style={{
+                    border: isOpen
+                      ? "1px solid #FFD700"
+                      : "1px solid rgba(255,255,255,0.07)",
+                  }}
+                >
+                  <button
+                    className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left group"
+                    onClick={() => setActiveFaq(isOpen ? null : i)}
+                  >
+                    <span
+                      className={`font-oswald font-bold text-sm transition-colors ${
+                        isOpen ? "text-[#FFD700]" : "text-white group-hover:text-[#FFD700]"
+                      }`}
+                    >
+                      {item.q}
+                    </span>
+                    <Icon
+                      name={isOpen ? "ChevronUp" : "ChevronDown"}
+                      size={16}
+                      className={`shrink-0 transition-colors ${
+                        isOpen ? "text-[#FFD700]" : "text-white/30"
+                      }`}
+                    />
+                  </button>
+                  {isOpen && (
+                    <div className="px-5 pb-5">
+                      <p className="font-roboto text-white/55 text-sm leading-relaxed">
+                        {item.a}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </section>
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import Icon from "@/components/ui/icon";
 import { ymGoal, Goals } from "@/lib/ym";
 
@@ -118,8 +119,8 @@ const ANTIQUE_ITEMS = [
 /** Кнопка «Антиквариат ▾» с выпадающим меню */
 const AntiqueDropdown = ({ compact }: { compact?: boolean }) => {
   const [open, setOpen] = useState(false);
-  const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
-  const isActive = ANTIQUE_ITEMS.some(i => i.href === currentPath);
+  const { pathname } = useLocation();
+  const isActive = ANTIQUE_ITEMS.some(i => i.href === pathname);
 
   useEffect(() => {
     if (!open) return;
@@ -154,7 +155,7 @@ const AntiqueDropdown = ({ compact }: { compact?: boolean }) => {
               href={item.href}
               onClick={() => setOpen(false)}
               className={`flex items-center gap-2.5 px-3 py-2 font-oswald font-bold text-[12px] uppercase tracking-wider transition-colors group/item
-                ${currentPath === item.href ? "text-[#FFD700] bg-[#FFD700]/8" : "text-white/80 hover:text-white hover:bg-white/[0.04]"}`}
+                ${pathname === item.href ? "text-[#FFD700] bg-[#FFD700]/8" : "text-white/80 hover:text-white hover:bg-white/[0.04]"}`}
             >
               <span className="w-5 h-5 rounded flex items-center justify-center shrink-0" style={{ background: `${item.color}18` }}>
                 <Icon name={item.icon} size={11} style={{ color: item.color }} />

@@ -66,11 +66,110 @@ const PROCESS = [
   { step: "04", title: "Оплата в день обращения", text: "Платим наличными или переводом сразу — без задержек и торгов" },
 ];
 
+const ANCIENT_PRICES = [
+  {
+    era: "Древний Рим",
+    color: "#FFD700",
+    items: [
+      { name: "Ауреус (золото Империи)", price: "от 300 000 ₽", hot: true },
+      { name: "Денарий серебряный", price: "от 3 000 ₽", hot: false },
+      { name: "Редкий денарий (портрет)", price: "от 30 000 ₽", hot: false },
+      { name: "Сестерций бронза (крупный)", price: "от 5 000 ₽", hot: false },
+      { name: "Монеты Юлия Цезаря", price: "от 50 000 ₽", hot: true },
+    ],
+  },
+  {
+    era: "Древняя Греция",
+    color: "#e2c96e",
+    items: [
+      { name: "Тетрадрахма Афин (сова)", price: "от 150 000 ₽", hot: true },
+      { name: "Тетрадрахма Македонии", price: "от 80 000 ₽", hot: false },
+      { name: "Статер золотой", price: "от 200 000 ₽", hot: true },
+      { name: "Обол (мелкое серебро)", price: "от 2 000 ₽", hot: false },
+    ],
+  },
+  {
+    era: "Парфия и Персия",
+    color: "#c084fc",
+    items: [
+      { name: "Драхма парфянская", price: "от 5 000 ₽", hot: false },
+      { name: "Тетрадрахма Парфии", price: "от 20 000 ₽", hot: false },
+      { name: "Дарик персидский (золото)", price: "от 100 000 ₽", hot: true },
+    ],
+  },
+  {
+    era: "Боспорское царство и Причерноморье",
+    color: "#60a5fa",
+    items: [
+      { name: "Статер Боспора (золото)", price: "от 80 000 ₽", hot: true },
+      { name: "Монеты Пантикапея", price: "от 10 000 ₽", hot: false },
+      { name: "Херсонес, Ольвия (бронза)", price: "от 3 000 ₽", hot: false },
+    ],
+  },
+];
+
+const ANCIENT_STORIES = [
+  {
+    title: "Тетрадрахма в банке с пуговицами",
+    tag: "Древняя Греция",
+    tagColor: "#e2c96e",
+    quote:
+      "Мама хранила разные монеты в банке с пуговицами. Среди советских копеек нашли одну необычную — с совой.",
+    result: "180 000 ₽",
+    detail:
+      "Афинская тетрадрахма V века до н.э., аверс — Афина, реверс — сова. Классика нумизматики.",
+  },
+  {
+    title: "Коллекция дяди-нумизмата",
+    tag: "Рим + Греция",
+    tagColor: "#FFD700",
+    quote:
+      "Дядя собирал монеты 40 лет. Наследники не знали что с этим делать — принесли нам на оценку.",
+    result: "2 400 000 ₽",
+    detail:
+      "87 монет: 12 ауреусов, 34 денария, 15 тетрадрахм, редкие монеты Боспора. Продано коллекционеру.",
+  },
+  {
+    title: "Находка при строительстве в Крыму",
+    tag: "Боспор",
+    tagColor: "#60a5fa",
+    quote:
+      "При рытье котлована в Керчи рабочий нашёл горшок с монетами. Принёс на проверку.",
+    result: "430 000 ₽",
+    detail:
+      "18 боспорских статеров III-IV вв. н.э. Редкие портретные монеты местных царей.",
+  },
+];
+
+const ANCIENT_FAQ = [
+  {
+    q: "Как отличить настоящую античную монету от подделки?",
+    a: "Подлинная монета имеет естественную патину (зелёную на меди, тёмно-серую на серебре), характерный вес и диаметр по каталогу, следы ручной чеканки (не идеально ровные края). Подделки часто слишком «чистые» или слишком «патинированные» химическим способом. Мы определяем подлинность визуально и при необходимости — XRF-анализом металла.",
+  },
+  {
+    q: "Можно ли продать монеты найденные на раскопках?",
+    a: "Монеты с законных частных раскопок, из наследства или старых коллекций — продать можно. Монеты, поднятые незаконно с памятников культуры, продавать нельзя. Мы работаем только с законными источниками и не задаём лишних вопросов о монетах из частных коллекций.",
+  },
+  {
+    q: "У меня один денарий — стоит ли приходить?",
+    a: "Да! Даже одна монета может стоить от 3 000 до 50 000 ₽ и выше. Оценку проводим бесплатно. Если монета окажется незначительной — честно скажем и не будем давить на продажу.",
+  },
+  {
+    q: "Нужно ли чистить монеты перед визитом?",
+    a: "Нет! Никогда не чистите античные монеты самостоятельно. Патина — это защитный слой и подтверждение возраста. Чистка разрушает поверхность и может снизить цену на 50–80%. Привозите как есть — грязные, в земле, с патиной.",
+  },
+  {
+    q: "Вы берёте монеты в плохом состоянии?",
+    a: "Да. Даже сильно коррозированная монета редкого типа стоит больше, чем идеальная распространённая. Мы оцениваем редкость и тип прежде всего, состояние — второй фактор.",
+  },
+];
+
 export default function AncientCoins() {
   const [activeEra, setActiveEra] = useState(0);
   const [formOpen, setFormOpen] = useState(false);
   const [phone, setPhone] = useState("");
   const [sent, setSent] = useState(false);
+  const [activeFaq, setActiveFaq] = useState<number | null>(null);
 
   const handleSend = () => {
     if (phone.replace(/\D/g, "").length < 10) return;
@@ -266,6 +365,182 @@ export default function AncientCoins() {
               </div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* ══ АКТУАЛЬНЫЕ ЦЕНЫ ══ */}
+      <section className="bg-[#0A0A0A] border-y border-white/5 py-14 md:py-20">
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="mb-10">
+            <div className="inline-flex items-center gap-1.5 bg-[#FFD700]/10 border border-[#FFD700]/30 text-[#FFD700] text-[10px] font-roboto uppercase tracking-widest px-2.5 py-1 rounded-full mb-3">
+              <Icon name="TrendingUp" size={10} />
+              Актуальные цены
+            </div>
+            <h2 className="font-oswald font-bold text-3xl md:text-4xl uppercase">
+              Сколько стоят{" "}
+              <span className="text-[#FFD700]">ваши монеты</span>
+            </h2>
+            <p className="font-roboto text-white/45 text-sm mt-1">
+              Ориентировочные цены выкупа — итоговая стоимость зависит от
+              состояния и редкости
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            {ANCIENT_PRICES.map((group) => (
+              <div
+                key={group.era}
+                className="bg-[#0D0D0D] border border-white/[0.07] rounded-xl overflow-hidden"
+                style={{ borderTopColor: group.color, borderTopWidth: 2 }}
+              >
+                <div className="px-5 py-4 border-b border-white/[0.06]">
+                  <span
+                    className="font-oswald font-bold text-base"
+                    style={{ color: group.color }}
+                  >
+                    {group.era}
+                  </span>
+                </div>
+                <div className="divide-y divide-white/[0.04]">
+                  {group.items.map((item) => (
+                    <div
+                      key={item.name}
+                      className="flex items-center justify-between px-5 py-3 hover:bg-white/[0.02] transition-colors"
+                    >
+                      <span className="font-roboto text-sm text-white/75">
+                        {item.name}
+                      </span>
+                      <div className="flex items-center gap-2 shrink-0 ml-4">
+                        <span className="font-oswald font-bold text-sm text-[#FFD700] whitespace-nowrap">
+                          {item.price}
+                        </span>
+                        {item.hot && (
+                          <span className="text-xs leading-none" title="Горячий спрос">
+                            🔥
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ══ РЕАЛЬНЫЕ ИСТОРИИ ══ */}
+      <section className="max-w-6xl mx-auto px-4 py-14 md:py-20">
+        <div className="mb-10">
+          <div className="inline-flex items-center gap-1.5 bg-white/5 border border-white/10 text-white/50 text-[10px] font-roboto uppercase tracking-widest px-2.5 py-1 rounded-full mb-3">
+            <Icon name="BookOpen" size={10} />
+            Реальные истории
+          </div>
+          <h2 className="font-oswald font-bold text-3xl md:text-4xl uppercase">
+            Находки наших <span className="text-[#FFD700]">клиентов</span>
+          </h2>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-4">
+          {ANCIENT_STORIES.map((story) => (
+            <div
+              key={story.title}
+              className="bg-[#0D0D0D] border border-white/[0.07] hover:border-[#FFD700]/20 transition-colors p-5 rounded-xl flex flex-col gap-4"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="font-oswald font-bold text-base leading-snug">
+                  {story.title}
+                </div>
+                <span
+                  className="shrink-0 font-roboto text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border whitespace-nowrap"
+                  style={{
+                    color: story.tagColor,
+                    borderColor: `${story.tagColor}40`,
+                    background: `${story.tagColor}12`,
+                  }}
+                >
+                  {story.tag}
+                </span>
+              </div>
+
+              <p className="font-roboto text-white/50 text-sm leading-relaxed italic flex-1">
+                &laquo;{story.quote}&raquo;
+              </p>
+
+              <div className="border-t border-white/[0.07] pt-4">
+                <div
+                  className="font-oswald font-black text-2xl mb-1"
+                  style={{ color: "#FFD700" }}
+                >
+                  {story.result}
+                </div>
+                <div className="font-roboto text-white/40 text-xs leading-relaxed">
+                  {story.detail}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ══ ЧАСТЫЕ ВОПРОСЫ ══ */}
+      <section className="bg-[#0A0A0A] border-y border-white/5 py-14 md:py-20">
+        <div className="max-w-3xl mx-auto px-4">
+          <div className="mb-10">
+            <div className="inline-flex items-center gap-1.5 bg-white/5 border border-white/10 text-white/50 text-[10px] font-roboto uppercase tracking-widest px-2.5 py-1 rounded-full mb-3">
+              <Icon name="HelpCircle" size={10} />
+              FAQ
+            </div>
+            <h2 className="font-oswald font-bold text-3xl md:text-4xl uppercase">
+              Частые <span className="text-[#FFD700]">вопросы</span>
+            </h2>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            {ANCIENT_FAQ.map((item, i) => {
+              const isOpen = activeFaq === i;
+              return (
+                <div
+                  key={i}
+                  className="bg-[#0D0D0D] rounded-xl overflow-hidden transition-colors"
+                  style={{
+                    border: isOpen
+                      ? "1px solid #FFD700"
+                      : "1px solid rgba(255,255,255,0.07)",
+                  }}
+                >
+                  <button
+                    className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left group"
+                    onClick={() => setActiveFaq(isOpen ? null : i)}
+                  >
+                    <span
+                      className={`font-oswald font-bold text-sm transition-colors ${
+                        isOpen
+                          ? "text-[#FFD700]"
+                          : "text-white group-hover:text-[#FFD700]"
+                      }`}
+                    >
+                      {item.q}
+                    </span>
+                    <Icon
+                      name={isOpen ? "ChevronUp" : "ChevronDown"}
+                      size={16}
+                      className={`shrink-0 transition-colors ${
+                        isOpen ? "text-[#FFD700]" : "text-white/30"
+                      }`}
+                    />
+                  </button>
+                  {isOpen && (
+                    <div className="px-5 pb-5">
+                      <p className="font-roboto text-white/55 text-sm leading-relaxed">
+                        {item.a}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </section>
 
