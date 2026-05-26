@@ -123,14 +123,28 @@ export default function OrderCardHeader({ o, isExpanded, onToggle, onQuickStatus
             )}
           </div>
 
-          {/* Имя + ID */}
-          <div className="flex-1 min-w-0">
+          {/* Имя + модель */}
+          <div className="flex-1 min-w-0 flex flex-col gap-0">
+            {/* Строка 1: имя + id */}
             <div className="flex items-baseline gap-1.5 min-w-0">
-              <span className="font-oswald font-bold text-[15px] text-white uppercase tracking-wide truncate leading-tight">
+              <span className="font-oswald font-bold text-[14px] text-white uppercase tracking-wide truncate leading-tight">
                 {o.name}
               </span>
-              <span className="font-roboto text-[10px] text-white/30 shrink-0 tabular-nums">#{o.id}</span>
+              <span className="font-roboto text-[9px] text-white/25 shrink-0 tabular-nums">#{o.id}</span>
             </div>
+            {/* Строка 2: модель — крупно и чётко */}
+            {(o.model || o.repair_type) && (
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="font-oswald font-bold text-[13px] truncate leading-tight" style={{ color: accent.barColor }}>
+                  {o.model || <span className="opacity-40">без модели</span>}
+                </span>
+                {o.repair_type && (
+                  <span className="font-roboto text-[11px] text-white/50 shrink-0 truncate">
+                    · {o.repair_type}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Статус-бейдж */}
@@ -201,19 +215,7 @@ export default function OrderCardHeader({ o, isExpanded, onToggle, onQuickStatus
             {o.phone}
           </a>
 
-          {/* Модель */}
-          {(o.model || o.repair_type) && (
-            <>
-              <span className="text-white/15 shrink-0">·</span>
-              <span className="text-white/60 truncate min-w-0 inline-flex items-center gap-1">
-                <Icon name="Smartphone" size={9} className="text-white/25 shrink-0" />
-                <span className="truncate">
-                  {o.model}
-                  {o.repair_type && <span className="text-white/45"> · {o.repair_type}</span>}
-                </span>
-              </span>
-            </>
-          )}
+
 
           {/* Мастер-заработок */}
           {masterCalc != null && masterCalc > 0 && (
