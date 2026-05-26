@@ -16,7 +16,7 @@ type Tab = "repairs" | "contracts" | "offers" | "chat";
 
 const TABS: { id: Tab; label: string; icon: string; desc: string }[] = [
   { id: "repairs", label: "Ремонты", icon: "Wrench", desc: "Что в работе" },
-  { id: "contracts", label: "Залоги 14 дней", icon: "ScrollText", desc: "Договоры ломбарда" },
+  { id: "contracts", label: "Договор", icon: "ScrollText", desc: "Договоры ломбарда" },
   { id: "offers", label: "Предложения", icon: "Send", desc: "Что я хочу сдать" },
   { id: "chat", label: "Чат", icon: "MessageCircle", desc: "Связь с менеджером" },
 ];
