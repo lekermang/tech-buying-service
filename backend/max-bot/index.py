@@ -1013,19 +1013,75 @@ def action_send(body: dict) -> dict:
     return _ok({'ok': ok, 'delivered': ok, 'response': d})
 
 
+def _send_max_photo(chat_id: int, photo_url: str, caption: str = '') -> bool:
+    """Отправляет фото в MAX по CDN-URL через attachments."""
+    token = os.environ.get('MAX_BOT_TOKEN', '')
+    if not token:
+        return False
+    try:
+        payload: dict = {'chat_id': chat_id}
+        if caption:
+            payload['text'] = caption
+        payload['attachments'] = [{'type': 'image', 'payload': {'url': photo_url}}]
+        r = requests.post(
+            f'{MAX_API_URL}/messages',
+            params={'chat_id': chat_id},
+            json=payload,
+            headers={'Authorization': token, 'Content-Type': 'application/json'},
+            timeout=10,
+        )
+        print(f'[MAX-photo] chat={chat_id} status={r.status_code} url={photo_url[:60]}')
+        return r.status_code == 200
+    except Exception as e:
+        print(f'[MAX-photo] error: {e}')
+        return False
+
+
+def _upload_photo_to_s3_and_get_url(photo_b64: str, prefix: str = 'leads'):
+    """Загружает base64-фото в S3 и возвращает CDN URL."""
+    try:
+        import boto3, base64 as b64m, secrets as sec
+        from botocore.client import Config as BotoConfig
+        data = b64m.b64decode(photo_b64)
+        key = f'{prefix}/{sec.token_hex(8)}.jpg'
+        s3 = boto3.client(
+            's3',
+            endpoint_url='https://bucket.poehali.dev',
+            aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
+            aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
+            config=BotoConfig(signature_version='s3v4'),
+        )
+        s3.put_object(Bucket='files', Key=key, Body=data, ContentType='image/jpeg')
+        return f"https://cdn.poehali.dev/projects/{os.environ['AWS_ACCESS_KEY_ID']}/bucket/{key}"
+    except Exception as e:
+        print(f'[MAX-upload-s3] error: {e}')
+        return None
+
+
 def action_staff_send(body: dict) -> dict:
-    """Отправить сообщение во ВСЕ staff-каналы MAX:
+    """Отправить сообщение (и фото) во ВСЕ staff-каналы MAX:
     1) staff-канал (если бот добавлен в группу/канал),
-    2) личные ID владельцев из MAX_OWNER_USER_ID (через запятую) — приходит в личку MAX-бота.
+    2) личные ID владельцев из MAX_OWNER_USER_ID (через запятую).
+    Поддерживает photo_urls (список CDN-URL) и photos_b64 (список base64).
     Используется из send-lead, repair-order, repair-admin, public-chat."""
     text = (body.get('text') or '').strip()
-    if not text:
-        return _err(400, 'text обязателен')
+    photo_urls: list[str] = body.get('photo_urls') or []
+    photos_b64: list[str] = body.get('photos_b64') or []
+
+    if not text and not photo_urls and not photos_b64:
+        return _err(400, 'text или фото обязательны')
+
+    # Загружаем base64-фото в S3 чтобы получить URL
+    if photos_b64 and not photo_urls:
+        for b64 in photos_b64[:3]:
+            url = _upload_photo_to_s3_and_get_url(b64, prefix='staff-photos')
+            if url:
+                photo_urls.append(url)
+
     targets: list[int] = []
     cid = get_staff_channel_id()
     if cid:
         targets.append(int(cid))
-    # Личные получатели — владельцы
     owners_raw = (os.environ.get('MAX_OWNER_USER_ID') or '').strip()
     for piece in owners_raw.replace(' ', '').split(','):
         if piece.isdigit():
@@ -1035,15 +1091,23 @@ def action_staff_send(body: dict) -> dict:
     if not targets:
         return _ok({'ok': True, 'delivered': False, 'reason': 'no_targets',
                     'hint': 'Добавь бота в канал ИЛИ заполни секрет MAX_OWNER_USER_ID'})
+
     delivered = 0
     last_resp: dict = {}
     for tid in targets:
-        ok, d = send_max_message(tid, text)
-        last_resp = d
-        _log('out', 'staff_send', text, max_chat_id=tid,
-             payload=d, error='' if ok else json.dumps(d, ensure_ascii=False)[:300])
-        if ok:
-            delivered += 1
+        # Сначала текст
+        if text:
+            ok, d = send_max_message(tid, text)
+            last_resp = d
+            _log('out', 'staff_send', text, max_chat_id=tid,
+                 payload=d, error='' if ok else json.dumps(d, ensure_ascii=False)[:300])
+            if ok:
+                delivered += 1
+        # Потом фото
+        for i, photo_url in enumerate(photo_urls[:3]):
+            caption = f'📷 Фото {i+1}' if not text or i > 0 else ''
+            _send_max_photo(tid, photo_url, caption)
+
     return _ok({'ok': delivered > 0, 'delivered': delivered, 'targets': targets,
                 'response': last_resp})
 

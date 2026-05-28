@@ -1141,6 +1141,7 @@ def handler(event: dict, context) -> dict:
     phone = (body.get('phone') or '').strip()
     model = (body.get('model') or '').strip()
     repair_type = (body.get('repair_type') or '').strip()
+    photos_b64 = body.get('photos') or (([body['photo']] if body.get('photo') else []))
     price_raw = body.get('price')
     # Безопасное приведение price к int|None (никаких NaN/строк/пустых)
     price = None
@@ -1335,7 +1336,7 @@ def handler(event: dict, context) -> dict:
     except Exception as max_err:
         print(f'[MAX][repair-new] error: {max_err}')
 
-    # 💬 MAX-канал сотрудников: дублируем уведомление о новой заявке на ремонт
+    # 💬 MAX-канал сотрудников: дублируем уведомление о новой заявке на ремонт (с фото)
     try:
         staff_repair = (
             f"🔧 *Новый ремонт #{order_id}*\n\n"
@@ -1346,10 +1347,13 @@ def handler(event: dict, context) -> dict:
             + (f"💰 {price_str}\n" if price_str else "")
             + (f"📝 {comment[:200]}\n" if comment else "")
         )
+        staff_payload = {'text': staff_repair}
+        if photos_b64:
+            staff_payload['photos_b64'] = photos_b64[:3]
         requests.post(
             'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c?action=staff_send',
-            json={'text': staff_repair},
-            timeout=6,
+            json=staff_payload,
+            timeout=15,
         )
     except Exception as max_err:
         print(f'[MAX STAFF REPAIR-NEW] error: {max_err}')
