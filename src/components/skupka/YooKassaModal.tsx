@@ -7,11 +7,9 @@ const PAYMENT_URL = "https://functions.poehali.dev/6d3e059a-1409-4391-bb0b-c3c62
 const QUICK_AMOUNTS = [500, 1000, 2000, 5000];
 
 const SERVICES = [
-  { label: "Оценка техники", value: "Оценка техники" },
-  { label: "Ремонт телефона", value: "Ремонт телефона" },
-  { label: "Ремонт ноутбука", value: "Ремонт ноутбука" },
-  { label: "Предоплата скупки", value: "Предоплата скупки" },
-  { label: "Другое", value: "Другое" },
+  { label: "Ремонт телефона", value: "Ремонт телефона", extraLabel: "Номер заявки", extraPlaceholder: "Например: 1042" },
+  { label: "Предоплата за товар", value: "Предоплата за товар", extraLabel: "Наименование товара", extraPlaceholder: "Например: iPhone 13 Pro" },
+  { label: "Чай", value: "Другое" },
 ];
 
 interface YooKassaModalProps {
@@ -24,13 +22,16 @@ const YooKassaModal = ({ open, onClose }: YooKassaModalProps) => {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [service, setService] = useState(SERVICES[0].value);
+  const [extra, setExtra] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   if (!open) return null;
 
   const amountNum = parseInt(amount.replace(/\D/g, "")) || 0;
-  const isValid = amountNum >= 100 && name.trim().length >= 2 && isPhoneValid(phone);
+  const activeService = SERVICES.find(s => s.value === service);
+  const needsExtra = !!activeService?.extraLabel;
+  const isValid = amountNum >= 100 && name.trim().length >= 2 && isPhoneValid(phone) && (!needsExtra || extra.trim().length >= 1);
 
   const handlePay = async () => {
     if (!isValid) return;
@@ -44,7 +45,7 @@ const YooKassaModal = ({ open, onClose }: YooKassaModalProps) => {
           amount: amountNum,
           name: name.trim(),
           phone,
-          description: service,
+          description: extra.trim() ? `${service}: ${extra.trim()}` : service,
           return_url: `${window.location.origin}/?paid=1`,
         }),
       });
@@ -107,7 +108,7 @@ const YooKassaModal = ({ open, onClose }: YooKassaModalProps) => {
               {SERVICES.map(s => (
                 <button
                   key={s.value}
-                  onClick={() => setService(s.value)}
+                  onClick={() => { setService(s.value); setExtra(""); }}
                   className={`px-3 py-1.5 font-roboto text-xs transition-all border rounded ${
                     service === s.value
                       ? "border-[#FFD700]/60 bg-[#FFD700]/10 text-[#FFD700]"
@@ -118,6 +119,15 @@ const YooKassaModal = ({ open, onClose }: YooKassaModalProps) => {
                 </button>
               ))}
             </div>
+            {needsExtra && activeService?.extraLabel && (
+              <input
+                type="text"
+                value={extra}
+                onChange={e => setExtra(e.target.value)}
+                placeholder={activeService.extraPlaceholder}
+                className="mt-2 w-full bg-[#1A1A1A] border border-[#333] focus:border-[#FFD700] text-white px-4 py-2.5 text-sm outline-none transition-colors placeholder:text-white/20 rounded"
+              />
+            )}
           </div>
 
           {/* Сумма */}
