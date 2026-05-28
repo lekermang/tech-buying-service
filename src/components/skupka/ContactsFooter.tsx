@@ -122,32 +122,18 @@ const ContactsFooter = ({ scrollTo }: ContactsFooterProps) => {
               <Icon name="ArrowUpRight" size={16} className="relative text-[#229ED9]/50 group-hover:text-[#229ED9] transition-colors" />
             </a>
 
-            <a href="https://max.ru/id402810962699_biz" target="_blank" rel="noopener noreferrer"
-              onClick={() => ymGoal(Goals.MAX_CLICK, { place: "footer_channel" })}
-              className="group relative overflow-hidden flex items-center gap-3 bg-gradient-to-br from-[#0077FF]/15 to-[#0077FF]/5 border border-[#0077FF]/40 hover:border-[#0077FF] rounded-md px-4 py-4 transition-all">
-              <div className="absolute -inset-1 bg-gradient-to-br from-[#0077FF]/20 to-transparent blur-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-              <div className="relative w-11 h-11 rounded-full bg-[#0077FF] flex items-center justify-center shrink-0 shadow-[0_4px_14px_rgba(0,119,255,0.45)]">
-                <span className="font-oswald font-extrabold text-white text-[13px] leading-none tracking-tight">MAX</span>
+            <a href="/chat"
+              className="group relative overflow-hidden flex items-center gap-3 bg-gradient-to-br from-[#FFD700]/15 to-[#FFD700]/5 border-2 border-[#FFD700]/50 hover:border-[#FFD700] rounded-md px-4 py-4 transition-all">
+              <div className="absolute -inset-1 bg-gradient-to-br from-[#FFD700]/20 to-transparent blur-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+              <div className="relative w-11 h-11 rounded-full bg-[#FFD700] flex items-center justify-center shrink-0 shadow-[0_4px_14px_rgba(255,215,0,0.4)]">
+                <Icon name="MessageSquare" size={20} className="text-black" />
+                <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-green-400 ring-2 ring-[#0D0D0D]" />
               </div>
               <div className="relative flex-1 min-w-0">
-                <div className="font-oswald font-bold text-white text-sm uppercase tracking-wide">MAX · Канал</div>
-                <div className="font-roboto text-[#0077FF] text-xs">Подпишись · новости и акции</div>
+                <div className="font-oswald font-bold text-white text-sm uppercase tracking-wide">Чат Live</div>
+                <div className="font-roboto text-[#FFD700] text-xs">Онлайн · ответ за минуту</div>
               </div>
-              <Icon name="ArrowUpRight" size={16} className="relative text-[#0077FF]/50 group-hover:text-[#0077FF] transition-colors" />
-            </a>
-
-            <a href="https://max.ru/id402810962699_bot" target="_blank" rel="noopener noreferrer"
-              onClick={() => ymGoal(Goals.MAX_CLICK, { place: "footer_bot" })}
-              className="group relative overflow-hidden flex items-center gap-3 bg-gradient-to-br from-[#0077FF]/20 to-[#0077FF]/5 border-2 border-[#0077FF]/50 hover:border-[#0077FF] rounded-md px-4 py-4 transition-all">
-              <div className="absolute -inset-1 bg-gradient-to-br from-[#0077FF]/25 to-transparent blur-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-              <div className="relative w-11 h-11 rounded-full bg-gradient-to-br from-[#0077FF] to-[#0066DD] flex items-center justify-center shrink-0 shadow-[0_4px_14px_rgba(0,119,255,0.45)]">
-                <Icon name="Bot" size={20} className="text-white" />
-              </div>
-              <div className="relative flex-1 min-w-0">
-                <div className="font-oswald font-bold text-white text-sm uppercase tracking-wide">MAX · Бот</div>
-                <div className="font-roboto text-[#0077FF] text-xs">Оценка, ремонт, статус</div>
-              </div>
-              <Icon name="ArrowUpRight" size={16} className="relative text-[#0077FF]/50 group-hover:text-[#0077FF] transition-colors" />
+              <Icon name="ArrowUpRight" size={16} className="relative text-[#FFD700]/50 group-hover:text-[#FFD700] transition-colors" />
             </a>
 
             <a href="https://wa.me/79929990333" target="_blank" rel="noopener noreferrer"
