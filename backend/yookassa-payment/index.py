@@ -56,6 +56,13 @@ def handler(event: dict, context) -> dict:
 
     amount = max(100, int(amount))
 
+    # Нормализуем телефон для чека: +7XXXXXXXXXX
+    import re as _re
+    digits = _re.sub(r'\D', '', phone)
+    if len(digits) == 11 and digits[0] in ('7', '8'):
+        digits = '7' + digits[1:]
+    phone_e164 = f'+{digits}' if digits else None
+
     idempotence_key = str(uuid.uuid4())
     payload = {
         "amount": {"value": f"{amount}.00", "currency": "RUB"},
@@ -63,6 +70,19 @@ def handler(event: dict, context) -> dict:
         "capture": True,
         "description": f"{description} | {name} {phone}".strip(" |"),
         "metadata": {"name": name, "phone": phone},
+        "receipt": {
+            "customer": {"phone": phone_e164} if phone_e164 else {"email": "noreply@skypka24.ru"},
+            "items": [
+                {
+                    "description": description[:128] or "Услуги Скупка24",
+                    "quantity": "1.00",
+                    "amount": {"value": f"{amount}.00", "currency": "RUB"},
+                    "vat_code": 1,
+                    "payment_mode": "full_payment",
+                    "payment_subject": "service",
+                }
+            ],
+        },
     }
 
     data = json.dumps(payload).encode()
