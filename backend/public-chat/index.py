@@ -289,6 +289,35 @@ def _notify_max_client(phone: str, text: str):
         print(f'[public-chat][MAX-send] {e}')
 
 
+MAX_STAFF_GROUP = 'https://max.ru/join/snbnTleb0RnsMQ-yXZ4tuuXJfDPM6liEP2ktT8zoIeE'
+MAX_API_URL = 'https://botapi.max.ru'
+SITE_CHAT_URL = 'https://skypka24.poehali.dev/staff'
+
+
+def _notify_max_staff_group(text: str, site_link: str = ''):
+    """Уведомление в MAX-группу команды через бот."""
+    bot_token = os.environ.get('MAX_BOT_TOKEN', '')
+    group_chat_id = os.environ.get('MAX_STAFF_CHAT_ID', '')
+    if not bot_token or not group_chat_id:
+        return
+    payload = {
+        'chat_id': group_chat_id,
+        'text': text,
+    }
+    if site_link:
+        payload['attachments'] = [{'type': 'inline_keyboard', 'payload': {'buttons': [[
+            {'type': 'link', 'url': site_link, 'text': '💬 Ответить в панели'}
+        ]]}}]
+    try:
+        requests.post(
+            f'{MAX_API_URL}/messages?access_token={bot_token}',
+            json=payload,
+            timeout=5,
+        )
+    except Exception as e:
+        print(f'[public-chat][max-staff] {e}')
+
+
 def _notify_telegram_staff(text: str):
     """Уведомление сотрудников в основной TG-чат."""
     token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
@@ -632,14 +661,20 @@ def action_send(event, body):
                 _notify_max_client(client_phone, f'💬 *{author_name}*:\n{text}')
         elif author_type == 'client':
             msg_preview = text[:1000] if text else ('📷 Фото' if photo_url else '—')
-            preview = (
+            tg_text = (
                 f'💬 *Новое сообщение в чате*\n\n'
                 f'👤 {client_name or client_phone or "клиент"}\n'
                 f'📞 {client_phone or "—"}\n'
                 f'🗨 {msg_preview}\n\n'
                 f'_Комната #{room_id}_'
             )
-            _notify_telegram_staff(preview)
+            _notify_telegram_staff(tg_text)
+            max_text = (
+                f'💬 Новое сообщение в чате с сайта\n'
+                f'👤 {client_name or "клиент"} · {client_phone or ""}\n'
+                f'🗨 {msg_preview}'
+            )
+            _notify_max_staff_group(max_text, f'{SITE_CHAT_URL}?tab=sitechat')
     except Exception as e:
         print(f'[public-chat][notify] {e}')
 
@@ -713,7 +748,12 @@ def action_register(body: dict):
             (room_id, sys_text)
         )
         conn.commit()
-        _notify_telegram_staff(f'💬 Новый чат с сайта\nКлиент: {name}\nТелефон: +{_normalize_phone(phone)}')
+        notify_text = f'💬 Новый чат с сайта\nКлиент: {name}\nТелефон: +{_normalize_phone(phone)}'
+        _notify_telegram_staff(notify_text)
+        _notify_max_staff_group(
+            f'🆕 Новый клиент в чате с сайта\n👤 {name} · +{_normalize_phone(phone)}',
+            f'{SITE_CHAT_URL}?tab=sitechat'
+        )
     cur.close(); conn.close()
     return _ok({
         'ok': True,
