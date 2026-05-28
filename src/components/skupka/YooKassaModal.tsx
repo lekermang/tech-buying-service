@@ -51,6 +51,9 @@ const YooKassaModal = ({ open, onClose }: YooKassaModalProps) => {
       const data = await res.json();
       if (data.confirmation_url) {
         window.location.href = data.confirmation_url;
+      } else if (data.error) {
+        setError(data.yookassa_description || "Ошибка ЮKassa. Попробуйте ещё раз.");
+        console.error("[YooKassa]", data);
       } else {
         setError("Не удалось создать платёж. Попробуйте ещё раз.");
       }

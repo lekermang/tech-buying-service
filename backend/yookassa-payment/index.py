@@ -7,6 +7,7 @@ import json
 import os
 import uuid
 import urllib.request
+import urllib.error
 import base64
 
 
@@ -75,8 +76,25 @@ def handler(event: dict, context) -> dict:
         },
         method="POST",
     )
-    with urllib.request.urlopen(req) as resp:
-        result = json.loads(resp.read())
+    try:
+        with urllib.request.urlopen(req) as resp:
+            result = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode("utf-8", errors="replace")
+        try:
+            err_data = json.loads(error_body)
+        except Exception:
+            err_data = {"raw": error_body}
+        return {
+            "statusCode": 200,
+            "headers": {**cors, "Content-Type": "application/json"},
+            "body": json.dumps({
+                "error": True,
+                "yookassa_code": err_data.get("code", "unknown"),
+                "yookassa_description": err_data.get("description", error_body),
+                "http_status": e.code,
+            }),
+        }
 
     confirmation_url = result.get("confirmation", {}).get("confirmation_url", "")
     payment_id = result.get("id", "")
