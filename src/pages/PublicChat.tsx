@@ -3,7 +3,6 @@ import { useSearchParams } from "react-router-dom";
 import Icon from "@/components/ui/icon";
 
 const PUBLIC_CHAT_URL = "https://functions.poehali.dev/81f2b98f-4c02-4f5a-afce-adf94d25dcac";
-const MAX_BOT_LINK = "https://max.ru/skypka24bot";
 
 const LS_AUTH = "pchat_auth";
 const LS_ROOM = "pchat_room";
@@ -44,6 +43,10 @@ export default function PublicChat() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [regName, setRegName] = useState("");
+  const [regPhone, setRegPhone] = useState("");
+  const [regLoading, setRegLoading] = useState(false);
+  const [regError, setRegError] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const lastIdRef = useRef<number>(0);
@@ -221,34 +224,80 @@ export default function PublicChat() {
     }
   };
 
-  // ─── Заглушка: нет инвайта и нет сохранённой сессии ───
+  const handleRegister = async () => {
+    const name = regName.trim();
+    const phone = regPhone.replace(/\D/g, "");
+    if (name.length < 2) { setRegError("Введите имя (минимум 2 символа)"); return; }
+    if (phone.length < 10) { setRegError("Введите корректный номер телефона"); return; }
+    setRegLoading(true);
+    setRegError(null);
+    try {
+      const r = await fetch(`${PUBLIC_CHAT_URL}?action=register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, phone }),
+      });
+      const d = await r.json();
+      if (!d || !d.ok) { setRegError(d?.error || "Ошибка. Попробуйте ещё раз."); return; }
+      localStorage.setItem(LS_AUTH, d.auth_token);
+      localStorage.setItem(LS_ROOM, String(d.room_id));
+      localStorage.setItem(LS_NAME, name);
+      setAuthToken(d.auth_token);
+      setRoomId(d.room_id);
+      setClientName(name);
+    } catch {
+      setRegError("Нет соединения. Проверьте интернет.");
+    } finally {
+      setRegLoading(false);
+    }
+  };
+
+  // ─── Форма регистрации: нет инвайта и нет сохранённой сессии ───
   if (!loading && (!authToken || !roomId)) {
     return (
       <div className="min-h-screen bg-[#0D0D0D] text-white flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-[#111] border border-[#FFD700]/20 rounded-2xl p-6 text-center">
-          <div className="w-16 h-16 bg-[#FFD700]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Icon name="MessageSquare" size={32} className="text-[#FFD700]" />
-          </div>
-          <h1 className="font-oswald text-2xl font-bold uppercase mb-2">Чат недоступен</h1>
-          <p className="font-roboto text-white/60 text-sm mb-6">
-            {authError || "Попросите менеджера прислать ссылку для входа в чат."}
-          </p>
-          <div className="space-y-2">
-            <a
-              href={MAX_BOT_LINK}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block w-full bg-[#FFD700] text-black font-oswald font-bold py-3 uppercase tracking-wider hover:bg-yellow-400 transition-colors text-sm"
-            >
-              <Icon name="MessageCircle" size={16} className="inline mr-2" />
-              Открыть в MAX
-            </a>
-            <a
-              href="/"
-              className="block w-full border border-white/20 text-white/70 font-roboto py-3 text-sm hover:bg-white/5 transition-colors"
-            >
-              На главную
-            </a>
+        <div className="max-w-sm w-full bg-[#111] border border-[#FFD700]/20 rounded-2xl overflow-hidden">
+          <div className="h-1 w-full bg-gradient-to-r from-[#FFD700] via-[#FFA500] to-[#FFD700]" />
+          <div className="p-6">
+            <div className="w-14 h-14 bg-[#FFD700]/10 rounded-full flex items-center justify-center mx-auto mb-4 relative">
+              <Icon name="MessageSquare" size={28} className="text-[#FFD700]" />
+              <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-green-400 ring-2 ring-[#111]" />
+            </div>
+            <h1 className="font-oswald text-2xl font-bold uppercase text-center mb-1">Чат Live</h1>
+            <p className="font-roboto text-white/50 text-sm text-center mb-6">Введите имя и телефон — менеджер ответит за 5 минут</p>
+            {authError && <p className="text-amber-400 text-xs mb-3 text-center">{authError}</p>}
+            <div className="space-y-3">
+              <input
+                type="text"
+                value={regName}
+                onChange={e => setRegName(e.target.value)}
+                placeholder="Ваше имя"
+                className="w-full bg-[#1A1A1A] border border-[#333] focus:border-[#FFD700] text-white px-4 py-3 text-sm outline-none transition-colors placeholder:text-white/25 rounded"
+              />
+              <input
+                type="tel"
+                value={regPhone}
+                onChange={e => setRegPhone(e.target.value)}
+                onFocus={() => { if (!regPhone) setRegPhone("+7"); }}
+                placeholder="+7 (___) ___-__-__"
+                inputMode="tel"
+                className="w-full bg-[#1A1A1A] border border-[#333] focus:border-[#FFD700] text-white px-4 py-3 text-sm outline-none transition-colors placeholder:text-white/25 rounded"
+              />
+              {regError && <p className="text-red-400 text-xs">{regError}</p>}
+              <button
+                onClick={handleRegister}
+                disabled={regLoading}
+                className="w-full bg-[#FFD700] text-black font-oswald font-bold py-3.5 uppercase tracking-widest hover:bg-yellow-400 transition-colors disabled:opacity-50 text-sm flex items-center justify-center gap-2"
+              >
+                {regLoading
+                  ? <><div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" /> Подключение...</>
+                  : <><Icon name="MessageSquare" size={16} /> Начать чат</>
+                }
+              </button>
+              <a href="/" className="block text-center text-white/30 font-roboto text-xs hover:text-white/60 transition-colors pt-1">
+                На главную
+              </a>
+            </div>
           </div>
         </div>
       </div>

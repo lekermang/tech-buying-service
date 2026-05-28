@@ -689,6 +689,40 @@ def action_poll(event, qp):
     return _ok({'ok': True, 'messages': msgs})
 
 
+def action_register(body: dict):
+    """Самостоятельная регистрация клиента по имени и телефону — без инвайта от менеджера."""
+    phone = (body.get('phone') or '').strip()
+    name = (body.get('name') or '').strip()
+    if not phone or not name:
+        return _err(400, 'phone and name required')
+    try:
+        client = _get_or_create_client(phone, name)
+    except ValueError:
+        return _err(400, 'Неверный номер телефона')
+    room_id = _get_or_create_direct_room(client['id'], name or client.get('display_name') or '')
+    # Системное сообщение — только для новых комнат (если нет сообщений)
+    conn = _conn(); cur = conn.cursor()
+    cur.execute(f"SELECT COUNT(*) FROM {SCHEMA}.pchat_messages WHERE room_id=%s", (room_id,))
+    count = cur.fetchone()[0]
+    if count == 0:
+        sys_text = f'💬 {name} начал чат с сайта'
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.pchat_messages "
+            f"(room_id, author_type, author_id, author_name, text, is_system) "
+            f"VALUES (%s, 'system', 0, 'Система', %s, TRUE)",
+            (room_id, sys_text)
+        )
+        conn.commit()
+        _notify_telegram_staff(f'💬 Новый чат с сайта\nКлиент: {name}\nТелефон: +{_normalize_phone(phone)}')
+    cur.close(); conn.close()
+    return _ok({
+        'ok': True,
+        'auth_token': client['auth_token'],
+        'room_id': room_id,
+        'client': {'name': client.get('display_name') or name},
+    })
+
+
 def action_staff_rooms(event):
     if not auth_staff(event):
         return _err(401, 'Auth required')
@@ -734,6 +768,8 @@ def handler(event: dict, context) -> dict:
             return action_create_invite(event, body)
         if method == 'POST' and action == 'auth':
             return action_auth(event, body)
+        if method == 'POST' and action == 'register':
+            return action_register(body)
         if method == 'GET' and action == 'room':
             return action_room(event, qp)
         if method == 'POST' and action == 'send':
