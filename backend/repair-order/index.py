@@ -1347,13 +1347,10 @@ def handler(event: dict, context) -> dict:
             + (f"💰 {price_str}\n" if price_str else "")
             + (f"📝 {comment[:200]}\n" if comment else "")
         )
-        staff_payload = {'text': staff_repair}
-        if photos_b64:
-            staff_payload['photos_b64'] = photos_b64[:3]
         requests.post(
             'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c?action=staff_send',
-            json=staff_payload,
-            timeout=15,
+            json={'text': staff_repair},
+            timeout=8,
         )
     except Exception as max_err:
         print(f'[MAX STAFF REPAIR-NEW] error: {max_err}')

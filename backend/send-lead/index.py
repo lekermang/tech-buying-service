@@ -397,10 +397,12 @@ def handler(event: dict, context) -> dict:
     # Если есть lead_id — добавляем кнопку "Беру в работу" + WhatsApp/Telegram
     photos_b64 = body.get('photos') or ([photo_b64] if photo_b64 else [])
 
-    # Параллельно сохраняем фото в S3 (Telegram продолжает получать как раньше)
+    # Загружаем фото в S3 и получаем CDN-URL для MAX
+    cdn_photo_urls = []
     if lead_id and photos_b64:
         try:
-            upload_lead_photos_to_s3(lead_id, photos_b64)
+            saved = upload_lead_photos_to_s3(lead_id, photos_b64)
+            cdn_photo_urls = [p['cdn_url'] for p in saved if p.get('cdn_url')]
         except Exception as up_err:
             print(f'[send-lead][S3] {up_err}')
 
@@ -475,12 +477,12 @@ def handler(event: dict, context) -> dict:
                 + f"\n_Источник: сайт_"
             )
             staff_payload = {'text': staff_text}
-            if photos_b64:
-                staff_payload['photos_b64'] = photos_b64[:3]
+            if cdn_photo_urls:
+                staff_payload['photo_urls'] = cdn_photo_urls[:3]
             requests.post(
                 'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c?action=staff_send',
                 json=staff_payload,
-                timeout=15,
+                timeout=10,
             )
         except Exception as max_err:
             print(f'[MAX STAFF LEAD] error: {max_err}')
