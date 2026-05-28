@@ -678,7 +678,8 @@ def action_send(event, body):
             max_text = (
                 f'💬 Новое сообщение в чате с сайта\n'
                 f'👤 {client_name or "клиент"} · {client_phone or ""}\n'
-                f'🗨 {msg_preview}'
+                f'🗨 {msg_preview}\n\n'
+                f'_Чтобы ответить напишите: >{room_id} текст_'
             )
             _notify_max_staff_group(max_text, f'{SITE_CHAT_URL}?tab=sitechat')
     except Exception as e:

@@ -645,12 +645,53 @@ def handle_message(msg: dict) -> dict:
         _log('in', 'unknown_sender', text, payload=msg, error='no max_user_id')
         return {'ok': False}
 
-    # Если это сообщение из ГРУППЫ/КАНАЛА (НЕ личный диалог) — фиксируем как staff-канал, не отвечаем приветствием
+    # Если это сообщение из ГРУППЫ/КАНАЛА
     if chat_type in ('chat', 'channel', 'group'):
         try:
             save_staff_channel(max_chat_id, chat_type, recipient.get('title') or chat.get('title') or '')
         except Exception:
             pass
+
+        # Ответ сотрудника клиенту: формат ">N текст" или "!N текст" (N = room_id)
+        # Пример: ">42 Ваш телефон готов!"
+        staff_reply = re.match(r'^[>!](\d+)\s+(.+)$', text, re.DOTALL)
+        if staff_reply and text:
+            room_id_r = int(staff_reply.group(1))
+            reply_text = staff_reply.group(2).strip()
+            staff_name = name or 'Менеджер'
+            try:
+                # Сохраняем в pchat как staff-сообщение
+                conn = _conn(); cur = conn.cursor()
+                cur.execute(
+                    f"INSERT INTO {SCHEMA}.pchat_messages "
+                    f"(room_id, author_type, author_id, author_name, text, is_system) "
+                    f"VALUES ({room_id_r}, 'staff', 0, %s, %s, FALSE) RETURNING id",
+                    (staff_name, reply_text)
+                )
+                cur.execute(
+                    f"UPDATE {SCHEMA}.pchat_rooms SET last_message_at=NOW(), last_message_text=%s WHERE id={room_id_r}",
+                    (reply_text[:500],)
+                )
+                # Находим max_chat_id клиента этой комнаты для дублирования в личку MAX
+                cur.execute(
+                    f"SELECT c.max_chat_id FROM {SCHEMA}.pchat_rooms r "
+                    f"JOIN {SCHEMA}.pchat_clients c ON c.id=r.client_id "
+                    f"WHERE r.id={room_id_r} LIMIT 1"
+                )
+                row = cur.fetchone()
+                conn.commit(); cur.close(); conn.close()
+                # Подтверждаем в группу
+                send_max_message(max_chat_id, f'✅ Ответ клиенту #{room_id_r} отправлен.')
+                # Если клиент пришёл из MAX — шлём ему в личку
+                if row and row[0]:
+                    send_max_message(int(row[0]), f'💬 *{staff_name}*:\n{reply_text}')
+                print(f'[MAX-staff-reply] room={room_id_r} staff={staff_name} text={reply_text[:80]}')
+            except Exception as e:
+                print(f'[MAX-staff-reply] error: {e}')
+                send_max_message(max_chat_id, f'❌ Ошибка отправки в комнату #{room_id_r}: {e}')
+            _log('in', 'staff_reply', text[:200], max_chat_id=max_chat_id, payload=msg)
+            return {'ok': True}
+
         _log('in', f'staff_channel:{chat_type}', text[:200], max_chat_id=max_chat_id, payload=msg)
         return {'ok': True}
 
