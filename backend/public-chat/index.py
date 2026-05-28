@@ -100,16 +100,18 @@ def auth_staff(event: dict) -> bool:
         return True
     # БД employees
     try:
+        safe_token = token.replace("'", "''")
         conn = _conn(); cur = conn.cursor()
         cur.execute(
             f"SELECT id FROM {SCHEMA}.employees "
-            f"WHERE auth_token=%s AND token_expires_at>NOW() AND is_active=true",
-            (token,)
+            f"WHERE auth_token='{safe_token}' AND token_expires_at>NOW() AND is_active=true"
         )
         row = cur.fetchone()
         cur.close(); conn.close()
+        print(f'[auth_staff] token={token[:8]}... found={row is not None}')
         return row is not None
-    except Exception:
+    except Exception as e:
+        print(f'[auth_staff] error: {e}')
         return False
 
 
@@ -122,11 +124,11 @@ def get_staff_info(event: dict) -> dict:
     if not token:
         return {'id': 0, 'name': name}
     try:
+        safe_token = token.replace("'", "''")
         conn = _conn(); cur = conn.cursor()
         cur.execute(
             f"SELECT id, full_name FROM {SCHEMA}.employees "
-            f"WHERE auth_token=%s AND token_expires_at>NOW() AND is_active=true",
-            (token,)
+            f"WHERE auth_token='{safe_token}' AND token_expires_at>NOW() AND is_active=true"
         )
         row = cur.fetchone()
         cur.close(); conn.close()
@@ -144,12 +146,12 @@ def auth_client(event: dict):
     if not token:
         return None
     try:
+        safe_token = token.replace("'", "''")
         conn = _conn()
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute(
             f"SELECT id, phone, display_name, auth_token, is_blocked "
-            f"FROM {SCHEMA}.pchat_clients WHERE auth_token=%s LIMIT 1",
-            (token,)
+            f"FROM {SCHEMA}.pchat_clients WHERE auth_token='{safe_token}' LIMIT 1"
         )
         row = cur.fetchone()
         cur.close(); conn.close()
