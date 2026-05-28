@@ -299,23 +299,29 @@ def _notify_max_staff_group(text: str, site_link: str = ''):
     bot_token = os.environ.get('MAX_BOT_TOKEN', '')
     group_chat_id = os.environ.get('MAX_STAFF_CHAT_ID', '')
     if not bot_token or not group_chat_id:
+        print(f'[public-chat][max-staff] no token or chat_id, skipping')
         return
-    payload = {
-        'chat_id': group_chat_id,
-        'text': text,
-    }
+    try:
+        chat_id_int = int(group_chat_id)
+    except Exception:
+        print(f'[public-chat][max-staff] bad chat_id: {group_chat_id}')
+        return
+    payload = {'chat_id': chat_id_int, 'text': text}
     if site_link:
         payload['attachments'] = [{'type': 'inline_keyboard', 'payload': {'buttons': [[
             {'type': 'link', 'url': site_link, 'text': '💬 Ответить в панели'}
         ]]}}]
     try:
-        requests.post(
-            f'{MAX_API_URL}/messages?access_token={bot_token}',
+        resp = requests.post(
+            f'{MAX_API_URL}/messages',
+            params={'chat_id': chat_id_int},
             json=payload,
-            timeout=5,
+            headers={'Authorization': bot_token, 'Content-Type': 'application/json'},
+            timeout=6,
         )
+        print(f'[public-chat][max-staff] status={resp.status_code} body={resp.text[:300]}')
     except Exception as e:
-        print(f'[public-chat][max-staff] {e}')
+        print(f'[public-chat][max-staff] error: {e}')
 
 
 def _notify_telegram_staff(text: str):
