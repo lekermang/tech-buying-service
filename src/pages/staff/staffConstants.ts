@@ -11,7 +11,8 @@ export type StaffTab =
   | "avitopro"
   | "salary"
   | "myday"
-  | "chat";
+  | "chat"
+  | "sitechat";
 
 export const PRICE_SCHEDULER_URL =
   "https://functions.poehali.dev/b09271ea-c662-4225-973f-4dd4c6a0e32c";
