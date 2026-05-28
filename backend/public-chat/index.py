@@ -296,32 +296,21 @@ MAX_API_URL = 'https://botapi.max.ru'
 SITE_CHAT_URL = 'https://skypka24.com/staff'
 
 
+MAX_BOT_URL = 'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c'
+
+
 def _notify_max_staff_group(text: str, site_link: str = ''):
-    """Уведомление в MAX-группу команды через бот."""
-    bot_token = os.environ.get('MAX_BOT_TOKEN', '')
-    group_chat_id = os.environ.get('MAX_STAFF_CHAT_ID', '')
-    if not bot_token or not group_chat_id:
-        print(f'[public-chat][max-staff] no token or chat_id, skipping')
-        return
-    try:
-        chat_id_int = int(group_chat_id)
-    except Exception:
-        print(f'[public-chat][max-staff] bad chat_id: {group_chat_id}')
-        return
-    payload = {'chat_id': chat_id_int, 'text': text}
+    """Уведомление в MAX-группу через max-bot?action=staff_send (читает chat_id из БД)."""
+    full_text = text
     if site_link:
-        payload['attachments'] = [{'type': 'inline_keyboard', 'payload': {'buttons': [[
-            {'type': 'link', 'url': site_link, 'text': '💬 Ответить в панели'}
-        ]]}}]
+        full_text += f'\n\n🔗 {site_link}'
     try:
         resp = requests.post(
-            f'{MAX_API_URL}/messages',
-            params={'chat_id': chat_id_int},
-            json=payload,
-            headers={'Authorization': bot_token, 'Content-Type': 'application/json'},
-            timeout=6,
+            f'{MAX_BOT_URL}?action=staff_send',
+            json={'text': full_text},
+            timeout=8,
         )
-        print(f'[public-chat][max-staff] status={resp.status_code} body={resp.text[:300]}')
+        print(f'[public-chat][max-staff] status={resp.status_code} body={resp.text[:200]}')
     except Exception as e:
         print(f'[public-chat][max-staff] error: {e}')
 
@@ -790,6 +779,60 @@ def action_register(body: dict):
     })
 
 
+def action_mark_read(event, qp):
+    """Отметить все сообщения комнаты как прочитанные сотрудником."""
+    if not auth_staff(event):
+        return _err(401, 'Auth required')
+    try:
+        room_id = int(qp.get('room_id') or 0)
+    except Exception:
+        return _err(400, 'Bad room_id')
+    if not room_id:
+        return _err(400, 'room_id required')
+    conn = _conn(); cur = conn.cursor()
+    cur.execute(
+        f"SELECT MAX(id) FROM {SCHEMA}.pchat_messages WHERE room_id=%s",
+        (room_id,)
+    )
+    max_id = cur.fetchone()[0] or 0
+    safe_room = int(room_id)
+    cur.execute(
+        f"SELECT id FROM {SCHEMA}.pchat_reads WHERE room_id={safe_room} AND reader_type='staff' AND reader_id=0 LIMIT 1"
+    )
+    existing = cur.fetchone()
+    if existing:
+        cur.execute(
+            f"UPDATE {SCHEMA}.pchat_reads SET last_read_msg_id={int(max_id)}, updated_at=NOW() "
+            f"WHERE room_id={safe_room} AND reader_type='staff' AND reader_id=0"
+        )
+    else:
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.pchat_reads (room_id, reader_type, reader_id, last_read_msg_id) "
+            f"VALUES ({safe_room}, 'staff', 0, {int(max_id)})"
+        )
+    conn.commit(); cur.close(); conn.close()
+    return _ok({'ok': True, 'last_read_msg_id': max_id})
+
+
+def action_archive_room(event, qp):
+    """Архивировать (скрыть) чат из списка."""
+    if not auth_staff(event):
+        return _err(401, 'Auth required')
+    try:
+        room_id = int(qp.get('room_id') or 0)
+    except Exception:
+        return _err(400, 'Bad room_id')
+    if not room_id:
+        return _err(400, 'room_id required')
+    conn = _conn(); cur = conn.cursor()
+    cur.execute(
+        f"UPDATE {SCHEMA}.pchat_rooms SET is_archived=TRUE WHERE id=%s",
+        (room_id,)
+    )
+    conn.commit(); cur.close(); conn.close()
+    return _ok({'ok': True})
+
+
 def action_staff_rooms(event):
     if not auth_staff(event):
         return _err(401, 'Auth required')
@@ -845,6 +888,10 @@ def handler(event: dict, context) -> dict:
             return action_poll(event, qp)
         if method == 'GET' and action == 'staff_rooms':
             return action_staff_rooms(event)
+        if method == 'POST' and action == 'mark_read':
+            return action_mark_read(event, qp)
+        if method == 'POST' and action == 'archive_room':
+            return action_archive_room(event, qp)
         return _err(400, f'Unknown action: {action} (method={method})')
     except Exception as e:
         return _err(500, f'{type(e).__name__}: {e}')

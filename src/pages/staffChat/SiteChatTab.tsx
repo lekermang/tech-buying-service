@@ -156,6 +156,27 @@ export default function SiteChatTab({ token }: { token: string }) {
     } catch { /* ignore */ } finally { setRoomsLoading(false); }
   }, [token, activeRoom]);
 
+  const markRead = useCallback(async (roomId: number) => {
+    try {
+      await fetch(`${CHAT_URL}?action=mark_read&room_id=${roomId}`, {
+        method: "POST", headers: { "X-Employee-Token": token }
+      });
+      setRooms(prev => prev.map(rm => rm.id === roomId ? { ...rm, unread_count: 0 } : rm));
+    } catch { /* ignore */ }
+  }, [token]);
+
+  const archiveRoom = useCallback(async (roomId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm("Удалить этот чат из списка?")) return;
+    try {
+      await fetch(`${CHAT_URL}?action=archive_room&room_id=${roomId}`, {
+        method: "POST", headers: { "X-Employee-Token": token }
+      });
+      setRooms(prev => prev.filter(rm => rm.id !== roomId));
+      if (activeRoom === roomId) setActiveRoom(null);
+    } catch { /* ignore */ }
+  }, [token, activeRoom]);
+
   const loadRoom = useCallback(async (roomId: number) => {
     try {
       const r = await fetch(`${CHAT_URL}?action=room&room_id=${roomId}`, { headers: { "X-Employee-Token": token } });
@@ -165,10 +186,10 @@ export default function SiteChatTab({ token }: { token: string }) {
         const last = d.messages[d.messages.length - 1];
         if (last) lastIdRef.current = last.id;
         scrollToBottom();
-        setRooms(prev => prev.map(rm => rm.id === roomId ? { ...rm, unread_count: 0 } : rm));
+        markRead(roomId);
       }
     } catch { /* ignore */ }
-  }, [token]);
+  }, [token, markRead]);
 
   const pollRoom = useCallback(async (roomId: number) => {
     try {
@@ -294,7 +315,7 @@ export default function SiteChatTab({ token }: { token: string }) {
 
   const markAsRead = (roomId: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    setRooms(prev => prev.map(rm => rm.id === roomId ? { ...rm, unread_count: 0 } : rm));
+    markRead(roomId);
   };
 
   const activeRoomData = rooms.find(r => r.id === activeRoom);
@@ -384,7 +405,13 @@ export default function SiteChatTab({ token }: { token: string }) {
                         {rm.last_message_at && <span className="text-white/30 text-[10px] font-roboto">{fmtTime(rm.last_message_at)}</span>}
                       </div>
                     </div>
-                    <div className="text-white/40 text-xs font-roboto truncate mt-0.5">{rm.last_message_text || "Нет сообщений"}</div>
+                    <div className="flex items-center justify-between mt-0.5">
+                      <div className="text-white/40 text-xs font-roboto truncate">{rm.last_message_text || "Нет сообщений"}</div>
+                      <button onClick={e => archiveRoom(rm.id, e)} title="Удалить чат"
+                        className="shrink-0 ml-1 w-4 h-4 flex items-center justify-center text-white/15 hover:text-red-400 transition-colors">
+                        <Icon name="Trash2" size={11} />
+                      </button>
+                    </div>
                     {tag && <span className={`inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded border ${TAG_COLORS[tag]}`}>{tag}</span>}
                   </div>
                 </div>
