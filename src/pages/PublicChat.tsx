@@ -335,15 +335,7 @@ export default function PublicChat() {
               <span className="font-roboto text-[11px] text-emerald-300/90">онлайн</span>
             </div>
           </div>
-          <a
-            href={MAX_BOT_LINK}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Открыть в MAX"
-            className="w-9 h-9 flex items-center justify-center text-white/50 hover:text-[#FFD700] transition-colors"
-          >
-            <Icon name="ExternalLink" size={18} />
-          </a>
+
         </div>
       </header>
 
