@@ -15,8 +15,12 @@ import {
 import { fmt, POLL_ONLINE_MS, POLL_STATS_MS, POLL_EVENTS_MS, toastForEvent } from "./utils";
 import { Kpi, OnlineList } from "./VisitorCard";
 import { SourcesBlock, ConversionsBlock, PhoneSearch } from "./AnalyticsBlocks";
+import VisitorsHistory from "./VisitorsHistory";
 
 export default function AnalyticsDashboard({ token }: { token: string }) {
+  const [tab, setTab] = useState<"live" | "history">(() =>
+    (localStorage.getItem("sk_an_tab") as "live" | "history") || "live"
+  );
   const [online, setOnline] = useState<OnlineSession[]>([]);
   const [stats, setStats] = useState<StatsToday | null>(null);
   const [conversions, setConversions] = useState<Conversion[]>([]);
@@ -83,6 +87,11 @@ export default function AnalyticsDashboard({ token }: { token: string }) {
     });
   };
 
+  const switchTab = (t: "live" | "history") => {
+    setTab(t);
+    try { localStorage.setItem("sk_an_tab", t); } catch {/* */}
+  };
+
   return (
     <div className="space-y-3">
       {/* Шапка модуля */}
@@ -92,43 +101,72 @@ export default function AnalyticsDashboard({ token }: { token: string }) {
         </div>
         <div className="flex-1 min-w-0">
           <div className="font-oswald uppercase font-bold text-[15px] tracking-wide">Аналитика посетителей</div>
-          <div className="text-[10px] text-white/45">Реальное время · обновление каждые 5 сек</div>
+          <div className="text-[10px] text-white/45">
+            {tab === "live" ? "Реальное время · обновление каждые 5 сек" : "История · фильтры по дате и источнику"}
+          </div>
         </div>
-        <button onClick={toggleMute}
-          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] uppercase tracking-wider font-bold ${
-            muted ? "bg-[#2A2A2A] text-white/55" : "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
-          }`}>
-          <Icon name={muted ? "BellOff" : "BellRing"} size={12} /> {muted ? "Звук вкл." : "Звук выкл."}
-        </button>
-        <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-white/55">
-          <span className={`w-1.5 h-1.5 rounded-full bg-emerald-400 ${pulse % 2 ? "animate-pulse" : ""}`}></span>
-          Live
-        </span>
+
+        {/* Переключатель Live / История */}
+        <div className="flex rounded overflow-hidden border border-[#2A2A2A]">
+          <button
+            onClick={() => switchTab("live")}
+            className={`flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-all ${
+              tab === "live" ? "bg-emerald-500/20 text-emerald-300" : "bg-[#1A1A1A] text-white/40 hover:text-white/70"
+            }`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full bg-emerald-400 ${tab === "live" && pulse % 2 ? "animate-pulse" : ""}`} />
+            Live
+          </button>
+          <button
+            onClick={() => switchTab("history")}
+            className={`flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-all border-l border-[#2A2A2A] ${
+              tab === "history" ? "bg-[#FFD700]/15 text-[#FFD700]" : "bg-[#1A1A1A] text-white/40 hover:text-white/70"
+            }`}
+          >
+            <Icon name="CalendarDays" size={11} />
+            История
+          </button>
+        </div>
+
+        {tab === "live" && (
+          <button onClick={toggleMute}
+            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] uppercase tracking-wider font-bold ${
+              muted ? "bg-[#2A2A2A] text-white/55" : "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+            }`}>
+            <Icon name={muted ? "BellOff" : "BellRing"} size={12} /> {muted ? "Звук вкл." : "Звук выкл."}
+          </button>
+        )}
       </div>
 
-      {/* KPI карточки */}
-      {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-          <Kpi label="Сейчас онлайн" value={fmt(stats.online_now)} color="green" icon="Users" big />
-          <Kpi label="Уник. сегодня" value={fmt(stats.uniq_today)} color="gold" icon="User" />
-          <Kpi label="Сессий" value={fmt(stats.sessions_today)} color="blue" icon="Activity" />
-          <Kpi label="Заявок" value={fmt(stats.conv_today)} color="orange" icon="Inbox" />
-          <Kpi label="Конверсия" value={`${stats.conversion_rate}%`} color="gold" icon="TrendingUp" />
-        </div>
+      {/* === Вкладка Live === */}
+      {tab === "live" && (
+        <>
+          {/* KPI карточки */}
+          {stats && (
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+              <Kpi label="Сейчас онлайн" value={fmt(stats.online_now)} color="green" icon="Users" big />
+              <Kpi label="Уник. сегодня" value={fmt(stats.uniq_today)} color="gold" icon="User" />
+              <Kpi label="Сессий" value={fmt(stats.sessions_today)} color="blue" icon="Activity" />
+              <Kpi label="Заявок" value={fmt(stats.conv_today)} color="orange" icon="Inbox" />
+              <Kpi label="Конверсия" value={`${stats.conversion_rate}%`} color="gold" icon="TrendingUp" />
+            </div>
+          )}
+
+          <div className="grid lg:grid-cols-[1fr_320px] gap-3">
+            <div className="space-y-3">
+              <OnlineList items={online} />
+              <SourcesBlock sources={stats?.top_sources || []} />
+            </div>
+            <div className="space-y-3">
+              <PhoneSearch token={token} />
+              <ConversionsBlock items={conversions} />
+            </div>
+          </div>
+        </>
       )}
 
-      <div className="grid lg:grid-cols-[1fr_320px] gap-3">
-        {/* Левая колонка */}
-        <div className="space-y-3">
-          <OnlineList items={online} />
-          <SourcesBlock sources={stats?.top_sources || []} />
-        </div>
-        {/* Правая колонка */}
-        <div className="space-y-3">
-          <PhoneSearch token={token} />
-          <ConversionsBlock items={conversions} />
-        </div>
-      </div>
+      {/* === Вкладка История === */}
+      {tab === "history" && <VisitorsHistory token={token} />}
     </div>
   );
 }

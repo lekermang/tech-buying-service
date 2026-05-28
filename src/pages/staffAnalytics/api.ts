@@ -109,6 +109,48 @@ export const getVisitor = (token: string, id: string) => call<VisitorDetail>("vi
 export const getSessionEvents = (token: string, id: string) => call<{ items: SessionEvent[] }>("session_events", token, { id });
 export const searchByPhone = (token: string, phone: string) => call<{ items: Array<{ visitor_id: string; phone: string | null; city: string | null; last_seen: string; visit_count: number; is_converted: boolean }> }>("search", token, { phone });
 
+export type VisitorRow = {
+  visitor_id: string;
+  first_seen: string;
+  last_seen: string;
+  visit_count: number;
+  city: string | null;
+  device_type: string | null;
+  browser: string | null;
+  os: string | null;
+  is_converted: boolean;
+  phone: string | null;
+  last_source: string | null;
+  last_pages: number | null;
+};
+
+export type VisitorsResult = {
+  items: VisitorRow[];
+  total: number;
+  daily: { day: string; sessions: number; visitors: number }[];
+  sources: { source: string; sessions: number; visitors: number }[];
+  limit: number;
+  offset: number;
+};
+
+export type StatsRange = {
+  uniq_visitors: number;
+  total_sessions: number;
+  total_conv: number;
+  total_amount: number;
+  conversion_rate: number;
+  date_from: string;
+  date_to: string;
+};
+
+export const getVisitors = (
+  token: string,
+  params: { date_from?: string; date_to?: string; source?: string; converted?: string; limit?: number; offset?: number }
+) => call<VisitorsResult>("visitors", token, params as Record<string, string | number>);
+
+export const getStatsRange = (token: string, date_from: string, date_to: string) =>
+  call<StatsRange>("stats_range", token, { date_from, date_to });
+
 export const SOURCE_LABEL: Record<string, { label: string; color: string; icon: string }> = {
   direct: { label: "Прямой", color: "#999", icon: "Globe" },
   yandex: { label: "Яндекс", color: "#FF0000", icon: "Search" },

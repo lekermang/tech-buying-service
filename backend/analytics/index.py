@@ -630,6 +630,122 @@ def action_session_events(qs):
     return _ok({'items': items})
 
 
+def action_visitors(qs):
+    """Список посетителей с фильтрацией по дате, источнику, конверсии. Пагинация offset/limit."""
+    date_from = (qs.get('date_from') or '').strip()
+    date_to   = (qs.get('date_to') or '').strip()
+    source    = (qs.get('source') or '').strip()
+    converted = qs.get('converted', '')
+    limit  = min(int(qs.get('limit') or 50), 200)
+    offset = max(int(qs.get('offset') or 0), 0)
+
+    where = ["1=1"]
+    params = []
+
+    if date_from:
+        where.append("v.last_seen::date >= %s")
+        params.append(date_from)
+    if date_to:
+        where.append("v.last_seen::date <= %s")
+        params.append(date_to)
+    if source:
+        where.append(
+            "EXISTS (SELECT 1 FROM " + SCHEMA + ".an_sessions s2 "
+            "WHERE s2.visitor_id=v.visitor_id AND s2.source=%s)"
+        )
+        params.append(source)
+    if converted == '1':
+        where.append("v.is_converted = TRUE")
+    elif converted == '0':
+        where.append("v.is_converted = FALSE")
+
+    w = " AND ".join(where)
+    conn = _get_conn(); cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    # Общее кол-во
+    cur.execute(
+        f"SELECT COUNT(*) FROM {SCHEMA}.an_visitors v WHERE {w}",
+        params
+    )
+    total = cur.fetchone()['count']
+
+    # Список с последним источником
+    cur.execute(
+        f"SELECT v.visitor_id, v.first_seen, v.last_seen, v.visit_count, "
+        f"v.city, v.device_type, v.browser, v.os, v.is_converted, v.phone, "
+        f"(SELECT s.source FROM {SCHEMA}.an_sessions s "
+        f" WHERE s.visitor_id=v.visitor_id ORDER BY s.started_at DESC LIMIT 1) AS last_source, "
+        f"(SELECT s.page_count FROM {SCHEMA}.an_sessions s "
+        f" WHERE s.visitor_id=v.visitor_id ORDER BY s.started_at DESC LIMIT 1) AS last_pages "
+        f"FROM {SCHEMA}.an_visitors v "
+        f"WHERE {w} "
+        f"ORDER BY v.last_seen DESC LIMIT {limit} OFFSET {offset}",
+        params
+    )
+    items = [dict(r) for r in cur.fetchall()]
+
+    # Агрегация по дням для графика (за выбранный диапазон или последние 30 дней)
+    df = date_from or (datetime.now(timezone.utc) - timedelta(days=29)).strftime('%Y-%m-%d')
+    dt = date_to   or datetime.now(timezone.utc).strftime('%Y-%m-%d')
+    cur.execute(
+        f"SELECT started_at::date AS day, "
+        f"COUNT(*) AS sessions, COUNT(DISTINCT visitor_id) AS visitors "
+        f"FROM {SCHEMA}.an_sessions "
+        f"WHERE started_at::date BETWEEN %s AND %s "
+        f"GROUP BY day ORDER BY day",
+        (df, dt)
+    )
+    daily = [dict(r) for r in cur.fetchall()]
+
+    # Топ источников за период
+    cur.execute(
+        f"SELECT source, COUNT(*) AS sessions, COUNT(DISTINCT visitor_id) AS visitors "
+        f"FROM {SCHEMA}.an_sessions "
+        f"WHERE started_at::date BETWEEN %s AND %s "
+        f"GROUP BY source ORDER BY sessions DESC LIMIT 15",
+        (df, dt)
+    )
+    sources = [dict(r) for r in cur.fetchall()]
+
+    cur.close(); conn.close()
+    return _ok({'items': items, 'total': total, 'daily': daily, 'sources': sources,
+                'limit': limit, 'offset': offset})
+
+
+def action_stats_range(qs):
+    """KPI за произвольный период (date_from / date_to)."""
+    date_from = (qs.get('date_from') or '').strip()
+    date_to   = (qs.get('date_to') or '').strip()
+
+    if not date_from:
+        date_from = (datetime.now(timezone.utc) - timedelta(days=6)).strftime('%Y-%m-%d')
+    if not date_to:
+        date_to = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+
+    conn = _get_conn(); cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        f"SELECT "
+        f"  (SELECT COUNT(DISTINCT visitor_id) FROM {SCHEMA}.an_sessions "
+        f"   WHERE started_at::date BETWEEN %s AND %s) AS uniq_visitors, "
+        f"  (SELECT COUNT(*) FROM {SCHEMA}.an_sessions "
+        f"   WHERE started_at::date BETWEEN %s AND %s) AS total_sessions, "
+        f"  (SELECT COUNT(*) FROM {SCHEMA}.an_conversions "
+        f"   WHERE timestamp::date BETWEEN %s AND %s) AS total_conv, "
+        f"  (SELECT COALESCE(SUM(amount),0) FROM {SCHEMA}.an_conversions "
+        f"   WHERE timestamp::date BETWEEN %s AND %s) AS total_amount ",
+        (date_from, date_to, date_from, date_to, date_from, date_to, date_from, date_to)
+    )
+    row = dict(cur.fetchone() or {})
+    uniq = int(row.get('uniq_visitors') or 0)
+    conv = int(row.get('total_conv') or 0)
+    row['conversion_rate'] = round((conv / uniq * 100), 2) if uniq else 0.0
+    row['total_amount'] = float(row.get('total_amount') or 0)
+    row['date_from'] = date_from
+    row['date_to'] = date_to
+    cur.close(); conn.close()
+    return _ok(row)
+
+
 def action_search(qs):
     phone_raw = (qs.get('phone') or '').strip()
     digits = re.sub(r'\D', '', phone_raw)
@@ -677,7 +793,7 @@ def handler(event: dict, context) -> dict:
         return action_convert(body, event)
 
     # Админ
-    admin = {'online', 'stats_today', 'conversions', 'recent_events', 'visitor', 'session_events', 'search'}
+    admin = {'online', 'stats_today', 'conversions', 'recent_events', 'visitor', 'session_events', 'search', 'visitors', 'stats_range'}
     if action in admin:
         headers = event.get('headers') or {}
         token = headers.get('X-Employee-Token') or headers.get('x-employee-token') or ''
@@ -695,5 +811,7 @@ def handler(event: dict, context) -> dict:
         if action == 'visitor': return action_visitor(qs)
         if action == 'session_events': return action_session_events(qs)
         if action == 'search': return action_search(qs)
+        if action == 'visitors': return action_visitors(qs)
+        if action == 'stats_range': return action_stats_range(qs)
 
     return _err(400, f'Unknown action: {action}')
