@@ -71,6 +71,8 @@ export default function SiteChatTab({ token }: { token: string }) {
         const last = d.messages[d.messages.length - 1];
         if (last) lastIdRef.current = last.id;
         scrollToBottom();
+        // Сбрасываем счётчик непрочитанных при открытии комнаты
+        setRooms(prev => prev.map(rm => rm.id === roomId ? { ...rm, unread_count: 0 } : rm));
       }
     } catch { /* ignore */ }
   }, [token]);

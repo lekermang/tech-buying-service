@@ -63,6 +63,24 @@ export function StaffMainLayout({
   const [profileOpen, setProfileOpen] = React.useState(false);
   const [myAvatar, setMyAvatar] = React.useState<string | null>(null);
   const [myName, setMyName] = React.useState<string | null>(null);
+  const [siteChatUnread, setSiteChatUnread] = React.useState(0);
+
+  React.useEffect(() => {
+    const CHAT_URL = "https://functions.poehali.dev/60644856-ff88-4875-b2a9-97c87d32a630";
+    const check = async () => {
+      try {
+        const r = await fetch(`${CHAT_URL}?action=staff_rooms`, { headers: { "X-Employee-Token": token } });
+        const d = await r.json();
+        if (d?.ok && Array.isArray(d.rooms)) {
+          const total = d.rooms.reduce((s: number, rm: { unread_count: number }) => s + (rm.unread_count || 0), 0);
+          setSiteChatUnread(total);
+        }
+      } catch { /* ignore */ }
+    };
+    check();
+    const id = setInterval(check, 20000);
+    return () => clearInterval(id);
+  }, [token]);
   // Мобильный режим: на узких экранах отключаем тяжёлые эффекты и компактим UI
   const [isMobile, setIsMobile] = React.useState<boolean>(() =>
     typeof window !== "undefined" && window.matchMedia("(max-width: 480px)").matches
@@ -95,6 +113,7 @@ export function StaffMainLayout({
   const analyticsAllowed = canSeeAnalytics(empRole, empName);
 
   const requestTab = (t: Tab) => {
+    if (t === "sitechat") setSiteChatUnread(0);
     if (isOwner || unlocked[t]) { setTab(t); return; }
     if ((PROTECTED_TABS as readonly string[]).includes(t)) {
       setPwModal(t); setPwInput(""); setPwError("");
@@ -107,7 +126,7 @@ export function StaffMainLayout({
   // редко используемые (золото/команда) — на правом краю для админов.
   const TABS: { k: Tab; l: string; icon: string; badge?: number; tip?: string; premium?: boolean }[] = [
     { k: "myday",        l: "Мой день",     icon: "Sunrise",       tip: "Чек-лист дня, мёртвые деньги, Авито-индекс, узкие места. Персонально для тебя." },
-    { k: "sitechat",     l: "Чат с сайта",  icon: "MessageCircle", tip: "Чаты от клиентов с сайта — отвечайте прямо здесь." },
+    { k: "sitechat",     l: "Чат с сайта",  icon: "MessageCircle", tip: "Чаты от клиентов с сайта — отвечайте прямо здесь.", badge: siteChatUnread || undefined },
     { k: "chat",         l: "Чат команды",  icon: "MessagesSquare", tip: "Чат команды Скупка 24: переписка, фото, push-уведомления о новых сообщениях." },
     { k: "repair",       l: "Ремонт",       icon: "Wrench",        tip: "Заявки на ремонт техники: новые, в работе, готовые. Поиск, фото, статусы." },
     { k: "smartlombard", l: "Ломбард",      icon: "Coins",         tip: "СмартЛомбард: скупка и продажа Б/У техники, касса, договоры на 14 дней.", premium: true },
