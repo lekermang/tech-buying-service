@@ -760,11 +760,11 @@ def action_register(body: dict):
         # Автоответ вне рабочих часов (10:00–22:00 МСК = UTC+3)
         from datetime import datetime, timezone, timedelta
         msk = datetime.now(timezone(timedelta(hours=3)))
-        is_off_hours = msk.hour < 10 or msk.hour >= 22
+        is_off_hours = msk.hour < 8 or msk.hour >= 23
         if is_off_hours:
             auto_text = (
                 f'Здравствуйте, {name}! 👋\n\n'
-                f'Наши менеджеры работают с 10:00 до 22:00 по московскому времени.\n'
+                f'Наши менеджеры работают с 08:00 до 23:00 по московскому времени.\n'
                 f'Мы увидим ваше сообщение и ответим, как только откроемся.\n\n'
                 f'Срочно? Звоните: 8 (800) 600-68-33 (бесплатно) или +7 (992) 999-03-33'
             )
