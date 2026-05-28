@@ -109,7 +109,7 @@ const MobileMenu = ({ open, navLinks, onNav, onPayClick }: MobileMenuProps) => {
             Оплатить услуги
           </button>
         )}
-        <a href="https://max.ru/id402810962699_bot"
+        <a href="https://max.ru/id402810962699_biz"
           target="_blank" rel="noopener noreferrer"
           onClick={() => ymGoal(Goals.MAX_CLICK, { place: "mobile_menu" })}
           className="flex items-center justify-center gap-3 w-full border-2 border-[#0077FF]/50 text-[#0077FF] font-oswald font-bold text-base py-3.5 uppercase tracking-wide active:scale-95 transition-all">
