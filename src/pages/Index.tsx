@@ -403,7 +403,6 @@ const Index = ({ goldOpen = false }: { goldOpen?: boolean }) => {
       <QuickContactSection />
 
       <JobsSection />
-      <MaxChannelBanner />
 
       <ContactsFooter scrollTo={scrollTo} />
       <ExitPopup onOpenEval={() => setEvalOpen(true)} />
@@ -427,12 +426,10 @@ const Index = ({ goldOpen = false }: { goldOpen?: boolean }) => {
             <span className="font-oswald font-bold text-sm uppercase tracking-wide">Оценить онлайн</span>
           </button>
           <a
-            href="https://max.ru/skypka24bot"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/chat"
             className="flex-1 flex flex-col items-center justify-center gap-1 text-[#FFD700] hover:bg-[#FFD700]/5 active:bg-[#FFD700]/10 transition-colors relative">
-            <Icon name="MessageCircle" size={22} />
-            <span className="font-roboto text-[10px] uppercase tracking-wide">MAX</span>
+            <Icon name="MessageSquare" size={22} />
+            <span className="font-roboto text-[10px] uppercase tracking-wide">Чат Live</span>
             <span className="absolute top-2 right-1/3 w-2 h-2 bg-green-400 rounded-full ring-2 ring-[#0D0D0D] animate-pulse" />
           </a>
           {installPrompt && !installed ? (
