@@ -41,6 +41,10 @@ export default function SiteChatTab({ token }: { token: string }) {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [msgError, setMsgError] = useState<string | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoBase64, setPhotoBase64] = useState<string | null>(null);
+  const [photoMime, setPhotoMime] = useState("image/jpeg");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const lastIdRef = useRef(0);
   const endRef = useRef<HTMLDivElement | null>(null);
 
@@ -117,34 +121,55 @@ export default function SiteChatTab({ token }: { token: string }) {
     return () => clearInterval(id);
   }, [activeRoom, pollRoom]);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoMime(file.type || "image/jpeg");
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = ev.target?.result as string;
+      setPhotoPreview(result);
+      setPhotoBase64(result.split(",")[1]);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
   const sendMessage = async () => {
     const text = draft.trim();
-    if (!text || !activeRoom || sending) return;
+    if (!text && !photoBase64) return;
+    if (!activeRoom || sending) return;
     setSending(true);
     setMsgError(null);
     try {
       const r = await fetch(`${CHAT_URL}?action=send`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Employee-Token": token },
-        body: JSON.stringify({ room_id: activeRoom, text }),
+        body: JSON.stringify({
+          room_id: activeRoom,
+          text: text || undefined,
+          photo_base64: photoBase64 || undefined,
+          photo_mime: photoBase64 ? photoMime : undefined,
+        }),
       });
       const d = await r.json();
       if (!d?.ok) { setMsgError(d?.error || "Ошибка отправки"); return; }
       setDraft("");
+      setPhotoBase64(null);
+      setPhotoPreview(null);
       const msg: Message = {
         id: d.message_id,
         author_type: "staff",
         author_name: "Менеджер",
-        text,
+        text: text || null,
         is_system: false,
         created_at: d.created_at || new Date().toISOString(),
       };
       setMessages(prev => [...prev, msg]);
       lastIdRef.current = Math.max(lastIdRef.current, d.message_id || 0);
       scrollToBottom();
-      // обновим превью в списке
       setRooms(prev => prev.map(rm => rm.id === activeRoom
-        ? { ...rm, last_message_text: text, last_message_at: msg.created_at }
+        ? { ...rm, last_message_text: text || "📷 Фото", last_message_at: msg.created_at }
         : rm
       ));
     } catch { setMsgError("Нет связи"); }
@@ -262,13 +287,18 @@ export default function SiteChatTab({ token }: { token: string }) {
               const mine = m.author_type === "staff";
               return (
                 <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-[75%] px-3 py-2 rounded-2xl text-sm font-roboto leading-relaxed ${
+                  <div className={`max-w-[75%] rounded-2xl text-sm font-roboto leading-relaxed overflow-hidden ${
                     mine
                       ? "bg-[#FFD700] text-black rounded-br-sm"
                       : "bg-[#1A1A1A] text-white border border-white/10 rounded-bl-sm"
                   }`}>
-                    <p className="whitespace-pre-wrap">{m.text}</p>
-                    <p className={`text-[10px] mt-1 text-right ${mine ? "text-black/50" : "text-white/30"}`}>
+                    {(m as Message & { photo_url?: string }).photo_url && (
+                      <img src={(m as Message & { photo_url?: string }).photo_url} alt="Фото"
+                        className="max-w-[240px] w-full object-cover cursor-pointer"
+                        onClick={() => window.open((m as Message & { photo_url?: string }).photo_url, '_blank')} />
+                    )}
+                    {m.text && <p className="px-3 py-2 whitespace-pre-wrap">{m.text}</p>}
+                    <p className={`px-3 pb-1.5 text-[10px] text-right ${mine ? "text-black/50" : "text-white/30"}`}>
                       {fmtTime(m.created_at)}
                     </p>
                   </div>
@@ -281,7 +311,20 @@ export default function SiteChatTab({ token }: { token: string }) {
           {/* Ввод */}
           <div className="px-4 py-3 border-t border-white/10 shrink-0">
             {msgError && <p className="text-red-400 text-xs mb-2">{msgError}</p>}
+            {photoPreview && (
+              <div className="mb-2 relative inline-block">
+                <img src={photoPreview} alt="Фото" className="max-h-20 rounded-lg border border-white/20 object-cover" />
+                <button onClick={() => { setPhotoPreview(null); setPhotoBase64(null); }}
+                  className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs leading-none">×</button>
+              </div>
+            )}
+            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
             <div className="flex items-end gap-2">
+              <button onClick={() => fileInputRef.current?.click()}
+                className="w-9 h-9 bg-[#1A1A1A] border border-[#333] text-white/40 flex items-center justify-center rounded-xl hover:text-[#FFD700] hover:border-[#FFD700] transition-all shrink-0"
+                title="Прикрепить фото">
+                <Icon name="ImagePlus" size={16} />
+              </button>
               <textarea
                 value={draft}
                 onChange={e => setDraft(e.target.value)}
@@ -293,7 +336,7 @@ export default function SiteChatTab({ token }: { token: string }) {
               />
               <button
                 onClick={sendMessage}
-                disabled={!draft.trim() || sending}
+                disabled={(!draft.trim() && !photoBase64) || sending}
                 className="w-9 h-9 bg-[#FFD700] text-black flex items-center justify-center rounded-xl hover:bg-yellow-400 active:scale-95 transition-all disabled:opacity-35 shrink-0"
               >
                 {sending

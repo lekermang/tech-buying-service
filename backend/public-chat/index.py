@@ -293,7 +293,7 @@ def _notify_max_client(phone: str, text: str):
 
 MAX_STAFF_GROUP = 'https://max.ru/join/snbnTleb0RnsMQ-yXZ4tuuXJfDPM6liEP2ktT8zoIeE'
 MAX_API_URL = 'https://botapi.max.ru'
-SITE_CHAT_URL = 'https://skypka24.poehali.dev/staff'
+SITE_CHAT_URL = 'https://skypka24.com/staff'
 
 
 def _notify_max_staff_group(text: str, site_link: str = ''):
@@ -683,7 +683,7 @@ def action_send(event, body):
                 f'🗨 {msg_preview}\n\n'
                 f'_Чтобы ответить напишите: >{room_id} текст_'
             )
-            _notify_max_staff_group(max_text, f'{SITE_CHAT_URL}?tab=sitechat')
+            _notify_max_staff_group(max_text, f'{SITE_CHAT_URL}?tab=sitechat#room-{room_id}')
     except Exception as e:
         print(f'[public-chat][notify] {e}')
 
@@ -761,7 +761,7 @@ def action_register(body: dict):
         _notify_telegram_staff(notify_text)
         _notify_max_staff_group(
             f'🆕 Новый клиент в чате с сайта\n👤 {name} · +{_normalize_phone(phone)}',
-            f'{SITE_CHAT_URL}?tab=sitechat'
+            f'{SITE_CHAT_URL}?tab=sitechat#room-{room_id}'
         )
     cur.close(); conn.close()
     return _ok({

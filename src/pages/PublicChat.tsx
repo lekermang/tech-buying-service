@@ -47,6 +47,10 @@ export default function PublicChat() {
   const [regPhone, setRegPhone] = useState("");
   const [regLoading, setRegLoading] = useState(false);
   const [regError, setRegError] = useState<string | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoBase64, setPhotoBase64] = useState<string | null>(null);
+  const [photoMime, setPhotoMime] = useState<string>("image/jpeg");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const lastIdRef = useRef<number>(0);
@@ -114,9 +118,25 @@ export default function PublicChat() {
     }
   }, [clientName, scrollToBottom]);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const mime = file.type || "image/jpeg";
+    setPhotoMime(mime);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = ev.target?.result as string;
+      setPhotoPreview(result);
+      setPhotoBase64(result.split(",")[1]);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
   const sendMessage = async () => {
     const text = draft.trim();
-    if (!text || !roomId || !authToken || sending) return;
+    if (!text && !photoBase64) return;
+    if (!roomId || !authToken || sending) return;
     setSending(true);
     setError(null);
 
@@ -126,7 +146,12 @@ export default function PublicChat() {
         const r = await fetch(`${PUBLIC_CHAT_URL}?action=send`, {
           method: "POST",
           headers: { "Content-Type": "application/json", "X-Auth-Token": authToken },
-          body: JSON.stringify({ room_id: roomId, text }),
+          body: JSON.stringify({
+            room_id: roomId,
+            text: text || undefined,
+            photo_base64: photoBase64 || undefined,
+            photo_mime: photoBase64 ? photoMime : undefined,
+          }),
         });
         const d = await r.json();
         if (!d || !d.ok) {
@@ -134,12 +159,14 @@ export default function PublicChat() {
           break;
         }
         setDraft("");
+        setPhotoBase64(null);
+        setPhotoPreview(null);
         const optimistic: Message = {
           id: d.message_id,
           author_type: "client",
           author_id: 0,
           author_name: clientName || "Вы",
-          text,
+          text: text || null,
           is_system: false,
           created_at: d.created_at || new Date().toISOString(),
         };
@@ -361,26 +388,29 @@ export default function PublicChat() {
             return (
               <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
                 <div
-                  className={`max-w-[85%] sm:max-w-[70%] px-3.5 py-2 rounded-2xl ${
+                  className={`max-w-[85%] sm:max-w-[70%] rounded-2xl overflow-hidden ${
                     mine
                       ? "bg-[#FFD700] text-black rounded-br-sm"
                       : "bg-[#1A1A1A] text-white border border-white/5 rounded-bl-sm"
                   }`}
                 >
-                  {!mine && (
-                    <div className="font-oswald text-[11px] uppercase tracking-wider text-[#FFD700]/80 mb-0.5">
-                      {m.author_name}
-                    </div>
+                  {(m as Message & { photo_url?: string }).photo_url && (
+                    <img src={(m as Message & { photo_url?: string }).photo_url} alt="Фото"
+                      className="max-w-full object-cover cursor-pointer"
+                      onClick={() => window.open((m as Message & { photo_url?: string }).photo_url, '_blank')} />
                   )}
-                  <div className="font-roboto text-sm whitespace-pre-wrap break-words">
-                    {m.text}
-                  </div>
-                  <div
-                    className={`font-roboto text-[10px] mt-1 ${
-                      mine ? "text-black/50 text-right" : "text-white/35"
-                    }`}
-                  >
-                    {fmtTime(m.created_at)}
+                  <div className="px-3.5 py-2">
+                    {!mine && (
+                      <div className="font-oswald text-[11px] uppercase tracking-wider text-[#FFD700]/80 mb-0.5">
+                        {m.author_name}
+                      </div>
+                    )}
+                    {m.text && (
+                      <div className="font-roboto text-sm whitespace-pre-wrap break-words">{m.text}</div>
+                    )}
+                    <div className={`font-roboto text-[10px] mt-1 ${mine ? "text-black/50 text-right" : "text-white/35"}`}>
+                      {fmtTime(m.created_at)}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -398,7 +428,20 @@ export default function PublicChat() {
               {error}
             </div>
           )}
+          {photoPreview && (
+            <div className="mb-2 relative inline-block">
+              <img src={photoPreview} alt="Фото" className="max-h-24 rounded-lg border border-white/20 object-cover" />
+              <button onClick={() => { setPhotoPreview(null); setPhotoBase64(null); }}
+                className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs">×</button>
+            </div>
+          )}
           <div className="flex items-end gap-1.5">
+            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+            <button type="button" onClick={() => fileInputRef.current?.click()}
+              className="shrink-0 w-9 h-9 bg-[#1A1A1A] border border-[#333] text-white/50 flex items-center justify-center rounded-xl hover:text-[#FFD700] hover:border-[#FFD700] transition-all"
+              aria-label="Прикрепить фото">
+              <Icon name="ImagePlus" size={16} />
+            </button>
             <textarea
               value={draft}
               onChange={e => setDraft(e.target.value)}
@@ -411,7 +454,7 @@ export default function PublicChat() {
             <button
               type="button"
               onClick={sendMessage}
-              disabled={!draft.trim() || sending}
+              disabled={(!draft.trim() && !photoBase64) || sending}
               className="shrink-0 w-9 h-9 bg-[#FFD700] text-black flex items-center justify-center rounded-xl hover:bg-yellow-400 active:scale-95 transition-all disabled:opacity-35 disabled:cursor-not-allowed"
               aria-label="Отправить"
             >
