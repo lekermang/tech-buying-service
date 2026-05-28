@@ -1437,7 +1437,15 @@ def handler(event: dict, context) -> dict:
                     recipients.append(pluxan)
                 for cid in recipients:
                     send_tg_document(tg_token, cid, html_bytes, filename, caption=f'📋 Акт приёмки №{new_id} — открыть и распечатать')
-            # SMS при создании НЕ отправляем — только Telegram
+            # MAX staff_send
+            try:
+                requests.post(
+                    'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c?action=staff_send',
+                    json={'text': f'🔧 *Новый ремонт #{new_id} (с панели)*\n👤 {name}\n📞 {phone}\n📱 {model or "—"}\n🛠 {repair_type or "—"}\n💰 {price_str}'},
+                    timeout=6,
+                )
+            except Exception:
+                pass
             cur.close(); conn.close()
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'id': new_id, 'order_id': new_id}, ensure_ascii=False)}
 
