@@ -292,6 +292,11 @@ export default function SiteChatTab({ token }: { token: string }) {
     scrollToBottom();
   };
 
+  const markAsRead = (roomId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setRooms(prev => prev.map(rm => rm.id === roomId ? { ...rm, unread_count: 0 } : rm));
+  };
+
   const activeRoomData = rooms.find(r => r.id === activeRoom);
   const filteredRooms = search
     ? rooms.filter(r => (r.client_name || r.title || "").toLowerCase().includes(search.toLowerCase()) || (r.client_phone || "").includes(search) || (r.last_message_text || "").toLowerCase().includes(search.toLowerCase()))
@@ -367,7 +372,15 @@ export default function SiteChatTab({ token }: { token: string }) {
                     <div className="flex items-center justify-between gap-1">
                       <span className="font-roboto font-semibold text-white text-sm truncate">{rm.client_name || rm.title}</span>
                       <div className="flex items-center gap-1 shrink-0">
-                        {rm.unread_count > 0 && <span className="bg-[#FFD700] text-black text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none">{rm.unread_count}</span>}
+                        {rm.unread_count > 0 && (
+                          <div className="flex items-center gap-1">
+                            <span className="bg-[#FFD700] text-black text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none">{rm.unread_count}</span>
+                            <button onClick={e => markAsRead(rm.id, e)} title="Прочитано"
+                              className="w-4 h-4 rounded-full bg-white/10 hover:bg-green-500/30 flex items-center justify-center text-white/30 hover:text-green-400 transition-all">
+                              <Icon name="Check" size={9} />
+                            </button>
+                          </div>
+                        )}
                         {rm.last_message_at && <span className="text-white/30 text-[10px] font-roboto">{fmtTime(rm.last_message_at)}</span>}
                       </div>
                     </div>
