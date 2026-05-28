@@ -757,6 +757,24 @@ def action_register(body: dict):
             (room_id, sys_text)
         )
         conn.commit()
+        # Автоответ вне рабочих часов (10:00–22:00 МСК = UTC+3)
+        from datetime import datetime, timezone, timedelta
+        msk = datetime.now(timezone(timedelta(hours=3)))
+        is_off_hours = msk.hour < 10 or msk.hour >= 22
+        if is_off_hours:
+            auto_text = (
+                f'Здравствуйте, {name}! 👋\n\n'
+                f'Наши менеджеры работают с 10:00 до 22:00 по московскому времени.\n'
+                f'Мы увидим ваше сообщение и ответим, как только откроемся.\n\n'
+                f'Срочно? Звоните: 8 (800) 600-68-33 (бесплатно) или +7 (992) 999-03-33'
+            )
+            cur.execute(
+                f"INSERT INTO {SCHEMA}.pchat_messages "
+                f"(room_id, author_type, author_id, author_name, text, is_system) "
+                f"VALUES (%s, 'staff', 0, 'Скупка24', %s, FALSE)",
+                (room_id, auto_text)
+            )
+            conn.commit()
         notify_text = f'💬 Новый чат с сайта\nКлиент: {name}\nТелефон: +{_normalize_phone(phone)}'
         _notify_telegram_staff(notify_text)
         _notify_max_staff_group(
