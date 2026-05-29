@@ -190,13 +190,13 @@ export default function AnalyticsTotalDay({
     title: "📦 Б/У техника — детализация",
     emoji: "📦",
     total: slPart,
-    totalLabel: "прибыль кассы за период",
+    totalLabel: "выручка с продаж за период",
     accentColor: "purple",
     periodLabel,
     rows: [
-      { icon: "TrendingUp", label: "Продажи (выручка)", value: slSalesTotal || slRevenue, color: "text-[#FFD700]", hint: `${slSalesCount} продаж` },
-      { icon: "ShoppingBag", label: "Скупка / выкуп", value: -(slBuyoutTotal || slExpense), color: "text-orange-400", hint: `${slBuyoutCount} скупок` },
-      { icon: "Equal", label: "Прибыль", value: slPart, color: slPart >= 0 ? "text-emerald-300" : "text-red-300", divider: true },
+      { icon: "TrendingUp", label: "Выручка с продаж", value: slSalesTotal || slRevenue, color: "text-[#FFD700]", hint: `${slSalesCount} продаж` },
+      { icon: "Equal", label: "Прибыль с продаж", value: slPart, color: slPart >= 0 ? "text-emerald-300" : "text-red-300", divider: true },
+      { icon: "Wallet", label: "Вложено в товар (скупка)", value: -(slBuyoutTotal || slExpense), color: "text-sky-400", hint: `${slBuyoutCount} скупок · это инвестиция, не расход` },
     ],
     groups: [
       {
@@ -224,7 +224,7 @@ export default function AnalyticsTotalDay({
     rows: [
       { icon: "Wrench", label: "🔧 Ремонт", value: repairPart, color: repairPart >= 0 ? "text-emerald-300" : "text-red-300", hint: "чистая прибыль с выданных" },
       { icon: "Coins", label: "🥇 Золото (продано)", value: goldPart, color: goldPart >= 0 ? "text-emerald-300" : "text-red-300", hint: goldData?.total_weight ? `${goldData.total_weight.toFixed(2)} г фактически продано` : "только фактические продажи" },
-      { icon: "Package", label: "📦 Б/У техника", value: slPart, color: slPart >= 0 ? "text-emerald-300" : "text-red-300", hint: `${slSalesCount} продаж · ${slBuyoutCount} скупок` },
+      { icon: "Package", label: "📦 Б/У техника", value: slPart, color: slPart >= 0 ? "text-emerald-300" : "text-red-300", hint: `${slSalesCount} продаж (скупка — инвестиция, не вычитается)` },
       { icon: "Equal", label: "Итого", value: totalDay, color: totalDay >= 0 ? "text-emerald-300" : "text-red-300", divider: true },
     ],
   });
@@ -373,14 +373,14 @@ export default function AnalyticsTotalDay({
               <div className="font-roboto text-white/50 text-[9px] uppercase tracking-wide mb-1 flex items-center gap-1">
                 <span>📦</span> Б/У техника
               </div>
-              <div className={`font-oswald font-bold text-lg tabular-nums ${slPart >= 0 ? "text-green-400" : "text-red-400"}`}>
+              <div className="font-oswald font-bold text-lg tabular-nums text-green-400">
                 {slPart.toLocaleString("ru-RU")} ₽
               </div>
               <div className="font-roboto text-[9px] leading-tight mt-1 space-y-0.5">
-                <div className="text-white/40">приход: <span className="text-[#FFD700]/80 font-bold tabular-nums">{slRevenue.toLocaleString("ru-RU")}</span></div>
-                <div className="text-white/40">расход: <span className="text-orange-400/80 font-bold tabular-nums">{slExpense.toLocaleString("ru-RU")}</span></div>
-                {slSalesTotal > 0 && (
-                  <div className="text-white/40">продажи: <span className="text-purple-300/80 font-bold tabular-nums">{slSalesTotal.toLocaleString("ru-RU")}</span></div>
+                <div className="text-white/40">продажи: <span className="text-[#FFD700]/80 font-bold tabular-nums">{(slSalesTotal || slRevenue).toLocaleString("ru-RU")}</span></div>
+                <div className="text-white/40">скупок: <span className="text-white/55 font-bold tabular-nums">{slBuyoutCount}</span></div>
+                {slBuyoutTotal > 0 && (
+                  <div className="text-white/40">вложено: <span className="text-sky-400/80 font-bold tabular-nums">{slBuyoutTotal.toLocaleString("ru-RU")}</span></div>
                 )}
               </div>
             </div>

@@ -151,12 +151,15 @@ export function AnalyticsTab({ token }: { token: string }) {
   const goldForecastRevenue = Math.round(periodWeight585 * goldForecastPriceNum);
   const goldForecastProfit = goldForecastRevenue - periodBuySum;
 
-  // Продажа б/у (комиссионка): используем чистую колонку «Комиссионный магазин»
-  // из сводной таблицы кассы. Если её нет — fallback на общий приход/расход.
+  // Продажа б/у: скупка — это ИНВЕСТИЦИЯ, а не расход.
+  // Прибыль Б/У = только выручка с продаж (то, что реально получили).
+  // Скупки не вычитаются — они показываются отдельно как "вложено в товар".
   const hasKom = !!slData && (slData.kom_income !== undefined || slData.kom_profit !== undefined);
   const slRevenue = hasKom ? (slData?.kom_income || 0) : (slData?.income || 0);
   const slCosts = hasKom ? (slData?.kom_costs || 0) : (slData?.expense || 0);
-  const slProfit = hasKom ? (slData?.kom_profit || 0) : (slData?.period_profit || 0);
+  // Прибыль = только выручка с продаж (sales_total), без вычитания скупок
+  const slSalesRevenue = slData?.sales_total || slRevenue;
+  const slProfit = slSalesRevenue;
 
   const totalRevenue = (data?.total_revenue || 0) + repairRevenue + goldRevenue + slRevenue;
   const totalProfit = repairNetProfit + goldProfit + slProfit;
