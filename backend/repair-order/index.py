@@ -1347,10 +1347,33 @@ def handler(event: dict, context) -> dict:
             + (f"💰 {price_str}\n" if price_str else "")
             + (f"📝 {comment[:200]}\n" if comment else "")
         )
+        # Загружаем фото в S3 чтобы передать CDN-URL в MAX
+        repair_cdn_urls = []
+        if photos_b64:
+            try:
+                import boto3, base64 as _b64, secrets as _sec
+                from botocore.client import Config as _BotoConfig
+                _s3 = boto3.client(
+                    's3',
+                    endpoint_url='https://bucket.poehali.dev',
+                    aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
+                    aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
+                    config=_BotoConfig(signature_version='s3v4'),
+                )
+                _proj = os.environ.get('AWS_ACCESS_KEY_ID', '')
+                for _i, _b in enumerate(photos_b64[:3]):
+                    _key = f'repair-photos/{order_id}/{_i}.jpg'
+                    _s3.put_object(Bucket='files', Key=_key, Body=_b64.b64decode(_b), ContentType='image/jpeg')
+                    repair_cdn_urls.append(f'https://cdn.poehali.dev/projects/{_proj}/bucket/{_key}')
+            except Exception as _s3err:
+                print(f'[repair-order][S3] {_s3err}')
+        staff_payload = {'text': staff_repair}
+        if repair_cdn_urls:
+            staff_payload['photo_urls'] = repair_cdn_urls
         requests.post(
             'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c?action=staff_send',
-            json={'text': staff_repair},
-            timeout=8,
+            json=staff_payload,
+            timeout=10,
         )
     except Exception as max_err:
         print(f'[MAX STAFF REPAIR-NEW] error: {max_err}')
