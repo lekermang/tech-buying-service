@@ -82,7 +82,7 @@ export function StaffMainLayout({
     const id = setInterval(check, 20000);
     return () => clearInterval(id);
   }, [token]);
-  // Мобильный режим: на узких экранах отключаем тяжёлые эффекты и компактим UI
+
   const [isMobile, setIsMobile] = React.useState<boolean>(() =>
     typeof window !== "undefined" && window.matchMedia("(max-width: 480px)").matches
   );
@@ -93,8 +93,8 @@ export function StaffMainLayout({
     mq.addEventListener?.("change", onChange);
     return () => mq.removeEventListener?.("change", onChange);
   }, []);
+
   React.useEffect(() => {
-    // Подтянем avatar_url из профиля — откладываем до простоя браузера
     let cancelled = false;
     type IdleWin = Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number };
     const w = window as IdleWin;
@@ -111,6 +111,7 @@ export function StaffMainLayout({
     else setTimeout(run, 1500);
     return () => { cancelled = true; };
   }, [token]);
+
   const analyticsAllowed = canSeeAnalytics(empRole, empName);
 
   const requestTab = (t: Tab) => {
@@ -123,51 +124,60 @@ export function StaffMainLayout({
     setTab(t);
   };
 
-  // Премиум-перекомпоновка: ежедневные модули в центре, ломбард — премиум-акцент рядом с ремонтом,
-  // редко используемые (золото/команда) — на правом краю для админов.
   const TABS: { k: Tab; l: string; icon: string; badge?: number; tip?: string; premium?: boolean }[] = [
-    { k: "myday",        l: "Мой день",     icon: "Sunrise",       tip: "Чек-лист дня, мёртвые деньги, Авито-индекс, узкие места. Персонально для тебя." },
-    { k: "sitechat",     l: "Чат с сайта",  icon: "MessageCircle", tip: "Чаты от клиентов с сайта — отвечайте прямо здесь.", badge: siteChatUnread || undefined },
-    { k: "wanttobuy",    l: "Хочу купить",  icon: "ShoppingBag",   tip: "Заявки клиентов на поиск б/у и нового товара — не упустите сделку!" },
-    { k: "chat",         l: "Чат команды",  icon: "MessagesSquare", tip: "Чат команды Скупка 24: переписка, фото, push-уведомления о новых сообщениях." },
-    { k: "repair",       l: "Ремонт",       icon: "Wrench",        tip: "Заявки на ремонт техники: новые, в работе, готовые. Поиск, фото, статусы." },
-    { k: "smartlombard", l: "Ломбард",      icon: "Coins",         tip: "СмартЛомбард: скупка и продажа Б/У техники, касса, договоры на 14 дней.", premium: true },
-    { k: "salary",       l: "Зарплата",     icon: "Wallet",        tip: "Моя смена и заработок. Владельцу — управление ставкой, %, выходными и выплатами." },
-    { k: "clients",      l: "Клиенты",      icon: "Users",         tip: "База клиентов, скидки, СМС-рассылки." },
-    { k: "avitopro",     l: "Авито",        icon: "Zap",           tip: "Авито PRO: сводка по объявлениям, статистика просмотров и контактов, авто-действия." },
-    ...(analyticsAllowed ? [{ k: "analytics" as Tab, l: "Статистика", icon: "BarChart2", tip: "Аналитика по продажам, ремонтам и сотрудникам." }] : []),
-    { k: "visitors",     l: "Посетители",   icon: "Activity",      tip: "Кто на сайте сейчас, источники трафика, заявки в реальном времени.", premium: true },
-    ...(isOwnerOrAdmin ? [{ k: "gold" as Tab, l: "Золото", icon: "Gem", tip: "Учёт ювелирных изделий и драгметаллов." }] : []),
-    ...(isOwnerOrAdmin ? [{ k: "employees" as Tab, l: "Команда", icon: "UserCog", tip: "Управление сотрудниками, роли, графики." }] : []),
+    { k: "myday",        l: "День",        icon: "Sunrise",       tip: "Чек-лист дня, мёртвые деньги, Авито-индекс, узкие места." },
+    { k: "sitechat",     l: "Чат",         icon: "MessageCircle", tip: "Чаты от клиентов с сайта.", badge: siteChatUnread || undefined },
+    { k: "wanttobuy",    l: "Ищут",        icon: "ShoppingBag",   tip: "Заявки клиентов на поиск б/у и нового товара." },
+    { k: "chat",         l: "Команда",     icon: "MessagesSquare", tip: "Чат команды Скупка24." },
+    { k: "repair",       l: "Ремонт",      icon: "Wrench",        tip: "Заявки на ремонт техники." },
+    { k: "smartlombard", l: "Ломбард",     icon: "Coins",         tip: "СмартЛомбард: скупка и продажа Б/У техники.", premium: true },
+    { k: "salary",       l: "Зарплата",    icon: "Wallet",        tip: "Моя смена и заработок." },
+    { k: "clients",      l: "Клиенты",     icon: "Users",         tip: "База клиентов, скидки, СМС-рассылки." },
+    { k: "avitopro",     l: "Авито",       icon: "Zap",           tip: "Авито PRO: статистика, авто-действия." },
+    ...(analyticsAllowed ? [{ k: "analytics" as Tab, l: "Стат.", icon: "BarChart2", tip: "Аналитика по продажам и ремонтам." }] : []),
+    { k: "visitors",     l: "Трафик",      icon: "Activity",      tip: "Кто на сайте сейчас, источники трафика.", premium: true },
+    ...(isOwnerOrAdmin ? [{ k: "gold" as Tab, l: "Золото", icon: "Gem", tip: "Учёт ювелирных изделий." }] : []),
+    ...(isOwnerOrAdmin ? [{ k: "employees" as Tab, l: "Команда", icon: "UserCog", tip: "Управление сотрудниками." }] : []),
   ];
 
   const initials = getInitials(empName);
 
+  // Цвет роли
+  const roleColor =
+    empRole === "owner" ? "#FFD700" :
+    empRole === "admin" ? "#60a5fa" :
+    "#a3e635";
+
   return (
     <div
-      className="bg-[#0D0D0D] text-white flex flex-col relative overflow-x-hidden"
-      style={{
-        fontFamily: "var(--staff-font, inherit)",
-        // 100dvh учитывает адресную строку Safari — иначе нижняя навигация уезжает под бар
-        minHeight: "100dvh",
-      }}
+      className="text-white flex flex-col relative overflow-x-hidden"
+      style={{ fontFamily: "var(--staff-font, inherit)", minHeight: "100dvh", background: "#050508" }}
     >
       <FontApplier />
-      {/* Премиум фон — как на главной (hero-grid + золотые blur-свечения) */}
-      <div
-        className="fixed inset-0 pointer-events-none z-0"
+
+      {/* ── Технологичный фон ── */}
+      {/* Hex-сетка */}
+      <div className="fixed inset-0 pointer-events-none z-0 opacity-[0.03]"
         style={{
-          backgroundImage: "linear-gradient(rgba(255,215,0,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,215,0,0.04) 1px, transparent 1px)",
-          backgroundSize: "60px 60px",
-          maskImage: "radial-gradient(ellipse at center, #000 30%, transparent 85%)",
-          WebkitMaskImage: "radial-gradient(ellipse at center, #000 30%, transparent 85%)",
+          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='100'%3E%3Cpath d='M28 66L0 50V18L28 2l28 16v32L28 66zm0-2.31L54 49.2V19.8L28 5.11 2 19.8v29.4L28 63.69z' fill='%23FFD700' /%3E%3C/svg%3E")`,
+          backgroundSize: "56px 100px",
         }}
       />
-      <div className="fixed -top-32 -left-32 w-[420px] h-[420px] rounded-full blur-3xl pointer-events-none z-0" style={{ background: "rgba(255,215,0,0.07)" }} />
-      <div className="fixed -bottom-32 -right-32 w-[420px] h-[420px] rounded-full blur-3xl pointer-events-none z-0" style={{ background: "rgba(255,184,0,0.04)" }} />
-      <div className="fixed top-1/3 -right-24 w-[320px] h-[320px] rounded-full blur-3xl pointer-events-none z-0" style={{ background: "rgba(255,215,0,0.04)" }} />
+      {/* Скан-линии */}
+      <div className="fixed inset-0 pointer-events-none z-0"
+        style={{
+          backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 4px)",
+          backgroundSize: "100% 4px",
+        }}
+      />
+      {/* Угловые свечения */}
+      <div className="fixed top-0 left-0 w-[500px] h-[500px] pointer-events-none z-0 rounded-full blur-[120px]"
+        style={{ background: `radial-gradient(circle, ${roleColor}18 0%, transparent 70%)`, transform: "translate(-30%, -30%)" }} />
+      <div className="fixed bottom-0 right-0 w-[400px] h-[400px] pointer-events-none z-0 rounded-full blur-[120px]"
+        style={{ background: "radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%)", transform: "translate(30%, 30%)" }} />
+      <div className="fixed top-1/2 left-1/2 w-[600px] h-[600px] pointer-events-none z-0 rounded-full blur-[160px] -translate-x-1/2 -translate-y-1/2"
+        style={{ background: "radial-gradient(circle, rgba(255,215,0,0.04) 0%, transparent 60%)" }} />
 
-      {/* На мобильных отключаем тяжёлые GPU-эффекты ради скорости */}
       {!isMobile && <BackgroundFx />}
       {!isMobile && <CursorEffects />}
       {!isMobile && <AnimeMascot onOpenSettings={() => setThemeOpen(true)} />}
@@ -182,137 +192,142 @@ export function StaffMainLayout({
           }}
         />
       )}
-      {/* Системный баннер офлайн (постоянный, пока нет сети) */}
+
       <OfflineBanner />
-      {/* Баннер «доступно обновление» — виден только в нативном .exe / .apk */}
       <AppUpdateBanner />
-      {/* Праздничный баннер (показывается за N дней до и после праздника) */}
       <HolidayBanner className="z-20" />
-      {/* Угловое праздничное украшение (Георгиевская лента 9 мая, снежинки на НГ и т.д.) */}
       <HolidayCornerDecor />
-      {/* Баннер темы */}
       <ThemeBanner onOpen={() => setThemeOpen(true)} />
-      {/* Шапка — премиальная как на главной */}
-      <div className="relative shrink-0 safe-top z-10">
-        {/* Градиент-фон шапки */}
-        <div
-          className="absolute inset-0 pointer-events-none"
+
+      {/* ── ШАПКА ── */}
+      <header className="relative shrink-0 safe-top z-10">
+        {/* Стеклянный фон шапки */}
+        <div className="absolute inset-0 pointer-events-none"
           style={{
-            background: "linear-gradient(180deg, rgba(13,13,13,0.95) 0%, rgba(13,13,13,0.8) 100%)",
-            backdropFilter: "blur(8px)",
-            WebkitBackdropFilter: "blur(8px)",
+            background: "linear-gradient(180deg, rgba(5,5,8,0.98) 0%, rgba(5,5,8,0.85) 100%)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
           }}
         />
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{ background: "linear-gradient(90deg, rgba(255,215,0,0.05) 0%, transparent 30%, transparent 70%, rgba(255,215,0,0.05) 100%)" }}
-        />
-        {/* Угловые blur-свечения */}
-        <div className="absolute -top-12 left-8 w-44 h-44 rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(255,215,0,0.08)" }} />
-        <div className="absolute -bottom-12 right-8 w-44 h-44 rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(255,184,0,0.05)" }} />
+        {/* Неоновая полоска сверху */}
+        <div className="absolute top-0 left-0 right-0 h-[2px] pointer-events-none z-10"
+          style={{ background: `linear-gradient(90deg, transparent 0%, ${roleColor}99 30%, ${roleColor} 50%, ${roleColor}99 70%, transparent 100%)`,
+            boxShadow: `0 0 12px ${roleColor}88, 0 0 30px ${roleColor}44` }} />
+        {/* Нижняя граница */}
+        <div className="absolute bottom-0 left-0 right-0 h-px pointer-events-none"
+          style={{ background: `linear-gradient(90deg, transparent, ${roleColor}30, transparent)` }} />
 
-        <div className={`relative flex items-center justify-between gap-2 ${isMobile ? "px-2.5 py-2" : "px-3 py-2.5"}`}>
-          {/* Аватар + имя — премиум-медальон как лого на главной */}
-          <SLTooltip as="flex" content={<><b>{myName || empName}</b><br/>{ROLE_LABEL[empRole] || empRole} · нажми, чтобы открыть профиль</>} placement="bottom">
-          <button onClick={() => setProfileOpen(true)} className="flex items-center gap-2.5 min-w-0 flex-1 text-left active:scale-95 transition group">
-            <div className="relative shrink-0">
-              {/* Премиум-кольцо: conic-gradient как лого на главной */}
-              <div className="relative w-10 h-10 rounded-full p-[1.5px] bg-[conic-gradient(from_0deg,#b8860b,#ffd700,#fff3a0,#ffd700,#b8860b)] shadow-[0_0_14px_rgba(255,215,0,0.3)]">
-                {myAvatar ? (
-                  <img src={myAvatar} alt="ava" className="w-full h-full rounded-full object-cover bg-black" />
-                ) : (
-                  <div className={`w-full h-full rounded-full flex items-center justify-center font-oswald font-bold text-sm ${
-                    empRole === "owner" ? "bg-gradient-to-br from-[#FFD700] to-[#b8860b] text-black" :
-                    empRole === "admin" ? "bg-gradient-to-br from-blue-500 to-blue-700 text-white" :
-                    "bg-gradient-to-br from-[#1a1a1a] to-[#0d0d0d] text-white/80"
-                  }`}>
-                    {initials}
-                  </div>
-                )}
+        <div className={`relative flex items-center gap-2 ${isMobile ? "px-2.5 py-2" : "px-4 py-2.5"}`}>
+
+          {/* Аватар */}
+          <SLTooltip as="flex" content={<><b>{myName || empName}</b><br />{ROLE_LABEL[empRole] || empRole} · нажми для профиля</>} placement="bottom">
+            <button onClick={() => setProfileOpen(true)} className="flex items-center gap-2.5 min-w-0 flex-1 text-left active:scale-95 transition group">
+              <div className="relative shrink-0">
+                <div className="relative w-9 h-9 rounded-xl overflow-hidden"
+                  style={{ boxShadow: `0 0 0 1.5px ${roleColor}60, 0 0 12px ${roleColor}30` }}>
+                  {myAvatar ? (
+                    <img src={myAvatar} alt="ava" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center font-oswald font-bold text-sm"
+                      style={{ background: `linear-gradient(135deg, ${roleColor}40, ${roleColor}15)`, color: roleColor }}>
+                      {initials}
+                    </div>
+                  )}
+                </div>
+                {/* Онлайн-индикатор */}
+                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#050508]"
+                  style={{ background: "#22c55e", boxShadow: "0 0 6px rgba(34,197,94,0.8)" }} />
               </div>
-              {/* Зелёная точка статуса */}
-              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-400 border-2 border-[#0D0D0D] rounded-full shadow-[0_0_6px_rgba(34,197,94,0.6)]" />
-            </div>
-            <div className="min-w-0">
-              <div className="font-oswald font-bold uppercase text-sm truncate leading-tight bg-gradient-to-r from-[#FFD700] via-[#fff3a0] to-[#FFD700] bg-clip-text text-transparent animate-shimmer">
-                {myName || empName}
+
+              <div className="min-w-0 flex flex-col gap-0.5">
+                <div className="font-oswald font-bold text-sm uppercase tracking-wide truncate leading-none"
+                  style={{ color: roleColor, textShadow: `0 0 12px ${roleColor}60` }}>
+                  {myName || empName}
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="inline-flex items-center gap-1 text-[9px] font-roboto px-1.5 py-0.5 rounded"
+                    style={{ background: `${roleColor}18`, border: `1px solid ${roleColor}35`, color: roleColor }}>
+                    {empRole === "owner" && "👑 "}
+                    {ROLE_LABEL[empRole] || empRole}
+                  </span>
+                </div>
               </div>
-              <span className={`font-roboto text-[9px] px-1.5 py-0.5 rounded-sm inline-flex items-center gap-1 mt-0.5 ${ROLE_BADGE[empRole] || "bg-white/10 text-white/50"}`}>
-                {empRole === "owner" && <span>👑</span>}
-                {ROLE_LABEL[empRole] || empRole}
-              </span>
-            </div>
-          </button>
+            </button>
           </SLTooltip>
 
-          <div className={isMobile ? "hidden" : "block"}>
-            <MskClock />
-          </div>
+          {/* Часы — только десктоп */}
+          {!isMobile && (
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg font-roboto text-xs"
+              style={{ background: "rgba(255,215,0,0.06)", border: "1px solid rgba(255,215,0,0.12)", color: "rgba(255,255,255,0.5)" }}>
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse shrink-0" />
+              <MskClock />
+            </div>
+          )}
 
-          <div className="flex items-center gap-1 shrink-0">
+          {/* Кнопки справа */}
+          <div className="flex items-center gap-0.5 shrink-0">
             {isOwnerOrAdmin && !isMobile && (
-              <button
-                onClick={sendReminderNow}
-                disabled={sending}
-                title="Отправить напоминание @PluXan сейчас"
-                className={`flex items-center gap-1 px-2 py-1.5 text-[10px] font-roboto font-bold uppercase tracking-wide rounded-sm transition-all active:scale-95 ${
-                  sendResult === true ? "bg-green-500/20 text-green-400 ring-1 ring-green-500/40" :
-                  sendResult === false ? "bg-red-500/20 text-red-400 ring-1 ring-red-500/40" :
-                  "bg-[#FFD700]/10 text-[#FFD700] hover:bg-[#FFD700]/20 ring-1 ring-[#FFD700]/20"
-                } ${sending ? "opacity-60 cursor-wait" : ""}`}
-              >
-                <Icon name={sending ? "Loader" : sendResult === true ? "Check" : "Bell"} size={12} className={sending ? "animate-spin" : ""} />
-                <span className="hidden sm:inline">{sending ? "..." : sendResult === true ? "OK" : sendResult === false ? "Ошибка" : "Напом."}</span>
-              </button>
+              <SLTooltip content="Отправить напоминание @PluXan" placement="bottom">
+                <button onClick={sendReminderNow} disabled={sending}
+                  className="p-2 rounded-lg transition-all active:scale-95"
+                  style={{
+                    background: sendResult === true ? "rgba(34,197,94,0.15)" : sendResult === false ? "rgba(239,68,68,0.15)" : "rgba(255,215,0,0.08)",
+                    border: `1px solid ${sendResult === true ? "rgba(34,197,94,0.3)" : sendResult === false ? "rgba(239,68,68,0.3)" : "rgba(255,215,0,0.2)"}`,
+                    color: sendResult === true ? "#22c55e" : sendResult === false ? "#ef4444" : "#FFD700",
+                  }}>
+                  <Icon name={sending ? "Loader" : sendResult === true ? "Check" : "Bell"} size={14} className={sending ? "animate-spin" : ""} />
+                </button>
+              </SLTooltip>
             )}
             <InstallPwaButton />
             <HolidayShowAgainButton />
             <AppSettingsMenu />
-            <SLTooltip content={<><b>Мой профиль</b><br/>Изменить аватар, имя, пин-код</>} placement="bottom">
+            <SLTooltip content={<><b>Мой профиль</b><br />Аватар, имя, пин-код</>} placement="bottom">
               <button onClick={() => setProfileOpen(true)}
-                className="text-white/40 hover:text-[#FFD700] active:text-[#FFD700] transition-all p-2 rounded-md hover:bg-[#FFD700]/10 hover:shadow-[0_0_10px_rgba(255,215,0,0.15)]">
-                <Icon name="UserCog" size={16} />
+                className="p-2 rounded-lg text-white/30 hover:text-white/70 transition-all hover:bg-white/5">
+                <Icon name="UserCog" size={15} />
               </button>
             </SLTooltip>
-            <SLTooltip content={<><b>Оформление</b><br/>Выбрать тему, цвета, эффекты курсора</>} placement="bottom">
+            <SLTooltip content={<><b>Оформление</b><br />Тема, цвета, эффекты</>} placement="bottom">
               <button onClick={() => setThemeOpen(true)}
-                className="text-white/40 hover:text-[#FFD700] active:text-[#FFD700] transition-all p-2 rounded-md hover:bg-[#FFD700]/10 hover:shadow-[0_0_10px_rgba(255,215,0,0.15)]">
-                <Icon name="Sparkles" size={16} />
+                className="p-2 rounded-lg transition-all"
+                style={{ color: `${roleColor}99` }}
+                onMouseEnter={e => (e.currentTarget.style.color = roleColor)}
+                onMouseLeave={e => (e.currentTarget.style.color = `${roleColor}99`)}>
+                <Icon name="Sparkles" size={15} />
               </button>
             </SLTooltip>
-            <SLTooltip content={<><b>Выйти</b><br/>Завершить сессию</>} placement="bottom">
+            <SLTooltip content={<><b>Выйти</b><br />Завершить сессию</>} placement="bottom">
               <button onClick={logout}
-                className="text-white/40 hover:text-red-400 active:text-red-500 transition-all p-2 rounded-md hover:bg-red-500/10 hover:shadow-[0_0_10px_rgba(239,68,68,0.15)]">
-                <Icon name="LogOut" size={16} />
+                className="p-2 rounded-lg text-white/20 hover:text-red-400 transition-all hover:bg-red-500/10">
+                <Icon name="LogOut" size={15} />
               </button>
             </SLTooltip>
           </div>
         </div>
-        {/* Золотая нижняя линия с shimmer — как на главной */}
-        <div className="absolute bottom-0 left-0 right-0 h-px bg-[linear-gradient(90deg,transparent,rgba(255,215,0,0.45),transparent)] pointer-events-none" />
-      </div>
+      </header>
 
-      {/* Контент — растягивается, с паддингом под нижнюю панель.
-          Запас 24px нужен для Safari/Chrome на iOS: их адресная строка
-          может перекрывать кнопки, если контент скроллится в самый низ. */}
-      <div
-        className="flex-1 overflow-y-auto relative z-10"
-        style={{ paddingBottom: 'calc(64px + env(safe-area-inset-bottom, 0px) + 32px)' }}
-      >
+      {/* ── КОНТЕНТ ── */}
+      <div className="flex-1 overflow-y-auto relative z-10"
+        style={{ paddingBottom: "calc(72px + env(safe-area-inset-bottom, 0px) + 24px)" }}>
         <StaffSectionBanner tab={tab} />
         <TabErrorBoundary key={tab}>
-          <React.Suspense fallback={<div className="flex items-center justify-center py-16 text-white/20 font-roboto text-sm"><Icon name="Loader" size={16} className="animate-spin mr-2" />Загружаю...</div>}>
-            {tab === "myday"      && <MyDayTab token={token} />}
-            {tab === "sitechat"   && <SiteChatTab token={token} />}
-            {tab === "wanttobuy"  && <WantToBuyTab token={token} />}
-            {tab === "chat"       && <VipChatTab token={token} />}
-            {tab === "repair"    && <StaffRepairTab token={token} isOwner={empRole === "owner"} />}
-            {tab === "goods"     && <GoodsTab token={token} />}
-            {tab === "sales"     && <SalesTab token={token} />}
-            {tab === "clients"   && <ClientsTab token={token} />}
-            {tab === "visitors"  && <VisitorsAnalyticsTab embedded tokenProp={token} />}
-            {tab === "analytics" && analyticsAllowed && <AnalyticsTab token={token} />}
-            {tab === "analytics" && !analyticsAllowed && (
+          <React.Suspense fallback={
+            <div className="flex items-center justify-center py-16 text-white/20 font-roboto text-sm">
+              <Icon name="Loader" size={16} className="animate-spin mr-2" />Загружаю...
+            </div>
+          }>
+            {tab === "myday"        && <MyDayTab token={token} />}
+            {tab === "sitechat"     && <SiteChatTab token={token} />}
+            {tab === "wanttobuy"    && <WantToBuyTab token={token} />}
+            {tab === "chat"         && <VipChatTab token={token} />}
+            {tab === "repair"       && <StaffRepairTab token={token} isOwner={empRole === "owner"} />}
+            {tab === "goods"        && <GoodsTab token={token} />}
+            {tab === "sales"        && <SalesTab token={token} />}
+            {tab === "clients"      && <ClientsTab token={token} />}
+            {tab === "visitors"     && <VisitorsAnalyticsTab embedded tokenProp={token} />}
+            {tab === "analytics"    && analyticsAllowed && <AnalyticsTab token={token} />}
+            {tab === "analytics"    && !analyticsAllowed && (
               <div className="flex flex-col items-center justify-center py-24 px-6 text-center gap-3">
                 <div className="w-14 h-14 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-1">
                   <Icon name="Lock" size={24} className="text-red-400/70" />
@@ -321,88 +336,114 @@ export function StaffMainLayout({
                 <div className="font-roboto text-sm text-white/30 max-w-xs">Аналитика доступна только владельцу и уполномоченным сотрудникам</div>
               </div>
             )}
-            {tab === "gold"      && isOwnerOrAdmin && <GoldTab token={token} />}
-            {tab === "employees" && isOwnerOrAdmin && <EmployeesTab token={token} myRole={empRole} />}
+            {tab === "gold"         && isOwnerOrAdmin && <GoldTab token={token} />}
+            {tab === "employees"    && isOwnerOrAdmin && <EmployeesTab token={token} myRole={empRole} />}
             {tab === "smartlombard" && <SmartLombardTab token={token} myRole={empRole} />}
-            {tab === "avitopro"  && <AvitoProTab token={token} />}
-            {tab === "salary"    && <SalaryTab role={empRole} token={token} employeeName={empName} />}
+            {tab === "avitopro"     && <AvitoProTab token={token} />}
+            {tab === "salary"       && <SalaryTab role={empRole} token={token} employeeName={empName} />}
           </React.Suspense>
         </TabErrorBoundary>
       </div>
 
-      {/* Нижняя навигация — premium glassmorphism как на главной */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-        {/* Glow сверху */}
-        <div className="absolute -top-6 left-0 right-0 h-6 bg-gradient-to-t from-black/95 to-transparent pointer-events-none" />
-        {/* Золотая shimmer-линия сверху */}
-        <div className="absolute top-0 left-0 right-0 h-px bg-[linear-gradient(90deg,transparent,rgba(255,215,0,0.45),transparent)] pointer-events-none z-10" />
-        <div className="relative bg-[#0D0D0D]/92 backdrop-blur-xl border-t border-[#FFD700]/15">
-          {/* Угловые золотые свечения */}
-          <div className="absolute -top-8 left-1/4 w-40 h-16 rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(255,215,0,0.06)" }} />
-          <div className="absolute -top-8 right-1/4 w-40 h-16 rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(255,184,0,0.05)" }} />
-          <div className="relative flex overflow-x-auto no-scrollbar">
+      {/* ── НИЖНЯЯ НАВИГАЦИЯ ── */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+        {/* Градиент-тень сверху */}
+        <div className="absolute -top-8 left-0 right-0 h-8 bg-gradient-to-t from-[#050508]/95 to-transparent pointer-events-none" />
+
+        <div className="relative"
+          style={{
+            background: "rgba(5,5,8,0.95)",
+            backdropFilter: "blur(24px)",
+            WebkitBackdropFilter: "blur(24px)",
+            borderTop: `1px solid ${roleColor}25`,
+            boxShadow: `0 -1px 0 ${roleColor}15, 0 -20px 40px rgba(5,5,8,0.8)`,
+          }}>
+
+          {/* Активная вкладка — неоновый индикатор сверху */}
+          <div className="absolute top-0 left-0 right-0 h-[1px] pointer-events-none"
+            style={{ background: `linear-gradient(90deg, transparent, ${roleColor}40, transparent)` }} />
+
+          <div className="flex overflow-x-auto" style={{ scrollbarWidth: "none" }}>
             {TABS.map(t => {
               const locked = !isOwner && !unlocked[t.k] && (PROTECTED_TABS as readonly string[]).includes(t.k);
               const active = tab === t.k;
+              const isHot = ("badge" in t) && typeof t.badge === "number" && t.badge > 0;
+
               return (
-                <SLTooltip
-                  key={t.k}
-                  placement="top"
-                  delay={400}
-                  as="flex"
-                  content={
-                    <>
-                      <b className="text-[#FFD700]">{t.l}</b>
-                      {t.tip && <><br/>{t.tip}</>}
-                      {locked && <><br/><span className="text-red-300">🔒 Требуется пароль владельца</span></>}
-                    </>
-                  }
-                >
-                <button
-                  onClick={() => requestTab(t.k as Tab)}
-                  onMouseEnter={() => prefetchTab(t.k)}
-                  onTouchStart={() => prefetchTab(t.k)}
-                  aria-label={t.l}
-                  aria-current={active ? "page" : undefined}
-                  className={`w-full min-w-[56px] flex flex-col items-center justify-center gap-0.5 pt-2 pb-1.5 min-h-[56px] transition-all duration-300 active:scale-95 relative group ${
-                    active
-                      ? "text-[#FFD700]"
-                      : t.premium
-                        ? "text-[#FFD700]/75 hover:text-[#FFD700]"
-                        : "text-white/45 hover:text-white/85"
-                  }`}
-                >
-                  {/* Премиум-подложка для ломбарда — едва заметное золотое свечение, даже не-активного */}
-                  {t.premium && !active && (
-                    <span className="absolute inset-x-1.5 top-1 bottom-1 bg-gradient-to-b from-[#FFD700]/[0.06] to-transparent rounded-xl -z-10 ring-1 ring-inset ring-[#FFD700]/12" aria-hidden />
-                  )}
+                <SLTooltip key={t.k} placement="top" delay={400} as="flex"
+                  content={<><b style={{ color: roleColor }}>{t.l}</b>{t.tip && <><br />{t.tip}</>}{locked && <><br /><span className="text-red-300">🔒 Пароль владельца</span></>}</>}>
+                  <button
+                    onClick={() => requestTab(t.k as Tab)}
+                    onMouseEnter={() => prefetchTab(t.k)}
+                    onTouchStart={() => prefetchTab(t.k)}
+                    aria-label={t.l}
+                    aria-current={active ? "page" : undefined}
+                    className="relative flex flex-col items-center justify-center gap-1 pt-2.5 pb-2 min-w-[52px] min-h-[60px] transition-all duration-200 active:scale-90 group"
+                    style={{ flex: "1 0 52px" }}
+                  >
+                    {/* Активный индикатор — линия сверху с неоновым свечением */}
+                    {active && (
+                      <span className="absolute top-0 left-1/2 -translate-x-1/2 h-[2px] w-10 rounded-b"
+                        style={{
+                          background: `linear-gradient(90deg, transparent, ${roleColor}, transparent)`,
+                          boxShadow: `0 0 8px ${roleColor}cc, 0 0 20px ${roleColor}66`,
+                        }} />
+                    )}
 
-                  {/* Активная подсветка — премиум */}
-                  {active && <>
-                    <span className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-[2px] bg-gradient-to-r from-transparent via-[#FFD700] to-transparent rounded-b-full shadow-[0_0_10px_rgba(255,215,0,0.6)]" />
-                    <span className={`absolute inset-x-2 top-1.5 bottom-1.5 bg-gradient-to-b ${t.premium ? "from-[#FFD700]/20 via-[#FFD700]/8" : "from-[#FFD700]/14 via-[#FFD700]/4"} to-transparent rounded-xl -z-10 shadow-[inset_0_1px_0_rgba(255,215,0,0.15)]`} />
-                  </>}
+                    {/* Активный фон */}
+                    {active && (
+                      <span className="absolute inset-x-1 inset-y-1 rounded-xl pointer-events-none"
+                        style={{
+                          background: `radial-gradient(ellipse at 50% 0%, ${roleColor}18 0%, transparent 70%)`,
+                          border: `1px solid ${roleColor}20`,
+                        }} />
+                    )}
 
-                  <div className={`relative transition-transform duration-300 ${active ? "scale-110 drop-shadow-[0_0_6px_rgba(255,215,0,0.5)]" : "group-active:scale-90"}`}>
-                    <Icon name={t.icon} size={18} />
-                    {/* Премиум-точка-индикатор */}
+                    {/* Премиум-подложка для особых вкладок */}
                     {t.premium && !active && (
-                      <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-[#FFD700] shadow-[0_0_6px_rgba(255,215,0,0.8)]" aria-hidden />
+                      <span className="absolute inset-x-1 inset-y-1 rounded-xl pointer-events-none"
+                        style={{ background: "rgba(255,215,0,0.04)", border: "1px solid rgba(255,215,0,0.10)" }} />
                     )}
-                    {locked && (
-                      <span className="absolute -top-1.5 -right-2 text-[9px] bg-[#0A0A0A] rounded-full px-0.5">🔒</span>
-                    )}
-                    {("badge" in t) && typeof t.badge === "number" && t.badge > 0 && (
-                      <span className="absolute -top-2 -right-2 min-w-[16px] h-[16px] px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.6)]">
-                        {t.badge > 99 ? "99+" : t.badge}
-                      </span>
-                    )}
-                  </div>
-                  <span className={`font-roboto text-[9px] leading-none tracking-tight ${active ? "font-bold" : ""}`}>
-                    {t.l}
-                  </span>
-                </button>
+
+                    {/* Иконка */}
+                    <div className="relative">
+                      <Icon name={t.icon}
+                        size={active ? 19 : 17}
+                        style={{
+                          color: active ? roleColor : t.premium ? "rgba(255,215,0,0.55)" : "rgba(255,255,255,0.35)",
+                          filter: active ? `drop-shadow(0 0 6px ${roleColor}aa)` : "none",
+                          transition: "all 0.2s",
+                        }}
+                      />
+                      {/* Бейдж непрочитанных */}
+                      {isHot && (
+                        <span className="absolute -top-2 -right-2 min-w-[15px] h-[15px] px-0.5 rounded-full flex items-center justify-center text-[8px] font-bold text-white"
+                          style={{ background: "#ef4444", boxShadow: "0 0 8px rgba(239,68,68,0.7)", animation: "pulse 2s infinite" }}>
+                          {(t.badge as number) > 99 ? "99+" : t.badge}
+                        </span>
+                      )}
+                      {/* Замок */}
+                      {locked && (
+                        <span className="absolute -top-1.5 -right-1.5 text-[8px]">🔒</span>
+                      )}
+                      {/* Премиум точка */}
+                      {t.premium && !active && (
+                        <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full"
+                          style={{ background: "#FFD700", boxShadow: "0 0 5px rgba(255,215,0,0.9)" }} />
+                      )}
+                    </div>
+
+                    {/* Лейбл */}
+                    <span className="font-roboto leading-none tracking-tight transition-all duration-200"
+                      style={{
+                        fontSize: "9px",
+                        color: active ? roleColor : "rgba(255,255,255,0.3)",
+                        fontWeight: active ? 700 : 400,
+                        textShadow: active ? `0 0 8px ${roleColor}66` : "none",
+                      }}>
+                      {t.l}
+                    </span>
+                  </button>
                 </SLTooltip>
               );
             })}
@@ -410,60 +451,90 @@ export function StaffMainLayout({
         </div>
       </nav>
 
-      {/* Глобальный watcher горящих заявок: всплывающие toast'ы + плавающая кнопка */}
+      {/* Watcher заявок */}
       <LeadsAlertWatcher token={token} empName={empName} />
 
-      {/* Модалка пароля для сотрудников */}
+      {/* ── МОДАЛКА ПАРОЛЯ ── */}
       {pwModal && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setPwModal(null)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(12px)" }}
+          onClick={() => setPwModal(null)}>
           <div onClick={e => e.stopPropagation()}
-            className="relative bg-gradient-to-br from-[#1A1A1A] to-[#0D0D0D] border border-[#FFD700]/30 w-full max-w-sm p-6 rounded-xl shadow-[0_24px_60px_rgba(0,0,0,0.6),0_0_30px_rgba(255,215,0,0.15)] overflow-hidden">
-            {/* Угловые свечения */}
-            <div className="absolute -top-16 -left-16 w-48 h-48 rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(255,215,0,0.1)" }} />
-            <div className="absolute -bottom-16 -right-16 w-48 h-48 rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(255,184,0,0.06)" }} />
-            <div className="absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-[#FFD700]/60 to-transparent" />
-            <div className="relative z-10 flex items-center gap-3 mb-4">
-              {/* Премиум-медальон с conic-gradient */}
-              <div className="relative w-11 h-11 rounded-full p-[1.5px] bg-[conic-gradient(from_0deg,#b8860b,#ffd700,#fff3a0,#ffd700,#b8860b)] shadow-[0_0_18px_rgba(255,215,0,0.35)] shrink-0">
-                <div className="w-full h-full rounded-full bg-gradient-to-br from-[#FFD700]/20 to-black flex items-center justify-center">
-                  <Icon name="Lock" size={16} className="text-[#FFD700]" />
+            className="relative w-full max-w-sm rounded-2xl overflow-hidden"
+            style={{
+              background: "linear-gradient(135deg, #0a0a10 0%, #050508 100%)",
+              border: `1px solid ${roleColor}40`,
+              boxShadow: `0 0 0 1px ${roleColor}15, 0 32px 64px rgba(0,0,0,0.8), 0 0 60px ${roleColor}15`,
+            }}>
+            {/* Верхняя неоновая линия */}
+            <div className="absolute top-0 left-0 right-0 h-[2px]"
+              style={{ background: `linear-gradient(90deg, transparent, ${roleColor}, transparent)`,
+                boxShadow: `0 0 12px ${roleColor}` }} />
+
+            {/* Свечения */}
+            <div className="absolute -top-20 -left-20 w-48 h-48 rounded-full blur-3xl pointer-events-none"
+              style={{ background: `${roleColor}12` }} />
+            <div className="absolute -bottom-20 -right-20 w-48 h-48 rounded-full blur-3xl pointer-events-none"
+              style={{ background: "rgba(99,102,241,0.10)" }} />
+
+            <div className="relative z-10 p-6">
+              {/* Заголовок */}
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                  style={{ background: `${roleColor}15`, border: `1px solid ${roleColor}35` }}>
+                  <Icon name="Lock" size={18} style={{ color: roleColor }} />
                 </div>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-oswald font-bold uppercase text-base leading-tight bg-gradient-to-r from-[#FFD700] via-[#fff3a0] to-[#FFD700] bg-clip-text text-transparent animate-shimmer">
-                  {pwModal === "gold" ? "Доступ к золоту" : pwModal === "employees" ? "Доступ к команде" : "Доступ к статистике"}
+                <div className="flex-1">
+                  <div className="font-oswald font-bold uppercase text-base tracking-wide"
+                    style={{ color: roleColor }}>
+                    {pwModal === "gold" ? "Доступ к золоту" : pwModal === "employees" ? "Доступ к команде" : "Доступ к статистике"}
+                  </div>
+                  <div className="text-white/40 text-xs font-roboto mt-0.5">Введите пароль владельца</div>
                 </div>
-                <div className="font-roboto text-white/45 text-[11px] mt-0.5">Требуется пароль владельца</div>
+                <button onClick={() => setPwModal(null)} className="text-white/20 hover:text-white/50 transition-colors p-1">
+                  <Icon name="X" size={16} />
+                </button>
               </div>
-              <button onClick={() => setPwModal(null)} className="text-white/30 hover:text-white transition-colors -mr-1">
-                <Icon name="X" size={18} />
-              </button>
-            </div>
-            <input
-              type="password"
-              autoFocus
-              value={pwInput}
-              onChange={e => { setPwInput(e.target.value); setPwError(""); }}
-              onKeyDown={e => { if (e.key === "Enter") submitPw(); if (e.key === "Escape") setPwModal(null); }}
-              placeholder="••••••••"
-              className={`relative z-10 w-full bg-[#0A0A0A] border-2 text-white px-4 py-3.5 font-roboto text-base focus:outline-none transition-all mb-3 rounded-md tracking-widest ${
-                pwError ? "border-red-500/50 focus:border-red-400" : "border-[#333] focus:border-[#FFD700]"
-              }`}
-            />
-            {pwError && (
-              <div className="relative z-10 text-red-400 font-roboto text-xs mb-3 flex items-center gap-1.5 bg-red-500/10 border border-red-500/20 px-2.5 py-2 rounded">
-                <Icon name="AlertCircle" size={12} />{pwError}
+
+              <input
+                type="password"
+                autoFocus
+                value={pwInput}
+                onChange={e => { setPwInput(e.target.value); setPwError(""); }}
+                onKeyDown={e => { if (e.key === "Enter") submitPw(); if (e.key === "Escape") setPwModal(null); }}
+                placeholder="••••••••"
+                className="w-full px-4 py-3.5 font-roboto text-base text-white placeholder:text-white/15 outline-none rounded-xl mb-3 tracking-widest transition-all"
+                style={{
+                  background: "rgba(255,255,255,0.04)",
+                  border: `1px solid ${pwError ? "rgba(239,68,68,0.5)" : roleColor + "30"}`,
+                  boxShadow: pwError ? "0 0 0 3px rgba(239,68,68,0.1)" : "none",
+                }}
+                onFocus={e => { e.currentTarget.style.border = `1px solid ${roleColor}70`; e.currentTarget.style.boxShadow = `0 0 0 3px ${roleColor}15`; }}
+                onBlur={e => { e.currentTarget.style.border = `1px solid ${pwError ? "rgba(239,68,68,0.5)" : roleColor + "30"}`; e.currentTarget.style.boxShadow = "none"; }}
+              />
+
+              {pwError && (
+                <div className="text-red-400 text-xs font-roboto mb-3 flex items-center gap-1.5 bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-lg">
+                  <Icon name="AlertCircle" size={12} />{pwError}
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <button onClick={() => setPwModal(null)}
+                  className="flex-1 py-3 rounded-xl font-roboto text-sm text-white/40 hover:text-white/60 transition-colors"
+                  style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
+                  Отмена
+                </button>
+                <button onClick={submitPw}
+                  className="flex-1 py-3 rounded-xl font-oswald font-bold uppercase text-sm tracking-wide transition-all active:scale-95"
+                  style={{
+                    background: `linear-gradient(135deg, ${roleColor}dd, ${roleColor}aa)`,
+                    color: "#000",
+                    boxShadow: `0 4px 20px ${roleColor}40`,
+                  }}>
+                  Войти
+                </button>
               </div>
-            )}
-            <div className="relative z-10 flex gap-2">
-              <button onClick={() => setPwModal(null)}
-                className="flex-1 border border-[#333] text-white/60 font-roboto text-sm py-3 rounded-md hover:text-white hover:border-white/20 transition-colors">
-                Отмена
-              </button>
-              <button onClick={submitPw}
-                className="flex-1 btn-gold-premium py-3 text-sm">
-                Войти
-              </button>
             </div>
           </div>
         </div>
@@ -471,5 +542,3 @@ export function StaffMainLayout({
     </div>
   );
 }
-
-export default StaffMainLayout;
