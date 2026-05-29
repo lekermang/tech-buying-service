@@ -869,7 +869,7 @@ def get_staff_channel_id() -> int | None:
         r = cur.fetchone(); cur.close(); conn.close()
         if r and r[0]:
             v = int(r[0])
-            return v if v > 0 else None
+            return v if v != 0 else None
     except Exception:
         pass
     return None
