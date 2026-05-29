@@ -88,41 +88,57 @@ export default function SLShopTab({ token, myRole }: { token: string; myRole?: s
   });
 
   return (
-    <div className="p-2 sm:p-3 max-w-[1400px] mx-auto w-full">
-      {/* Премиум-шапка с золотым glow */}
-      <div className="relative rounded-xl bg-gradient-to-br from-[#FFD700]/12 via-[#FFD700]/4 to-transparent border border-[#FFD700]/30 px-2.5 py-2 mb-2 flex items-center gap-2.5 shadow-[0_0_24px_rgba(255,215,0,0.08),inset_0_1px_0_rgba(255,215,0,0.1)] overflow-hidden">
-        {/* Световой блик */}
-        <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-[#FFD700]/8 blur-2xl pointer-events-none" />
-        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#FFD700]/40 to-transparent" />
+    <div className="px-2 pt-2 pb-1 sm:px-3 max-w-[1400px] mx-auto w-full">
 
-        <div
-          className="relative w-8 h-8 rounded-lg bg-gradient-to-br from-[#FFE34D] via-[#FFD700] to-[#b8860b] flex items-center justify-center shrink-0 shadow-[0_3px_10px_rgba(255,215,0,0.4),inset_0_1px_0_rgba(255,255,255,0.4)]"
-          title="СмартЛомбард — модуль скупки и продажи Б/У"
-        >
-          <Icon name="Gem" size={16} className="text-black drop-shadow" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="font-oswald font-bold uppercase text-[14px] tracking-[0.06em] leading-tight bg-gradient-to-r from-[#FFD700] via-[#FFE34D] to-[#FFD700] bg-clip-text text-transparent">
-            СмартЛомбард
+      {/* ── Компактная шапка модуля ── */}
+      <div className="relative rounded-2xl overflow-hidden mb-2.5"
+        style={{
+          background: "linear-gradient(135deg, rgba(255,215,0,0.1) 0%, rgba(255,215,0,0.04) 50%, transparent 100%)",
+          border: "1px solid rgba(255,215,0,0.22)",
+          boxShadow: "0 0 30px rgba(255,215,0,0.07), inset 0 1px 0 rgba(255,215,0,0.15)",
+        }}>
+        {/* Верхняя неоновая полоска */}
+        <div className="absolute top-0 left-0 right-0 h-[1px]"
+          style={{ background: "linear-gradient(90deg, transparent, rgba(255,215,0,0.7), transparent)" }} />
+        {/* Угловое свечение */}
+        <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full blur-3xl pointer-events-none"
+          style={{ background: "rgba(255,215,0,0.12)" }} />
+
+        <div className="relative flex items-center gap-2.5 px-3 py-2.5">
+          {/* Иконка */}
+          <div className="relative w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+            style={{
+              background: "linear-gradient(135deg, #FFE34D 0%, #FFD700 55%, #b8860b 100%)",
+              boxShadow: "0 0 16px rgba(255,215,0,0.45), inset 0 1px 0 rgba(255,255,255,0.35)",
+            }}>
+            <Icon name="Gem" size={17} className="text-black" />
           </div>
-          <div className="text-[10px] text-white/50 truncate leading-tight">
-            {perms?.name ? `${perms.name} · ` : ""}Скупка, склад, касса, договоры
+
+          {/* Текст */}
+          <div className="flex-1 min-w-0">
+            <div className="font-oswald font-black uppercase text-[15px] tracking-[0.08em] leading-none"
+              style={{ color: "#FFD700", textShadow: "0 0 16px rgba(255,215,0,0.5)" }}>
+              СмартЛомбард
+            </div>
+            <div className="text-[10px] font-roboto mt-0.5 truncate"
+              style={{ color: "rgba(255,255,255,0.38)" }}>
+              {perms?.name ? `${perms.name} · ` : ""}Скупка · Склад · Касса · Договоры
+            </div>
           </div>
-        </div>
-        {/* Premium индикатор */}
-        <div
-          className="hidden sm:flex items-center gap-1 px-2 py-1 rounded-full bg-[#FFD700]/10 border border-[#FFD700]/30 shrink-0"
-          title="Премиум-модуль с расширенным функционалом"
-        >
-          <span className="relative flex h-1.5 w-1.5">
-            <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
-            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
-          </span>
-          <span className="text-[9px] uppercase tracking-wider font-bold text-[#FFD700]">Premium</span>
+
+          {/* Premium badge */}
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl shrink-0"
+            style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.2)" }}>
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            </span>
+            <span className="text-[9px] uppercase tracking-widest font-bold text-emerald-400">Live</span>
+          </div>
         </div>
       </div>
 
-      {/* Подвкладки — премиум сетка-плитки с подсказками */}
+      {/* ── Навигация по разделам ── */}
       <div className="mb-2">
         <SLTabsGrid
           items={visibleTabs.map(t => ({ v: t.k, l: t.l, icon: t.icon, featured: t.featured, tooltip: t.tip }))}
