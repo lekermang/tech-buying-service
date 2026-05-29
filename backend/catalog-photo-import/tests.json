@@ -1,0 +1,12 @@
+{
+  "tests": [
+    {
+      "name": "List Apple items without photo",
+      "method": "GET",
+      "path": "/?action=list&brand=Apple&limit=5",
+      "expectedStatus": 200,
+      "expectedBody": {"total": 0},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

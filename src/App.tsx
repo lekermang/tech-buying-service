@@ -61,6 +61,7 @@ const SafeDealsItem = safeLazy(() => import("./pages/SafeDealsItem"));
 const StaffSafeDeals = safeLazy(() => import("./pages/StaffSafeDeals"));
 const StaffAnalytics = safeLazy(() => import("./pages/StaffAnalytics"));
 const StaffAnalyticsVisitor = safeLazy(() => import("./pages/StaffAnalyticsVisitor"));
+const CatalogPhotoImport = safeLazy(() => import("./pages/CatalogPhotoImport"));
 const AncientCoins = safeLazy(() => import("./pages/AncientCoins"));
 const BronzeSculptures = safeLazy(() => import("./pages/BronzeSculptures"));
 const RussianCoins = safeLazy(() => import("./pages/RussianCoins"));
@@ -160,6 +161,7 @@ const App = () => {
             <Route path="/staff/safe-deals" element={<StaffSafeDeals />} />
             <Route path="/staff/analytics" element={<StaffAnalytics />} />
             <Route path="/staff/analytics/visitor/:id" element={<StaffAnalyticsVisitor />} />
+            <Route path="/staff/catalog-photos" element={<CatalogPhotoImport />} />
             <Route path="/safe-deals/:slug" element={<SafeDealsLanding />} />
             {/* Удобные алиасы */}
             <Route path="/blacklist" element={<Navigate to="/safe-deals/blacklist" replace />} />
