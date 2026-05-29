@@ -1,6 +1,4 @@
-type Props = {
-  roleColor: string;
-};
+type Props = { roleColor: string };
 
 export default function StaffBackground({ roleColor }: Props) {
   return (
@@ -19,13 +17,11 @@ export default function StaffBackground({ roleColor }: Props) {
           backgroundSize: "100% 4px",
         }}
       />
-      {/* Угловое свечение — роль */}
+      {/* Угловые свечения */}
       <div className="fixed top-0 left-0 w-[500px] h-[500px] pointer-events-none z-0 rounded-full blur-[120px]"
         style={{ background: `radial-gradient(circle, ${roleColor}18 0%, transparent 70%)`, transform: "translate(-30%, -30%)" }} />
-      {/* Угловое свечение — фиолетовое */}
       <div className="fixed bottom-0 right-0 w-[400px] h-[400px] pointer-events-none z-0 rounded-full blur-[120px]"
         style={{ background: "radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%)", transform: "translate(30%, 30%)" }} />
-      {/* Центральное свечение */}
       <div className="fixed top-1/2 left-1/2 w-[600px] h-[600px] pointer-events-none z-0 rounded-full blur-[160px] -translate-x-1/2 -translate-y-1/2"
         style={{ background: "radial-gradient(circle, rgba(255,215,0,0.04) 0%, transparent 60%)" }} />
     </>
