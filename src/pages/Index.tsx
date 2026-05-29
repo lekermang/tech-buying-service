@@ -19,6 +19,7 @@ import EasierWithUsBlock from "@/components/EasierWithUsBlock";
 import QuickContactSection from "@/components/QuickContactSection";
 import WholesaleBanner from "@/components/skupka/WholesaleBanner";
 import AntiquesPreviewBlock from "@/components/skupka/AntiquesPreviewBlock";
+import WantToBuySection from "@/components/skupka/WantToBuySection";
 
 const scrollTo = (href: string) => {
   const el = document.querySelector(href);
@@ -390,6 +391,7 @@ const Index = ({ goldOpen = false }: { goldOpen?: boolean }) => {
       <HeroSection scrollTo={scrollTo} externalModalOpen={evalOpen} onExternalModalClose={() => setEvalOpen(false)} />
       <SafeDealsBanner />
       <PremiumServicesGrid />
+      <WantToBuySection />
       <WholesaleBanner />
       <InfoSections />
 

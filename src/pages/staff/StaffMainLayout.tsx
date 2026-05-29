@@ -23,6 +23,7 @@ import LeadsAlertWatcher from "./LeadsAlertWatcher";
 import MyDayTab from "../staffMyDay/MyDayTab";
 import VipChatTab from "../staffChat/VipChatTab";
 import SiteChatTab from "../staffChat/SiteChatTab";
+import WantToBuyTab from "../staffWantToBuy/WantToBuyTab";
 import AppUpdateBanner from "@/components/AppUpdateBanner";
 import AppSettingsMenu from "@/components/AppSettingsMenu";
 
@@ -127,6 +128,7 @@ export function StaffMainLayout({
   const TABS: { k: Tab; l: string; icon: string; badge?: number; tip?: string; premium?: boolean }[] = [
     { k: "myday",        l: "Мой день",     icon: "Sunrise",       tip: "Чек-лист дня, мёртвые деньги, Авито-индекс, узкие места. Персонально для тебя." },
     { k: "sitechat",     l: "Чат с сайта",  icon: "MessageCircle", tip: "Чаты от клиентов с сайта — отвечайте прямо здесь.", badge: siteChatUnread || undefined },
+    { k: "wanttobuy",    l: "Хочу купить",  icon: "ShoppingBag",   tip: "Заявки клиентов на поиск б/у и нового товара — не упустите сделку!" },
     { k: "chat",         l: "Чат команды",  icon: "MessagesSquare", tip: "Чат команды Скупка 24: переписка, фото, push-уведомления о новых сообщениях." },
     { k: "repair",       l: "Ремонт",       icon: "Wrench",        tip: "Заявки на ремонт техники: новые, в работе, готовые. Поиск, фото, статусы." },
     { k: "smartlombard", l: "Ломбард",      icon: "Coins",         tip: "СмартЛомбард: скупка и продажа Б/У техники, касса, договоры на 14 дней.", premium: true },
@@ -300,9 +302,10 @@ export function StaffMainLayout({
         <StaffSectionBanner tab={tab} />
         <TabErrorBoundary key={tab}>
           <React.Suspense fallback={<div className="flex items-center justify-center py-16 text-white/20 font-roboto text-sm"><Icon name="Loader" size={16} className="animate-spin mr-2" />Загружаю...</div>}>
-            {tab === "myday"     && <MyDayTab token={token} />}
-            {tab === "sitechat"  && <SiteChatTab token={token} />}
-            {tab === "chat"      && <VipChatTab token={token} />}
+            {tab === "myday"      && <MyDayTab token={token} />}
+            {tab === "sitechat"   && <SiteChatTab token={token} />}
+            {tab === "wanttobuy"  && <WantToBuyTab token={token} />}
+            {tab === "chat"       && <VipChatTab token={token} />}
             {tab === "repair"    && <StaffRepairTab token={token} isOwner={empRole === "owner"} />}
             {tab === "goods"     && <GoodsTab token={token} />}
             {tab === "sales"     && <SalesTab token={token} />}
