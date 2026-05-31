@@ -364,8 +364,10 @@ body{font-family:Arial,sans-serif;font-size:10px;color:#000;background:#fff}
 .date-line{font-size:8px;margin-bottom:2px}
 </style>
 </head><body>
-<div class="print-btn">
-  <button onclick="window.print()" style="padding:8px 28px;font-size:14px;cursor:pointer;background:#FFD700;border:2px solid #000;font-weight:bold">🖨 Распечатать акт</button>
+<div class="print-btn" style="text-align:center;padding:10px 12px;background:#f5f5f5;border-bottom:1px solid #ccc;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap">
+  <button onclick="window.print()" style="padding:9px 28px;font-size:14px;cursor:pointer;background:#FFD700;border:2px solid #000;font-weight:bold;border-radius:4px">🖨 Распечатать акт</button>
+  <a href="https://skypka24.com/repair-status?id=${o.id}" target="_blank" style="display:inline-block;padding:9px 20px;font-size:13px;background:#fff;border:2px solid #333;font-weight:bold;text-decoration:none;color:#000;border-radius:4px">🔍 Статус ремонта</a>
+  <a href="https://skypka24.com/act" target="_blank" style="display:inline-block;padding:9px 20px;font-size:13px;background:#fff;border:2px solid #888;font-weight:normal;text-decoration:none;color:#333;border-radius:4px">📋 Условия гарантии</a>
 </div>
 <div class="page">
 
@@ -729,7 +731,7 @@ const SITE_URL = "https://skypka24.com";
 // Общая «обёртка» письма — тёмная, в стиле бренда
 const emailWrap = (title: string, badge: string, bodyHtml: string, order: Order) => {
   const statusUrl = `${SITE_URL}/repair-status?id=${order.id}`;
-  const termsUrl  = `${SITE_URL}/repair-terms`;
+  const termsUrl  = `${SITE_URL}/act`;
   return `
 <!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title></head>
 <body style="margin:0;padding:0;background:#0d0d0d;font-family:Arial,Helvetica,sans-serif">
@@ -794,16 +796,207 @@ const row = (label: string, value: string) =>
 
 const divider = () => `<div style="height:1px;background:#2a2a2a;margin:10px 0"></div>`;
 
-// ── 1. АКТ ПРИЁМКИ для email — настоящий акт, но без print-кнопки и barcode-JS
+// ── 1. АКТ ПРИЁМКИ для email — полноценный table-based HTML без SVG/JS ──────
 export const getIntakeActHtml = (o: Order): string => {
-  const html = getActHtmlString(o);
-  return html
-    // убираем кнопку "Распечатать"
-    .replace(/<div class="print-btn">[\s\S]*?<\/div>/, "")
-    // убираем barcode-скрипт (не работает в email)
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    // убираем пустой SVG барcode (заменяем на номер заявки)
-    .replace('<svg id="barcode"></svg>', `<div style="font-size:16px;font-weight:bold;letter-spacing:2px;text-align:center">#${String(o.id).padStart(6,"0")}</div>`);
+  const d = new Date(o.created_at);
+  const dateStr = d.toLocaleDateString("ru-RU", { day: "2-digit", month: "long", year: "numeric" });
+  const orderNum = String(o.id).padStart(6, "0");
+  const statusUrl = `https://skypka24.com/repair-status?id=${o.id}`;
+  const termsUrl  = "https://skypka24.com/act";
+
+  const FUNCS = [
+    "Кнопка Home","Кнопка Вкл./Выкл.","Изменение геометрии","Деформация корпуса",
+    "Компас и гироскол","Кнопки громкости (меню)","Поиск сети",
+    "Нижний микрофон (диктофон)","Полифонический динамик","Wi-Fi/Bluetooth",
+    "Фонарик","Датчик приближения","Кнопки громкости (вызов)","Камера основная",
+    "Чтение SIM-карты","Датчик освещённости","Дисплей (touch/экран/рамка)",
+    "Сканер радужки глаз","Touch ID / Face ID","Беспроводная зарядка",
+    "Слуховой динамик","Разъём зарядки","Переключатель вибро","Камера фронтальная",
+    "Аудиоразъём (L/R)",
+  ];
+
+  const funcRows = FUNCS.map(f =>
+    `<tr><td style="border:1px solid #ccc;padding:3px 6px;font-size:11px">${f}</td><td style="border:1px solid #ccc;padding:3px 6px;width:90px"></td></tr>`
+  ).join("");
+
+  // Схема телефона — простые прямоугольники вместо SVG (работают в email)
+  const phoneDiagrams = `
+<table cellpadding="0" cellspacing="0" border="0" style="margin:8px 0">
+<tr>
+  <td style="text-align:center;padding:0 6px">
+    <table cellpadding="0" cellspacing="0" style="margin:0 auto;width:54px;height:100px;border:2px solid #333;border-radius:6px;background:#f9f9f9">
+      <tr><td style="height:10px;border-bottom:1px solid #ccc;font-size:7px;color:#777;text-align:center">────</td></tr>
+      <tr><td style="height:72px"></td></tr>
+      <tr><td style="height:18px;border-top:1px solid #ccc;text-align:center"><div style="width:16px;height:16px;border:1px solid #999;border-radius:50%;margin:1px auto"></div></td></tr>
+    </table>
+    <div style="font-size:8px;color:#666;margin-top:2px">Спереди</div>
+  </td>
+  <td style="text-align:center;padding:0 6px">
+    <table cellpadding="0" cellspacing="0" style="margin:0 auto;width:54px;height:100px;border:2px solid #333;border-radius:6px;background:#f9f9f9">
+      <tr><td style="height:8px"></td></tr>
+      <tr><td style="text-align:center"><div style="width:22px;height:22px;border:1px solid #999;border-radius:4px;margin:0 auto"></div></td></tr>
+      <tr><td style="height:60px"></td></tr>
+    </table>
+    <div style="font-size:8px;color:#666;margin-top:2px">Сзади</div>
+  </td>
+  <td style="text-align:center;padding:0 6px">
+    <table cellpadding="0" cellspacing="0" style="margin:0 auto;width:20px;height:100px;border:2px solid #333;border-radius:4px;background:#f9f9f9">
+      <tr><td></td></tr>
+    </table>
+    <div style="font-size:8px;color:#666;margin-top:2px">Слева</div>
+  </td>
+  <td style="text-align:center;padding:0 6px">
+    <table cellpadding="0" cellspacing="0" style="margin:0 auto;width:100px;height:20px;border:2px solid #333;border-radius:4px;background:#f9f9f9">
+      <tr><td></td></tr>
+    </table>
+    <div style="font-size:8px;color:#666;margin-top:2px">Снизу</div>
+  </td>
+</tr>
+</table>`;
+
+  return `<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8"><title>Акт приёмки №${o.id}</title></head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,Helvetica,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:16px 8px">
+<tr><td align="center">
+<table width="700" cellpadding="0" cellspacing="0" style="max-width:700px;width:100%;background:#fff;border:1px solid #ccc">
+
+  <!-- ШАПКА -->
+  <tr>
+    <td style="padding:12px 16px;border-bottom:2px solid #000">
+      <table width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td style="width:180px;padding:6px;border:1px solid #ccc;text-align:center;vertical-align:middle">
+          <div style="font-size:18px;font-weight:900;letter-spacing:2px">СКУПКА<span style="color:#b8860b">24</span></div>
+          <div style="font-size:9px;color:#777;margin-top:2px">ВНИМАНИЕ! Оплата производится только в сервисном центре при получении заказа.</div>
+        </td>
+        <td style="text-align:center;padding:8px;vertical-align:middle">
+          <div style="font-size:14px;font-weight:bold">Акт приёма — передачи</div>
+          <div style="font-size:11px;color:#555">устройства в ремонт</div>
+          <div style="font-size:16px;font-weight:bold;margin-top:4px">№ ${orderNum}</div>
+          <div style="font-size:11px;color:#333">от ${dateStr}</div>
+        </td>
+        <td style="width:200px;padding:6px;border:1px solid #ccc;font-size:10px;line-height:1.7;vertical-align:top">
+          <b style="font-size:11px">Исполнитель:</b><br>
+          ИП Мамедов Адиль Мирза Оглы<br>
+          ИНН: 402810962699<br>
+          ОГРНИП: 307402814200032<br>
+          г. Калуга, ул. Кирова, 7/47 и 11<br>
+          Тел.: +7 (992) 990-33-33<br>
+          skypka24.com
+        </td>
+      </tr></table>
+    </td>
+  </tr>
+
+  <!-- КЛИЕНТ / УСТРОЙСТВО / РЕМОНТ -->
+  <tr>
+    <td style="padding:0;border-bottom:1px solid #000">
+      <table width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td style="width:33%;padding:8px 10px;border-right:1px solid #ccc;vertical-align:top">
+          <div style="font-size:10px;font-weight:bold;background:#efefef;padding:2px 4px;margin-bottom:6px;border-bottom:1px solid #ccc">Клиент:</div>
+          <div style="font-size:9px;color:#555">ФИО Клиента:</div>
+          <div style="font-size:12px;font-weight:bold;margin-bottom:8px">${o.name}</div>
+          <div style="font-size:9px;color:#555">Телефон Клиента:</div>
+          <div style="font-size:12px;font-weight:bold">${o.phone || "—"}</div>
+          ${o.client_email ? `<div style="font-size:9px;color:#555;margin-top:4px">Email:</div><div style="font-size:11px">${o.client_email}</div>` : ""}
+        </td>
+        <td style="width:33%;padding:8px 10px;border-right:1px solid #ccc;vertical-align:top">
+          <div style="font-size:10px;font-weight:bold;background:#efefef;padding:2px 4px;margin-bottom:6px;border-bottom:1px solid #ccc">Устройство:</div>
+          <div style="font-size:9px;color:#555">Устройство:</div>
+          <div style="font-size:12px;font-weight:bold;margin-bottom:4px">${o.model || "—"}</div>
+          <div style="font-size:9px;color:#555">Внешний вид:</div>
+          <div style="font-size:10px">Царапины, потёртости, возможны скрытые дефекты</div>
+        </td>
+        <td style="width:34%;padding:8px 10px;vertical-align:top">
+          <div style="font-size:10px;font-weight:bold;background:#efefef;padding:2px 4px;margin-bottom:6px;border-bottom:1px solid #ccc">Ремонт:</div>
+          <div style="font-size:9px;color:#555">Ориентировочная стоимость:</div>
+          <div style="font-size:13px;font-weight:bold;margin-bottom:4px">${o.price ? o.price.toLocaleString("ru-RU") + " ₽" : "По договорённости"}</div>
+          <div style="font-size:9px;color:#555">Аванс:</div>
+          <div style="font-size:11px;margin-bottom:4px">0</div>
+          <div style="font-size:9px;color:#555">Ориентировочный срок:</div>
+          <div style="font-size:10px;margin-bottom:4px">По договорённости</div>
+          <div style="font-size:9px;color:#555">Заявленные неисправности:</div>
+          <div style="font-size:11px;font-weight:bold">${o.comment || o.repair_type || "—"}</div>
+        </td>
+      </tr></table>
+    </td>
+  </tr>
+
+  <!-- НАРУЖНЫЕ ПОВРЕЖДЕНИЯ + ФУНКЦИИ -->
+  <tr>
+    <td style="padding:0;border-bottom:1px solid #000">
+      <table width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td style="width:50%;padding:8px 10px;border-right:1px solid #ccc;vertical-align:top">
+          <div style="font-size:10px;font-weight:bold;margin-bottom:4px">Наружные повреждения</div>
+          <div style="font-size:8px;color:#777;margin-bottom:6px">Отметить на схеме: * – скол, / – вмятина, v – царапина</div>
+          ${phoneDiagrams}
+        </td>
+        <td style="width:50%;padding:8px 10px;vertical-align:top">
+          <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
+            <tr>
+              <th style="border:1px solid #ccc;padding:3px 6px;font-size:10px;background:#efefef;text-align:left">Проверка функций</th>
+              <th style="border:1px solid #ccc;padding:3px 6px;font-size:10px;background:#efefef;width:90px">До ремонта</th>
+            </tr>
+            ${funcRows}
+          </table>
+        </td>
+      </tr></table>
+    </td>
+  </tr>
+
+  <!-- ПРАВИЛА -->
+  <tr>
+    <td style="padding:10px 14px;border-bottom:1px solid #000">
+      <div style="font-size:10px;font-weight:bold;margin-bottom:6px">Правила и условия проведения ремонтных работ</div>
+      <ol style="margin:0;padding-left:16px;font-size:9px;line-height:1.7;color:#222">
+        <li>Правила изложены на сайте <b>skypka24.com/act</b></li>
+        <li>Устройство Клиента принимается без разборки и проверки внутренних неисправностей.</li>
+        <li>Клиент согласен с тем, что гарантия от производителя после произведённого ремонта не возможна.</li>
+        <li>Клиент принимает на себя риск, связанный с возможным проявлением скрытых дефектов.</li>
+        <li>Ремонт осуществляется в соответствии с ГОСТ Р МЭК 60065-2002, 60950-2002 и ФЗ «О защите прав потребителей».</li>
+        <li>Установленные узлы и расходные материалы возврату не подлежат.</li>
+        <li>Исполнитель не несёт ответственности за сохранность гарантийных пломб сторонних сервисных центров.</li>
+      </ol>
+    </td>
+  </tr>
+
+  <!-- КНОПКИ -->
+  <tr>
+    <td style="padding:14px;text-align:center;background:#f9f9f9;border-bottom:1px solid #ddd">
+      <table cellpadding="0" cellspacing="0" style="margin:0 auto"><tr>
+        <td style="padding:0 6px">
+          <a href="${statusUrl}" style="display:inline-block;background:#FFD700;color:#000;font-weight:900;font-size:13px;padding:12px 24px;border-radius:30px;text-decoration:none;letter-spacing:0.5px">🔍 Статус ремонта</a>
+        </td>
+        <td style="padding:0 6px">
+          <a href="${termsUrl}" style="display:inline-block;background:#fff;color:#333;border:2px solid #ccc;font-size:13px;font-weight:700;padding:10px 22px;border-radius:30px;text-decoration:none">📋 Условия гарантии</a>
+        </td>
+      </tr></table>
+      <div style="font-size:10px;color:#999;margin-top:8px">
+        Статус ремонта онлайн: <a href="${statusUrl}" style="color:#b8860b">${statusUrl}</a>
+      </div>
+    </td>
+  </tr>
+
+  <!-- ПОДВАЛ -->
+  <tr>
+    <td style="background:#111;padding:14px 20px;border-radius:0 0 4px 4px">
+      <table width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td style="font-size:11px;color:#888;line-height:2">
+          📍 г. Калуга, ул. Кирова, 7/47 и ул. Кирова, 11<br>
+          📞 <a href="tel:+79929903333" style="color:#aaa;text-decoration:none">+7 (992) 990-33-33</a> · 
+          🌐 <a href="https://skypka24.com" style="color:#FFD700;text-decoration:none">skypka24.com</a>
+        </td>
+        <td style="font-size:10px;color:#555;text-align:right;line-height:1.8">
+          ИП Мамедов Адиль Мирза Оглы<br>
+          ИНН: 402810962699 · ОГРНИП: 307402814200032
+        </td>
+      </tr></table>
+    </td>
+  </tr>
+
+</table>
+</td></tr></table>
+</body></html>`;
 };
 
 // ── 2. АКТ ГОТОВНОСТИ — отправляется при статусе «Готов» ───────────────────
@@ -841,7 +1034,7 @@ export const getWarrantyActHtml = (o: Order): string => {
           • Не распространяется на механические повреждения<br>
           • Не распространяется на попадание влаги<br>
           • При нарушении пломб гарантия аннулируется<br>
-          • Полные условия: <a href="${SITE_URL}/repair-terms" style="color:#FFD700">${SITE_URL}/repair-terms</a>
+          • Полные условия: <a href="${SITE_URL}/act" style="color:#FFD700">${SITE_URL}/act</a>
         </td>
       </tr></table>`;
   const body = `
