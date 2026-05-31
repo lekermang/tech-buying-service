@@ -72,9 +72,16 @@ export default function SLItemsTable({ items, selected, toggleSelect, onOpen, on
   );
 
   return (
-    <div className="border border-[#1F1F1F] rounded-lg overflow-x-auto bg-[#0A0A0A]">
+    <div className="rounded-xl overflow-x-auto" style={{
+      background: "linear-gradient(145deg, rgba(14,11,7,0.98) 0%, rgba(8,6,4,0.99) 100%)",
+      border: "1px solid rgba(255,215,0,0.1)",
+      boxShadow: "0 2px 0 rgba(255,255,255,0.03) inset, 0 8px 32px rgba(0,0,0,0.6)",
+    }}>
       <table className="w-full text-[12px] border-collapse">
-        <thead className="bg-[#0F0F0F] border-b border-[#1F1F1F] sticky top-0 z-10">
+        <thead className="sticky top-0 z-10" style={{
+          background: "linear-gradient(180deg, rgba(20,15,8,0.99) 0%, rgba(14,11,7,0.98) 100%)",
+          borderBottom: "1px solid rgba(255,215,0,0.1)",
+        }}>
           <tr>
             <th className="px-2 py-1.5 w-8"></th>
             <Th f="title" l="Наименование" w="min-w-[180px]" />
@@ -97,7 +104,16 @@ export default function SLItemsTable({ items, selected, toggleSelect, onOpen, on
             const sn = it.serial_number || it.imei || "";
             return (
               <tr key={it.id}
-                className={`border-b border-[#1F1F1F]/60 hover:bg-[#FFD700]/5 transition-colors ${isSel ? "bg-[#FFD700]/10" : ""}`}>
+                className="transition-colors duration-150"
+                style={{
+                  borderBottom: "1px solid rgba(255,255,255,0.04)",
+                  background: isSel
+                    ? "linear-gradient(90deg, rgba(255,215,0,0.08), rgba(255,215,0,0.04))"
+                    : "transparent",
+                }}
+                onMouseEnter={e => { if (!isSel) (e.currentTarget as HTMLElement).style.background = "rgba(255,215,0,0.04)"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isSel ? "linear-gradient(90deg, rgba(255,215,0,0.08), rgba(255,215,0,0.04))" : "transparent"; }}
+              >
                 <td className="px-2 py-1.5">
                   <button onClick={(e) => { e.stopPropagation(); toggleSelect(it.id); }}
                     className={`w-4 h-4 rounded border-2 flex items-center justify-center ${isSel ? "bg-[#FFD700] border-[#FFD700]" : "border-white/20"}`}>

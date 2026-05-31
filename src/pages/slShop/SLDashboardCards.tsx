@@ -18,12 +18,12 @@ export function StatCard({
       onPointerDown={() => setPressed(true)}
       onPointerUp={() => setPressed(false)}
       onPointerLeave={() => setPressed(false)}
-      className="relative overflow-hidden rounded-2xl text-left w-full transition-all duration-150"
+      className="relative overflow-hidden rounded-2xl text-left w-full transition-all duration-200"
       style={{
-        background: `linear-gradient(145deg, ${accentColor}14 0%, ${accentColor}06 60%, transparent 100%)`,
-        border: `1px solid ${accentColor}28`,
-        boxShadow: `0 0 20px ${accentColor}0a, inset 0 1px 0 ${accentColor}15`,
-        transform: pressed ? "scale(0.97)" : "scale(1)",
+        background: `linear-gradient(145deg, rgba(18,14,8,0.96) 0%, rgba(10,8,5,0.98) 60%, ${accentColor}06 100%)`,
+        border: `1px solid ${accentColor}25`,
+        boxShadow: `0 2px 0 rgba(255,255,255,0.03) inset, 0 -1px 0 rgba(0,0,0,0.5) inset, 0 8px 32px rgba(0,0,0,0.6), 0 0 24px ${accentColor}06`,
+        transform: pressed ? "scale(0.97) translateY(1px)" : "scale(1) translateY(0)",
         cursor: onClick ? "pointer" : "default",
         padding: "14px",
       }}
@@ -92,11 +92,12 @@ export function StatusCard({
       onPointerDown={() => setPressed(true)}
       onPointerUp={() => setPressed(false)}
       onPointerLeave={() => setPressed(false)}
-      className="relative rounded-xl text-center overflow-hidden w-full transition-all duration-150"
+      className="relative rounded-xl text-center overflow-hidden w-full transition-all duration-200"
       style={{
-        background: `linear-gradient(145deg, ${accentColor}0f 0%, transparent 100%)`,
-        border: `1px solid ${accentColor}20`,
-        transform: pressed ? "scale(0.96)" : "scale(1)",
+        background: `linear-gradient(145deg, rgba(16,12,7,0.96) 0%, rgba(10,8,5,0.98) 100%)`,
+        border: `1px solid ${accentColor}22`,
+        boxShadow: `0 2px 0 rgba(255,255,255,0.03) inset, 0 6px 24px rgba(0,0,0,0.6)`,
+        transform: pressed ? "scale(0.95) translateY(1px)" : "scale(1) translateY(0)",
         cursor: onClick ? "pointer" : "default",
         padding: "10px 8px",
       }}
@@ -131,11 +132,11 @@ export function DirectionCard({
   footer?: { label: string; value: string };
 }) {
   return (
-    <div className="rounded-xl overflow-hidden"
-      style={{
-        background: `linear-gradient(145deg, ${accentColor}0c 0%, transparent 100%)`,
-        border: `1px solid ${accentColor}25`,
-      }}>
+    <div className="rounded-xl overflow-hidden" style={{
+      background: "linear-gradient(145deg, rgba(18,14,8,0.97) 0%, rgba(10,8,5,0.99) 100%)",
+      border: `1px solid ${accentColor}22`,
+      boxShadow: "0 2px 0 rgba(255,255,255,0.03) inset, 0 6px 24px rgba(0,0,0,0.5)",
+    }}>
       <div className="flex items-center gap-2 px-3 py-2.5"
         style={{ borderBottom: `1px solid ${accentColor}15` }}>
         <div className="w-5 h-5 rounded-md flex items-center justify-center"

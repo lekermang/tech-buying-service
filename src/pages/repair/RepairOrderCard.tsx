@@ -75,7 +75,13 @@ export default function RepairOrderCard({
   };
 
   return (
-    <div className="bg-[#1A1A1A] border border-[#2A2A2A] p-3">
+    <div className="relative overflow-hidden p-3 transition-all duration-200" style={{
+      background: "linear-gradient(145deg, rgba(18,14,8,0.97) 0%, rgba(10,8,5,0.99) 100%)",
+      border: `1px solid ${isDone ? "rgba(34,197,94,0.2)" : "rgba(255,215,0,0.1)"}`,
+      boxShadow: "0 2px 0 rgba(255,255,255,0.03) inset, 0 6px 24px rgba(0,0,0,0.5)",
+    }}>
+      <div className="absolute top-0 left-0 right-0 h-px pointer-events-none"
+        style={{ background: isDone ? "linear-gradient(90deg, transparent, rgba(34,197,94,0.3), transparent)" : "linear-gradient(90deg, transparent, rgba(255,215,0,0.2), transparent)" }} />
       {/* Шапка */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">

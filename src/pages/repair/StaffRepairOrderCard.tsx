@@ -47,15 +47,36 @@ export default function StaffRepairOrderCard({
 
   return (
     <div id={`order-${o.id}`} className="relative scroll-mt-24">
-      <div className={`relative rounded-xl overflow-hidden transition-all duration-150 ${
-        isExpanded
-          ? "shadow-[0_0_0_1px_rgba(255,215,0,0.4),0_4px_20px_rgba(255,215,0,0.08)]"
-          : isCritical
-            ? "shadow-[0_0_0_1px_rgba(239,68,68,0.4)]"
-            : isNew
-              ? "shadow-[0_0_0_1px_rgba(251,146,60,0.25)]"
-              : "shadow-[0_0_0_1px_rgba(255,255,255,0.06)]"
-      } hover:shadow-[0_0_0_1px_rgba(255,215,0,0.2)] bg-[#0D0D0D]`}>
+      <div className="relative rounded-xl overflow-hidden transition-all duration-300"
+        style={{
+          background: "linear-gradient(145deg, rgba(18,14,8,0.97) 0%, rgba(10,8,5,0.99) 100%)",
+          border: isExpanded
+            ? "1px solid rgba(255,215,0,0.35)"
+            : isCritical
+              ? "1px solid rgba(239,68,68,0.4)"
+              : isNew
+                ? "1px solid rgba(251,146,60,0.28)"
+                : "1px solid rgba(255,255,255,0.06)",
+          boxShadow: isExpanded
+            ? "0 0 0 1px rgba(255,215,0,0.08) inset, 0 8px 40px rgba(0,0,0,0.7), 0 0 30px rgba(255,215,0,0.05)"
+            : isCritical
+              ? "0 0 0 1px rgba(255,255,255,0.02) inset, 0 4px 20px rgba(0,0,0,0.6), 0 0 20px rgba(239,68,68,0.08)"
+              : isNew
+                ? "0 0 0 1px rgba(255,255,255,0.02) inset, 0 4px 20px rgba(0,0,0,0.6)"
+                : "0 2px 0 rgba(255,255,255,0.03) inset, 0 4px 20px rgba(0,0,0,0.5)",
+        }}
+      >
+        {/* Noir верхняя световая полоса */}
+        <div className="absolute top-0 left-0 right-0 pointer-events-none" style={{
+          height: "1px",
+          background: isExpanded
+            ? "linear-gradient(90deg, transparent, rgba(255,215,0,0.5), rgba(255,248,232,0.6), rgba(255,215,0,0.5), transparent)"
+            : isCritical
+              ? "linear-gradient(90deg, transparent, rgba(239,68,68,0.4), transparent)"
+              : isNew
+                ? "linear-gradient(90deg, transparent, rgba(251,146,60,0.3), transparent)"
+                : "linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent)",
+        }} />
           {/* ── Шапка карточки ── */}
           <OrderCardHeader
             o={o}
@@ -66,7 +87,10 @@ export default function StaffRepairOrderCard({
 
       {/* ── Раскрытая часть ── */}
       {isExpanded && (
-        <div className="relative border-t border-[#FFD700]/15 p-3 space-y-3 bg-gradient-to-b from-transparent to-black/30">
+        <div className="relative border-t p-3 space-y-3" style={{
+          borderColor: "rgba(255,215,0,0.12)",
+          background: "linear-gradient(180deg, rgba(20,15,5,0.4) 0%, rgba(5,4,3,0.6) 100%)",
+        }}>
 
           {/* Комментарий клиента — премиум */}
           {o.comment && (

@@ -100,7 +100,17 @@ export default function ChecklistTaskCard({ task, token, accent, busy, onToggle,
   const k = d?.kind;
 
   return (
-    <li className={`rounded-lg bg-[#0A0A0A] border-l-2 ${accent} hover:bg-[#0F0F0F] transition`}>
+    <li className={`relative rounded-xl overflow-hidden border-l-2 ${accent} transition-all duration-200`}
+      style={{
+        background: "linear-gradient(145deg, rgba(16,12,7,0.97) 0%, rgba(10,8,5,0.99) 100%)",
+        boxShadow: task.is_done
+          ? "0 2px 8px rgba(0,0,0,0.4)"
+          : "0 2px 0 rgba(255,255,255,0.03) inset, 0 4px 20px rgba(0,0,0,0.5)",
+      }}
+    >
+      {/* Световой блик сверху */}
+      <div className="absolute top-0 left-0 right-0 h-px pointer-events-none"
+        style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent)" }} />
       <div className="flex items-start gap-2 p-2">
         <button
           onClick={(e) => { e.stopPropagation(); onToggle(task.key, !task.is_done); }}
@@ -129,7 +139,7 @@ export default function ChecklistTaskCard({ task, token, accent, busy, onToggle,
       </div>
 
       {open && (
-        <div className="px-2 pb-3 pt-1 border-t border-white/5">
+        <div className="px-2 pb-3 pt-1" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
           {loading && (
             <div className="flex items-center gap-2 text-white/40 text-[11px] py-3 justify-center">
               <Icon name="Loader" size={12} className="animate-spin" /> Загружаю данные…
