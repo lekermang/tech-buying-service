@@ -28,6 +28,7 @@ import StaffBackground from "./StaffBackground";
 import StaffHeader from "./StaffHeader";
 import StaffBottomNav from "./StaffBottomNav";
 import StaffPasswordModal from "./StaffPasswordModal";
+import DigitalParticles from "@/components/fx/DigitalParticles";
 
 type Tab = StaffTab;
 
@@ -158,6 +159,7 @@ export function StaffMainLayout({
 
       {/* Технологичный фон */}
       <StaffBackground roleColor={roleColor} />
+      <DigitalParticles />
 
       {!isMobile && <BackgroundFx />}
       {!isMobile && <CursorEffects />}

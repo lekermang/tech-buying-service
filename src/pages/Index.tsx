@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import DigitalParticles from "@/components/fx/DigitalParticles";
 import Header from "@/components/skupka/Header";
 import HeroSection from "@/components/skupka/HeroSection";
 import InfoSections from "@/components/skupka/InfoSections";
@@ -382,6 +383,7 @@ const Index = ({ goldOpen = false }: { goldOpen?: boolean }) => {
 
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-white pb-[72px] md:pb-0">
+      <DigitalParticles />
       {!splashDone && <SplashScreen onDone={() => setSplashDone(true)} />}
       {/* Праздничный баннер — автоматически появляется за 3 дня до и 3 дня после праздника (9 мая, 23 фев, 8 марта и т.д.) */}
       <HolidayBanner />
