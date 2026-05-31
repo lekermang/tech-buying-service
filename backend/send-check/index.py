@@ -6,8 +6,10 @@
 import json
 import os
 import smtplib
+import ssl
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.utils import formataddr
 
 HEADERS = {
     'Access-Control-Allow-Origin': '*',
@@ -17,7 +19,8 @@ HEADERS = {
 
 SMTP_HOST = 'smtp.yandex.ru'
 SMTP_PORT = 465
-SMTP_USER = 'info@skypka24.com'
+SMTP_USER = 'lekermany@yandex.ru'
+SMTP_FROM_NAME = 'Скупка24'
 
 
 def ok(data):
@@ -90,19 +93,20 @@ def build_email_html(check_type: str, subject_data: dict, check_html: str) -> st
 
 
 def send_email(to_email: str, subject: str, html_body: str) -> None:
-    password = os.environ.get('YANDEX_SMTP_PASSWORD', '')
+    password = os.environ.get('YANDEX_SMTP_PASSWORD', '').strip()
     sender = SMTP_USER
 
     msg = MIMEMultipart('alternative')
     msg['Subject'] = subject
-    msg['From'] = f'Скупка24 <{sender}>'
+    msg['From'] = formataddr((SMTP_FROM_NAME, sender))
     msg['To'] = to_email
 
     msg.attach(MIMEText(html_body, 'html', 'utf-8'))
 
-    with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT) as server:
+    ctx = ssl.create_default_context()
+    with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=ctx, timeout=12) as server:
         server.login(sender, password)
-        server.sendmail(sender, to_email, msg.as_string())
+        server.sendmail(sender, [to_email], msg.as_string())
 
 
 def handler(event: dict, context) -> dict:
