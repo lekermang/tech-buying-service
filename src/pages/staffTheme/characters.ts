@@ -22,6 +22,7 @@ export const CHARACTERS: CharacterPreset[] = [
 
 export const CURSOR_EFFECTS: { id: string; label: string }[] = [
   { id: "none",     label: "Без эффекта" },
+  { id: "dot",      label: "Премиум точка + кольцо" },
   { id: "eyes",     label: "Глаза за курсором" },
   { id: "tilt",     label: "Наклон за курсором" },
   { id: "sparkles", label: "Искры за курсором" },
@@ -31,12 +32,24 @@ export const CURSOR_EFFECTS: { id: string; label: string }[] = [
 
 export const BG_STYLES: { id: string; label: string }[] = [
   { id: "default",   label: "Обычный" },
+  { id: "webgl",     label: "✦ WebGL шейдер" },
   { id: "sakura",    label: "Сакура падает" },
   { id: "stars",     label: "Звёзды" },
   { id: "rain",      label: "Дождь" },
   { id: "bubbles",   label: "Пузырьки" },
   { id: "neon-grid", label: "Неон-сетка" },
 ];
+
+// Пресет SaaS-темы — применяется одной кнопкой
+export const SAAS_PRESET: StaffThemeSettings = {
+  enabled: true,
+  character_id: "cyber",
+  cursor_effect: "dot",
+  accent_color: "#38BDF8",
+  bg_style: "webgl",
+  ui_density: "normal",
+  font_family: "inter",
+};
 
 export const ACCENTS: { id: string; color: string; label: string }[] = [
   { id: "gold",    color: "#FFD700", label: "Золото" },
@@ -81,4 +94,3 @@ export const DEFAULT_THEME: StaffThemeSettings = {
   ui_density: "normal",
   font_family: "roboto",
 };
-

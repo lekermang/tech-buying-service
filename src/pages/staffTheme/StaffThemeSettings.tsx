@@ -1,5 +1,5 @@
 import Icon from "@/components/ui/icon";
-import { ACCENTS, BG_STYLES, CHARACTERS, CURSOR_EFFECTS, DENSITIES, FONTS } from "./characters";
+import { ACCENTS, BG_STYLES, CHARACTERS, CURSOR_EFFECTS, DENSITIES, FONTS, SAAS_PRESET } from "./characters";
 import { useStaffTheme } from "./StaffThemeContext";
 
 export default function StaffThemeSettings({ onClose }: { onClose: () => void }) {
@@ -58,6 +58,28 @@ export default function StaffThemeSettings({ onClose }: { onClose: () => void })
 
         {/* Контент — прокручивается */}
         <div className="flex-1 overflow-y-auto p-4 space-y-5">
+
+          {/* ── SaaS-пресет ── */}
+          <button
+            onClick={() => {
+              Object.entries(SAAS_PRESET).forEach(([k, v]) => setDraft({ [k]: v } as never));
+            }}
+            className="w-full relative overflow-hidden rounded-xl px-4 py-3 flex items-center gap-3 border border-[#38BDF8]/30 hover:border-[#38BDF8]/60 transition-all group"
+            style={{ background: "linear-gradient(135deg,#020f1a,#03192a)" }}
+          >
+            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
+              style={{ background: "radial-gradient(ellipse at 30% 50%,#38BDF822,transparent 70%)" }} />
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+              style={{ background: "linear-gradient(135deg,#0ea5e9,#6366f1)", boxShadow: "0 0 18px #38BDF855" }}>
+              <Icon name="Zap" size={18} className="text-white" />
+            </div>
+            <div className="text-left min-w-0">
+              <div className="font-oswald font-bold text-white text-sm uppercase tracking-wide">✦ SaaS / Digital</div>
+              <div className="font-roboto text-white/40 text-[10px] mt-0.5">WebGL шейдер · Курсор-точка · Cyan · Inter</div>
+            </div>
+            <Icon name="ChevronRight" size={14} className="text-white/30 group-hover:text-[#38BDF8] transition-colors ml-auto shrink-0" />
+          </button>
+
           <label className="flex items-center justify-between bg-[#141414] border border-[#1F1F1F] rounded-lg px-4 py-3 cursor-pointer">
             <div>
               <div className="font-oswald font-bold text-white text-sm uppercase">Включить тему</div>

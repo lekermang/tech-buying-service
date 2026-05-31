@@ -4,6 +4,7 @@ import BackgroundFx from "../staffTheme/BackgroundFx";
 import CursorEffects from "../staffTheme/CursorEffects";
 import AnimeMascot from "../staffTheme/AnimeMascot";
 import StaffThemeSettings from "../staffTheme/StaffThemeSettings";
+import { useStaffTheme } from "../staffTheme/StaffThemeContext";
 import { OfflineBanner } from "./StaffStatusBanners";
 import HolidayBanner from "@/components/holidays/HolidayBanner";
 import HolidayCornerDecor from "@/components/holidays/HolidayCornerDecor";
@@ -64,6 +65,7 @@ export function StaffMainLayout({
   pwModal, setPwModal, pwInput, setPwInput, pwError, setPwError, submitPw,
   sending, sendResult, sendReminderNow, logout,
 }: Props) {
+  const { theme } = useStaffTheme();
   const [profileOpen, setProfileOpen] = React.useState(false);
   const [myAvatar, setMyAvatar] = React.useState<string | null>(null);
   const [myName, setMyName] = React.useState<string | null>(null);
@@ -162,6 +164,9 @@ export function StaffMainLayout({
       <DigitalParticles />
 
       {!isMobile && <BackgroundFx />}
+      {!isMobile && theme.enabled && theme.bg_style === "webgl" && (
+        <div className="fixed inset-0 z-[1] pointer-events-none" style={{ opacity: 0.045, backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`, backgroundSize: "180px 180px", mixBlendMode: "overlay" }} />
+      )}
       {!isMobile && <CursorEffects />}
       {!isMobile && <AnimeMascot onOpenSettings={() => setThemeOpen(true)} />}
       {themeOpen && <StaffThemeSettings onClose={() => setThemeOpen(false)} />}
@@ -265,5 +270,39 @@ export function StaffMainLayout({
         />
       )}
     </div>
+  );
+}
+
+// Grain-оверлей — только при webgl-теме, создаёт плёночную текстуру
+function GrainOverlay() {
+  const { theme } = useStaffTheme();
+  if (!theme.enabled || theme.bg_style !== "webgl") return null;
+  return (
+    <div
+      className="fixed inset-0 z-[1] pointer-events-none"
+      style={{
+        opacity: 0.045,
+        backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
+        backgroundSize: "180px 180px",
+        mixBlendMode: "overlay",
+      }}
+    />
+  );
+}
+
+// Grain-оверлей — только при webgl-теме, создаёт плёночную текстуру
+function GrainOverlay() {
+  const { theme } = useStaffTheme();
+  if (!theme.enabled || theme.bg_style !== "webgl") return null;
+  return (
+    <div
+      className="fixed inset-0 z-[1] pointer-events-none"
+      style={{
+        opacity: 0.045,
+        backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
+        backgroundSize: "180px 180px",
+        mixBlendMode: "overlay",
+      }}
+    />
   );
 }
