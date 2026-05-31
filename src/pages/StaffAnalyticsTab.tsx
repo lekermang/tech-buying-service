@@ -151,15 +151,15 @@ export function AnalyticsTab({ token }: { token: string }) {
   const goldForecastRevenue = Math.round(periodWeight585 * goldForecastPriceNum);
   const goldForecastProfit = goldForecastRevenue - periodBuySum;
 
-  // Продажа б/у: скупка — это ИНВЕСТИЦИЯ, а не расход.
-  // Прибыль Б/У = только выручка с продаж (то, что реально получили).
-  // Скупки не вычитаются — они показываются отдельно как "вложено в товар".
+  // Продажа б/у: прибыль = выручка − себестоимость проданных товаров (buy_price каждого).
+  // Скупки за период (непроданные) показываются отдельно как "вложено в товар".
   const hasKom = !!slData && (slData.kom_income !== undefined || slData.kom_profit !== undefined);
   const slRevenue = hasKom ? (slData?.kom_income || 0) : (slData?.income || 0);
   const slCosts = hasKom ? (slData?.kom_costs || 0) : (slData?.expense || 0);
-  // Прибыль = только выручка с продаж (sales_total), без вычитания скупок
+  // Прибыль = выручка − себестоимость проданного (сумма profit по sold_items)
   const slSalesRevenue = slData?.sales_total || slRevenue;
-  const slProfit = slSalesRevenue;
+  const slProfitFromItems = (slData?.sold_items || []).reduce((s, it) => s + (it.profit || 0), 0);
+  const slProfit = slProfitFromItems || (hasKom ? (slData?.kom_profit || 0) : (slData?.period_profit || 0));
 
   const totalRevenue = (data?.total_revenue || 0) + repairRevenue + goldRevenue + slRevenue;
   const totalProfit = repairNetProfit + goldProfit + slProfit;

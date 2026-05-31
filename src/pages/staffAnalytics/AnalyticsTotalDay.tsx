@@ -190,13 +190,14 @@ export default function AnalyticsTotalDay({
     title: "📦 Б/У техника — детализация",
     emoji: "📦",
     total: slPart,
-    totalLabel: "выручка с продаж за период",
+    totalLabel: "чистая прибыль (выручка − себестоимость проданного)",
     accentColor: "purple",
     periodLabel,
     rows: [
       { icon: "TrendingUp", label: "Выручка с продаж", value: slSalesTotal || slRevenue, color: "text-[#FFD700]", hint: `${slSalesCount} продаж` },
-      { icon: "Equal", label: "Прибыль с продаж", value: slPart, color: slPart >= 0 ? "text-emerald-300" : "text-red-300", divider: true },
-      { icon: "Wallet", label: "Вложено в товар (скупка)", value: -(slBuyoutTotal || slExpense), color: "text-sky-400", hint: `${slBuyoutCount} скупок · это инвестиция, не расход` },
+      { icon: "ShoppingBag", label: "Себестоимость проданного", value: -((slSalesTotal || slRevenue) - slPart), color: "text-orange-400", hint: "закупка именно проданных товаров" },
+      { icon: "Equal", label: "Чистая прибыль", value: slPart, color: slPart >= 0 ? "text-emerald-300" : "text-red-300", divider: true },
+      { icon: "Wallet", label: "Вложено в товар (непроданное)", value: -(slBuyoutTotal || slExpense), color: "text-sky-400", hint: `${slBuyoutCount} скупок · это инвестиция, не расход` },
     ],
     groups: [
       {
