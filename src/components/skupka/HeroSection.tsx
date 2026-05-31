@@ -3,20 +3,9 @@ import Icon from "@/components/ui/icon";
 import AppleWidget from "@/components/skupka/AppleWidget";
 import RepairWidget from "@/components/skupka/RepairWidget";
 import UsedGoodsSearch from "@/components/skupka/UsedGoodsSearch";
-import ContactChannelsBlock from "@/components/forms/ContactChannelsBlock";
 import { ymGoal, Goals } from "@/lib/ym";
 import { formatPhone, isPhoneValid } from "@/lib/phoneFormat";
 
-const CATEGORIES = [
-  { icon: "Smartphone", title: "Смартфоны", desc: "iPhone, Samsung, Xiaomi и другие", price: "до 95 000 ₽" },
-  { icon: "Laptop", title: "Ноутбуки", desc: "MacBook, Dell, Lenovo, HP, Asus", price: "до 150 000 ₽" },
-  { icon: "Tablet", title: "Планшеты", desc: "iPad, Samsung Tab, Huawei", price: "до 70 000 ₽" },
-  { icon: "Watch", title: "Умные часы", desc: "Apple Watch, Samsung Galaxy Watch", price: "до 40 000 ₽" },
-  { icon: "Gem", title: "Ювелирные", desc: "Золото, серебро, бриллианты", price: "до 500 000 ₽" },
-  { icon: "Camera", title: "Фотоаппараты", desc: "Зеркальные, беззеркальные, объективы", price: "до 80 000 ₽" },
-  { icon: "Gamepad2", title: "Игровые консоли", desc: "PlayStation, Xbox, Nintendo", price: "до 45 000 ₽" },
-  { icon: "Headphones", title: "Аудио", desc: "AirPods, Beats, Sony, Bose", price: "до 30 000 ₽" },
-];
 
 const SEND_LEAD_URL = "https://functions.poehali.dev/52666ff7-db52-4b6a-a90e-d60aeed699de";
 
@@ -56,14 +45,16 @@ interface HeroSectionProps {
   onExternalModalClose?: () => void;
 }
 
+const INP_CLS = "w-full bg-[#0D0D0D] border border-[#2a2a2a] text-white px-4 py-3.5 font-roboto text-base focus:outline-none focus:border-[#FFD700] transition-colors rounded-lg placeholder:text-white/25";
+const LBL_CLS = "font-roboto text-white/40 text-[11px] uppercase tracking-wider block mb-1.5";
+
 const EvaluateModal = ({ onClose }: { onClose: () => void }) => {
-  const [formData, setFormData] = useState({ name: "", phone: "", category: "", desc: "", client_price: "" });
+  const [step, setStep] = useState<1 | 2>(1);
+  const [formData, setFormData] = useState({ name: "", phone: "", desc: "", client_price: "" });
   const [photos, setPhotos] = useState<{ preview: string; base64: string }[]>([]);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [contactChannels, setContactChannels] = useState<string[]>([]);
-  const [contactTime, setContactTime] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -74,9 +65,7 @@ const EvaluateModal = ({ onClose }: { onClose: () => void }) => {
   const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     e.target.value = "";
-    const remaining = 5 - photos.length;
-    const toAdd = files.slice(0, remaining);
-    toAdd.forEach(file => {
+    files.slice(0, 5 - photos.length).forEach(file => {
       const preview = URL.createObjectURL(file);
       compressImage(file).then(base64 => {
         setPhotos(prev => prev.length < 5 ? [...prev, { preview, base64 }] : prev);
@@ -84,65 +73,45 @@ const EvaluateModal = ({ onClose }: { onClose: () => void }) => {
     });
   };
 
-  const removePhoto = (idx: number) => {
-    setPhotos(prev => prev.filter((_, i) => i !== idx));
+  const goStep2 = () => {
+    if (!formData.name.trim()) { setError("Введите ваше имя"); return; }
+    if (!isPhoneValid(formData.phone)) { setError("Введите номер в формате +7 (___) ___-__-__"); return; }
+    setError(null);
+    setStep(2);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name.trim()) { setError("Введите ваше имя"); return; }
-    if (!isPhoneValid(formData.phone)) { setError("Введите номер целиком в формате +7 (___) ___-__-__"); return; }
-    ymGoal(Goals.FORM_SUBMIT, { category: formData.category });
+  const handleSubmit = async () => {
     setLoading(true);
     setError(null);
+    ymGoal(Goals.FORM_SUBMIT, {});
     try {
-      // Сначала отправляем заявку без фото — быстро и надёжно
       const res = await fetch(SEND_LEAD_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...formData,
-          photos: [],
-          client_price: formData.client_price,
-          contact_channels: contactChannels,
-          contact_time: contactTime,
-          device: formData.category || undefined,
-        }),
+        body: JSON.stringify({ ...formData, photos: [], contact_channels: [], contact_time: "" }),
       });
       if (!res.ok) throw new Error("bad_status");
-      ymGoal(Goals.FORM_SUCCESS, { category: formData.category });
-      // Аналитика /staff/analytics: фиксируем конверсию
+      ymGoal(Goals.FORM_SUCCESS, {});
       try {
         (window as unknown as { skypkaConvert?: (d: Record<string, unknown>) => void }).skypkaConvert?.({
           type: "evaluate_skupka",
           form_type: "evaluate_skupka",
           phone: formData.phone,
           amount: formData.client_price ? Number(String(formData.client_price).replace(/\D/g, "")) : null,
-          category: formData.category,
           name: formData.name,
         });
       } catch { /* noop */ }
       setSubmitted(true);
-      // Потом тихо досылаем фото если есть (не блокируем UX)
       const readyPhotos = photos.map(p => p.base64).filter(Boolean);
       if (readyPhotos.length > 0) {
         fetch(SEND_LEAD_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...formData,
-            desc: `[фото к заявке] ${formData.desc}`,
-            photos: readyPhotos,
-            contact_channels: contactChannels,
-            contact_time: contactTime,
-            device: formData.category || undefined,
-          }),
+          body: JSON.stringify({ ...formData, desc: `[фото] ${formData.desc}`, photos: readyPhotos }),
         }).catch(() => {});
       }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error("send-lead error:", msg);
-      setError(`Ошибка: ${msg}`);
+    } catch {
+      setError("Ошибка отправки. Попробуйте ещё раз.");
     } finally {
       setLoading(false);
     }
@@ -150,134 +119,177 @@ const EvaluateModal = ({ onClose }: { onClose: () => void }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 animate-[fadeIn_0.2s_ease]">
-      <div className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full sm:max-w-lg bg-[#141414] border-t sm:border border-[#FFD700]/30 shadow-2xl max-h-[95dvh] sm:max-h-[90vh] overflow-y-auto animate-[slideDown_0.25s_ease] rounded-t-2xl sm:rounded-none">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 sticky top-0 bg-[#141414] z-10">
-          <div className="flex items-center gap-3">
-            <div className="w-1 h-7 bg-[#FFD700]" />
-            <h2 className="font-oswald text-xl font-bold uppercase">Быстрая оценка</h2>
-          </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-white/40 hover:text-white transition-colors">
-            <Icon name="X" size={18} />
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full sm:max-w-md bg-[#111] border-t sm:border border-[#FFD700]/25 shadow-2xl max-h-[95dvh] sm:max-h-[88vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl animate-[slideDown_0.22s_ease]">
+
+        {/* Шапка */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/8 sticky top-0 bg-[#111] z-10">
+          {step === 2 && !submitted ? (
+            <button onClick={() => { setStep(1); setError(null); }}
+              className="flex items-center gap-1.5 text-white/50 hover:text-white transition-colors font-roboto text-sm">
+              <Icon name="ChevronLeft" size={16} /> Назад
+            </button>
+          ) : (
+            <div className="flex items-center gap-2.5">
+              <div className="w-6 h-6 bg-[#FFD700] flex items-center justify-center rounded">
+                <Icon name="Zap" size={13} className="text-black" />
+              </div>
+              <span className="font-oswald text-base font-bold uppercase tracking-wide">Быстрая оценка</span>
+            </div>
+          )}
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-white/30 hover:text-white transition-colors rounded-lg hover:bg-white/5">
+            <Icon name="X" size={17} />
           </button>
         </div>
 
         <div className="p-5">
+          {/* ── Успех ── */}
           {submitted ? (
-            <div className="text-center py-10">
-              <div className="w-16 h-16 bg-[#FFD700] flex items-center justify-center mx-auto mb-4">
+            <div className="text-center py-8">
+              <div className="w-16 h-16 bg-[#FFD700] flex items-center justify-center mx-auto mb-4 rounded-2xl">
                 <Icon name="Check" size={32} className="text-black" />
               </div>
-              <h3 className="font-oswald text-2xl font-bold text-[#FFD700] mb-2">ЗАЯВКА ОТПРАВЛЕНА</h3>
-              <p className="font-roboto text-white/60 mb-6">Перезвоним в течение 15 минут</p>
-              <button onClick={onClose} className="btn-gold-premium btn-lg">
-                Закрыть
-              </button>
+              <h3 className="font-oswald text-2xl font-bold text-[#FFD700] mb-2 uppercase">Заявка принята!</h3>
+              <p className="font-roboto text-white/55 text-sm mb-1">Перезвоним в течение <b className="text-white">15 минут</b></p>
+              <p className="font-roboto text-white/35 text-xs mb-7">Работаем с 10:00 до 21:00, без выходных</p>
+              <button onClick={onClose} className="btn-gold-premium btn-lg w-full">Закрыть</button>
             </div>
+
+          ) : step === 1 ? (
+            /* ── Шаг 1: Контакты ── */
+            <div className="space-y-3">
+              <div>
+                <div className="font-roboto text-white/60 text-sm mb-4 leading-relaxed">
+                  Оставьте номер — перезвоним, назовём цену и договоримся об удобном времени.
+                </div>
+              </div>
+
+              <div>
+                <label className={LBL_CLS}>Ваше имя</label>
+                <input
+                  autoFocus
+                  type="text"
+                  value={formData.name}
+                  onChange={e => setFormData(p => ({ ...p, name: e.target.value }))}
+                  onKeyDown={e => e.key === "Enter" && goStep2()}
+                  placeholder="Иван"
+                  className={INP_CLS}
+                />
+              </div>
+
+              <div>
+                <label className={LBL_CLS}>Телефон <span className="text-[#FFD700]">*</span></label>
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  value={formData.phone}
+                  onChange={e => setFormData(p => ({ ...p, phone: formatPhone(e.target.value) }))}
+                  onFocus={() => { if (!formData.phone) setFormData(p => ({ ...p, phone: "+7" })); }}
+                  onKeyDown={e => e.key === "Enter" && goStep2()}
+                  placeholder="+7 (___) ___-__-__"
+                  className={INP_CLS}
+                />
+              </div>
+
+              {error && <p className="text-red-400 text-sm font-roboto text-center">{error}</p>}
+
+              <button onClick={goStep2} className="btn-gold-premium btn-xl w-full mt-1">
+                Далее <Icon name="ArrowRight" size={18} />
+              </button>
+
+              {/* Соцдоказательства */}
+              <div className="flex items-center justify-center gap-4 pt-1">
+                <span className="flex items-center gap-1 text-white/35 text-[11px] font-roboto">
+                  <Icon name="Clock" size={11} /> 15 мин ответ
+                </span>
+                <span className="flex items-center gap-1 text-white/35 text-[11px] font-roboto">
+                  <Icon name="ShieldCheck" size={11} /> Без обязательств
+                </span>
+                <span className="flex items-center gap-1 text-white/35 text-[11px] font-roboto">
+                  <Icon name="Star" size={11} /> 4.9 рейтинг
+                </span>
+              </div>
+            </div>
+
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="font-roboto text-white/50 text-xs uppercase tracking-wider block mb-1">Ваше имя</label>
-                  <input type="text"
-                    value={formData.name}
-                    onChange={e => setFormData(p => ({ ...p, name: e.target.value }))}
-                    placeholder="Иван"
-                    className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-3 font-roboto text-base focus:outline-none focus:border-[#FFD700] transition-colors" />
-                </div>
-                <div>
-                  <label className="font-roboto text-white/50 text-xs uppercase tracking-wider block mb-1">Телефон</label>
-                  <input type="tel"
-                    value={formData.phone}
-                    onChange={e => setFormData(p => ({ ...p, phone: formatPhone(e.target.value) }))}
-                    onFocus={() => { if (!formData.phone) setFormData(p => ({ ...p, phone: "+7" })); }}
-                    required
-                    inputMode="tel"
-                    placeholder="+7 (___) ___-__-__"
-                    className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-3 font-roboto text-base focus:outline-none focus:border-[#FFD700] transition-colors" />
+            /* ── Шаг 2: Описание + фото + цена ── */
+            <div className="space-y-3">
+              <div className="bg-[#0D0D0D] border border-[#1f1f1f] rounded-xl p-3 flex items-center gap-3 mb-1">
+                <Icon name="CheckCircle2" size={16} className="text-[#FFD700] shrink-0" />
+                <div className="font-roboto text-sm">
+                  <span className="text-white/50">Контакты: </span>
+                  <span className="text-white font-semibold">{formData.name}</span>
+                  <span className="text-white/50"> · </span>
+                  <span className="text-white font-semibold">{formData.phone}</span>
                 </div>
               </div>
 
               <div>
-                <label className="font-roboto text-white/50 text-xs uppercase tracking-wider block mb-1">Категория</label>
-                <select value={formData.category}
-                  onChange={e => setFormData(p => ({ ...p, category: e.target.value }))}
-                  className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-3 font-roboto text-base focus:outline-none focus:border-[#FFD700] transition-colors appearance-none cursor-pointer">
-                  <option value="">Выберите категорию</option>
-                  {CATEGORIES.map(c => <option key={c.title} value={c.title}>{c.title}</option>)}
-                </select>
-              </div>
-
-              <div>
-                <label className="font-roboto text-white/50 text-xs uppercase tracking-wider block mb-1">Описание товара</label>
-                <textarea value={formData.desc}
+                <label className={LBL_CLS}>Что продаёте?</label>
+                <textarea
+                  autoFocus
+                  value={formData.desc}
                   onChange={e => setFormData(p => ({ ...p, desc: e.target.value }))}
-                  placeholder="Модель, состояние, комплектация..."
+                  placeholder="iPhone 14 Pro 256GB, чёрный, без трещин, все документы"
                   rows={3}
-                  className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-3 font-roboto text-base focus:outline-none focus:border-[#FFD700] transition-colors resize-none" />
+                  className={INP_CLS + " resize-none"}
+                />
               </div>
 
               <div>
-                <label className="font-roboto text-white/50 text-xs uppercase tracking-wider block mb-1">Ваша цена <span className="text-white/30 normal-case">(необязательно)</span></label>
+                <label className={LBL_CLS}>Желаемая цена <span className="text-white/30 normal-case font-roboto">(необязательно)</span></label>
                 <div className="relative">
-                  <input type="number" min="0"
+                  <input
+                    type="number" min="0"
                     value={formData.client_price}
                     onChange={e => setFormData(p => ({ ...p, client_price: e.target.value }))}
-                    placeholder="0"
-                    className="w-full bg-[#0D0D0D] border border-[#333] text-white px-3 py-3 pr-8 font-roboto text-base focus:outline-none focus:border-[#FFD700] transition-colors" />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 font-roboto text-sm">₽</span>
+                    placeholder="30 000"
+                    className={INP_CLS + " pr-8"}
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-white/35 font-roboto text-sm">₽</span>
                 </div>
               </div>
 
+              {/* Фото */}
               <div>
-                <label className="font-roboto text-white/50 text-xs uppercase tracking-wider block mb-2">
-                  Фото товара <span className="text-[#FFD700]">{photos.length}/5</span>
-                </label>
-                <div className="grid grid-cols-5 gap-2 mb-1">
+                <div className="flex items-center justify-between mb-2">
+                  <label className={LBL_CLS + " mb-0"}>Фото <span className="text-white/30 normal-case">(необязательно)</span></label>
+                  <span className="text-[#FFD700] text-[11px] font-roboto">{photos.length}/5</span>
+                </div>
+                <div className="flex gap-2 flex-wrap">
                   {photos.map((p, idx) => (
-                    <div key={idx} className="relative aspect-square">
-                      <img src={p.preview} alt={`фото ${idx + 1}`} className="w-full h-full object-cover border border-[#333]" />
-                      <button type="button" onClick={() => removePhoto(idx)}
-                        className="absolute top-0.5 right-0.5 w-6 h-6 bg-black/80 text-white flex items-center justify-center rounded-full border border-white/20">
-                        <Icon name="X" size={11} />
+                    <div key={idx} className="relative w-16 h-16 rounded-lg overflow-hidden shrink-0">
+                      <img src={p.preview} alt="" className="w-full h-full object-cover" />
+                      <button type="button" onClick={() => setPhotos(prev => prev.filter((_, i) => i !== idx))}
+                        className="absolute top-0.5 right-0.5 w-5 h-5 bg-black/80 text-white flex items-center justify-center rounded-full">
+                        <Icon name="X" size={9} />
                       </button>
                     </div>
                   ))}
                   {photos.length < 5 && (
                     <div onClick={() => fileRef.current?.click()}
-                      className="aspect-square border-2 border-dashed border-[#444] hover:border-[#FFD700] active:border-[#FFD700] transition-colors cursor-pointer flex flex-col items-center justify-center gap-1 touch-manipulation">
-                      <Icon name="Plus" size={18} className="text-[#FFD700]" />
-                      <span className="font-roboto text-white/40 text-[9px]">фото</span>
+                      className="w-16 h-16 border-2 border-dashed border-[#333] hover:border-[#FFD700] active:border-[#FFD700] rounded-lg flex flex-col items-center justify-center gap-0.5 cursor-pointer touch-manipulation transition-colors">
+                      <Icon name="Camera" size={18} className="text-[#FFD700]/60" />
+                      <span className="font-roboto text-white/30 text-[9px]">добавить</span>
                     </div>
                   )}
                 </div>
                 <input ref={fileRef} type="file" accept="image/*" multiple onChange={handlePhoto} className="hidden" />
               </div>
 
-              <ContactChannelsBlock
-                value={contactChannels}
-                onChange={setContactChannels}
-                timeNote={contactTime}
-                onTimeChange={setContactTime}
-              />
+              {error && <p className="text-red-400 text-sm font-roboto text-center">{error}</p>}
 
-              {error && (
-                <p className="font-roboto text-red-400 text-sm text-center">{error}</p>
-              )}
-
-              <button type="submit" disabled={loading}
-                className="btn-gold-premium btn-xl w-full">
-                {loading ? (
-                  <><Icon name="Loader" size={20} className="animate-spin" /> Отправляем...</>
-                ) : (
-                  <><Icon name="Check" size={20} /> Получить оценку бесплатно</>
-                )}
+              <button onClick={handleSubmit} disabled={loading} className="btn-gold-premium btn-xl w-full">
+                {loading
+                  ? <><Icon name="Loader" size={18} className="animate-spin" /> Отправляем...</>
+                  : <><Icon name="Check" size={18} /> Отправить заявку</>
+                }
               </button>
 
-              <p className="font-roboto text-white/30 text-xs text-center">
+              <p className="font-roboto text-white/25 text-xs text-center">
                 Нажимая кнопку, вы соглашаетесь с обработкой персональных данных
               </p>
-            </form>
+            </div>
           )}
         </div>
       </div>
