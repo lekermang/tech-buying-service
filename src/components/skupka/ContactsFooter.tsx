@@ -88,10 +88,10 @@ const ContactsFooter = ({ scrollTo }: ContactsFooterProps) => {
                          e.stopPropagation();
                          e.preventDefault();
                          ymGoal(Goals.CALL_CLICK, { place: "footer_secondary" });
-                         window.location.href = "tel:+79929990333";
+                         window.location.href = "tel:+78006006833";
                        }}
                        className="font-roboto text-white/60 hover:text-[#FFD700] text-xs md:text-sm transition-colors bg-transparent border-0 p-0 cursor-pointer">
-                      или +7 (992) 999-03-33
+                      или 8 (800) 600-68-33
                     </button>
                     <span className="text-[#FFD700]/30">·</span>
                     <span className="font-roboto text-white/40 text-xs md:text-sm flex items-center gap-1">
@@ -136,7 +136,7 @@ const ContactsFooter = ({ scrollTo }: ContactsFooterProps) => {
               <Icon name="ArrowUpRight" size={16} className="relative text-[#FFD700]/50 group-hover:text-[#FFD700] transition-colors" />
             </a>
 
-            <a href="https://wa.me/79929990333" target="_blank" rel="noopener noreferrer"
+            <a href="https://wa.me/78006006833" target="_blank" rel="noopener noreferrer"
               onClick={() => ymGoal(Goals.WHATSAPP_CLICK, { place: "footer" })}
               className="group relative overflow-hidden flex items-center gap-3 bg-gradient-to-br from-[#25D366]/15 to-[#25D366]/5 border border-[#25D366]/40 hover:border-[#25D366] rounded-md px-4 py-4 transition-all">
               <div className="absolute -inset-1 bg-gradient-to-br from-[#25D366]/20 to-transparent blur-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
