@@ -22,6 +22,7 @@ import SafeDealsTab from "./safeDeals/SafeDealsTab";
 import SLAvitoShowcase from "./SLAvitoShowcase";
 import { slApi, can, type SLMyPermissions } from "./types";
 import { SLTabsGrid } from "./slUI";
+import { useNavigate } from "react-router-dom";
 
 type SubTab =
   | "dashboard"
@@ -72,6 +73,7 @@ export default function SLShopTab({ token, myRole }: { token: string; myRole?: s
   const [tab, setTab] = useState<SubTab>("dashboard");
   const [perms, setPerms] = useState<SLMyPermissions | null>(null);
   const empName = typeof window !== "undefined" ? (localStorage.getItem("employee_name") || "") : "";
+  const navigate = useNavigate();
 
   useEffect(() => {
     slApi<SLMyPermissions>(token, "my_permissions").then(r => {
@@ -125,6 +127,28 @@ export default function SLShopTab({ token, myRole }: { token: string; myRole?: s
               {perms?.name ? `${perms.name} · ` : ""}Скупка · Склад · Касса · Договоры
             </div>
           </div>
+
+          {/* Кнопка ИИ-оценщика */}
+          <button
+            onClick={() => navigate("/staff/evaluator")}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl shrink-0 transition-all duration-200 active:scale-95"
+            style={{
+              background: "linear-gradient(135deg, rgba(255,215,0,0.18), rgba(255,215,0,0.08))",
+              border: "1px solid rgba(255,215,0,0.4)",
+              boxShadow: "0 0 12px rgba(255,215,0,0.15)",
+            }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 20px rgba(255,215,0,0.35)";
+              (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,215,0,0.7)";
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 12px rgba(255,215,0,0.15)";
+              (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,215,0,0.4)";
+            }}
+          >
+            <Icon name="TrendingUp" size={12} style={{ color: "#FFD700" }} />
+            <span className="text-[9px] uppercase tracking-widest font-bold" style={{ color: "#FFD700" }}>Оценить</span>
+          </button>
 
           {/* Premium badge */}
           <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl shrink-0"

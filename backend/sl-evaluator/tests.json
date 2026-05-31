@@ -1,0 +1,22 @@
+{
+  "tests": [
+    {
+      "name": "Evaluate iPhone 14",
+      "method": "POST",
+      "path": "/",
+      "body": {"action": "evaluate", "model": "iPhone 14", "brand": "Apple", "category": "смартфон", "storage": "128 GB", "year": "2022", "condition": "хорошее", "kit": "без коробки", "region": "Калуга"},
+      "expectedStatus": 200,
+      "expectedBody": {"min_price": 1},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Get history",
+      "method": "POST",
+      "path": "/",
+      "body": {"action": "history"},
+      "expectedStatus": 200,
+      "expectedBody": {"items": []},
+      "bodyMatcher": "partial"
+    }
+  ]
+}
