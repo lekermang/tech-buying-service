@@ -6,6 +6,8 @@
 """
 import json
 import os
+import base64
+import io
 import urllib.request
 import psycopg2
 import psycopg2.extras
@@ -38,8 +40,43 @@ def handler(event: dict, context) -> dict:
         return analyze(body)
     if action == "get_stock":
         return get_stock_summary()
+    if action == "parse_pdf":
+        return parse_pdf(body)
 
     return {"statusCode": 400, "headers": CORS, "body": json.dumps({"error": "unknown action"})}
+
+
+def parse_pdf(body: dict) -> dict:
+    """Извлекает текст из PDF (base64) с помощью pdfplumber."""
+    pdf_b64 = body.get("pdf_base64", "")
+    if not pdf_b64:
+        return {"statusCode": 400, "headers": CORS, "body": json.dumps({"error": "pdf_base64 обязателен"})}
+
+    # Убираем data URL prefix
+    if "," in pdf_b64:
+        pdf_b64 = pdf_b64.split(",", 1)[1]
+
+    try:
+        raw_bytes = base64.b64decode(pdf_b64)
+    except Exception as e:
+        return {"statusCode": 400, "headers": CORS, "body": json.dumps({"error": f"Ошибка декодирования base64: {e}"})}
+
+    try:
+        import pdfplumber
+        text_pages = []
+        with pdfplumber.open(io.BytesIO(raw_bytes)) as pdf:
+            for page in pdf.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text_pages.append(page_text.strip())
+        full_text = "\n\n".join(text_pages)
+        if not full_text.strip():
+            return {"statusCode": 200, "headers": CORS,
+                    "body": json.dumps({"text": "", "pages": len(pdf.pages), "warning": "PDF не содержит текста (возможно, скан)"}, ensure_ascii=False)}
+        return {"statusCode": 200, "headers": CORS,
+                "body": json.dumps({"text": full_text, "pages": len(text_pages)}, ensure_ascii=False)}
+    except Exception as e:
+        return {"statusCode": 500, "headers": CORS, "body": json.dumps({"error": f"Ошибка парсинга PDF: {e}"}, ensure_ascii=False)}
 
 
 def get_stock_summary() -> dict:

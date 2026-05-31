@@ -24,32 +24,176 @@ type ReportResult = {
   report: string; parsed: ParsedReport; stock: StockData; generated_at: string;
 };
 
+type PdfState = {
+  file: File | null;
+  text: string;
+  loading: boolean;
+  pages: number;
+  error: string | null;
+};
+
 const SAFETY_COLORS = {
   green:  { bg: "rgba(52,211,153,0.1)", border: "rgba(52,211,153,0.3)", text: "#34d399", label: "Зелёный ✓" },
   yellow: { bg: "rgba(255,215,0,0.1)",  border: "rgba(255,215,0,0.3)",  text: "#FFD700", label: "Жёлтый ⚠" },
   red:    { bg: "rgba(248,113,113,0.1)", border: "rgba(248,113,113,0.3)", text: "#f87171", label: "Красный ✕" },
 };
 
-const PLACEHOLDER_DEBIT = `Пример (вставьте свою выписку):
-Остаток на начало: 45 000 руб
-22.05 — Скупка телефонов (Яндекс касса) +18 000
-23.05 — Аренда офиса -15 000
-24.05 — Продажа ноутбука +12 500
-...
-Остаток на конец: 60 500 руб`;
+const emptyPdf = (): PdfState => ({ file: null, text: "", loading: false, pages: 0, error: null });
 
-const PLACEHOLDER_SAVINGS = `Пример:
-Остаток на начало: 120 000 руб
-Начислены проценты: +1 200 руб
-Пополнение с карты: +50 000 руб
-Остаток на конец: 171 200 руб`;
+// Конвертируем File → base64
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((res, rej) => {
+    const reader = new FileReader();
+    reader.onload = ev => res((ev.target?.result as string) ?? "");
+    reader.onerror = rej;
+    reader.readAsDataURL(file);
+  });
+}
+
+// Зона загрузки одного PDF
+function PdfDropZone({
+  label, hint, state, onFile, onClear, token,
+}: {
+  label: string; hint: string;
+  state: PdfState;
+  onFile: (s: PdfState) => void;
+  onClear: () => void;
+  token: string;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [drag, setDrag] = useState(false);
+
+  const handleFile = async (file: File) => {
+    if (!file.type.includes("pdf") && !file.name.endsWith(".pdf")) {
+      onFile({ ...emptyPdf(), error: "Нужен PDF-файл" });
+      return;
+    }
+    onFile({ ...emptyPdf(), file, loading: true });
+    try {
+      const b64 = await fileToBase64(file);
+      const r = await fetch(FINANCE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Employee-Token": token },
+        body: JSON.stringify({ action: "parse_pdf", pdf_base64: b64 }),
+      });
+      const d = await r.json();
+      if (d.error) {
+        onFile({ ...emptyPdf(), file, error: d.error });
+      } else {
+        onFile({ file, text: d.text || "", loading: false, pages: d.pages || 0, error: d.warning || null });
+      }
+    } catch (ex) {
+      onFile({ ...emptyPdf(), file, error: "Ошибка: " + String(ex) });
+    }
+  };
+
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault(); setDrag(false);
+    const f = e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  };
+
+  const isReady = state.text && !state.loading && !state.error;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1.5">
+        <label className="font-roboto text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.38)" }}>
+          {label}
+        </label>
+        {state.file && (
+          <button onClick={onClear} className="font-roboto text-[10px] transition-colors" style={{ color: "rgba(248,113,113,0.7)" }}>
+            Удалить
+          </button>
+        )}
+      </div>
+
+      {/* Зона дропа */}
+      {!state.file ? (
+        <div
+          onClick={() => inputRef.current?.click()}
+          onDragOver={e => { e.preventDefault(); setDrag(true); }}
+          onDragLeave={() => setDrag(false)}
+          onDrop={onDrop}
+          className="relative flex flex-col items-center justify-center gap-2 py-6 px-4 rounded-xl cursor-pointer transition-all select-none"
+          style={{
+            background: drag ? "rgba(255,215,0,0.08)" : "rgba(255,255,255,0.03)",
+            border: `1.5px dashed ${drag ? "rgba(255,215,0,0.6)" : "rgba(255,255,255,0.12)"}`,
+          }}
+        >
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{
+            background: "rgba(255,255,255,0.06)",
+          }}>
+            <Icon name="FileUp" size={20} style={{ color: "rgba(255,255,255,0.4)" }} />
+          </div>
+          <div className="text-center">
+            <div className="font-roboto text-sm font-semibold" style={{ color: "rgba(255,255,255,0.6)" }}>
+              Загрузить PDF
+            </div>
+            <div className="font-roboto text-[11px] mt-0.5" style={{ color: "rgba(255,255,255,0.28)" }}>
+              {hint}
+            </div>
+          </div>
+          <input ref={inputRef} type="file" accept=".pdf,application/pdf" className="hidden"
+            onChange={e => { const f = e.target.files?.[0]; e.target.value = ""; if (f) handleFile(f); }}
+          />
+        </div>
+      ) : (
+        <div className="rounded-xl overflow-hidden" style={{
+          border: `1px solid ${isReady ? "rgba(52,211,153,0.3)" : state.error ? "rgba(248,113,113,0.3)" : "rgba(255,215,0,0.25)"}`,
+          background: isReady ? "rgba(52,211,153,0.05)" : state.error ? "rgba(248,113,113,0.05)" : "rgba(255,215,0,0.04)",
+        }}>
+          <div className="flex items-center gap-3 px-3 py-2.5">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{
+              background: isReady ? "rgba(52,211,153,0.15)" : "rgba(255,255,255,0.06)",
+            }}>
+              {state.loading
+                ? <Icon name="Loader2" size={16} className="animate-spin" style={{ color: "#FFD700" }} />
+                : isReady
+                  ? <Icon name="CheckCircle2" size={16} style={{ color: "#34d399" }} />
+                  : state.error
+                    ? <Icon name="AlertCircle" size={16} style={{ color: "#f87171" }} />
+                    : <Icon name="FileText" size={16} style={{ color: "rgba(255,255,255,0.5)" }} />
+              }
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-roboto text-sm truncate" style={{ color: "rgba(255,255,255,0.8)" }}>
+                {state.file.name}
+              </div>
+              <div className="font-roboto text-[10px]" style={{ color: "rgba(255,255,255,0.35)" }}>
+                {state.loading ? "Извлекаю текст..." :
+                  isReady ? `${state.pages} стр. · ${state.text.length.toLocaleString("ru-RU")} симв.` :
+                  state.error ? state.error : "Обрабатываю..."}
+              </div>
+            </div>
+          </div>
+          {/* Превью текста */}
+          {isReady && (
+            <div className="px-3 pb-3">
+              <div className="rounded-lg px-3 py-2 font-roboto text-[11px] leading-relaxed line-clamp-3" style={{
+                background: "rgba(255,255,255,0.04)",
+                color: "rgba(255,255,255,0.45)",
+                display: "-webkit-box",
+                WebkitLineClamp: 3,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}>
+                {state.text.slice(0, 300)}…
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function StaffFinanceReport({ token }: { token: string }) {
-  const [debitText, setDebitText] = useState("");
-  const [savingsText, setSavingsText] = useState("");
+  const [debitPdf, setDebitPdf] = useState<PdfState>(emptyPdf());
+  const [savingsPdf, setSavingsPdf] = useState<PdfState>(emptyPdf());
   const [period, setPeriod] = useState(() => {
     const now = new Date();
-    return `${now.toLocaleString("ru-RU", { month: "long", year: "numeric" })}`;
+    return now.toLocaleString("ru-RU", { month: "long", year: "numeric" });
   });
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ReportResult | null>(null);
@@ -58,9 +202,9 @@ export default function StaffFinanceReport({ token }: { token: string }) {
   const [stockLoading, setStockLoading] = useState(true);
   const [tab, setTab] = useState<"input" | "result">("input");
   const [showRaw, setShowRaw] = useState(false);
+  const [copied, setCopied] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
 
-  // Грузим данные склада при открытии
   useEffect(() => {
     const load = async () => {
       setStockLoading(true);
@@ -78,9 +222,12 @@ export default function StaffFinanceReport({ token }: { token: string }) {
     load();
   }, [token]);
 
+  const canAnalyze = (debitPdf.text || savingsPdf.text) &&
+    !debitPdf.loading && !savingsPdf.loading;
+
   const analyze = async () => {
-    if (!debitText.trim() && !savingsText.trim()) {
-      setError("Вставьте хотя бы одну выписку");
+    if (!canAnalyze) {
+      setError("Загрузите хотя бы один PDF-файл выписки");
       return;
     }
     setLoading(true);
@@ -89,7 +236,12 @@ export default function StaffFinanceReport({ token }: { token: string }) {
       const r = await fetch(FINANCE_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Employee-Token": token },
-        body: JSON.stringify({ action: "analyze", debit_text: debitText, savings_text: savingsText, period }),
+        body: JSON.stringify({
+          action: "analyze",
+          debit_text: debitPdf.text,
+          savings_text: savingsPdf.text,
+          period,
+        }),
       });
       const d = await r.json();
       if (d.error) { setError(d.error); return; }
@@ -105,7 +257,10 @@ export default function StaffFinanceReport({ token }: { token: string }) {
 
   const copyReport = () => {
     if (!result) return;
-    navigator.clipboard.writeText(result.report);
+    navigator.clipboard.writeText(result.report).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   };
 
   const safetyStyle = result?.parsed.safety_level
@@ -129,12 +284,12 @@ export default function StaffFinanceReport({ token }: { token: string }) {
             WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
           }}>Финансовый отчёт</div>
           <div className="font-roboto text-[10px]" style={{ color: "rgba(255,255,255,0.3)" }}>
-            ДДС · Банк + Склад · GPT-4o
+            ДДС · PDF выписки + Склад · GPT-4o
           </div>
         </div>
       </div>
 
-      {/* Блок данных склада (всегда видно) */}
+      {/* Данные склада */}
       <div className="rounded-xl p-3" style={{
         background: "linear-gradient(145deg, rgba(255,215,0,0.06), rgba(255,215,0,0.02))",
         border: "1px solid rgba(255,215,0,0.15)",
@@ -166,7 +321,7 @@ export default function StaffFinanceReport({ token }: { token: string }) {
         )}
       </div>
 
-      {/* Переключатель ввод / результат */}
+      {/* Переключатель */}
       {result && (
         <div className="flex gap-1 p-1 rounded-xl" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
           {(["input", "result"] as const).map(v => (
@@ -178,15 +333,16 @@ export default function StaffFinanceReport({ token }: { token: string }) {
                 border: tab === v ? "1px solid rgba(255,215,0,0.3)" : "1px solid transparent",
               }}
             >
-              {v === "input" ? "✏️ Ввод данных" : "📊 Отчёт"}
+              {v === "input" ? "📂 Файлы" : "📊 Отчёт"}
             </button>
           ))}
         </div>
       )}
 
-      {/* ── Форма ввода ── */}
+      {/* ── Форма ── */}
       {tab === "input" && (
-        <div className="space-y-3">
+        <div className="space-y-4">
+
           {/* Период */}
           <div>
             <label className="block font-roboto text-[10px] uppercase tracking-widest mb-1.5" style={{ color: "rgba(255,255,255,0.38)" }}>
@@ -201,43 +357,36 @@ export default function StaffFinanceReport({ token }: { token: string }) {
             />
           </div>
 
-          {/* Дебетовая карта */}
-          <div>
-            <label className="block font-roboto text-[10px] uppercase tracking-widest mb-1.5" style={{ color: "rgba(255,255,255,0.38)" }}>
-              Выписка · Дебетовая карта
-            </label>
-            <textarea
-              value={debitText}
-              onChange={e => setDebitText(e.target.value)}
-              placeholder={PLACEHOLDER_DEBIT}
-              rows={7}
-              className="w-full px-3 py-2.5 rounded-xl font-roboto text-sm text-white outline-none transition-all resize-y placeholder:text-white/15"
-              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", minHeight: 140 }}
-              onFocus={e => { e.target.style.borderColor = "rgba(255,215,0,0.5)"; e.target.style.boxShadow = "0 0 0 3px rgba(255,215,0,0.06)"; }}
-              onBlur={e => { e.target.style.borderColor = "rgba(255,255,255,0.08)"; e.target.style.boxShadow = "none"; }}
-            />
-          </div>
+          {/* PDF выписки */}
+          <PdfDropZone
+            label="Выписка · Дебетовая карта"
+            hint="Перетащите или нажмите · PDF из банка"
+            state={debitPdf}
+            onFile={setDebitPdf}
+            onClear={() => setDebitPdf(emptyPdf())}
+            token={token}
+          />
 
-          {/* Накопительный счёт */}
-          <div>
-            <label className="block font-roboto text-[10px] uppercase tracking-widest mb-1.5" style={{ color: "rgba(255,255,255,0.38)" }}>
-              Выписка · Накопительный счёт
-            </label>
-            <textarea
-              value={savingsText}
-              onChange={e => setSavingsText(e.target.value)}
-              placeholder={PLACEHOLDER_SAVINGS}
-              rows={5}
-              className="w-full px-3 py-2.5 rounded-xl font-roboto text-sm text-white outline-none transition-all resize-y placeholder:text-white/15"
-              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", minHeight: 100 }}
-              onFocus={e => { e.target.style.borderColor = "rgba(255,215,0,0.5)"; e.target.style.boxShadow = "0 0 0 3px rgba(255,215,0,0.06)"; }}
-              onBlur={e => { e.target.style.borderColor = "rgba(255,255,255,0.08)"; e.target.style.boxShadow = "none"; }}
-            />
-          </div>
+          <PdfDropZone
+            label="Выписка · Накопительный счёт"
+            hint="Необязательно · PDF из банка"
+            state={savingsPdf}
+            onFile={setSavingsPdf}
+            onClear={() => setSavingsPdf(emptyPdf())}
+            token={token}
+          />
 
-          <div className="font-roboto text-[10px] leading-relaxed" style={{ color: "rgba(255,255,255,0.25)" }}>
-            Вставьте текст из банковского приложения или CSV. Данные склада подтянутся автоматически.
-          </div>
+          {/* Подсказка */}
+          {!debitPdf.file && !savingsPdf.file && (
+            <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl" style={{
+              background: "rgba(96,165,250,0.06)", border: "1px solid rgba(96,165,250,0.15)",
+            }}>
+              <Icon name="Info" size={13} className="shrink-0 mt-0.5" style={{ color: "#60a5fa" }} />
+              <span className="font-roboto text-xs leading-relaxed" style={{ color: "rgba(255,255,255,0.45)" }}>
+                Скачайте выписку в банковском приложении в формате PDF и загрузите сюда. Текст извлечётся автоматически.
+              </span>
+            </div>
+          )}
 
           {error && (
             <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl" style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)" }}>
@@ -246,11 +395,11 @@ export default function StaffFinanceReport({ token }: { token: string }) {
             </div>
           )}
 
-          <button onClick={analyze} disabled={loading}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-oswald font-bold uppercase tracking-wide text-black transition-all active:scale-95 disabled:opacity-50"
+          <button onClick={analyze} disabled={loading || !canAnalyze}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-oswald font-bold uppercase tracking-wide text-black transition-all active:scale-95 disabled:opacity-40"
             style={{
               background: "linear-gradient(135deg, #FFE34D, #FFD700)",
-              boxShadow: loading ? "none" : "0 0 24px rgba(255,215,0,0.4)",
+              boxShadow: (!loading && canAnalyze) ? "0 0 24px rgba(255,215,0,0.4)" : "none",
             }}
           >
             {loading
@@ -265,7 +414,7 @@ export default function StaffFinanceReport({ token }: { token: string }) {
       {tab === "result" && result && (
         <div ref={resultRef} className="space-y-3">
 
-          {/* Деньги на сегодня */}
+          {/* Деньги */}
           <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,215,0,0.2)" }}>
             <div className="px-4 py-2.5" style={{ background: "rgba(255,215,0,0.06)", borderBottom: "1px solid rgba(255,215,0,0.12)" }}>
               <div className="flex items-center gap-2">
@@ -275,12 +424,12 @@ export default function StaffFinanceReport({ token }: { token: string }) {
             </div>
             <div className="px-4 py-3 space-y-2">
               {[
-                { l: "Дебетовая карта", v: result.parsed.debit_balance, c: "rgba(255,255,255,0.7)" },
-                { l: "Накопительный счёт", v: result.parsed.savings_balance, c: "rgba(255,255,255,0.7)" },
-              ].map(({ l, v, c }) => v && (
+                { l: "Дебетовая карта", v: result.parsed.debit_balance },
+                { l: "Накопительный счёт", v: result.parsed.savings_balance },
+              ].map(({ l, v }) => v && (
                 <div key={l} className="flex items-center justify-between">
                   <span className="font-roboto text-sm" style={{ color: "rgba(255,255,255,0.45)" }}>{l}</span>
-                  <span className="font-roboto font-semibold text-sm" style={{ color: c }}>{v}</span>
+                  <span className="font-roboto font-semibold text-sm text-white/70">{v}</span>
                 </div>
               ))}
               {result.parsed.total_money && (
@@ -292,7 +441,7 @@ export default function StaffFinanceReport({ token }: { token: string }) {
             </div>
           </div>
 
-          {/* Прибыль бизнеса */}
+          {/* Прибыль */}
           <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(52,211,153,0.2)" }}>
             <div className="px-4 py-2.5" style={{ background: "rgba(52,211,153,0.06)", borderBottom: "1px solid rgba(52,211,153,0.12)" }}>
               <div className="flex items-center gap-2">
@@ -310,7 +459,7 @@ export default function StaffFinanceReport({ token }: { token: string }) {
               {result.parsed.profit_period && (
                 <div className="flex items-center justify-between">
                   <span className="font-roboto text-sm" style={{ color: "rgba(255,255,255,0.45)" }}>За период ({period})</span>
-                  <span className="font-roboto font-semibold text-sm" style={{ color: "rgba(255,255,255,0.7)" }}>{result.parsed.profit_period}</span>
+                  <span className="font-roboto font-semibold text-sm text-white/70">{result.parsed.profit_period}</span>
                 </div>
               )}
             </div>
@@ -318,29 +467,25 @@ export default function StaffFinanceReport({ token }: { token: string }) {
 
           {/* Кассовый разрыв */}
           {(result.parsed.days_runway || result.parsed.safety_level) && (
-            <div className="rounded-xl overflow-hidden" style={{
-              border: `1px solid ${safetyStyle?.border || "rgba(255,255,255,0.1)"}`,
-            }}>
-              <div className="px-4 py-2.5" style={{ background: safetyStyle?.bg || "rgba(255,255,255,0.04)", borderBottom: `1px solid ${safetyStyle?.border || "rgba(255,255,255,0.08)"}` }}>
+            <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${safetyStyle?.border || "rgba(255,255,255,0.1)"}` }}>
+              <div className="px-4 py-2.5" style={{ background: safetyStyle?.bg, borderBottom: `1px solid ${safetyStyle?.border}` }}>
                 <div className="flex items-center gap-2">
-                  <Icon name="AlertTriangle" size={13} style={{ color: safetyStyle?.text || "white" }} />
-                  <span className="font-roboto text-[10px] uppercase tracking-widest font-bold" style={{ color: safetyStyle?.text || "rgba(255,255,255,0.6)" }}>Риск кассового разрыва</span>
+                  <Icon name="AlertTriangle" size={13} style={{ color: safetyStyle?.text }} />
+                  <span className="font-roboto text-[10px] uppercase tracking-widest font-bold" style={{ color: safetyStyle?.text }}>Риск кассового разрыва</span>
                 </div>
               </div>
               <div className="px-4 py-3 space-y-2">
                 {result.parsed.days_runway && (
                   <div className="flex items-center justify-between">
                     <span className="font-roboto text-sm" style={{ color: "rgba(255,255,255,0.45)" }}>Денег хватит на</span>
-                    <span className="font-roboto font-bold text-sm" style={{ color: safetyStyle?.text || "white" }}>{result.parsed.days_runway}</span>
+                    <span className="font-roboto font-bold text-sm" style={{ color: safetyStyle?.text }}>{result.parsed.days_runway}</span>
                   </div>
                 )}
                 {result.parsed.safety_level && (
                   <div className="flex items-center justify-between">
                     <span className="font-roboto text-sm" style={{ color: "rgba(255,255,255,0.45)" }}>Порог безопасности</span>
                     <span className="font-roboto font-bold text-sm px-3 py-1 rounded-lg" style={{
-                      background: safetyStyle?.bg,
-                      color: safetyStyle?.text,
-                      border: `1px solid ${safetyStyle?.border}`,
+                      background: safetyStyle?.bg, color: safetyStyle?.text, border: `1px solid ${safetyStyle?.border}`,
                     }}>{safetyStyle?.label}</span>
                   </div>
                 )}
@@ -383,13 +528,18 @@ export default function StaffFinanceReport({ token }: { token: string }) {
             </div>
           )}
 
-          {/* Кнопки действий */}
+          {/* Кнопки */}
           <div className="flex gap-2">
             <button onClick={copyReport}
               className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-roboto text-sm transition-all"
-              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)" }}
+              style={{
+                background: copied ? "rgba(52,211,153,0.1)" : "rgba(255,255,255,0.05)",
+                border: `1px solid ${copied ? "rgba(52,211,153,0.3)" : "rgba(255,255,255,0.1)"}`,
+                color: copied ? "#34d399" : "rgba(255,255,255,0.5)",
+              }}
             >
-              <Icon name="Copy" size={14} /> Скопировать
+              <Icon name={copied ? "Check" : "Copy"} size={14} />
+              {copied ? "Скопировано!" : "Скопировать"}
             </button>
             <button onClick={() => setShowRaw(v => !v)}
               className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-roboto text-sm transition-all"
@@ -399,7 +549,6 @@ export default function StaffFinanceReport({ token }: { token: string }) {
             </button>
           </div>
 
-          {/* Полный текст */}
           {showRaw && (
             <div className="rounded-xl p-4" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
               <pre className="font-roboto text-sm leading-relaxed whitespace-pre-wrap" style={{ color: "rgba(255,255,255,0.65)" }}>
@@ -432,7 +581,6 @@ export default function StaffFinanceReport({ token }: { token: string }) {
               ))}
             </div>
           </div>
-
         </div>
       )}
     </div>
