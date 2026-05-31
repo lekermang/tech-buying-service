@@ -19,6 +19,8 @@ export default function DigitalParticles() {
   const raf = useRef<number>(0);
 
   useEffect(() => {
+    const isMobile = window.matchMedia("(pointer: coarse)").matches;
+    if (isMobile) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -120,7 +122,9 @@ export default function DigitalParticles() {
         position: "fixed", inset: 0, zIndex: 0,
         pointerEvents: "none",
         opacity: 0.25,
+        display: "block",
       }}
+      className="hidden md:block"
     />
   );
 }
