@@ -21,6 +21,7 @@ import QuickContactSection from "@/components/QuickContactSection";
 import WholesaleBanner from "@/components/skupka/WholesaleBanner";
 import AntiquesPreviewBlock from "@/components/skupka/AntiquesPreviewBlock";
 import WantToBuySection from "@/components/skupka/WantToBuySection";
+import DesktopStickyBar from "@/components/skupka/DesktopStickyBar";
 
 const scrollTo = (href: string) => {
   const el = document.querySelector(href);
@@ -412,6 +413,7 @@ const Index = ({ goldOpen = false }: { goldOpen?: boolean }) => {
       <ExitPopup onOpenEval={() => setEvalOpen(true)} />
       <CookieBanner />
       <PublicChatFab />
+      <DesktopStickyBar onOpenModal={() => setEvalOpen(true)} />
 
       {/* Sticky нижняя панель — только мобильные */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0D0D0D]/98 backdrop-blur-sm border-t border-[#FFD700]/20 pb-safe">
