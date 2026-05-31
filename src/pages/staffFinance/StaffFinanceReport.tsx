@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import Icon from "@/components/ui/icon";
+import { useFinanceHistory } from "./useFinanceHistory";
+import type { ReportResult as HistReportResult } from "./useFinanceHistory";
+import FinanceHistoryView from "./FinanceHistoryView";
 
 const FINANCE_URL = "https://functions.poehali.dev/f7e6a419-7cd3-4768-86b6-8a63dfc212ee";
 const fmt = (n: number) => new Intl.NumberFormat("ru-RU").format(Math.round(n));
@@ -160,9 +163,10 @@ export default function StaffFinanceReport({ token }: { token: string }) {
   const [stock, setStock]     = useState<StockData | null>(null);
   const [error, setError]     = useState<string | null>(null);
   const [stockLoading, setStockLoading] = useState(true);
-  const [view, setView]       = useState<"input" | "report">("input");
+  const [view, setView]       = useState<"input" | "report" | "history">("input");
   const [copied, setCopied]   = useState(false);
   const topRef = useRef<HTMLDivElement>(null);
+  const { history, addEntry, removeEntry, clearAll } = useFinanceHistory();
 
   useEffect(() => {
     (async () => {
@@ -193,7 +197,10 @@ export default function StaffFinanceReport({ token }: { token: string }) {
       });
       const d = await r.json();
       if (d.error) { setError(d.error); return; }
-      setResult(d); setView("report");
+      setResult(d);
+      // Сохраняем в историю
+      addEntry(period, d as HistReportResult);
+      setView("report");
       setTimeout(() => topRef.current?.scrollIntoView({ behavior: "smooth" }), 80);
     } catch (ex) { setError(String(ex)); }
     finally { setLoading(false); }
@@ -254,20 +261,23 @@ export default function StaffFinanceReport({ token }: { token: string }) {
       </div>
 
       {/* Табы */}
-      {result && (
-        <div className="flex gap-1 p-1 rounded-xl" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
-          {(["input","report"] as const).map(v => (
-            <button key={v} onClick={() => setView(v)}
-              className="flex-1 py-1.5 rounded-lg font-roboto text-xs font-semibold transition-all"
-              style={{
-                background: view === v ? "rgba(255,215,0,0.15)" : "transparent",
-                color: view === v ? "#FFD700" : "rgba(255,255,255,0.4)",
-                border: view === v ? "1px solid rgba(255,215,0,0.3)" : "1px solid transparent",
-              }}
-            >{v === "input" ? "📂 Файлы" : "📊 Отчёт"}</button>
-          ))}
-        </div>
-      )}
+      <div className="flex gap-1 p-1 rounded-xl" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
+        {([
+          { k: "input",   l: "📂 Файлы" },
+          { k: "report",  l: "📊 Отчёт",  disabled: !result },
+          { k: "history", l: `🕐 История${history.length > 0 ? ` (${history.length})` : ""}` },
+        ] as const).map(({ k, l, disabled }) => (
+          <button key={k} onClick={() => !disabled && setView(k)}
+            className="flex-1 py-1.5 rounded-lg font-roboto text-xs font-semibold transition-all"
+            style={{
+              background: view === k ? "rgba(255,215,0,0.15)" : "transparent",
+              color: view === k ? "#FFD700" : disabled ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.4)",
+              border: view === k ? "1px solid rgba(255,215,0,0.3)" : "1px solid transparent",
+              cursor: disabled ? "not-allowed" : "pointer",
+            }}
+          >{l}</button>
+        ))}
+      </div>
 
       {/* ── ВВОД ── */}
       {view === "input" && (
@@ -559,6 +569,15 @@ export default function StaffFinanceReport({ token }: { token: string }) {
             Сформировано: {new Date(result.generated_at).toLocaleString("ru-RU")}
           </div>
         </div>
+      )}
+
+      {/* ── ИСТОРИЯ / СРАВНЕНИЕ ── */}
+      {view === "history" && (
+        <FinanceHistoryView
+          history={history}
+          onRemove={removeEntry}
+          onClear={clearAll}
+        />
       )}
     </div>
   );
