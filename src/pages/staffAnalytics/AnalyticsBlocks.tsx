@@ -4,6 +4,20 @@ import Icon from "@/components/ui/icon";
 import { SOURCE_LABEL, searchByPhone, type Conversion } from "./api";
 import { fmtAgo } from "./utils";
 
+const CONV_TYPE: Record<string, { label: string; icon: string; color: string }> = {
+  evaluate_skupka:  { label: "Оценка скупки",   icon: "DollarSign",    color: "#FFD700" },
+  repair_order:     { label: "Заявка ремонт",    icon: "Wrench",        color: "#38BDF8" },
+  lead:             { label: "Оценка",            icon: "Tag",           color: "#FFD700" },
+  repair:           { label: "Ремонт",            icon: "Wrench",        color: "#38BDF8" },
+  apple:            { label: "Apple",             icon: "Smartphone",    color: "#aaa" },
+  gold:             { label: "Золото",            icon: "Gem",           color: "#FCD34D" },
+  jobs:             { label: "Вакансия",          icon: "Briefcase",     color: "#a78bfa" },
+  catalog:          { label: "Каталог",           icon: "ShoppingBag",   color: "#34d399" },
+  tools:            { label: "Инструменты",       icon: "Wrench",        color: "#fb923c" },
+  avito:            { label: "Авито",             icon: "ExternalLink",  color: "#97CF26" },
+  exit_popup:       { label: "Поп-ап",            icon: "AlertCircle",   color: "#f87171" },
+};
+
 export function SourcesBlock({ sources }: { sources: { source: string; sessions: number; visitors: number }[] }) {
   const max = Math.max(1, ...sources.map(s => s.sessions));
   return (
@@ -50,21 +64,35 @@ export function ConversionsBlock({ items }: { items: Conversion[] }) {
         <div className="text-[11px] text-white/40 text-center py-3">Заявок ещё нет</div>
       ) : (
         <div className="space-y-1.5">
-          {items.slice(0, 12).map(c => (
-            <a key={c.id} href={`/staff/analytics/visitor/${c.visitor_id}`}
-              className="block bg-[#0F0F0F] border border-[#1F1F1F] hover:border-[#FFD700]/30 rounded-lg px-2.5 py-1.5 text-[11px]">
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-bold text-white/85 truncate">{c.type}</span>
-                {c.amount ? <span className="text-[#FFD700] font-extrabold shrink-0">{c.amount.toLocaleString("ru-RU")} ₽</span> : null}
-              </div>
-              <div className="text-[10px] text-white/45 flex items-center gap-1.5 flex-wrap">
-                {c.phone && <span>📞 {c.phone}</span>}
-                {c.city && <span>📍 {c.city}</span>}
-                {c.source && <span>← {(SOURCE_LABEL[c.source]?.label) || c.source}</span>}
-                <span className="ml-auto">{fmtAgo(c.timestamp)}</span>
-              </div>
-            </a>
-          ))}
+          {items.slice(0, 12).map(c => {
+            const ct = CONV_TYPE[c.type] || { label: c.type, icon: "Inbox", color: "#999" };
+            return (
+              <a key={c.id} href={`/staff/analytics/visitor/${c.visitor_id}`}
+                className="flex items-stretch bg-[#0F0F0F] border border-[#1F1F1F] hover:border-[#FFD700]/30 rounded-lg overflow-hidden text-[11px] transition-colors">
+                {/* Цветная полоска-тип слева */}
+                <div className="w-1 shrink-0" style={{ background: ct.color }} />
+                <div className="flex-1 px-2.5 py-1.5 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-bold flex items-center gap-1" style={{ color: ct.color }}>
+                      <Icon name={ct.icon as Parameters<typeof Icon>[0]["name"]} size={11} />
+                      {ct.label}
+                    </span>
+                    {c.amount ? (
+                      <span className="text-[#FFD700] font-extrabold shrink-0">
+                        {c.amount.toLocaleString("ru-RU")} ₽
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="text-[10px] text-white/45 flex items-center gap-1.5 flex-wrap mt-0.5">
+                    {c.phone && <span>📞 {c.phone}</span>}
+                    {c.city && <span>📍 {c.city}</span>}
+                    {c.source && <span>← {SOURCE_LABEL[c.source]?.label || c.source}</span>}
+                    <span className="ml-auto">{fmtAgo(c.timestamp)}</span>
+                  </div>
+                </div>
+              </a>
+            );
+          })}
         </div>
       )}
     </section>
