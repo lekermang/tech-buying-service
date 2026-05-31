@@ -4,6 +4,9 @@ import Icon from "@/components/ui/icon";
 import { fmt, type SLSoldItem, type SLBoughtItem } from "./types";
 import { printReceipt } from "./labelPrinter";
 
+const SEND_CHECK_URL = "https://functions.poehali.dev/3e5c5c1a-5e16-4ae2-8b34-8618e4f6558d";
+const ADMIN_TOKEN = "Mark2015N";
+
 // ── Пульсирующий статус-индикатор ─────────────────────────────────────────
 export function LiveDot({ color = "#22c55e" }: { color?: string }) {
   return (
@@ -18,13 +21,13 @@ export function LiveDot({ color = "#22c55e" }: { color?: string }) {
 
 // ── Строка товара ──────────────────────────────────────────────────────────
 export function ItemRow({
-  title, meta, amount, amountColor, onPrint,
+  title, meta, amount, amountColor, onPrint, onEmail,
 }: {
   title: string; meta: string; amount: string;
-  amountColor: string; onPrint?: () => void;
+  amountColor: string; onPrint?: () => void; onEmail?: () => void;
 }) {
   return (
-    <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl transition-colors"
+    <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl transition-colors"
       style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
       <div className="flex-1 min-w-0">
         <div className="text-[13px] font-medium text-white truncate leading-tight">{title}</div>
@@ -42,6 +45,13 @@ export function ItemRow({
           className="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all active:scale-90"
           style={{ background: "rgba(255,215,0,0.08)", border: "1px solid rgba(255,215,0,0.2)", color: "#FFD700" }}>
           <Icon name="Receipt" size={12} />
+        </button>
+      )}
+      {onEmail && (
+        <button onClick={onEmail}
+          className="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all active:scale-90"
+          style={{ background: "rgba(96,165,250,0.08)", border: "1px solid rgba(96,165,250,0.25)", color: "#60a5fa" }}>
+          <Icon name="Mail" size={12} />
         </button>
       )}
     </div>
@@ -140,13 +150,64 @@ export function Section({
 }
 
 // ── Секция «Что продано» ──────────────────────────────────────────────────
+function buildSaleCheckHtml(s: SLSoldItem): string {
+  const dateStr = s.sell_at ? new Date(s.sell_at).toLocaleDateString("ru-RU") : new Date().toLocaleDateString("ru-RU");
+  const timeStr = s.sell_at ? new Date(s.sell_at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }) : "";
+  const pmLabel: Record<string, string> = { cash: "Наличные", card: "Карта", transfer: "Перевод" };
+  const amount = Number(s.amount || s.sell_price || 0);
+  return `<div style="font-family:Arial,sans-serif;font-size:12px;color:#000;max-width:500px">
+  <h2 style="text-align:center;margin:0 0 4px;font-size:16px">Скупка24</h2>
+  <div style="font-size:10px;text-align:center;color:#555;margin-bottom:12px">ИП Мамедов Адиль Мирза Оглы · г.Калуга, ул.Кирова, 7 / 11 · skypka24.com</div>
+  <div style="font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #000;padding-bottom:3px;margin:0 0 8px">Товарный чек</div>
+  <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px"><span style="color:#666">№ операции:</span><span style="font-weight:600">#${s.operation_id || s.id}</span></div>
+  <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px"><span style="color:#666">Дата:</span><span style="font-weight:600">${dateStr}${timeStr ? " " + timeStr : ""}</span></div>
+  <div style="border-top:1px dashed #ccc;margin:8px 0"></div>
+  <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px"><span style="color:#666">Товар:</span><span style="font-weight:600">${s.title}</span></div>
+  ${s.specs_short ? `<div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px"><span style="color:#666">Характеристики:</span><span style="font-weight:600">${s.specs_short}</span></div>` : ""}
+  ${s.imei ? `<div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px"><span style="color:#666">IMEI:</span><span style="font-weight:600">${s.imei}</span></div>` : ""}
+  ${s.client_name ? `<div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px"><span style="color:#666">Покупатель:</span><span style="font-weight:600">${s.client_name}</span></div>` : ""}
+  <div style="border-top:1px dashed #ccc;margin:8px 0"></div>
+  ${s.payment_method ? `<div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px"><span style="color:#666">Оплата:</span><span style="font-weight:600">${pmLabel[s.payment_method] || s.payment_method}</span></div>` : ""}
+  <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:bold;border-top:2px solid #000;padding-top:8px;margin-top:4px"><span>Итого:</span><span>${amount.toLocaleString("ru-RU")} ₽</span></div>
+  <div style="font-size:9px;color:#888;margin-top:12px">ИНН: 402810962699 · ОГРНИП: 307402814200032<br>Товар надлежащего качества обмену и возврату не подлежит.</div>
+</div>`;
+}
+
 export function SoldSection({
   sold, onNav,
 }: {
   sold: SLSoldItem[];
   onNav: (k: string) => void;
 }) {
+  const [emailDialog, setEmailDialog] = useState<SLSoldItem | null>(null);
+  const [emailInput, setEmailInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  const handleSend = async () => {
+    if (!emailInput.trim() || !emailDialog) return;
+    setSending(true);
+    try {
+      const res = await fetch(SEND_CHECK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Admin-Token": ADMIN_TOKEN },
+        body: JSON.stringify({
+          email: emailInput.trim(),
+          check_html: buildSaleCheckHtml(emailDialog),
+          check_type: "sale",
+          order_id: emailDialog.operation_id || emailDialog.id,
+          client_name: emailDialog.client_name || "",
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.sent) { setSent(true); setTimeout(() => { setEmailDialog(null); setSent(false); }, 1500); }
+    } finally {
+      setSending(false);
+    }
+  };
+
   return (
+    <>
     <Section title="Что продано" onMore={() => onNav("operations")} accentColor="#34d399">
       {sold.length === 0 ? (
         <div className="text-center py-4 text-[12px] font-roboto"
@@ -167,6 +228,7 @@ export function SoldSection({
               amount={fmt(s.amount || s.sell_price)}
               amountColor="#60a5fa"
               onPrint={() => printReceipt(s)}
+              onEmail={() => { setEmailInput(""); setSent(false); setEmailDialog(s); }}
             />
           ))}
           {sold.length > 15 && (
@@ -179,6 +241,69 @@ export function SoldSection({
         </>
       )}
     </Section>
+
+    {/* Диалог отправки чека на email */}
+    {emailDialog && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+        <div className="w-full max-w-sm rounded-2xl p-5 shadow-2xl"
+          style={{ background: "#111", border: "1px solid rgba(255,255,255,0.08)" }}>
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: "rgba(96,165,250,0.15)", border: "1px solid rgba(96,165,250,0.3)" }}>
+              <Icon name="Mail" size={16} style={{ color: "#60a5fa" }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-oswald font-bold text-white text-sm uppercase tracking-wide">Отправить чек</div>
+              <div className="font-roboto text-[10px] truncate" style={{ color: "rgba(255,255,255,0.35)" }}>
+                {emailDialog.title}
+              </div>
+            </div>
+            <button onClick={() => setEmailDialog(null)} style={{ color: "rgba(255,255,255,0.3)" }}>
+              <Icon name="X" size={16} />
+            </button>
+          </div>
+
+          {sent ? (
+            <div className="flex items-center justify-center gap-2 py-4 text-emerald-400 font-roboto text-sm">
+              <Icon name="CheckCircle2" size={18} /> Чек отправлен!
+            </div>
+          ) : (
+            <>
+              <div className="font-roboto text-[11px] mb-2" style={{ color: "rgba(255,255,255,0.4)" }}>
+                Email покупателя
+              </div>
+              <input
+                type="email"
+                value={emailInput}
+                onChange={e => setEmailInput(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleSend()}
+                placeholder="email@example.com"
+                autoFocus
+                className="w-full px-3 py-2.5 rounded-lg text-white text-sm placeholder-white/20 outline-none mb-3 font-roboto"
+                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
+              />
+              <div className="flex gap-2">
+                <button onClick={() => setEmailDialog(null)}
+                  className="flex-1 py-2.5 rounded-lg text-sm font-roboto transition-colors"
+                  style={{ border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.4)" }}>
+                  Отмена
+                </button>
+                <button
+                  onClick={handleSend}
+                  disabled={sending || !emailInput.trim()}
+                  className="flex-1 py-2.5 rounded-lg font-bold text-sm font-roboto flex items-center justify-center gap-1.5 transition-all disabled:opacity-40"
+                  style={{ background: "#3b82f6", color: "#fff" }}>
+                  {sending
+                    ? <><Icon name="Loader2" size={13} className="animate-spin" /> Отправляю...</>
+                    : <><Icon name="Send" size={13} /> Отправить</>}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 
