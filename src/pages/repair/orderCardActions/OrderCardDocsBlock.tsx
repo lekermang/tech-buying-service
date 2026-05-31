@@ -1,6 +1,6 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
-import { Order, printReceipt, printAct, printActHTML, sendReceiptByEmail } from "../types";
+import { Order, printReceipt, printAct, printActHTML, sendReceiptByEmail, sendIntakeEmailBundle } from "../types";
 import { useStaffToast } from "../../staff/StaffToast";
 import { humanizeError } from "../staffTab/humanizeError";
 import {
@@ -12,6 +12,9 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { AuthHeader } from "./orderCardActionsTypes";
+import { INP, LBL } from "../types";
+
+type EmailDoc = "receipt" | "intake_bundle";
 
 type Props = {
   o: Order;
@@ -25,18 +28,28 @@ export default function OrderCardDocsBlock({ o, isOwner, token, authHeader, onDe
   const toast = useStaffToast();
   const [actSending, setActSending] = useState(false);
   const [actSent, setActSent] = useState(false);
-  const [emailDialog, setEmailDialog] = useState(false);
-  const [emailInput, setEmailInput] = useState("");
+  const [emailDialog, setEmailDialog] = useState<EmailDoc | null>(null);
+  const [emailInput, setEmailInput] = useState(o.client_email || "");
   const [emailSending, setEmailSending] = useState(false);
 
+  const openEmailDialog = (doc: EmailDoc) => {
+    setEmailInput(o.client_email || "");
+    setEmailDialog(doc);
+  };
+
   const handleSendEmail = async () => {
-    if (!emailInput.trim()) return;
+    if (!emailInput.trim() || !emailDialog) return;
     setEmailSending(true);
-    const tid = toast.loading(`Отправляю чек на ${emailInput}...`);
+    const label = emailDialog === "intake_bundle" ? "Акт приёмки + гарантия" : "Гарантийный чек";
+    const tid = toast.loading(`Отправляю «${label}» на ${emailInput}...`);
     try {
-      await sendReceiptByEmail(o, emailInput.trim(), token);
-      toast.update(tid, { kind: "success", message: `Чек отправлен на ${emailInput}`, duration: 4000 });
-      setEmailDialog(false);
+      if (emailDialog === "intake_bundle") {
+        await sendIntakeEmailBundle(o, emailInput.trim(), token);
+      } else {
+        await sendReceiptByEmail(o, emailInput.trim(), token);
+      }
+      toast.update(tid, { kind: "success", message: `Отправлено на ${emailInput}`, duration: 4000 });
+      setEmailDialog(null);
       setEmailInput("");
     } catch (e) {
       toast.update(tid, { kind: "error", message: String((e as Error).message), duration: 5000 });
@@ -188,15 +201,29 @@ export default function OrderCardDocsBlock({ o, isOwner, token, authHeader, onDe
             </DropdownMenuItem>
 
             <DropdownMenuItem
-              onClick={() => { setEmailInput(""); setEmailDialog(true); }}
+              onClick={() => openEmailDialog("intake_bundle")}
               className="group/item rounded-lg cursor-pointer focus:bg-blue-500/10 px-2 py-2 gap-2.5 transition-colors"
             >
               <div className="w-8 h-8 rounded-md bg-blue-500/15 border border-blue-500/30 flex items-center justify-center shrink-0">
-                <Icon name="Mail" size={14} className="text-blue-300" />
+                <Icon name="MailCheck" size={14} className="text-blue-300" />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="font-roboto text-[12px] text-white font-bold leading-tight">Чек на email</div>
-                <div className="font-roboto text-[10px] text-white/40 leading-tight">отправить клиенту письмом</div>
+                <div className="font-roboto text-[12px] text-white font-bold leading-tight">Акт приёмки + Гарантия</div>
+                <div className="font-roboto text-[10px] text-white/40 leading-tight">2 документа на email клиенту</div>
+              </div>
+              <Icon name="ChevronRight" size={12} className="text-white/30 group-hover/item:text-white/60 transition-colors" />
+            </DropdownMenuItem>
+
+            <DropdownMenuItem
+              onClick={() => openEmailDialog("receipt")}
+              className="group/item rounded-lg cursor-pointer focus:bg-blue-400/10 px-2 py-2 gap-2.5 transition-colors"
+            >
+              <div className="w-8 h-8 rounded-md bg-blue-400/10 border border-blue-400/20 flex items-center justify-center shrink-0">
+                <Icon name="Mail" size={14} className="text-blue-200" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-roboto text-[12px] text-white font-bold leading-tight">Гарантийный чек</div>
+                <div className="font-roboto text-[10px] text-white/40 leading-tight">1 документ на email</div>
               </div>
               <Icon name="ChevronRight" size={12} className="text-white/30 group-hover/item:text-white/60 transition-colors" />
             </DropdownMenuItem>
@@ -237,44 +264,73 @@ export default function OrderCardDocsBlock({ o, isOwner, token, authHeader, onDe
 
         {/* Кнопка «Email» */}
         <button
-          onClick={() => { setEmailInput(""); setEmailDialog(true); }}
-          title="Отправить чек на email клиенту"
+          onClick={() => openEmailDialog("intake_bundle")}
+          title={o.client_email ? `Отправить на ${o.client_email}` : "Отправить акты на email клиенту"}
           className="relative font-roboto text-[11px] py-3 px-4 rounded-lg border border-blue-500/40 bg-gradient-to-br from-blue-500/15 via-blue-500/5 to-transparent text-blue-200 hover:from-blue-500/25 hover:border-blue-500/70 active:scale-95 transition-all inline-flex items-center justify-center gap-1.5 min-h-[48px] shrink-0"
         >
           <Icon name="Mail" size={14} />
           <span className="hidden sm:inline font-bold relative">Email</span>
+          {o.client_email && <span className="w-1.5 h-1.5 rounded-full bg-blue-400 absolute top-1.5 right-1.5" />}
         </button>
       </div>
     </div>
 
-    {/* Диалог ввода email */}
+    {/* Диалог отправки на email */}
     {emailDialog && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
-        <div className="w-full max-w-sm bg-[#111] border border-white/10 rounded-2xl p-5 shadow-2xl">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 rounded-lg bg-blue-500/20 border border-blue-500/30 flex items-center justify-center">
-              <Icon name="Mail" size={15} className="text-blue-300" />
+        <div className="w-full max-w-sm bg-gradient-to-br from-[#141414] to-[#0e0e0e] border border-[#FFD700]/20 rounded-2xl p-5 shadow-2xl shadow-black/80">
+          {/* Шапка */}
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-9 h-9 rounded-xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center shrink-0">
+              <Icon name={emailDialog === "intake_bundle" ? "MailCheck" : "Mail"} size={16} className="text-blue-300" />
             </div>
-            <div>
-              <div className="font-oswald font-bold text-white text-sm uppercase tracking-wide">Отправить чек</div>
-              <div className="font-roboto text-[10px] text-white/40">Заявка #{o.id} · {o.name}</div>
+            <div className="flex-1 min-w-0">
+              <div className="font-oswald font-bold text-white text-sm uppercase tracking-wide">
+                {emailDialog === "intake_bundle" ? "Акт приёмки + Гарантия" : "Гарантийный чек"}
+              </div>
+              <div className="font-roboto text-[10px] text-white/40">#{o.id} · {o.model || o.name}</div>
             </div>
-            <button onClick={() => setEmailDialog(false)} className="ml-auto text-white/30 hover:text-white/70">
+            <button onClick={() => setEmailDialog(null)} className="text-white/30 hover:text-white/70 transition-colors">
               <Icon name="X" size={16} />
             </button>
           </div>
+
+          {/* Что будет отправлено */}
+          <div className="bg-blue-500/[0.07] border border-blue-500/20 rounded-xl p-3 mb-4 space-y-1.5">
+            {emailDialog === "intake_bundle" ? (
+              <>
+                <div className="flex items-center gap-2 text-[11px] text-blue-200/80 font-roboto">
+                  <Icon name="FileCheck" size={11} className="text-blue-400 shrink-0" />
+                  Акт приёмки — номер, устройство, проблема, стоимость
+                </div>
+                <div className="flex items-center gap-2 text-[11px] text-blue-200/80 font-roboto">
+                  <Icon name="Shield" size={11} className="text-blue-400 shrink-0" />
+                  Гарантийный талон — условия, сроки, ссылки
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center gap-2 text-[11px] text-blue-200/80 font-roboto">
+                <Icon name="Receipt" size={11} className="text-blue-400 shrink-0" />
+                Гарантийный чек — итоговая сумма, гарантия 30 дней
+              </div>
+            )}
+          </div>
+
+          {/* Email */}
+          <label className={LBL}>Email клиента</label>
           <input
             type="email"
             value={emailInput}
             onChange={e => setEmailInput(e.target.value)}
             onKeyDown={e => e.key === "Enter" && handleSendEmail()}
-            placeholder="email@example.com"
+            placeholder="ivan@mail.ru"
             autoFocus
-            className="w-full px-3 py-2.5 rounded-lg bg-white/[0.06] border border-white/[0.12] text-white text-sm placeholder-white/25 outline-none focus:border-blue-400/50 font-roboto mb-3"
+            className={INP + " mb-4"}
           />
+
           <div className="flex gap-2">
             <button
-              onClick={() => setEmailDialog(false)}
+              onClick={() => setEmailDialog(null)}
               className="flex-1 py-2.5 rounded-lg border border-white/10 text-white/50 text-sm font-roboto hover:border-white/20 transition-colors"
             >
               Отмена
@@ -282,11 +338,11 @@ export default function OrderCardDocsBlock({ o, isOwner, token, authHeader, onDe
             <button
               onClick={handleSendEmail}
               disabled={emailSending || !emailInput.trim()}
-              className="flex-1 py-2.5 rounded-lg bg-blue-500 hover:bg-blue-400 disabled:opacity-40 text-white font-bold text-sm font-roboto transition-colors flex items-center justify-center gap-1.5"
+              className="flex-1 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-bold text-sm font-roboto transition-colors flex items-center justify-center gap-1.5"
             >
               {emailSending
-                ? <><Icon name="Loader2" size={13} className="animate-spin" /> Отправляю...</>
-                : <><Icon name="Send" size={13} /> Отправить</>
+                ? <><Icon name="Loader2" size={13} className="animate-spin" />Отправляю...</>
+                : <><Icon name="Send" size={13} />Отправить</>
               }
             </button>
           </div>
