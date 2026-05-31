@@ -543,6 +543,165 @@ def list_events(params):
     return [dict(r) for r in rows]
 
 
+def inventory_report(params):
+    """Складской баланс и ДДС: остатки на начало/конец месяца, инвестиции vs вычеты,
+    движение по дням и месяцам, прирост товарного запаса, ROI."""
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    # ── 1. Итоговые цифры с начала бизнеса ──────────────────────────────────
+    cur.execute(f"""
+        SELECT
+            MIN(created_at)                                                         AS started_at,
+            COUNT(*)                                                                AS total_items,
+            COUNT(*) FILTER (WHERE status IN ('stock','showcase','consignment'))    AS in_stock_count,
+            COUNT(*) FILTER (WHERE status = 'sold')                                 AS sold_count,
+            COUNT(*) FILTER (WHERE status = 'returned')                             AS returned_count,
+            COALESCE(SUM(buy_price), 0)                                             AS total_invested,
+            COALESCE(SUM(buy_price) FILTER (WHERE status IN ('stock','showcase','consignment')), 0) AS stock_value_buy,
+            COALESCE(SUM(sell_price) FILTER (WHERE status IN ('stock','showcase','consignment')), 0) AS stock_value_sell,
+            COALESCE(SUM(sell_price) FILTER (WHERE status = 'sold'), 0)             AS total_revenue,
+            COALESCE(SUM(buy_price)  FILTER (WHERE status = 'sold'), 0)             AS total_cogs,
+            COALESCE(SUM(sell_price - buy_price) FILTER (WHERE status = 'sold'), 0) AS total_profit
+        FROM {SCHEMA}.slshop_items
+    """)
+    totals = dict(cur.fetchone())
+
+    # ── 2. По месяцам: закупки и продажи ────────────────────────────────────
+    cur.execute(f"""
+        SELECT
+            TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') AS month,
+            COUNT(*)                                             AS bought_count,
+            COALESCE(SUM(buy_price), 0)                         AS bought_sum
+        FROM {SCHEMA}.slshop_items
+        WHERE created_at IS NOT NULL
+        GROUP BY DATE_TRUNC('month', created_at)
+        ORDER BY DATE_TRUNC('month', created_at)
+    """)
+    by_month_buy = [dict(r) for r in cur.fetchall()]
+
+    cur.execute(f"""
+        SELECT
+            TO_CHAR(DATE_TRUNC('month', sell_at), 'YYYY-MM') AS month,
+            COUNT(*)                                           AS sold_count,
+            COALESCE(SUM(sell_price), 0)                      AS revenue,
+            COALESCE(SUM(buy_price), 0)                       AS cogs,
+            COALESCE(SUM(sell_price - buy_price), 0)          AS profit
+        FROM {SCHEMA}.slshop_items
+        WHERE sell_at IS NOT NULL AND status = 'sold'
+        GROUP BY DATE_TRUNC('month', sell_at)
+        ORDER BY DATE_TRUNC('month', sell_at)
+    """)
+    by_month_sell = [dict(r) for r in cur.fetchall()]
+
+    # ── 3. По дням: закупки ─────────────────────────────────────────────────
+    cur.execute(f"""
+        SELECT
+            DATE(buy_at)                    AS day,
+            COUNT(*)                        AS bought_count,
+            COALESCE(SUM(buy_price), 0)     AS bought_sum
+        FROM {SCHEMA}.slshop_items
+        WHERE buy_at IS NOT NULL AND buy_at >= NOW() - INTERVAL '90 days'
+        GROUP BY DATE(buy_at)
+        ORDER BY day
+    """)
+    by_day_buy = [dict(r) for r in cur.fetchall()]
+
+    # ── 4. По дням: продажи ──────────────────────────────────────────────────
+    cur.execute(f"""
+        SELECT
+            DATE(sell_at)                             AS day,
+            COUNT(*)                                  AS sold_count,
+            COALESCE(SUM(sell_price), 0)              AS revenue,
+            COALESCE(SUM(buy_price), 0)               AS cogs,
+            COALESCE(SUM(sell_price - buy_price), 0)  AS profit
+        FROM {SCHEMA}.slshop_items
+        WHERE sell_at IS NOT NULL AND sell_at >= NOW() - INTERVAL '90 days'
+        GROUP BY DATE(sell_at)
+        ORDER BY day
+    """)
+    by_day_sell = [dict(r) for r in cur.fetchall()]
+
+    # ── 5. Баланс на начало и конец каждого месяца ───────────────────────────
+    # «Стоимость склада на конец месяца M» = сумма buy_price товаров,
+    #   которые были закуплены до конца M, но ещё не проданы к концу M
+    cur.execute(f"""
+        WITH months AS (
+            SELECT DISTINCT DATE_TRUNC('month', created_at) AS m
+            FROM {SCHEMA}.slshop_items
+            WHERE created_at IS NOT NULL
+            ORDER BY m
+        )
+        SELECT
+            TO_CHAR(m, 'YYYY-MM')                       AS month,
+            (SELECT COALESCE(SUM(i.buy_price), 0)
+             FROM {SCHEMA}.slshop_items i
+             WHERE i.created_at <= (m + INTERVAL '1 month' - INTERVAL '1 second')
+               AND (i.sell_at IS NULL OR i.sell_at > (m + INTERVAL '1 month' - INTERVAL '1 second'))
+               AND i.status != 'returned'
+            )                                            AS stock_value_end,
+            (SELECT COUNT(*)
+             FROM {SCHEMA}.slshop_items i
+             WHERE i.created_at <= (m + INTERVAL '1 month' - INTERVAL '1 second')
+               AND (i.sell_at IS NULL OR i.sell_at > (m + INTERVAL '1 month' - INTERVAL '1 second'))
+               AND i.status != 'returned'
+            )                                            AS stock_count_end
+        FROM months
+        ORDER BY m
+    """)
+    monthly_balance = [dict(r) for r in cur.fetchall()]
+
+    # ── 6. По категориям: текущие остатки ────────────────────────────────────
+    cur.execute(f"""
+        SELECT
+            COALESCE(c.name, 'Без категории') AS category,
+            COUNT(*)                          AS count,
+            COALESCE(SUM(i.buy_price), 0)     AS buy_sum,
+            COALESCE(SUM(i.sell_price), 0)    AS sell_sum,
+            ROUND(AVG(i.buy_price))           AS avg_buy
+        FROM {SCHEMA}.slshop_items i
+        LEFT JOIN {SCHEMA}.slshop_categories c ON c.id = i.category_id
+        WHERE i.status IN ('stock', 'showcase', 'consignment')
+        GROUP BY c.name
+        ORDER BY buy_sum DESC
+    """)
+    by_category = [dict(r) for r in cur.fetchall()]
+
+    cur.close(); conn.close()
+
+    # Вычисляем ROI: прибыль / вложения в проданный товар * 100
+    cogs = float(totals.get('total_cogs') or 0)
+    profit = float(totals.get('total_profit') or 0)
+    roi = round(profit / cogs * 100, 1) if cogs > 0 else 0
+
+    # Оборачиваемость: среднее кол-во дней от закупки до продажи (приближение)
+    total_sold = int(totals.get('sold_count') or 0)
+    total_stock = int(totals.get('in_stock_count') or 0)
+
+    return _ok({
+        'totals': {
+            'started_at': totals['started_at'].isoformat() if totals.get('started_at') else None,
+            'total_items': int(totals.get('total_items') or 0),
+            'in_stock_count': total_stock,
+            'sold_count': total_sold,
+            'returned_count': int(totals.get('returned_count') or 0),
+            'total_invested': float(totals.get('total_invested') or 0),
+            'stock_value_buy': float(totals.get('stock_value_buy') or 0),
+            'stock_value_sell': float(totals.get('stock_value_sell') or 0),
+            'total_revenue': float(totals.get('total_revenue') or 0),
+            'total_cogs': float(totals.get('total_cogs') or 0),
+            'total_profit': float(totals.get('total_profit') or 0),
+            'roi': roi,
+        },
+        'by_month_buy': by_month_buy,
+        'by_month_sell': by_month_sell,
+        'by_day_buy': by_day_buy,
+        'by_day_sell': by_day_sell,
+        'monthly_balance': monthly_balance,
+        'by_category': by_category,
+    })
+
+
 def analytics_full(params):
     """Расширенная аналитика: периоды, разбивка по сотрудникам, филиалам, категориям, дням"""
     period = (params.get('period') or '30d').strip()
@@ -2912,6 +3071,8 @@ def handler(event: dict, context) -> dict:
             return _ok(list_events(params))
         if action == 'analytics_full':
             return analytics_full(params)
+        if action == 'inventory_report':
+            return inventory_report(params)
         if action == 'accounting':
             return accounting_summary(params)
         if action == 'favorites':
