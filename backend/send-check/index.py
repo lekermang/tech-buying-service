@@ -19,7 +19,7 @@ HEADERS = {
 
 SMTP_HOST = 'smtp.yandex.ru'
 SMTP_PORT = 465
-SMTP_USER = 'lekermany@yandex.ru'
+SMTP_USER = 'lekermanya@yandex.ru'
 SMTP_FROM_NAME = 'Скупка24'
 
 

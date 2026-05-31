@@ -27,7 +27,7 @@ import psycopg2
 
 SCHEMA = 't_p31606708_tech_buying_service'
 SITE_BASE = 'https://skypka24.ru'
-SMTP_FROM = 'lekermany@yandex.ru'
+SMTP_FROM = 'lekermanya@yandex.ru'
 SMTP_FROM_NAME = 'Скупка 24'
 
 CORS = {
