@@ -282,7 +282,7 @@ export default function StaffRepairList({
                 </div>
               </div>
 
-              {/* ── Блок 3: тип ремонта + стоимость ── */}
+              {/* ── Блок 3: тип ремонта + пароль + стоимость ── */}
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className={LBL}>Причина / что делать</label>
@@ -294,13 +294,68 @@ export default function StaffRepairList({
                 </div>
               </div>
 
-              {/* ── Блок 4: комментарий ── */}
+              {/* ── Блок 4: Пароль устройства ── */}
               <div>
-                <label className={LBL}>Описание проблемы</label>
-                <input value={form.comment} onChange={e => setForm(p => ({ ...p, comment: e.target.value }))} placeholder="Не включается, разбит экран..." className={INP} />
+                <label className={LBL}>Пароль устройства</label>
+                <input
+                  value={form.device_password}
+                  onChange={e => setForm(p => ({ ...p, device_password: e.target.value }))}
+                  placeholder="1234 / не знает / нет пароля"
+                  className={INP}
+                />
               </div>
 
-              {/* ── Блок 5: email — необязательно ── */}
+              {/* ── Блок 5: Дефекты внешнего вида ── */}
+              <div className="border border-white/10 bg-black/30 rounded-lg p-3">
+                <div className="font-roboto text-[#FFD700] text-[10px] uppercase tracking-widest mb-2.5 flex items-center gap-1.5">
+                  <Icon name="ClipboardList" size={11} />
+                  Внешний вид и дефекты
+                </div>
+                {([
+                  { group: "Экран",   items: ["Трещина экрана", "Скол стекла", "Битые пиксели", "Полосы", "Не реагирует тачскрин", "Пятна / засветы"] },
+                  { group: "Корпус",  items: ["Царапины", "Потёртости", "Вмятина", "Скол корпуса", "Трещина корпуса", "Следы влаги"] },
+                  { group: "Функции", items: ["Не включается", "Не заряжается", "Нет звука", "Нет сети", "Камера не работает", "Кнопки не работают"] },
+                ] as { group: string; items: string[] }[]).map(({ group, items }) => (
+                  <div key={group} className="mb-2">
+                    <div className="font-roboto text-white/35 text-[9px] uppercase tracking-wider mb-1">{group}</div>
+                    <div className="flex flex-wrap gap-1">
+                      {items.map(label => {
+                        const active = (form.comment || "").includes(label);
+                        return (
+                          <button
+                            key={label}
+                            type="button"
+                            onClick={() => {
+                              setForm(p => {
+                                const cur = p.comment || "";
+                                const next = active
+                                  ? cur.split(", ").filter(x => x !== label).join(", ")
+                                  : cur ? cur + ", " + label : label;
+                                return { ...p, comment: next };
+                              });
+                            }}
+                            className={`px-2 py-0.5 rounded text-[10px] font-roboto border transition-all ${
+                              active
+                                ? "bg-[#FFD700] border-[#FFD700] text-black font-bold"
+                                : "bg-transparent border-white/15 text-white/45 hover:border-white/35 hover:text-white/65"
+                            }`}
+                          >
+                            {active && "✓ "}{label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+                {/* Итог */}
+                {form.comment && (
+                  <div className="mt-2 px-2 py-1.5 bg-[#111] border border-[#FFD700]/20 rounded text-[10px] font-roboto text-white/60">
+                    <span className="text-[#FFD700]/50">В акте: </span>{form.comment}
+                  </div>
+                )}
+              </div>
+
+              {/* ── Блок 6: email — необязательно ── */}
               <div className="relative">
                 <label className={LBL}>
                   Email клиента <span className="text-white/30">— для актов и чека</span>
