@@ -155,22 +155,32 @@ function buildSaleCheckHtml(s: SLSoldItem): string {
   const timeStr = s.sell_at ? new Date(s.sell_at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }) : "";
   const pmLabel: Record<string, string> = { cash: "Наличные", card: "Карта", transfer: "Перевод" };
   const amount = Number(s.amount || s.sell_price || 0);
-  return `<div style="font-family:Arial,sans-serif;font-size:12px;color:#000;max-width:500px">
-  <h2 style="text-align:center;margin:0 0 4px;font-size:16px">Скупка24</h2>
-  <div style="font-size:10px;text-align:center;color:#555;margin-bottom:12px">ИП Мамедов Адиль Мирза Оглы · г.Калуга, ул.Кирова, 7 / 11 · skypka24.com</div>
-  <div style="font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #000;padding-bottom:3px;margin:0 0 8px">Товарный чек</div>
-  <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px"><span style="color:#666">№ операции:</span><span style="font-weight:600">#${s.operation_id || s.id}</span></div>
-  <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px"><span style="color:#666">Дата:</span><span style="font-weight:600">${dateStr}${timeStr ? " " + timeStr : ""}</span></div>
-  <div style="border-top:1px dashed #ccc;margin:8px 0"></div>
-  <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px"><span style="color:#666">Товар:</span><span style="font-weight:600">${s.title}</span></div>
-  ${s.specs_short ? `<div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px"><span style="color:#666">Характеристики:</span><span style="font-weight:600">${s.specs_short}</span></div>` : ""}
-  ${s.imei ? `<div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px"><span style="color:#666">IMEI:</span><span style="font-weight:600">${s.imei}</span></div>` : ""}
-  ${s.client_name ? `<div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px"><span style="color:#666">Покупатель:</span><span style="font-weight:600">${s.client_name}</span></div>` : ""}
-  <div style="border-top:1px dashed #ccc;margin:8px 0"></div>
-  ${s.payment_method ? `<div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px"><span style="color:#666">Оплата:</span><span style="font-weight:600">${pmLabel[s.payment_method] || s.payment_method}</span></div>` : ""}
-  <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:bold;border-top:2px solid #000;padding-top:8px;margin-top:4px"><span>Итого:</span><span>${amount.toLocaleString("ru-RU")} ₽</span></div>
-  <div style="font-size:9px;color:#888;margin-top:12px">ИНН: 402810962699 · ОГРНИП: 307402814200032<br>Товар надлежащего качества обмену и возврату не подлежит.</div>
-</div>`;
+
+  const row = (label: string, value: string) =>
+    `<tr><td style="padding:7px 0;color:#aaa;font-size:13px;width:45%">${label}</td><td style="padding:7px 0;color:#fff;font-size:13px;font-weight:600;text-align:right">${value}</td></tr>`;
+
+  return `
+  <table width="100%" cellpadding="0" cellspacing="0" style="color:#e0e0e0;font-family:Arial,sans-serif">
+    ${row("№ операции", `#${s.operation_id || s.id}`)}
+    ${row("Дата", `${dateStr}${timeStr ? " " + timeStr : ""}`)}
+    <tr><td colspan="2" style="padding:4px 0"><div style="height:1px;background:#333"></div></td></tr>
+    ${row("Товар", s.title)}
+    ${s.specs_short ? row("Характеристики", s.specs_short) : ""}
+    ${s.imei ? row("IMEI", s.imei) : ""}
+    ${s.client_name ? row("Покупатель", s.client_name) : ""}
+    ${s.client_phone ? row("Телефон", s.client_phone) : ""}
+    <tr><td colspan="2" style="padding:4px 0"><div style="height:1px;background:#333"></div></td></tr>
+    ${s.payment_method ? row("Способ оплаты", pmLabel[s.payment_method] || s.payment_method) : ""}
+    <tr>
+      <td style="padding:12px 0 4px;color:#FFD700;font-size:16px;font-weight:800">ИТОГО</td>
+      <td style="padding:12px 0 4px;color:#FFD700;font-size:20px;font-weight:900;text-align:right">${amount.toLocaleString("ru-RU")} ₽</td>
+    </tr>
+    <tr><td colspan="2" style="padding:4px 0"><div style="height:2px;background:linear-gradient(90deg,#FFD700,transparent)"></div></td></tr>
+    <tr><td colspan="2" style="padding:12px 0 0;font-size:11px;color:#555;line-height:1.7">
+      Товар надлежащего качества обмену и возврату не подлежит.<br>
+      ИНН: 402810962699 · ОГРНИП: 307402814200032
+    </td></tr>
+  </table>`;
 }
 
 export function SoldSection({

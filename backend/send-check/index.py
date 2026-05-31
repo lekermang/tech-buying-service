@@ -37,10 +37,13 @@ def has_access(headers_in: dict) -> bool:
 
 
 def build_email_html(check_type: str, subject_data: dict, check_html: str) -> str:
-    """Оборачивает HTML чека в красивый email-шаблон."""
+    """Оборачивает HTML чека в красивый фирменный email-шаблон Скупки24."""
     title = subject_data.get('title', 'Квитанция Скупка24')
     order_id = subject_data.get('order_id', '')
     client_name = subject_data.get('client_name', '')
+    greeting = f'Здравствуйте, {client_name}!' if client_name else 'Здравствуйте!'
+    doc_line = f'Ваш чек по заказу <span style="color:#FFD700;font-weight:bold">#{order_id}</span>' if order_id else 'Ваш документ'
+    icon = '🔧' if check_type == 'repair' else '🛍️'
 
     return f"""<!DOCTYPE html>
 <html lang="ru">
@@ -49,45 +52,94 @@ def build_email_html(check_type: str, subject_data: dict, check_html: str) -> st
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{title}</title>
 </head>
-<body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,sans-serif">
-  <div style="max-width:680px;margin:24px auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08)">
+<body style="margin:0;padding:0;background:#0d0d0d;font-family:Arial,Helvetica,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#0d0d0d;padding:32px 16px">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
 
-    <!-- Шапка -->
-    <div style="background:#111;padding:20px 32px;display:flex;align-items:center;gap:16px">
-      <div>
-        <div style="color:#FFD700;font-size:22px;font-weight:bold;letter-spacing:1px">Скупка24</div>
-        <div style="color:#888;font-size:12px;margin-top:2px">г. Калуга · skypka24.com</div>
-      </div>
-      <div style="margin-left:auto;background:#FFD700;color:#000;padding:6px 16px;border-radius:20px;font-size:13px;font-weight:bold">
-        {title}
-      </div>
-    </div>
+  <!-- ШАПКА -->
+  <tr>
+    <td style="background:linear-gradient(135deg,#1a1a1a 0%,#111 100%);border-radius:16px 16px 0 0;padding:32px 40px;border-bottom:2px solid #FFD700">
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td>
+            <div style="font-size:28px;font-weight:900;color:#FFD700;letter-spacing:2px;line-height:1">СКУПКА<span style="color:#fff">24</span></div>
+            <div style="font-size:12px;color:#666;margin-top:4px;letter-spacing:1px;text-transform:uppercase">г. Калуга · Покупаем дорого</div>
+          </td>
+          <td align="right">
+            <div style="background:#FFD700;color:#000;padding:8px 18px;border-radius:30px;font-size:13px;font-weight:800;letter-spacing:0.5px;display:inline-block">{icon} {title}</div>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
 
-    <!-- Приветствие -->
-    <div style="padding:24px 32px 16px;border-bottom:1px solid #eee">
-      <div style="font-size:15px;color:#222;font-weight:bold;margin-bottom:6px">
-        {'Здравствуйте, ' + client_name + '!' if client_name else 'Здравствуйте!'}
+  <!-- ПРИВЕТСТВИЕ -->
+  <tr>
+    <td style="background:#161616;padding:28px 40px 20px">
+      <div style="font-size:18px;font-weight:700;color:#fff;margin-bottom:8px">{greeting}</div>
+      <div style="font-size:14px;color:#aaa;line-height:1.7">
+        {doc_line} прикреплён ниже.<br>
+        Сохраните это письмо — он понадобится при обращении по гарантии.
       </div>
-      <div style="font-size:13px;color:#555;line-height:1.6">
-        {'Ваш чек по заказу <b>#' + str(order_id) + '</b>' if order_id else 'Ваш документ'} прикреплён ниже.
-        Сохраните это письмо для получения гарантийного обслуживания.
-      </div>
-    </div>
+    </td>
+  </tr>
 
-    <!-- Чек -->
-    <div style="padding:24px 32px">
-      {check_html}
-    </div>
+  <!-- РАЗДЕЛИТЕЛЬ -->
+  <tr>
+    <td style="background:#161616;padding:0 40px">
+      <div style="height:1px;background:linear-gradient(90deg,transparent,#FFD700,transparent)"></div>
+    </td>
+  </tr>
 
-    <!-- Футер -->
-    <div style="background:#f8f8f8;padding:16px 32px;border-top:1px solid #eee;text-align:center">
-      <div style="font-size:11px;color:#999;line-height:1.8">
-        ИП Мамедов Адиль Мирза Оглы · ИНН: 402810962699<br>
-        г. Калуга, ул. Кирова, 7/47 и ул. Кирова, 11<br>
-        Тел.: +7 (992) 990-33-33 · <a href="https://skypka24.com" style="color:#888">skypka24.com</a>
+  <!-- ЧЕК -->
+  <tr>
+    <td style="background:#161616;padding:28px 40px">
+      <div style="background:#1e1e1e;border-radius:12px;border:1px solid #2a2a2a;padding:24px;color:#e0e0e0;font-size:13px;line-height:1.8">
+        {check_html}
       </div>
-    </div>
-  </div>
+    </td>
+  </tr>
+
+  <!-- КНОПКА НА САЙТ -->
+  <tr>
+    <td style="background:#161616;padding:8px 40px 28px;text-align:center">
+      <a href="https://skypka24.com" style="display:inline-block;background:#FFD700;color:#000;font-weight:800;font-size:14px;padding:14px 36px;border-radius:30px;text-decoration:none;letter-spacing:0.5px">
+        Перейти на сайт →
+      </a>
+    </td>
+  </tr>
+
+  <!-- КОНТАКТЫ -->
+  <tr>
+    <td style="background:#111;padding:20px 40px;border-top:1px solid #222">
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="font-size:12px;color:#555;line-height:2">
+            📍 г. Калуга, ул. Кирова, 7/47 и ул. Кирова, 11<br>
+            📞 <a href="tel:+79929903333" style="color:#888;text-decoration:none">+7 (992) 990-33-33</a><br>
+            🌐 <a href="https://skypka24.com" style="color:#FFD700;text-decoration:none">skypka24.com</a>
+          </td>
+          <td align="right" style="font-size:11px;color:#444;line-height:1.8">
+            ИП Мамедов Адиль Мирза Оглы<br>
+            ИНН: 402810962699<br>
+            ОГРНИП: 307402814200032
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- ПОДВАЛ -->
+  <tr>
+    <td style="background:#0a0a0a;border-radius:0 0 16px 16px;padding:16px 40px;text-align:center">
+      <div style="font-size:11px;color:#444">© 2025 Скупка24 · Все права защищены</div>
+    </td>
+  </tr>
+
+</table>
+</td></tr>
+</table>
 </body>
 </html>"""
 
