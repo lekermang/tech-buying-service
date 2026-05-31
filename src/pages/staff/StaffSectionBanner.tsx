@@ -26,12 +26,10 @@ const SECTION_META: Record<string, SectionMeta> = {
 };
 
 export default function StaffSectionBanner({ tab }: { tab: StaffTab }) {
-  const meta = SECTION_META[tab];
   const [mounted, setMounted] = useState(false);
   const [prevTab, setPrevTab] = useState(tab);
   const [visible, setVisible] = useState(true);
 
-  // Анимация при смене таба
   useEffect(() => {
     if (tab !== prevTab) {
       setVisible(false);
@@ -50,112 +48,134 @@ export default function StaffSectionBanner({ tab }: { tab: StaffTab }) {
   return (
     <>
       <style>{`
-        @keyframes scanLineBanner {
-          0%   { top: 0; opacity: 0.6; }
-          80%  { opacity: 0.6; }
+        @keyframes bannerScan {
+          0%   { top: 0; opacity: 0; }
+          5%   { opacity: 0.7; }
+          90%  { opacity: 0.4; }
           100% { top: 100%; opacity: 0; }
         }
         @keyframes bannerIn {
-          from { opacity: 0; transform: translateY(-6px); }
-          to   { opacity: 1; transform: translateY(0); }
+          from { opacity: 0; transform: translateY(-8px) scale(0.99); filter: blur(3px); }
+          to   { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
         }
       `}</style>
 
       <div className="px-3 pt-3 pb-0 sm:px-4 sm:pt-3 max-w-[1400px] mx-auto w-full">
         <div
-          className="relative overflow-hidden rounded-2xl"
+          className="relative overflow-hidden"
           style={{
-            background: `linear-gradient(135deg, ${color}0e 0%, rgba(5,5,8,0.0) 65%)`,
-            border: `1px solid ${color}22`,
-            boxShadow: `0 0 24px ${color}0a, inset 0 1px 0 ${color}12`,
+            borderRadius: 14,
+            background: `
+              linear-gradient(135deg, ${color}0d 0%, rgba(8,6,4,0.0) 60%),
+              linear-gradient(180deg, rgba(20,16,10,0.7) 0%, rgba(10,8,6,0.8) 100%)
+            `,
+            border: `1px solid ${color}20`,
+            boxShadow: `
+              0 0 0 1px rgba(255,255,255,0.03) inset,
+              0 -1px 0 rgba(0,0,0,0.4) inset,
+              0 8px 32px rgba(0,0,0,0.5),
+              0 0 40px ${color}06
+            `,
             opacity: mounted && visible ? 1 : 0,
-            transform: mounted && visible ? "translateY(0)" : "translateY(-4px)",
-            transition: "opacity 0.15s ease, transform 0.15s ease",
+            animation: mounted && visible ? "bannerIn 0.3s cubic-bezier(0.23,1,0.32,1) both" : "none",
           }}
         >
-          {/* Верхняя неоновая линия */}
-          <div className="absolute top-0 left-0 right-0 h-[1px] pointer-events-none"
-            style={{ background: `linear-gradient(90deg, transparent, ${color}70, transparent)` }} />
+          {/* Верхняя световая линия */}
+          <div className="absolute top-0 left-0 right-0 pointer-events-none" style={{
+            height: "1px",
+            background: `linear-gradient(90deg, transparent 0%, ${color}50 25%, rgba(255,248,232,0.6) 50%, ${color}50 75%, transparent 100%)`,
+          }} />
 
-          {/* Сканирующая линия */}
-          <div className="absolute left-0 right-0 h-[1px] pointer-events-none"
-            style={{
-              background: `linear-gradient(90deg, transparent, ${color}50, transparent)`,
-              animation: "scanLineBanner 4s linear infinite",
-              animationDelay: "0.5s",
-            }} />
+          {/* Кино-сканлайн */}
+          <div className="absolute left-0 right-0 h-px pointer-events-none" style={{
+            background: `linear-gradient(90deg, transparent, ${color}60, transparent)`,
+            animation: "bannerScan 5s linear infinite",
+            animationDelay: "1s",
+          }} />
 
-          {/* Угловое свечение */}
-          <div className="absolute -top-6 -left-6 w-24 h-24 rounded-full blur-2xl pointer-events-none"
-            style={{ background: `${color}20` }} />
+          {/* Угловое свечение — как прожектор */}
+          <div className="absolute -top-4 -left-4 w-20 h-20 rounded-full pointer-events-none" style={{
+            background: `radial-gradient(circle, ${color}25 0%, transparent 70%)`,
+            filter: "blur(16px)",
+          }} />
 
-          {/* Corner brackets */}
+          {/* Watermark */}
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 font-mono font-black pointer-events-none select-none hidden sm:block"
+            style={{ color: `${color}06`, fontSize: "60px", letterSpacing: "-0.04em", lineHeight: 1 }}>
+            {currentMeta.tag || tab.toUpperCase()}
+          </div>
+
+          {/* Угловые скобки */}
           {[
-            { top: 0, left: 0, borderTop: `1.5px solid ${color}50`, borderLeft: `1.5px solid ${color}50` },
-            { top: 0, right: 0, borderTop: `1.5px solid ${color}50`, borderRight: `1.5px solid ${color}50` },
-            { bottom: 0, left: 0, borderBottom: `1.5px solid ${color}30`, borderLeft: `1.5px solid ${color}30` },
-            { bottom: 0, right: 0, borderBottom: `1.5px solid ${color}30`, borderRight: `1.5px solid ${color}30` },
+            { top: 0, left: 0, borderTop: `1.5px solid ${color}55`, borderLeft: `1.5px solid ${color}55`, borderRadius: "14px 0 0 0" },
+            { top: 0, right: 0, borderTop: `1.5px solid ${color}55`, borderRight: `1.5px solid ${color}55`, borderRadius: "0 14px 0 0" },
+            { bottom: 0, left: 0, borderBottom: `1px solid ${color}28`, borderLeft: `1px solid ${color}28`, borderRadius: "0 0 0 14px" },
+            { bottom: 0, right: 0, borderBottom: `1px solid ${color}28`, borderRight: `1px solid ${color}28`, borderRadius: "0 0 14px 0" },
           ].map((s, i) => (
             <span key={i} className="absolute w-4 h-4 pointer-events-none" style={s} />
           ))}
 
-          {/* Фоновый watermark */}
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 font-mono font-black pointer-events-none select-none hidden sm:block"
-            style={{ color: `${color}05`, fontSize: "52px", letterSpacing: "-0.05em", lineHeight: 1 }}>
-            {currentMeta.tag || tab.toUpperCase()}
-          </div>
-
           <div className="relative flex items-center gap-3 px-4 py-3">
-            {/* Иконка */}
-            <div className="shrink-0 relative w-10 h-10 rounded-xl flex items-center justify-center"
-              style={{
-                background: `${color}12`,
-                border: `1px solid ${color}28`,
-                boxShadow: `0 0 20px ${color}18`,
-              }}>
+            {/* Иконка в 3D раме */}
+            <div className="shrink-0 relative w-10 h-10 flex items-center justify-center" style={{
+              borderRadius: 10,
+              background: `linear-gradient(145deg, ${color}18, ${color}08)`,
+              border: `1px solid ${color}25`,
+              boxShadow: `0 0 20px ${color}15, inset 0 1px 0 rgba(255,255,255,0.06)`,
+            }}>
               <Icon name={currentMeta.icon} size={18}
-                style={{ color, filter: `drop-shadow(0 0 6px ${color}90)` }} />
-              {/* Угловая точка иконки */}
+                style={{ color, filter: `drop-shadow(0 0 8px ${color}90)` }} />
               <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full"
-                style={{ background: color, boxShadow: `0 0 6px ${color}`, opacity: 0.8 }} />
+                style={{ background: color, boxShadow: `0 0 6px ${color}`, opacity: 0.9 }} />
             </div>
 
             {/* Текст */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <h1 className="font-oswald font-black uppercase text-[15px] tracking-[0.07em] leading-tight"
-                  style={{ color, textShadow: `0 0 20px ${color}60` }}>
+                <h1 className="font-oswald font-black uppercase leading-tight"
+                  style={{
+                    fontSize: "15px",
+                    letterSpacing: "0.1em",
+                    background: `linear-gradient(90deg, #fff8e8, ${color})`,
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    backgroundClip: "text",
+                    filter: `drop-shadow(0 0 8px ${color}50)`,
+                  }}>
                   {currentMeta.title}
                 </h1>
                 {currentMeta.tag && (
-                  <span className="font-mono text-[8px] px-1.5 py-0.5 rounded hidden sm:inline-block"
-                    style={{ color: `${color}60`, background: `${color}0a`, border: `1px solid ${color}15`, letterSpacing: "0.1em" }}>
+                  <span className="font-mono text-[8px] px-1.5 py-0.5 hidden sm:inline-block" style={{
+                    color: `${color}55`,
+                    background: `${color}08`,
+                    border: `1px solid ${color}15`,
+                    borderRadius: 4,
+                    letterSpacing: "0.12em",
+                  }}>
                     {currentMeta.tag}
                   </span>
                 )}
               </div>
               <p className="text-[11px] font-roboto truncate leading-tight mt-0.5"
-                style={{ color: "rgba(255,255,255,0.32)" }}>
+                style={{ color: "rgba(255,240,200,0.28)" }}>
                 {currentMeta.subtitle}
               </p>
             </div>
 
-            {/* Статус */}
-            <div className="hidden sm:flex flex-col items-end gap-1 shrink-0">
-              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg"
-                style={{ background: "rgba(34,197,94,0.07)", border: "1px solid rgba(34,197,94,0.18)" }}>
-                <span className="relative flex h-1.5 w-1.5">
-                  <span className="absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75 animate-ping" />
-                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-400" />
-                </span>
-                <span className="text-[9px] uppercase tracking-widest font-bold text-green-400">Live</span>
-              </div>
+            {/* Live статус */}
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 shrink-0" style={{
+              background: "rgba(34,197,94,0.06)",
+              border: "1px solid rgba(34,197,94,0.15)",
+              borderRadius: 8,
+              boxShadow: "0 0 12px rgba(34,197,94,0.08)",
+            }}>
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75 animate-ping" />
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-400" style={{ boxShadow: "0 0 6px rgba(34,197,94,0.9)" }} />
+              </span>
+              <span className="font-mono text-[9px] uppercase tracking-widest font-bold text-green-400">Live</span>
             </div>
           </div>
-
-          {/* Нижняя линия */}
-          <div className="absolute bottom-0 left-0 right-0 h-px pointer-events-none"
-            style={{ background: `linear-gradient(90deg, transparent, ${color}15, transparent)` }} />
         </div>
       </div>
     </>

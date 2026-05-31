@@ -154,8 +154,8 @@ export function StaffMainLayout({
 
   return (
     <div
-      className="text-white flex flex-col relative overflow-x-hidden"
-      style={{ fontFamily: "var(--staff-font, inherit)", minHeight: "100dvh", background: "#050508" }}
+      className="text-white flex flex-col relative overflow-x-hidden noir-scanline"
+      style={{ fontFamily: "var(--staff-font, inherit)", minHeight: "100dvh", background: "#050403" }}
     >
       <FontApplier />
 
@@ -272,4 +272,3 @@ export function StaffMainLayout({
     </div>
   );
 }
-

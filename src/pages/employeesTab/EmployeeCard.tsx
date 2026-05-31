@@ -22,13 +22,15 @@ export default function EmployeeCard({
 
   return (
     <div
-      className={`border rounded-lg transition-all overflow-hidden ${
+      className={`overflow-hidden transition-all duration-300 ${
         isEditing
-          ? "bg-gradient-to-br from-[#1A1A1A] to-[#141414] border-[#FFD700]/40 shadow-lg shadow-[#FFD700]/5"
+          ? "noir-card border-[#FFD700]/40"
           : emp.is_active
-            ? "bg-[#141414] border-[#1F1F1F] hover:border-[#2A2A2A]"
-            : "bg-[#0F0F0F] border-[#1A1A1A] opacity-60"
-      }`}>
+            ? "noir-card"
+            : "noir-card opacity-50"
+      }`}
+      style={isEditing ? { borderColor: "rgba(255,215,0,0.35)", boxShadow: "0 0 0 1px rgba(255,215,0,0.15), 0 8px 32px rgba(0,0,0,0.7), 0 0 30px rgba(255,215,0,0.05)" } : undefined}
+    >
       {isEditing ? (
         <div className="p-3 space-y-2.5">
           <div className="flex items-center gap-2 pb-2 border-b border-[#1F1F1F]">
