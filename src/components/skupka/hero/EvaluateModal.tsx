@@ -74,181 +74,354 @@ export default function EvaluateModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 animate-[fadeIn_0.2s_ease]">
-      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full sm:max-w-md bg-[#111] border-t sm:border border-[#FFD700]/25 shadow-2xl max-h-[95dvh] sm:max-h-[88vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl animate-[slideDown_0.22s_ease]">
+    <>
+      <style>{`
+        @keyframes evalFadeIn {
+          from { opacity: 0; }
+          to   { opacity: 1; }
+        }
+        @keyframes evalSlideUp {
+          from { transform: translateY(100%); opacity: 0.5; }
+          to   { transform: translateY(0);    opacity: 1; }
+        }
+        @keyframes evalScaleIn {
+          from { transform: scale(0.95) translateY(8px); opacity: 0; }
+          to   { transform: scale(1) translateY(0); opacity: 1; }
+        }
+        @keyframes evalSuccessPop {
+          0%   { transform: scale(0.5); opacity: 0; }
+          70%  { transform: scale(1.1); }
+          100% { transform: scale(1); opacity: 1; }
+        }
+      `}</style>
 
-        {/* Шапка */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/8 sticky top-0 bg-[#111] z-10">
-          {step === 2 && !submitted ? (
-            <button onClick={() => { setStep(1); setError(null); }}
-              className="flex items-center gap-1.5 text-white/50 hover:text-white transition-colors font-roboto text-sm">
-              <Icon name="ChevronLeft" size={16} /> Назад
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
+        style={{ animation: "evalFadeIn 0.2s ease both" }}>
+
+        {/* Бэкдроп */}
+        <div className="absolute inset-0" onClick={onClose} style={{
+          background: "rgba(0,0,0,0.85)",
+          backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
+        }} />
+
+        {/* Модал */}
+        <div className="relative w-full sm:max-w-md max-h-[95dvh] sm:max-h-[88vh] overflow-y-auto overflow-x-hidden"
+          style={{
+            background: "linear-gradient(170deg, rgba(20,16,8,0.99) 0%, rgba(10,8,4,1) 100%)",
+            border: "1px solid rgba(255,215,0,0.18)",
+            borderBottom: "none",
+            borderRadius: "20px 20px 0 0",
+            boxShadow: "0 -4px 60px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.03) inset",
+            animation: "evalSlideUp 0.28s cubic-bezier(0.23,1,0.32,1) both",
+          }}
+          // На десктопе — другой стиль
+          {...{ "data-modal": true }}
+        >
+          {/* Десктоп-оверрайд */}
+          <style>{`
+            @media (min-width: 640px) {
+              [data-modal="true"] {
+                border-radius: 20px !important;
+                border-bottom: 1px solid rgba(255,215,0,0.18) !important;
+                animation: evalScaleIn 0.25s cubic-bezier(0.23,1,0.32,1) both !important;
+              }
+            }
+          `}</style>
+
+          {/* Drag handle (мобайл) */}
+          <div className="flex justify-center pt-3 pb-1 sm:hidden">
+            <div className="w-10 h-1 rounded-full" style={{ background: "rgba(255,215,0,0.25)" }} />
+          </div>
+
+          {/* Световая полоска сверху */}
+          <div className="absolute top-0 left-8 right-8 pointer-events-none" style={{
+            height: "1px",
+            background: "linear-gradient(90deg, transparent, rgba(255,215,0,0.6), rgba(255,248,232,0.8), rgba(255,215,0,0.6), transparent)",
+            boxShadow: "0 0 20px rgba(255,215,0,0.4)",
+          }} />
+
+          {/* Угловое свечение */}
+          <div className="absolute top-0 left-0 w-40 h-32 pointer-events-none" style={{
+            background: "radial-gradient(ellipse at 0% 0%, rgba(255,215,0,0.06) 0%, transparent 70%)",
+          }} />
+
+          {/* ── Шапка ── */}
+          <div className="flex items-center justify-between px-5 py-3.5 sticky top-0 z-10" style={{
+            background: "linear-gradient(180deg, rgba(20,16,8,0.99) 0%, rgba(14,11,6,0.97) 100%)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+            borderBottom: "1px solid rgba(255,215,0,0.08)",
+          }}>
+            {step === 2 && !submitted ? (
+              <button onClick={() => { setStep(1); setError(null); }}
+                className="flex items-center gap-1.5 transition-all duration-150 active:scale-95 font-roboto text-sm"
+                style={{ color: "rgba(255,255,255,0.45)" }}
+                onMouseEnter={e => (e.currentTarget.style.color = "rgba(255,255,255,0.9)")}
+                onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.45)")}
+              >
+                <Icon name="ChevronLeft" size={16} /> Назад
+              </button>
+            ) : (
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 flex items-center justify-center rounded-lg" style={{
+                  background: "linear-gradient(135deg, #FFE34D, #FFD700)",
+                  boxShadow: "0 0 16px rgba(255,215,0,0.5)",
+                }}>
+                  <Icon name="Zap" size={14} className="text-black" />
+                </div>
+                <span className="font-oswald text-base font-bold uppercase tracking-wide" style={{
+                  background: "linear-gradient(90deg, #fff8e8, #FFD700)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                }}>
+                  Быстрая оценка
+                </span>
+              </div>
+            )}
+
+            <button onClick={onClose}
+              className="w-8 h-8 flex items-center justify-center rounded-lg transition-all duration-150 active:scale-90"
+              style={{ color: "rgba(255,255,255,0.3)", background: "transparent" }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLButtonElement).style.color = "rgba(255,255,255,0.8)";
+                (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.06)";
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLButtonElement).style.color = "rgba(255,255,255,0.3)";
+                (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+              }}
+            >
+              <Icon name="X" size={17} />
             </button>
-          ) : (
-            <div className="flex items-center gap-2.5">
-              <div className="w-6 h-6 bg-[#FFD700] flex items-center justify-center rounded">
-                <Icon name="Zap" size={13} className="text-black" />
-              </div>
-              <span className="font-oswald text-base font-bold uppercase tracking-wide">Быстрая оценка</span>
+          </div>
+
+          {/* Прогресс-бар (шаги) */}
+          {!submitted && (
+            <div className="flex gap-1 px-5 pt-3">
+              {[1, 2].map(s => (
+                <div key={s} className="flex-1 h-0.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.07)" }}>
+                  <div className="h-full rounded-full transition-all duration-500" style={{
+                    width: step >= s ? "100%" : "0%",
+                    background: "linear-gradient(90deg, #FFD700, #fff8a0)",
+                    boxShadow: step >= s ? "0 0 8px rgba(255,215,0,0.6)" : "none",
+                  }} />
+                </div>
+              ))}
             </div>
           )}
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-white/30 hover:text-white transition-colors rounded-lg hover:bg-white/5">
-            <Icon name="X" size={17} />
-          </button>
-        </div>
 
-        <div className="p-5">
-          {/* ── Успех ── */}
-          {submitted ? (
-            <div className="text-center py-8">
-              <div className="w-16 h-16 bg-[#FFD700] flex items-center justify-center mx-auto mb-4 rounded-2xl">
-                <Icon name="Check" size={32} className="text-black" />
+          <div className="p-5 pt-4">
+
+            {/* ── Успех ── */}
+            {submitted ? (
+              <div className="text-center py-6">
+                <div className="w-20 h-20 mx-auto mb-5 flex items-center justify-center rounded-2xl" style={{
+                  background: "linear-gradient(135deg, #FFE34D, #FFD700)",
+                  boxShadow: "0 0 40px rgba(255,215,0,0.5), 0 8px 32px rgba(0,0,0,0.4)",
+                  animation: "evalSuccessPop 0.5s cubic-bezier(0.23,1,0.32,1) both",
+                }}>
+                  <Icon name="Check" size={36} className="text-black" />
+                </div>
+                <h3 className="font-oswald text-2xl font-bold uppercase mb-2" style={{
+                  background: "linear-gradient(180deg, #fff8e8, #FFD700)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                }}>Заявка принята!</h3>
+                <p className="font-roboto text-sm mb-1" style={{ color: "rgba(255,255,255,0.5)" }}>
+                  Перезвоним в течение <b style={{ color: "white" }}>15 минут</b>
+                </p>
+                <p className="font-roboto text-xs mb-8" style={{ color: "rgba(255,255,255,0.28)" }}>
+                  Работаем с 10:00 до 21:00, без выходных
+                </p>
+                <button onClick={onClose} className="btn-gold-premium btn-xl w-full">Закрыть</button>
               </div>
-              <h3 className="font-oswald text-2xl font-bold text-[#FFD700] mb-2 uppercase">Заявка принята!</h3>
-              <p className="font-roboto text-white/55 text-sm mb-1">Перезвоним в течение <b className="text-white">15 минут</b></p>
-              <p className="font-roboto text-white/35 text-xs mb-7">Работаем с 10:00 до 21:00, без выходных</p>
-              <button onClick={onClose} className="btn-gold-premium btn-lg w-full">Закрыть</button>
-            </div>
 
-          ) : step === 1 ? (
-            /* ── Шаг 1: Контакты ── */
-            <div className="space-y-3">
-              <div>
-                <div className="font-roboto text-white/60 text-sm mb-4 leading-relaxed">
+            ) : step === 1 ? (
+              /* ── Шаг 1: Контакты ── */
+              <div className="space-y-4">
+                <p className="font-roboto text-sm leading-relaxed" style={{ color: "rgba(255,255,255,0.5)" }}>
                   Оставьте номер — перезвоним, назовём цену и договоримся об удобном времени.
-                </div>
-              </div>
+                </p>
 
-              <div>
-                <label className={LBL_CLS}>Ваше имя</label>
-                <input
-                  autoFocus
-                  type="text"
-                  value={formData.name}
-                  onChange={e => setFormData(p => ({ ...p, name: e.target.value }))}
-                  onKeyDown={e => e.key === "Enter" && goStep2()}
-                  placeholder="Иван"
-                  className={INP_CLS}
-                />
-              </div>
-
-              <div>
-                <label className={LBL_CLS}>Телефон <span className="text-[#FFD700]">*</span></label>
-                <input
-                  type="tel"
-                  inputMode="tel"
-                  value={formData.phone}
-                  onChange={e => setFormData(p => ({ ...p, phone: formatPhone(e.target.value) }))}
-                  onFocus={() => { if (!formData.phone) setFormData(p => ({ ...p, phone: "+7" })); }}
-                  onKeyDown={e => e.key === "Enter" && goStep2()}
-                  placeholder="+7 (___) ___-__-__"
-                  className={INP_CLS}
-                />
-              </div>
-
-              {error && <p className="text-red-400 text-sm font-roboto text-center">{error}</p>}
-
-              <button onClick={goStep2} className="btn-gold-premium btn-xl w-full mt-1">
-                Далее <Icon name="ArrowRight" size={18} />
-              </button>
-
-              {/* Соцдоказательства */}
-              <div className="flex items-center justify-center gap-4 pt-1">
-                <span className="flex items-center gap-1 text-white/35 text-[11px] font-roboto">
-                  <Icon name="Clock" size={11} /> 15 мин ответ
-                </span>
-                <span className="flex items-center gap-1 text-white/35 text-[11px] font-roboto">
-                  <Icon name="ShieldCheck" size={11} /> Без обязательств
-                </span>
-                <span className="flex items-center gap-1 text-white/35 text-[11px] font-roboto">
-                  <Icon name="Star" size={11} /> 4.9 рейтинг
-                </span>
-              </div>
-            </div>
-
-          ) : (
-            /* ── Шаг 2: Описание + фото + цена ── */
-            <div className="space-y-3">
-              <div className="bg-[#0D0D0D] border border-[#1f1f1f] rounded-xl p-3 flex items-center gap-3 mb-1">
-                <Icon name="CheckCircle2" size={16} className="text-[#FFD700] shrink-0" />
-                <div className="font-roboto text-sm">
-                  <span className="text-white/50">Контакты: </span>
-                  <span className="text-white font-semibold">{formData.name}</span>
-                  <span className="text-white/50"> · </span>
-                  <span className="text-white font-semibold">{formData.phone}</span>
-                </div>
-              </div>
-
-              <div>
-                <label className={LBL_CLS}>Что продаёте?</label>
-                <textarea
-                  autoFocus
-                  value={formData.desc}
-                  onChange={e => setFormData(p => ({ ...p, desc: e.target.value }))}
-                  placeholder="iPhone 14 Pro 256GB, чёрный, без трещин, все документы"
-                  rows={3}
-                  className={INP_CLS + " resize-none"}
-                />
-              </div>
-
-              <div>
-                <label className={LBL_CLS}>Желаемая цена <span className="text-white/30 normal-case font-roboto">(необязательно)</span></label>
-                <div className="relative">
+                <div>
+                  <label className={LBL_CLS}>Ваше имя</label>
                   <input
-                    type="number" min="0"
-                    value={formData.client_price}
-                    onChange={e => setFormData(p => ({ ...p, client_price: e.target.value }))}
-                    placeholder="30 000"
-                    className={INP_CLS + " pr-8"}
+                    autoFocus
+                    type="text"
+                    value={formData.name}
+                    onChange={e => setFormData(p => ({ ...p, name: e.target.value }))}
+                    onKeyDown={e => e.key === "Enter" && goStep2()}
+                    placeholder="Иван"
+                    className={INP_CLS}
                   />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-white/35 font-roboto text-sm">₽</span>
                 </div>
-              </div>
 
-              {/* Фото */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className={LBL_CLS + " mb-0"}>Фото <span className="text-white/30 normal-case">(необязательно)</span></label>
-                  <span className="text-[#FFD700] text-[11px] font-roboto">{photos.length}/5</span>
+                <div>
+                  <label className={LBL_CLS}>Телефон <span style={{ color: "#FFD700" }}>*</span></label>
+                  <input
+                    type="tel"
+                    inputMode="tel"
+                    value={formData.phone}
+                    onChange={e => setFormData(p => ({ ...p, phone: formatPhone(e.target.value) }))}
+                    onFocus={() => { if (!formData.phone) setFormData(p => ({ ...p, phone: "+7" })); }}
+                    onKeyDown={e => e.key === "Enter" && goStep2()}
+                    placeholder="+7 (___) ___-__-__"
+                    className={INP_CLS}
+                  />
                 </div>
-                <div className="flex gap-2 flex-wrap">
-                  {photos.map((p, idx) => (
-                    <div key={idx} className="relative w-16 h-16 rounded-lg overflow-hidden shrink-0">
-                      <img src={p.preview} alt="" className="w-full h-full object-cover" />
-                      <button type="button" onClick={() => setPhotos(prev => prev.filter((_, i) => i !== idx))}
-                        className="absolute top-0.5 right-0.5 w-5 h-5 bg-black/80 text-white flex items-center justify-center rounded-full">
-                        <Icon name="X" size={9} />
-                      </button>
-                    </div>
+
+                {error && (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{
+                    background: "rgba(239,68,68,0.1)",
+                    border: "1px solid rgba(239,68,68,0.25)",
+                  }}>
+                    <Icon name="AlertCircle" size={14} className="text-red-400 shrink-0" />
+                    <p className="text-red-400 text-sm font-roboto">{error}</p>
+                  </div>
+                )}
+
+                <button onClick={goStep2} className="btn-gold-premium btn-xl w-full mt-1">
+                  Далее <Icon name="ArrowRight" size={18} />
+                </button>
+
+                {/* Соцдоказательства */}
+                <div className="flex items-center justify-center gap-3 pt-1 flex-wrap">
+                  {[
+                    { icon: "Clock", text: "15 мин ответ" },
+                    { icon: "ShieldCheck", text: "Без обязательств" },
+                    { icon: "Star", text: "4.9 рейтинг" },
+                  ].map(({ icon, text }) => (
+                    <span key={text} className="flex items-center gap-1 font-roboto text-[11px]"
+                      style={{ color: "rgba(255,255,255,0.3)" }}>
+                      <Icon name={icon} size={11} />
+                      {text}
+                    </span>
                   ))}
-                  {photos.length < 5 && (
-                    <div onClick={() => fileRef.current?.click()}
-                      className="w-16 h-16 border-2 border-dashed border-[#333] hover:border-[#FFD700] active:border-[#FFD700] rounded-lg flex flex-col items-center justify-center gap-0.5 cursor-pointer touch-manipulation transition-colors">
-                      <Icon name="Camera" size={18} className="text-[#FFD700]/60" />
-                      <span className="font-roboto text-white/30 text-[9px]">добавить</span>
-                    </div>
-                  )}
                 </div>
-                <input ref={fileRef} type="file" accept="image/*" multiple onChange={handlePhoto} className="hidden" />
               </div>
 
-              {error && <p className="text-red-400 text-sm font-roboto text-center">{error}</p>}
+            ) : (
+              /* ── Шаг 2: Описание + фото + цена ── */
+              <div className="space-y-4">
 
-              <button onClick={handleSubmit} disabled={loading} className="btn-gold-premium btn-xl w-full">
-                {loading
-                  ? <><Icon name="Loader" size={18} className="animate-spin" /> Отправляем...</>
-                  : <><Icon name="Check" size={18} /> Отправить заявку</>
-                }
-              </button>
+                {/* Карточка контактов (подтверждение) */}
+                <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl" style={{
+                  background: "linear-gradient(90deg, rgba(255,215,0,0.08), rgba(255,215,0,0.04))",
+                  border: "1px solid rgba(255,215,0,0.15)",
+                }}>
+                  <Icon name="CheckCircle2" size={16} style={{ color: "#FFD700", flexShrink: 0 }} />
+                  <div className="font-roboto text-sm min-w-0">
+                    <span style={{ color: "rgba(255,255,255,0.45)" }}>Контакты: </span>
+                    <span className="font-semibold text-white truncate">{formData.name}</span>
+                    <span style={{ color: "rgba(255,255,255,0.45)" }}> · </span>
+                    <span className="font-semibold text-white">{formData.phone}</span>
+                  </div>
+                </div>
 
-              <p className="font-roboto text-white/25 text-xs text-center">
-                Нажимая кнопку, вы соглашаетесь с обработкой персональных данных
-              </p>
-            </div>
-          )}
+                <div>
+                  <label className={LBL_CLS}>Что продаёте?</label>
+                  <textarea
+                    autoFocus
+                    value={formData.desc}
+                    onChange={e => setFormData(p => ({ ...p, desc: e.target.value }))}
+                    placeholder="iPhone 14 Pro 256GB, чёрный, без трещин, все документы"
+                    rows={3}
+                    className={INP_CLS + " resize-none"}
+                  />
+                </div>
+
+                <div>
+                  <label className={LBL_CLS}>
+                    Желаемая цена <span className="normal-case font-roboto" style={{ color: "rgba(255,255,255,0.28)" }}>(необязательно)</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number" min="0"
+                      value={formData.client_price}
+                      onChange={e => setFormData(p => ({ ...p, client_price: e.target.value }))}
+                      placeholder="30 000"
+                      className={INP_CLS + " pr-8"}
+                    />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 font-roboto text-sm"
+                      style={{ color: "rgba(255,255,255,0.3)" }}>₽</span>
+                  </div>
+                </div>
+
+                {/* Фото */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className={LBL_CLS + " !mb-0"}>
+                      Фото <span className="normal-case" style={{ color: "rgba(255,255,255,0.28)" }}>(необязательно)</span>
+                    </label>
+                    <span className="text-[11px] font-roboto" style={{ color: "rgba(255,215,0,0.7)" }}>{photos.length}/5</span>
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    {photos.map((p, idx) => (
+                      <div key={idx} className="relative rounded-xl overflow-hidden shrink-0" style={{ width: 64, height: 64 }}>
+                        <img src={p.preview} alt="" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 pointer-events-none" style={{
+                          background: "linear-gradient(145deg, rgba(255,255,255,0.05), transparent)",
+                        }} />
+                        <button type="button" onClick={() => setPhotos(prev => prev.filter((_, i) => i !== idx))}
+                          className="absolute top-1 right-1 w-5 h-5 flex items-center justify-center rounded-full"
+                          style={{ background: "rgba(0,0,0,0.85)", color: "white", border: "1px solid rgba(255,255,255,0.15)" }}>
+                          <Icon name="X" size={9} />
+                        </button>
+                      </div>
+                    ))}
+                    {photos.length < 5 && (
+                      <div onClick={() => fileRef.current?.click()}
+                        className="flex flex-col items-center justify-center gap-1 cursor-pointer touch-manipulation transition-all duration-200 active:scale-95 rounded-xl"
+                        style={{
+                          width: 64, height: 64,
+                          border: "1.5px dashed rgba(255,215,0,0.25)",
+                          background: "rgba(255,215,0,0.04)",
+                        }}
+                        onMouseEnter={e => {
+                          (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(255,215,0,0.6)";
+                          (e.currentTarget as HTMLDivElement).style.background = "rgba(255,215,0,0.08)";
+                        }}
+                        onMouseLeave={e => {
+                          (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(255,215,0,0.25)";
+                          (e.currentTarget as HTMLDivElement).style.background = "rgba(255,215,0,0.04)";
+                        }}
+                      >
+                        <Icon name="Camera" size={18} style={{ color: "rgba(255,215,0,0.55)" }} />
+                        <span className="font-roboto text-[9px]" style={{ color: "rgba(255,255,255,0.3)" }}>добавить</span>
+                      </div>
+                    )}
+                  </div>
+                  <input ref={fileRef} type="file" accept="image/*" multiple onChange={handlePhoto} className="hidden" />
+                </div>
+
+                {error && (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{
+                    background: "rgba(239,68,68,0.1)",
+                    border: "1px solid rgba(239,68,68,0.25)",
+                  }}>
+                    <Icon name="AlertCircle" size={14} className="text-red-400 shrink-0" />
+                    <p className="text-red-400 text-sm font-roboto">{error}</p>
+                  </div>
+                )}
+
+                <button onClick={handleSubmit} disabled={loading} className="btn-gold-premium btn-xl w-full">
+                  {loading
+                    ? <><Icon name="Loader" size={18} className="animate-spin" /> Отправляем...</>
+                    : <><Icon name="Check" size={18} /> Отправить заявку</>
+                  }
+                </button>
+
+                <p className="font-roboto text-xs text-center" style={{ color: "rgba(255,255,255,0.2)" }}>
+                  Нажимая кнопку, вы соглашаетесь с обработкой персональных данных
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

@@ -67,16 +67,29 @@ const YooKassaModal = ({ open, onClose }: YooKassaModalProps) => {
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(6px)" }}
+      className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4"
+      style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
-        className="relative w-full max-w-md bg-[#0D0D0D] border border-[#FFD700]/40 shadow-2xl overflow-hidden"
-        style={{ boxShadow: "0 0 60px rgba(255,215,0,0.12)" }}
+        className="relative w-full sm:max-w-md overflow-hidden max-h-[95dvh] sm:max-h-[88vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl"
+        style={{
+          background: "linear-gradient(170deg, rgba(20,16,8,0.99) 0%, rgba(10,8,4,1) 100%)",
+          border: "1px solid rgba(255,215,0,0.18)",
+          borderBottom: "none",
+          boxShadow: "0 -4px 60px rgba(0,0,0,0.9), 0 0 40px rgba(255,215,0,0.08)",
+        }}
       >
-        {/* Золотая полоса сверху */}
-        <div className="h-1 w-full bg-gradient-to-r from-[#FFD700] via-[#FFA500] to-[#FFD700]" />
+        {/* Drag handle (мобайл) */}
+        <div className="flex justify-center pt-3 pb-1 sm:hidden">
+          <div className="w-10 h-1 rounded-full" style={{ background: "rgba(255,215,0,0.25)" }} />
+        </div>
+
+        {/* Световая верхняя полоска */}
+        <div className="absolute top-0 left-8 right-8 h-px pointer-events-none" style={{
+          background: "linear-gradient(90deg, transparent, rgba(255,215,0,0.6), rgba(255,248,232,0.8), rgba(255,215,0,0.6), transparent)",
+          boxShadow: "0 0 16px rgba(255,215,0,0.4)",
+        }} />
 
         {/* Кнопка закрытия */}
         <button
@@ -125,7 +138,10 @@ const YooKassaModal = ({ open, onClose }: YooKassaModalProps) => {
                 value={extra}
                 onChange={e => setExtra(e.target.value)}
                 placeholder={activeService.extraPlaceholder}
-                className="mt-2 w-full bg-[#1A1A1A] border border-[#333] focus:border-[#FFD700] text-white px-4 py-2.5 text-sm outline-none transition-colors placeholder:text-white/20 rounded"
+                className="mt-2 w-full text-white px-4 py-2.5 text-sm outline-none transition-all placeholder:text-white/20 rounded-xl"
+                style={{ background: "linear-gradient(145deg,rgba(16,12,7,0.97),rgba(10,8,5,0.99))", border: "1px solid rgba(255,255,255,0.08)" }}
+                onFocus={e => { (e.target as HTMLInputElement).style.borderColor = "rgba(255,215,0,0.5)"; }}
+                onBlur={e => { (e.target as HTMLInputElement).style.borderColor = "rgba(255,255,255,0.08)"; }}
               />
             )}
           </div>
@@ -157,7 +173,10 @@ const YooKassaModal = ({ open, onClose }: YooKassaModalProps) => {
                 value={amount}
                 onChange={e => setAmount(e.target.value)}
                 placeholder="Введите свою сумму"
-                className="w-full bg-[#1A1A1A] border border-[#333] focus:border-[#FFD700] text-white px-4 py-3 text-sm outline-none transition-colors placeholder:text-white/20 rounded"
+                className="w-full text-white px-4 py-3 text-sm outline-none transition-all placeholder:text-white/20 rounded-xl"
+                style={{ background: "linear-gradient(145deg,rgba(16,12,7,0.97),rgba(10,8,5,0.99))", border: "1px solid rgba(255,255,255,0.08)" }}
+                onFocus={e => { (e.target as HTMLInputElement).style.borderColor = "rgba(255,215,0,0.5)"; }}
+                onBlur={e => { (e.target as HTMLInputElement).style.borderColor = "rgba(255,255,255,0.08)"; }}
               />
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 font-oswald font-bold text-sm">₽</span>
             </div>
@@ -176,7 +195,10 @@ const YooKassaModal = ({ open, onClose }: YooKassaModalProps) => {
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder="Имя или компания"
-              className="w-full bg-[#1A1A1A] border border-[#333] focus:border-[#FFD700] text-white px-4 py-3 text-sm outline-none transition-colors placeholder:text-white/20 rounded"
+              className="w-full text-white px-4 py-3 text-sm outline-none transition-all placeholder:text-white/20 rounded-xl"
+            style={{ background: "linear-gradient(145deg,rgba(16,12,7,0.97),rgba(10,8,5,0.99))", border: "1px solid rgba(255,255,255,0.08)" }}
+            onFocus={e => { (e.target as HTMLInputElement).style.borderColor = "rgba(255,215,0,0.5)"; }}
+            onBlur={e => { (e.target as HTMLInputElement).style.borderColor = "rgba(255,255,255,0.08)"; }}
             />
           </div>
 
@@ -189,10 +211,12 @@ const YooKassaModal = ({ open, onClose }: YooKassaModalProps) => {
               type="tel"
               value={phone}
               onChange={e => setPhone(formatPhone(e.target.value))}
-              onFocus={() => { if (!phone) setPhone("+7"); }}
+              onFocus={e => { if (!phone) setPhone("+7"); (e.target as HTMLInputElement).style.borderColor = "rgba(255,215,0,0.5)"; }}
+              onBlur={e => { (e.target as HTMLInputElement).style.borderColor = "rgba(255,255,255,0.08)"; }}
               inputMode="tel"
               placeholder="+7 (___) ___-__-__"
-              className="w-full bg-[#1A1A1A] border border-[#333] focus:border-[#FFD700] text-white px-4 py-3 text-sm outline-none transition-colors placeholder:text-white/20 rounded"
+              className="w-full text-white px-4 py-3 text-sm outline-none transition-all placeholder:text-white/20 rounded-xl"
+              style={{ background: "linear-gradient(145deg,rgba(16,12,7,0.97),rgba(10,8,5,0.99))", border: "1px solid rgba(255,255,255,0.08)" }}
             />
           </div>
 

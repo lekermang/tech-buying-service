@@ -1,7 +1,15 @@
 export const SEND_LEAD_URL = "https://functions.poehali.dev/52666ff7-db52-4b6a-a90e-d60aeed699de";
 
-export const INP_CLS = "w-full bg-[#0D0D0D] border border-[#2a2a2a] text-white px-4 py-3.5 font-roboto text-base focus:outline-none focus:border-[#FFD700] transition-colors rounded-lg placeholder:text-white/25";
-export const LBL_CLS = "font-roboto text-white/40 text-[11px] uppercase tracking-wider block mb-1.5";
+export const INP_CLS = [
+  "w-full text-white px-4 py-3.5 font-roboto text-base",
+  "focus:outline-none transition-all duration-200 rounded-xl",
+  "placeholder:text-white/20",
+  "[background:linear-gradient(145deg,rgba(16,12,7,0.97),rgba(10,8,5,0.99))]",
+  "[border:1px_solid_rgba(255,255,255,0.08)]",
+  "focus:[border-color:rgba(255,215,0,0.5)]",
+  "focus:[box-shadow:0_0_0_3px_rgba(255,215,0,0.08),inset_0_1px_0_rgba(255,255,255,0.03)]",
+].join(" ");
+export const LBL_CLS = "font-roboto text-[11px] uppercase tracking-widest block mb-1.5 [color:rgba(255,255,255,0.38)]";
 
 export const compressImage = (file: File, maxW = 1200, quality = 0.75): Promise<string> =>
   new Promise(resolve => {

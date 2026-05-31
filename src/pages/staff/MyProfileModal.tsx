@@ -149,9 +149,32 @@ export default function MyProfileModal({ token, onClose, onUpdated }: Props) {
   const initials = (me?.full_name || "?").trim().split(/\s+/).map(s => s[0]).slice(0, 2).join("").toUpperCase();
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/85 flex items-end sm:items-center justify-center p-2" onClick={onClose}>
-      <div className="bg-[#0A0A0A] border border-[#1F1F1F] rounded-2xl w-full max-w-md max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <div className="sticky top-0 bg-[#0A0A0A] border-b border-[#1F1F1F] p-3 flex items-center justify-between z-10">
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4"
+      style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}
+      onClick={onClose}>
+      <div className="w-full sm:max-w-md max-h-[92dvh] overflow-y-auto rounded-t-2xl sm:rounded-2xl"
+        style={{
+          background: "linear-gradient(170deg, rgba(18,14,8,0.99) 0%, rgba(10,8,4,1) 100%)",
+          border: "1px solid rgba(255,215,0,0.14)",
+          borderBottom: "none",
+          boxShadow: "0 -4px 60px rgba(0,0,0,0.9)",
+        }}
+        onClick={e => e.stopPropagation()}>
+        {/* Drag handle */}
+        <div className="flex justify-center pt-3 pb-1 sm:hidden">
+          <div className="w-10 h-1 rounded-full" style={{ background: "rgba(255,215,0,0.2)" }} />
+        </div>
+        {/* Световая полоска */}
+        <div className="absolute top-0 left-8 right-8 h-px pointer-events-none" style={{
+          background: "linear-gradient(90deg, transparent, rgba(255,215,0,0.5), transparent)",
+        }} />
+        <div className="sticky top-0 z-10 p-3 flex items-center justify-between"
+          style={{
+            background: "linear-gradient(180deg, rgba(18,14,8,0.99), rgba(14,11,6,0.97))",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+            borderBottom: "1px solid rgba(255,215,0,0.08)",
+          }}>
           <div className="font-bold flex items-center gap-2">
             <Icon name="UserCog" size={16} className="text-[#FFD700]" />
             Мой профиль
