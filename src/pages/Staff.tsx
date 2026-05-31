@@ -56,6 +56,19 @@ function StaffInner() {
   // Офлайн-кэш последних 200 клиентов (для работы без интернета)
   useOfflineClientsSync(authed ? token : "");
 
+  // Ping каждые 2 минуты — обновляем last_seen_at для онлайн-статуса
+  useEffect(() => {
+    if (!authed || !token) return;
+    const ping = () => fetch(EMPLOYEE_AUTH_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Employee-Token": token },
+      body: JSON.stringify({ action: "ping" }),
+    }).catch(() => {});
+    ping();
+    const id = setInterval(ping, 2 * 60 * 1000);
+    return () => clearInterval(id);
+  }, [authed, token]);
+
   useEffect(() => {
     if (!token) return;
     const ctrl = new AbortController();

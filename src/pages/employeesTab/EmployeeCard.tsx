@@ -1,5 +1,5 @@
 import Icon from "@/components/ui/icon";
-import { Employee, FormFields, ROLE_LABELS, ROLE_STYLES } from "./employeesTabTypes";
+import { Employee, EmployeeSession, FormFields, ROLE_LABELS, ROLE_STYLES, isOnline, fmtLastSeen } from "./employeesTabTypes";
 
 type Props = {
   emp: Employee;
@@ -10,11 +10,12 @@ type Props = {
   startEdit: (emp: Employee) => void;
   cancelEdit: () => void;
   updateEmployee: (id: number, fields: Record<string, unknown>) => void;
+  sessions?: EmployeeSession[];
 };
 
 export default function EmployeeCard({
   emp, isEditing, editForm, setEditForm, myRole,
-  startEdit, cancelEdit, updateEmployee,
+  startEdit, cancelEdit, updateEmployee, sessions = [],
 }: Props) {
   const style = ROLE_STYLES[emp.role] || ROLE_STYLES.staff;
   const initials = emp.full_name.trim().split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase() || "?";
@@ -120,12 +121,24 @@ export default function EmployeeCard({
         </div>
       ) : (
         <div className="p-3 flex items-start gap-3">
-          <div className={`w-11 h-11 rounded-full bg-gradient-to-br ${style.avatar} flex items-center justify-center font-oswald font-bold text-sm shrink-0 relative`}>
-            {initials}
-            {emp.is_active && (
-              <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 border-2 border-[#141414] rounded-full" />
-            )}
-          </div>
+          {(() => {
+            const empSessions = sessions.filter(s => s.employee_id === emp.id);
+            const lastSession = empSessions[0] ?? null;
+            const online = lastSession ? isOnline(lastSession.last_seen_at) : false;
+            return (
+              <div className={`w-11 h-11 rounded-full bg-gradient-to-br ${style.avatar} flex items-center justify-center font-oswald font-bold text-sm shrink-0 relative`}>
+                {initials}
+                {emp.is_active && (
+                  <span
+                    title={online ? "Онлайн сейчас" : lastSession ? `Был(а) ${fmtLastSeen(lastSession.last_seen_at)}` : "Ещё не заходил"}
+                    className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 border-2 border-[#141414] rounded-full transition-colors ${
+                      online ? "bg-green-400 shadow-[0_0_6px_rgba(74,222,128,0.8)]" : lastSession ? "bg-yellow-500" : "bg-white/20"
+                    }`}
+                  />
+                )}
+              </div>
+            );
+          })()}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <span className="font-oswald font-bold text-white text-sm uppercase truncate">{emp.full_name}</span>
@@ -146,10 +159,35 @@ export default function EmployeeCard({
                 <span className="bg-red-500/10 text-red-400 px-1.5 py-0.5 rounded">неактивен</span>
               )}
             </div>
+            {/* Последняя активность */}
+            {(() => {
+              const empSessions = sessions.filter(s => s.employee_id === emp.id);
+              const lastSession = empSessions[0] ?? null;
+              if (!lastSession) return null;
+              const online = isOnline(lastSession.last_seen_at);
+              return (
+                <div className={`mt-1 flex items-center gap-1 font-roboto text-[9px] ${online ? "text-green-400" : "text-white/30"}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${online ? "bg-green-400 animate-pulse" : "bg-white/20"}`} />
+                  {online ? "Онлайн сейчас" : `Был(а) ${fmtLastSeen(lastSession.last_seen_at)}`}
+                </div>
+              );
+            })()}
             {emp.created_at && (
               <div className="font-roboto text-[9px] text-white/25 mt-1 flex items-center gap-1">
                 <Icon name="Calendar" size={9} />
                 добавлен {new Date(emp.created_at).toLocaleDateString("ru-RU")}
+              </div>
+            )}
+            {/* История сессий (до 3 последних) */}
+            {myRole === "owner" && sessions.filter(s => s.employee_id === emp.id).length > 0 && (
+              <div className="mt-2 space-y-0.5">
+                {sessions.filter(s => s.employee_id === emp.id).slice(0, 3).map(s => (
+                  <div key={s.id} className="flex items-center gap-1.5 font-roboto text-[9px] text-white/25">
+                    <Icon name="LogIn" size={8} className="text-white/20 shrink-0" />
+                    <span>{new Date(s.login_at).toLocaleDateString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                    {s.ip_address && <span className="text-white/15">· {s.ip_address}</span>}
+                  </div>
+                ))}
               </div>
             )}
           </div>

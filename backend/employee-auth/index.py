@@ -263,6 +263,13 @@ def handler(event: dict, context) -> dict:
             f"WHERE id=%s",
             (token, expires, emp_id),
         )
+        # Логируем сессию
+        ip = (event.get('requestContext') or {}).get('identity', {}).get('sourceIp') or ''
+        ua = headers_in.get('user-agent', '')[:300]
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.employee_sessions (employee_id, ip_address, user_agent) VALUES (%s,%s,%s)",
+            (emp_id, ip or None, ua or None),
+        )
         conn.commit(); cur.close(); conn.close()
         return _ok({
             'token': token,
@@ -453,6 +460,43 @@ def handler(event: dict, context) -> dict:
             conn.commit()
         cur.close(); conn.close()
         return _ok({'ok': True})
+
+    # POST /ping — обновить last_seen_at для текущего сотрудника (вызывается периодически)
+    if method == 'POST' and body.get('action') == 'ping':
+        emp = get_employee_by_token(emp_token)
+        if not emp:
+            return _err(401, 'Требуется авторизация')
+        conn = get_conn(); cur = conn.cursor()
+        cur.execute(
+            f"UPDATE {SCHEMA}.employee_sessions SET last_seen_at=NOW() "
+            f"WHERE employee_id=%s AND last_seen_at=(SELECT MAX(last_seen_at) FROM {SCHEMA}.employee_sessions WHERE employee_id=%s)",
+            (emp['id'], emp['id']),
+        )
+        conn.commit(); cur.close(); conn.close()
+        return _ok({'ok': True})
+
+    # GET ?action=sessions — список сессий сотрудников (только owner)
+    if method == 'GET' and params.get('action') == 'sessions':
+        emp = get_employee_by_token(emp_token)
+        if not emp or emp['role'] != 'owner':
+            return _err(403, 'Нет доступа')
+        conn = get_conn(); cur = conn.cursor()
+        # Последние 50 сессий по всем сотрудникам
+        cur.execute(
+            f"""SELECT s.id, s.employee_id, e.full_name, e.role, s.login_at, s.last_seen_at, s.ip_address, s.user_agent
+                FROM {SCHEMA}.employee_sessions s
+                JOIN {SCHEMA}.employees e ON e.id = s.employee_id
+                ORDER BY s.last_seen_at DESC
+                LIMIT 50"""
+        )
+        rows = cur.fetchall(); cur.close(); conn.close()
+        sessions = [{
+            'id': r[0], 'employee_id': r[1], 'full_name': r[2], 'role': r[3],
+            'login_at': r[4].isoformat() if r[4] else None,
+            'last_seen_at': r[5].isoformat() if r[5] else None,
+            'ip_address': r[6], 'user_agent': r[7],
+        } for r in rows]
+        return _ok({'sessions': sessions})
 
     # POST /check_pin — проверка PIN по текущему токену (для закрытых разделов, напр. зарплата)
     if method == 'POST' and body.get('action') == 'check_pin':

@@ -3,7 +3,7 @@ import Icon from "@/components/ui/icon";
 import { EMPLOYEE_AUTH_URL } from "./staff.types";
 import { useStaffToast } from "./staff/StaffToast";
 import useDebouncedValue from "@/hooks/useDebouncedValue";
-import { Employee, FormFields, EMPTY_FORM } from "./employeesTab/employeesTabTypes";
+import { Employee, EmployeeSession, FormFields, EMPTY_FORM } from "./employeesTab/employeesTabTypes";
 import EmployeesHeader from "./employeesTab/EmployeesHeader";
 import EmployeesFilters from "./employeesTab/EmployeesFilters";
 import EmployeesAddForm from "./employeesTab/EmployeesAddForm";
@@ -12,6 +12,7 @@ import EmployeeCard from "./employeesTab/EmployeeCard";
 export function EmployeesTab({ token, myRole }: { token: string; myRole: string }) {
   const toast = useStaffToast();
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [sessions, setSessions] = useState<EmployeeSession[]>([]);
   const [loading, setLoading] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [addForm, setAddForm] = useState<FormFields>(EMPTY_FORM);
@@ -22,6 +23,15 @@ export function EmployeesTab({ token, myRole }: { token: string; myRole: string 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [roleFilter, setRoleFilter] = useState<string>("all");
+
+  const loadSessions = useCallback(async () => {
+    if (myRole !== "owner") return;
+    try {
+      const res = await fetch(`${EMPLOYEE_AUTH_URL}?action=sessions`, { headers: { "X-Employee-Token": token } });
+      const data = await res.json();
+      setSessions(data.sessions || []);
+    } catch (_) { /* ignore */ }
+  }, [token, myRole]);
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
@@ -36,8 +46,11 @@ export function EmployeesTab({ token, myRole }: { token: string; myRole: string 
   useEffect(() => {
     const ctrl = new AbortController();
     load(ctrl.signal);
-    return () => ctrl.abort();
-  }, [load]);
+    loadSessions();
+    // Обновляем сессии каждые 30 секунд
+    const id = setInterval(loadSessions, 30_000);
+    return () => { ctrl.abort(); clearInterval(id); };
+  }, [load, loadSessions]);
 
   const debouncedSearch = useDebouncedValue(search, 250);
   const filtered = useMemo(() => {
@@ -178,6 +191,7 @@ export function EmployeesTab({ token, myRole }: { token: string; myRole: string 
               startEdit={startEdit}
               cancelEdit={() => setEditId(null)}
               updateEmployee={updateEmployee}
+              sessions={sessions}
             />
           ))}
 

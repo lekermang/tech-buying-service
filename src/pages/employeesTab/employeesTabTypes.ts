@@ -11,6 +11,33 @@ export type Employee = {
   note?: string | null;
 };
 
+export type EmployeeSession = {
+  id: number;
+  employee_id: number;
+  full_name: string;
+  role: string;
+  login_at: string;
+  last_seen_at: string;
+  ip_address: string | null;
+  user_agent: string | null;
+};
+
+// Онлайн если last_seen_at < 5 минут назад
+export function isOnline(lastSeen: string | null | undefined): boolean {
+  if (!lastSeen) return false;
+  return (Date.now() - new Date(lastSeen).getTime()) < 5 * 60 * 1000;
+}
+
+// Форматирование времени последнего визита
+export function fmtLastSeen(lastSeen: string | null | undefined): string {
+  if (!lastSeen) return "никогда";
+  const diff = Math.floor((Date.now() - new Date(lastSeen).getTime()) / 1000);
+  if (diff < 60) return "только что";
+  if (diff < 3600) return `${Math.floor(diff / 60)} мин назад`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} ч назад`;
+  return new Date(lastSeen).toLocaleDateString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
 export const ROLE_LABELS: Record<string, string> = { owner: "Владелец", admin: "Администратор", staff: "Сотрудник", master: "Мастер" };
 export const ROLE_STYLES: Record<string, { badge: string; avatar: string; icon: string; emoji: string }> = {
   owner: { badge: "bg-gradient-to-r from-[#FFD700] to-yellow-500 text-black", avatar: "from-[#FFD700] to-yellow-600 text-black", icon: "Crown", emoji: "👑" },
