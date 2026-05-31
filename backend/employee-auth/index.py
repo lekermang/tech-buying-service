@@ -461,17 +461,30 @@ def handler(event: dict, context) -> dict:
         cur.close(); conn.close()
         return _ok({'ok': True})
 
-    # POST /ping — обновить last_seen_at для текущего сотрудника (вызывается периодически)
+    # POST /ping — обновить last_seen_at (или создать сессию если нет)
     if method == 'POST' and body.get('action') == 'ping':
         emp = get_employee_by_token(emp_token)
         if not emp:
             return _err(401, 'Требуется авторизация')
+        ip = (event.get('requestContext') or {}).get('identity', {}).get('sourceIp') or ''
+        ua = headers_in.get('user-agent', '')[:300]
         conn = get_conn(); cur = conn.cursor()
+        # Проверяем есть ли сессия за последние 8 часов
         cur.execute(
-            f"UPDATE {SCHEMA}.employee_sessions SET last_seen_at=NOW() "
-            f"WHERE employee_id=%s AND last_seen_at=(SELECT MAX(last_seen_at) FROM {SCHEMA}.employee_sessions WHERE employee_id=%s)",
-            (emp['id'], emp['id']),
+            f"SELECT id FROM {SCHEMA}.employee_sessions WHERE employee_id=%s AND last_seen_at > NOW() - INTERVAL '8 hours' ORDER BY last_seen_at DESC LIMIT 1",
+            (emp['id'],),
         )
+        row = cur.fetchone()
+        if row:
+            cur.execute(
+                f"UPDATE {SCHEMA}.employee_sessions SET last_seen_at=NOW() WHERE id=%s",
+                (row[0],),
+            )
+        else:
+            cur.execute(
+                f"INSERT INTO {SCHEMA}.employee_sessions (employee_id, ip_address, user_agent) VALUES (%s,%s,%s)",
+                (emp['id'], ip or None, ua or None),
+            )
         conn.commit(); cur.close(); conn.close()
         return _ok({'ok': True})
 
