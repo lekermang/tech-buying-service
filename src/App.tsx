@@ -6,7 +6,6 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import CustomCursor from "@/components/fx/CustomCursor";
 import GrainOverlay from "@/components/fx/GrainOverlay";
 
 /**
@@ -128,7 +127,6 @@ const App = () => {
       <Toaster />
       <Sonner />
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <CustomCursor />
         <GrainOverlay />
         <Suspense fallback={null}>
           <Routes>
