@@ -12,7 +12,7 @@ import { canSeeAnalytics, type StaffTab } from "./staffConstants";
 import { FontApplier, ThemeBanner, TabErrorBoundary } from "./StaffPwa";
 import {
   GoodsTab, StaffRepairTab, GoldTab, SalesTab, ClientsTab, AnalyticsTab,
-  EmployeesTab, SmartLombardTab, AvitoProTab, SalaryTab,
+  EmployeesTab, SmartLombardTab, AvitoProTab, SalaryTab, FinanceTab,
 } from "./StaffLazy";
 const VisitorsAnalyticsTab = React.lazy(() => import("../StaffAnalytics"));
 import MyProfileModal from "./MyProfileModal";
@@ -140,6 +140,7 @@ export function StaffMainLayout({
     { k: "clients",      l: "Клиенты",     icon: "Users",          tip: "База клиентов, скидки, СМС-рассылки." },
     { k: "avitopro",     l: "Авито",       icon: "Zap",            tip: "Авито PRO: статистика, авто-действия." },
     ...(analyticsAllowed ? [{ k: "analytics" as Tab, l: "Стат.", icon: "BarChart2", tip: "Аналитика по продажам и ремонтам." }] : []),
+    ...(isOwner ? [{ k: "finance" as Tab, l: "Финансы", icon: "LineChart", tip: "ДДС: банковские выписки + склад → ИИ-отчёт." }] : []),
     { k: "visitors",     l: "Трафик",      icon: "Activity",       tip: "Кто на сайте сейчас, источники трафика.", premium: true },
     ...(isOwnerOrAdmin ? [{ k: "gold"      as Tab, l: "Золото",  icon: "Gem",     tip: "Учёт ювелирных изделий." }] : []),
     ...(isOwnerOrAdmin ? [{ k: "employees" as Tab, l: "Команда", icon: "UserCog", tip: "Управление сотрудниками." }] : []),
@@ -239,6 +240,16 @@ export function StaffMainLayout({
             {tab === "smartlombard" && <SmartLombardTab token={token} myRole={empRole} />}
             {tab === "avitopro"     && <AvitoProTab token={token} />}
             {tab === "salary"       && <SalaryTab role={empRole} token={token} employeeName={empName} />}
+            {tab === "finance"      && isOwner && <FinanceTab token={token} />}
+            {tab === "finance"      && !isOwner && (
+              <div className="flex flex-col items-center justify-center py-24 px-6 text-center gap-3">
+                <div className="w-14 h-14 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-1">
+                  <Icon name="Lock" size={24} className="text-red-400/70" />
+                </div>
+                <div className="font-oswald font-bold text-lg text-white/60 uppercase tracking-wide">Нет доступа</div>
+                <div className="font-roboto text-sm text-white/30 max-w-xs">Финансовый отчёт доступен только владельцу</div>
+              </div>
+            )}
           </React.Suspense>
         </TabErrorBoundary>
       </div>
