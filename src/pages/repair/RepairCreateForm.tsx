@@ -101,11 +101,22 @@ export default function RepairCreateForm({ form, creating, onChange, onCreate, o
         </div>
       </div>
 
-      {/* Стоимость */}
-      <div className="mb-3">
-        <label className={LBL}>Примерная стоимость (₽)</label>
-        <input type="number" value={form.price} onChange={e => onChange({ ...form, price: e.target.value })}
-          placeholder="1500" className={INP} />
+      {/* Пароль устройства + стоимость */}
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        <div>
+          <label className={LBL}>Пароль устройства</label>
+          <input
+            value={form.device_password}
+            onChange={e => onChange({ ...form, device_password: e.target.value })}
+            placeholder="1234 / не знает / нет"
+            className={INP}
+          />
+        </div>
+        <div>
+          <label className={LBL}>Примерная стоимость (₽)</label>
+          <input type="number" value={form.price} onChange={e => onChange({ ...form, price: e.target.value })}
+            placeholder="1500" className={INP} />
+        </div>
       </div>
 
       {/* ─── ДЕФЕКТЫ ─────────────────────────────────────── */}

@@ -28,6 +28,7 @@ export type Order = {
   payment_method: string | null;
   status_updated_at?: string | null;
   client_email?: string | null;
+  device_password?: string | null;
   // Выбранная клиентом запчасть из подбора (откуда заказывать)
   part_id?: string | null;
   part_name?: string | null;
@@ -44,7 +45,7 @@ export type DayStat = {
   revenue: number; costs: number; profit: number; master_income: number;
 };
 
-export const EMPTY_FORM = { name: "", phone: "", model: "", repair_type: "", price: "", comment: "", client_email: "" };
+export const EMPTY_FORM = { name: "", phone: "", model: "", repair_type: "", price: "", comment: "", client_email: "", device_password: "" };
 export const EMPTY_COMPLETE = { purchase_amount: "", repair_amount: "", parts_name: "" };
 
 export const statusInfo = (key: string) => STATUSES.find(s => s.key === key) || STATUSES[0];
@@ -415,9 +416,9 @@ body{font-family:Arial,sans-serif;font-size:10px;color:#000;background:#fff}
     <div class="sc-b">
       <div class="f"><div class="fl">Устройство:</div><div class="fv">${o.model || "—"}</div></div>
       <div class="f"><div class="fl">Цвет:</div><div class="fvn">—</div></div>
-      <div class="f"><div class="fl">Пароль от устройства:</div><div class="fvn">&nbsp;</div></div>
+      <div class="f"><div class="fl">Пароль от устройства:</div><div class="fvn">${o.device_password || "&nbsp;"}</div></div>
       <div class="f"><div class="fl">Сер. №:</div><div class="fvn">—</div></div>
-      <div class="f"><div class="fl">Внешний вид:</div><div class="fvn">Царапины, потёртости, возможны скрытые дефекты</div></div>
+      <div class="f"><div class="fl">Внешний вид:</div><div class="fvn">${o.comment || "Царапины, потёртости, возможны скрытые дефекты"}</div></div>
       <div class="f"><div class="fl">IMEI:</div><div class="fvn">&nbsp;</div></div>
     </div>
   </div>
@@ -905,6 +906,7 @@ export const getIntakeActHtml = (o: Order): string => {
           <div style="font-size:10px;font-weight:bold;background:#efefef;padding:2px 4px;margin-bottom:6px;border-bottom:1px solid #ccc">Устройство:</div>
           <div style="font-size:9px;color:#555">Устройство:</div>
           <div style="font-size:12px;font-weight:bold;margin-bottom:4px">${o.model || "—"}</div>
+          ${o.device_password ? `<div style="font-size:9px;color:#555">Пароль:</div><div style="font-size:11px;font-weight:bold;margin-bottom:4px;background:#fffbe6;padding:1px 4px;border:1px solid #e6d000;display:inline-block">${o.device_password}</div>` : ""}
           <div style="font-size:9px;color:#555">Внешний вид:</div>
           <div style="font-size:10px">${o.comment || "Царапины, потёртости, возможны скрытые дефекты"}</div>
         </td>

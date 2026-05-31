@@ -111,6 +111,7 @@ export function useStaffRepairActions(token: string, st: StaffRepairState) {
           completed_at: null, master_income: null, parts_name: null, picked_up_at: null,
           advance: null, is_paid: null, payment_method: null,
           client_email: email || null,
+          device_password: form.device_password || null,
         };
         printAct(newOrder);
         if (email) {
