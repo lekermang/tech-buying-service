@@ -1,9 +1,8 @@
 import { useEffect, useRef } from "react";
-import { useLocation } from "react-router-dom";
 
 export default function CustomCursor() {
-  const { pathname } = useLocation();
-  const isStaff = pathname.startsWith("/staff") || pathname.startsWith("/admin");
+  const isStaff = window.location.pathname.startsWith("/staff") || window.location.pathname.startsWith("/admin");
+  const isMobile = window.matchMedia("(pointer: coarse)").matches;
 
   const dotRef = useRef<HTMLDivElement>(null);
   const ringRef = useRef<HTMLDivElement>(null);
@@ -14,13 +13,13 @@ export default function CustomCursor() {
   const hovering = useRef(false);
 
   useEffect(() => {
-    if (isStaff) return;
+    if (isStaff || isMobile) return;
+
     const move = (e: MouseEvent) => {
       mouse.current = { x: e.clientX, y: e.clientY };
     };
     const down = () => { clicking.current = true; };
     const up = () => { clicking.current = false; };
-
     const checkHover = (e: MouseEvent) => {
       const el = e.target as HTMLElement;
       hovering.current = !!(el.closest("a,button,[role=button],[tabindex]"));
@@ -30,7 +29,6 @@ export default function CustomCursor() {
       const speed = 0.13;
       ring.current.x += (mouse.current.x - ring.current.x) * speed;
       ring.current.y += (mouse.current.y - ring.current.y) * speed;
-
       if (dotRef.current) {
         dotRef.current.style.transform = `translate(${mouse.current.x}px,${mouse.current.y}px) translate(-50%,-50%) scale(${clicking.current ? 0.5 : 1})`;
       }
@@ -55,16 +53,17 @@ export default function CustomCursor() {
       document.removeEventListener("mouseup", up);
       cancelAnimationFrame(raf.current);
     };
-  }, []);
+  }, [isStaff, isMobile]);
 
-  if (isStaff) return null;
+  if (isStaff || isMobile) return null;
 
   return (
     <>
       <style>{`
-        @media (pointer: coarse) { .custom-cursor-dot, .custom-cursor-ring { display: none !important; } }
-        body { cursor: none !important; }
-        body * { cursor: none !important; }
+        @media (pointer: fine) {
+          body { cursor: none !important; }
+          body * { cursor: none !important; }
+        }
       `}</style>
       <div
         ref={dotRef}
@@ -75,7 +74,6 @@ export default function CustomCursor() {
           background: "#FFD700",
           pointerEvents: "none", willChange: "transform",
           boxShadow: "0 0 8px #FFD700, 0 0 16px rgba(255,215,0,0.4)",
-          transition: "transform 0.08s ease",
         }}
       />
       <div
@@ -86,8 +84,7 @@ export default function CustomCursor() {
           width: 36, height: 36, borderRadius: "50%",
           border: "1.5px solid rgba(255,215,0,0.5)",
           pointerEvents: "none", willChange: "transform",
-          transition: "border-color 0.2s, transform 0.12s ease",
-          backdropFilter: "blur(0px)",
+          transition: "border-color 0.2s",
         }}
       />
     </>

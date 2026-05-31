@@ -124,11 +124,11 @@ const App = () => {
   return (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <CustomCursor />
-      <GrainOverlay />
       <Toaster />
       <Sonner />
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <CustomCursor />
+        <GrainOverlay />
         <Suspense fallback={null}>
           <Routes>
             <Route path="/" element={<Index />} />
