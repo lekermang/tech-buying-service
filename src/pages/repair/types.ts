@@ -436,6 +436,7 @@ body{font-family:Arial,sans-serif;font-size:10px;color:#000;background:#fff}
 <!-- ЗАМЕТКИ ПРИЁМЩИКА -->
 <div class="notes">
   <div class="notes-lbl">Заметки приёмщика:</div>
+  ${o.comment ? `<div style="font-size:10px;color:#222;margin-bottom:6px;padding:4px 6px;background:#f5f5f5;border:1px solid #ddd"><b>Зафиксированные дефекты:</b> ${o.comment}</div>` : ""}
 </div>
 
 <!-- НАРУЖНЫЕ ПОВРЕЖДЕНИЯ + ПРОВЕРКА ФУНКЦИЙ -->
@@ -905,7 +906,7 @@ export const getIntakeActHtml = (o: Order): string => {
           <div style="font-size:9px;color:#555">Устройство:</div>
           <div style="font-size:12px;font-weight:bold;margin-bottom:4px">${o.model || "—"}</div>
           <div style="font-size:9px;color:#555">Внешний вид:</div>
-          <div style="font-size:10px">Царапины, потёртости, возможны скрытые дефекты</div>
+          <div style="font-size:10px">${o.comment || "Царапины, потёртости, возможны скрытые дефекты"}</div>
         </td>
         <td style="width:34%;padding:8px 10px;vertical-align:top">
           <div style="font-size:10px;font-weight:bold;background:#efefef;padding:2px 4px;margin-bottom:6px;border-bottom:1px solid #ccc">Ремонт:</div>

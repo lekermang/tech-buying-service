@@ -21,12 +21,59 @@ const RISKS = [
   "Гарантия на результат ремонта не предоставляется. В худшем случае устройство будет возвращено в нерабочем состоянии; клиент оплачивает диагностику и уже выполненные работы.",
 ];
 
+// Дефекты внешнего вида — группами
+const DEFECTS: { group: string; items: string[] }[] = [
+  {
+    group: "Экран",
+    items: ["Трещина экрана", "Скол стекла", "Битые пиксели", "Полосы на экране", "Не реагирует тачскрин", "Пятна / засветы"],
+  },
+  {
+    group: "Корпус",
+    items: ["Царапины", "Потёртости", "Вмятина / деформация", "Скол корпуса", "Трещина корпуса", "Следы влаги / коррозии"],
+  },
+  {
+    group: "Функции",
+    items: ["Не включается", "Не заряжается", "Нет звука", "Нет сети / Wi-Fi", "Камера не работает", "Кнопки не работают"],
+  },
+];
+
+// Собрать строку дефектов из выбранных чекбоксов + доп. комментарий
+function buildComment(defects: Set<string>, extra: string): string {
+  const parts: string[] = [];
+  if (defects.size > 0) parts.push([...defects].join(", "));
+  if (extra.trim()) parts.push(extra.trim());
+  return parts.join(". ");
+}
+
 export default function RepairCreateForm({ form, creating, onChange, onCreate, onCancel }: Props) {
   const [agreed, setAgreed] = useState(false);
+  const [defects, setDefects] = useState<Set<string>>(new Set());
+  const [extraComment, setExtraComment] = useState("");
+
+  const toggleDefect = (label: string) => {
+    setDefects(prev => {
+      const next = new Set(prev);
+      if (next.has(label)) {
+        next.delete(label);
+      } else {
+        next.add(label);
+      }
+      const comment = buildComment(next, extraComment);
+      onChange({ ...form, comment });
+      return next;
+    });
+  };
+
+  const handleExtraChange = (val: string) => {
+    setExtraComment(val);
+    onChange({ ...form, comment: buildComment(defects, val) });
+  };
 
   return (
     <div className="mx-4 mt-3 mb-1 bg-[#1A1A1A] border border-[#FFD700]/30 p-4">
       <div className="font-roboto text-white/40 text-[10px] uppercase tracking-widest mb-3">Новая заявка на ремонт</div>
+
+      {/* Клиент */}
       <div className="grid grid-cols-2 gap-2 mb-2">
         <div>
           <label className={LBL}>Имя клиента *</label>
@@ -39,6 +86,8 @@ export default function RepairCreateForm({ form, creating, onChange, onCreate, o
             placeholder="+7 (___) ___-__-__" className={INP} />
         </div>
       </div>
+
+      {/* Устройство */}
       <div className="grid grid-cols-2 gap-2 mb-2">
         <div>
           <label className={LBL}>Модель устройства</label>
@@ -51,21 +100,69 @@ export default function RepairCreateForm({ form, creating, onChange, onCreate, o
             placeholder="Замена дисплея, зарядка..." className={INP} />
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-2 mb-2">
-        <div>
-          <label className={LBL}>Примерная стоимость (₽)</label>
-          <input type="number" value={form.price} onChange={e => onChange({ ...form, price: e.target.value })}
-            placeholder="1500" className={INP} />
-        </div>
-        <div>
-          <label className={LBL}>Комментарий</label>
-          <input value={form.comment} onChange={e => onChange({ ...form, comment: e.target.value })}
-            placeholder="Разбитый экран, не включается..." className={INP} />
-        </div>
+
+      {/* Стоимость */}
+      <div className="mb-3">
+        <label className={LBL}>Примерная стоимость (₽)</label>
+        <input type="number" value={form.price} onChange={e => onChange({ ...form, price: e.target.value })}
+          placeholder="1500" className={INP} />
       </div>
 
-      {/* Акт приёмки */}
-      <div className="mt-3 border border-white/10 bg-[#111] p-3">
+      {/* ─── ДЕФЕКТЫ ─────────────────────────────────────── */}
+      <div className="border border-white/10 bg-[#111] rounded p-3 mb-3">
+        <div className="font-roboto text-[#FFD700] text-[10px] uppercase tracking-widest mb-3 flex items-center gap-1.5">
+          <Icon name="ClipboardList" size={11} />
+          Внешний вид и дефекты устройства
+        </div>
+
+        {DEFECTS.map(({ group, items }) => (
+          <div key={group} className="mb-3">
+            <div className="font-roboto text-white/40 text-[9px] uppercase tracking-wider mb-1.5">{group}</div>
+            <div className="flex flex-wrap gap-1.5">
+              {items.map(label => {
+                const active = defects.has(label);
+                return (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => toggleDefect(label)}
+                    className={`px-2.5 py-1 rounded text-[11px] font-roboto border transition-all ${
+                      active
+                        ? "bg-[#FFD700] border-[#FFD700] text-black font-bold"
+                        : "bg-transparent border-white/20 text-white/50 hover:border-white/40 hover:text-white/70"
+                    }`}
+                  >
+                    {active && <span className="mr-1">✓</span>}
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+
+        {/* Доп. комментарий */}
+        <div>
+          <label className={LBL}>Дополнительно</label>
+          <input
+            value={extraComment}
+            onChange={e => handleExtraChange(e.target.value)}
+            placeholder="Другие дефекты, особые условия..."
+            className={INP}
+          />
+        </div>
+
+        {/* Итоговая строка дефектов */}
+        {form.comment && (
+          <div className="mt-2 p-2 bg-[#1a1a1a] border border-white/10 rounded">
+            <span className="font-roboto text-white/30 text-[9px] uppercase tracking-wide">В акте: </span>
+            <span className="font-roboto text-white/70 text-[11px]">{form.comment}</span>
+          </div>
+        )}
+      </div>
+
+      {/* ─── УСЛОВИЯ ПРИЁМКИ ─────────────────────────────── */}
+      <div className="border border-white/10 bg-[#111] p-3">
         <div className="font-roboto text-[#FFD700] text-[10px] uppercase tracking-widest mb-2 flex items-center gap-1.5">
           <Icon name="AlertTriangle" size={11} />
           Условия приёмки — клиент ознакомлен
@@ -90,11 +187,8 @@ export default function RepairCreateForm({ form, creating, onChange, onCreate, o
               Клиент ознакомлен с условиями, рисками и согласен на проведение ремонта
             </span>
           </label>
-          <a
-            href="/act"
-            target="_blank"
-            className="font-roboto text-[#FFD700]/70 text-[10px] hover:text-[#FFD700] transition-colors shrink-0 underline underline-offset-2 mt-0.5"
-          >
+          <a href="/act" target="_blank"
+            className="font-roboto text-[#FFD700]/70 text-[10px] hover:text-[#FFD700] transition-colors shrink-0 underline underline-offset-2 mt-0.5">
             Условия
           </a>
         </div>
