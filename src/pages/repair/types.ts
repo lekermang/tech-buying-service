@@ -718,3 +718,70 @@ export const printReceipt = (o: Order) => {
   win.focus();
   setTimeout(() => win.print(), 400);
 };
+
+const SEND_CHECK_URL = "https://functions.poehali.dev/3e5c5c1a-5e16-4ae2-8b34-8618e4f6558d";
+
+export const getReceiptHtml = (o: Order): string => {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("ru-RU");
+  const timeStr = now.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  const isWater = /вода|влага|залит|liquid|water/i.test((o.repair_type || "") + " " + (o.comment || ""));
+  return `<div style="font-family:Arial,sans-serif;font-size:12px;color:#000;max-width:600px">
+  <style>
+    .row{display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px}
+    .row .label{color:#666;flex-shrink:0;margin-right:6px}
+    .row .val{font-weight:600;text-align:right}
+    .total-row{display:flex;justify-content:space-between;font-size:14px;font-weight:bold;border-top:2px solid #000;padding-top:8px;margin-top:8px}
+    .dashed{border-top:1px dashed #bbb;margin:8px 0}
+    .section-title{font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #000;padding-bottom:3px;margin:10px 0 6px}
+    .warranty-box{border:2px solid #000;padding:8px;margin-top:10px}
+    .warranty-title{font-size:12px;font-weight:bold;text-align:center;margin-bottom:4px}
+    .warranty-item{font-size:10px;margin-bottom:3px;padding-left:12px;position:relative}
+    .warranty-item:before{content:"•";position:absolute;left:0}
+    .no-warranty{font-size:11px;font-weight:bold;border:2px solid #000;padding:6px;text-align:center;margin-top:8px}
+  </style>
+  <h2 style="text-align:center;margin:0 0 2px;font-size:16px">Скупка24</h2>
+  <div style="font-size:10px;text-align:center;color:#555;margin-bottom:12px">ИП Мамедов Адиль Мирза Оглы · г.Калуга, ул.Кирова, 7 / 11 · skypka24.com</div>
+  <div class="section-title">Квитанция об оплате</div>
+  <div class="row"><span class="label">№ заявки:</span><span class="val">#${o.id}</span></div>
+  <div class="row"><span class="label">Дата:</span><span class="val">${dateStr} ${timeStr}</span></div>
+  <div class="dashed"></div>
+  <div class="row"><span class="label">Клиент:</span><span class="val">${o.name}</span></div>
+  <div class="row"><span class="label">Телефон:</span><span class="val">${o.phone}</span></div>
+  ${o.model ? `<div class="row"><span class="label">Устройство:</span><span class="val">${o.model}</span></div>` : ""}
+  <div class="dashed"></div>
+  ${o.repair_type ? `<div class="row"><span class="label">Вид работы:</span><span class="val">${o.repair_type}</span></div>` : ""}
+  ${o.comment ? `<div class="row"><span class="label">Описание:</span><span class="val">${o.comment}</span></div>` : ""}
+  <div class="total-row"><span>К оплате:</span><span>${(o.repair_amount || 0).toLocaleString("ru-RU")} ₽</span></div>
+  <div class="dashed"></div>
+  ${isWater ? `<div class="no-warranty">⚠ ГАРАНТИЯ НЕ ПРЕДОСТАВЛЯЕТСЯ<br><span style="font-size:10px;font-weight:normal">Ремонт после воздействия влаги/воды</span></div>` : `
+  <div class="warranty-box">
+    <div class="warranty-title">Гарантия: 30 дней</div>
+    <div class="warranty-item">Гарантия на выполненную работу и установленные запчасти</div>
+    <div class="warranty-item">Не распространяется на мех. повреждения и попадание влаги</div>
+    <div class="warranty-item">При нарушении пломб гарантия аннулируется</div>
+  </div>`}
+  <div style="font-size:9px;color:#888;margin-top:12px">ИНН: 402810962699 · ОГРНИП: 307402814200032<br>Р/с: 40802810422270001866 · БИК: 042908612</div>
+</div>`;
+};
+
+export const sendReceiptByEmail = async (
+  o: Order,
+  email: string,
+  token: string
+): Promise<void> => {
+  const checkHtml = getReceiptHtml(o);
+  const res = await fetch(SEND_CHECK_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Admin-Token": token },
+    body: JSON.stringify({
+      email,
+      check_html: checkHtml,
+      check_type: "repair",
+      order_id: o.id,
+      client_name: o.name,
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.sent) throw new Error(data.error || "Ошибка отправки");
+};

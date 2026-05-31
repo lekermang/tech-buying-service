@@ -4,6 +4,29 @@ import { slApi, type SLItem, PAYMENT_METHODS } from "./types";
 import { Inp2 } from "./SLItemsCommon";
 import { SLModal, SLField, SLInput, SLButton } from "./slUI";
 
+const SEND_CHECK_URL = "https://functions.poehali.dev/3e5c5c1a-5e16-4ae2-8b34-8618e4f6558d";
+const ADMIN_TOKEN = "Mark2015N";
+
+function buildSaleCheckHtml(item: SLItem, amount: number, payment: string, orderId: number): string {
+  const dateStr = new Date().toLocaleDateString("ru-RU");
+  const timeStr = new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  const pmLabel: Record<string, string> = { cash: "Наличные", card: "Карта", transfer: "Перевод" };
+  return `<div style="font-family:Arial,sans-serif;font-size:12px;color:#000;max-width:500px">
+  <h2 style="text-align:center;margin:0 0 4px;font-size:16px">Скупка24</h2>
+  <div style="font-size:10px;text-align:center;color:#555;margin-bottom:12px">ИП Мамедов Адиль Мирза Оглы · г.Калуга, ул.Кирова, 7 / 11 · skypka24.com</div>
+  <div style="font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #000;padding-bottom:3px;margin:10px 0 6px">Товарный чек</div>
+  <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px"><span style="color:#666">№ чека:</span><span style="font-weight:600">#${orderId}</span></div>
+  <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px"><span style="color:#666">Дата:</span><span style="font-weight:600">${dateStr} ${timeStr}</span></div>
+  <div style="border-top:1px dashed #bbb;margin:8px 0"></div>
+  <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px"><span style="color:#666">Товар:</span><span style="font-weight:600">${item.title}</span></div>
+  ${item.specs_short ? `<div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px"><span style="color:#666">Характеристики:</span><span style="font-weight:600">${item.specs_short}</span></div>` : ""}
+  <div style="border-top:1px dashed #bbb;margin:8px 0"></div>
+  <div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px"><span style="color:#666">Способ оплаты:</span><span style="font-weight:600">${pmLabel[payment] || payment}</span></div>
+  <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:bold;border-top:2px solid #000;padding-top:8px;margin-top:8px"><span>Итого:</span><span>${amount.toLocaleString("ru-RU")} ₽</span></div>
+  <div style="font-size:9px;color:#888;margin-top:12px">ИНН: 402810962699 · ОГРНИП: 307402814200032<br>Товар надлежащего качества обмену и возврату не подлежит.</div>
+</div>`;
+}
+
 const nowLocal = () => {
   const d = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -23,6 +46,9 @@ export default function SLItemSellModal({ token, item, onClose, onDone }: { toke
   const [err, setErr] = useState<string | null>(null);
   const [autoPrint, setAutoPrint] = useState(true);
   const [soldAt, setSoldAt] = useState<string>(nowLocal());
+  const [emailInput, setEmailInput] = useState("");
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
   const sellQtyNum = Math.max(1, Math.min(stockQty, parseInt(sellQty, 10) || 1));
   const submit = async () => {
     if (!amount || Number(amount) <= 0) { setErr("Укажите сумму"); return; }
@@ -53,6 +79,18 @@ export default function SLItemSellModal({ token, item, onClose, onDone }: { toke
         } catch (e) {
           console.error("auto-print sale", e);
         }
+      }
+      // Отправляем чек на email если указан
+      if (emailInput.trim()) {
+        const checkHtml = buildSaleCheckHtml(item, Number(amount), payment, Date.now());
+        setEmailSending(true);
+        fetch(SEND_CHECK_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Admin-Token": ADMIN_TOKEN },
+          body: JSON.stringify({ email: emailInput.trim(), check_html: checkHtml, check_type: "sale", client_name: "" }),
+        }).then(res => res.json()).then(d => {
+          if (d.sent) setEmailSent(true);
+        }).catch(() => {}).finally(() => setEmailSending(false));
       }
       onDone();
     } else setErr(r.error || "Ошибка");
@@ -172,6 +210,25 @@ export default function SLItemSellModal({ token, item, onClose, onDone }: { toke
             <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${autoPrint ? "left-4" : "left-0.5"}`} />
           </button>
         </label>
+
+        {/* Email чека клиенту */}
+        <div className="bg-[#141414] border border-[#1F1F1F] rounded-lg p-2.5">
+          <div className="flex items-center gap-1.5 text-[12px] text-white/60 mb-2">
+            <Icon name="Mail" size={12} className="text-blue-400" />
+            Отправить чек на email (необязательно)
+          </div>
+          <div className="flex gap-1.5">
+            <input
+              type="email"
+              value={emailInput}
+              onChange={e => setEmailInput(e.target.value)}
+              placeholder="email@example.com"
+              className="flex-1 px-2.5 py-1.5 text-[12px] bg-[#0A0A0A] border border-[#1F1F1F] rounded-md text-white placeholder-white/20 outline-none focus:border-blue-400/40"
+            />
+            {emailSent && <div className="flex items-center gap-1 text-emerald-400 text-[11px]"><Icon name="Check" size={12} />Отправлено</div>}
+          </div>
+        </div>
+
         {err && <div className="text-red-400 text-sm">{err}</div>}
       </div>
     </SLModal>
