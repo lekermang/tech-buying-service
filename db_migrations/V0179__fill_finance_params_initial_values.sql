@@ -1,0 +1,15 @@
+UPDATE t_p31606708_tech_buying_service.finance_params SET value = 3200000 WHERE key = 'total_assets';
+UPDATE t_p31606708_tech_buying_service.finance_params SET value = 0       WHERE key = 'non_interest_liab';
+UPDATE t_p31606708_tech_buying_service.finance_params SET value = 3200000 WHERE key = 'equity';
+UPDATE t_p31606708_tech_buying_service.finance_params SET value = 0       WHERE key = 'debt';
+UPDATE t_p31606708_tech_buying_service.finance_params SET value = 0       WHERE key = 'cost_of_debt';
+UPDATE t_p31606708_tech_buying_service.finance_params SET value = 15      WHERE key = 'cost_of_equity';
+UPDATE t_p31606708_tech_buying_service.finance_params SET value = 6       WHERE key = 'tax_rate';
+UPDATE t_p31606708_tech_buying_service.finance_params SET value = 1       WHERE key = 'shares_outstanding';
+UPDATE t_p31606708_tech_buying_service.finance_params SET value = 0       WHERE key = 'dividends_paid';
+UPDATE t_p31606708_tech_buying_service.finance_params SET value = 0       WHERE key = 'interest_paid';
+UPDATE t_p31606708_tech_buying_service.finance_params SET value = 0       WHERE key = 'interest_received';
+UPDATE t_p31606708_tech_buying_service.finance_params SET value = 150000  WHERE key = 'fixed_costs_monthly';
+UPDATE t_p31606708_tech_buying_service.finance_params SET value = 2500000 WHERE key = 'avg_inventory';
+UPDATE t_p31606708_tech_buying_service.finance_params SET value = 0       WHERE key = 'avg_receivables';
+UPDATE t_p31606708_tech_buying_service.finance_params SET value = 0       WHERE key = 'avg_payables';
