@@ -269,15 +269,12 @@ export const printAct = async (o: Order) => {
   saveAs(blob, `Акт_приёмки_№${o.id}_${o.name.replace(/\s+/g, "_")}.docx`);
 };
 
-export const printActHTML = (o: Order) => {
+export const getActHtmlString = (o: Order): string => {
   const now = new Date(o.created_at);
   const dateStr = now.toLocaleDateString("ru-RU", { day: "2-digit", month: "long", year: "numeric" });
   const timeStr = now.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
   const barNum = String(o.id).padStart(12, "0");
   const orderNum = String(o.id).padStart(6, "0");
-
-  const win = window.open("", "_blank", "width=980,height=1300");
-  if (!win) return;
 
   const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Акт приёма №${o.id}</title>
@@ -621,7 +618,13 @@ body{font-family:Arial,sans-serif;font-size:10px;color:#000;background:#fff}
   });
 ` + `</script>
 </body></html>`;
+  return html;
+};
 
+export const printActHTML = (o: Order) => {
+  const html = getActHtmlString(o);
+  const win = window.open("", "_blank", "width=980,height=1300");
+  if (!win) return;
   win.document.write(html);
   win.document.close();
 };
@@ -791,27 +794,16 @@ const row = (label: string, value: string) =>
 
 const divider = () => `<div style="height:1px;background:#2a2a2a;margin:10px 0"></div>`;
 
-// ── 1. АКТ ПРИЁМКИ — отправляется при создании заявки ──────────────────────
+// ── 1. АКТ ПРИЁМКИ для email — настоящий акт, но без print-кнопки и barcode-JS
 export const getIntakeActHtml = (o: Order): string => {
-  const d = new Date(o.created_at);
-  const dateStr = d.toLocaleDateString("ru-RU");
-  const timeStr = d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
-  const body = `
-    ${row("№ заявки", `#${o.id}`)}
-    ${row("Дата приёмки", `${dateStr} ${timeStr}`)}
-    ${divider()}
-    ${row("Клиент", o.name)}
-    ${row("Телефон", o.phone)}
-    ${o.model ? row("Устройство", o.model) : ""}
-    ${divider()}
-    ${o.repair_type ? row("Вид работы", o.repair_type) : ""}
-    ${o.comment ? row("Описание проблемы", o.comment) : ""}
-    ${o.price ? row("Предв. стоимость", `${o.price.toLocaleString("ru-RU")} ₽`) : ""}
-    ${divider()}
-    <table width="100%" cellpadding="0" cellspacing="0"><tr>
-      <td style="font-size:12px;color:#666;padding-top:4px">Устройство принято на диагностику и ремонт. Мастер свяжется с вами для согласования стоимости.</td>
-    </tr></table>`;
-  return emailWrap("Акт приёмки на ремонт", "🔧 Акт приёмки", body, o);
+  const html = getActHtmlString(o);
+  return html
+    // убираем кнопку "Распечатать"
+    .replace(/<div class="print-btn">[\s\S]*?<\/div>/, "")
+    // убираем barcode-скрипт (не работает в email)
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    // убираем пустой SVG барcode (заменяем на номер заявки)
+    .replace('<svg id="barcode"></svg>', `<div style="font-size:16px;font-weight:bold;letter-spacing:2px;text-align:center">#${String(o.id).padStart(6,"0")}</div>`);
 };
 
 // ── 2. АКТ ГОТОВНОСТИ — отправляется при статусе «Готов» ───────────────────

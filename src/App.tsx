@@ -43,6 +43,7 @@ const Catalog = safeLazy(() => import("./pages/Catalog"));
 const Tools = safeLazy(() => import("./pages/Tools"));
 const ToolsSync = safeLazy(() => import("./pages/ToolsSync"));
 const NotFound = safeLazy(() => import("./pages/NotFound"));
+const RepairStatus = safeLazy(() => import("./pages/RepairStatus"));
 const RepairDiscount = safeLazy(() => import("./pages/RepairDiscount"));
 const Requisites = safeLazy(() => import("./pages/Requisites"));
 const Act = safeLazy(() => import("./pages/Act"));
@@ -146,6 +147,7 @@ const App = () => {
             <Route path="/icons" element={<RussianIcons />} />
             <Route path="/porcelain" element={<RussianPorcelain />} />
             <Route path="/soviet-antiques" element={<SovietAntiques />} />
+            <Route path="/repair-status" element={<RepairStatus />} />
             <Route path="/repair-discount" element={<RepairDiscount />} />
             <Route path="/requisites" element={<Requisites />} />
             <Route path="/act" element={<Act />} />
