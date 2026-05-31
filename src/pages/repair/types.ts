@@ -27,6 +27,7 @@ export type Order = {
   advance: number | null; is_paid: boolean | null;
   payment_method: string | null;
   status_updated_at?: string | null;
+  client_email?: string | null;
   // Выбранная клиентом запчасть из подбора (откуда заказывать)
   part_id?: string | null;
   part_name?: string | null;
@@ -43,7 +44,7 @@ export type DayStat = {
   revenue: number; costs: number; profit: number; master_income: number;
 };
 
-export const EMPTY_FORM = { name: "", phone: "", model: "", repair_type: "", price: "", comment: "" };
+export const EMPTY_FORM = { name: "", phone: "", model: "", repair_type: "", price: "", comment: "", client_email: "" };
 export const EMPTY_COMPLETE = { purchase_amount: "", repair_amount: "", parts_name: "" };
 
 export const statusInfo = (key: string) => STATUSES.find(s => s.key === key) || STATUSES[0];
@@ -720,68 +721,180 @@ export const printReceipt = (o: Order) => {
 };
 
 const SEND_CHECK_URL = "https://functions.poehali.dev/3e5c5c1a-5e16-4ae2-8b34-8618e4f6558d";
+const SITE_URL = "https://skypka24.com";
 
-export const getReceiptHtml = (o: Order): string => {
-  const now = new Date();
-  const dateStr = now.toLocaleDateString("ru-RU");
-  const timeStr = now.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
-  const isWater = /вода|влага|залит|liquid|water/i.test((o.repair_type || "") + " " + (o.comment || ""));
-  return `<div style="font-family:Arial,sans-serif;font-size:12px;color:#000;max-width:600px">
-  <style>
-    .row{display:flex;justify-content:space-between;margin-bottom:4px;font-size:11px}
-    .row .label{color:#666;flex-shrink:0;margin-right:6px}
-    .row .val{font-weight:600;text-align:right}
-    .total-row{display:flex;justify-content:space-between;font-size:14px;font-weight:bold;border-top:2px solid #000;padding-top:8px;margin-top:8px}
-    .dashed{border-top:1px dashed #bbb;margin:8px 0}
-    .section-title{font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #000;padding-bottom:3px;margin:10px 0 6px}
-    .warranty-box{border:2px solid #000;padding:8px;margin-top:10px}
-    .warranty-title{font-size:12px;font-weight:bold;text-align:center;margin-bottom:4px}
-    .warranty-item{font-size:10px;margin-bottom:3px;padding-left:12px;position:relative}
-    .warranty-item:before{content:"•";position:absolute;left:0}
-    .no-warranty{font-size:11px;font-weight:bold;border:2px solid #000;padding:6px;text-align:center;margin-top:8px}
-  </style>
-  <h2 style="text-align:center;margin:0 0 2px;font-size:16px">Скупка24</h2>
-  <div style="font-size:10px;text-align:center;color:#555;margin-bottom:12px">ИП Мамедов Адиль Мирза Оглы · г.Калуга, ул.Кирова, 7 / 11 · skypka24.com</div>
-  <div class="section-title">Квитанция об оплате</div>
-  <div class="row"><span class="label">№ заявки:</span><span class="val">#${o.id}</span></div>
-  <div class="row"><span class="label">Дата:</span><span class="val">${dateStr} ${timeStr}</span></div>
-  <div class="dashed"></div>
-  <div class="row"><span class="label">Клиент:</span><span class="val">${o.name}</span></div>
-  <div class="row"><span class="label">Телефон:</span><span class="val">${o.phone}</span></div>
-  ${o.model ? `<div class="row"><span class="label">Устройство:</span><span class="val">${o.model}</span></div>` : ""}
-  <div class="dashed"></div>
-  ${o.repair_type ? `<div class="row"><span class="label">Вид работы:</span><span class="val">${o.repair_type}</span></div>` : ""}
-  ${o.comment ? `<div class="row"><span class="label">Описание:</span><span class="val">${o.comment}</span></div>` : ""}
-  <div class="total-row"><span>К оплате:</span><span>${(o.repair_amount || 0).toLocaleString("ru-RU")} ₽</span></div>
-  <div class="dashed"></div>
-  ${isWater ? `<div class="no-warranty">⚠ ГАРАНТИЯ НЕ ПРЕДОСТАВЛЯЕТСЯ<br><span style="font-size:10px;font-weight:normal">Ремонт после воздействия влаги/воды</span></div>` : `
-  <div class="warranty-box">
-    <div class="warranty-title">Гарантия: 30 дней</div>
-    <div class="warranty-item">Гарантия на выполненную работу и установленные запчасти</div>
-    <div class="warranty-item">Не распространяется на мех. повреждения и попадание влаги</div>
-    <div class="warranty-item">При нарушении пломб гарантия аннулируется</div>
-  </div>`}
-  <div style="font-size:9px;color:#888;margin-top:12px">ИНН: 402810962699 · ОГРНИП: 307402814200032<br>Р/с: 40802810422270001866 · БИК: 042908612</div>
-</div>`;
+// Общая «обёртка» письма — тёмная, в стиле бренда
+const emailWrap = (title: string, badge: string, bodyHtml: string, order: Order) => {
+  const statusUrl = `${SITE_URL}/repair-status?id=${order.id}`;
+  const termsUrl  = `${SITE_URL}/repair-terms`;
+  return `
+<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title></head>
+<body style="margin:0;padding:0;background:#0d0d0d;font-family:Arial,Helvetica,sans-serif">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#0d0d0d;padding:28px 12px">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
+
+  <!-- ШАПКА -->
+  <tr><td style="background:linear-gradient(135deg,#1a1a1a,#111);border-radius:16px 16px 0 0;padding:28px 36px;border-bottom:2px solid #FFD700">
+    <table width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td><div style="font-size:26px;font-weight:900;color:#FFD700;letter-spacing:2px">СКУПКА<span style="color:#fff">24</span></div>
+          <div style="font-size:11px;color:#555;margin-top:3px;letter-spacing:1px;text-transform:uppercase">Ремонт техники · г. Калуга</div></td>
+      <td align="right"><div style="background:#FFD700;color:#000;padding:7px 16px;border-radius:30px;font-size:12px;font-weight:800;letter-spacing:0.5px">${badge}</div></td>
+    </tr></table>
+  </td></tr>
+
+  <!-- ТЕЛО -->
+  <tr><td style="background:#161616;padding:28px 36px">
+    <div style="font-size:17px;font-weight:700;color:#fff;margin-bottom:6px">Здравствуйте, ${order.name}!</div>
+    <div style="font-size:13px;color:#aaa;line-height:1.7;margin-bottom:20px">${title} по заявке <span style="color:#FFD700;font-weight:700">#${order.id}</span></div>
+    <div style="background:#1e1e1e;border-radius:12px;border:1px solid #2a2a2a;padding:20px;color:#e0e0e0;font-size:13px;line-height:1.9">
+      ${bodyHtml}
+    </div>
+  </td></tr>
+
+  <!-- КНОПКИ -->
+  <tr><td style="background:#161616;padding:4px 36px 24px;text-align:center">
+    <table cellpadding="0" cellspacing="0" style="margin:0 auto"><tr>
+      <td style="padding:0 6px"><a href="${statusUrl}" style="display:inline-block;background:#FFD700;color:#000;font-weight:800;font-size:13px;padding:12px 24px;border-radius:30px;text-decoration:none">🔍 Проверить статус</a></td>
+      <td style="padding:0 6px"><a href="${termsUrl}" style="display:inline-block;background:#1e1e1e;color:#aaa;border:1px solid #333;font-size:13px;padding:12px 24px;border-radius:30px;text-decoration:none">📋 Условия гарантии</a></td>
+    </tr></table>
+    <div style="font-size:11px;color:#444;margin-top:12px">
+      Статус ремонта: <a href="${statusUrl}" style="color:#FFD700;text-decoration:none">${statusUrl}</a>
+    </div>
+  </td></tr>
+
+  <!-- КОНТАКТЫ -->
+  <tr><td style="background:#111;padding:16px 36px;border-top:1px solid #222">
+    <table width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td style="font-size:12px;color:#555;line-height:2">
+        📍 г. Калуга, ул. Кирова, 7/47 и ул. Кирова, 11<br>
+        📞 <a href="tel:+79929903333" style="color:#888;text-decoration:none">+7 (992) 990-33-33</a><br>
+        🌐 <a href="${SITE_URL}" style="color:#FFD700;text-decoration:none">skypka24.com</a>
+      </td>
+      <td align="right" style="font-size:11px;color:#444;line-height:1.8">
+        ИП Мамедов Адиль Мирза Оглы<br>ИНН: 402810962699<br>ОГРНИП: 307402814200032
+      </td>
+    </tr></table>
+  </td></tr>
+  <tr><td style="background:#0a0a0a;border-radius:0 0 16px 16px;padding:12px 36px;text-align:center">
+    <div style="font-size:11px;color:#333">© 2025 Скупка24 · Все права защищены</div>
+  </td></tr>
+
+</table></td></tr></table></body></html>`;
 };
 
-export const sendReceiptByEmail = async (
-  o: Order,
-  email: string,
-  token: string
+const row = (label: string, value: string) =>
+  `<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:6px"><tr>
+    <td style="color:#888;font-size:13px;width:45%">${label}</td>
+    <td style="color:#fff;font-size:13px;font-weight:600;text-align:right">${value}</td>
+  </tr></table>`;
+
+const divider = () => `<div style="height:1px;background:#2a2a2a;margin:10px 0"></div>`;
+
+// ── 1. АКТ ПРИЁМКИ — отправляется при создании заявки ──────────────────────
+export const getIntakeActHtml = (o: Order): string => {
+  const d = new Date(o.created_at);
+  const dateStr = d.toLocaleDateString("ru-RU");
+  const timeStr = d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  const body = `
+    ${row("№ заявки", `#${o.id}`)}
+    ${row("Дата приёмки", `${dateStr} ${timeStr}`)}
+    ${divider()}
+    ${row("Клиент", o.name)}
+    ${row("Телефон", o.phone)}
+    ${o.model ? row("Устройство", o.model) : ""}
+    ${divider()}
+    ${o.repair_type ? row("Вид работы", o.repair_type) : ""}
+    ${o.comment ? row("Описание проблемы", o.comment) : ""}
+    ${o.price ? row("Предв. стоимость", `${o.price.toLocaleString("ru-RU")} ₽`) : ""}
+    ${divider()}
+    <table width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td style="font-size:12px;color:#666;padding-top:4px">Устройство принято на диагностику и ремонт. Мастер свяжется с вами для согласования стоимости.</td>
+    </tr></table>`;
+  return emailWrap("Акт приёмки на ремонт", "🔧 Акт приёмки", body, o);
+};
+
+// ── 2. АКТ ГОТОВНОСТИ — отправляется при статусе «Готов» ───────────────────
+export const getReadyActHtml = (o: Order): string => {
+  const body = `
+    ${row("№ заявки", `#${o.id}`)}
+    ${o.model ? row("Устройство", o.model) : ""}
+    ${divider()}
+    ${o.repair_type ? row("Выполненные работы", o.repair_type) : ""}
+    ${o.parts_name ? row("Замененные запчасти", o.parts_name) : ""}
+    ${divider()}
+    ${row("Стоимость ремонта", `${(o.repair_amount || 0).toLocaleString("ru-RU")} ₽`)}
+    ${o.advance ? row("Аванс", `${o.advance.toLocaleString("ru-RU")} ₽`) : ""}
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px"><tr>
+      <td style="padding:10px 12px;background:#1a2a1a;border-radius:8px;border-left:3px solid #4ade80;font-size:13px;color:#4ade80;font-weight:600">
+        ✅ Ваше устройство готово! Ждём вас в офисе.
+      </td>
+    </tr></table>`;
+  return emailWrap("Ваш ремонт готов!", "✅ Ремонт готов", body, o);
+};
+
+// ── 3. ГАРАНТИЙНЫЙ ЧЕК — отправляется при выдаче / при приёмке ─────────────
+export const getWarrantyActHtml = (o: Order): string => {
+  const isWater = /вода|влага|залит|liquid|water/i.test((o.repair_type || "") + " " + (o.comment || ""));
+  const warrantyBlock = isWater
+    ? `<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px"><tr>
+        <td style="padding:10px 12px;background:#2a1a1a;border-radius:8px;border-left:3px solid #f87171;font-size:12px;color:#f87171">
+          ⚠️ <strong>Гарантия не предоставляется</strong><br>Ремонт после воздействия влаги/жидкости
+        </td>
+      </tr></table>`
+    : `<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px"><tr>
+        <td style="padding:12px;background:#1a1f2a;border-radius:8px;border:1px solid #FFD700/30;font-size:12px;color:#aaa;line-height:2">
+          <div style="font-size:13px;font-weight:700;color:#FFD700;margin-bottom:6px">🛡 Гарантия: 30 дней</div>
+          • Гарантия на выполненные работы и установленные запчасти<br>
+          • Не распространяется на механические повреждения<br>
+          • Не распространяется на попадание влаги<br>
+          • При нарушении пломб гарантия аннулируется<br>
+          • Полные условия: <a href="${SITE_URL}/repair-terms" style="color:#FFD700">${SITE_URL}/repair-terms</a>
+        </td>
+      </tr></table>`;
+  const body = `
+    ${row("№ заявки", `#${o.id}`)}
+    ${o.model ? row("Устройство", o.model) : ""}
+    ${o.repair_type ? row("Вид работы", o.repair_type) : ""}
+    ${o.parts_name ? row("Запчасти", o.parts_name) : ""}
+    ${divider()}
+    ${row("Итого оплачено", `${(o.repair_amount || 0).toLocaleString("ru-RU")} ₽`)}
+    ${warrantyBlock}`;
+  return emailWrap("Гарантийный талон", "🛡 Гарантия", body, o);
+};
+
+// ── Старый getReceiptHtml — оставляем для совместимости (при выдаче) ────────
+export const getReceiptHtml = (o: Order): string => getWarrantyActHtml(o);
+
+// ── Отправка одного письма ──────────────────────────────────────────────────
+const sendOneEmail = async (
+  email: string, token: string,
+  checkHtml: string, checkType: string,
+  orderId: number, clientName: string, subject?: string,
 ): Promise<void> => {
-  const checkHtml = getReceiptHtml(o);
   const res = await fetch(SEND_CHECK_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Admin-Token": token },
-    body: JSON.stringify({
-      email,
-      check_html: checkHtml,
-      check_type: "repair",
-      order_id: o.id,
-      client_name: o.name,
-    }),
+    body: JSON.stringify({ email, check_html: checkHtml, check_type: checkType, order_id: orderId, client_name: clientName, subject }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.sent) throw new Error(data.error || "Ошибка отправки");
+};
+
+// ── Отправка 3 документов при приёмке ──────────────────────────────────────
+export const sendIntakeEmailBundle = async (o: Order, email: string, token: string): Promise<void> => {
+  await Promise.all([
+    sendOneEmail(email, token, getIntakeActHtml(o),   "repair", o.id, o.name, `Акт приёмки #${o.id} — ${o.model || o.name}`),
+    sendOneEmail(email, token, getWarrantyActHtml(o), "repair", o.id, o.name, `Условия гарантии — ${o.model || o.name}`),
+  ]);
+};
+
+// ── Отправка чека при готовности ────────────────────────────────────────────
+export const sendReadyEmail = async (o: Order, email: string, token: string): Promise<void> => {
+  await sendOneEmail(email, token, getReadyActHtml(o), "repair", o.id, o.name, `Ремонт готов! Заявка #${o.id}`);
+};
+
+// ── Ручная отправка чека (из карточки) ─────────────────────────────────────
+export const sendReceiptByEmail = async (o: Order, email: string, token: string): Promise<void> => {
+  await sendOneEmail(email, token, getWarrantyActHtml(o), "repair", o.id, o.name, `Чек ремонта #${o.id} — ${o.model || o.name}`);
 };

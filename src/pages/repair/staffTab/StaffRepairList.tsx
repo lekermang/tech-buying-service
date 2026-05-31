@@ -300,6 +300,23 @@ export default function StaffRepairList({
                 <input value={form.comment} onChange={e => setForm(p => ({ ...p, comment: e.target.value }))} placeholder="Не включается, разбит экран..." className={INP} />
               </div>
 
+              {/* ── Блок 5: email — необязательно ── */}
+              <div className="relative">
+                <label className={LBL}>
+                  Email клиента <span className="text-white/30">— для актов и чека</span>
+                </label>
+                <input
+                  type="email"
+                  value={form.client_email}
+                  onChange={e => setForm(p => ({ ...p, client_email: e.target.value }))}
+                  placeholder="ivan@mail.ru"
+                  className={INP}
+                />
+                {form.client_email && (
+                  <span className="absolute right-2 top-7 text-[10px] text-green-400/70 font-roboto pointer-events-none">3 документа на почту</span>
+                )}
+              </div>
+
               <button
                 onClick={createOrder}
                 disabled={creating || !form.name || !form.phone || !form.model}

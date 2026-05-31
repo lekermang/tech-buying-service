@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { REPAIR_URL, Order, EMPTY_FORM, printReceipt, printAct } from "../types";
+import { REPAIR_URL, Order, EMPTY_FORM, printReceipt, printAct, sendIntakeEmailBundle } from "../types";
 import { Period, EditForm } from "./staffTabTypes";
 import { useStaffToast } from "../../staff/StaffToast";
 import { humanizeError } from "./humanizeError";
@@ -99,7 +99,8 @@ export function useStaffRepairActions(token: string, st: StaffRepairState) {
       let data: { order_id?: number; error?: string } = {};
       try { data = await res.json(); } catch { /* not json */ }
       if (data.order_id) {
-        toast.update(tid, { kind: "success", message: `Заявка #${data.order_id} создана`, duration: 3000 });
+        const email = (form.client_email || "").trim();
+        toast.update(tid, { kind: "success", message: `Заявка #${data.order_id} создана${email ? " · отправляю документы" : ""}`, duration: 3000 });
         const newOrder: Order = {
           id: data.order_id, name: form.name, phone: form.phone,
           model: form.model || null, repair_type: form.repair_type || null,
@@ -109,8 +110,14 @@ export function useStaffRepairActions(token: string, st: StaffRepairState) {
           purchase_amount: null, repair_amount: null,
           completed_at: null, master_income: null, parts_name: null, picked_up_at: null,
           advance: null, is_paid: null, payment_method: null,
+          client_email: email || null,
         };
         printAct(newOrder);
+        if (email) {
+          sendIntakeEmailBundle(newOrder, email, token)
+            .then(() => toast.success(`Акты отправлены на ${email}`))
+            .catch(() => toast.warning("Заявка создана, но письмо не отправилось"));
+        }
         setShowForm(false);
         setForm(EMPTY_FORM);
         loadOrders();

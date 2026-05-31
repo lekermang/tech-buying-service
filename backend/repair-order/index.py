@@ -1154,6 +1154,7 @@ def handler(event: dict, context) -> dict:
         except (TypeError, ValueError):
             price = None
     comment = (body.get('comment') or '').strip()
+    client_email = (body.get('client_email') or '').strip() or None
 
     # Выбранная клиентом запчасть из подбора (если есть)
     sel = body.get('selected_part') or {}
@@ -1199,10 +1200,10 @@ def handler(event: dict, context) -> dict:
         cur.execute(
             f"INSERT INTO {SCHEMA}.repair_orders "
             "(name, phone, model, repair_type, price, repair_amount, comment, client_tg_chat_id, "
-            " part_id, part_name, part_quality, part_source, part_supplier, part_code, part_category, part_supplier_price) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+            " part_id, part_name, part_quality, part_source, part_supplier, part_code, part_category, part_supplier_price, client_email) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
             (name, phone, model or None, repair_type or None, price, repair_amount_initial, comment or None, client_chat_id,
-             part_id, part_name, part_quality, part_source, part_supplier, part_code, part_category, part_supplier_price)
+             part_id, part_name, part_quality, part_source, part_supplier, part_code, part_category, part_supplier_price, client_email)
         )
         order_id = cur.fetchone()[0]
         conn.commit()

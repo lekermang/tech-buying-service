@@ -182,22 +182,33 @@ def handler(event: dict, context) -> dict:
     check_type = body.get('check_type', 'repair')  # 'repair' | 'sale'
     order_id = body.get('order_id', '')
     client_name = (body.get('client_name') or '').strip()
+    # Если передан subject — используем его напрямую
+    custom_subject = (body.get('subject') or '').strip()
 
     if not to_email:
         return err(400, 'email required')
     if not check_html:
         return err(400, 'check_html required')
 
-    # Формируем тему письма
-    if check_type == 'repair':
-        title = 'Чек ремонта'
+    # Тема письма
+    if custom_subject:
+        subject = f'Скупка24 — {custom_subject}'
+    elif check_type == 'repair':
         subject = f'Скупка24 — Чек ремонта #{order_id}' if order_id else 'Скупка24 — Чек ремонта'
     else:
-        title = 'Товарный чек'
         subject = f'Скупка24 — Товарный чек #{order_id}' if order_id else 'Скупка24 — Товарный чек'
 
-    subject_data = {'title': title, 'order_id': order_id, 'client_name': client_name}
-    email_html = build_email_html(check_type, subject_data, check_html)
+    # Если check_html уже полноценный HTML-документ (наши новые шаблоны) — отправляем как есть
+    # Иначе оборачиваем в старый шаблон (обратная совместимость)
+    if check_html.strip().lower().startswith('<!doctype') or check_html.strip().lower().startswith('<html'):
+        email_html = check_html
+    else:
+        if check_type == 'repair':
+            title = 'Чек ремонта'
+        else:
+            title = 'Товарный чек'
+        subject_data = {'title': title, 'order_id': order_id, 'client_name': client_name}
+        email_html = build_email_html(check_type, subject_data, check_html)
 
     send_email(to_email, subject, email_html)
 
