@@ -1,13 +1,11 @@
 """
-Финансовый аналитик-отчёт: банковские выписки + данные склада → ИИ-резюме.
-Принимает тексты выписок (дебетовая карта, накопительный счёт)
-и автоматически подтягивает складские данные из БД.
-Возвращает структурированный отчёт по шаблону ДДС.
+Финансовый аналитик-отчёт: PDF-выписки + склад → ИИ ДДС + дашборд расходов.
 """
 import json
 import os
 import base64
 import io
+import re
 import urllib.request
 import psycopg2
 import psycopg2.extras
@@ -25,7 +23,7 @@ CORS = {
 
 
 def handler(event: dict, context) -> dict:
-    """Принимает банковские выписки, возвращает ИИ-финотчёт по шаблону ДДС."""
+    """Финансовый аналитик: PDF выписки + склад → ДДС + дашборд."""
     if event.get("httpMethod") == "OPTIONS":
         return {"statusCode": 200, "headers": CORS, "body": ""}
 
@@ -46,45 +44,45 @@ def handler(event: dict, context) -> dict:
     return {"statusCode": 400, "headers": CORS, "body": json.dumps({"error": "unknown action"})}
 
 
+# ── PDF парсинг ───────────────────────────────────────────────────────────────
+
 def parse_pdf(body: dict) -> dict:
     """Извлекает текст из PDF (base64) с помощью pdfplumber."""
     pdf_b64 = body.get("pdf_base64", "")
     if not pdf_b64:
         return {"statusCode": 400, "headers": CORS, "body": json.dumps({"error": "pdf_base64 обязателен"})}
-
-    # Убираем data URL prefix
     if "," in pdf_b64:
         pdf_b64 = pdf_b64.split(",", 1)[1]
-
     try:
         raw_bytes = base64.b64decode(pdf_b64)
     except Exception as e:
-        return {"statusCode": 400, "headers": CORS, "body": json.dumps({"error": f"Ошибка декодирования base64: {e}"})}
-
+        return {"statusCode": 400, "headers": CORS, "body": json.dumps({"error": f"base64 ошибка: {e}"})}
     try:
         import pdfplumber
         text_pages = []
         with pdfplumber.open(io.BytesIO(raw_bytes)) as pdf:
+            total_pages = len(pdf.pages)
             for page in pdf.pages:
-                page_text = page.extract_text()
-                if page_text:
-                    text_pages.append(page_text.strip())
+                t = page.extract_text()
+                if t:
+                    text_pages.append(t.strip())
         full_text = "\n\n".join(text_pages)
         if not full_text.strip():
             return {"statusCode": 200, "headers": CORS,
-                    "body": json.dumps({"text": "", "pages": len(pdf.pages), "warning": "PDF не содержит текста (возможно, скан)"}, ensure_ascii=False)}
+                    "body": json.dumps({"text": "", "pages": total_pages,
+                                        "warning": "PDF не содержит текста — возможно, скан"}, ensure_ascii=False)}
         return {"statusCode": 200, "headers": CORS,
-                "body": json.dumps({"text": full_text, "pages": len(text_pages)}, ensure_ascii=False)}
+                "body": json.dumps({"text": full_text, "pages": total_pages}, ensure_ascii=False)}
     except Exception as e:
-        return {"statusCode": 500, "headers": CORS, "body": json.dumps({"error": f"Ошибка парсинга PDF: {e}"}, ensure_ascii=False)}
+        return {"statusCode": 500, "headers": CORS, "body": json.dumps({"error": f"Ошибка PDF: {e}"}, ensure_ascii=False)}
 
+
+# ── Данные склада из БД ───────────────────────────────────────────────────────
 
 def get_stock_summary() -> dict:
-    """Вытаскивает сводку склада из БД."""
     try:
         conn = psycopg2.connect(DB)
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-
         cur.execute(f"""
             SELECT
                 COUNT(*) FILTER (WHERE status IN ('stock','showcase','consignment')) AS in_stock,
@@ -98,34 +96,22 @@ def get_stock_summary() -> dict:
             FROM {SCHEMA}.slshop_items
         """)
         row = dict(cur.fetchone())
-
-        # Расходы за последние 30 дней (скупка)
         cur.execute(f"""
-            SELECT
-                COALESCE(SUM(buy_price), 0) AS last30_buy,
-                COUNT(*) AS last30_count
-            FROM {SCHEMA}.slshop_items
-            WHERE created_at >= NOW() - INTERVAL '30 days'
+            SELECT COALESCE(SUM(buy_price), 0) AS last30_buy, COUNT(*) AS last30_count
+            FROM {SCHEMA}.slshop_items WHERE created_at >= NOW() - INTERVAL '30 days'
         """)
         last30 = dict(cur.fetchone())
-
-        # Доходы за последние 30 дней (продажи)
         cur.execute(f"""
-            SELECT
-                COALESCE(SUM(sell_price), 0) AS last30_revenue,
-                COALESCE(SUM(sell_price - buy_price), 0) AS last30_profit,
-                COUNT(*) AS last30_sold
+            SELECT COALESCE(SUM(sell_price), 0) AS last30_revenue,
+                   COALESCE(SUM(sell_price - buy_price), 0) AS last30_profit,
+                   COUNT(*) AS last30_sold
             FROM {SCHEMA}.slshop_items
             WHERE status = 'sold' AND sell_at >= NOW() - INTERVAL '30 days'
         """)
         last30_sell = dict(cur.fetchone())
-
-        cur.close()
-        conn.close()
-
+        cur.close(); conn.close()
         return {
-            "statusCode": 200,
-            "headers": CORS,
+            "statusCode": 200, "headers": CORS,
             "body": json.dumps({
                 "in_stock": int(row.get("in_stock") or 0),
                 "stock_value": float(row.get("stock_value") or 0),
@@ -146,37 +132,42 @@ def get_stock_summary() -> dict:
         return {"statusCode": 500, "headers": CORS, "body": json.dumps({"error": str(e)})}
 
 
+# ── Основной анализ ───────────────────────────────────────────────────────────
+
 def analyze(body: dict) -> dict:
-    """Основной action: принимает выписки, берёт склад из БД, отправляет в GPT-4o."""
     debit_text = (body.get("debit_text") or "").strip()
     savings_text = (body.get("savings_text") or "").strip()
     period = (body.get("period") or "текущий месяц").strip()
+    today = datetime.now()
+    today_str = today.strftime("%d.%m.%Y")
+    # Сколько дней прошло и осталось в месяце
+    day_of_month = today.day
+    import calendar
+    days_in_month = calendar.monthrange(today.year, today.month)[1]
+    days_left = days_in_month - day_of_month
 
     if not debit_text and not savings_text:
-        return {
-            "statusCode": 400,
-            "headers": CORS,
-            "body": json.dumps({"error": "Нужна хотя бы одна выписка"}, ensure_ascii=False),
-        }
+        return {"statusCode": 400, "headers": CORS,
+                "body": json.dumps({"error": "Нужна хотя бы одна выписка"}, ensure_ascii=False)}
 
-    # Берём данные склада
     stock_resp = get_stock_summary()
     stock_data = json.loads(stock_resp["body"])
 
-    stock_context = f"""ДАННЫЕ СКЛАДА (из системы учёта, актуально на сегодня {datetime.now().strftime('%d.%m.%Y')}):
+    stock_context = f"""ДАННЫЕ СКЛАДА (актуально на {today_str}):
 - Товаров на складе: {int(stock_data.get('in_stock', 0))} позиций
 - Стоимость склада (закупочная): {stock_data.get('stock_value', 0):,.0f} руб
 - Потенциальная выручка со склада: {stock_data.get('stock_sell_value', 0):,.0f} руб
 - Прибыль с начала бизнеса: {stock_data.get('total_profit', 0):,.0f} руб
-- Всего вложено в товар: {stock_data.get('total_invested', 0):,.0f} руб
-- Всего выручки за всё время: {stock_data.get('total_revenue', 0):,.0f} руб
-- Закупки за последние 30 дней: {stock_data.get('last30_buy', 0):,.0f} руб ({int(stock_data.get('last30_count', 0))} шт)
-- Продажи за последние 30 дней: {stock_data.get('last30_revenue', 0):,.0f} руб ({int(stock_data.get('last30_sold', 0))} шт), прибыль: {stock_data.get('last30_profit', 0):,.0f} руб"""
+- Всего вложено: {stock_data.get('total_invested', 0):,.0f} руб
+- Выручка за всё время: {stock_data.get('total_revenue', 0):,.0f} руб
+- Закупки последние 30 дн.: {stock_data.get('last30_buy', 0):,.0f} руб ({int(stock_data.get('last30_count', 0))} шт)
+- Продажи последние 30 дн.: {stock_data.get('last30_revenue', 0):,.0f} руб ({int(stock_data.get('last30_sold', 0))} шт), прибыль: {stock_data.get('last30_profit', 0):,.0f} руб"""
 
     debit_section = f"ВЫПИСКА ПО ДЕБЕТОВОЙ КАРТЕ:\n{debit_text}" if debit_text else "ВЫПИСКА ПО ДЕБЕТОВОЙ КАРТЕ: не предоставлена"
     savings_section = f"ВЫПИСКА ПО НАКОПИТЕЛЬНОМУ СЧЁТУ:\n{savings_text}" if savings_text else "ВЫПИСКА ПО НАКОПИТЕЛЬНОМУ СЧЁТУ: не предоставлена"
 
-    prompt = f"""Ты — финансовый аналитик. Период: {period}.
+    prompt = f"""Ты — строгий финансовый аналитик. Сегодня {today_str}, период: {period}.
+До конца месяца осталось {days_left} дней (из {days_in_month}).
 
 {stock_context}
 
@@ -184,39 +175,51 @@ def analyze(body: dict) -> dict:
 
 {savings_section}
 
-Твоя задача — объединить все данные и выдать ОДИН краткий отчёт СТРОГО по шаблону ниже.
-НЕ пиши общие фразы. НЕ учи вести учёт. ТОЛЬКО цифры и три действия.
-Если данных не хватает для конкретной строки — напиши «нет данных» для этой строки, не додумывай.
+Проанализируй ВСЕ транзакции и верни ответ СТРОГО в формате JSON — без markdown, без пояснений, только JSON объект.
 
-ШАБЛОН (выдай строго в этом формате, с этими заголовками):
+Структура JSON:
+{{
+  "debit_balance": "сумма руб или нет данных",
+  "savings_balance": "сумма руб или нет данных",
+  "total_money": "сумма руб",
+  "profit_total": "сумма руб",
+  "profit_period": "сумма руб (+ или -)",
+  "days_runway": "X дней",
+  "safety_level": "green|yellow|red",
+  "main_problem": "одна фраза — самое опасное",
+  "budget_today": "сколько можно потратить сегодня в рублях (число)",
+  "budget_today_explain": "краткое объяснение откуда цифра (1 предложение)",
+  "actions": ["действие 1", "действие 2", "действие 3"],
+  "expense_categories": [
+    {{"name": "Аренда", "amount": 15000, "percent": 22, "trend": "stable", "comment": "ежемесячный платёж"}},
+    {{"name": "Закупка товара", "amount": 85000, "percent": 45, "trend": "up", "comment": "основная статья"}},
+    ...до 8 категорий
+  ],
+  "income_categories": [
+    {{"name": "Продажи б/у", "amount": 120000, "percent": 78}},
+    ...до 5 категорий
+  ],
+  "top_expenses": [
+    {{"date": "дд.мм", "desc": "название операции", "amount": 5000}},
+    ...до 5 крупнейших расходов
+  ],
+  "savings_tips": [
+    "На чём можно сэкономить 1 (конкретно, в рублях если возможно)",
+    "На чём можно сэкономить 2",
+    "На чём можно сэкономить 3"
+  ],
+  "cash_flow_summary": "2-3 предложения о движении денег: откуда приходят, куда уходят, что тревожит"
+}}
 
-ДЕНЬГИ НА СЕГОДНЯ:
-- Остаток на дебетовой карте: ХХХ руб
-- Остаток на накопительном: ХХХ руб
-- ИТОГО ДЕНЕГ: ХХХ руб
-
-ПРИБЫЛЬ БИЗНЕСА:
-- Прибыль с начала бизнеса (реальная): ХХХ руб
-- Прибыль/убыток за отчётный период: ХХХ руб
-
-РИСК КАССОВОГО РАЗРЫВА:
-- Денег хватит на: X дней (при нулевых продажах)
-- Порог безопасности: зелёный / жёлтый / красный
-
-ГЛАВНАЯ ПРОБЛЕМА:
-- (одна фраза, самое опасное)
-
-ТРИ ДЕЙСТВИЯ ЗАВТРА:
-1. ...
-2. ...
-3. ..."""
+Если данных нет для поля — ставь null. trend: up/down/stable. percent — от общей суммы расходов/доходов."""
 
     try:
         data = json.dumps({
             "model": "gpt-4o",
-            "max_tokens": 800,
+            "max_tokens": 2000,
             "temperature": 0.1,
             "messages": [{"role": "user", "content": prompt}],
+            "response_format": {"type": "json_object"},
         }).encode()
         req = urllib.request.Request(
             "https://api.polza.ai/v1/chat/completions",
@@ -224,76 +227,24 @@ def analyze(body: dict) -> dict:
             headers={"Content-Type": "application/json", "Authorization": f"Bearer {OPENAI_KEY}"},
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=40) as resp:
+        with urllib.request.urlopen(req, timeout=60) as resp:
             result = json.loads(resp.read())
-        report_text = result["choices"][0]["message"]["content"].strip()
-
-        # Парсим структурированно для фронтенда
-        parsed = parse_report(report_text)
+        raw = result["choices"][0]["message"]["content"].strip()
+        # Убираем markdown если вдруг есть
+        if raw.startswith("```"):
+            raw = re.sub(r"```\w*\n?", "", raw).strip()
+        parsed = json.loads(raw)
 
         return {
-            "statusCode": 200,
-            "headers": CORS,
+            "statusCode": 200, "headers": CORS,
             "body": json.dumps({
-                "report": report_text,
                 "parsed": parsed,
                 "stock": stock_data,
                 "generated_at": datetime.now().isoformat(),
+                "days_left_month": days_left,
+                "day_of_month": day_of_month,
             }, ensure_ascii=False),
         }
     except Exception as e:
-        return {"statusCode": 500, "headers": CORS, "body": json.dumps({"error": str(e)}, ensure_ascii=False)}
-
-
-def parse_report(text: str) -> dict:
-    """Извлекаем ключевые строки из текста отчёта для структурированного отображения."""
-    lines = text.split("\n")
-    result = {
-        "debit_balance": None,
-        "savings_balance": None,
-        "total_money": None,
-        "profit_total": None,
-        "profit_period": None,
-        "days_runway": None,
-        "safety_level": None,
-        "main_problem": None,
-        "actions": [],
-    }
-    actions = []
-    for line in lines:
-        l = line.strip()
-        lo = l.lower()
-        if "дебетовой карте:" in lo:
-            result["debit_balance"] = l.split(":", 1)[-1].strip()
-        elif "накопительном:" in lo:
-            result["savings_balance"] = l.split(":", 1)[-1].strip()
-        elif "итого денег:" in lo:
-            result["total_money"] = l.split(":", 1)[-1].strip()
-        elif "с начала бизнеса" in lo:
-            result["profit_total"] = l.split(":", 1)[-1].strip()
-        elif "за отчётный период" in lo:
-            result["profit_period"] = l.split(":", 1)[-1].strip()
-        elif "денег хватит на:" in lo:
-            result["days_runway"] = l.split(":", 1)[-1].strip()
-        elif "порог безопасности:" in lo:
-            val = l.split(":", 1)[-1].strip().lower()
-            result["safety_level"] = "green" if "зелён" in val else "red" if "красн" in val else "yellow"
-        elif lo.startswith("- ") and result.get("main_problem") is None and "главная проблема" not in lo:
-            # Первая строка после ГЛАВНАЯ ПРОБЛЕМА
-            pass
-        if l.startswith("1.") or l.startswith("2.") or l.startswith("3."):
-            actions.append(l[2:].strip())
-    result["actions"] = actions[:3]
-
-    # Ищем ГЛАВНАЯ ПРОБЛЕМА отдельным проходом
-    found_problem = False
-    for line in lines:
-        l = line.strip()
-        if "главная проблема" in l.lower():
-            found_problem = True
-            continue
-        if found_problem and l.startswith("-") and not result["main_problem"]:
-            result["main_problem"] = l[1:].strip()
-            break
-
-    return result
+        return {"statusCode": 500, "headers": CORS,
+                "body": json.dumps({"error": str(e)}, ensure_ascii=False)}
