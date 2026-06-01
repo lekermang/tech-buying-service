@@ -1,6 +1,6 @@
 """
-Парсинг PDF-выписок: читает файл из S3 по ключу, извлекает текст через pdfplumber.
-Отдельная функция с увеличенным таймаутом для больших файлов (64+ страниц).
+Парсинг PDF-выписок: читает файл из S3 по ключу, извлекает текст через pypdf (быстро).
+Отдельная функция для больших файлов (64+ страниц).
 """
 import json
 import os
@@ -26,7 +26,7 @@ def get_s3():
 
 
 def handler(event: dict, context) -> dict:
-    """Парсит PDF из S3 через pdfplumber и возвращает текст."""
+    """Парсит PDF из S3 через pypdf и возвращает текст."""
     if event.get("httpMethod") == "OPTIONS":
         return {"statusCode": 200, "headers": CORS, "body": ""}
 
@@ -59,16 +59,16 @@ def handler(event: dict, context) -> dict:
         return {"statusCode": 500, "headers": CORS,
                 "body": json.dumps({"error": f"S3 ошибка: {e}"}, ensure_ascii=False)}
 
-    # Парсим текст через pdfplumber
+    # Парсим текст через pypdf — намного быстрее pdfplumber для текстовых PDF
     try:
-        import pdfplumber
+        from pypdf import PdfReader
+        reader = PdfReader(io.BytesIO(raw_bytes))
+        total_pages = len(reader.pages)
         text_pages = []
-        with pdfplumber.open(io.BytesIO(raw_bytes)) as pdf:
-            total_pages = len(pdf.pages)
-            for page in pdf.pages:
-                t = page.extract_text()
-                if t:
-                    text_pages.append(t.strip())
+        for page in reader.pages:
+            t = page.extract_text()
+            if t and t.strip():
+                text_pages.append(t.strip())
         full_text = "\n\n".join(text_pages)
         if not full_text.strip():
             return {"statusCode": 200, "headers": CORS,
