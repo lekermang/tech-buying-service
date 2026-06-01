@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { REPAIR_URL, Order, EMPTY_FORM, printReceipt, printAct, sendIntakeEmailBundle } from "../types";
+import { triggerReaction } from "@/components/FunReaction";
 import { Period, EditForm } from "./staffTabTypes";
 import { useStaffToast } from "../../staff/StaffToast";
 import { humanizeError } from "./humanizeError";
@@ -212,6 +213,8 @@ export function useStaffRepairActions(token: string, st: StaffRepairState) {
         return false;
       }
       toast.success(`#${id}: ${STATUS_LABELS[status] || status}`);
+      if (status === "accepted") triggerReaction("repair_accepted");
+      else if (status === "ready") triggerReaction("repair_ready");
       loadOrders();
       return true;
     } catch (e) {
@@ -265,6 +268,7 @@ export function useStaffRepairActions(token: string, st: StaffRepairState) {
     extra.repair_amount   = parseInt(repairStr);
     if (ef?.parts_name) extra.parts_name = ef.parts_name;
     await changeStatus(o.id, "done", extra);
+    triggerReaction("repair_issued", parseInt(repairStr) || undefined);
     printReceipt({ ...o, status: "done" });
   };
 

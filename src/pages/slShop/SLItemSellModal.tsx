@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import { slApi, type SLItem, PAYMENT_METHODS } from "./types";
+import { triggerReaction } from "@/components/FunReaction";
 import { Inp2 } from "./SLItemsCommon";
 import { SLModal, SLField, SLInput, SLButton } from "./slUI";
 
@@ -92,6 +93,7 @@ export default function SLItemSellModal({ token, item, onClose, onDone }: { toke
           if (d.sent) setEmailSent(true);
         }).catch(() => {}).finally(() => setEmailSending(false));
       }
+      triggerReaction("item_sold", Number(amount) || undefined);
       onDone();
     } else setErr(r.error || "Ошибка");
   };

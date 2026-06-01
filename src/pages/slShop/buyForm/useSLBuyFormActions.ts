@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { slApi, type SLCategory, type SLClient, type SLBranch, type SLItem } from "../types";
+import { triggerReaction } from "@/components/FunReaction";
 import { printLabelQuick } from "../labelPrinter";
 import type { SLBuyFormState } from "./useSLBuyFormState";
 
@@ -228,6 +229,7 @@ export function useSLBuyFormActions(token: string, st: SLBuyFormState) {
     if (r.ok && r.data) {
       setMsg(`Принято: ${r.data.sku}`);
       setCreatedItemId(r.data.id);
+      triggerReaction("item_bought", Number(payload.buy_price) || undefined);
       // Автопечать: договор и/или ценник — каждое под своим флагом
       if (autoPrint || autoPrintLabel) {
         setTimeout(async () => {

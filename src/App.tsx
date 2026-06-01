@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import GrainOverlay from "@/components/fx/GrainOverlay";
+import FunReaction from "@/components/FunReaction";
 
 /**
  * Безопасный lazy-импорт: если после деплоя браузер запросил старый chunk,
@@ -127,6 +128,7 @@ const App = () => {
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      <FunReaction />
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <GrainOverlay />
         <Suspense fallback={null}>

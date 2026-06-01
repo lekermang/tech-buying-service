@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import Icon from "@/components/ui/icon";
+import { triggerReaction } from "@/components/FunReaction";
 
 const SAVINGS_URL = "https://functions.poehali.dev/4b6d2cd3-a8ca-4aac-aec2-ba9664b21b07";
 const fmt = (n: number) => Math.round(n).toLocaleString("ru-RU");
@@ -240,11 +241,12 @@ function TipCard({ tip }: { tip: Tip }) {
 
 // ─── Modal: создать/редактировать цель ───────────────────────────────────────
 function GoalModal({
-  goal, onClose, onSave,
+  goal, onClose, onSave, token,
 }: {
   goal: Goal | null;
   onClose: () => void;
   onSave: () => void;
+  token: string;
 }) {
   const isEdit = !!goal;
   const [title, setTitle] = useState(goal?.title ?? "");
@@ -257,8 +259,6 @@ function GoalModal({
   const [status, setStatus] = useState(goal?.status ?? "active");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
-
-  const token = typeof window !== "undefined" ? localStorage.getItem("employee_token") || "" : "";
 
   const save = async () => {
     if (!title.trim()) { setErr("Введи название"); return; }
@@ -394,19 +394,18 @@ function GoalModal({
 
 // ─── Modal: пополнить / снять ─────────────────────────────────────────────────
 function TransactionModal({
-  goal, mode, onClose, onDone,
+  goal, mode, onClose, onDone, token,
 }: {
   goal: Goal;
   mode: "deposit" | "withdraw";
   onClose: () => void;
   onDone: () => void;
+  token: string;
 }) {
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
-
-  const token = typeof window !== "undefined" ? localStorage.getItem("employee_token") || "" : "";
 
   const QUICK = mode === "deposit"
     ? [500, 1000, 2000, 5000]
@@ -423,7 +422,7 @@ function TransactionModal({
       body: JSON.stringify({ goal_id: goal.id, amount: val, note: note.trim() || null }),
     });
     setSaving(false);
-    if (r.ok) { const d = await r.json(); if (d.goal_reached) alert("🎉 Цель достигнута!"); onDone(); onClose(); }
+    if (r.ok) { const d = await r.json(); if (d.goal_reached) triggerReaction("goal_reached", goal.target_amount); onDone(); onClose(); }
     else { const d = await r.json(); setErr(d.error || "Ошибка"); }
   };
 
@@ -768,17 +767,17 @@ export default function SavingsView({ token }: { token: string }) {
 
       {/* Модалки */}
       {createOpen && (
-        <GoalModal goal={null} onClose={() => setCreateOpen(false)} onSave={load} />
+        <GoalModal goal={null} token={token} onClose={() => setCreateOpen(false)} onSave={load} />
       )}
       {editGoal && (
-        <GoalModal goal={editGoal} onClose={() => setEditGoal(null)} onSave={load} />
+        <GoalModal goal={editGoal} token={token} onClose={() => setEditGoal(null)} onSave={load} />
       )}
       {depositGoal && (
-        <TransactionModal goal={depositGoal} mode="deposit"
+        <TransactionModal goal={depositGoal} mode="deposit" token={token}
           onClose={() => setDepositGoal(null)} onDone={load} />
       )}
       {withdrawGoal && (
-        <TransactionModal goal={withdrawGoal} mode="withdraw"
+        <TransactionModal goal={withdrawGoal} mode="withdraw" token={token}
           onClose={() => setWithdrawGoal(null)} onDone={load} />
       )}
     </div>
