@@ -541,17 +541,36 @@ def handler(event, context):
             )
             con = cur.fetchone()
 
+            # Золото
+            cur.execute(
+                f"""
+                SELECT
+                  COALESCE(SUM(CASE WHEN completed_at::date = %s THEN profit ELSE 0 END), 0) AS profit_today,
+                  COALESCE(SUM(CASE WHEN completed_at::date = %s THEN sell_price ELSE 0 END), 0) AS revenue_today,
+                  COALESCE(SUM(CASE WHEN completed_at::date >= %s THEN profit ELSE 0 END), 0) AS profit_month,
+                  COALESCE(SUM(CASE WHEN completed_at::date >= %s THEN sell_price ELSE 0 END), 0) AS revenue_month
+                FROM {SCHEMA}.gold_orders
+                WHERE status = 'done'
+                  AND completed_at IS NOT NULL
+                  AND completed_at::date >= %s
+                """,
+                (today, today, first_of_month, first_of_month, first_of_month),
+            )
+            gold = cur.fetchone()
+
             my_stats = {
-                'profit_today': int((sl['profit_today'] or 0) + (rep['profit_today'] or 0) + (con['profit_today'] or 0)),
-                'revenue_today': int((sl['revenue_today'] or 0) + (rep['revenue_today'] or 0) + (con['revenue_today'] or 0)),
+                'profit_today': int((sl['profit_today'] or 0) + (rep['profit_today'] or 0) + (con['profit_today'] or 0) + (gold['profit_today'] or 0)),
+                'revenue_today': int((sl['revenue_today'] or 0) + (rep['revenue_today'] or 0) + (con['revenue_today'] or 0) + (gold['revenue_today'] or 0)),
                 'sales_today': int(sl['sales_today'] or 0),
-                'profit_month': int((sl['profit_month'] or 0) + (rep['profit_month'] or 0) + (con['profit_month'] or 0)),
-                'revenue_month': int((sl['revenue_month'] or 0) + (rep['revenue_month'] or 0) + (con['revenue_month'] or 0)),
+                'profit_month': int((sl['profit_month'] or 0) + (rep['profit_month'] or 0) + (con['profit_month'] or 0) + (gold['profit_month'] or 0)),
+                'revenue_month': int((sl['revenue_month'] or 0) + (rep['revenue_month'] or 0) + (con['revenue_month'] or 0) + (gold['revenue_month'] or 0)),
                 'sales_month': int(sl['sales_month'] or 0),
                 # разбивка
                 'sl_profit_today': int(sl['profit_today'] or 0),
                 'repair_profit_today': int(rep['profit_today'] or 0),
                 'contract_profit_today': int(con['profit_today'] or 0),
+                'gold_profit_today': int(gold['profit_today'] or 0),
+                'gold_profit_month': int(gold['profit_month'] or 0),
             }
 
             return resp(200, {'employees': employees, 'my_stats': my_stats})

@@ -14,6 +14,8 @@ type MyStats = {
   sl_profit_today: number;
   repair_profit_today: number;
   contract_profit_today: number;
+  gold_profit_today: number;
+  gold_profit_month: number;
 } | null;
 
 export default function OwnerEmployeesList({
@@ -78,7 +80,7 @@ export default function OwnerEmployeesList({
             </div>
 
             {/* Разбивка по источникам */}
-            <div className="grid grid-cols-3 gap-2" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "12px" }}>
+            <div className="grid grid-cols-2 gap-2" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "12px" }}>
               <div className="rounded-xl p-2.5 text-center" style={{ background: "rgba(52,211,153,0.07)", border: "1px solid rgba(52,211,153,0.15)" }}>
                 <div className="font-roboto text-[9px] uppercase tracking-widest mb-1" style={{ color: "rgba(52,211,153,0.6)" }}>Ремонты</div>
                 <div className="font-oswald font-bold text-base tabular-nums" style={{ color: "#34d399" }}>
@@ -95,6 +97,12 @@ export default function OwnerEmployeesList({
                 <div className="font-roboto text-[9px] uppercase tracking-widest mb-1" style={{ color: "rgba(251,191,36,0.6)" }}>Договора</div>
                 <div className="font-oswald font-bold text-base tabular-nums" style={{ color: "#fbbf24" }}>
                   {fmt(myStats.contract_profit_today)} ₽
+                </div>
+              </div>
+              <div className="rounded-xl p-2.5 text-center" style={{ background: "rgba(250,204,21,0.07)", border: "1px solid rgba(250,204,21,0.15)" }}>
+                <div className="font-roboto text-[9px] uppercase tracking-widest mb-1" style={{ color: "rgba(250,204,21,0.6)" }}>Золото</div>
+                <div className="font-oswald font-bold text-base tabular-nums" style={{ color: "#facc15" }}>
+                  {fmt(myStats.gold_profit_today)} ₽
                 </div>
               </div>
             </div>
