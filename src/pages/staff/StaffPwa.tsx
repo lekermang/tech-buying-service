@@ -14,7 +14,7 @@ export class TabErrorBoundary extends Component<{ children: ReactNode }, { error
       <div className="p-6 text-center">
         <div className="text-red-400 font-roboto text-sm mb-3">Ошибка загрузки раздела</div>
         <div className="text-white/30 font-roboto text-xs mb-4">{this.state.error}</div>
-        <button onClick={() => this.setState({ error: null })}
+        <button onClick={() => window.location.reload()}
           className="bg-[#FFD700] text-black font-oswald font-bold px-4 py-2 text-sm uppercase">
           Обновить
         </button>
