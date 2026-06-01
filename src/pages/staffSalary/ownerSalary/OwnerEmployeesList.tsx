@@ -11,6 +11,9 @@ type MyStats = {
   profit_month: number;
   revenue_month: number;
   sales_month: number;
+  sl_profit_today: number;
+  repair_profit_today: number;
+  contract_profit_today: number;
 } | null;
 
 export default function OwnerEmployeesList({
@@ -34,7 +37,7 @@ export default function OwnerEmployeesList({
         <p className="text-white/50 text-sm mt-1 font-roboto">Управление сотрудниками</p>
       </div>
 
-      {/* Мой доход сегодня */}
+      {/* Прибыль магазина сегодня */}
       {myStats && (
         <div className="rounded-2xl overflow-hidden" style={{
           background: "linear-gradient(145deg,rgba(255,215,0,0.1),rgba(255,215,0,0.03))",
@@ -42,31 +45,25 @@ export default function OwnerEmployeesList({
           boxShadow: "0 0 32px rgba(255,215,0,0.06)",
         }}>
           <div className="px-4 py-2.5 flex items-center gap-2" style={{ borderBottom: "1px solid rgba(255,215,0,0.1)" }}>
-            <Icon name="Wallet" size={12} style={{ color: "rgba(255,215,0,0.7)" }} />
+            <Icon name="TrendingUp" size={12} style={{ color: "rgba(255,215,0,0.7)" }} />
             <span className="font-roboto text-[10px] uppercase tracking-widest font-semibold" style={{ color: "rgba(255,215,0,0.6)" }}>
-              Мой доход сегодня
+              Прибыль магазина сегодня
             </span>
           </div>
-          <div className="px-4 py-4">
+          <div className="px-4 py-4 space-y-4">
+            {/* Главная цифра */}
             <div className="flex items-end justify-between gap-4">
               <div>
                 <div className="font-roboto text-xs mb-1" style={{ color: "rgba(255,255,255,0.4)" }}>
                   Чистая прибыль
                 </div>
                 <div className="font-oswald font-black text-4xl tabular-nums" style={{ color: "#FFD700" }}>
-                  {fmt(myStats.profit_today)} ₽
+                  +{fmt(myStats.profit_today)} ₽
                 </div>
-                {myStats.sales_today > 0 ? (
-                  <div className="font-roboto text-xs mt-1" style={{ color: "rgba(255,255,255,0.35)" }}>
-                    {myStats.sales_today} {myStats.sales_today === 1 ? "продажа" : myStats.sales_today < 5 ? "продажи" : "продаж"} · выручка {fmt(myStats.revenue_today)} ₽
-                  </div>
-                ) : (
-                  <div className="font-roboto text-xs mt-1" style={{ color: "rgba(255,255,255,0.25)" }}>
-                    Продаж сегодня нет
-                  </div>
-                )}
+                <div className="font-roboto text-xs mt-1" style={{ color: "rgba(255,255,255,0.3)" }}>
+                  выручка {fmt(myStats.revenue_today)} ₽
+                </div>
               </div>
-
               <div className="text-right shrink-0">
                 <div className="font-roboto text-[10px] uppercase tracking-widest mb-1" style={{ color: "rgba(255,255,255,0.3)" }}>
                   За {monthLabel}
@@ -75,7 +72,29 @@ export default function OwnerEmployeesList({
                   {fmt(myStats.profit_month)} ₽
                 </div>
                 <div className="font-roboto text-[10px]" style={{ color: "rgba(255,255,255,0.25)" }}>
-                  {myStats.sales_month} продаж
+                  выручка {fmt(myStats.revenue_month)} ₽
+                </div>
+              </div>
+            </div>
+
+            {/* Разбивка по источникам */}
+            <div className="grid grid-cols-3 gap-2" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "12px" }}>
+              <div className="rounded-xl p-2.5 text-center" style={{ background: "rgba(52,211,153,0.07)", border: "1px solid rgba(52,211,153,0.15)" }}>
+                <div className="font-roboto text-[9px] uppercase tracking-widest mb-1" style={{ color: "rgba(52,211,153,0.6)" }}>Ремонты</div>
+                <div className="font-oswald font-bold text-base tabular-nums" style={{ color: "#34d399" }}>
+                  {fmt(myStats.repair_profit_today)} ₽
+                </div>
+              </div>
+              <div className="rounded-xl p-2.5 text-center" style={{ background: "rgba(167,139,250,0.07)", border: "1px solid rgba(167,139,250,0.15)" }}>
+                <div className="font-roboto text-[9px] uppercase tracking-widest mb-1" style={{ color: "rgba(167,139,250,0.6)" }}>Б/У техника</div>
+                <div className="font-oswald font-bold text-base tabular-nums" style={{ color: "#a78bfa" }}>
+                  {fmt(myStats.sl_profit_today)} ₽
+                </div>
+              </div>
+              <div className="rounded-xl p-2.5 text-center" style={{ background: "rgba(251,191,36,0.07)", border: "1px solid rgba(251,191,36,0.15)" }}>
+                <div className="font-roboto text-[9px] uppercase tracking-widest mb-1" style={{ color: "rgba(251,191,36,0.6)" }}>Договора</div>
+                <div className="font-oswald font-bold text-base tabular-nums" style={{ color: "#fbbf24" }}>
+                  {fmt(myStats.contract_profit_today)} ₽
                 </div>
               </div>
             </div>

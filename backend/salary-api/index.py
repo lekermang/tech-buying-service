@@ -487,49 +487,71 @@ def handler(event, context):
             )
             employees = cur.fetchall()
 
-            # Личный доход владельца сегодня: продажи с именем Dmitriy
+            first_of_month = today.replace(day=1)
+
+            # Ломбард (б/у техника) — прибыль магазина
             cur.execute(
                 f"""
                 SELECT
                   COALESCE(SUM(op.amount - COALESCE(i.buy_price, 0)), 0) AS profit_today,
                   COALESCE(SUM(op.amount), 0) AS revenue_today,
-                  COUNT(*) AS sales_today
+                  COUNT(*) AS sales_today,
+                  COALESCE(SUM(CASE WHEN op.created_at::date >= %s THEN op.amount - COALESCE(i.buy_price,0) ELSE 0 END), 0) AS profit_month,
+                  COALESCE(SUM(CASE WHEN op.created_at::date >= %s THEN op.amount ELSE 0 END), 0) AS revenue_month,
+                  COUNT(CASE WHEN op.created_at::date >= %s THEN 1 END) AS sales_month
                 FROM {SCHEMA}.slshop_operations op
                 LEFT JOIN {SCHEMA}.slshop_items i ON i.id = op.item_id
                 WHERE op.op_type = 'sell'
                   AND op.created_at::date = %s
-                  AND op.employee_name = %s
                 """,
-                (today, full_name),
+                (first_of_month, first_of_month, first_of_month, today),
             )
-            owner_today = cur.fetchone()
+            sl = cur.fetchone()
 
-            # Личный доход за текущий месяц
-            first_of_month = today.replace(day=1)
+            # Ремонты
             cur.execute(
                 f"""
                 SELECT
-                  COALESCE(SUM(op.amount - COALESCE(i.buy_price, 0)), 0) AS profit_month,
-                  COALESCE(SUM(op.amount), 0) AS revenue_month,
-                  COUNT(*) AS sales_month
-                FROM {SCHEMA}.slshop_operations op
-                LEFT JOIN {SCHEMA}.slshop_items i ON i.id = op.item_id
-                WHERE op.op_type = 'sell'
-                  AND op.created_at::date >= %s
-                  AND op.created_at::date <= %s
-                  AND op.employee_name = %s
+                  COALESCE(SUM(CASE WHEN completed_at::date = %s THEN repair_amount - COALESCE(purchase_amount,0) ELSE 0 END), 0) AS profit_today,
+                  COALESCE(SUM(CASE WHEN completed_at::date = %s THEN repair_amount ELSE 0 END), 0) AS revenue_today,
+                  COALESCE(SUM(CASE WHEN completed_at::date >= %s THEN repair_amount - COALESCE(purchase_amount,0) ELSE 0 END), 0) AS profit_month,
+                  COALESCE(SUM(CASE WHEN completed_at::date >= %s THEN repair_amount ELSE 0 END), 0) AS revenue_month
+                FROM {SCHEMA}.repair_orders
+                WHERE status = 'done' AND completed_at IS NOT NULL
+                  AND completed_at::date >= %s
                 """,
-                (first_of_month, today, full_name),
+                (today, today, first_of_month, first_of_month, first_of_month),
             )
-            owner_month = cur.fetchone()
+            rep = cur.fetchone()
+
+            # Договора 14 дней — прибыль = paid_total - amount (проценты)
+            cur.execute(
+                f"""
+                SELECT
+                  COALESCE(SUM(CASE WHEN closed_at::date = %s THEN paid_total - amount ELSE 0 END), 0) AS profit_today,
+                  COALESCE(SUM(CASE WHEN closed_at::date = %s THEN paid_total ELSE 0 END), 0) AS revenue_today,
+                  COALESCE(SUM(CASE WHEN closed_at::date >= %s THEN paid_total - amount ELSE 0 END), 0) AS profit_month,
+                  COALESCE(SUM(CASE WHEN closed_at::date >= %s THEN paid_total ELSE 0 END), 0) AS revenue_month
+                FROM {SCHEMA}.contracts_14d
+                WHERE status = 'closed'
+                  AND closed_at IS NOT NULL
+                  AND closed_at::date >= %s
+                """,
+                (today, today, first_of_month, first_of_month, first_of_month),
+            )
+            con = cur.fetchone()
 
             my_stats = {
-                'profit_today': int(owner_today['profit_today'] or 0),
-                'revenue_today': int(owner_today['revenue_today'] or 0),
-                'sales_today': int(owner_today['sales_today'] or 0),
-                'profit_month': int(owner_month['profit_month'] or 0),
-                'revenue_month': int(owner_month['revenue_month'] or 0),
-                'sales_month': int(owner_month['sales_month'] or 0),
+                'profit_today': int((sl['profit_today'] or 0) + (rep['profit_today'] or 0) + (con['profit_today'] or 0)),
+                'revenue_today': int((sl['revenue_today'] or 0) + (rep['revenue_today'] or 0) + (con['revenue_today'] or 0)),
+                'sales_today': int(sl['sales_today'] or 0),
+                'profit_month': int((sl['profit_month'] or 0) + (rep['profit_month'] or 0) + (con['profit_month'] or 0)),
+                'revenue_month': int((sl['revenue_month'] or 0) + (rep['revenue_month'] or 0) + (con['revenue_month'] or 0)),
+                'sales_month': int(sl['sales_month'] or 0),
+                # разбивка
+                'sl_profit_today': int(sl['profit_today'] or 0),
+                'repair_profit_today': int(rep['profit_today'] or 0),
+                'contract_profit_today': int(con['profit_today'] or 0),
             }
 
             return resp(200, {'employees': employees, 'my_stats': my_stats})
