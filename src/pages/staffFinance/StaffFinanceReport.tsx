@@ -57,18 +57,19 @@ const TREND_COLOR: Record<string, string> = { up: "#f87171", down: "#34d399", st
 const emptyPdf = (): PdfState => ({ file: null, text: "", loading: false, pages: 0, error: null });
 
 // Загружаем pdf.js с CDN один раз
-let pdfjsLoaded = false;
-async function loadPdfJs(): Promise<void> {
-  if (pdfjsLoaded || (window as unknown as Record<string, unknown>)["pdfjsLib"]) {
-    pdfjsLoaded = true; return;
-  }
-  await new Promise<void>((resolve, reject) => {
+let pdfjsLoadPromise: Promise<void> | null = null;
+function loadPdfJs(): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if ((window as any).pdfjsLib) return Promise.resolve();
+  if (pdfjsLoadPromise) return pdfjsLoadPromise;
+  pdfjsLoadPromise = new Promise<void>((resolve, reject) => {
     const s = document.createElement("script");
-    s.src = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js";
-    s.onload = () => { pdfjsLoaded = true; resolve(); };
-    s.onerror = reject;
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+    s.onload = () => resolve();
+    s.onerror = (e) => reject(new Error(`Не удалось загрузить pdf.js: ${String(e)}`));
     document.head.appendChild(s);
   });
+  return pdfjsLoadPromise;
 }
 
 // Извлекаем текст из PDF прямо в браузере — без отправки файла на сервер
@@ -76,12 +77,14 @@ async function extractPdfText(file: File): Promise<{ text: string; pages: number
   await loadPdfJs();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pdfjsLib = (window as any).pdfjsLib;
+  if (!pdfjsLib) throw new Error("pdf.js не загрузился");
+
   pdfjsLib.GlobalWorkerOptions.workerSrc =
-    "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
   const buf = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
-  const total = pdf.numPages;
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+  const total: number = pdf.numPages;
   const parts: string[] = [];
   for (let i = 1; i <= total; i++) {
     const page = await pdf.getPage(i);
