@@ -57,42 +57,37 @@ const TREND_COLOR: Record<string, string> = { up: "#f87171", down: "#34d399", st
 
 const emptyPdf = (): PdfState => ({ file: null, text: "", loading: false, pages: 0, error: null });
 
-// Конвертируем File в base64 строку
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((res, rej) => {
-    const r = new FileReader();
-    r.onload = ev => res((ev.target?.result as string) ?? "");
-    r.onerror = () => rej(new Error("Ошибка чтения файла"));
-    r.readAsDataURL(file);
-  });
-}
-
-// Загружаем PDF на S3 через finance-report (быстро),
-// затем парсим через отдельную функцию parse-pdf (таймаут 120 сек)
+// Загружаем PDF напрямую на S3 через presigned URL (без base64, без бэкенда)
+// Шаги: 1) получить presigned URL, 2) PUT файл прямо на S3, 3) парсить через parse-pdf
 async function extractPdfText(
   file: File,
   token: string,
   financeUrl: string
 ): Promise<{ text: string; pages: number }> {
-  // Шаг 1: конвертируем в base64
-  const b64 = await fileToBase64(file);
-
-  // Шаг 2: загружаем на S3 — возвращает s3_key
-  const uploadResp = await fetch(financeUrl, {
+  // Шаг 1: получаем presigned URL для прямой загрузки
+  const urlResp = await fetch(financeUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Employee-Token": token },
-    body: JSON.stringify({ action: "upload_pdf", token, pdf_base64: b64 }),
+    body: JSON.stringify({ action: "get_upload_url", token }),
   });
-  if (!uploadResp.ok) throw new Error(`Ошибка загрузки: HTTP ${uploadResp.status}`);
-  const uploadData = await uploadResp.json();
-  if (uploadData.error) throw new Error(uploadData.error);
-  const s3Key: string = uploadData.s3_key;
+  if (!urlResp.ok) throw new Error(`Ошибка получения URL: HTTP ${urlResp.status}`);
+  const urlData = await urlResp.json();
+  if (urlData.error) throw new Error(urlData.error);
+  const { upload_url, s3_key } = urlData;
 
-  // Шаг 3: парсим через отдельную функцию с увеличенным таймаутом
+  // Шаг 2: PUT файл напрямую на S3 — без конвертации в base64
+  const putResp = await fetch(upload_url, {
+    method: "PUT",
+    headers: { "Content-Type": "application/pdf" },
+    body: file,
+  });
+  if (!putResp.ok) throw new Error(`Ошибка загрузки файла: HTTP ${putResp.status}`);
+
+  // Шаг 3: парсим через отдельную функцию parse-pdf
   const parseResp = await fetch(PARSE_PDF_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Employee-Token": token },
-    body: JSON.stringify({ token, s3_key: s3Key }),
+    body: JSON.stringify({ token, s3_key }),
   });
   if (!parseResp.ok) throw new Error(`Ошибка парсинга: HTTP ${parseResp.status}`);
   const parseData = await parseResp.json();

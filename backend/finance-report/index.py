@@ -51,6 +51,8 @@ def handler(event: dict, context) -> dict:
         return analyze(body)
     if action == "get_stock":
         return get_stock_summary()
+    if action == "get_upload_url":
+        return get_upload_url(body)
     if action == "upload_pdf":
         return upload_pdf(body)
     if action == "parse_pdf":
@@ -70,7 +72,22 @@ def get_s3():
     )
 
 
-# ── PDF загрузка на S3 ────────────────────────────────────────────────────────
+# ── Presigned URL для прямой загрузки с фронтенда ────────────────────────────
+
+def get_upload_url(body: dict) -> dict:
+    """Генерирует presigned PUT URL — фронтенд загружает PDF напрямую в S3."""
+    key = f"finance-tmp/{uuid.uuid4()}.pdf"
+    s3 = get_s3()
+    upload_url = s3.generate_presigned_url(
+        "put_object",
+        Params={"Bucket": "files", "Key": key, "ContentType": "application/pdf"},
+        ExpiresIn=300,
+    )
+    return {"statusCode": 200, "headers": CORS,
+            "body": json.dumps({"upload_url": upload_url, "s3_key": key})}
+
+
+# ── PDF загрузка на S3 (через бэкенд, запасной вариант) ──────────────────────
 
 def upload_pdf(body: dict) -> dict:
     """Принимает base64 PDF, сохраняет во временное хранилище S3, возвращает s3_key."""
