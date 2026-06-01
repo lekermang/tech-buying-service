@@ -199,7 +199,7 @@ const ContactsFooter = ({ scrollTo }: ContactsFooterProps) => {
                   />
                   {/* Кнопки */}
                   <div className="grid grid-cols-2 gap-px bg-[#FFD700]/15">
-                    <a href={`tel:+79929990333`}
+                    <a href={`tel:+79929999777`}
                       onClick={() => ymGoal(Goals.CALL_CLICK, { place: "footer_branch" })}
                       className="bg-black/60 hover:bg-[#FFD700]/10 text-[#FFD700] font-oswald font-bold text-xs uppercase tracking-wide py-3 transition-colors flex items-center justify-center gap-1.5">
                       <Icon name="Phone" size={13} />

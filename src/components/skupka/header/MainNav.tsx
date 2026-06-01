@@ -290,7 +290,7 @@ const MainNav = ({ navLinks, menuOpen, onToggleMenu, onNav, compact = false, onP
 
           {/* Телефон — десктоп xl+ : премиум золотая капсула */}
           <a
-            href="tel:+79929990333"
+            href="tel:+79929999777"
             onClick={() => ymGoal(Goals.CALL_CLICK, { place: "header" })}
             className="hidden xl:inline-flex items-center gap-2 h-9 pl-2 pr-3.5 rounded-md
                        bg-gradient-to-br from-[#FFD700]/[0.12] via-[#FFD700]/[0.05] to-transparent
@@ -306,12 +306,12 @@ const MainNav = ({ navLinks, menuOpen, onToggleMenu, onNav, compact = false, onP
               <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-[#0D0D0D] animate-pulse" aria-hidden />
             </span>
             <span className="font-oswald font-extrabold text-[13.5px] text-[#FFD700] tracking-wide whitespace-nowrap drop-shadow-[0_0_5px_rgba(255,215,0,0.35)]">
-              +7 (992) 999-03-33
+              +7 (992) 999-97-77
             </span>
           </a>
           {/* Телефон — планшет/средний десктоп иконкой */}
           <a
-            href="tel:+79929990333"
+            href="tel:+79929999777"
             onClick={() => ymGoal(Goals.CALL_CLICK, { place: "header" })}
             title="Позвонить"
             className="hidden md:inline-flex xl:hidden items-center justify-center w-9 h-9 rounded-md border border-[#FFD700]/35 text-[#FFD700] hover:bg-[#FFD700]/10 hover:border-[#FFD700]/65 hover:shadow-[0_0_12px_rgba(255,215,0,0.3)] transition-all"

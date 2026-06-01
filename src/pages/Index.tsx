@@ -65,7 +65,7 @@ const SECTION_SEO: Record<string, { title: string; description: string }> = {
   },
   branches: {
     title: "Наши офисы в Калуге — Кирова 11 и Кирова 7/47 | Скупка24",
-    description: "Два офиса Скупка24 в центре Калуги: ул. Кирова, 11 и ул. Кирова, 7/47. Работаем 24/7 без выходных. Телефон: +7 (992) 999-03-33, 8 (800) 600-68-33.",
+    description: "Два офиса Скупка24 в центре Калуги: ул. Кирова, 11 и ул. Кирова, 7/47. Работаем 24/7 без выходных. Телефон: +7 (992) 999-97-77, 8 (800) 600-68-33.",
   },
   reviews: {
     title: "Отзывы клиентов Скупка24 на Яндекс Картах | Рейтинг 5.0",
@@ -77,7 +77,7 @@ const SECTION_SEO: Record<string, { title: string; description: string }> = {
   },
   contacts: {
     title: "Контакты Скупка24 Калуга | Телефон, Telegram, адреса офисов",
-    description: "Телефон: +7 (992) 999-03-33, бесплатно 8 (800) 600-68-33. Telegram @skypka24. Два офиса в Калуге: Кирова 11 и 7/47. Работаем круглосуточно.",
+    description: "Телефон: +7 (992) 999-97-77, бесплатно 8 (800) 600-68-33. Telegram @skypka24. Два офиса в Калуге: Кирова 11 и 7/47. Работаем круглосуточно.",
   },
   jobs: {
     title: "Работа в Скупка24 Калуга — Вакансии | Менеджер, оценщик, кассир",
@@ -419,7 +419,7 @@ const Index = ({ goldOpen = false }: { goldOpen?: boolean }) => {
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0D0D0D]/98 backdrop-blur-sm border-t border-[#FFD700]/20 pb-safe">
         <div className="flex h-[68px]">
           <a
-            href="tel:+79929990333"
+            href="tel:+79929999777"
             onClick={() => ymGoal(Goals.CALL_CLICK, { place: "sticky_bar" })}
             className="flex-1 flex flex-col items-center justify-center gap-1 text-[#FFD700] hover:bg-[#FFD700]/5 active:bg-[#FFD700]/10 transition-colors">
             <Icon name="Phone" size={22} />

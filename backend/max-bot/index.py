@@ -372,12 +372,12 @@ def menu_contact() -> tuple[str, dict]:
         "в течение минуты (10:00–21:00).\n\n"
         "Также можно:\n"
         "📞 Позвонить: 8-800-600-68-33\n"
-        "💬 WhatsApp: +7 992 999-03-33\n"
+        "💬 WhatsApp: +7 992 999-97-77\n"
         "✈️ Telegram: @skypka24"
     )
     kb = {'buttons': [
         [{'type': 'link', 'text': '📞 Позвонить', 'url': 'tel:+78006006833'}],
-        [{'type': 'link', 'text': '💬 WhatsApp', 'url': 'https://wa.me/79929990333'}],
+        [{'type': 'link', 'text': '💬 WhatsApp', 'url': 'https://wa.me/79929999777'}],
         [{'type': 'callback', 'text': '⬅ В меню', 'payload': 'menu:home'}],
     ]}
     return text, kb

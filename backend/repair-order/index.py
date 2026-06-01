@@ -1439,7 +1439,7 @@ def handler(event: dict, context) -> dict:
         except Exception:
             pass
 
-    send_sms('+79929990333', f'Заявка #{order_id} на ремонт. {name}, {phone}. {repair_type or model or ""}. Скупка24')
+    send_sms('+79929999777', f'Заявка #{order_id} на ремонт. {name}, {phone}. {repair_type or model or ""}. Скупка24')
     send_email('lekermanya@yandex.ru', f'Заявка #{order_id} на ремонт — Скупка24',
         f"Заявка #{order_id}\nИмя: {name}\nТелефон: {phone}\nМодель: {model}\nТип: {repair_type}\nСтоимость: {price_str}")
 
