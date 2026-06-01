@@ -6,9 +6,11 @@ import os
 import base64
 import io
 import re
+import uuid
 import urllib.request
 import psycopg2
 import psycopg2.extras
+import boto3
 from datetime import datetime
 
 DB = os.environ["DATABASE_URL"]
@@ -49,16 +51,29 @@ def handler(event: dict, context) -> dict:
         return analyze(body)
     if action == "get_stock":
         return get_stock_summary()
+    if action == "upload_pdf":
+        return upload_pdf(body)
     if action == "parse_pdf":
         return parse_pdf(body)
 
     return {"statusCode": 400, "headers": CORS, "body": json.dumps({"error": "unknown action"})}
 
 
-# ── PDF парсинг ───────────────────────────────────────────────────────────────
+# ── S3 клиент ─────────────────────────────────────────────────────────────────
 
-def parse_pdf(body: dict) -> dict:
-    """Извлекает текст из PDF (base64) с помощью pdfplumber."""
+def get_s3():
+    return boto3.client(
+        "s3",
+        endpoint_url="https://bucket.poehali.dev",
+        aws_access_key_id=os.environ["AWS_ACCESS_KEY_ID"],
+        aws_secret_access_key=os.environ["AWS_SECRET_ACCESS_KEY"],
+    )
+
+
+# ── PDF загрузка на S3 ────────────────────────────────────────────────────────
+
+def upload_pdf(body: dict) -> dict:
+    """Принимает base64 PDF, сохраняет во временное хранилище S3, возвращает s3_key."""
     pdf_b64 = body.get("pdf_base64", "")
     if not pdf_b64:
         return {"statusCode": 400, "headers": CORS, "body": json.dumps({"error": "pdf_base64 обязателен"})}
@@ -68,6 +83,28 @@ def parse_pdf(body: dict) -> dict:
         raw_bytes = base64.b64decode(pdf_b64)
     except Exception as e:
         return {"statusCode": 400, "headers": CORS, "body": json.dumps({"error": f"base64 ошибка: {e}"})}
+
+    key = f"finance-tmp/{uuid.uuid4()}.pdf"
+    s3 = get_s3()
+    s3.put_object(Bucket="files", Key=key, Body=raw_bytes, ContentType="application/pdf")
+    return {"statusCode": 200, "headers": CORS, "body": json.dumps({"s3_key": key})}
+
+
+# ── PDF парсинг из S3 ─────────────────────────────────────────────────────────
+
+def parse_pdf(body: dict) -> dict:
+    """Читает PDF из S3 по s3_key, извлекает текст через pdfplumber."""
+    s3_key = body.get("s3_key", "")
+    if not s3_key:
+        return {"statusCode": 400, "headers": CORS, "body": json.dumps({"error": "s3_key обязателен"})}
+    try:
+        s3 = get_s3()
+        obj = s3.get_object(Bucket="files", Key=s3_key)
+        raw_bytes = obj["Body"].read()
+        # Удаляем временный файл после чтения
+        s3.delete_object(Bucket="files", Key=s3_key)
+    except Exception as e:
+        return {"statusCode": 500, "headers": CORS, "body": json.dumps({"error": f"S3 ошибка: {e}"}, ensure_ascii=False)}
     try:
         import pdfplumber
         text_pages = []

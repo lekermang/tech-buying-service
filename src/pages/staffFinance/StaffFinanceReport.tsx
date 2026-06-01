@@ -56,66 +56,52 @@ const TREND_COLOR: Record<string, string> = { up: "#f87171", down: "#34d399", st
 
 const emptyPdf = (): PdfState => ({ file: null, text: "", loading: false, pages: 0, error: null });
 
-// Нативный парсер текста из PDF — без внешних библиотек
-// Работает с текстовыми PDF (Сбер, и т.п.) — извлекает строки из BT/ET блоков
-function parsePdfTextNative(bytes: Uint8Array): { text: string; pages: number } {
-  const decoder = new TextDecoder("latin1");
-  const raw = decoder.decode(bytes);
-
-  // Считаем страницы
-  const pageCount = (raw.match(/\/Type\s*\/Page[^s]/g) || []).length || 1;
-
-  // Извлекаем все текстовые блоки BT ... ET
-  const parts: string[] = [];
-  const btEt = /BT([\s\S]*?)ET/g;
-  let m: RegExpExecArray | null;
-  while ((m = btEt.exec(raw)) !== null) {
-    const block = m[1];
-    // Парсим Tj, TJ, ' операторы
-    const tjRe = /\(((?:[^()\\]|\\[\s\S])*)\)\s*(?:Tj|'|")/g;
-    const tjArrRe = /\[((?:[^[\]]|\((?:[^()\\]|\\[\s\S])*\))*)\]\s*TJ/g;
-    let tj: RegExpExecArray | null;
-    while ((tj = tjRe.exec(block)) !== null) {
-      const s = decodePdfString(tj[1]);
-      if (s.trim()) parts.push(s);
-    }
-    while ((tj = tjArrRe.exec(block)) !== null) {
-      const arrContent = tj[1];
-      const inner = /\(((?:[^()\\]|\\[\s\S])*)\)/g;
-      let inn: RegExpExecArray | null;
-      const words: string[] = [];
-      while ((inn = inner.exec(arrContent)) !== null) {
-        const s = decodePdfString(inn[1]);
-        if (s.trim()) words.push(s);
-      }
-      if (words.length) parts.push(words.join(""));
-    }
-  }
-
-  return { text: parts.join(" "), pages: pageCount };
+// Конвертируем File в base64 строку
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = ev => res((ev.target?.result as string) ?? "");
+    r.onerror = () => rej(new Error("Ошибка чтения файла"));
+    r.readAsDataURL(file);
+  });
 }
 
-function decodePdfString(s: string): string {
-  return s
-    .replace(/\\n/g, "\n").replace(/\\r/g, "\r").replace(/\\t/g, "\t")
-    .replace(/\\([0-7]{3})/g, (_, o) => String.fromCharCode(parseInt(o, 8)))
-    .replace(/\\(.)/g, "$1");
+// Загружаем PDF на S3 через бэкенд, затем парсим там же через pdfplumber
+async function extractPdfText(
+  file: File,
+  token: string,
+  financeUrl: string
+): Promise<{ text: string; pages: number }> {
+  // Шаг 1: конвертируем в base64
+  const b64 = await fileToBase64(file);
+
+  // Шаг 2: загружаем на S3 — возвращает s3_key
+  const uploadResp = await fetch(financeUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Employee-Token": token },
+    body: JSON.stringify({ action: "upload_pdf", token, pdf_base64: b64 }),
+  });
+  if (!uploadResp.ok) throw new Error(`Ошибка загрузки: HTTP ${uploadResp.status}`);
+  const uploadData = await uploadResp.json();
+  if (uploadData.error) throw new Error(uploadData.error);
+  const s3Key: string = uploadData.s3_key;
+
+  // Шаг 3: парсим PDF на сервере через pdfplumber (правильная кодировка)
+  const parseResp = await fetch(financeUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Employee-Token": token },
+    body: JSON.stringify({ action: "parse_pdf", token, s3_key: s3Key }),
+  });
+  if (!parseResp.ok) throw new Error(`Ошибка парсинга: HTTP ${parseResp.status}`);
+  const parseData = await parseResp.json();
+  if (parseData.error) throw new Error(parseData.error);
+  if (!parseData.text?.trim()) throw new Error("PDF не содержит текста — возможно, скан. Выгрузите выписку из Сбербанк Онлайн заново.");
+  return { text: parseData.text, pages: parseData.pages || 1 };
 }
 
-// Извлекаем текст из PDF прямо в браузере — без внешних зависимостей
-async function extractPdfText(file: File): Promise<{ text: string; pages: number }> {
-  const buf = await file.arrayBuffer();
-  const bytes = new Uint8Array(buf);
-  const result = parsePdfTextNative(bytes);
-  if (!result.text.trim()) {
-    throw new Error("PDF не содержит текста — возможно, это скан. Попробуйте выгрузить выписку заново из Сбербанк Онлайн.");
-  }
-  return result;
-}
-
-function PdfZone({ label, hint, state, onFile, onClear }: {
+function PdfZone({ label, hint, state, onFile, onClear, token, financeUrl }: {
   label: string; hint: string; state: PdfState;
-  onFile: (s: PdfState) => void; onClear: () => void; token: string;
+  onFile: (s: PdfState) => void; onClear: () => void; token: string; financeUrl: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [drag, setDrag] = useState(false);
@@ -126,15 +112,10 @@ function PdfZone({ label, hint, state, onFile, onClear }: {
     }
     onFile({ ...emptyPdf(), file, loading: true });
     try {
-      // Парсим PDF прямо в браузере — не гоняем файл на сервер
-      const { text, pages } = await extractPdfText(file);
-      if (!text.trim()) {
-        onFile({ ...emptyPdf(), file, pages, error: "PDF не содержит текста — возможно, скан (фото). Попробуйте другой файл." });
-      } else {
-        onFile({ file, text, loading: false, pages, error: null });
-      }
+      const { text, pages } = await extractPdfText(file, token, financeUrl);
+      onFile({ file, text, loading: false, pages, error: null });
     } catch (ex) {
-      onFile({ ...emptyPdf(), file, error: `Ошибка чтения PDF: ${String(ex)}` });
+      onFile({ ...emptyPdf(), file, error: String(ex).replace("Error: ", "") });
     }
   };
 
@@ -338,9 +319,9 @@ export default function StaffFinanceReport({ token }: { token: string }) {
             />
           </div>
           <PdfZone label="Выписка · Дебетовая карта" hint="Перетащите или нажмите · PDF из банка"
-            state={debitPdf} onFile={setDebitPdf} onClear={() => setDebitPdf(emptyPdf())} token={token} />
+            state={debitPdf} onFile={setDebitPdf} onClear={() => setDebitPdf(emptyPdf())} token={token} financeUrl={FINANCE_URL} />
           <PdfZone label="Выписка · Накопительный счёт" hint="Необязательно"
-            state={savingsPdf} onFile={setSavingsPdf} onClear={() => setSavingsPdf(emptyPdf())} token={token} />
+            state={savingsPdf} onFile={setSavingsPdf} onClear={() => setSavingsPdf(emptyPdf())} token={token} financeUrl={FINANCE_URL} />
           {!debitPdf.file && !savingsPdf.file && (
             <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl" style={{ background: "rgba(96,165,250,0.06)", border: "1px solid rgba(96,165,250,0.15)" }}>
               <Icon name="Info" size={13} className="shrink-0 mt-0.5" style={{ color: "#60a5fa" }} />
