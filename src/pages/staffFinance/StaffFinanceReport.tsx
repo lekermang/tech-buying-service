@@ -57,37 +57,54 @@ const TREND_COLOR: Record<string, string> = { up: "#f87171", down: "#34d399", st
 
 const emptyPdf = (): PdfState => ({ file: null, text: "", loading: false, pages: 0, error: null });
 
-// Загружаем PDF напрямую на S3 через presigned URL (без base64, без бэкенда)
-// Шаги: 1) получить presigned URL, 2) PUT файл прямо на S3, 3) парсить через parse-pdf
+// Конвертируем ArrayBuffer в base64
+function bufToB64(buf: ArrayBuffer): string {
+  const bytes = new Uint8Array(buf);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
+// Загружаем PDF чанками по 50КБ, затем собираем на сервере и парсим
 async function extractPdfText(
   file: File,
   token: string,
   financeUrl: string
 ): Promise<{ text: string; pages: number }> {
-  // Шаг 1: получаем presigned URL для прямой загрузки
-  const urlResp = await fetch(financeUrl, {
+  const CHUNK = 50 * 1024; // 50 КБ — каждый запрос ~65КБ JSON, укладывается за 1 сек
+  const fileId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const buf = await file.arrayBuffer();
+  const totalChunks = Math.ceil(buf.byteLength / CHUNK);
+
+  // Загружаем чанки последовательно
+  for (let i = 0; i < totalChunks; i++) {
+    const slice = buf.slice(i * CHUNK, (i + 1) * CHUNK);
+    const chunkB64 = bufToB64(slice);
+    const r = await fetch(financeUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Employee-Token": token },
+      body: JSON.stringify({ action: "upload_chunk", token, file_id: fileId, chunk_index: i, chunk_b64: chunkB64 }),
+    });
+    if (!r.ok) throw new Error(`Ошибка загрузки чанка ${i}: HTTP ${r.status}`);
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+  }
+
+  // Собираем чанки в один PDF на сервере
+  const asmResp = await fetch(financeUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Employee-Token": token },
-    body: JSON.stringify({ action: "get_upload_url", token }),
+    body: JSON.stringify({ action: "assemble_pdf", token, file_id: fileId, total_chunks: totalChunks }),
   });
-  if (!urlResp.ok) throw new Error(`Ошибка получения URL: HTTP ${urlResp.status}`);
-  const urlData = await urlResp.json();
-  if (urlData.error) throw new Error(urlData.error);
-  const { upload_url, s3_key } = urlData;
+  if (!asmResp.ok) throw new Error(`Ошибка сборки: HTTP ${asmResp.status}`);
+  const asmData = await asmResp.json();
+  if (asmData.error) throw new Error(asmData.error);
 
-  // Шаг 2: PUT файл напрямую на S3 — без конвертации в base64
-  const putResp = await fetch(upload_url, {
-    method: "PUT",
-    headers: { "Content-Type": "application/pdf" },
-    body: file,
-  });
-  if (!putResp.ok) throw new Error(`Ошибка загрузки файла: HTTP ${putResp.status}`);
-
-  // Шаг 3: парсим через отдельную функцию parse-pdf
+  // Парсим через отдельную функцию parse-pdf
   const parseResp = await fetch(PARSE_PDF_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Employee-Token": token },
-    body: JSON.stringify({ token, s3_key }),
+    body: JSON.stringify({ token, s3_key: asmData.s3_key }),
   });
   if (!parseResp.ok) throw new Error(`Ошибка парсинга: HTTP ${parseResp.status}`);
   const parseData = await parseResp.json();

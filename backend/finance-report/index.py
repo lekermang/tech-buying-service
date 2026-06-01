@@ -53,6 +53,10 @@ def handler(event: dict, context) -> dict:
         return get_stock_summary()
     if action == "get_upload_url":
         return get_upload_url(body)
+    if action == "upload_chunk":
+        return upload_chunk(body)
+    if action == "assemble_pdf":
+        return assemble_pdf(body)
     if action == "upload_pdf":
         return upload_pdf(body)
     if action == "parse_pdf":
@@ -85,6 +89,41 @@ def get_upload_url(body: dict) -> dict:
     )
     return {"statusCode": 200, "headers": CORS,
             "body": json.dumps({"upload_url": upload_url, "s3_key": key})}
+
+
+# ── Чанковая загрузка: принимаем по 50КБ, собираем в S3 ──────────────────────
+
+def upload_chunk(body: dict) -> dict:
+    """Принимает один base64-чанк файла, сохраняет в S3 как часть chunk_id/N."""
+    file_id = body.get("file_id", "")
+    chunk_index = body.get("chunk_index", 0)
+    chunk_b64 = body.get("chunk_b64", "")
+    if not file_id or not chunk_b64:
+        return {"statusCode": 400, "headers": CORS, "body": json.dumps({"error": "file_id и chunk_b64 обязательны"})}
+    chunk_bytes = base64.b64decode(chunk_b64)
+    key = f"finance-chunks/{file_id}/{chunk_index:04d}"
+    s3 = get_s3()
+    s3.put_object(Bucket="files", Key=key, Body=chunk_bytes)
+    return {"statusCode": 200, "headers": CORS, "body": json.dumps({"ok": True})}
+
+
+def assemble_pdf(body: dict) -> dict:
+    """Собирает все чанки в один PDF-файл, возвращает s3_key для parse-pdf."""
+    file_id = body.get("file_id", "")
+    total_chunks = body.get("total_chunks", 0)
+    if not file_id or not total_chunks:
+        return {"statusCode": 400, "headers": CORS, "body": json.dumps({"error": "file_id и total_chunks обязательны"})}
+    s3 = get_s3()
+    parts = []
+    for i in range(total_chunks):
+        chunk_key = f"finance-chunks/{file_id}/{i:04d}"
+        obj = s3.get_object(Bucket="files", Key=chunk_key)
+        parts.append(obj["Body"].read())
+        s3.delete_object(Bucket="files", Key=chunk_key)
+    pdf_bytes = b"".join(parts)
+    final_key = f"finance-tmp/{file_id}.pdf"
+    s3.put_object(Bucket="files", Key=final_key, Body=pdf_bytes, ContentType="application/pdf")
+    return {"statusCode": 200, "headers": CORS, "body": json.dumps({"s3_key": final_key})}
 
 
 # ── PDF загрузка на S3 (через бэкенд, запасной вариант) ──────────────────────
