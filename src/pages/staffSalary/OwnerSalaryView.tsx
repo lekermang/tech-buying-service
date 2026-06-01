@@ -7,12 +7,14 @@ import {
 import { DayEditModal, PayoutModal, BulkFillModal } from "./ownerSalary/OwnerSalaryModals";
 import OwnerEmployeesList from "./ownerSalary/OwnerEmployeesList";
 import OwnerEmployeeDetail from "./ownerSalary/OwnerEmployeeDetail";
+import SavingsView from "./SavingsView";
 
 interface Props {
   token: string;
 }
 
 export default function OwnerSalaryView({ token }: Props) {
+  const [mainTab, setMainTab] = useState<"employees" | "savings">("employees");
   const [employees, setEmployees] = useState<EmployeeOverview[]>([]);
   const [myStats, setMyStats] = useState<Record<string, number> | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -212,12 +214,42 @@ export default function OwnerSalaryView({ token }: Props) {
   // === ЭКРАН СПИСКА ===
   if (!selectedId) {
     return (
-      <OwnerEmployeesList
-        employees={employees}
-        myStats={myStats}
-        onSelect={(id) => { setSelectedId(id); setViewMonth(startOfMonth(new Date())); }}
-        token={token}
-      />
+      <div>
+        {/* Переключатель Сотрудники / Моя копилка */}
+        <div className="flex gap-1 p-1 mx-4 mt-4 rounded-xl" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
+          <button onClick={() => setMainTab("employees")}
+            className="flex-1 py-2 rounded-lg font-roboto text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
+            style={{
+              background: mainTab === "employees" ? "rgba(255,215,0,0.15)" : "transparent",
+              color: mainTab === "employees" ? "#FFD700" : "rgba(255,255,255,0.4)",
+              border: mainTab === "employees" ? "1px solid rgba(255,215,0,0.3)" : "1px solid transparent",
+            }}>
+            👥 Сотрудники
+          </button>
+          <button onClick={() => setMainTab("savings")}
+            className="flex-1 py-2 rounded-lg font-roboto text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
+            style={{
+              background: mainTab === "savings" ? "rgba(167,139,250,0.15)" : "transparent",
+              color: mainTab === "savings" ? "#a78bfa" : "rgba(255,255,255,0.4)",
+              border: mainTab === "savings" ? "1px solid rgba(167,139,250,0.3)" : "1px solid transparent",
+            }}>
+            🐷 Моя копилка
+          </button>
+        </div>
+
+        {mainTab === "savings" ? (
+          <div className="px-4 pt-4">
+            <SavingsView token={token} />
+          </div>
+        ) : (
+          <OwnerEmployeesList
+            employees={employees}
+            myStats={myStats}
+            onSelect={(id) => { setSelectedId(id); setViewMonth(startOfMonth(new Date())); }}
+            token={token}
+          />
+        )}
+      </div>
     );
   }
 
