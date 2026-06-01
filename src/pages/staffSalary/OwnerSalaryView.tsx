@@ -14,6 +14,7 @@ interface Props {
 
 export default function OwnerSalaryView({ token }: Props) {
   const [employees, setEmployees] = useState<EmployeeOverview[]>([]);
+  const [summary, setSummary] = useState<Record<string, number> | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [detail, setDetail] = useState<DetailState | null>(null);
   const [editing, setEditing] = useState<{ daily_rate: string; bonus_percent: string } | null>(null);
@@ -35,6 +36,7 @@ export default function OwnerSalaryView({ token }: Props) {
     if (r.ok) {
       const d = await r.json();
       setEmployees(d.employees || []);
+      setSummary(d.summary || null);
     }
   }, [token]);
 
@@ -212,6 +214,7 @@ export default function OwnerSalaryView({ token }: Props) {
     return (
       <OwnerEmployeesList
         employees={employees}
+        summary={summary}
         onSelect={(id) => { setSelectedId(id); setViewMonth(startOfMonth(new Date())); }}
       />
     );

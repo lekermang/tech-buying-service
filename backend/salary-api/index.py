@@ -454,14 +454,15 @@ def handler(event, context):
             })
 
     # =====================================================
-    # ВЛАДЕЛЕЦ
+    # ВЛАДЕЛЕЦ / АДМИНИСТРАТОР
     # =====================================================
-    if role != 'owner':
-        return resp(403, {'error': 'forbidden', 'message': 'Только для владельца'})
+    if role not in ('owner', 'admin'):
+        return resp(403, {'error': 'forbidden', 'message': 'Только для владельца или администратора'})
 
     if action == 'owner_overview':
         with get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             today = date.today()
+            # Список сотрудников
             cur.execute(
                 f"""
                 SELECT
@@ -483,7 +484,74 @@ def handler(event, context):
                 """,
                 (today,),
             )
-            return resp(200, {'employees': cur.fetchall()})
+            employees = cur.fetchall()
+
+            # Общая выручка: продажи (Смарт-Ломбард) — текущий месяц и всего
+            first_of_month = today.replace(day=1)
+            cur.execute(
+                f"""
+                SELECT
+                  COALESCE(SUM(op.amount - COALESCE(i.buy_price, 0)), 0) AS profit_month,
+                  COALESCE(SUM(op.amount), 0) AS revenue_month,
+                  COUNT(*) AS sales_month
+                FROM {SCHEMA}.slshop_operations op
+                LEFT JOIN {SCHEMA}.slshop_items i ON i.id = op.item_id
+                WHERE op.op_type = 'sell'
+                  AND op.created_at::date >= %s
+                  AND op.created_at::date <= %s
+                """,
+                (first_of_month, today),
+            )
+            month_stats = cur.fetchone()
+
+            # Ремонты — текущий месяц
+            cur.execute(
+                f"""
+                SELECT
+                  COALESCE(SUM(repair_amount), 0) AS repair_revenue_month,
+                  COALESCE(SUM(repair_amount - COALESCE(purchase_amount, 0)), 0) AS repair_profit_month,
+                  COUNT(*) AS repair_count_month
+                FROM {SCHEMA}.repair_orders
+                WHERE status = 'done'
+                  AND completed_at IS NOT NULL
+                  AND completed_at::date >= %s
+                  AND completed_at::date <= %s
+                """,
+                (first_of_month, today),
+            )
+            repair_stats = cur.fetchone()
+
+            # Зарплата — сколько начислено и к выплате всего
+            cur.execute(
+                f"""
+                SELECT
+                  COALESCE(SUM(total), 0) AS total_salary_accrued,
+                  COALESCE(SUM(CASE WHEN shift_date >= %s AND shift_date <= %s THEN total ELSE 0 END), 0) AS salary_month
+                FROM {SCHEMA}.employee_salary_log
+                """,
+                (first_of_month, today),
+            )
+            salary_stats = cur.fetchone()
+
+            cur.execute(
+                f"SELECT COALESCE(SUM(amount), 0) AS total_paid FROM {SCHEMA}.employee_payouts"
+            )
+            paid_stats = cur.fetchone()
+
+            summary = {
+                'revenue_month': int(month_stats['revenue_month'] or 0),
+                'profit_month': int(month_stats['profit_month'] or 0),
+                'sales_count_month': int(month_stats['sales_month'] or 0),
+                'repair_revenue_month': int(repair_stats['repair_revenue_month'] or 0),
+                'repair_profit_month': int(repair_stats['repair_profit_month'] or 0),
+                'repair_count_month': int(repair_stats['repair_count_month'] or 0),
+                'total_revenue_month': int((month_stats['revenue_month'] or 0) + (repair_stats['repair_revenue_month'] or 0)),
+                'total_profit_month': int((month_stats['profit_month'] or 0) + (repair_stats['repair_profit_month'] or 0)),
+                'salary_month': int(salary_stats['salary_month'] or 0),
+                'salary_unpaid': int((salary_stats['total_salary_accrued'] or 0) - (paid_stats['total_paid'] or 0)),
+            }
+
+            return resp(200, {'employees': employees, 'summary': summary})
 
     if action == 'owner_employee_detail':
         try:
