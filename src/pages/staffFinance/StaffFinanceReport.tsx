@@ -82,7 +82,7 @@ function PdfZone({ label, hint, state, onFile, onClear, token }: {
       const r = await fetch(FINANCE_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Employee-Token": token },
-        body: JSON.stringify({ action: "parse_pdf", pdf_base64: b64 }),
+        body: JSON.stringify({ action: "parse_pdf", token, pdf_base64: b64 }),
       });
       const d = await r.json();
       if (d.error) onFile({ ...emptyPdf(), file, error: d.error });
@@ -175,7 +175,7 @@ export default function StaffFinanceReport({ token }: { token: string }) {
         const r = await fetch(FINANCE_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json", "X-Employee-Token": token },
-          body: JSON.stringify({ action: "get_stock" }),
+          body: JSON.stringify({ action: "get_stock", token }),
         });
         const d = await r.json();
         if (!d.error) setStock(d);
@@ -193,7 +193,7 @@ export default function StaffFinanceReport({ token }: { token: string }) {
       const r = await fetch(FINANCE_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Employee-Token": token },
-        body: JSON.stringify({ action: "analyze", debit_text: debitPdf.text, savings_text: savingsPdf.text, period }),
+        body: JSON.stringify({ action: "analyze", token, debit_text: debitPdf.text, savings_text: savingsPdf.text, period }),
       });
       const d = await r.json();
       if (d.error) { setError(d.error); return; }

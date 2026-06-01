@@ -27,11 +27,19 @@ def handler(event: dict, context) -> dict:
     if event.get("httpMethod") == "OPTIONS":
         return {"statusCode": 200, "headers": CORS, "body": ""}
 
-    token = (event.get("headers") or {}).get("x-employee-token", "")
+    body = json.loads(event.get("body") or "{}")
+
+    # Токен принимаем из заголовка ИЛИ из тела запроса (PDF запросы могут обрезать заголовки)
+    headers = event.get("headers") or {}
+    token = (
+        headers.get("x-employee-token")
+        or headers.get("X-Employee-Token")
+        or body.get("token")
+        or ""
+    )
     if not token:
         return {"statusCode": 401, "headers": CORS, "body": json.dumps({"error": "Нет токена"})}
 
-    body = json.loads(event.get("body") or "{}")
     action = body.get("action", "analyze")
 
     if action == "analyze":
