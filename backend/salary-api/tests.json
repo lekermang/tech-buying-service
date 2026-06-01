@@ -8,6 +8,13 @@
       "bodyMatcher": "partial"
     },
     {
+      "name": "my_detail no date returns 400",
+      "method": "GET",
+      "path": "/?action=my_detail",
+      "expectedStatus": 401,
+      "bodyMatcher": "partial"
+    },
+    {
       "name": "OPTIONS preflight returns 200",
       "method": "OPTIONS",
       "path": "/",

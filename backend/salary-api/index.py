@@ -179,30 +179,126 @@ def handler(event, context):
             })
 
     if action == 'my_history':
-        # Сотрудник видит дневные начисления (ставка + премия, без прибыли) + выплаты
+        # Сотрудник видит дневные начисления + выплаты за произвольный диапазон дат
         with get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            date_from = params.get('date_from')
+            date_to = params.get('date_to')
+            if date_from and date_to:
+                cur.execute(
+                    f"""
+                    SELECT shift_date, hours_worked, base_rate, bonus_amount, total
+                    FROM {SCHEMA}.employee_salary_log
+                    WHERE employee_id = %s AND shift_date >= %s AND shift_date <= %s
+                    ORDER BY shift_date DESC
+                    """,
+                    (user_id, date_from, date_to),
+                )
+            else:
+                cur.execute(
+                    f"""
+                    SELECT shift_date, hours_worked, base_rate, bonus_amount, total
+                    FROM {SCHEMA}.employee_salary_log
+                    WHERE employee_id = %s
+                    ORDER BY shift_date DESC LIMIT 90
+                    """,
+                    (user_id,),
+                )
+            days = cur.fetchall()
+
+            if date_from and date_to:
+                cur.execute(
+                    f"""
+                    SELECT id, payout_date, amount, note
+                    FROM {SCHEMA}.employee_payouts
+                    WHERE employee_id = %s AND payout_date >= %s AND payout_date <= %s
+                    ORDER BY payout_date DESC
+                    """,
+                    (user_id, date_from, date_to),
+                )
+            else:
+                cur.execute(
+                    f"""
+                    SELECT id, payout_date, amount, note
+                    FROM {SCHEMA}.employee_payouts
+                    WHERE employee_id = %s
+                    ORDER BY payout_date DESC LIMIT 90
+                    """,
+                    (user_id,),
+                )
+            payouts = cur.fetchall()
+            return resp(200, {'days': days, 'payouts': payouts})
+
+    if action == 'my_detail':
+        # Детализация конкретного дня: список продаж с расшифровкой бонуса
+        day_str = params.get('date')
+        if not day_str:
+            return resp(400, {'error': 'Нужен параметр date=YYYY-MM-DD'})
+        with get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            # Итог дня из лога
             cur.execute(
                 f"""
                 SELECT shift_date, hours_worked, base_rate, bonus_amount, total
                 FROM {SCHEMA}.employee_salary_log
-                WHERE employee_id = %s
-                ORDER BY shift_date DESC LIMIT 90
+                WHERE employee_id = %s AND shift_date = %s
                 """,
+                (user_id, day_str),
+            )
+            day_log = cur.fetchone()
+
+            # Конфиг сотрудника (% бонуса)
+            cur.execute(
+                f"SELECT daily_rate, bonus_percent FROM {SCHEMA}.employee_salary_config WHERE employee_id = %s",
                 (user_id,),
             )
-            days = cur.fetchall()
+            cfg = cur.fetchone() or {'daily_rate': 2000, 'bonus_percent': 3.0}
 
+            # Список конкретных продаж за этот день
             cur.execute(
                 f"""
-                SELECT id, payout_date, amount, note
-                FROM {SCHEMA}.employee_payouts
-                WHERE employee_id = %s
-                ORDER BY payout_date DESC LIMIT 90
+                SELECT
+                    op.id,
+                    op.created_at,
+                    COALESCE(i.title, op.item_name, 'Товар') AS item_title,
+                    i.category AS item_category,
+                    op.amount AS sell_price,
+                    COALESCE(i.buy_price, 0) AS buy_price,
+                    (op.amount - COALESCE(i.buy_price, 0)) AS profit
+                FROM {SCHEMA}.slshop_operations op
+                LEFT JOIN {SCHEMA}.slshop_items i ON i.id = op.item_id
+                WHERE op.op_type = 'sell'
+                  AND op.created_at::date = %s
+                  AND (
+                    (op.employee_name IS NOT NULL AND op.employee_name = %s)
+                    OR (op.employee_token IS NOT NULL AND op.employee_token = %s)
+                  )
+                ORDER BY op.created_at ASC
                 """,
-                (user_id,),
+                (day_str, full_name, token),
             )
-            payouts = cur.fetchall()
-            return resp(200, {'days': days, 'payouts': payouts})
+            sales = cur.fetchall()
+
+            bonus_pct = float(cfg['bonus_percent']) if cfg else 3.0
+            sales_list = []
+            for s in sales:
+                profit = int(s['profit'] or 0)
+                bonus_from_sale = round(profit * bonus_pct / 100)
+                sales_list.append({
+                    'id': s['id'],
+                    'time': s['created_at'].strftime('%H:%M') if s['created_at'] else '',
+                    'item_title': s['item_title'],
+                    'item_category': s['item_category'],
+                    'sell_price': int(s['sell_price'] or 0),
+                    'buy_price': int(s['buy_price'] or 0),
+                    'profit': profit,
+                    'bonus_from_sale': bonus_from_sale,
+                })
+
+            return resp(200, {
+                'date': day_str,
+                'day_log': day_log,
+                'config': {'daily_rate': cfg['daily_rate'], 'bonus_percent': bonus_pct},
+                'sales': sales_list,
+            })
 
     # =====================================================
     # ВЛАДЕЛЕЦ
