@@ -166,6 +166,13 @@ def handler(event, context):
             )
             total_paid = int(cur.fetchone()['total_paid'] or 0)
 
+            # Определяем мастера ремонтов: есть хотя бы один завершённый ремонт
+            cur.execute(
+                f"SELECT COUNT(*) AS cnt FROM {SCHEMA}.repair_orders WHERE status = 'done' AND completed_at IS NOT NULL LIMIT 1"
+            )
+            repair_row = cur.fetchone()
+            is_repair_master = int(repair_row['cnt'] or 0) > 0 if repair_row else False
+
             return resp(200, {
                 'employee': {'id': user_id, 'name': full_name},
                 'config': {
@@ -176,6 +183,7 @@ def handler(event, context):
                 'total_earned': total_earned,
                 'total_paid': total_paid,
                 'remaining': total_earned - total_paid,
+                'is_repair_master': is_repair_master,
             })
 
     if action == 'my_history':
@@ -298,6 +306,151 @@ def handler(event, context):
                 'day_log': day_log,
                 'config': {'daily_rate': cfg['daily_rate'], 'bonus_percent': bonus_pct},
                 'sales': sales_list,
+            })
+
+    if action == 'my_repair_history':
+        # История ремонтов мастера по дням за произвольный диапазон дат
+        with get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            date_from = params.get('date_from')
+            date_to = params.get('date_to')
+            if date_from and date_to:
+                cur.execute(
+                    f"""
+                    SELECT
+                        completed_at::date AS repair_date,
+                        COUNT(*) AS orders_count,
+                        COALESCE(SUM(repair_amount), 0) AS total_revenue,
+                        COALESCE(SUM(purchase_amount), 0) AS total_costs,
+                        COALESCE(SUM(repair_amount), 0) - COALESCE(SUM(purchase_amount), 0) AS profit,
+                        COALESCE(SUM(master_income), 0) AS master_income
+                    FROM {SCHEMA}.repair_orders
+                    WHERE status = 'done'
+                      AND completed_at IS NOT NULL
+                      AND completed_at::date >= %s
+                      AND completed_at::date <= %s
+                    GROUP BY completed_at::date
+                    ORDER BY completed_at::date DESC
+                    """,
+                    (date_from, date_to),
+                )
+            else:
+                cur.execute(
+                    f"""
+                    SELECT
+                        completed_at::date AS repair_date,
+                        COUNT(*) AS orders_count,
+                        COALESCE(SUM(repair_amount), 0) AS total_revenue,
+                        COALESCE(SUM(purchase_amount), 0) AS total_costs,
+                        COALESCE(SUM(repair_amount), 0) - COALESCE(SUM(purchase_amount), 0) AS profit,
+                        COALESCE(SUM(master_income), 0) AS master_income
+                    FROM {SCHEMA}.repair_orders
+                    WHERE status = 'done'
+                      AND completed_at IS NOT NULL
+                      AND completed_at::date >= CURRENT_DATE - INTERVAL '90 days'
+                    GROUP BY completed_at::date
+                    ORDER BY completed_at::date DESC
+                    """,
+                )
+            days = cur.fetchall()
+
+            # Выплаты мастера
+            if date_from and date_to:
+                cur.execute(
+                    f"""
+                    SELECT id, payout_date, amount, note
+                    FROM {SCHEMA}.employee_payouts
+                    WHERE employee_id = %s AND payout_date >= %s AND payout_date <= %s
+                    ORDER BY payout_date DESC
+                    """,
+                    (user_id, date_from, date_to),
+                )
+            else:
+                cur.execute(
+                    f"""
+                    SELECT id, payout_date, amount, note
+                    FROM {SCHEMA}.employee_payouts
+                    WHERE employee_id = %s
+                    ORDER BY payout_date DESC LIMIT 90
+                    """,
+                    (user_id,),
+                )
+            payouts = cur.fetchall()
+
+            # Итоговые суммы
+            total_earned = sum(int(d['master_income'] or 0) for d in days)
+            cur.execute(
+                f"SELECT COALESCE(SUM(amount), 0) AS total_paid FROM {SCHEMA}.employee_payouts WHERE employee_id = %s",
+                (user_id,),
+            )
+            total_paid = int(cur.fetchone()['total_paid'] or 0)
+
+            return resp(200, {
+                'days': days,
+                'payouts': payouts,
+                'total_earned': total_earned,
+                'total_paid': total_paid,
+                'remaining': total_earned - total_paid,
+            })
+
+    if action == 'my_repair_detail':
+        # Детализация ремонтов за конкретный день
+        day_str = params.get('date')
+        if not day_str:
+            return resp(400, {'error': 'Нужен параметр date=YYYY-MM-DD'})
+        with get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                f"""
+                SELECT
+                    id,
+                    completed_at,
+                    model,
+                    repair_type,
+                    COALESCE(repair_amount, 0) AS repair_amount,
+                    COALESCE(purchase_amount, 0) AS purchase_amount,
+                    COALESCE(repair_amount, 0) - COALESCE(purchase_amount, 0) AS profit,
+                    COALESCE(master_income, 0) AS master_income,
+                    parts_name,
+                    name AS client_name
+                FROM {SCHEMA}.repair_orders
+                WHERE status = 'done'
+                  AND completed_at IS NOT NULL
+                  AND completed_at::date = %s
+                ORDER BY completed_at ASC
+                """,
+                (day_str,),
+            )
+            orders = cur.fetchall()
+
+            total_revenue = sum(int(o['repair_amount'] or 0) for o in orders)
+            total_costs = sum(int(o['purchase_amount'] or 0) for o in orders)
+            total_profit = sum(int(o['profit'] or 0) for o in orders)
+            total_master = sum(int(o['master_income'] or 0) for o in orders)
+
+            orders_list = []
+            for o in orders:
+                orders_list.append({
+                    'id': o['id'],
+                    'time': o['completed_at'].strftime('%H:%M') if o['completed_at'] else '',
+                    'model': o['model'] or '—',
+                    'repair_type': o['repair_type'] or '—',
+                    'repair_amount': int(o['repair_amount'] or 0),
+                    'purchase_amount': int(o['purchase_amount'] or 0),
+                    'profit': int(o['profit'] or 0),
+                    'master_income': int(o['master_income'] or 0),
+                    'parts_name': o['parts_name'],
+                    'client_name': o['client_name'] or '—',
+                })
+
+            return resp(200, {
+                'date': day_str,
+                'orders': orders_list,
+                'summary': {
+                    'orders_count': len(orders_list),
+                    'total_revenue': total_revenue,
+                    'total_costs': total_costs,
+                    'total_profit': total_profit,
+                    'total_master_income': total_master,
+                },
             })
 
     # =====================================================
