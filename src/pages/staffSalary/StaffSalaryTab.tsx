@@ -150,10 +150,12 @@ function SalaryPinGate({ token, employeeName, onUnlock }: { token: string; emplo
 export default function StaffSalaryTab({ role, token, employeeName }: Props) {
   const [pinPassed, setPinPassed] = useState(false);
 
-  if (role === "owner" || role === "admin") {
+  // Только владелец видит панель управления зарплатами
+  if (role === "owner") {
     return <OwnerSalaryView token={token} />;
   }
 
+  // Все остальные (admin, staff) — своя зарплата с PIN-защитой
   if (!pinPassed) {
     return (
       <SalaryPinGate

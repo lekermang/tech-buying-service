@@ -166,12 +166,13 @@ def handler(event, context):
             )
             total_paid = int(cur.fetchone()['total_paid'] or 0)
 
-            # Определяем мастера ремонтов: есть хотя бы один завершённый ремонт
+            # Мастер ремонтов — только David (login='PluXan')
             cur.execute(
-                f"SELECT COUNT(*) AS cnt FROM {SCHEMA}.repair_orders WHERE status = 'done' AND completed_at IS NOT NULL LIMIT 1"
+                f"SELECT login FROM {SCHEMA}.employees WHERE id = %s",
+                (user_id,),
             )
-            repair_row = cur.fetchone()
-            is_repair_master = int(repair_row['cnt'] or 0) > 0 if repair_row else False
+            emp_row = cur.fetchone()
+            is_repair_master = (emp_row['login'] == 'PluXan') if emp_row else False
 
             return resp(200, {
                 'employee': {'id': user_id, 'name': full_name},
