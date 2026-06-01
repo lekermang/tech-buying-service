@@ -1,7 +1,9 @@
+import { useEffect, useState } from "react";
 import Icon from "@/components/ui/icon";
 import type { EmployeeOverview } from "@/pages/staff.types";
 import { statusDot } from "./ownerSalaryTypes";
 
+const SAVINGS_URL = "https://functions.poehali.dev/4b6d2cd3-a8ca-4aac-aec2-ba9664b21b07";
 const fmt = (n: number) => Math.round(n).toLocaleString("ru-RU");
 
 type MyStats = {
@@ -18,15 +20,35 @@ type MyStats = {
   gold_profit_month: number;
 } | null;
 
+type SavingsEmp = {
+  id: number;
+  full_name: string;
+  total_saved: number;
+  active_goals: number;
+  done_goals: number;
+  total_target: number;
+};
+
 export default function OwnerEmployeesList({
   employees,
   myStats,
   onSelect,
+  token,
 }: {
   employees: EmployeeOverview[];
   myStats?: MyStats;
   onSelect: (id: number) => void;
+  token: string;
 }) {
+  const [savingsData, setSavingsData] = useState<{ employees: SavingsEmp[]; grand_total: number } | null>(null);
+  const [savingsOpen, setSavingsOpen] = useState(false);
+
+  useEffect(() => {
+    if (!savingsOpen || savingsData) return;
+    fetch(`${SAVINGS_URL}?action=owner_savings_overview`, { headers: { "X-Employee-Token": token } })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => d && setSavingsData(d));
+  }, [savingsOpen, token, savingsData]);
   const now = new Date();
   const monthLabel = now.toLocaleString("ru-RU", { month: "long" });
 
@@ -109,6 +131,89 @@ export default function OwnerEmployeesList({
           </div>
         </div>
       )}
+
+      {/* Накопления сотрудников */}
+      <div className="rounded-xl overflow-hidden" style={{
+        border: "1px solid rgba(167,139,250,0.25)",
+        background: "rgba(167,139,250,0.04)",
+      }}>
+        <button
+          className="w-full flex items-center justify-between px-4 py-3"
+          onClick={() => setSavingsOpen(v => !v)}
+        >
+          <div className="flex items-center gap-2">
+            <Icon name="PiggyBank" size={15} style={{ color: "#a78bfa" }} />
+            <span className="font-oswald font-bold text-sm uppercase tracking-wide" style={{ color: "#a78bfa" }}>
+              Копилки сотрудников
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            {savingsData && (
+              <span className="font-oswald font-bold tabular-nums text-sm" style={{ color: "#a78bfa" }}>
+                {fmt(savingsData.grand_total)} ₽
+              </span>
+            )}
+            <Icon name={savingsOpen ? "ChevronUp" : "ChevronDown"} size={15} style={{ color: "rgba(167,139,250,0.5)" }} />
+          </div>
+        </button>
+
+        {savingsOpen && (
+          <div className="px-4 pb-4 space-y-2" style={{ borderTop: "1px solid rgba(167,139,250,0.12)" }}>
+            {!savingsData ? (
+              <div className="py-4 flex items-center justify-center gap-2" style={{ color: "rgba(255,255,255,0.3)" }}>
+                <Icon name="Loader2" size={14} className="animate-spin" />
+                <span className="font-roboto text-sm">Загрузка...</span>
+              </div>
+            ) : savingsData.employees.length === 0 ? (
+              <div className="py-4 text-center font-roboto text-sm" style={{ color: "rgba(255,255,255,0.3)" }}>
+                Никто ещё не начал копить
+              </div>
+            ) : (
+              <>
+                {/* Итого */}
+                <div className="flex items-center justify-between py-2" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                  <span className="font-roboto text-xs" style={{ color: "rgba(255,255,255,0.35)" }}>Всего накоплено командой</span>
+                  <span className="font-oswald font-black text-lg tabular-nums" style={{ color: "#a78bfa" }}>
+                    {fmt(savingsData.grand_total)} ₽
+                  </span>
+                </div>
+                {/* По каждому */}
+                {savingsData.employees.map(e => (
+                  <div key={e.id} className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={{
+                    background: e.total_saved > 0 ? "rgba(167,139,250,0.07)" : "rgba(255,255,255,0.02)",
+                    border: e.total_saved > 0 ? "1px solid rgba(167,139,250,0.18)" : "1px solid rgba(255,255,255,0.05)",
+                  }}>
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center font-oswald font-bold text-xs shrink-0" style={{
+                      background: "rgba(167,139,250,0.15)", color: "#a78bfa",
+                    }}>
+                      {(e.full_name || "?").trim().split(/\s+/).map((w: string) => w[0]).slice(0, 2).join("").toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-roboto text-sm font-semibold text-white truncate">{e.full_name}</div>
+                      <div className="font-roboto text-[10px]" style={{ color: "rgba(255,255,255,0.3)" }}>
+                        {e.active_goals > 0 ? `${e.active_goals} активн. ${e.active_goals === 1 ? "цель" : e.active_goals < 5 ? "цели" : "целей"}` : "Нет активных целей"}
+                        {e.done_goals > 0 && ` · ${e.done_goals} выполнено`}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="font-oswald font-bold tabular-nums" style={{
+                        color: e.total_saved > 0 ? "#a78bfa" : "rgba(255,255,255,0.2)",
+                      }}>
+                        {e.total_saved > 0 ? `${fmt(e.total_saved)} ₽` : "—"}
+                      </div>
+                      {e.total_target > 0 && (
+                        <div className="font-roboto text-[10px]" style={{ color: "rgba(255,255,255,0.25)" }}>
+                          цель {fmt(e.total_target)} ₽
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Список сотрудников */}
       <div>

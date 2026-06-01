@@ -1,9 +1,11 @@
+import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import type { EmployeeOverview } from "@/pages/staff.types";
 import {
   MONTHS, WEEKDAYS,
   type CalendarDay, type DetailState, type LogRow,
 } from "./ownerSalaryTypes";
+import OwnerSavingsPanel from "./OwnerSavingsPanel";
 
 type MonthCell = { date: string | null; status: CalendarDay["status"] | null; total: number; payout: number; bonus: number };
 
@@ -55,7 +57,10 @@ export default function OwnerEmployeeDetail({
   onOpenPayout: () => void;
   onDeletePayout: (id: number) => void;
   onResync: () => void;
+  token: string;
 }) {
+  const [activeTab, setActiveTab] = useState<"salary" | "savings">("salary");
+
   return (
     <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-5">
       <button
@@ -112,6 +117,40 @@ export default function OwnerEmployeeDetail({
           </div>
         )}
       </div>
+
+      {/* Переключатель Зарплата / Копилка */}
+      <div className="flex gap-1 p-1 rounded-xl border border-white/8" style={{ background: "rgba(255,255,255,0.04)" }}>
+        <button onClick={() => setActiveTab("salary")}
+          className="flex-1 py-2 rounded-lg font-roboto text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
+          style={{
+            background: activeTab === "salary" ? "rgba(255,215,0,0.15)" : "transparent",
+            color: activeTab === "salary" ? "#FFD700" : "rgba(255,255,255,0.4)",
+            border: activeTab === "salary" ? "1px solid rgba(255,215,0,0.3)" : "1px solid transparent",
+          }}>
+          <Icon name="Wallet" size={13} /> Зарплата
+        </button>
+        <button onClick={() => setActiveTab("savings")}
+          className="flex-1 py-2 rounded-lg font-roboto text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
+          style={{
+            background: activeTab === "savings" ? "rgba(167,139,250,0.15)" : "transparent",
+            color: activeTab === "savings" ? "#a78bfa" : "rgba(255,255,255,0.4)",
+            border: activeTab === "savings" ? "1px solid rgba(167,139,250,0.3)" : "1px solid transparent",
+          }}>
+          <Icon name="PiggyBank" size={13} /> Копилка
+        </button>
+      </div>
+
+      {/* ── КОПИЛКА ── */}
+      {activeTab === "savings" && (
+        <OwnerSavingsPanel
+          employeeId={selected.id}
+          employeeName={selected.full_name}
+          token={token}
+        />
+      )}
+
+      {/* ── ЗАРПЛАТА ── */}
+      {activeTab === "salary" && <>
 
       {/* Сводки */}
       {detail?.summary && (
@@ -276,6 +315,8 @@ export default function OwnerEmployeeDetail({
           </div>
         </div>
       )}
+
+      </>}
     </div>
   );
 }

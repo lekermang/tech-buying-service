@@ -171,37 +171,36 @@ export default function EmployeeSalaryView({ token, employeeName }: Props) {
         </div>
       </div>
 
-      {/* Переключатель Зарплата / Копилка — только для мастера */}
-      {isRepairMaster && (
-        <div className="flex gap-1 p-1 rounded-xl" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
-          <button onClick={() => setMainTab("salary")}
-            className="flex-1 py-2 rounded-lg font-roboto text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
-            style={{
-              background: mainTab === "salary" ? "rgba(52,211,153,0.15)" : "transparent",
-              color: mainTab === "salary" ? "#34d399" : "rgba(255,255,255,0.4)",
-              border: mainTab === "salary" ? "1px solid rgba(52,211,153,0.35)" : "1px solid transparent",
-            }}>
-            <Icon name="Wrench" size={13} /> Мой заработок
-          </button>
-          <button onClick={() => setMainTab("savings")}
-            className="flex-1 py-2 rounded-lg font-roboto text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
-            style={{
-              background: mainTab === "savings" ? "rgba(167,139,250,0.15)" : "transparent",
-              color: mainTab === "savings" ? "#a78bfa" : "rgba(255,255,255,0.4)",
-              border: mainTab === "savings" ? "1px solid rgba(167,139,250,0.35)" : "1px solid transparent",
-            }}>
-            <Icon name="PiggyBank" size={13} /> Копилка
-          </button>
-        </div>
-      )}
+      {/* Переключатель Зарплата / Копилка — для всех */}
+      <div className="flex gap-1 p-1 rounded-xl" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
+        <button onClick={() => setMainTab("salary")}
+          className="flex-1 py-2 rounded-lg font-roboto text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
+          style={{
+            background: mainTab === "salary" ? (isRepairMaster ? "rgba(52,211,153,0.15)" : "rgba(255,215,0,0.15)") : "transparent",
+            color: mainTab === "salary" ? (isRepairMaster ? "#34d399" : "#FFD700") : "rgba(255,255,255,0.4)",
+            border: mainTab === "salary" ? `1px solid ${isRepairMaster ? "rgba(52,211,153,0.35)" : "rgba(255,215,0,0.35)"}` : "1px solid transparent",
+          }}>
+          <Icon name={isRepairMaster ? "Wrench" : "Wallet"} size={13} />
+          {isRepairMaster ? "Заработок" : "Зарплата"}
+        </button>
+        <button onClick={() => setMainTab("savings")}
+          className="flex-1 py-2 rounded-lg font-roboto text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
+          style={{
+            background: mainTab === "savings" ? "rgba(167,139,250,0.15)" : "transparent",
+            color: mainTab === "savings" ? "#a78bfa" : "rgba(255,255,255,0.4)",
+            border: mainTab === "savings" ? "1px solid rgba(167,139,250,0.35)" : "1px solid transparent",
+          }}>
+          <Icon name="PiggyBank" size={13} /> Копилка
+        </button>
+      </div>
 
-      {/* ── КОПИЛКА (мастер, вкладка savings) ── */}
-      {isRepairMaster && mainTab === "savings" && (
+      {/* ── КОПИЛКА (для всех) ── */}
+      {mainTab === "savings" && (
         <SavingsView token={token} />
       )}
 
       {/* ── ЗАРПЛАТА ── */}
-      {(!isRepairMaster || mainTab === "salary") && <>
+      {mainTab === "salary" && <>
 
       {/* Итог */}
       {isRepairMaster ? (

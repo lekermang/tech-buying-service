@@ -379,4 +379,93 @@ def handler(event: dict, context) -> dict:
             'total_saved': total_saved,
         })
 
+    # ── ВЛАДЕЛЕЦ: обзор накоплений всех сотрудников ─────────────────────────
+    if action == 'owner_savings_overview':
+        if emp_role not in ('admin', 'owner'):
+            return resp(403, {'error': 'Нет доступа'})
+        with get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                f"""
+                SELECT e.id, e.full_name, e.position, e.role,
+                  COALESCE(sl.total_saved, 0) AS total_saved,
+                  COALESCE(goals.active_count, 0) AS active_goals,
+                  COALESCE(goals.done_count, 0) AS done_goals,
+                  COALESCE(goals.total_target, 0) AS total_target
+                FROM {SCHEMA}.employees e
+                LEFT JOIN (
+                  SELECT employee_id, SUM(amount) AS total_saved
+                  FROM {SCHEMA}.savings_log
+                  GROUP BY employee_id
+                ) sl ON sl.employee_id = e.id
+                LEFT JOIN (
+                  SELECT employee_id,
+                    COUNT(*) FILTER (WHERE status = 'active') AS active_count,
+                    COUNT(*) FILTER (WHERE status = 'done') AS done_count,
+                    SUM(target_amount) FILTER (WHERE status = 'active') AS total_target
+                  FROM {SCHEMA}.savings_goals
+                  GROUP BY employee_id
+                ) goals ON goals.employee_id = e.id
+                WHERE e.is_active = true
+                ORDER BY e.full_name
+                """,
+            )
+            employees = cur.fetchall()
+
+            # Итого по всем
+            cur.execute(
+                f"SELECT COALESCE(SUM(amount), 0) FROM {SCHEMA}.savings_log",
+            )
+            grand_total = int(cur.fetchone()[0] or 0)
+
+        return resp(200, {'employees': employees, 'grand_total': grand_total})
+
+    # ── ВЛАДЕЛЕЦ: цели конкретного сотрудника ────────────────────────────────
+    if action == 'owner_employee_goals':
+        if emp_role not in ('admin', 'owner'):
+            return resp(403, {'error': 'Нет доступа'})
+        target_id = int(params.get('employee_id') or 0)
+        if not target_id:
+            return resp(400, {'error': 'employee_id обязателен'})
+
+        with get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                f"""
+                SELECT g.*,
+                  COALESCE((SELECT SUM(amount) FROM {SCHEMA}.savings_log
+                            WHERE goal_id = g.id AND amount > 0), 0) AS deposited,
+                  COALESCE((SELECT SUM(ABS(amount)) FROM {SCHEMA}.savings_log
+                            WHERE goal_id = g.id AND amount < 0), 0) AS withdrawn,
+                  (SELECT COUNT(*) FROM {SCHEMA}.savings_log WHERE goal_id = g.id) AS tx_count
+                FROM {SCHEMA}.savings_goals g
+                WHERE g.employee_id = %s
+                ORDER BY
+                  CASE g.status WHEN 'active' THEN 0 WHEN 'paused' THEN 1 WHEN 'done' THEN 2 ELSE 3 END,
+                  g.created_at DESC
+                """,
+                (target_id,),
+            )
+            goals = cur.fetchall()
+
+            cur.execute(
+                f"SELECT COALESCE(SUM(amount), 0) FROM {SCHEMA}.savings_log WHERE employee_id = %s",
+                (target_id,),
+            )
+            total_saved = int(cur.fetchone()[0] or 0)
+
+            cur.execute(
+                f"""
+                SELECT sl.id, sl.amount, sl.note, sl.source, sl.created_at,
+                       g.title AS goal_title, g.emoji AS goal_emoji
+                FROM {SCHEMA}.savings_log sl
+                LEFT JOIN {SCHEMA}.savings_goals g ON g.id = sl.goal_id
+                WHERE sl.employee_id = %s
+                ORDER BY sl.created_at DESC
+                LIMIT 30
+                """,
+                (target_id,),
+            )
+            recent_tx = cur.fetchall()
+
+        return resp(200, {'goals': goals, 'total_saved': total_saved, 'recent_tx': recent_tx})
+
     return resp(400, {'error': f'Неизвестное действие: {action}'})

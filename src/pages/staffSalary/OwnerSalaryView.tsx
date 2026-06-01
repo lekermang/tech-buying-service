@@ -216,6 +216,7 @@ export default function OwnerSalaryView({ token }: Props) {
         employees={employees}
         myStats={myStats}
         onSelect={(id) => { setSelectedId(id); setViewMonth(startOfMonth(new Date())); }}
+        token={token}
       />
     );
   }
@@ -248,6 +249,7 @@ export default function OwnerSalaryView({ token }: Props) {
           onOpenPayout={() => setPayoutOpen(true)}
           onDeletePayout={deletePayout}
           onResync={resyncMonth}
+          token={token}
         />
       )}
 
