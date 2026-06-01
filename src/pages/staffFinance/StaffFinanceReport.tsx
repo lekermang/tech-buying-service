@@ -56,44 +56,61 @@ const TREND_COLOR: Record<string, string> = { up: "#f87171", down: "#34d399", st
 
 const emptyPdf = (): PdfState => ({ file: null, text: "", loading: false, pages: 0, error: null });
 
-// Загружаем pdf.js с CDN один раз
-let pdfjsLoadPromise: Promise<void> | null = null;
-function loadPdfJs(): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  if ((window as any).pdfjsLib) return Promise.resolve();
-  if (pdfjsLoadPromise) return pdfjsLoadPromise;
-  pdfjsLoadPromise = new Promise<void>((resolve, reject) => {
-    const s = document.createElement("script");
-    s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
-    s.onload = () => resolve();
-    s.onerror = (e) => reject(new Error(`Не удалось загрузить pdf.js: ${String(e)}`));
-    document.head.appendChild(s);
-  });
-  return pdfjsLoadPromise;
+// Нативный парсер текста из PDF — без внешних библиотек
+// Работает с текстовыми PDF (Сбер, и т.п.) — извлекает строки из BT/ET блоков
+function parsePdfTextNative(bytes: Uint8Array): { text: string; pages: number } {
+  const decoder = new TextDecoder("latin1");
+  const raw = decoder.decode(bytes);
+
+  // Считаем страницы
+  const pageCount = (raw.match(/\/Type\s*\/Page[^s]/g) || []).length || 1;
+
+  // Извлекаем все текстовые блоки BT ... ET
+  const parts: string[] = [];
+  const btEt = /BT([\s\S]*?)ET/g;
+  let m: RegExpExecArray | null;
+  while ((m = btEt.exec(raw)) !== null) {
+    const block = m[1];
+    // Парсим Tj, TJ, ' операторы
+    const tjRe = /\(((?:[^()\\]|\\[\s\S])*)\)\s*(?:Tj|'|")/g;
+    const tjArrRe = /\[((?:[^[\]]|\((?:[^()\\]|\\[\s\S])*\))*)\]\s*TJ/g;
+    let tj: RegExpExecArray | null;
+    while ((tj = tjRe.exec(block)) !== null) {
+      const s = decodePdfString(tj[1]);
+      if (s.trim()) parts.push(s);
+    }
+    while ((tj = tjArrRe.exec(block)) !== null) {
+      const arrContent = tj[1];
+      const inner = /\(((?:[^()\\]|\\[\s\S])*)\)/g;
+      let inn: RegExpExecArray | null;
+      const words: string[] = [];
+      while ((inn = inner.exec(arrContent)) !== null) {
+        const s = decodePdfString(inn[1]);
+        if (s.trim()) words.push(s);
+      }
+      if (words.length) parts.push(words.join(""));
+    }
+  }
+
+  return { text: parts.join(" "), pages: pageCount };
 }
 
-// Извлекаем текст из PDF прямо в браузере — без отправки файла на сервер
+function decodePdfString(s: string): string {
+  return s
+    .replace(/\\n/g, "\n").replace(/\\r/g, "\r").replace(/\\t/g, "\t")
+    .replace(/\\([0-7]{3})/g, (_, o) => String.fromCharCode(parseInt(o, 8)))
+    .replace(/\\(.)/g, "$1");
+}
+
+// Извлекаем текст из PDF прямо в браузере — без внешних зависимостей
 async function extractPdfText(file: File): Promise<{ text: string; pages: number }> {
-  await loadPdfJs();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const pdfjsLib = (window as any).pdfjsLib;
-  if (!pdfjsLib) throw new Error("pdf.js не загрузился");
-
-  pdfjsLib.GlobalWorkerOptions.workerSrc =
-    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-
   const buf = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
-  const total: number = pdf.numPages;
-  const parts: string[] = [];
-  for (let i = 1; i <= total; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const pageText = content.items.map((item: any) => item.str).join(" ").trim();
-    if (pageText) parts.push(pageText);
+  const bytes = new Uint8Array(buf);
+  const result = parsePdfTextNative(bytes);
+  if (!result.text.trim()) {
+    throw new Error("PDF не содержит текста — возможно, это скан. Попробуйте выгрузить выписку заново из Сбербанк Онлайн.");
   }
-  return { text: parts.join("\n\n"), pages: total };
+  return result;
 }
 
 function PdfZone({ label, hint, state, onFile, onClear }: {
