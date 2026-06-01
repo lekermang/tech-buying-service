@@ -234,7 +234,7 @@ export default function StaffFinanceReport({ token }: { token: string }) {
       const r = await fetch(FINANCE_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Employee-Token": token },
-        body: JSON.stringify({ action: "analyze", token, debit_text: debitPdf.text, savings_text: savingsPdf.text, period }),
+        body: JSON.stringify({ action: "analyze", token, debit_text: debitPdf.text.slice(0, 60000), savings_text: savingsPdf.text.slice(0, 60000), period }),
       });
       const d = await r.json();
       if (d.error) { setError(d.error); return; }
