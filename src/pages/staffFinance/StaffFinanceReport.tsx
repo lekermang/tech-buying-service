@@ -121,7 +121,7 @@ function PdfZone({ label, hint, state, onFile, onClear, token, financeUrl }: {
   const [drag, setDrag] = useState(false);
 
   const handleFile = async (file: File) => {
-    if (!file.type.includes("pdf") && !file.name.endsWith(".pdf")) {
+    if (!file.name.toLowerCase().endsWith(".pdf") && file.type && !file.type.includes("pdf")) {
       onFile({ ...emptyPdf(), error: "Нужен PDF-файл" }); return;
     }
     onFile({ ...emptyPdf(), file, loading: true });
