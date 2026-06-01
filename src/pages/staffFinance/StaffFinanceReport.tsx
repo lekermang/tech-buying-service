@@ -5,6 +5,7 @@ import type { ReportResult as HistReportResult } from "./useFinanceHistory";
 import FinanceHistoryView from "./FinanceHistoryView";
 
 const FINANCE_URL = "https://functions.poehali.dev/f7e6a419-7cd3-4768-86b6-8a63dfc212ee";
+const PARSE_PDF_URL = "https://functions.poehali.dev/030f7058-cbff-43cc-8e5b-12110c9ceb5f";
 const fmt = (n: number) => new Intl.NumberFormat("ru-RU").format(Math.round(n));
 
 type ExpCat  = { name: string; amount: number; percent: number; trend?: string; comment?: string };
@@ -66,7 +67,8 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
-// Загружаем PDF на S3 через бэкенд, затем парсим там же через pdfplumber
+// Загружаем PDF на S3 через finance-report (быстро),
+// затем парсим через отдельную функцию parse-pdf (таймаут 120 сек)
 async function extractPdfText(
   file: File,
   token: string,
@@ -86,11 +88,11 @@ async function extractPdfText(
   if (uploadData.error) throw new Error(uploadData.error);
   const s3Key: string = uploadData.s3_key;
 
-  // Шаг 3: парсим PDF на сервере через pdfplumber (правильная кодировка)
-  const parseResp = await fetch(financeUrl, {
+  // Шаг 3: парсим через отдельную функцию с увеличенным таймаутом
+  const parseResp = await fetch(PARSE_PDF_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Employee-Token": token },
-    body: JSON.stringify({ action: "parse_pdf", token, s3_key: s3Key }),
+    body: JSON.stringify({ token, s3_key: s3Key }),
   });
   if (!parseResp.ok) throw new Error(`Ошибка парсинга: HTTP ${parseResp.status}`);
   const parseData = await parseResp.json();
