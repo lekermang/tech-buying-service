@@ -68,8 +68,6 @@ export default function EmployeeSalaryView({ token, employeeName }: Props) {
   const [dateFrom, setDateFrom] = useState(range.from);
   const [dateTo, setDateTo] = useState(range.to);
 
-  const [tab, setTab] = useState<"sales" | "repairs">("sales");
-
   // Детализация обычных продаж
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const [detailCache, setDetailCache] = useState<Record<string, DayDetail>>({});
@@ -169,58 +167,55 @@ export default function EmployeeSalaryView({ token, employeeName }: Props) {
         </div>
       </div>
 
-      {/* Итог — К выплате */}
-      <div className="rounded-2xl p-5 text-center" style={{
-        background: "linear-gradient(145deg,rgba(255,215,0,0.12),rgba(255,215,0,0.04))",
-        border: "1.5px solid rgba(255,215,0,0.3)",
-        boxShadow: "0 0 32px rgba(255,215,0,0.08)",
-      }}>
-        <div className="font-roboto text-[10px] uppercase tracking-widest mb-1" style={{ color: "rgba(255,215,0,0.6)" }}>К выплате</div>
-        <div className="font-oswald font-black text-5xl tabular-nums" style={{ color: "#FFD700" }}>
-          {fmt(isRepairMaster ? (repairHistory?.remaining ?? state.remaining) : state.remaining)} ₽
-        </div>
-        <div className="font-roboto text-xs mt-2" style={{ color: "rgba(255,255,255,0.35)" }}>
-          Заработано {fmt(isRepairMaster ? (repairHistory?.total_earned ?? state.total_earned) : state.total_earned)} ₽
-          · Выплачено {fmt(isRepairMaster ? (repairHistory?.total_paid ?? state.total_paid) : state.total_paid)} ₽
-        </div>
-      </div>
-
-      {/* Два показателя */}
-      <div className="grid grid-cols-2 gap-2">
-        <div className="rounded-xl p-3 text-center" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-          <div className="font-roboto text-[10px] uppercase tracking-widest mb-1" style={{ color: "rgba(255,255,255,0.35)" }}>
-            {isRepairMaster ? "Ставка / день" : "Ставка / день"}
+      {/* Итог */}
+      {isRepairMaster ? (
+        <div className="rounded-2xl p-5 text-center" style={{
+          background: "linear-gradient(145deg,rgba(52,211,153,0.1),rgba(52,211,153,0.03))",
+          border: "1.5px solid rgba(52,211,153,0.3)",
+          boxShadow: "0 0 32px rgba(52,211,153,0.08)",
+        }}>
+          <div className="font-roboto text-[10px] uppercase tracking-widest mb-1" style={{ color: "rgba(52,211,153,0.6)" }}>Заработано за период</div>
+          <div className="font-oswald font-black text-5xl tabular-nums" style={{ color: "#34d399" }}>
+            {fmt(repairHistory?.total_earned ?? 0)} ₽
           </div>
-          <div className="font-oswald font-bold text-xl text-white">{fmt(state.config.daily_rate)} ₽</div>
+          {repairHistory && repairHistory.days.length > 0 && (
+            <div className="font-roboto text-xs mt-2" style={{ color: "rgba(255,255,255,0.35)" }}>
+              {repairHistory.days.length} рабочих {repairHistory.days.length === 1 ? "день" : repairHistory.days.length < 5 ? "дня" : "дней"}
+              · {repairHistory.days.reduce((s, d) => s + d.orders_count, 0)} ремонтов
+            </div>
+          )}
         </div>
-        <div className="rounded-xl p-3 text-center" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-          <div className="font-roboto text-[10px] uppercase tracking-widest mb-1" style={{ color: "rgba(255,255,255,0.35)" }}>
-            {isRepairMaster ? "Доход с ремонтов" : "Бонус с продаж"}
+      ) : (
+        <div className="rounded-2xl p-5 text-center" style={{
+          background: "linear-gradient(145deg,rgba(255,215,0,0.12),rgba(255,215,0,0.04))",
+          border: "1.5px solid rgba(255,215,0,0.3)",
+          boxShadow: "0 0 32px rgba(255,215,0,0.08)",
+        }}>
+          <div className="font-roboto text-[10px] uppercase tracking-widest mb-1" style={{ color: "rgba(255,215,0,0.6)" }}>К выплате</div>
+          <div className="font-oswald font-black text-5xl tabular-nums" style={{ color: "#FFD700" }}>
+            {fmt(state.remaining)} ₽
           </div>
-          <div className="font-oswald font-bold text-xl" style={{ color: isRepairMaster ? "#34d399" : "#a78bfa" }}>
-            {isRepairMaster ? `${fmt(repairHistory?.total_earned ?? 0)} ₽` : `${state.config.bonus_percent}%`}
+          <div className="font-roboto text-xs mt-2" style={{ color: "rgba(255,255,255,0.35)" }}>
+            Заработано {fmt(state.total_earned)} ₽ · Выплачено {fmt(state.total_paid)} ₽
           </div>
-        </div>
-      </div>
-
-      {/* Вкладки (только для мастера ремонтов — показываем переключатель) */}
-      {isRepairMaster && (
-        <div className="flex gap-1 p-1 rounded-xl" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
-          {([
-            { k: "repairs", l: "🔧 Ремонты", icon: "Wrench" },
-            { k: "sales", l: "💰 Продажи", icon: "ShoppingBag" },
-          ] as const).map(({ k, l }) => (
-            <button key={k} onClick={() => setTab(k)}
-              className="flex-1 py-1.5 rounded-lg font-roboto text-xs font-semibold transition-all"
-              style={{
-                background: tab === k ? "rgba(255,215,0,0.15)" : "transparent",
-                color: tab === k ? "#FFD700" : "rgba(255,255,255,0.4)",
-                border: tab === k ? "1px solid rgba(255,215,0,0.3)" : "1px solid transparent",
-              }}
-            >{l}</button>
-          ))}
         </div>
       )}
+
+      {/* Два показателя — только для обычных сотрудников */}
+      {!isRepairMaster && (
+        <div className="grid grid-cols-2 gap-2">
+          <div className="rounded-xl p-3 text-center" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+            <div className="font-roboto text-[10px] uppercase tracking-widest mb-1" style={{ color: "rgba(255,255,255,0.35)" }}>Ставка / день</div>
+            <div className="font-oswald font-bold text-xl text-white">{fmt(state.config.daily_rate)} ₽</div>
+          </div>
+          <div className="rounded-xl p-3 text-center" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+            <div className="font-roboto text-[10px] uppercase tracking-widest mb-1" style={{ color: "rgba(255,255,255,0.35)" }}>Бонус с продаж</div>
+            <div className="font-oswald font-bold text-xl" style={{ color: "#a78bfa" }}>{state.config.bonus_percent}%</div>
+          </div>
+        </div>
+      )}
+
+
 
       {/* Фильтр дат */}
       <div className="rounded-xl p-3 space-y-2" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
@@ -371,35 +366,11 @@ export default function EmployeeSalaryView({ token, employeeName }: Props) {
             </div>
           )}
 
-          {/* Выплаты мастера */}
-          {repairHistory && repairHistory.payouts.filter(p => p.amount > 0).length > 0 && (
-            <div className="mt-4">
-              <div className="font-oswald font-bold text-base uppercase tracking-wide text-white mb-3">Выплаты</div>
-              <div className="space-y-1.5">
-                {repairHistory.payouts.filter(p => p.amount > 0).map(p => (
-                  <div key={p.id} className="flex items-center justify-between rounded-xl px-3 py-3" style={{
-                    background: "rgba(52,211,153,0.05)", border: "1px solid rgba(52,211,153,0.15)",
-                  }}>
-                    <div>
-                      <div className="font-roboto text-sm text-white">
-                        {new Date(p.payout_date.slice(0, 10) + "T12:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}
-                      </div>
-                      {p.note && <div className="font-roboto text-[11px]" style={{ color: "rgba(255,255,255,0.35)" }}>{p.note}</div>}
-                    </div>
-                    <div className="flex items-center gap-1.5 font-oswald font-bold tabular-nums" style={{ color: "#34d399" }}>
-                      <Icon name="ArrowDownLeft" size={14} />
-                      {fmt(Number(p.amount))} ₽
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
-      {/* ── ПРОДАЖИ (обычные сотрудники + вкладка у мастера) ── */}
-      {(!isRepairMaster || tab === "sales") && (
+      {/* ── ПРОДАЖИ (только обычные сотрудники) ── */}
+      {!isRepairMaster && (
         <div>
           <div className="font-oswald font-bold text-base uppercase tracking-wide text-white mb-3">Доход по дням</div>
           {days.length === 0 ? (
