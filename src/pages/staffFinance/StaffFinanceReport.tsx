@@ -56,16 +56,44 @@ const TREND_COLOR: Record<string, string> = { up: "#f87171", down: "#34d399", st
 
 const emptyPdf = (): PdfState => ({ file: null, text: "", loading: false, pages: 0, error: null });
 
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((res, rej) => {
-    const r = new FileReader();
-    r.onload = ev => res((ev.target?.result as string) ?? "");
-    r.onerror = rej;
-    r.readAsDataURL(file);
+// Загружаем pdf.js с CDN один раз
+let pdfjsLoaded = false;
+async function loadPdfJs(): Promise<void> {
+  if (pdfjsLoaded || (window as unknown as Record<string, unknown>)["pdfjsLib"]) {
+    pdfjsLoaded = true; return;
+  }
+  await new Promise<void>((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js";
+    s.onload = () => { pdfjsLoaded = true; resolve(); };
+    s.onerror = reject;
+    document.head.appendChild(s);
   });
 }
 
-function PdfZone({ label, hint, state, onFile, onClear, token }: {
+// Извлекаем текст из PDF прямо в браузере — без отправки файла на сервер
+async function extractPdfText(file: File): Promise<{ text: string; pages: number }> {
+  await loadPdfJs();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pdfjsLib = (window as any).pdfjsLib;
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  const total = pdf.numPages;
+  const parts: string[] = [];
+  for (let i = 1; i <= total; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pageText = content.items.map((item: any) => item.str).join(" ").trim();
+    if (pageText) parts.push(pageText);
+  }
+  return { text: parts.join("\n\n"), pages: total };
+}
+
+function PdfZone({ label, hint, state, onFile, onClear }: {
   label: string; hint: string; state: PdfState;
   onFile: (s: PdfState) => void; onClear: () => void; token: string;
 }) {
@@ -78,17 +106,15 @@ function PdfZone({ label, hint, state, onFile, onClear, token }: {
     }
     onFile({ ...emptyPdf(), file, loading: true });
     try {
-      const b64 = await fileToBase64(file);
-      const r = await fetch(FINANCE_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Employee-Token": token },
-        body: JSON.stringify({ action: "parse_pdf", token, pdf_base64: b64 }),
-      });
-      const d = await r.json();
-      if (d.error) onFile({ ...emptyPdf(), file, error: d.error });
-      else onFile({ file, text: d.text || "", loading: false, pages: d.pages || 0, error: d.warning || null });
+      // Парсим PDF прямо в браузере — не гоняем файл на сервер
+      const { text, pages } = await extractPdfText(file);
+      if (!text.trim()) {
+        onFile({ ...emptyPdf(), file, pages, error: "PDF не содержит текста — возможно, скан (фото). Попробуйте другой файл." });
+      } else {
+        onFile({ file, text, loading: false, pages, error: null });
+      }
     } catch (ex) {
-      onFile({ ...emptyPdf(), file, error: String(ex) });
+      onFile({ ...emptyPdf(), file, error: `Ошибка чтения PDF: ${String(ex)}` });
     }
   };
 

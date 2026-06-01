@@ -27,7 +27,10 @@ def handler(event: dict, context) -> dict:
     if event.get("httpMethod") == "OPTIONS":
         return {"statusCode": 200, "headers": CORS, "body": ""}
 
-    body = json.loads(event.get("body") or "{}")
+    raw_body = event.get("body") or "{}"
+    if event.get("isBase64Encoded"):
+        raw_body = base64.b64decode(raw_body).decode("utf-8")
+    body = json.loads(raw_body)
 
     # Токен принимаем из заголовка ИЛИ из тела запроса (PDF запросы могут обрезать заголовки)
     headers = event.get("headers") or {}
