@@ -487,7 +487,24 @@ def handler(event, context):
             )
             employees = cur.fetchall()
 
-            # Общая выручка: продажи (Смарт-Ломбард) — текущий месяц и всего
+            # Личный доход владельца сегодня: продажи с именем Dmitriy
+            cur.execute(
+                f"""
+                SELECT
+                  COALESCE(SUM(op.amount - COALESCE(i.buy_price, 0)), 0) AS profit_today,
+                  COALESCE(SUM(op.amount), 0) AS revenue_today,
+                  COUNT(*) AS sales_today
+                FROM {SCHEMA}.slshop_operations op
+                LEFT JOIN {SCHEMA}.slshop_items i ON i.id = op.item_id
+                WHERE op.op_type = 'sell'
+                  AND op.created_at::date = %s
+                  AND op.employee_name = %s
+                """,
+                (today, full_name),
+            )
+            owner_today = cur.fetchone()
+
+            # Личный доход за текущий месяц
             first_of_month = today.replace(day=1)
             cur.execute(
                 f"""
@@ -500,59 +517,22 @@ def handler(event, context):
                 WHERE op.op_type = 'sell'
                   AND op.created_at::date >= %s
                   AND op.created_at::date <= %s
+                  AND op.employee_name = %s
                 """,
-                (first_of_month, today),
+                (first_of_month, today, full_name),
             )
-            month_stats = cur.fetchone()
+            owner_month = cur.fetchone()
 
-            # Ремонты — текущий месяц
-            cur.execute(
-                f"""
-                SELECT
-                  COALESCE(SUM(repair_amount), 0) AS repair_revenue_month,
-                  COALESCE(SUM(repair_amount - COALESCE(purchase_amount, 0)), 0) AS repair_profit_month,
-                  COUNT(*) AS repair_count_month
-                FROM {SCHEMA}.repair_orders
-                WHERE status = 'done'
-                  AND completed_at IS NOT NULL
-                  AND completed_at::date >= %s
-                  AND completed_at::date <= %s
-                """,
-                (first_of_month, today),
-            )
-            repair_stats = cur.fetchone()
-
-            # Зарплата — сколько начислено и к выплате всего
-            cur.execute(
-                f"""
-                SELECT
-                  COALESCE(SUM(total), 0) AS total_salary_accrued,
-                  COALESCE(SUM(CASE WHEN shift_date >= %s AND shift_date <= %s THEN total ELSE 0 END), 0) AS salary_month
-                FROM {SCHEMA}.employee_salary_log
-                """,
-                (first_of_month, today),
-            )
-            salary_stats = cur.fetchone()
-
-            cur.execute(
-                f"SELECT COALESCE(SUM(amount), 0) AS total_paid FROM {SCHEMA}.employee_payouts"
-            )
-            paid_stats = cur.fetchone()
-
-            summary = {
-                'revenue_month': int(month_stats['revenue_month'] or 0),
-                'profit_month': int(month_stats['profit_month'] or 0),
-                'sales_count_month': int(month_stats['sales_month'] or 0),
-                'repair_revenue_month': int(repair_stats['repair_revenue_month'] or 0),
-                'repair_profit_month': int(repair_stats['repair_profit_month'] or 0),
-                'repair_count_month': int(repair_stats['repair_count_month'] or 0),
-                'total_revenue_month': int((month_stats['revenue_month'] or 0) + (repair_stats['repair_revenue_month'] or 0)),
-                'total_profit_month': int((month_stats['profit_month'] or 0) + (repair_stats['repair_profit_month'] or 0)),
-                'salary_month': int(salary_stats['salary_month'] or 0),
-                'salary_unpaid': int((salary_stats['total_salary_accrued'] or 0) - (paid_stats['total_paid'] or 0)),
+            my_stats = {
+                'profit_today': int(owner_today['profit_today'] or 0),
+                'revenue_today': int(owner_today['revenue_today'] or 0),
+                'sales_today': int(owner_today['sales_today'] or 0),
+                'profit_month': int(owner_month['profit_month'] or 0),
+                'revenue_month': int(owner_month['revenue_month'] or 0),
+                'sales_month': int(owner_month['sales_month'] or 0),
             }
 
-            return resp(200, {'employees': employees, 'summary': summary})
+            return resp(200, {'employees': employees, 'my_stats': my_stats})
 
     if action == 'owner_employee_detail':
         try:
