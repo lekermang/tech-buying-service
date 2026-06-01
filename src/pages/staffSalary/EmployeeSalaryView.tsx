@@ -108,7 +108,6 @@ export default function EmployeeSalaryView({ token, employeeName }: Props) {
 
   useEffect(() => {
     if (state?.is_repair_master) {
-      setTab("repairs");
       fetchRepairs(dateFrom, dateTo);
     }
   }, [state?.is_repair_master, dateFrom, dateTo, fetchRepairs]);
