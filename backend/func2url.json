@@ -1,4 +1,5 @@
 {
+  "savings-api": "https://functions.poehali.dev/4b6d2cd3-a8ca-4aac-aec2-ba9664b21b07",
   "parse-pdf": "https://functions.poehali.dev/030f7058-cbff-43cc-8e5b-12110c9ceb5f",
   "finance-report": "https://functions.poehali.dev/f7e6a419-7cd3-4768-86b6-8a63dfc212ee",
   "sl-evaluator": "https://functions.poehali.dev/c19fbf1e-d61d-4b21-8f8a-d478faacdaad",

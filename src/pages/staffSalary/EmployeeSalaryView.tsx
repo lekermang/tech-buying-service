@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 import { SALARY_URL } from "@/pages/staff.types";
+import SavingsView from "@/pages/staffSalary/SavingsView";
 
 interface Props {
   token: string;
@@ -72,6 +73,9 @@ export default function EmployeeSalaryView({ token, employeeName }: Props) {
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const [detailCache, setDetailCache] = useState<Record<string, DayDetail>>({});
   const [detailLoading, setDetailLoading] = useState<string | null>(null);
+
+  // Главная вкладка (для мастера ремонтов: зарплата / копилка)
+  const [mainTab, setMainTab] = useState<"salary" | "savings">("salary");
 
   // Ремонты
   const [repairHistory, setRepairHistory] = useState<RepairHistory | null>(null);
@@ -166,6 +170,38 @@ export default function EmployeeSalaryView({ token, employeeName }: Props) {
           <div className="font-roboto text-[10px]" style={{ color: "rgba(255,255,255,0.3)" }}>{employeeName}</div>
         </div>
       </div>
+
+      {/* Переключатель Зарплата / Копилка — только для мастера */}
+      {isRepairMaster && (
+        <div className="flex gap-1 p-1 rounded-xl" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
+          <button onClick={() => setMainTab("salary")}
+            className="flex-1 py-2 rounded-lg font-roboto text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
+            style={{
+              background: mainTab === "salary" ? "rgba(52,211,153,0.15)" : "transparent",
+              color: mainTab === "salary" ? "#34d399" : "rgba(255,255,255,0.4)",
+              border: mainTab === "salary" ? "1px solid rgba(52,211,153,0.35)" : "1px solid transparent",
+            }}>
+            <Icon name="Wrench" size={13} /> Мой заработок
+          </button>
+          <button onClick={() => setMainTab("savings")}
+            className="flex-1 py-2 rounded-lg font-roboto text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
+            style={{
+              background: mainTab === "savings" ? "rgba(167,139,250,0.15)" : "transparent",
+              color: mainTab === "savings" ? "#a78bfa" : "rgba(255,255,255,0.4)",
+              border: mainTab === "savings" ? "1px solid rgba(167,139,250,0.35)" : "1px solid transparent",
+            }}>
+            <Icon name="PiggyBank" size={13} /> Копилка
+          </button>
+        </div>
+      )}
+
+      {/* ── КОПИЛКА (мастер, вкладка savings) ── */}
+      {isRepairMaster && mainTab === "savings" && (
+        <SavingsView token={token} />
+      )}
+
+      {/* ── ЗАРПЛАТА ── */}
+      {(!isRepairMaster || mainTab === "salary") && <>
 
       {/* Итог */}
       {isRepairMaster ? (
@@ -530,6 +566,8 @@ export default function EmployeeSalaryView({ token, employeeName }: Props) {
           )}
         </div>
       )}
+
+      </>}
 
     </div>
   );

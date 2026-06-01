@@ -1,0 +1,22 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "No token returns 401",
+      "method": "GET",
+      "path": "/?action=get_goals",
+      "expectedStatus": 401
+    },
+    {
+      "name": "No token tips returns 401",
+      "method": "GET",
+      "path": "/?action=get_tips",
+      "expectedStatus": 401
+    }
+  ]
+}
