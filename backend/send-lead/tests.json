@@ -19,6 +19,13 @@
       "path": "/",
       "body": {"name": "Тест", "phone": "+79999999999", "category": "Смартфоны", "desc": "iPhone 13"},
       "expectedStatus": 200
+    },
+    {
+      "name": "Оценка без lead_id — ошибка",
+      "method": "POST",
+      "path": "/?action=rate",
+      "body": {"action": "rate", "rating": 5},
+      "expectedStatus": 400
     }
   ]
 }

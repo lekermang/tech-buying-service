@@ -23,6 +23,9 @@ export type Lead = {
   contact_channels?: string | string[] | null;
   device?: string | null;
   photos?: LeadPhoto[];
+  site_rating?: number | null;
+  site_liked?: string | null;
+  site_feedback?: string | null;
 };
 
 export type Stats = {

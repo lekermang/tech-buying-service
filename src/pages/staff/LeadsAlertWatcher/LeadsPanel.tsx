@@ -150,6 +150,33 @@ export default function LeadsPanel({
                     )}
                     {l.description && <div className="text-xs text-white/55 mt-0.5 line-clamp-2">{l.description}</div>}
                     <LeadPhotoStrip leadId={l.id} initialPhotos={l.photos} token={token} />
+                    {l.site_rating ? (
+                      <div className="mt-1.5 rounded-lg px-2 py-1.5"
+                        style={{
+                          background: l.site_rating >= 4 ? "rgba(255,215,0,0.08)" : "rgba(251,146,60,0.08)",
+                          border: `1px solid ${l.site_rating >= 4 ? "rgba(255,215,0,0.2)" : "rgba(251,146,60,0.25)"}`,
+                        }}>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-white/45 font-roboto uppercase tracking-wide mr-0.5">Оценка сайта:</span>
+                          {[1, 2, 3, 4, 5].map(n => (
+                            <Icon key={n} name="Star" size={11}
+                              style={{
+                                color: n <= (l.site_rating || 0) ? "#FFD700" : "rgba(255,255,255,0.15)",
+                                fill: n <= (l.site_rating || 0) ? "#FFD700" : "transparent",
+                              } as React.CSSProperties} />
+                          ))}
+                          <span className="text-[10px] font-bold ml-0.5" style={{ color: l.site_rating >= 4 ? "#FFD700" : "#fb923c" }}>
+                            {l.site_rating}/5
+                          </span>
+                        </div>
+                        {l.site_liked && (
+                          <div className="text-[10px] text-emerald-300/80 mt-0.5 font-roboto">👍 {l.site_liked}</div>
+                        )}
+                        {l.site_feedback && (
+                          <div className="text-[10px] text-orange-300/80 mt-0.5 font-roboto">📝 {l.site_feedback}</div>
+                        )}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
                 <div className="grid grid-cols-4 gap-1 mt-2">

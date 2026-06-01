@@ -3,12 +3,14 @@ import Icon from "@/components/ui/icon";
 import { ymGoal, Goals } from "@/lib/ym";
 import { formatPhone, isPhoneValid } from "@/lib/phoneFormat";
 import { SEND_LEAD_URL, INP_CLS, LBL_CLS, compressImage } from "./evaluateModalShared";
+import SiteRatingThankYou from "@/components/skupka/SiteRatingThankYou";
 
 export default function EvaluateModal({ onClose }: { onClose: () => void }) {
   const [step, setStep] = useState<1 | 2>(1);
   const [formData, setFormData] = useState({ name: "", phone: "", desc: "", client_price: "" });
   const [photos, setPhotos] = useState<{ preview: string; base64: string }[]>([]);
   const [submitted, setSubmitted] = useState(false);
+  const [leadId, setLeadId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -47,6 +49,7 @@ export default function EvaluateModal({ onClose }: { onClose: () => void }) {
         body: JSON.stringify({ ...formData, photos: [], contact_channels: [], contact_time: "" }),
       });
       if (!res.ok) throw new Error("bad_status");
+      try { const data = await res.json(); if (data?.lead_id) setLeadId(data.lead_id); } catch { /* noop */ }
       ymGoal(Goals.FORM_SUCCESS, {});
       try {
         (window as unknown as { skypkaConvert?: (d: Record<string, unknown>) => void }).skypkaConvert?.({
@@ -72,6 +75,11 @@ export default function EvaluateModal({ onClose }: { onClose: () => void }) {
       setLoading(false);
     }
   };
+
+  // После успешной отправки — экран благодарности с оценкой сайта и каналом MAX
+  if (submitted) {
+    return <SiteRatingThankYou leadId={leadId} onClose={onClose} />;
+  }
 
   return (
     <>

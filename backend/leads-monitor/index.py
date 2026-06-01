@@ -316,6 +316,7 @@ def action_hot(params):
     cur.execute(
         f"SELECT id, source, client_name, client_phone, category, description, status, "
         f"owner_name, taken_at, answered_at, sla_minutes, escalation_level, created_at, "
+        f"contact_channels, device, site_rating, site_liked, site_feedback, "
         f"EXTRACT(EPOCH FROM (NOW() - created_at))/60 AS age_minutes "
         f"FROM {SCHEMA}.leads_tracking "
         f"WHERE created_at > NOW() - INTERVAL '24 hours' "
@@ -724,7 +725,7 @@ def action_client_history(qp, headers):
     cur.execute(
         f"SELECT id, source, client_name, client_phone, category, description, status, "
         f"owner_name, taken_at, answered_at, created_at, "
-        f"contact_channels, device "
+        f"contact_channels, device, site_rating, site_liked, site_feedback "
         f"FROM {SCHEMA}.leads_tracking "
         f"WHERE client_phone LIKE %s OR client_phone LIKE %s "
         f"ORDER BY created_at DESC LIMIT 20",

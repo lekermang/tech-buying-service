@@ -310,6 +310,59 @@ def handler(event: dict, context) -> dict:
 
     raw_body = event.get('body') or '{}'
     body = json.loads(raw_body) if isinstance(raw_body, str) else (raw_body or {})
+
+    # ── Оценка сайта от клиента (после заявки) ───────────────────────────────
+    qs = event.get('queryStringParameters') or {}
+    if qs.get('action') == 'rate' or body.get('action') == 'rate':
+        try:
+            lid = int(body.get('lead_id') or 0)
+        except Exception:
+            lid = 0
+        try:
+            rating = int(body.get('rating') or 0)
+        except Exception:
+            rating = 0
+        if not lid or rating < 1 or rating > 5:
+            return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'Нужны lead_id и оценка 1-5'})}
+        liked = (body.get('liked') or '')
+        if isinstance(liked, list):
+            liked = ', '.join(str(x) for x in liked)
+        liked = str(liked).strip()[:500]
+        feedback = str(body.get('feedback') or '').strip()[:1000]
+        try:
+            connr = psycopg2.connect(os.environ['DATABASE_URL'])
+            curr = connr.cursor()
+            l_e = liked.replace("'", "''")
+            f_e = feedback.replace("'", "''")
+            l_sql = f"'{l_e}'" if l_e else 'NULL'
+            f_sql = f"'{f_e}'" if f_e else 'NULL'
+            curr.execute(
+                f"UPDATE {SCHEMA}.leads_tracking "
+                f"SET site_rating={rating}, site_liked={l_sql}, site_feedback={f_sql}, site_rated_at=NOW() "
+                f"WHERE id={lid}"
+            )
+            connr.commit(); curr.close(); connr.close()
+        except Exception as e:
+            print(f'[send-lead][rate] error: {e}')
+            return {'statusCode': 500, 'headers': HEADERS, 'body': json.dumps({'error': 'Не удалось сохранить оценку'})}
+        # Уведомляем сотрудников об оценке (особенно если низкая или есть замечания)
+        try:
+            stars = '⭐' * rating
+            note = f"Клиент оценил сайт: {stars} ({rating}/5)"
+            if liked:
+                note += f"\n👍 Понравилось: {liked}"
+            if feedback:
+                note += f"\n📝 Замечания: {feedback}"
+            _send_push_event(
+                title=f"Оценка заявки #{lid}: {rating}/5",
+                body=note[:120],
+                url=f"/staff?tab=clients&lead={lid}",
+                tag=f"rate-{lid}",
+            )
+        except Exception:
+            pass
+        return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True})}
+
     name = body.get('name', '').strip()
     phone = body.get('phone', '').strip()
     category = body.get('category', '').strip()
@@ -539,4 +592,4 @@ def handler(event: dict, context) -> dict:
         except Exception:
             pass
 
-    return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True})}
+    return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'lead_id': lead_id})}
