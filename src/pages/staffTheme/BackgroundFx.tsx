@@ -105,10 +105,15 @@ export default function BackgroundFx() {
 
 // ── WebGL шейдер ─────────────────────────────────────────────────────────────
 function hexToRgb(hex: string): [number, number, number] {
-  const r = parseInt(hex.slice(1, 3), 16) / 255;
-  const g = parseInt(hex.slice(3, 5), 16) / 255;
-  const b = parseInt(hex.slice(5, 7), 16) / 255;
-  return [r, g, b];
+  const h = (hex || "#FFD700").replace(/[^0-9a-fA-F]/g, "").padEnd(6, "0");
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return [
+    (Number.isFinite(r) ? r : 255) / 255,
+    (Number.isFinite(g) ? g : 215) / 255,
+    (Number.isFinite(b) ? b : 0) / 255,
+  ];
 }
 
 const VERT = `attribute vec2 a_pos; void main(){gl_Position=vec4(a_pos,0,1);}`;

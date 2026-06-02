@@ -15,6 +15,7 @@ import { useStaffPwa } from "./staff/StaffPwa";
 import { prefetchTab } from "./staff/StaffLazy";
 import { LoginScreen, PinScreen } from "./staff/StaffLoginScreens";
 import { StaffMainLayout } from "./staff/StaffMainLayout";
+import StaffRootBoundary from "./staff/StaffRootBoundary";
 
 type Tab = StaffTab;
 
@@ -22,11 +23,13 @@ export default function Staff() {
   const [tokenBoot] = useState(() => localStorage.getItem("employee_token") || "");
   useStaffPwa();
   return (
-    <StaffThemeProvider token={tokenBoot}>
-      <StaffToastProvider>
-        <StaffInner />
-      </StaffToastProvider>
-    </StaffThemeProvider>
+    <StaffRootBoundary>
+      <StaffThemeProvider token={tokenBoot}>
+        <StaffToastProvider>
+          <StaffInner />
+        </StaffToastProvider>
+      </StaffThemeProvider>
+    </StaffRootBoundary>
   );
 }
 

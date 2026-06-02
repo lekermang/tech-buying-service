@@ -58,6 +58,10 @@ type Props = {
   slBuyoutTotal: number;
   slBuyoutCount: number;
   slData?: SmartlombardStats | null;
+  // Договора 14 дней (проценты = прибыль)
+  c14dProfit?: number;
+  c14dCount?: number;
+  c14dItems?: { contract_number: string; client_name: string; amount: number; paid_at: string }[];
 };
 
 export default function AnalyticsTotalDay({
@@ -65,13 +69,15 @@ export default function AnalyticsTotalDay({
   repairNetProfit, goldForecastProfit, goldForecastPriceNum, slPeriodProfit,
   totalRevenue, totalProfit, repairRevenue, repairCosts, goldRevenue, goldCosts, goldProfit, masterIncome,
   slRevenue, slExpense, slSalesTotal, slSalesCount, slBuyoutTotal, slBuyoutCount, slData,
+  c14dProfit = 0, c14dCount = 0, c14dItems = [],
 }: Props) {
   const repairPart = repairNetProfit;
   // В статистику идёт ТОЛЬКО фактическая прибыль по проданному золоту
   // (gold_orders.profit при status='done'). Прогноз — отдельным блоком ниже.
   const goldPart = goldProfit;
   const slPart = slPeriodProfit;
-  const totalDay = repairPart + goldPart + slPart;
+  const contractPart = c14dProfit;
+  const totalDay = repairPart + goldPart + slPart + contractPart;
   // Прогноз остатка — справочно (не входит в "Итого")
   const goldForecastExtra = goldForecastProfit;
   const periodLabel =
@@ -215,6 +221,36 @@ export default function AnalyticsTotalDay({
     ],
   });
 
+  const contractItems: BreakdownItem[] = c14dItems.map(it => ({
+    title: it.contract_number || "Договор",
+    subtitle: it.client_name || undefined,
+    date: fmtDate(it.paid_at),
+    totalValue: it.amount,
+    totalColor: "text-emerald-300",
+    totalLabel: "проценты",
+  }));
+
+  const showContractBreakdown = () => setBreakdown({
+    title: "📄 Договора 14 дней — детализация",
+    emoji: "📄",
+    total: contractPart,
+    totalLabel: "прибыль = проценты, полученные за период",
+    accentColor: "emerald",
+    periodLabel,
+    rows: [
+      { icon: "Percent", label: "Полученные проценты", value: contractPart, color: contractPart >= 0 ? "text-emerald-300" : "text-red-300", hint: `${c14dCount} платежей за период` },
+      { icon: "Equal", label: "Прибыль с договоров", value: contractPart, color: contractPart >= 0 ? "text-emerald-300" : "text-red-300", divider: true },
+    ],
+    groups: [
+      {
+        title: `Платежи (проценты) · ${contractItems.length} шт`,
+        icon: "FileText",
+        items: contractItems,
+        emptyText: "В этом периоде нет процентных платежей по договорам",
+      },
+    ],
+  });
+
   const showTotalBreakdown = () => setBreakdown({
     title: "💎 Итого прибыль",
     emoji: "💎",
@@ -226,6 +262,7 @@ export default function AnalyticsTotalDay({
       { icon: "Wrench", label: "🔧 Ремонт", value: repairPart, color: repairPart >= 0 ? "text-emerald-300" : "text-red-300", hint: "чистая прибыль с выданных" },
       { icon: "Coins", label: "🥇 Золото (продано)", value: goldPart, color: goldPart >= 0 ? "text-emerald-300" : "text-red-300", hint: goldData?.total_weight ? `${goldData.total_weight.toFixed(2)} г фактически продано` : "только фактические продажи" },
       { icon: "Package", label: "📦 Б/У техника", value: slPart, color: slPart >= 0 ? "text-emerald-300" : "text-red-300", hint: `${slSalesCount} продаж (скупка — инвестиция, не вычитается)` },
+      { icon: "FileText", label: "📄 Договора 14 дней", value: contractPart, color: contractPart >= 0 ? "text-emerald-300" : "text-red-300", hint: `${c14dCount} платежей (полученные проценты)` },
       { icon: "Equal", label: "Итого", value: totalDay, color: totalDay >= 0 ? "text-emerald-300" : "text-red-300", divider: true },
     ],
   });
@@ -250,7 +287,7 @@ export default function AnalyticsTotalDay({
               {totalDay >= 0 ? "+" : ""}{totalDay.toLocaleString("ru-RU")} ₽
             </div>
           </button>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <button
               onClick={showRepairBreakdown}
               className="bg-black/40 border border-[#1F1F1F] hover:border-emerald-400/50 hover:bg-emerald-500/[0.05] rounded-lg p-2.5 text-left transition-all active:scale-[0.97] relative group"
@@ -305,6 +342,22 @@ export default function AnalyticsTotalDay({
                 </div>
               )}
             </button>
+            <button
+              onClick={showContractBreakdown}
+              className="bg-black/40 border border-[#1F1F1F] hover:border-emerald-400/50 hover:bg-emerald-500/[0.05] rounded-lg p-2.5 text-left transition-all active:scale-[0.97] relative group"
+              title="📄 Договора 14 дней — за что эта сумма?"
+            >
+              <div className="font-roboto text-white/40 text-[9px] uppercase tracking-wide mb-0.5 flex items-center gap-1">
+                📄 Договора
+                <Icon name="Info" size={9} className="ml-auto text-white/25 group-hover:text-emerald-300/80" />
+              </div>
+              <div className={`font-oswald font-bold text-base tabular-nums ${contractPart >= 0 ? "text-green-400" : "text-red-400"}`}>
+                {contractPart >= 0 ? "+" : ""}{contractPart.toLocaleString("ru-RU")}
+              </div>
+              <div className="font-roboto text-white/30 text-[9px] tabular-nums mt-0.5 group-hover:text-emerald-300/70 transition-colors">
+                {c14dCount > 0 ? `${c14dCount} платежей` : "нажми для деталей"}
+              </div>
+            </button>
           </div>
         </div>
       </div>
@@ -322,7 +375,7 @@ export default function AnalyticsTotalDay({
         <div className="relative">
           <div className="font-roboto text-[#FFD700]/80 text-[10px] uppercase tracking-wider mb-2 flex items-center gap-1.5">
             <Icon name="TrendingUp" size={12} />
-            Общий доход · Ремонт + Золото + Б/У
+            Общий доход · Ремонт + Золото + Б/У + Договора
           </div>
           <div className="flex items-end justify-between gap-2 mb-3">
             <div>

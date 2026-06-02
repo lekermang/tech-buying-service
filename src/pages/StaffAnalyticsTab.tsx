@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import Icon from "@/components/ui/icon";
-import { SALES_URL, type Analytics } from "./staff.types";
+import { SALES_URL, SL_C14D_URL, type Analytics } from "./staff.types";
 import { REPAIR_URL } from "./repair/types";
 import { GOLD_URL, type GoldAnalytics } from "./gold/types";
 import AnalyticsTotalDay from "./staffAnalytics/AnalyticsTotalDay";
@@ -50,7 +50,23 @@ export function AnalyticsTab({ token }: { token: string }) {
   const [slLoading, setSlLoading] = useState(false);
   const [slError, setSlError] = useState<string | null>(null);
 
+  // Договора 14 дней — прибыль (проценты) за период
+  const [c14dProfit, setC14dProfit] = useState(0);
+  const [c14dCount, setC14dCount] = useState(0);
+  const [c14dItems, setC14dItems] = useState<{ contract_number: string; client_name: string; amount: number; paid_at: string }[]>([]);
+
   const repairPeriod = period === "today" ? "day" : period === "yesterday" ? "yesterday" : period === "week" ? "week" : period === "custom" ? "custom" : "month";
+
+  // Границы периода (для договоров используем income_report по датам платежей)
+  const periodDates = (() => {
+    const today = new Date();
+    const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    if (period === "custom" && customRange) return { from: customRange.from, to: customRange.to };
+    if (period === "today") return { from: iso(today), to: iso(today) };
+    if (period === "yesterday") { const y = new Date(today); y.setDate(y.getDate() - 1); return { from: iso(y), to: iso(y) }; }
+    if (period === "week") { const w = new Date(today); w.setDate(w.getDate() - 6); return { from: iso(w), to: iso(today) }; }
+    const m = new Date(today); m.setDate(m.getDate() - 29); return { from: iso(m), to: iso(today) };
+  })();
 
   // Хвост query string для кастомного периода
   const customQS = period === "custom" && customRange
@@ -74,13 +90,37 @@ export function AnalyticsTab({ token }: { token: string }) {
       if (goldD && typeof goldD === "object" && !goldD.error) {
         setGoldData(goldD);
       }
+
+      // Договора 14 дней: прибыль = полученные проценты за период (по датам платежей)
+      try {
+        const cRes = await fetch(
+          `${SL_C14D_URL}?action=income_report&start_date=${periodDates.from}&end_date=${periodDates.to}&income_type=interest`,
+          { headers: { "X-Employee-Token": token } },
+        );
+        const cD = await cRes.json();
+        if (cD && cD.summary) {
+          setC14dProfit(Number(cD.summary.interest_income) || 0);
+          setC14dCount(Number(cD.summary.payments_count) || 0);
+          const items = Array.isArray(cD.details) ? cD.details : [];
+          setC14dItems(items.map((d: { contract_number?: string; client_name?: string; amount?: number; paid_at?: string }) => ({
+            contract_number: d.contract_number || "",
+            client_name: d.client_name || "",
+            amount: Number(d.amount) || 0,
+            paid_at: d.paid_at || "",
+          })));
+        } else {
+          setC14dProfit(0); setC14dCount(0); setC14dItems([]);
+        }
+      } catch {
+        setC14dProfit(0); setC14dCount(0); setC14dItems([]);
+      }
     } catch (e) {
       setError("Ошибка загрузки данных. Попробуйте обновить.");
       console.error("[AnalyticsTab]", e);
     } finally {
       setLoading(false);
     }
-  }, [period, repairPeriod, token, customQS]);
+  }, [period, repairPeriod, token, customQS, periodDates.from, periodDates.to]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -161,8 +201,8 @@ export function AnalyticsTab({ token }: { token: string }) {
   const slProfitFromItems = (slData?.sold_items || []).reduce((s, it) => s + (it.profit || 0), 0);
   const slProfit = slProfitFromItems || (hasKom ? (slData?.kom_profit || 0) : (slData?.period_profit || 0));
 
-  const totalRevenue = (data?.total_revenue || 0) + repairRevenue + goldRevenue + slRevenue;
-  const totalProfit = repairNetProfit + goldProfit + slProfit;
+  const totalRevenue = (data?.total_revenue || 0) + repairRevenue + goldRevenue + slRevenue + c14dProfit;
+  const totalProfit = repairNetProfit + goldProfit + slProfit + c14dProfit;
 
   return (
     <div className="p-3">
@@ -253,6 +293,9 @@ export function AnalyticsTab({ token }: { token: string }) {
             slBuyoutTotal={slData?.buyout_total || 0}
             slBuyoutCount={slData?.buyout_count || 0}
             slData={slData}
+            c14dProfit={c14dProfit}
+            c14dCount={c14dCount}
+            c14dItems={c14dItems}
           />
 
           <AnalyticsGoldForecast

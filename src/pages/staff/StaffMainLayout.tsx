@@ -88,15 +88,27 @@ export function StaffMainLayout({
     return () => clearInterval(id);
   }, [token]);
 
-  const [isMobile, setIsMobile] = React.useState<boolean>(() =>
-    typeof window !== "undefined" && window.matchMedia("(max-width: 480px)").matches
-  );
+  // Мобила = узкий экран ИЛИ сенсорное устройство (надёжнее, чем только ширина).
+  // На таких устройствах отключаем тяжёлые canvas/WebGL-эффекты, которые
+  // могут крашить рендер (чёрный экран) на iOS Safari / слабых Android.
+  const detectMobile = () => {
+    if (typeof window === "undefined") return false;
+    const narrow = window.matchMedia("(max-width: 768px)").matches;
+    const coarse = window.matchMedia("(pointer: coarse)").matches;
+    return narrow || coarse;
+  };
+  const [isMobile, setIsMobile] = React.useState<boolean>(detectMobile);
   React.useEffect(() => {
     if (typeof window === "undefined") return;
-    const mq = window.matchMedia("(max-width: 480px)");
-    const onChange = () => setIsMobile(mq.matches);
-    mq.addEventListener?.("change", onChange);
-    return () => mq.removeEventListener?.("change", onChange);
+    const mqNarrow = window.matchMedia("(max-width: 768px)");
+    const mqCoarse = window.matchMedia("(pointer: coarse)");
+    const onChange = () => setIsMobile(mqNarrow.matches || mqCoarse.matches);
+    mqNarrow.addEventListener?.("change", onChange);
+    mqCoarse.addEventListener?.("change", onChange);
+    return () => {
+      mqNarrow.removeEventListener?.("change", onChange);
+      mqCoarse.removeEventListener?.("change", onChange);
+    };
   }, []);
 
   React.useEffect(() => {
@@ -161,8 +173,8 @@ export function StaffMainLayout({
       <FontApplier />
 
       {/* Технологичный фон */}
-      <StaffBackground roleColor={roleColor} />
-      <DigitalParticles />
+      <StaffBackground roleColor={roleColor} isMobile={isMobile} />
+      {!isMobile && <DigitalParticles />}
 
       {!isMobile && <BackgroundFx />}
       {!isMobile && theme.enabled && theme.bg_style === "webgl" && (

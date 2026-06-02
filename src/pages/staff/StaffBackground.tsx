@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 
-type Props = { roleColor: string };
+type Props = { roleColor: string; isMobile?: boolean };
 
 // ── Кинематографический canvas: лучи света + пыль ─────────────────────────
 function CinemaCanvas({ roleColor }: { roleColor: string }) {
@@ -15,10 +15,10 @@ function CinemaCanvas({ roleColor }: { roleColor: string }) {
     let raf: number;
     let w = 0, h = 0;
 
-    const hex = roleColor.replace("#", "");
-    const r = parseInt(hex.slice(0, 2), 16);
-    const g = parseInt(hex.slice(2, 4), 16);
-    const b = parseInt(hex.slice(4, 6), 16);
+    const hex = (roleColor || "#FFD700").replace("#", "");
+    const r = parseInt(hex.slice(0, 2), 16) || 255;
+    const g = parseInt(hex.slice(2, 4), 16) || 215;
+    const b = parseInt(hex.slice(4, 6), 16) || 0;
 
     const resize = () => {
       w = canvas.width = window.innerWidth;
@@ -120,7 +120,7 @@ function CinemaCanvas({ roleColor }: { roleColor: string }) {
   );
 }
 
-export default function StaffBackground({ roleColor }: Props) {
+export default function StaffBackground({ roleColor, isMobile }: Props) {
   return (
     <>
       {/* ── Глубокий кинематографический фон ── */}
@@ -133,8 +133,8 @@ export default function StaffBackground({ roleColor }: Props) {
         `,
       }} />
 
-      {/* ── Кинематографические лучи и пыль ── */}
-      <CinemaCanvas roleColor={roleColor} />
+      {/* ── Кинематографические лучи и пыль (только десктоп — на мобиле тяжело и может крашить iOS) ── */}
+      {!isMobile && <CinemaCanvas roleColor={roleColor} />}
 
       {/* ── Тонкие горизонтальные линии — эффект киноплёнки ── */}
       <div className="fixed inset-0 pointer-events-none z-0" style={{
