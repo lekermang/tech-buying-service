@@ -12,7 +12,7 @@ import JobsSection from "@/components/skupka/JobsSection";
 import HolidayBanner from "@/components/holidays/HolidayBanner";
 import HolidayCornerDecor from "@/components/holidays/HolidayCornerDecor";
 import PremiumServicesGrid from "@/components/skupka/PremiumServicesGrid";
-import WhatDoYouNeed from "@/components/skupka/WhatDoYouNeed";
+
 import SafeDealsBanner from "@/components/skupka/SafeDealsBanner";
 import MaxChannelBanner from "@/components/skupka/MaxChannelBanner";
 import PublicChatFab from "@/components/skupka/PublicChatFab";
@@ -393,8 +393,6 @@ const Index = ({ goldOpen = false }: { goldOpen?: boolean }) => {
       <HolidayCornerDecor />
       <Header scrollTo={scrollTo} goldOpen={goldOpen} />
       <HeroSection scrollTo={scrollTo} externalModalOpen={evalOpen} onExternalModalClose={() => setEvalOpen(false)} />
-      {/* Блок «Что вам нужно?» — крупные плитки-направления сразу после Hero для конверсии */}
-      <WhatDoYouNeed />
       <SafeDealsBanner />
       <PremiumServicesGrid />
       <WantToBuySection />
