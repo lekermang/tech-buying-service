@@ -439,6 +439,12 @@ def handler(event: dict, context) -> dict:
         fields, values = [], []
         if 'password' in body and body['password']:
             fields.append("password_hash=%s"); values.append(hash_pw(body['password']))
+        # Сброс PIN владельцем/админом: очищаем хэш и просим задать заново при входе
+        if body.get('reset_pin'):
+            fields.append("pin_hash=%s"); values.append(None)
+            fields.append("pin_pending=%s"); values.append(True)
+            fields.append("pin_failed_count=%s"); values.append(0)
+            fields.append("pin_locked_until=%s"); values.append(None)
         if 'is_active' in body:
             fields.append("is_active=%s"); values.append(bool(body['is_active']))
         if 'full_name' in body and body['full_name']:

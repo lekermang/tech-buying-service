@@ -1,3 +1,4 @@
+import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import { Employee, EmployeeSession, FormFields, ROLE_LABELS, ROLE_STYLES, isOnline, fmtLastSeen } from "./employeesTabTypes";
 
@@ -17,6 +18,7 @@ export default function EmployeeCard({
   emp, isEditing, editForm, setEditForm, myRole,
   startEdit, cancelEdit, updateEmployee, sessions = [],
 }: Props) {
+  const [showPw, setShowPw] = useState(false);
   const style = ROLE_STYLES[emp.role] || ROLE_STYLES.staff;
   const initials = emp.full_name.trim().split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase() || "?";
 
@@ -47,7 +49,6 @@ export default function EmployeeCard({
             { key: "position", label: "Должность", placeholder: "Приёмщик", icon: "Briefcase", list: "positions" },
             { key: "email", label: "Email", placeholder: "ivanov@mail.ru", icon: "Mail", type: "email" },
             { key: "phone", label: "Телефон", placeholder: "+7 ...", icon: "Phone", type: "tel" },
-            { key: "password", label: "Новый пароль (пусто — не менять)", placeholder: "••••••••", type: "password", icon: "Lock" },
           ].map(f => (
             <div key={f.key}>
               <label className="font-roboto text-white/40 text-[10px] block mb-1 uppercase tracking-wide">{f.label}</label>
@@ -61,6 +62,52 @@ export default function EmployeeCard({
               </div>
             </div>
           ))}
+
+          {/* Новый пароль — с кнопкой «глаз» */}
+          <div>
+            <label className="font-roboto text-white/40 text-[10px] block mb-1 uppercase tracking-wide">Новый пароль (пусто — не менять)</label>
+            <div className="relative">
+              <Icon name="Lock" size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
+              <input
+                type={showPw ? "text" : "password"}
+                value={editForm.password}
+                onChange={e => setEditForm(p => ({ ...p, password: e.target.value }))}
+                placeholder="••••••••"
+                autoComplete="new-password"
+                className="w-full bg-[#0A0A0A] border border-[#1F1F1F] text-white pl-9 pr-10 py-2 font-roboto text-sm rounded-md focus:outline-none focus:border-[#FFD700]/50" />
+              <button
+                type="button"
+                onClick={() => setShowPw(v => !v)}
+                title={showPw ? "Скрыть пароль" : "Показать пароль"}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-white/30 hover:text-[#FFD700] p-1 transition-colors">
+                <Icon name={showPw ? "EyeOff" : "Eye"} size={15} />
+              </button>
+            </div>
+          </div>
+
+          {/* Сброс PIN-кода — сотрудник задаст новый при следующем входе */}
+          {emp.role !== "owner" && (
+            <div className="rounded-md border border-[#1F1F1F] bg-[#0A0A0A] p-2.5">
+              <div className="flex items-center gap-2 mb-1.5">
+                <Icon name="KeyRound" size={13} className="text-[#FFD700]/70" />
+                <span className="font-roboto text-white/60 text-[11px] font-semibold">PIN-код для входа</span>
+              </div>
+              <div className="font-roboto text-white/30 text-[10px] mb-2 leading-relaxed">
+                PIN хранится в зашифрованном виде, поэтому его нельзя посмотреть. Сбросьте — и сотрудник задаст новый PIN при следующем входе.
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm(`Сбросить PIN сотрудника «${emp.full_name}»? Он задаст новый PIN при следующем входе.`)) {
+                    updateEmployee(emp.id, { reset_pin: true });
+                  }
+                }}
+                className="w-full flex items-center justify-center gap-1.5 border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10 active:scale-95 font-roboto text-xs px-3 py-2 rounded-md transition-all">
+                <Icon name="RotateCcw" size={12} />
+                Сбросить PIN-код
+              </button>
+            </div>
+          )}
           <div>
             <label className="font-roboto text-white/40 text-[10px] block mb-1 uppercase tracking-wide">Заметка</label>
             <textarea value={editForm.note} onChange={e => setEditForm(p => ({ ...p, note: e.target.value }))}

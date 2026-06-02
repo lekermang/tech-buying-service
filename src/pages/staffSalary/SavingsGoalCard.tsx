@@ -26,6 +26,15 @@ export function GoalCard({
     daysLeft = d;
   }
 
+  // ── Мотивация: сколько нужно откладывать, чтобы успеть к цели ──
+  // Если есть дедлайн — делим остаток на оставшиеся дни.
+  // Если дедлайна нет — берём горизонт 30 дней (план на месяц).
+  const horizonDays = daysLeft !== null && daysLeft > 0 ? daysLeft : (goal.deadline ? 0 : 30);
+  const perDay = !isDone && left > 0 && horizonDays > 0 ? Math.ceil(left / horizonDays) : 0;
+  const perWeek = perDay > 0 ? perDay * 7 : 0;
+  // Просрочка: дедлайн прошёл, но цель не достигнута
+  const overdue = daysLeft !== null && daysLeft <= 0 && !isDone && left > 0;
+
   // Мотивационное сообщение
   const motivation = !isDone && pct < 100 ? (
     pct === 0 ? "Сделай первый шаг — положи хоть немного!" :
@@ -159,6 +168,51 @@ export function GoalCard({
           </div>
         )}
       </div>
+
+      {/* ── Мотивация: сколько откладывать ── */}
+      {!isDone && perDay > 0 && (
+        <div className="px-4 pb-3">
+          <div className="rounded-xl p-3 flex items-center gap-3" style={{
+            background: `linear-gradient(135deg,${goal.color}14,${goal.color}06)`,
+            border: `1px solid ${goal.color}30`,
+          }}>
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{
+              background: `${goal.color}20`, border: `1px solid ${goal.color}40`,
+            }}>
+              <Icon name="PiggyBank" size={16} style={{ color: goal.color }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-roboto text-[10px] uppercase tracking-wide" style={{ color: "rgba(255,255,255,0.4)" }}>
+                {daysLeft !== null && daysLeft > 0
+                  ? `Чтобы успеть за ${daysLeft} ${daysLeft === 1 ? "день" : daysLeft < 5 ? "дня" : "дней"}, откладывай`
+                  : "Чтобы достичь за месяц, откладывай"}
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="font-oswald font-black text-xl tabular-nums" style={{ color: goal.color }}>
+                  {fmt(perDay)} ₽
+                </span>
+                <span className="font-roboto text-[11px]" style={{ color: "rgba(255,255,255,0.35)" }}>в день</span>
+                {perWeek > 0 && (
+                  <span className="font-roboto text-[10px] ml-auto" style={{ color: "rgba(255,255,255,0.25)" }}>
+                    ≈ {fmt(perWeek)} ₽ / неделю
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Просрочка без накоплений — мягкое предупреждение */}
+      {overdue && (
+        <div className="px-4 pb-3">
+          <div className="rounded-xl p-3 font-roboto text-[11px] leading-relaxed" style={{
+            background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.25)", color: "#fca5a5",
+          }}>
+            ⏰ Срок прошёл, а до цели ещё {fmt(left)} ₽. Продли срок в редактировании или откладывай чаще — ты справишься!
+          </div>
+        </div>
+      )}
 
       {/* Кнопки действий */}
       {!isDone && (
