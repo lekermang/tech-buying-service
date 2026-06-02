@@ -1,6 +1,5 @@
 import React from "react";
 import { shareToChat, formatLeadShare } from "@/lib/shareToChat";
-import FloatingButton from "./LeadsAlertWatcher/FloatingButton";
 import ToastsStack from "./LeadsAlertWatcher/ToastsStack";
 import LeadsPanel from "./LeadsAlertWatcher/LeadsPanel";
 import ClientHistoryDrawer from "./LeadsAlertWatcher/ClientHistoryDrawer";
@@ -16,11 +15,23 @@ import {
   type Toast,
 } from "./LeadsAlertWatcher/types";
 
-export default function LeadsAlertWatcher({ token, empName }: { token: string; empName: string }) {
+export default function LeadsAlertWatcher({
+  token, empName, panelOpen, onPanelClose, onPanelOpen, onStatsChange,
+}: {
+  token: string;
+  empName: string;
+  panelOpen?: boolean;
+  onPanelClose?: () => void;
+  onPanelOpen?: () => void;
+  onStatsChange?: (s: Stats | null) => void;
+}) {
   const [leads, setLeads] = React.useState<Lead[]>([]);
   const [stats, setStats] = React.useState<Stats | null>(null);
   const [toasts, setToasts] = React.useState<Toast[]>([]);
-  const [panelOpen, setPanelOpen] = React.useState(false);
+  const [internalPanelOpen, setInternalPanelOpen] = React.useState(false);
+  const isOpen = panelOpen !== undefined ? panelOpen : internalPanelOpen;
+  const openPanel  = () => { if (onPanelOpen) onPanelOpen(); else setInternalPanelOpen(true); };
+  const closePanel = () => { if (onPanelClose) onPanelClose(); else setInternalPanelOpen(false); };
   const [historyLead, setHistoryLead] = React.useState<Lead | null>(null);
   const [inviteLeadState, setInviteLeadState] = React.useState<Lead | null>(null);
   const seenRef = React.useRef<Set<number>>(getSeenIds());
@@ -33,7 +44,9 @@ export default function LeadsAlertWatcher({ token, empName }: { token: string; e
       if (!d || !d.ok) return;
       const list: Lead[] = d.leads || [];
       setLeads(list);
-      setStats(d.stats || null);
+      const newStats: Stats | null = d.stats || null;
+      setStats(newStats);
+      if (onStatsChange) onStatsChange(newStats);
       // Найти новые (не виденные) и показать toast
       const fresh: Toast[] = [];
       for (const l of list) {
@@ -183,19 +196,16 @@ export default function LeadsAlertWatcher({ token, empName }: { token: string; e
 
   return (
     <>
-      {/* Плавающая кнопка-индикатор */}
-      <FloatingButton stats={stats} onOpen={() => setPanelOpen(true)} />
-
       {/* Toast-уведомления */}
       <ToastsStack toasts={toasts} onDismiss={dismissToast} onTake={takeLead} />
 
       {/* Панель горящих заявок */}
-      {panelOpen && (
+      {isOpen && (
         <LeadsPanel
           leads={leads}
           stats={stats}
           token={token}
-          onClose={() => setPanelOpen(false)}
+          onClose={closePanel}
           onTake={takeLead}
           onMarkAnswered={markAnswered}
           onCloseLead={closeLead}

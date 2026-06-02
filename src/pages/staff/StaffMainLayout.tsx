@@ -70,6 +70,8 @@ export function StaffMainLayout({
   const [myAvatar, setMyAvatar] = React.useState<string | null>(null);
   const [myName, setMyName] = React.useState<string | null>(null);
   const [siteChatUnread, setSiteChatUnread] = React.useState(0);
+  const [leadsStats, setLeadsStats] = React.useState<{ new_count: number; overdue_count: number } | null>(null);
+  const [leadsPanelOpen, setLeadsPanelOpen] = React.useState(false);
 
   React.useEffect(() => {
     const CHAT_URL = "https://functions.poehali.dev/60644856-ff88-4875-b2a9-97c87d32a630";
@@ -133,6 +135,8 @@ export function StaffMainLayout({
 
   const requestTab = (t: Tab) => {
     if (t === "sitechat") setSiteChatUnread(0);
+    // Заявки — открываем панель поверх текущей вкладки, не меняем таб
+    if (t === "leads") { setLeadsPanelOpen(true); return; }
     if (isOwner || unlocked[t]) { setTab(t); return; }
     if ((["gold", "employees"] as readonly string[]).includes(t)) {
       setPwModal(t); setPwInput(""); setPwError("");
@@ -146,7 +150,17 @@ export function StaffMainLayout({
   // Admin: + Клиенты, Ломбард — 7 вкладок
   // Owner: 6 основных + кнопка «···» (drawer) со всем остальным
 
-  const ALL_TABS: { k: Tab; l: string; icon: string; badge?: number; tip?: string; premium?: boolean }[] = [
+  // Бейдж заявок: горящий счётчик новых / просроченных
+  const leadsNewCount  = leadsStats?.new_count     || 0;
+  const leadsOverdue   = leadsStats?.overdue_count || 0;
+  const leadsHot       = leadsOverdue > 0 ? leadsOverdue : leadsNewCount;
+
+  const ALL_TABS: { k: Tab; l: string; icon: string; badge?: number; tip?: string; premium?: boolean; hot?: boolean }[] = [
+    // «Заявки» — первой, видна всем ролям (открывает панель, не меняет таб)
+    { k: "leads", l: "Заявки", icon: leadsOverdue > 0 ? "Flame" : "Inbox",
+      badge: leadsHot || undefined,
+      hot: leadsOverdue > 0,
+      tip: "Горящие заявки от клиентов сайта." },
     { k: "myday",        l: "День",        icon: "Sunrise",        tip: "Чек-лист дня, мёртвые деньги, Авито-индекс, узкие места." },
     { k: "repair",       l: "Ремонт",      icon: "Wrench",         tip: "Заявки на ремонт техники." },
     { k: "sitechat",     l: "Чат",         icon: "MessageCircle",  tip: "Чаты от клиентов с сайта.", badge: siteChatUnread || undefined },
@@ -164,11 +178,15 @@ export function StaffMainLayout({
   ];
 
   // Вкладки в основной панели по роли
+  // Заявки (index 0) — всегда первая для всех
+  // Staff/master: 5 вкладок (Заявки · День · Ремонт · Чат · Зарплата)
+  // Admin: 7 вкладок (+ Ищут · Клиенты)
+  // Owner: 6 вкладок (+ Ломбард) + drawer для остальных
   const TABS: typeof ALL_TABS = isOwner
-    ? ALL_TABS.slice(0, 6)          // Owner: первые 6 + drawer для остальных
+    ? ALL_TABS.slice(0, 7)          // Owner: первые 7 + drawer для остальных
     : isOwnerOrAdmin
-      ? ALL_TABS.slice(0, 7)        // Admin: первые 7 (до Ломбард включительно)
-      : ALL_TABS.slice(0, 5);       // Staff/master: только первые 5
+      ? ALL_TABS.slice(0, 7)        // Admin: первые 7
+      : ALL_TABS.slice(0, 5);       // Staff/master: первые 5
 
   const initials = getInitials(empName);
 
@@ -281,7 +299,7 @@ export function StaffMainLayout({
       {/* Нижняя навигация */}
       <StaffBottomNav
         tabs={TABS}
-        drawerTabs={isOwner ? ALL_TABS.slice(6) : []}
+        drawerTabs={isOwner ? ALL_TABS.slice(7) : []}
         tab={tab}
         roleColor={roleColor}
         isOwner={isOwner}
@@ -289,8 +307,15 @@ export function StaffMainLayout({
         onRequestTab={requestTab}
       />
 
-      {/* Watcher заявок */}
-      <LeadsAlertWatcher token={token} empName={empName} />
+      {/* Watcher заявок — без плавающей кнопки, панель управляется из навигации */}
+      <LeadsAlertWatcher
+        token={token}
+        empName={empName}
+        panelOpen={leadsPanelOpen}
+        onPanelOpen={() => setLeadsPanelOpen(true)}
+        onPanelClose={() => setLeadsPanelOpen(false)}
+        onStatsChange={(s) => setLeadsStats(s ? { new_count: s.new_count, overdue_count: s.overdue_count } : null)}
+      />
 
       {/* Модалка пароля */}
       {pwModal && (

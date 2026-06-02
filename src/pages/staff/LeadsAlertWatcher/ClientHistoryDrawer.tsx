@@ -18,6 +18,9 @@ type ClientHistoryLead = {
   status: string | null;
   device?: string | null;
   created_at: string;
+  owner_name?: string | null;
+  taken_at?: string | null;
+  answered_at?: string | null;
 };
 
 type ClientHistoryRepair = {
@@ -284,6 +287,19 @@ export default function ClientHistoryDrawer({ open, onClose, phone, name, token 
                         )}
                         {l.description && (
                           <div className="mt-0.5 text-white/55 line-clamp-2">{l.description}</div>
+                        )}
+                        {/* Кто взял заявку — видно владельцу в истории */}
+                        {l.owner_name && (
+                          <div className="mt-1.5 flex items-center gap-1 text-emerald-300/80 text-[10px] font-semibold">
+                            <span>👤</span>
+                            <span>Взял: {l.owner_name}</span>
+                            {l.taken_at && (
+                              <span className="text-white/30 font-normal ml-1">· {fmtDate(l.taken_at)}</span>
+                            )}
+                          </div>
+                        )}
+                        {!l.owner_name && l.status === "new" && (
+                          <div className="mt-1.5 text-amber-400/60 text-[10px]">⏳ Ещё не взята</div>
                         )}
                       </div>
                     ))}

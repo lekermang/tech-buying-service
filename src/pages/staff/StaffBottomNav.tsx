@@ -11,6 +11,7 @@ type TabDef = {
   badge?: number;
   tip?: string;
   premium?: boolean;
+  hot?: boolean;        // горящая вкладка — мигает красным (для заявок)
 };
 
 type Props = {
@@ -120,6 +121,16 @@ function NavTab({
           }} />
         )}
 
+        {/* ── Горящий фон для «Заявок» — пульсирует красным ── */}
+        {t.hot && !active && (
+          <span className="absolute pointer-events-none" style={{
+            inset: "3px 2px 0px 2px",
+            background: "radial-gradient(ellipse at 50% 100%, rgba(239,68,68,0.22) 0%, transparent 70%)",
+            borderRadius: "10px",
+            animation: "hotGlow 1.4s ease-in-out infinite alternate",
+          }} />
+        )}
+
         {/* ── Иконка ── */}
         <div className="relative flex items-center justify-center" style={{ width: 24, height: 24 }}>
           <Icon
@@ -128,15 +139,20 @@ function NavTab({
             style={{
               color: active
                 ? roleColor
-                : t.premium
-                  ? "rgba(255,215,0,0.6)"
-                  : "rgba(255,255,255,0.32)",
+                : t.hot
+                  ? "#ef4444"
+                  : t.premium
+                    ? "rgba(255,215,0,0.6)"
+                    : "rgba(255,255,255,0.32)",
               filter: active
                 ? `drop-shadow(0 0 6px ${roleColor}) drop-shadow(0 0 18px ${roleColor}70)`
-                : t.premium
-                  ? "drop-shadow(0 0 4px rgba(255,215,0,0.4))"
-                  : "none",
+                : t.hot
+                  ? "drop-shadow(0 0 6px rgba(239,68,68,0.8)) drop-shadow(0 0 14px rgba(239,68,68,0.4))"
+                  : t.premium
+                    ? "drop-shadow(0 0 4px rgba(255,215,0,0.4))"
+                    : "none",
               transition: "all 0.2s cubic-bezier(0.23, 1, 0.32, 1)",
+              animation: t.hot && !active ? "hotIconPulse 1.4s ease-in-out infinite alternate" : "none",
             }}
           />
 
@@ -176,10 +192,14 @@ function NavTab({
           className="font-roboto leading-none select-none"
           style={{
             fontSize: active ? "10px" : "9px",
-            fontWeight: active ? 700 : 400,
+            fontWeight: (active || t.hot) ? 700 : 400,
             letterSpacing: active ? "0.04em" : "0.01em",
-            color: active ? roleColor : "rgba(255,255,255,0.3)",
-            textShadow: active ? `0 0 10px ${roleColor}90, 0 0 20px ${roleColor}40` : "none",
+            color: active ? roleColor : t.hot ? "#f87171" : "rgba(255,255,255,0.3)",
+            textShadow: active
+              ? `0 0 10px ${roleColor}90, 0 0 20px ${roleColor}40`
+              : t.hot
+                ? "0 0 8px rgba(239,68,68,0.6)"
+                : "none",
             transition: "all 0.2s cubic-bezier(0.23, 1, 0.32, 1)",
           }}
         >
@@ -315,6 +335,14 @@ export default function StaffBottomNav({ tabs, drawerTabs = [], tab, roleColor, 
         @keyframes drawerUp {
           from { opacity: 0; transform: translateY(24px); }
           to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes hotGlow {
+          from { opacity: 0.5; }
+          to   { opacity: 1; }
+        }
+        @keyframes hotIconPulse {
+          from { filter: drop-shadow(0 0 4px rgba(239,68,68,0.6)); }
+          to   { filter: drop-shadow(0 0 10px rgba(239,68,68,1)) drop-shadow(0 0 20px rgba(239,68,68,0.5)); }
         }
       `}</style>
 
