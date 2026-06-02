@@ -1,5 +1,5 @@
 import Icon from "@/components/ui/icon";
-import { EMPTY_FORM, INP, LBL } from "../types";
+import { EMPTY_FORM, INP, LBL, ACCEPTOR_BONUS_VALUES } from "../types";
 
 type Props = {
   form: typeof EMPTY_FORM;
@@ -8,7 +8,17 @@ type Props = {
   createOrder: () => void;
 };
 
+// Богдан определяется по сохранённому имени сотрудника
+function isAcceptor(): boolean {
+  try {
+    return (localStorage.getItem("employee_name") || "").trim().toLowerCase() === "богдан";
+  } catch {
+    return false;
+  }
+}
+
 export default function RepairNewOrderForm({ form, setForm, creating, createOrder }: Props) {
+  const showBonus = isAcceptor();
   return (
     <div className="relative mx-3 mt-3 mb-1 rounded-xl overflow-hidden animate-in slide-in-from-top-2 duration-300">
       {/* HALO ореол */}
@@ -161,6 +171,41 @@ export default function RepairNewOrderForm({ form, setForm, creating, createOrde
               <span className="absolute right-2 top-7 text-[10px] text-green-400/70 font-roboto pointer-events-none">3 документа на почту</span>
             )}
           </div>
+
+          {/* ── Бонус приёмщика (виден только Богдану) ── */}
+          {showBonus && (
+            <div className="border rounded-lg p-3" style={{ borderColor: "rgba(52,211,153,0.25)", background: "rgba(52,211,153,0.05)" }}>
+              <div className="font-roboto text-[10px] uppercase tracking-widest mb-2 flex items-center gap-1.5" style={{ color: "#34d399" }}>
+                <Icon name="Coffee" size={11} />
+                Твой бонус с этого ремонта
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                {ACCEPTOR_BONUS_VALUES.map(v => {
+                  const active = form.acceptor_bonus === v;
+                  return (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setForm(p => ({ ...p, acceptor_bonus: active ? 0 : v }))}
+                      className="py-2 rounded-md font-oswald font-bold text-sm transition-all active:scale-95"
+                      style={{
+                        background: active ? "linear-gradient(135deg,#34d399,#10b981)" : "rgba(255,255,255,0.04)",
+                        color: active ? "#062b1e" : "rgba(255,255,255,0.55)",
+                        border: active ? "1px solid #34d399" : "1px solid rgba(255,255,255,0.1)",
+                      }}
+                    >
+                      {v}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="font-roboto text-[10px] mt-2 leading-relaxed" style={{ color: "rgba(255,255,255,0.35)" }}>
+                {form.acceptor_bonus > 0
+                  ? `Бонус ${form.acceptor_bonus} ₽ закрепится за тобой, когда ремонт станет «Готов». Это «чай» сверх зарплаты.`
+                  : "Выбери сумму, если хочешь заработать с этого ремонта. Можно не выбирать."}
+              </div>
+            </div>
+          )}
 
           <button
             onClick={createOrder}

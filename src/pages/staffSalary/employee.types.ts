@@ -16,6 +16,12 @@ export type TodayState = {
   total_paid: number;
   remaining: number;
   is_repair_master: boolean;
+  // Бонус приёмщика (Богдана) за принесённые ремонты
+  is_acceptor?: boolean;
+  acceptor_bonus_total?: number;
+  acceptor_bonus_today?: number;
+  acceptor_bonus_unpaid?: number;
+  acceptor_orders_count?: number;
 };
 
 export type DayRow = { shift_date: string; hours_worked: number; base_rate?: number; bonus_amount?: number; total: number };

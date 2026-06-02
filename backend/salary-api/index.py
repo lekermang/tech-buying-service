@@ -25,6 +25,10 @@ HEADERS = {
 }
 SCHEMA = 't_p31606708_tech_buying_service'
 
+# Приёмщик, которому начисляется бонус за принесённые ремонты, и дата старта учёта
+ACCEPTOR_BONUS_LOGIN = 'Bogdan'
+ACCEPTOR_BONUS_START_DATE = '2026-06-03'
+
 
 def get_conn():
     return psycopg2.connect(os.environ['DATABASE_URL'])
@@ -172,7 +176,35 @@ def handler(event, context):
                 (user_id,),
             )
             emp_row = cur.fetchone()
-            is_repair_master = (emp_row['login'] == 'PluXan') if emp_row else False
+            my_login = emp_row['login'] if emp_row else ''
+            is_repair_master = (my_login == 'PluXan')
+
+            # Приёмщик (Богдан) — бонус с принесённых ремонтов (закреплённых, когда ремонт готов)
+            is_acceptor = (my_login == ACCEPTOR_BONUS_LOGIN)
+            acceptor_bonus_total = 0
+            acceptor_bonus_today = 0
+            acceptor_bonus_unpaid = 0
+            acceptor_orders_count = 0
+            if is_acceptor:
+                cur.execute(
+                    f"""
+                    SELECT
+                      COALESCE(SUM(acceptor_bonus), 0) AS total,
+                      COALESCE(SUM(acceptor_bonus) FILTER (WHERE acceptor_bonus_locked_at::date = %s), 0) AS today,
+                      COALESCE(SUM(acceptor_bonus) FILTER (WHERE acceptor_bonus_paid = false), 0) AS unpaid,
+                      COUNT(*) FILTER (WHERE acceptor_bonus > 0) AS cnt
+                    FROM {SCHEMA}.repair_orders
+                    WHERE created_by = %s
+                      AND acceptor_bonus_locked_at IS NOT NULL
+                      AND created_at::date >= DATE '{ACCEPTOR_BONUS_START_DATE}'
+                    """,
+                    (today, my_login),
+                )
+                ar = cur.fetchone() or {}
+                acceptor_bonus_total = int(ar.get('total', 0) or 0)
+                acceptor_bonus_today = int(ar.get('today', 0) or 0)
+                acceptor_bonus_unpaid = int(ar.get('unpaid', 0) or 0)
+                acceptor_orders_count = int(ar.get('cnt', 0) or 0)
 
             return resp(200, {
                 'employee': {'id': user_id, 'name': full_name},
@@ -185,6 +217,11 @@ def handler(event, context):
                 'total_paid': total_paid,
                 'remaining': total_earned - total_paid,
                 'is_repair_master': is_repair_master,
+                'is_acceptor': is_acceptor,
+                'acceptor_bonus_total': acceptor_bonus_total,
+                'acceptor_bonus_today': acceptor_bonus_today,
+                'acceptor_bonus_unpaid': acceptor_bonus_unpaid,
+                'acceptor_orders_count': acceptor_orders_count,
             })
 
     if action == 'my_history':

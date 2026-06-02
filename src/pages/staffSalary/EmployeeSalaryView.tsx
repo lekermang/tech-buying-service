@@ -218,6 +218,56 @@ export default function EmployeeSalaryView({ token, employeeName }: Props) {
         </div>
       )}
 
+      {/* ── Доход с ремонтов (бонус приёмщика, только Богдан) ── */}
+      {state.is_acceptor && (
+        <div className="rounded-2xl p-4" style={{
+          background: "linear-gradient(145deg,rgba(52,211,153,0.12),rgba(52,211,153,0.03))",
+          border: "1.5px solid rgba(52,211,153,0.3)",
+          boxShadow: "0 0 24px rgba(52,211,153,0.06)",
+        }}>
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{
+              background: "rgba(52,211,153,0.18)", border: "1px solid rgba(52,211,153,0.4)",
+            }}>
+              <Icon name="Coffee" size={15} style={{ color: "#34d399" }} />
+            </div>
+            <div>
+              <div className="font-oswald font-bold text-sm" style={{ color: "#34d399" }}>Доход с ремонтов</div>
+              <div className="font-roboto text-[10px]" style={{ color: "rgba(255,255,255,0.35)" }}>
+                «Чай» сверх зарплаты за принесённые ремонты
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="text-center">
+              <div className="font-roboto text-[9px] uppercase tracking-widest mb-1" style={{ color: "rgba(52,211,153,0.6)" }}>Всего</div>
+              <div className="font-oswald font-black text-xl tabular-nums" style={{ color: "#34d399" }}>
+                {fmt(state.acceptor_bonus_total ?? 0)} ₽
+              </div>
+            </div>
+            <div className="text-center" style={{ borderLeft: "1px solid rgba(255,255,255,0.06)", borderRight: "1px solid rgba(255,255,255,0.06)" }}>
+              <div className="font-roboto text-[9px] uppercase tracking-widest mb-1" style={{ color: "rgba(255,215,0,0.6)" }}>Сегодня</div>
+              <div className="font-oswald font-black text-xl tabular-nums" style={{ color: "#FFD700" }}>
+                {fmt(state.acceptor_bonus_today ?? 0)} ₽
+              </div>
+            </div>
+            <div className="text-center">
+              <div className="font-roboto text-[9px] uppercase tracking-widest mb-1" style={{ color: "rgba(248,113,113,0.6)" }}>К выдаче</div>
+              <div className="font-oswald font-black text-xl tabular-nums" style={{ color: "#f87171" }}>
+                {fmt(state.acceptor_bonus_unpaid ?? 0)} ₽
+              </div>
+            </div>
+          </div>
+          <div className="mt-3 pt-3 font-roboto text-[11px] text-center leading-relaxed" style={{
+            color: "rgba(255,255,255,0.4)", borderTop: "1px solid rgba(255,255,255,0.06)",
+          }}>
+            {(state.acceptor_orders_count ?? 0) > 0
+              ? `🔥 ${state.acceptor_orders_count} ремонтов принесли тебе доход. Чем больше приводишь — тем больше зарабатываешь!`
+              : "Оформляй ремонты со своим бонусом — и зарабатывай сверх зарплаты!"}
+          </div>
+        </div>
+      )}
+
       {/* Ставка / бонус — только для обычных сотрудников */}
       {!isRepairMaster && (
         <div className="grid grid-cols-2 gap-2">

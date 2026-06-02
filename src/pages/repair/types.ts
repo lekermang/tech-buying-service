@@ -45,7 +45,11 @@ export type DayStat = {
   revenue: number; costs: number; profit: number; master_income: number;
 };
 
-export const EMPTY_FORM = { name: "", phone: "", model: "", repair_type: "", price: "", comment: "", client_email: "", device_password: "" };
+export const EMPTY_FORM = { name: "", phone: "", model: "", repair_type: "", price: "", comment: "", client_email: "", device_password: "", acceptor_bonus: 0 };
+
+// Приёмщик, которому доступен бонус за принесённый ремонт
+export const ACCEPTOR_BONUS_LOGIN = "Bogdan";
+export const ACCEPTOR_BONUS_VALUES = [300, 400, 500, 1000] as const;
 export const EMPTY_COMPLETE = { purchase_amount: "", repair_amount: "", parts_name: "" };
 
 export const statusInfo = (key: string) => STATUSES.find(s => s.key === key) || STATUSES[0];

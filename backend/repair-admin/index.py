@@ -486,6 +486,105 @@ def is_owner(event: dict) -> bool:
     return False
 
 
+def current_employee(event: dict):
+    """Возвращает (login, role, full_name) текущего сотрудника по X-Employee-Token, либо (None, None, None)."""
+    headers = {k.lower(): v for k, v in (event.get('headers') or {}).items()}
+    emp_token = headers.get('x-employee-token', '')
+    if not emp_token:
+        return (None, None, None)
+    try:
+        conn = psycopg2.connect(os.environ['DATABASE_URL'])
+        cur = conn.cursor()
+        cur.execute(
+            f"SELECT login, role, full_name FROM {SCHEMA}.employees "
+            f"WHERE auth_token='{emp_token}' AND token_expires_at>NOW() AND is_active=true"
+        )
+        row = cur.fetchone()
+        cur.close(); conn.close()
+        if row:
+            return (row[0], row[1], row[2])
+    except Exception:
+        pass
+    return (None, None, None)
+
+
+# Логин приёмщика, которому начисляется бонус за принесённый ремонт.
+# Можно расширить до списка, если бонус понадобится другим приёмщикам.
+ACCEPTOR_BONUS_LOGIN = 'Bogdan'
+# Допустимые суммы бонуса приёмщика
+ACCEPTOR_BONUS_VALUES = (300, 400, 500, 1000)
+# Учёт бонусов стартует с этой даты (МСК). Заявки до неё бонус не дают.
+ACCEPTOR_BONUS_START_DATE = '2026-06-03'
+
+
+def _send_tg_to_login(conn, login: str, message: str) -> None:
+    """Отправить личное Telegram-сообщение сотруднику по его login (через tg_chat_id)."""
+    token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+    if not token:
+        return
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            f"SELECT tg_chat_id FROM {SCHEMA}.employees WHERE login=%s AND tg_chat_id IS NOT NULL",
+            (login,),
+        )
+        row = cur.fetchone()
+        cur.close()
+        if not row or not row[0]:
+            return
+        requests.post(
+            f'https://api.telegram.org/bot{token}/sendMessage',
+            json={'chat_id': row[0], 'text': message, 'parse_mode': 'Markdown'},
+            timeout=8,
+        )
+    except Exception:
+        pass
+
+
+def _notify_acceptor_created(conn, order_id: int, client_name: str, model: str, repair_type: str, bonus: int) -> None:
+    """Мотивирующее оповещение приёмщику при оформлении заявки с бонусом."""
+    msg = (
+        f"🍵 *Твой бонус с ремонта #{order_id}*\n\n"
+        f"📱 {model or '—'} · {repair_type or 'ремонт'}\n"
+        f"👤 Клиент: {client_name}\n\n"
+        f"💰 Заложен твой бонус: *{bonus:,} ₽*".replace(',', ' ') + "\n"
+        f"Это твой «чай» сверх зарплаты — из маржи Давида и владельца.\n\n"
+        f"✅ Как только ремонт будет *готов* — бонус закрепится за тобой. Красавчик, так держать! 🔥"
+    )
+    _send_tg_to_login(conn, ACCEPTOR_BONUS_LOGIN, msg)
+
+
+def _notify_acceptor_ready(conn, order_id: int, client_name: str, model: str, bonus: int) -> None:
+    """Мотивирующее оповещение приёмщику когда ремонт переведён в 'готов' — бонус закреплён."""
+    msg = (
+        f"🎉 *Ремонт #{order_id} готов — твой бонус закреплён!*\n\n"
+        f"📱 {model or '—'} · клиент {client_name}\n\n"
+        f"💸 Тебе начислено: *{bonus:,} ₽*".replace(',', ' ') + "\n"
+        f"Сумма учтена как закупка — магазин отдаст её тебе.\n\n"
+        f"🚀 Это твой заработок сверх зарплаты за то, что принёс и оформил ремонт. "
+        f"Чем больше ремонтов приводишь — тем больше зарабатываешь!"
+    )
+    _send_tg_to_login(conn, ACCEPTOR_BONUS_LOGIN, msg)
+    # Владельцу — напоминание отдать деньги Богдану
+    owner_msg = (
+        f"📌 *К выплате Богдану*\n\n"
+        f"Ремонт #{order_id} ({model or '—'}) готов.\n"
+        f"Бонус приёмщику: *{bonus:,} ₽*".replace(',', ' ') + "\n"
+        f"Учтено как закупка — нужно отдать Богдану."
+    )
+    main_chat = os.environ.get('TELEGRAM_CHAT_ID', '')
+    token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+    if main_chat and token:
+        try:
+            requests.post(
+                f'https://api.telegram.org/bot{token}/sendMessage',
+                json={'chat_id': main_chat, 'text': owner_msg, 'parse_mode': 'Markdown'},
+                timeout=8,
+            )
+        except Exception:
+            pass
+
+
 def handler(event: dict, context) -> dict:
     """Управление заявками на ремонт: список, создание, смена статуса, аналитика по периодам, доход мастера"""
 
@@ -1402,11 +1501,29 @@ def handler(event: dict, context) -> dict:
             cur.execute(f"SELECT chat_id FROM {SCHEMA}.tg_phone_map WHERE RIGHT(REGEXP_REPLACE(phone, '[^0-9]', '', 'g'), 10) = '{suffix}' LIMIT 1")
             prow = cur.fetchone()
             client_chat_id = prow[0] if prow else None
+
+            # Приёмщик (кто оформил заявку) и его бонус
+            actor_login, _actor_role, _actor_name = current_employee(event)
+            created_by_val = f"'{actor_login}'" if actor_login else 'NULL'
+            # Бонус приёмщика начисляем только Богдану и только из допустимых сумм
+            acceptor_bonus = 0
+            try:
+                req_bonus = int(body.get('acceptor_bonus') or 0)
+            except Exception:
+                req_bonus = 0
+            if actor_login == ACCEPTOR_BONUS_LOGIN and req_bonus in ACCEPTOR_BONUS_VALUES:
+                acceptor_bonus = req_bonus
+
             cur.execute(
-                f"INSERT INTO {SCHEMA}.repair_orders (name, phone, model, repair_type, price, comment, client_tg_chat_id) VALUES ('{name}', '{phone}', {model_val}, {repair_type_val}, {price_val}, {comment_val}, {'NULL' if not client_chat_id else client_chat_id}) RETURNING id"
+                f"INSERT INTO {SCHEMA}.repair_orders (name, phone, model, repair_type, price, comment, client_tg_chat_id, created_by, acceptor_bonus) "
+                f"VALUES ('{name}', '{phone}', {model_val}, {repair_type_val}, {price_val}, {comment_val}, {'NULL' if not client_chat_id else client_chat_id}, {created_by_val}, {acceptor_bonus}) RETURNING id"
             )
             new_id = cur.fetchone()[0]
             conn.commit()
+
+            # Мотивирующее оповещение приёмщику при оформлении (если выбрал бонус)
+            if acceptor_bonus > 0 and actor_login == ACCEPTOR_BONUS_LOGIN:
+                _notify_acceptor_created(conn, new_id, name, model, repair_type, acceptor_bonus)
             tg_token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
             main_chat = os.environ.get('TELEGRAM_CHAT_ID', '')
             tg_msg = (
@@ -1675,6 +1792,34 @@ def handler(event: dict, context) -> dict:
         if not row:
             cur.close(); conn.close()
             return {'statusCode': 404, 'headers': HEADERS, 'body': json.dumps({'error': 'Заявка не найдена'}, ensure_ascii=False)}
+
+        # ── Бонус приёмщика: закрепляем когда ремонт переведён в "готов"/"выдан" ──
+        # Только: заявка создана Богданом, бонус задан, ещё не закреплён,
+        # и заявка создана не раньше даты старта учёта (03.06.2026 МСК).
+        if new_status in ('ready', 'done'):
+            try:
+                cur.execute(
+                    f"SELECT created_by, acceptor_bonus, acceptor_bonus_locked_at, model, name "
+                    f"FROM {SCHEMA}.repair_orders WHERE id = {order_id}"
+                )
+                br = cur.fetchone()
+                if br:
+                    b_created_by, b_bonus, b_locked, b_model, b_name = br[0], int(br[1] or 0), br[2], br[3], br[4]
+                    if (b_created_by == ACCEPTOR_BONUS_LOGIN and b_bonus > 0 and b_locked is None):
+                        cur.execute(
+                            f"UPDATE {SCHEMA}.repair_orders "
+                            f"SET acceptor_bonus_locked_at = NOW() "
+                            f"WHERE id = {order_id} "
+                            f"AND created_at::date >= DATE '{ACCEPTOR_BONUS_START_DATE}' "
+                            f"AND acceptor_bonus_locked_at IS NULL "
+                            f"RETURNING id"
+                        )
+                        locked = cur.fetchone()
+                        conn.commit()
+                        if locked:
+                            _notify_acceptor_ready(conn, order_id, b_name or '', b_model or '', b_bonus)
+            except Exception as bonus_err:
+                print(f'[ACCEPTOR BONUS] error: {bonus_err}')
 
         # Записываем историю изменений
         FIELD_LABELS = {'status': 'Статус', 'repair_amount': 'Сумма ремонта', 'purchase_amount': 'Закупка', 'parts_name': 'Запчасть', 'admin_note': 'Заметка', 'master_income': 'Доход мастера'}
