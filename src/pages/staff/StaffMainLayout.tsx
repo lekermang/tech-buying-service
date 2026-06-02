@@ -141,22 +141,34 @@ export function StaffMainLayout({
     setTab(t);
   };
 
-  const TABS: { k: Tab; l: string; icon: string; badge?: number; tip?: string; premium?: boolean }[] = [
+  // ── Навигация по ролям ──────────────────────────────────────────────────────
+  // Staff/master: только самое важное — 5 вкладок
+  // Admin: + Клиенты, Ломбард — 7 вкладок
+  // Owner: 6 основных + кнопка «···» (drawer) со всем остальным
+
+  const ALL_TABS: { k: Tab; l: string; icon: string; badge?: number; tip?: string; premium?: boolean }[] = [
     { k: "myday",        l: "День",        icon: "Sunrise",        tip: "Чек-лист дня, мёртвые деньги, Авито-индекс, узкие места." },
-    { k: "sitechat",     l: "Чат",         icon: "MessageCircle",  tip: "Чаты от клиентов с сайта.", badge: siteChatUnread || undefined },
-    { k: "wanttobuy",    l: "Ищут",        icon: "ShoppingBag",    tip: "Заявки клиентов на поиск б/у и нового товара." },
-    { k: "chat",         l: "Команда",     icon: "MessagesSquare", tip: "Чат команды Скупка24." },
     { k: "repair",       l: "Ремонт",      icon: "Wrench",         tip: "Заявки на ремонт техники." },
-    { k: "smartlombard", l: "Ломбард",     icon: "Coins",          tip: "СмартЛомбард: скупка и продажа Б/У техники.", premium: true },
+    { k: "sitechat",     l: "Чат",         icon: "MessageCircle",  tip: "Чаты от клиентов с сайта.", badge: siteChatUnread || undefined },
     { k: "salary",       l: "Зарплата",    icon: "Wallet",         tip: "Моя смена и заработок." },
+    { k: "wanttobuy",    l: "Ищут",        icon: "ShoppingBag",    tip: "Заявки клиентов на поиск б/у и нового товара." },
     { k: "clients",      l: "Клиенты",     icon: "Users",          tip: "База клиентов, скидки, СМС-рассылки." },
+    { k: "smartlombard", l: "Ломбард",     icon: "Coins",          tip: "СмартЛомбард: скупка и продажа Б/У техники.", premium: true },
+    { k: "chat",         l: "Команда",     icon: "MessagesSquare", tip: "Чат команды Скупка24." },
     { k: "avitopro",     l: "Авито",       icon: "Zap",            tip: "Авито PRO: статистика, авто-действия." },
-    ...(analyticsAllowed ? [{ k: "analytics" as Tab, l: "Стат.", icon: "BarChart2", tip: "Аналитика по продажам и ремонтам." }] : []),
-    ...(isOwner ? [{ k: "finance" as Tab, l: "Финансы", icon: "LineChart", tip: "ДДС: банковские выписки + склад → ИИ-отчёт." }] : []),
+    ...(analyticsAllowed ? [{ k: "analytics" as Tab, l: "Стат.",   icon: "BarChart2", tip: "Аналитика по продажам и ремонтам." }] : []),
+    ...(isOwner ? [{ k: "finance"   as Tab, l: "Финансы", icon: "LineChart", tip: "ДДС: банковские выписки + склад → ИИ-отчёт." }] : []),
     { k: "visitors",     l: "Трафик",      icon: "Activity",       tip: "Кто на сайте сейчас, источники трафика.", premium: true },
     ...(isOwnerOrAdmin ? [{ k: "gold"      as Tab, l: "Золото",  icon: "Gem",     tip: "Учёт ювелирных изделий." }] : []),
     ...(isOwnerOrAdmin ? [{ k: "employees" as Tab, l: "Команда", icon: "UserCog", tip: "Управление сотрудниками." }] : []),
   ];
+
+  // Вкладки в основной панели по роли
+  const TABS: typeof ALL_TABS = isOwner
+    ? ALL_TABS.slice(0, 6)          // Owner: первые 6 + drawer для остальных
+    : isOwnerOrAdmin
+      ? ALL_TABS.slice(0, 7)        // Admin: первые 7 (до Ломбард включительно)
+      : ALL_TABS.slice(0, 5);       // Staff/master: только первые 5
 
   const initials = getInitials(empName);
 
@@ -269,6 +281,7 @@ export function StaffMainLayout({
       {/* Нижняя навигация */}
       <StaffBottomNav
         tabs={TABS}
+        drawerTabs={isOwner ? ALL_TABS.slice(6) : []}
         tab={tab}
         roleColor={roleColor}
         isOwner={isOwner}

@@ -15,6 +15,7 @@ type TabDef = {
 
 type Props = {
   tabs: TabDef[];
+  drawerTabs?: TabDef[];
   tab: StaffTab;
   roleColor: string;
   isOwner: boolean;
@@ -81,7 +82,7 @@ function NavTab({
           }} />
         )}
 
-        {/* ── Активный фон — кинематографическое свечение снизу ── */}
+        {/* ── Активный фон ── */}
         {active && (
           <>
             <span className="absolute pointer-events-none" style={{
@@ -108,7 +109,7 @@ function NavTab({
           }} />
         )}
 
-        {/* ── Верхний световой индикатор — как прожектор сверху ── */}
+        {/* ── Верхний световой индикатор ── */}
         {active && (
           <span className="absolute top-0 left-1/2 -translate-x-1/2" style={{
             width: "40px",
@@ -189,28 +190,116 @@ function NavTab({
   );
 }
 
-// ── Разделитель ───────────────────────────────────────────────────────────
-function Divider({ color }: { color: string }) {
+// ── Drawer — всплывающий список вкладок для owner ─────────────────────────
+function DrawerMenu({
+  tabs, tab, roleColor, isOwner, unlocked, onSelect, onClose,
+}: {
+  tabs: TabDef[]; tab: StaffTab; roleColor: string;
+  isOwner: boolean; unlocked: Record<string, boolean>;
+  onSelect: (k: StaffTab) => void; onClose: () => void;
+}) {
   return (
-    <div className="flex items-center justify-center shrink-0 self-stretch py-3" style={{ width: 10 }}>
-      <div className="w-px h-7 rounded-full" style={{
-        background: `linear-gradient(180deg, transparent, ${color}25, rgba(255,200,50,0.15), ${color}25, transparent)`,
-      }} />
-    </div>
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 z-[60]"
+        style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(3px)" }}
+        onClick={onClose}
+      />
+      {/* Panel */}
+      <div
+        className="fixed left-0 right-0 z-[61]"
+        style={{
+          bottom: "calc(72px + env(safe-area-inset-bottom, 0px))",
+          background: "linear-gradient(180deg, rgba(14,10,6,0.98), rgba(8,6,3,0.99))",
+          borderTop: `1px solid ${roleColor}30`,
+          borderRadius: "20px 20px 0 0",
+          boxShadow: `0 -8px 40px rgba(0,0,0,0.8), 0 -2px 0 ${roleColor}20 inset`,
+          padding: "16px 8px 8px",
+          animation: "drawerUp 0.22s cubic-bezier(0.22,1,0.36,1) forwards",
+        }}
+      >
+        {/* Ручка */}
+        <div className="flex justify-center mb-3">
+          <div className="w-10 h-1 rounded-full" style={{ background: `${roleColor}40` }} />
+        </div>
+
+        <div className="font-roboto text-[10px] uppercase tracking-widest mb-3 px-3" style={{ color: `${roleColor}60` }}>
+          Ещё разделы
+        </div>
+
+        {/* Сетка вкладок */}
+        <div className="grid grid-cols-4 gap-1 px-2">
+          {tabs.map(t => {
+            const locked = PROTECTED_TABS.includes(t.k) && !isOwner && !unlocked[t.k];
+            const active = tab === t.k;
+            return (
+              <button
+                key={t.k}
+                onClick={() => { onSelect(t.k); onClose(); }}
+                onMouseEnter={() => prefetchTab(t.k)}
+                className="relative flex flex-col items-center justify-center gap-1.5 py-3 px-1 rounded-xl transition-all active:scale-90"
+                style={{
+                  background: active
+                    ? `linear-gradient(145deg, ${roleColor}18, ${roleColor}08)`
+                    : "rgba(255,255,255,0.03)",
+                  border: active
+                    ? `1px solid ${roleColor}35`
+                    : "1px solid rgba(255,255,255,0.07)",
+                }}
+              >
+                {active && (
+                  <span className="absolute top-0 left-1/2 -translate-x-1/2" style={{
+                    width: "32px", height: "2px", borderRadius: "0 0 4px 4px",
+                    background: `linear-gradient(90deg, transparent, ${roleColor}cc, transparent)`,
+                  }} />
+                )}
+                <div className="relative">
+                  <Icon
+                    name={t.icon}
+                    size={20}
+                    style={{
+                      color: active ? roleColor : t.premium ? "rgba(255,215,0,0.55)" : "rgba(255,255,255,0.45)",
+                      filter: active ? `drop-shadow(0 0 6px ${roleColor}80)` : "none",
+                    }}
+                  />
+                  {locked && <span className="absolute -top-1.5 -right-1.5 text-[9px]">🔒</span>}
+                  {t.premium && !active && (
+                    <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full"
+                      style={{ background: "#FFD700", boxShadow: "0 0 6px rgba(255,215,0,0.8)" }} />
+                  )}
+                  {t.badge && t.badge > 0 ? (
+                    <span className="absolute -top-2 -right-2 flex items-center justify-center text-white"
+                      style={{ minWidth: 16, height: 16, fontSize: 8, borderRadius: 9, padding: "0 3px",
+                        background: "linear-gradient(135deg,#ff5555,#ef4444)",
+                        boxShadow: "0 0 8px rgba(239,68,68,0.8)" }}>
+                      {t.badge > 99 ? "99+" : t.badge}
+                    </span>
+                  ) : null}
+                </div>
+                <span className="font-roboto text-[10px] leading-tight text-center select-none"
+                  style={{ color: active ? roleColor : "rgba(255,255,255,0.45)", fontWeight: active ? 700 : 400 }}>
+                  {t.l}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </>
   );
 }
 
-export default function StaffBottomNav({ tabs, tab, roleColor, isOwner, unlocked, onRequestTab }: Props) {
+export default function StaffBottomNav({ tabs, drawerTabs = [], tab, roleColor, isOwner, unlocked, onRequestTab }: Props) {
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!scrollRef.current) return;
-    const el = scrollRef.current.querySelector<HTMLElement>("[aria-current='page']");
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
-  }, [tab]);
+  // Закрыть drawer при смене вкладки
+  useEffect(() => { setDrawerOpen(false); }, [tab]);
 
-  const main = tabs.slice(0, 6);
-  const extra = tabs.slice(6);
+  // Активна ли одна из вкладок в drawer
+  const drawerHasActive = drawerTabs.some(t => t.k === tab);
+  const drawerHasBadge = drawerTabs.some(t => t.badge && t.badge > 0);
 
   return (
     <>
@@ -223,7 +312,24 @@ export default function StaffBottomNav({ tabs, tab, roleColor, isOwner, unlocked
           from { opacity: 0.6; transform: scale(0.7); }
           to   { opacity: 0;   transform: scale(1.8); }
         }
+        @keyframes drawerUp {
+          from { opacity: 0; transform: translateY(24px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
       `}</style>
+
+      {/* Drawer (owner only) */}
+      {drawerOpen && drawerTabs.length > 0 && (
+        <DrawerMenu
+          tabs={drawerTabs}
+          tab={tab}
+          roleColor={roleColor}
+          isOwner={isOwner}
+          unlocked={unlocked}
+          onSelect={onRequestTab}
+          onClose={() => setDrawerOpen(false)}
+        />
+      )}
 
       <nav
         className="fixed bottom-0 left-0 right-0 z-50"
@@ -237,50 +343,31 @@ export default function StaffBottomNav({ tabs, tab, roleColor, isOwner, unlocked
 
         {/* 3D пластина */}
         <div className="relative" style={{
-          background: `
-            linear-gradient(180deg,
-              rgba(18,14,8,0.97) 0%,
-              rgba(10,8,5,0.99) 100%
-            )
-          `,
+          background: "linear-gradient(180deg, rgba(18,14,8,0.97) 0%, rgba(10,8,5,0.99) 100%)",
           backdropFilter: "blur(40px)",
           WebkitBackdropFilter: "blur(40px)",
           borderTop: `1px solid ${roleColor}20`,
-          boxShadow: `
-            0 -1px 0 rgba(255,255,255,0.04) inset,
-            0 -20px 60px rgba(0,0,0,0.8),
-            0 -4px 20px rgba(0,0,0,0.6)
-          `,
+          boxShadow: `0 -1px 0 rgba(255,255,255,0.04) inset, 0 -20px 60px rgba(0,0,0,0.8), 0 -4px 20px rgba(0,0,0,0.6)`,
         }}>
 
-          {/* Верхняя золотая линия */}
+          {/* Верхняя световая линия */}
           <div className="absolute top-0 left-0 right-0 pointer-events-none" style={{
             height: "2px",
-            background: `linear-gradient(90deg,
-              transparent 0%,
-              ${roleColor}25 10%,
-              ${roleColor}80 35%,
-              #fff8e8cc 50%,
-              ${roleColor}80 65%,
-              ${roleColor}25 90%,
-              transparent 100%
-            )`,
+            background: `linear-gradient(90deg, transparent 0%, ${roleColor}25 10%, ${roleColor}80 35%, #fff8e8cc 50%, ${roleColor}80 65%, ${roleColor}25 90%, transparent 100%)`,
             boxShadow: `0 0 20px ${roleColor}50, 0 0 40px ${roleColor}20`,
           }} />
 
-          {/* Тонкий градиент сверху — глубина */}
           <div className="absolute top-0 left-0 right-0 h-12 pointer-events-none" style={{
             background: `radial-gradient(ellipse at 50% 0%, ${roleColor}08 0%, transparent 70%)`,
           }} />
 
-          {/* Скролл-контейнер */}
           <div
             ref={scrollRef}
-            className="flex overflow-x-auto scrollbar-none"
+            className="flex"
             style={{ WebkitOverflowScrolling: "touch" }}
           >
             {/* Основные табы */}
-            {main.map((t) => {
+            {tabs.map((t) => {
               const locked = PROTECTED_TABS.includes(t.k) && !isOwner && !unlocked[t.k];
               const isHot = Boolean(t.badge && t.badge > 0);
               return (
@@ -289,18 +376,68 @@ export default function StaffBottomNav({ tabs, tab, roleColor, isOwner, unlocked
               );
             })}
 
-            {/* Разделитель */}
-            {extra.length > 0 && <Divider color={roleColor} />}
+            {/* Кнопка «···» для owner — открывает drawer */}
+            {drawerTabs.length > 0 && (
+              <button
+                onClick={() => setDrawerOpen(v => !v)}
+                className="relative flex flex-col items-center justify-center overflow-hidden"
+                style={{
+                  flex: "1 0 52px",
+                  minWidth: "48px",
+                  minHeight: "62px",
+                  paddingTop: "10px",
+                  paddingBottom: "8px",
+                  gap: "5px",
+                }}
+                aria-label="Ещё разделы"
+              >
+                {/* Активный фон если в drawer выбрана вкладка */}
+                {(drawerHasActive || drawerOpen) && (
+                  <>
+                    <span className="absolute pointer-events-none" style={{
+                      inset: "3px 2px 0px 2px",
+                      background: `radial-gradient(ellipse at 50% 100%, ${roleColor}22 0%, transparent 70%)`,
+                      borderRadius: "10px",
+                    }} />
+                    <span className="absolute top-0 left-1/2 -translate-x-1/2" style={{
+                      width: "40px", height: "3px", borderRadius: "0 0 4px 4px",
+                      background: `linear-gradient(90deg, transparent, ${roleColor}dd, #fff8e8, ${roleColor}dd, transparent)`,
+                      boxShadow: `0 0 16px ${roleColor}, 0 0 32px ${roleColor}80`,
+                    }} />
+                  </>
+                )}
 
-            {/* Дополнительные табы */}
-            {extra.map((t) => {
-              const locked = PROTECTED_TABS.includes(t.k) && !isOwner && !unlocked[t.k];
-              const isHot = Boolean(t.badge && t.badge > 0);
-              return (
-                <NavTab key={t.k} t={t} active={tab === t.k} locked={locked}
-                  isHot={isHot} roleColor={roleColor} onPress={onRequestTab} prefetch={prefetchTab} />
-              );
-            })}
+                {/* Иконка «···» или «✕» */}
+                <div className="relative flex items-center justify-center" style={{ width: 24, height: 24 }}>
+                  <Icon
+                    name={drawerOpen ? "X" : "MoreHorizontal"}
+                    size={drawerOpen ? 20 : 19}
+                    style={{
+                      color: (drawerHasActive || drawerOpen) ? roleColor : "rgba(255,255,255,0.32)",
+                      filter: (drawerHasActive || drawerOpen) ? `drop-shadow(0 0 6px ${roleColor})` : "none",
+                      transition: "all 0.2s ease",
+                    }}
+                  />
+                  {/* Бейдж если в drawer есть уведомления */}
+                  {drawerHasBadge && !drawerOpen && (
+                    <span className="absolute -top-1.5 -right-1.5 w-2 h-2 rounded-full"
+                      style={{ background: "#ef4444", boxShadow: "0 0 6px rgba(239,68,68,0.8)" }} />
+                  )}
+                </div>
+
+                <span
+                  className="font-roboto leading-none select-none"
+                  style={{
+                    fontSize: (drawerHasActive || drawerOpen) ? "10px" : "9px",
+                    fontWeight: (drawerHasActive || drawerOpen) ? 700 : 400,
+                    color: (drawerHasActive || drawerOpen) ? roleColor : "rgba(255,255,255,0.3)",
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  {drawerOpen ? "Закрыть" : "Ещё"}
+                </span>
+              </button>
+            )}
           </div>
         </div>
       </nav>
