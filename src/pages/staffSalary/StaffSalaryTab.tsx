@@ -288,7 +288,7 @@ export default function StaffSalaryTab({ role, token, employeeName }: Props) {
 
   // Только владелец видит панель управления зарплатами
   if (role === "owner") {
-    return <OwnerSalaryView token={token} />;
+    return <OwnerSalaryView token={token} employeeName={employeeName} />;
   }
 
   // Все остальные (admin, staff) — своя зарплата с PIN-защитой
