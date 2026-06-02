@@ -1,9 +1,10 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import Icon from "@/components/ui/icon";
 import { SALARY_URL } from "@/pages/staff.types";
 import SavingsView from "@/pages/staffSalary/SavingsView";
 import EmployeeRepairHistory from "./EmployeeRepairHistory";
 import EmployeeSalesHistory from "./EmployeeSalesHistory";
+import EmployeeCalendar from "./EmployeeCalendar";
 import {
   fmt, currentMonthRange,
   type TodayState, type DayRow, type PayoutRow,
@@ -15,22 +16,36 @@ interface Props {
   employeeName: string;
 }
 
+function isoLocal(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+function startOfMonth(d: Date) { return new Date(d.getFullYear(), d.getMonth(), 1); }
+function endOfMonth(d: Date)   { return new Date(d.getFullYear(), d.getMonth() + 1, 0); }
+
 export default function EmployeeSalaryView({ token, employeeName }: Props) {
+  const todayIso = isoLocal(new Date());
+
   const [state, setState] = useState<TodayState | null>(null);
   const [days, setDays] = useState<DayRow[]>([]);
   const [payouts, setPayouts] = useState<PayoutRow[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const range = currentMonthRange();
-  const [dateFrom, setDateFrom] = useState(range.from);
-  const [dateTo, setDateTo] = useState(range.to);
+  // Месяц для календаря
+  const [viewMonth, setViewMonth] = useState<Date>(() => startOfMonth(new Date()));
+  const isCurrentMonth = useMemo(() => {
+    const now = new Date();
+    return viewMonth.getFullYear() === now.getFullYear() && viewMonth.getMonth() === now.getMonth();
+  }, [viewMonth]);
+
+  const dateFrom = isoLocal(startOfMonth(viewMonth));
+  const dateTo   = isoLocal(endOfMonth(viewMonth));
 
   // Детализация обычных продаж
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const [detailCache, setDetailCache] = useState<Record<string, DayDetail>>({});
   const [detailLoading, setDetailLoading] = useState<string | null>(null);
 
-  // Главная вкладка (для мастера ремонтов: зарплата / копилка)
+  // Главная вкладка
   const [mainTab, setMainTab] = useState<"salary" | "savings">("salary");
 
   // Ремонты
@@ -63,15 +78,16 @@ export default function EmployeeSalaryView({ token, employeeName }: Props) {
   useEffect(() => { fetchAll(dateFrom, dateTo); }, [fetchAll, dateFrom, dateTo]);
 
   useEffect(() => {
-    if (state?.is_repair_master) {
-      fetchRepairs(dateFrom, dateTo);
-    }
+    if (state?.is_repair_master) fetchRepairs(dateFrom, dateTo);
   }, [state?.is_repair_master, dateFrom, dateTo, fetchRepairs]);
 
-  // При смене дат перегружаем ремонты тоже
+  // Сброс кэша деталей при смене месяца
   useEffect(() => {
-    if (state?.is_repair_master) fetchRepairs(dateFrom, dateTo);
-  }, [dateFrom, dateTo, fetchRepairs, state?.is_repair_master]);
+    setDetailCache({});
+    setExpandedDate(null);
+    setRepairDetailCache({});
+    setExpandedRepairDate(null);
+  }, [viewMonth]);
 
   const loadSaleDetail = async (date: string) => {
     if (expandedDate === date) { setExpandedDate(null); return; }
@@ -91,6 +107,19 @@ export default function EmployeeSalaryView({ token, employeeName }: Props) {
       const r = await fetch(`${SALARY_URL}?action=my_repair_detail&date=${date}`, { headers: { "X-Employee-Token": token } });
       if (r.ok) { const d = await r.json(); setRepairDetailCache(p => ({ ...p, [date]: d })); setExpandedRepairDate(date); }
     } finally { setRepairDetailLoading(null); }
+  };
+
+  // Клик по дню в календаре — раскрываем в списке
+  const handleCalendarDayClick = (date: string) => {
+    if (isRepairMaster) {
+      loadRepairDetail(date);
+    } else {
+      loadSaleDetail(date);
+    }
+    // Скролл к списку
+    setTimeout(() => {
+      document.getElementById("employee-history-list")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
   };
 
   const totalEarned = days.reduce((s, d) => s + Number(d.total), 0);
@@ -126,7 +155,7 @@ export default function EmployeeSalaryView({ token, employeeName }: Props) {
         </div>
       </div>
 
-      {/* Переключатель Зарплата / Копилка — для всех */}
+      {/* Переключатель Зарплата / Копилка */}
       <div className="flex gap-1 p-1 rounded-xl" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
         <button onClick={() => setMainTab("salary")}
           className="flex-1 py-2 rounded-lg font-roboto text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
@@ -149,10 +178,8 @@ export default function EmployeeSalaryView({ token, employeeName }: Props) {
         </button>
       </div>
 
-      {/* ── КОПИЛКА (для всех) ── */}
-      {mainTab === "savings" && (
-        <SavingsView token={token} />
-      )}
+      {/* ── КОПИЛКА ── */}
+      {mainTab === "savings" && <SavingsView token={token} />}
 
       {/* ── ЗАРПЛАТА ── */}
       {mainTab === "salary" && <>
@@ -164,7 +191,7 @@ export default function EmployeeSalaryView({ token, employeeName }: Props) {
           border: "1.5px solid rgba(52,211,153,0.3)",
           boxShadow: "0 0 32px rgba(52,211,153,0.08)",
         }}>
-          <div className="font-roboto text-[10px] uppercase tracking-widest mb-1" style={{ color: "rgba(52,211,153,0.6)" }}>Заработано за период</div>
+          <div className="font-roboto text-[10px] uppercase tracking-widest mb-1" style={{ color: "rgba(52,211,153,0.6)" }}>Заработано за месяц</div>
           <div className="font-oswald font-black text-5xl tabular-nums" style={{ color: "#34d399" }}>
             {fmt(repairHistory?.total_earned ?? 0)} ₽
           </div>
@@ -191,7 +218,7 @@ export default function EmployeeSalaryView({ token, employeeName }: Props) {
         </div>
       )}
 
-      {/* Два показателя — только для обычных сотрудников */}
+      {/* Ставка / бонус — только для обычных сотрудников */}
       {!isRepairMaster && (
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-xl p-3 text-center" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
@@ -205,46 +232,49 @@ export default function EmployeeSalaryView({ token, employeeName }: Props) {
         </div>
       )}
 
-      {/* Фильтр дат */}
-      <div className="rounded-xl p-3 space-y-2" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
-        <div className="font-roboto text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.3)" }}>Период</div>
-        <div className="flex items-center gap-2">
-          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-            className="flex-1 px-3 py-2 rounded-xl font-roboto text-sm text-white outline-none"
-            style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
-          />
-          <span className="font-roboto text-xs" style={{ color: "rgba(255,255,255,0.3)" }}>—</span>
-          <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-            className="flex-1 px-3 py-2 rounded-xl font-roboto text-sm text-white outline-none"
-            style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
+      {/* ── КАЛЕНДАРЬ ── */}
+      <EmployeeCalendar
+        viewMonth={viewMonth}
+        todayIso={todayIso}
+        isCurrentMonth={isCurrentMonth}
+        days={days}
+        payouts={payouts}
+        repairDays={repairHistory?.days ?? []}
+        isRepairMaster={isRepairMaster}
+        onPrevMonth={() => setViewMonth(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
+        onNextMonth={() => setViewMonth(d => new Date(d.getFullYear(), d.getMonth() + 1, 1))}
+        onCurrentMonth={() => setViewMonth(startOfMonth(new Date()))}
+        onDayClick={handleCalendarDayClick}
+      />
+
+      {/* ── ИСТОРИЯ РЕМОНТОВ ── */}
+      {isRepairMaster && (
+        <div id="employee-history-list">
+          <EmployeeRepairHistory
+            repairHistory={repairHistory}
+            repairLoading={repairLoading}
+            expandedRepairDate={expandedRepairDate}
+            repairDetailCache={repairDetailCache}
+            repairDetailLoading={repairDetailLoading}
+            onToggleDay={loadRepairDetail}
           />
         </div>
-      </div>
-
-      {/* ── РЕМОНТЫ ── */}
-      {isRepairMaster && (
-        <EmployeeRepairHistory
-          repairHistory={repairHistory}
-          repairLoading={repairLoading}
-          expandedRepairDate={expandedRepairDate}
-          repairDetailCache={repairDetailCache}
-          repairDetailLoading={repairDetailLoading}
-          onToggleDay={loadRepairDetail}
-        />
       )}
 
-      {/* ── ПРОДАЖИ (только обычные сотрудники) ── */}
+      {/* ── ИСТОРИЯ ПРОДАЖ ── */}
       {!isRepairMaster && (
-        <EmployeeSalesHistory
-          days={days}
-          payouts={payouts}
-          totalEarned={totalEarned}
-          totalPaid={totalPaid}
-          expandedDate={expandedDate}
-          detailCache={detailCache}
-          detailLoading={detailLoading}
-          onToggleDay={loadSaleDetail}
-        />
+        <div id="employee-history-list">
+          <EmployeeSalesHistory
+            days={days}
+            payouts={payouts}
+            totalEarned={totalEarned}
+            totalPaid={totalPaid}
+            expandedDate={expandedDate}
+            detailCache={detailCache}
+            detailLoading={detailLoading}
+            onToggleDay={loadSaleDetail}
+          />
+        </div>
       )}
 
       </>}
