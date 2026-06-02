@@ -95,10 +95,10 @@ def handler(event: dict, context) -> dict:
 
             # Общая сумма накоплений
             cur.execute(
-                f"SELECT COALESCE(SUM(amount), 0) FROM {SCHEMA}.savings_log WHERE employee_id = %s",
+                f"SELECT COALESCE(SUM(amount), 0) AS total_saved FROM {SCHEMA}.savings_log WHERE employee_id = %s",
                 (emp_id,),
             )
-            total_saved = int(cur.fetchone()[0] or 0)
+            total_saved = int((cur.fetchone() or {}).get('total_saved', 0) or 0)
 
             # Доход за последние 30 дней (для советов)
             cur.execute(
@@ -111,9 +111,9 @@ def handler(event: dict, context) -> dict:
                 """,
                 (emp_id,),
             )
-            row30 = cur.fetchone()
-            earned_30d = int(row30[0] or 0)
-            days_worked = int(row30[1] or 0)
+            row30 = cur.fetchone() or {}
+            earned_30d = int(row30.get('earned_30d', 0) or 0)
+            days_worked = int(row30.get('days_worked', 0) or 0)
 
             # Последние транзакции
             cur.execute(
@@ -413,9 +413,9 @@ def handler(event: dict, context) -> dict:
 
             # Итого по всем
             cur.execute(
-                f"SELECT COALESCE(SUM(amount), 0) FROM {SCHEMA}.savings_log",
+                f"SELECT COALESCE(SUM(amount), 0) AS grand_total FROM {SCHEMA}.savings_log",
             )
-            grand_total = int(cur.fetchone()[0] or 0)
+            grand_total = int((cur.fetchone() or {}).get('grand_total', 0) or 0)
 
         return resp(200, {'employees': employees, 'grand_total': grand_total})
 
@@ -447,10 +447,10 @@ def handler(event: dict, context) -> dict:
             goals = cur.fetchall()
 
             cur.execute(
-                f"SELECT COALESCE(SUM(amount), 0) FROM {SCHEMA}.savings_log WHERE employee_id = %s",
+                f"SELECT COALESCE(SUM(amount), 0) AS total_saved FROM {SCHEMA}.savings_log WHERE employee_id = %s",
                 (target_id,),
             )
-            total_saved = int(cur.fetchone()[0] or 0)
+            total_saved = int((cur.fetchone() or {}).get('total_saved', 0) or 0)
 
             cur.execute(
                 f"""

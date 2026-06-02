@@ -261,19 +261,20 @@ def handler(event, context):
             )
             cfg = cur.fetchone() or {'daily_rate': 2000, 'bonus_percent': 3.0}
 
-            # Список конкретных продаж за этот день
+            # Список конкретных продаж за этот день (Б/у техника)
             cur.execute(
                 f"""
                 SELECT
                     op.id,
                     op.created_at,
                     COALESCE(i.title, op.item_name, 'Товар') AS item_title,
-                    i.category AS item_category,
+                    c.name AS item_category,
                     op.amount AS sell_price,
                     COALESCE(i.buy_price, 0) AS buy_price,
                     (op.amount - COALESCE(i.buy_price, 0)) AS profit
                 FROM {SCHEMA}.slshop_operations op
                 LEFT JOIN {SCHEMA}.slshop_items i ON i.id = op.item_id
+                LEFT JOIN {SCHEMA}.slshop_categories c ON c.id = i.category_id
                 WHERE op.op_type = 'sell'
                   AND op.created_at::date = %s
                   AND (
@@ -285,6 +286,44 @@ def handler(event, context):
                 (day_str, full_name, token),
             )
             sales = cur.fetchall()
+
+            # Золото за день
+            cur.execute(
+                f"""
+                SELECT id, created_at, weight_g, price_per_g, total_price, item_description
+                FROM {SCHEMA}.gold_orders
+                WHERE date(created_at) = %s AND status = 'completed'
+                ORDER BY created_at ASC
+                """,
+                (day_str,),
+            )
+            gold_orders = cur.fetchall()
+
+            # Ремонты за день (прибыль магазина)
+            cur.execute(
+                f"""
+                SELECT id, created_at, device_model, repair_type, repair_amount,
+                       parts_cost, COALESCE(repair_amount - parts_cost, repair_amount) AS profit
+                FROM {SCHEMA}.repair_orders
+                WHERE date(created_at) = %s AND status != 'cancelled'
+                ORDER BY created_at ASC
+                """,
+                (day_str,),
+            )
+            repair_orders = cur.fetchall()
+
+            # Договора 14 дней за день (выкупы)
+            cur.execute(
+                f"""
+                SELECT id, created_at, item_name, loan_amount, interest_amount,
+                       COALESCE(interest_amount, 0) AS profit
+                FROM {SCHEMA}.contracts_14d
+                WHERE date(created_at) = %s AND status != 'cancelled'
+                ORDER BY created_at ASC
+                """,
+                (day_str,),
+            )
+            contracts = cur.fetchall()
 
             bonus_pct = float(cfg['bonus_percent']) if cfg else 3.0
             sales_list = []
@@ -302,11 +341,69 @@ def handler(event, context):
                     'bonus_from_sale': bonus_from_sale,
                 })
 
+            gold_list = []
+            for g in gold_orders:
+                gold_list.append({
+                    'id': g['id'],
+                    'time': g['created_at'].strftime('%H:%M') if g['created_at'] else '',
+                    'description': g.get('item_description') or f"{g.get('weight_g', '?')} г",
+                    'total_price': int(g.get('total_price') or 0),
+                })
+
+            repair_list = []
+            for r in repair_orders:
+                repair_list.append({
+                    'id': r['id'],
+                    'time': r['created_at'].strftime('%H:%M') if r['created_at'] else '',
+                    'device': r.get('device_model') or '—',
+                    'repair_type': r.get('repair_type') or '—',
+                    'amount': int(r.get('repair_amount') or 0),
+                    'parts_cost': int(r.get('parts_cost') or 0),
+                    'profit': int(r.get('profit') or 0),
+                })
+
+            contract_list = []
+            for c in contracts:
+                contract_list.append({
+                    'id': c['id'],
+                    'time': c['created_at'].strftime('%H:%M') if c['created_at'] else '',
+                    'item_name': c.get('item_name') or '—',
+                    'loan_amount': int(c.get('loan_amount') or 0),
+                    'profit': int(c.get('profit') or 0),
+                })
+
+            # Сводка по категориям
+            breakdown = {
+                'goods': {
+                    'count': len(sales_list),
+                    'revenue': sum(s['sell_price'] for s in sales_list),
+                    'profit': sum(s['profit'] for s in sales_list),
+                },
+                'gold': {
+                    'count': len(gold_list),
+                    'revenue': sum(g['total_price'] for g in gold_list),
+                },
+                'repairs': {
+                    'count': len(repair_list),
+                    'revenue': sum(r['amount'] for r in repair_list),
+                    'profit': sum(r['profit'] for r in repair_list),
+                },
+                'contracts': {
+                    'count': len(contract_list),
+                    'revenue': sum(c['loan_amount'] for c in contract_list),
+                    'profit': sum(c['profit'] for c in contract_list),
+                },
+            }
+
             return resp(200, {
                 'date': day_str,
                 'day_log': day_log,
                 'config': {'daily_rate': cfg['daily_rate'], 'bonus_percent': bonus_pct},
                 'sales': sales_list,
+                'gold': gold_list,
+                'repairs': repair_list,
+                'contracts': contract_list,
+                'breakdown': breakdown,
             })
 
     if action == 'my_repair_history':

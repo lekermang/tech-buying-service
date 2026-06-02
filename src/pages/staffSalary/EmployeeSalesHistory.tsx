@@ -1,6 +1,6 @@
 import Icon from "@/components/ui/icon";
 import { fmt } from "./employee.types";
-import type { DayRow, PayoutRow, DayDetail } from "./employee.types";
+import type { DayRow, PayoutRow, DayDetail, GoldRow, RepairShopRow, ContractRow } from "./employee.types";
 
 interface Props {
   days: DayRow[];
@@ -129,6 +129,68 @@ export default function EmployeeSalesHistory({
 
                       {detail.sales.length === 0 && bonus === 0 && (
                         <div className="px-3 py-2 font-roboto text-xs" style={{ color: "rgba(255,255,255,0.25)" }}>Продаж за этот день не найдено</div>
+                      )}
+
+                      {/* Золото */}
+                      {(detail.gold?.length ?? 0) > 0 && (
+                        <div className="space-y-1 mt-1">
+                          <div className="font-roboto text-[10px] uppercase tracking-widest px-1" style={{ color: "rgba(255,215,0,0.6)" }}>
+                            Золото · {detail.gold!.length} {detail.gold!.length === 1 ? "сделка" : "сделки"}
+                          </div>
+                          {detail.gold!.map((g: GoldRow) => (
+                            <div key={g.id} className="flex items-center justify-between px-3 py-2 rounded-lg"
+                              style={{ background: "rgba(255,215,0,0.06)", border: "1px solid rgba(255,215,0,0.15)" }}>
+                              <div>
+                                <span className="font-roboto text-[10px] mr-1.5" style={{ color: "rgba(255,255,255,0.3)" }}>{g.time}</span>
+                                <span className="font-roboto text-sm text-white">{g.description}</span>
+                              </div>
+                              <span className="font-oswald font-bold text-sm" style={{ color: "#FFD700" }}>{fmt(g.total_price)} ₽</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Ремонты */}
+                      {(detail.repairs?.length ?? 0) > 0 && (
+                        <div className="space-y-1 mt-1">
+                          <div className="font-roboto text-[10px] uppercase tracking-widest px-1" style={{ color: "rgba(52,211,153,0.6)" }}>
+                            Ремонты · {detail.repairs!.length} {detail.repairs!.length === 1 ? "заказ" : "заказа"}
+                          </div>
+                          {detail.repairs!.map((r: RepairShopRow) => (
+                            <div key={r.id} className="px-3 py-2 rounded-lg"
+                              style={{ background: "rgba(52,211,153,0.06)", border: "1px solid rgba(52,211,153,0.15)" }}>
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <span className="font-roboto text-[10px] mr-1.5" style={{ color: "rgba(255,255,255,0.3)" }}>{r.time}</span>
+                                  <span className="font-roboto text-sm text-white">{r.device}</span>
+                                </div>
+                                <span className="font-oswald font-bold text-sm" style={{ color: "#34d399" }}>{fmt(r.amount)} ₽</span>
+                              </div>
+                              {r.repair_type && r.repair_type !== "—" && (
+                                <div className="font-roboto text-[11px] mt-0.5" style={{ color: "rgba(255,255,255,0.35)" }}>{r.repair_type}</div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Договора 14 дней */}
+                      {(detail.contracts?.length ?? 0) > 0 && (
+                        <div className="space-y-1 mt-1">
+                          <div className="font-roboto text-[10px] uppercase tracking-widest px-1" style={{ color: "rgba(96,165,250,0.6)" }}>
+                            Договора · {detail.contracts!.length} {detail.contracts!.length === 1 ? "договор" : "договора"}
+                          </div>
+                          {detail.contracts!.map((c: ContractRow) => (
+                            <div key={c.id} className="flex items-center justify-between px-3 py-2 rounded-lg"
+                              style={{ background: "rgba(96,165,250,0.06)", border: "1px solid rgba(96,165,250,0.15)" }}>
+                              <div>
+                                <span className="font-roboto text-[10px] mr-1.5" style={{ color: "rgba(255,255,255,0.3)" }}>{c.time}</span>
+                                <span className="font-roboto text-sm text-white truncate">{c.item_name}</span>
+                              </div>
+                              <span className="font-oswald font-bold text-sm" style={{ color: "#60a5fa" }}>{fmt(c.loan_amount)} ₽</span>
+                            </div>
+                          ))}
+                        </div>
                       )}
 
                       <div className="flex items-center justify-between px-3 py-2.5 rounded-lg mt-1" style={{

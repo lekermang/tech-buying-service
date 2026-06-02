@@ -25,9 +25,24 @@ export type SaleRow = {
   id: number; time: string; item_title: string; item_category: string | null;
   sell_price: number; buy_price: number; profit: number; bonus_from_sale: number;
 };
+export type GoldRow = { id: number; time: string; description: string; total_price: number };
+export type RepairShopRow = { id: number; time: string; device: string; repair_type: string; amount: number; parts_cost: number; profit: number };
+export type ContractRow = { id: number; time: string; item_name: string; loan_amount: number; profit: number };
+export type Breakdown = {
+  goods: { count: number; revenue: number; profit: number };
+  gold: { count: number; revenue: number };
+  repairs: { count: number; revenue: number; profit: number };
+  contracts: { count: number; revenue: number; profit: number };
+};
+
 export type DayDetail = {
   date: string; day_log: DayRow | null;
-  config: { daily_rate: number; bonus_percent: number }; sales: SaleRow[];
+  config: { daily_rate: number; bonus_percent: number };
+  sales: SaleRow[];
+  gold?: GoldRow[];
+  repairs?: RepairShopRow[];
+  contracts?: ContractRow[];
+  breakdown?: Breakdown;
 };
 
 export type RepairDayRow = {
