@@ -4,12 +4,13 @@ import { fmt, LEVEL_STYLES, LEVEL_LABELS, type Goal, type Tip } from "./savings.
 
 // ─── GoalCard ─────────────────────────────────────────────────────────────────
 export function GoalCard({
-  goal, onDeposit, onWithdraw, onEdit,
+  goal, onDeposit, onWithdraw, onEdit, onDelete,
 }: {
   goal: Goal;
   onDeposit: (g: Goal) => void;
   onWithdraw: (g: Goal) => void;
   onEdit: (g: Goal) => void;
+  onDelete: (g: Goal) => void;
 }) {
   const pct = goal.target_amount > 0
     ? Math.min(100, Math.round((goal.current_amount / goal.target_amount) * 100))
@@ -17,6 +18,7 @@ export function GoalCard({
   const left = goal.target_amount - goal.current_amount;
   const isDone = goal.status === "done";
   const isPaused = goal.status === "paused";
+  const [menuOpen, setMenuOpen] = useState(false);
 
   let daysLeft: number | null = null;
   if (goal.deadline) {
@@ -24,8 +26,17 @@ export function GoalCard({
     daysLeft = d;
   }
 
+  // Мотивационное сообщение
+  const motivation = !isDone && pct < 100 ? (
+    pct === 0 ? "Сделай первый шаг — положи хоть немного!" :
+    pct < 25 ? "Хорошее начало! Продолжай откладывать." :
+    pct < 50 ? "Четверть пути позади — ты на верном пути!" :
+    pct < 75 ? "Больше половины! Ещё немного усилий." :
+    pct < 100 ? "Финишная прямая! Почти у цели 🔥" : null
+  ) : null;
+
   return (
-    <div className="rounded-2xl overflow-hidden" style={{
+    <div className="rounded-2xl overflow-hidden relative" style={{
       background: isDone
         ? "linear-gradient(145deg,rgba(52,211,153,0.12),rgba(52,211,153,0.04))"
         : isPaused
@@ -41,7 +52,7 @@ export function GoalCard({
       {/* Заголовок */}
       <div className="px-4 pt-4 pb-3 flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 font-bold" style={{
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0" style={{
             background: `${goal.color}18`, border: `1.5px solid ${goal.color}40`,
           }}>
             {goal.emoji}
@@ -65,10 +76,33 @@ export function GoalCard({
             )}
           </div>
         </div>
-        <button onClick={() => onEdit(goal)} className="p-1.5 rounded-lg shrink-0 transition-opacity hover:opacity-80"
-          style={{ color: "rgba(255,255,255,0.3)" }}>
-          <Icon name="Pencil" size={13} />
-        </button>
+
+        {/* Меню редактирования/удаления */}
+        <div className="relative shrink-0">
+          <button onClick={() => setMenuOpen(v => !v)}
+            className="p-1.5 rounded-lg transition-all"
+            style={{ color: "rgba(255,255,255,0.3)", background: menuOpen ? "rgba(255,255,255,0.08)" : "transparent" }}>
+            <Icon name="MoreVertical" size={15} />
+          </button>
+          {menuOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+              <div className="absolute right-0 top-7 z-20 rounded-xl overflow-hidden shadow-2xl min-w-[140px]"
+                style={{ background: "#1e1e1e", border: "1px solid rgba(255,255,255,0.12)" }}>
+                <button onClick={() => { setMenuOpen(false); onEdit(goal); }}
+                  className="w-full flex items-center gap-2 px-4 py-3 font-roboto text-sm text-white hover:bg-white/5 active:bg-white/10 transition-colors">
+                  <Icon name="Pencil" size={14} style={{ color: "#FFD700" }} /> Редактировать
+                </button>
+                <div style={{ height: "1px", background: "rgba(255,255,255,0.07)" }} />
+                <button onClick={() => { setMenuOpen(false); onDelete(goal); }}
+                  className="w-full flex items-center gap-2 px-4 py-3 font-roboto text-sm hover:bg-white/5 active:bg-white/10 transition-colors"
+                  style={{ color: "#f87171" }}>
+                  <Icon name="Trash2" size={14} /> Удалить
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Прогресс */}
@@ -83,7 +117,7 @@ export function GoalCard({
             </div>
           </div>
           <div className="text-right">
-            <div className="font-oswald font-bold text-xl tabular-nums" style={{ color: isDone ? "#34d399" : "rgba(255,255,255,0.5)" }}>
+            <div className="font-oswald font-bold text-xl tabular-nums" style={{ color: isDone ? "#34d399" : pct >= 75 ? goal.color : "rgba(255,255,255,0.5)" }}>
               {pct}%
             </div>
             {!isDone && left > 0 && (
@@ -95,7 +129,7 @@ export function GoalCard({
         </div>
 
         {/* Прогресс-бар */}
-        <div className="h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.07)" }}>
+        <div className="h-2.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.07)" }}>
           <div className="h-full rounded-full transition-all duration-500" style={{
             width: `${pct}%`,
             background: isDone
@@ -105,9 +139,16 @@ export function GoalCard({
           }} />
         </div>
 
+        {/* Мотивация */}
+        {motivation && (
+          <div className="mt-1.5 font-roboto text-[11px]" style={{ color: "rgba(255,255,255,0.35)" }}>
+            {motivation}
+          </div>
+        )}
+
         {/* Дедлайн */}
         {goal.deadline && daysLeft !== null && (
-          <div className="mt-2 flex items-center gap-1 font-roboto text-[10px]" style={{
+          <div className="mt-1.5 flex items-center gap-1 font-roboto text-[10px]" style={{
             color: daysLeft < 7 ? "#f87171" : daysLeft < 30 ? "#fb923c" : "rgba(255,255,255,0.25)",
           }}>
             <Icon name="Calendar" size={10} />
@@ -119,21 +160,21 @@ export function GoalCard({
         )}
       </div>
 
-      {/* Кнопки */}
+      {/* Кнопки действий */}
       {!isDone && (
         <div className="px-4 pb-4 flex gap-2">
           <button onClick={() => onDeposit(goal)}
-            className="flex-1 py-2 rounded-xl font-roboto text-sm font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95"
+            className="flex-1 py-2.5 rounded-xl font-roboto text-sm font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95"
             style={{
-              background: `linear-gradient(135deg,${goal.color}25,${goal.color}15)`,
-              border: `1px solid ${goal.color}40`,
+              background: `linear-gradient(135deg,${goal.color}30,${goal.color}18)`,
+              border: `1px solid ${goal.color}50`,
               color: goal.color,
             }}>
-            <Icon name="Plus" size={14} /> Пополнить
+            <Icon name="Plus" size={14} /> Отложить
           </button>
           {goal.current_amount > 0 && (
             <button onClick={() => onWithdraw(goal)}
-              className="px-3 py-2 rounded-xl font-roboto text-sm transition-all active:scale-95"
+              className="px-3 py-2.5 rounded-xl font-roboto text-sm transition-all active:scale-95"
               style={{
                 background: "rgba(255,255,255,0.04)",
                 border: "1px solid rgba(255,255,255,0.1)",
@@ -142,6 +183,15 @@ export function GoalCard({
               <Icon name="Minus" size={14} />
             </button>
           )}
+        </div>
+      )}
+
+      {isDone && (
+        <div className="px-4 pb-4">
+          <div className="py-2 text-center font-roboto text-sm font-bold rounded-xl"
+            style={{ background: "rgba(52,211,153,0.1)", color: "#34d399" }}>
+            🎉 Цель достигнута!
+          </div>
         </div>
       )}
     </div>

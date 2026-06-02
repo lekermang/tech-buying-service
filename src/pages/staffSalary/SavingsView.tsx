@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 import { SAVINGS_URL, fmt, type Goal, type Tip, type Overview } from "./savings.types";
 import { GoalCard, TipCard } from "./SavingsGoalCard";
-import { GoalModal, TransactionModal } from "./SavingsModals";
+import { GoalModal, TransactionModal, DeleteGoalModal } from "./SavingsModals";
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function SavingsView({ token }: { token: string }) {
@@ -15,6 +15,7 @@ export default function SavingsView({ token }: { token: string }) {
   const [editGoal, setEditGoal] = useState<Goal | null>(null);
   const [depositGoal, setDepositGoal] = useState<Goal | null>(null);
   const [withdrawGoal, setWithdrawGoal] = useState<Goal | null>(null);
+  const [deleteGoal, setDeleteGoal] = useState<Goal | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -150,6 +151,7 @@ export default function SavingsView({ token }: { token: string }) {
                   onDeposit={setDepositGoal}
                   onWithdraw={setWithdrawGoal}
                   onEdit={setEditGoal}
+                  onDelete={setDeleteGoal}
                 />
               ))}
               {doneGoals.length > 0 && (
@@ -162,6 +164,7 @@ export default function SavingsView({ token }: { token: string }) {
                       onDeposit={setDepositGoal}
                       onWithdraw={setWithdrawGoal}
                       onEdit={setEditGoal}
+                      onDelete={setDeleteGoal}
                     />
                   ))}
                 </>
@@ -176,6 +179,7 @@ export default function SavingsView({ token }: { token: string }) {
                       onDeposit={setDepositGoal}
                       onWithdraw={setWithdrawGoal}
                       onEdit={setEditGoal}
+                      onDelete={setDeleteGoal}
                     />
                   ))}
                 </>
@@ -270,6 +274,10 @@ export default function SavingsView({ token }: { token: string }) {
       {withdrawGoal && (
         <TransactionModal goal={withdrawGoal} mode="withdraw" token={token}
           onClose={() => setWithdrawGoal(null)} onDone={load} />
+      )}
+      {deleteGoal && (
+        <DeleteGoalModal goal={deleteGoal} token={token}
+          onClose={() => setDeleteGoal(null)} onDeleted={load} />
       )}
     </div>
   );

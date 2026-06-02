@@ -468,4 +468,29 @@ def handler(event: dict, context) -> dict:
 
         return resp(200, {'goals': goals, 'total_saved': total_saved, 'recent_tx': recent_tx})
 
+    # ── УДАЛИТЬ ЦЕЛЬ (только своя цель) ──────────────────────────────────────
+    if action == 'delete_goal':
+        goal_id = int(body.get('goal_id') or 0)
+        if not goal_id:
+            return resp(400, {'error': 'goal_id обязателен'})
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"SELECT id, current_amount FROM {SCHEMA}.savings_goals WHERE id = %s AND employee_id = %s",
+                (goal_id, emp_id),
+            )
+            row = cur.fetchone()
+            if not row:
+                return resp(403, {'error': 'Цель не найдена'})
+            # Если были деньги — пишем лог возврата (сумма обнуляется)
+            remaining = int(row[1] or 0)
+            if remaining > 0:
+                cur.execute(
+                    f"INSERT INTO {SCHEMA}.savings_log (employee_id, goal_id, amount, note, source) VALUES (%s, %s, %s, %s, %s)",
+                    (emp_id, goal_id, -remaining, 'Цель удалена', 'delete'),
+                )
+            cur.execute(f"DELETE FROM {SCHEMA}.savings_log WHERE goal_id = %s", (goal_id,))
+            cur.execute(f"DELETE FROM {SCHEMA}.savings_goals WHERE id = %s AND employee_id = %s", (goal_id, emp_id))
+            conn.commit()
+        return resp(200, {'ok': True})
+
     return resp(400, {'error': f'Неизвестное действие: {action}'})

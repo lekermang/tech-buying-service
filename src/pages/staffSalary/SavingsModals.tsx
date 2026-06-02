@@ -21,6 +21,8 @@ export function GoalModal({
   const [deadline, setDeadline] = useState(goal?.deadline?.slice(0, 10) ?? "");
   const [autoSave, setAutoSave] = useState(goal?.auto_save_percent ? String(goal.auto_save_percent) : "0");
   const [status, setStatus] = useState(goal?.status ?? "active");
+  // Начальный депозит — только при создании
+  const [initDeposit, setInitDeposit] = useState("");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
 
@@ -38,9 +40,24 @@ export function GoalModal({
       `${SAVINGS_URL}?action=${isEdit ? "update_goal" : "create_goal"}`,
       { method: "POST", headers: { "X-Employee-Token": token, "Content-Type": "application/json" }, body: JSON.stringify(body) },
     );
+    if (!r.ok) {
+      setSaving(false);
+      const d = await r.json(); setErr(d.error || "Ошибка"); return;
+    }
+    // Если создание и есть начальный депозит — сразу кладём деньги
+    if (!isEdit && initDeposit && parseInt(initDeposit) > 0) {
+      const created = await r.json();
+      const goalId = created?.goal?.id || created?.id;
+      if (goalId) {
+        await fetch(`${SAVINGS_URL}?action=deposit`, {
+          method: "POST",
+          headers: { "X-Employee-Token": token, "Content-Type": "application/json" },
+          body: JSON.stringify({ goal_id: goalId, amount: parseInt(initDeposit), note: "Начальный взнос" }),
+        });
+      }
+    }
     setSaving(false);
-    if (r.ok) { onSave(); onClose(); }
-    else { const d = await r.json(); setErr(d.error || "Ошибка"); }
+    onSave(); onClose();
   };
 
   const INP = "w-full px-3 py-3 rounded-xl font-roboto text-sm text-white outline-none appearance-none";
@@ -54,7 +71,6 @@ export function GoalModal({
       style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)" }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      {/* Sheet — прижат ко дну на мобиле, по центру на десктопе */}
       <div
         className="absolute bottom-0 left-0 right-0 sm:relative sm:top-1/2 sm:left-1/2 sm:bottom-auto sm:max-w-md sm:mx-auto sm:my-0"
         style={{
@@ -71,7 +87,7 @@ export function GoalModal({
           <div className="w-10 h-1 rounded-full" style={{ background: "rgba(255,255,255,0.18)" }} />
         </div>
 
-        {/* Шапка — фиксирована */}
+        {/* Шапка */}
         <div className="px-5 py-3.5 flex items-center justify-between shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
           <div className="font-oswald font-bold text-white text-lg uppercase tracking-wide">
             {isEdit ? "Редактировать цель" : "Новая цель"}
@@ -82,8 +98,10 @@ export function GoalModal({
         </div>
 
         {/* Скролл-область */}
-        <div className="overflow-y-auto overscroll-contain flex-1 px-5 py-4 space-y-5 pb-8">
-
+        <div
+          className="flex-1 px-5 py-4 space-y-5 pb-8"
+          style={{ overflowY: "auto", WebkitOverflowScrolling: "touch" } as React.CSSProperties}
+        >
           {/* Иконки */}
           <div>
             <label style={LBL_STYLE} className={LBL}>Иконка</label>
@@ -98,7 +116,6 @@ export function GoalModal({
                   }}>{e}</button>
               ))}
             </div>
-            {/* Цвета */}
             <div className="flex flex-wrap gap-2.5">
               {COLORS.map(c => (
                 <button key={c} onClick={() => setColor(c)}
@@ -128,7 +145,7 @@ export function GoalModal({
               className={INP} style={INP_STYLE} />
           </div>
 
-          {/* Сумма */}
+          {/* Сумма цели */}
           <div>
             <label style={LBL_STYLE} className={LBL}>Сумма цели *</label>
             <div className="relative">
@@ -139,11 +156,31 @@ export function GoalModal({
             </div>
           </div>
 
+          {/* Сразу положить — только при создании */}
+          {!isEdit && (
+            <div>
+              <label style={LBL_STYLE} className={LBL}>
+                Сразу положить (необязательно)
+              </label>
+              <div className="relative">
+                <input value={initDeposit} onChange={e => setInitDeposit(e.target.value.replace(/\D/g, ""))}
+                  placeholder="Начальная сумма" inputMode="numeric"
+                  className={INP + " pr-8"} style={{ ...INP_STYLE, borderColor: initDeposit ? `${color}60` : undefined }} />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 font-roboto text-sm" style={{ color: "rgba(255,255,255,0.3)" }}>₽</span>
+              </div>
+              {initDeposit && parseInt(initDeposit) > 0 && (
+                <div className="mt-1.5 font-roboto text-[11px] px-1" style={{ color: color }}>
+                  🚀 Старт с {fmt(parseInt(initDeposit))} ₽ — отличное начало!
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Срок */}
           <div>
             <label style={LBL_STYLE} className={LBL}>Срок (необязательно)</label>
             <input type="date" value={deadline} onChange={e => setDeadline(e.target.value)}
-              className={INP} style={{ ...INP_STYLE, colorScheme: "dark" }} />
+              className={INP} style={{ ...INP_STYLE, colorScheme: "dark" } as React.CSSProperties} />
           </div>
 
           {/* Статус (только редактирование) */}
@@ -225,7 +262,8 @@ export function TransactionModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)" }}>
+      style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)" }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="w-full max-w-sm rounded-2xl overflow-hidden" style={{
         background: "linear-gradient(145deg,#1a1a1a,#111)", border: "1px solid rgba(255,255,255,0.1)",
       }}>
@@ -237,7 +275,9 @@ export function TransactionModal({
               <div className="font-roboto text-[10px]" style={{ color: "rgba(255,255,255,0.35)" }}>{goal.title}</div>
             </div>
           </div>
-          <button onClick={onClose} style={{ color: "rgba(255,255,255,0.4)" }}><Icon name="X" size={18} /></button>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full" style={{ background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.5)" }}>
+            <Icon name="X" size={16} />
+          </button>
         </div>
 
         <div className="p-5 space-y-4">
@@ -275,7 +315,7 @@ export function TransactionModal({
 
           {/* Сумма вручную */}
           <div className="relative">
-            <input value={amount} onChange={e => setAmount(e.target.value.replace(/\D/,""))}
+            <input value={amount} onChange={e => setAmount(e.target.value.replace(/\D/, ""))}
               placeholder="Своя сумма" inputMode="numeric"
               className="w-full px-3 py-2.5 pr-8 rounded-xl font-roboto text-sm text-white outline-none"
               style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }} />
@@ -301,6 +341,69 @@ export function TransactionModal({
               opacity: saving ? 0.6 : 1,
             }}>
             {saving ? "..." : isDeposit ? `+ Положить в копилку` : `− Снять`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal: подтверждение удаления ────────────────────────────────────────────
+export function DeleteGoalModal({
+  goal, onClose, onDeleted, token,
+}: {
+  goal: Goal;
+  onClose: () => void;
+  onDeleted: () => void;
+  token: string;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+
+  const del = async () => {
+    setLoading(true);
+    const r = await fetch(`${SAVINGS_URL}?action=delete_goal`, {
+      method: "POST",
+      headers: { "X-Employee-Token": token, "Content-Type": "application/json" },
+      body: JSON.stringify({ goal_id: goal.id }),
+    });
+    setLoading(false);
+    if (r.ok) { onDeleted(); onClose(); }
+    else { const d = await r.json(); setErr(d.error || "Ошибка удаления"); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.8)", backdropFilter: "blur(6px)" }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="w-full max-w-sm rounded-2xl p-6 text-center"
+        style={{ background: "linear-gradient(145deg,#1c1c1c,#111)", border: "1px solid rgba(255,255,255,0.1)" }}>
+        <div className="text-4xl mb-3">{goal.emoji}</div>
+        <div className="font-oswald font-bold text-white text-lg mb-1">Удалить цель?</div>
+        <div className="font-roboto text-sm mb-1" style={{ color: "rgba(255,255,255,0.5)" }}>
+          «{goal.title}»
+        </div>
+        {goal.current_amount > 0 && (
+          <div className="font-roboto text-sm mb-4" style={{ color: "#f87171" }}>
+            В копилке {fmt(goal.current_amount)} ₽ — они вернутся на общий баланс
+          </div>
+        )}
+        {!goal.current_amount && (
+          <div className="font-roboto text-sm mb-4" style={{ color: "rgba(255,255,255,0.35)" }}>
+            Это действие нельзя отменить
+          </div>
+        )}
+        {err && <div className="font-roboto text-sm text-red-400 mb-3">{err}</div>}
+        <div className="flex gap-2">
+          <button onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl font-roboto text-sm font-semibold"
+            style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.6)" }}>
+            Отмена
+          </button>
+          <button onClick={del} disabled={loading}
+            className="flex-1 py-2.5 rounded-xl font-roboto text-sm font-bold transition-all active:scale-95"
+            style={{ background: "rgba(248,113,113,0.2)", border: "1px solid rgba(248,113,113,0.4)", color: "#f87171" }}>
+            {loading ? "..." : "Удалить"}
           </button>
         </div>
       </div>
