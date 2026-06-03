@@ -186,7 +186,7 @@ export function StaffMainLayout({
     ? ALL_TABS.slice(0, 7)          // Owner: первые 7 + drawer для остальных
     : isOwnerOrAdmin
       ? ALL_TABS.slice(0, 7)        // Admin: первые 7
-      : ALL_TABS.slice(0, 5);       // Staff/master: первые 5
+      : ALL_TABS.slice(0, 7);       // Staff/master: первые 7 (+ Ищут · Ломбард)
 
   const initials = getInitials(empName);
 
