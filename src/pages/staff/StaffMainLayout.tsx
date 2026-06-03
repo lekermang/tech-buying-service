@@ -183,10 +183,10 @@ export function StaffMainLayout({
   // Admin: 7 вкладок (+ Ищут · Клиенты)
   // Owner: 6 вкладок (+ Ломбард) + drawer для остальных
   const TABS: typeof ALL_TABS = isOwner
-    ? ALL_TABS.slice(0, 7)          // Owner: первые 7 + drawer для остальных
+    ? ALL_TABS.slice(0, 8)          // Owner: первые 8 + drawer для остальных
     : isOwnerOrAdmin
-      ? ALL_TABS.slice(0, 7)        // Admin: первые 7
-      : ALL_TABS.slice(0, 7);       // Staff/master: первые 7 (+ Ищут · Ломбард)
+      ? ALL_TABS.slice(0, 8)        // Admin: первые 8
+      : ALL_TABS.slice(0, 8);       // Staff/master: первые 8 (Заявки·День·Ремонт·Чат·Зарплата·Ищут·Клиенты·Ломбард)
 
   const initials = getInitials(empName);
 
@@ -299,7 +299,7 @@ export function StaffMainLayout({
       {/* Нижняя навигация */}
       <StaffBottomNav
         tabs={TABS}
-        drawerTabs={isOwner ? ALL_TABS.slice(7) : []}
+        drawerTabs={isOwner ? ALL_TABS.slice(8) : []}
         tab={tab}
         roleColor={roleColor}
         isOwner={isOwner}
