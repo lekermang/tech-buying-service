@@ -6,26 +6,38 @@ export default function RepairParts({ onOrder }: { onOrder: () => void }) {
       <div className="text-center mb-9 max-w-3xl mx-auto">
         <div className="inline-flex items-center gap-2 bg-[#FFD700]/10 border border-[#FFD700]/30 text-[#FFD700] px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium mb-4">
           <Icon name="Store" size={14} />
-          Сервис + магазин запчастей
+          Переклейка и запчасти — Калуга
         </div>
         <h2 className="font-oswald text-2xl sm:text-4xl font-bold uppercase leading-tight">
-          Замена стекла и <span className="text-[#FFD700]">продажа запчастей</span> для ремонта
+          Замена стекла (переклейка) и{" "}
+          <span className="text-[#FFD700]">продажа запчастей</span> для телефонов
         </h2>
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
         {/* Услуга — переклейка */}
-        <div className="bg-[#111] border border-white/[0.07] rounded-2xl p-6">
+        <div className="bg-[#111]/80 border border-white/[0.07] rounded-2xl p-6 backdrop-blur-sm">
           <div className="w-12 h-12 rounded-xl bg-[#FFD700]/10 flex items-center justify-center mb-4">
             <Icon name="Layers" size={24} className="text-[#FFD700]" />
           </div>
-          <h3 className="font-oswald text-lg font-semibold uppercase mb-2">Переклейка стекла любой сложности</h3>
-          <p className="text-white/50 text-sm leading-relaxed mb-3">
-            От бюджетных смартфонов до флагманов с изогнутыми (Curved) экранами. Используем вакуумный сепаратор,
-            пресс и чистый УФ-клей OCA. Возвращаем битым экранам заводской вид — без замены всего дисплейного модуля.
+          <h3 className="font-oswald text-xl font-bold uppercase mb-3">
+            Профессиональная переклейка стекла
+          </h3>
+          <p className="text-white/55 text-[13px] leading-relaxed mb-4">
+            Разбили стекло, но дисплей работает, а сенсор реагирует? Делаем профессиональную замену
+            стекла (переклейку) любой сложности — от бюджетных моделей до флагманов с изогнутыми
+            Curved-экранами. Используем вакуумный сепаратор, пресс и чистый УФ-клей. Никаких пузырей,
+            пятен и отклеек — возвращаем битому экрану заводской вид без замены дорогостоящего
+            дисплейного модуля.
           </p>
-          <ul className="space-y-1.5">
-            {["Сепаратор и пресс", "УФ-клей OCA, поляризатор", "Удаление царапин и полировка", "Ламинация без пузырей"].map((t) => (
+          <ul className="space-y-2">
+            {[
+              "Вакуумный сепаратор и ламинатор",
+              "УФ-клей OCA, поляризатор",
+              "Curved и изогнутые экраны",
+              "Удаление царапин, полировка",
+              "Без пузырей — заводской вид",
+            ].map((t) => (
               <li key={t} className="flex items-center gap-2 text-white/70 text-[13px]">
                 <Icon name="Check" size={14} className="text-[#FFD700] shrink-0" />
                 {t}
@@ -34,18 +46,30 @@ export default function RepairParts({ onOrder }: { onOrder: () => void }) {
           </ul>
         </div>
 
-        {/* Товары — запчасти */}
-        <div className="bg-[#111] border border-white/[0.07] rounded-2xl p-6">
+        {/* Магазин запчастей */}
+        <div className="bg-[#111]/80 border border-white/[0.07] rounded-2xl p-6 backdrop-blur-sm">
           <div className="w-12 h-12 rounded-xl bg-[#FFD700]/10 flex items-center justify-center mb-4">
             <Icon name="PackageOpen" size={24} className="text-[#FFD700]" />
           </div>
-          <h3 className="font-oswald text-lg font-semibold uppercase mb-2">Запчасти для ремонта своими руками</h3>
-          <p className="text-white/50 text-sm leading-relaxed mb-3">
-            Вы мастер или хотите отремонтировать телефон сами? В наличии и под заказ — качественные запчасти
-            и расходники. Поможем с подбором: покажите телефон или назовите модель — подберём совместимую деталь.
+          <h3 className="font-oswald text-xl font-bold uppercase mb-3">
+            Продажа запчастей для мобильных телефонов
+          </h3>
+          <p className="text-white/55 text-[13px] leading-relaxed mb-4">
+            Вы мастер или хотите отремонтировать телефон своими руками? У нас в наличии и под заказ —
+            качественные запчасти: дисплейные модули (оригинал, качественная копия TFT/Incell,
+            восстановленный Refurbished), шлейфы, аккумуляторы повышенной ёмкости, разъёмы зарядки
+            и гарнитуры. Расходники для переклейки: OCA-плёнка, жидкий УФ-клей, поляризаторы.
+            Не знаете, какая деталь нужна? Присылайте фото или приходите лично — подберём совместимую
+            запчасть за 5 минут.
           </p>
-          <ul className="space-y-1.5">
-            {["Дисплейные модули: оригинал, копия, восстановленные", "Шлейфы и аккумуляторы повышенной ёмкости", "Инструмент для пайки и ламинации", "Трафареты, паста, OCA-плёнка"].map((t) => (
+          <ul className="space-y-2">
+            {[
+              "Дисплеи: оригинал, копия (TFT/Incell), Refurbished",
+              "Шлейфы, аккумуляторы повышенной ёмкости",
+              "Разъёмы зарядки и гарнитуры",
+              "OCA-плёнка, жидкий УФ-клей, поляризаторы",
+              "Консультация по совместимости — бесплатно",
+            ].map((t) => (
               <li key={t} className="flex items-center gap-2 text-white/70 text-[13px]">
                 <Icon name="Check" size={14} className="text-[#FFD700] shrink-0" />
                 {t}
@@ -58,7 +82,7 @@ export default function RepairParts({ onOrder }: { onOrder: () => void }) {
       <div className="mt-5 text-center">
         <button
           onClick={onOrder}
-          className="bg-[#FFD700] hover:bg-[#ffed4a] text-black font-oswald font-bold tracking-wide px-8 py-3.5 rounded-lg text-sm transition-colors inline-flex items-center gap-2"
+          className="bg-[#FFD700] hover:bg-[#ffed4a] text-black font-oswald font-bold tracking-wide px-8 py-3.5 rounded-xl text-sm transition-all shadow-[0_0_24px_rgba(255,215,0,0.2)] inline-flex items-center gap-2"
         >
           <Icon name="MessageSquare" size={16} />
           Подобрать запчасть или заказать переклейку

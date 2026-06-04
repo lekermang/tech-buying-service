@@ -15,6 +15,7 @@ import RepairParts from "@/components/repair/RepairParts";
 import RepairHowItWorks from "@/components/repair/RepairHowItWorks";
 import RepairModels from "@/components/repair/RepairModels";
 import RepairLocation from "@/components/repair/RepairLocation";
+import RepairReviews from "@/components/repair/RepairReviews";
 import RepairFAQ from "@/components/repair/RepairFAQ";
 import RepairSEOText from "@/components/repair/RepairSEOText";
 import { REPAIR_PHONE_DISPLAY, REPAIR_PHONE_TEL } from "@/components/repair/repairContacts";
@@ -94,6 +95,7 @@ export default function Repair() {
             <a href="#prices" className="hidden md:block text-sm text-white/60 hover:text-[#FFD700] transition-colors">Цены</a>
             <a href="#services" className="hidden md:block text-sm text-white/60 hover:text-[#FFD700] transition-colors">Услуги</a>
             <a href="#all-devices" className="hidden lg:block text-sm text-white/60 hover:text-[#FFD700] transition-colors">Все бренды</a>
+            <a href="#reviews" className="hidden lg:block text-sm text-white/60 hover:text-[#FFD700] transition-colors">Отзывы</a>
             <a href="#contacts" className="hidden md:block text-sm text-white/60 hover:text-[#FFD700] transition-colors">Контакты</a>
             <a
               href={REPAIR_PHONE_TEL}
@@ -122,6 +124,7 @@ export default function Repair() {
         <RepairModels onOrder={scrollToForm} />
         <RepairHowItWorks />
         <RepairLocation />
+        <RepairReviews />
 
         {/* Форма заявки */}
         <section id="repair-form" className="px-4 sm:px-8 py-14 max-w-3xl mx-auto scroll-mt-20">
