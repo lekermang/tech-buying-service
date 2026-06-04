@@ -42,22 +42,6 @@ def get_employee_by_token(token: str):
 
 
 def handler(event: dict, context) -> dict:
-    import time as _t
-    try:
-        from func_metrics import track
-    except Exception:
-        track = None
-    started = _t.time()
-    resp = _handle_impl(event, context)
-    try:
-        if track and event.get('httpMethod') != 'OPTIONS':
-            track('employee-auth', int((resp or {}).get('statusCode', 200)), started)
-    except Exception:
-        pass
-    return resp
-
-
-def _handle_impl(event: dict, context) -> dict:
     """Авторизация сотрудников: вход, профиль, управление сотрудниками (только owner/admin)"""
 
     if event.get('httpMethod') == 'OPTIONS':

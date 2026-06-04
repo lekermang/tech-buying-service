@@ -984,18 +984,6 @@ def action_opt_status(event):
                 'applied_at': _get_setting('optimization_applied_at')})
 
 
-def action_func_stats(event, qp):
-    """Реальная статистика вызовов функций за N дней (для владельца)."""
-    if not auth_staff(event):
-        return _err(401, 'Auth required')
-    from func_metrics import read_stats
-    try:
-        days = int((qp or {}).get('days', 7))
-    except Exception:
-        days = 7
-    return _ok({'ok': True, **read_stats(days)})
-
-
 def action_opt_apply(event):
     """Применяет все доступные из кода оптимизации и фиксирует флаг."""
     if not auth_staff(event):
@@ -1022,20 +1010,6 @@ def action_opt_apply(event):
 # ─────────────────────────── handler ────────────────────────────────
 
 def handler(event: dict, context) -> dict:
-    """Обёртка с замером реальных метрик вызова функции."""
-    import time as _t
-    from func_metrics import track
-    started = _t.time()
-    resp = _handle(event, context)
-    try:
-        if event.get('httpMethod') != 'OPTIONS':
-            track('public-chat', int((resp or {}).get('statusCode', 200)), started)
-    except Exception:
-        pass
-    return resp
-
-
-def _handle(event: dict, context) -> dict:
     method = event.get('httpMethod', 'GET')
     if method == 'OPTIONS':
         return {'statusCode': 200, 'headers': CORS, 'body': ''}
@@ -1071,8 +1045,6 @@ def _handle(event: dict, context) -> dict:
             return action_ai_status(event)
         if method == 'GET' and action == 'opt_status':
             return action_opt_status(event)
-        if method == 'GET' and action == 'func_stats':
-            return action_func_stats(event, qp)
         if method == 'POST' and action == 'opt_apply':
             return action_opt_apply(event)
         if method == 'POST' and action == 'ai_toggle':
