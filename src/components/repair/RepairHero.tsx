@@ -29,8 +29,8 @@ export default function RepairHero({ onOrder }: { onOrder: () => void }) {
           <span className="text-[#FFD700]">быстро, качественно, с гарантией</span>
         </h1>
         <p className="text-white/50 text-sm sm:text-lg max-w-xl leading-relaxed mb-6">
-          iPhone, iPad, MacBook и другие телефоны. Замена экранов, аккумуляторов, ремонт после воды.
-          Срочный ремонт при вас.
+          iPhone, Android и все бренды мира. Замена экранов и аккумуляторов, компонентный ремонт,
+          BGA-пайка плат, снятие FRP и разблокировка iCloud. Срочный ремонт при вас.
         </p>
 
         {/* Преимущества-галочки */}

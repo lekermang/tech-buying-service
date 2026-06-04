@@ -9,6 +9,7 @@ import RepairStats from "@/components/repair/RepairStats";
 import RepairFeatures from "@/components/repair/RepairFeatures";
 import RepairPriceTable from "@/components/repair/RepairPriceTable";
 import RepairServices from "@/components/repair/RepairServices";
+import RepairAllDevices from "@/components/repair/RepairAllDevices";
 import RepairHowItWorks from "@/components/repair/RepairHowItWorks";
 import RepairModels from "@/components/repair/RepairModels";
 import RepairLocation from "@/components/repair/RepairLocation";
@@ -51,6 +52,9 @@ export default function Repair() {
           <a href="#services" className="hidden md:block text-sm text-white/60 hover:text-[#FFD700] transition-colors">
             Услуги
           </a>
+          <a href="#all-devices" className="hidden lg:block text-sm text-white/60 hover:text-[#FFD700] transition-colors">
+            Все бренды
+          </a>
           <a href="#contacts" className="hidden md:block text-sm text-white/60 hover:text-[#FFD700] transition-colors">
             Контакты
           </a>
@@ -76,6 +80,7 @@ export default function Repair() {
       <RepairPriceTable onOrder={scrollToForm} />
       <RepairFeatures />
       <RepairServices onOrder={scrollToForm} />
+      <RepairAllDevices onOrder={scrollToForm} />
       <RepairModels onOrder={scrollToForm} />
       <RepairHowItWorks />
       <RepairLocation />
