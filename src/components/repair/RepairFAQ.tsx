@@ -1,6 +1,6 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
-import { FAQS } from "./RepairSEO";
+import { FAQS } from "./repairFaqData";
 
 export default function RepairFAQ() {
   const [open, setOpen] = useState<number | null>(0);

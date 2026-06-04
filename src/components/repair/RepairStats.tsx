@@ -7,7 +7,7 @@ const STATS = [
 
 export default function RepairStats() {
   return (
-    <section className="border-y border-white/[0.07] bg-[#111] px-4 py-8 sm:py-10">
+    <section className="border-y border-[#FFD700]/10 bg-[#111]/70 backdrop-blur-sm px-4 py-8 sm:py-10">
       <div className="max-w-4xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-6 sm:gap-8">
         {STATS.map((s) => (
           <div key={s.label} className="text-center">

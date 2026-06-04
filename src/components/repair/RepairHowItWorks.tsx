@@ -7,7 +7,7 @@ const STEPS = [
 
 export default function RepairHowItWorks() {
   return (
-    <section id="how" className="border-y border-white/[0.07] bg-[#111] px-4 sm:px-8 py-14 my-4 scroll-mt-20">
+    <section id="how" className="border-y border-[#FFD700]/10 bg-[#111]/70 backdrop-blur-sm px-4 sm:px-8 py-14 my-4 scroll-mt-20">
       <div className="text-center mb-9">
         <h2 className="font-oswald text-3xl sm:text-4xl font-bold uppercase">
           Как это <span className="text-[#FFD700]">работает</span>
