@@ -45,6 +45,7 @@ const ToolsSync = safeLazy(() => import("./pages/ToolsSync"));
 const NotFound = safeLazy(() => import("./pages/NotFound404"));
 const RepairStatus = safeLazy(() => import("./pages/RepairStatus"));
 const RepairDiscount = safeLazy(() => import("./pages/RepairDiscount"));
+const Repair = safeLazy(() => import("./pages/Repair"));
 const Requisites = safeLazy(() => import("./pages/Requisites"));
 const Act = safeLazy(() => import("./pages/Act"));
 const PublicChat = safeLazy(() => import("./pages/PublicChat"));
@@ -116,6 +117,7 @@ const App = () => {
       // На /staff и /admin это не нужно — там сотрудники.
       const path = window.location.pathname;
       if (path === "/" || path === "/TopGold") {
+        import("./pages/Repair").catch(() => { /* ignore */ });
         import("./pages/RepairDiscount").catch(() => { /* ignore */ });
         import("./pages/Catalog").catch(() => { /* ignore */ });
         import("./pages/Tools").catch(() => { /* ignore */ });
@@ -148,6 +150,7 @@ const App = () => {
             <Route path="/icons" element={<RussianIcons />} />
             <Route path="/porcelain" element={<RussianPorcelain />} />
             <Route path="/soviet-antiques" element={<SovietAntiques />} />
+            <Route path="/repair" element={<Repair />} />
             <Route path="/repair-status" element={<RepairStatus />} />
             <Route path="/repair-discount" element={<RepairDiscount />} />
             <Route path="/requisites" element={<Requisites />} />

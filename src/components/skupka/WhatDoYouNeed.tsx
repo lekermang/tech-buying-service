@@ -62,7 +62,7 @@ const TILES: Tile[] = [
     cta: "Оставить заявку",
     accent: "#fb923c",
     glow: "rgba(251,146,60,0.16)",
-    action: { type: "event", name: "open-repair" },
+    action: { type: "link", href: "/repair" },
   },
   {
     id: "buy",

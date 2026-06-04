@@ -119,7 +119,7 @@ export default function PremiumServicesGrid() {
       return;
     }
     if (action.type === "open-repair") {
-      window.dispatchEvent(new CustomEvent("open-repair"));
+      window.location.href = "/repair";
     }
   };
 
