@@ -267,6 +267,11 @@ def handler(event: dict, context) -> dict:
     qp = event.get('queryStringParameters') or {}
     action = (qp.get('action') or body.get('action') or 'poll')
 
+    # Временная диагностика DeepSeek (вернёт точную ошибку API)
+    if action == 'ai_check':
+        from ai import diagnose
+        return _ok(diagnose())
+
     # Cron / служебный вызов: ИИ-советник раз в час (защищён admin-токеном)
     if action == 'ai_advice':
         hdrs = {k.lower(): v for k, v in (event.get('headers') or {}).items()}

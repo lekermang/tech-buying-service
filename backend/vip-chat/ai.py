@@ -7,6 +7,7 @@
 import os
 import json
 import urllib.request
+import urllib.error
 
 DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions'
 
@@ -50,6 +51,37 @@ def _call(messages: list, max_tokens: int = 350) -> str | None:
     except Exception as e:
         print(f'[vip-ai] error: {e}')
         return None
+
+
+def diagnose() -> dict:
+    """Возвращает точную причину, почему DeepSeek не отвечает (HTTP-код + тело ошибки)."""
+    api_key = os.environ.get('DEEPSEEK_API_KEY', '').strip()
+    if not api_key:
+        return {'ok': False, 'reason': 'no_key', 'detail': 'DEEPSEEK_API_KEY пустой'}
+    payload = json.dumps({
+        'model': 'deepseek-chat',
+        'messages': [{'role': 'user', 'content': 'ping'}],
+        'max_tokens': 5,
+    }).encode('utf-8')
+    req = urllib.request.Request(
+        DEEPSEEK_URL, data=payload,
+        headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
+        method='POST',
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=25) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+        reply = data.get('choices', [{}])[0].get('message', {}).get('content', '')
+        return {'ok': True, 'reply': reply, 'key_tail': api_key[-4:]}
+    except urllib.error.HTTPError as e:
+        body = ''
+        try:
+            body = e.read().decode('utf-8')[:300]
+        except Exception:
+            pass
+        return {'ok': False, 'reason': f'http_{e.code}', 'detail': body, 'key_tail': api_key[-4:]}
+    except Exception as e:
+        return {'ok': False, 'reason': 'exception', 'detail': str(e)[:300], 'key_tail': api_key[-4:]}
 
 
 def answer_staff(question: str, history: list | None = None) -> str | None:
