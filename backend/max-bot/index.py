@@ -791,6 +791,20 @@ def handle_message(msg: dict) -> dict:
             _log('in', 'staff_reply', text[:200], max_chat_id=max_chat_id, payload=msg)
             return {'ok': True}
 
+        # ИИ-помощник в группе: отвечает, если к нему обратились (триггер-слово или вопрос)
+        if text:
+            low = text.lower()
+            triggers = ('бот', 'ии', 'ai', 'совет', 'помоги', 'подскажи', 'скупка24', '?')
+            if any(t in low for t in triggers):
+                try:
+                    answer = ask_deepseek(text)
+                    if answer:
+                        send_max_message(max_chat_id, answer)
+                        _log('in', 'group_ai_reply', text[:200], max_chat_id=max_chat_id, payload=msg)
+                        return {'ok': True, 'ai_answered': True}
+                except Exception as e:
+                    print(f'[MAX][group-ai] {e}')
+
         _log('in', f'staff_channel:{chat_type}', text[:200], max_chat_id=max_chat_id, payload=msg)
         return {'ok': True}
 
