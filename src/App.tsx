@@ -42,7 +42,7 @@ const StaffShare = safeLazy(() => import("./pages/StaffShare"));
 const Catalog = safeLazy(() => import("./pages/Catalog"));
 const Tools = safeLazy(() => import("./pages/Tools"));
 const ToolsSync = safeLazy(() => import("./pages/ToolsSync"));
-const NotFound = safeLazy(() => import("./pages/NotFound"));
+const NotFound = safeLazy(() => import("./pages/NotFound404"));
 const RepairStatus = safeLazy(() => import("./pages/RepairStatus"));
 const RepairDiscount = safeLazy(() => import("./pages/RepairDiscount"));
 const Requisites = safeLazy(() => import("./pages/Requisites"));
