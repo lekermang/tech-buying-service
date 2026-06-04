@@ -1,5 +1,5 @@
 export const CHAT_URL = "https://functions.poehali.dev/60644856-ff88-4875-b2a9-97c87d32a630";
-export const POLL_INTERVAL = 12000;
+export const POLL_INTERVAL = 20000;
 
 export const QUICK_REPLIES = [
   "Здравствуйте! Чем могу помочь?",

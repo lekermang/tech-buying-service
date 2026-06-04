@@ -33,6 +33,11 @@ export default function VipChatTab({ token }: { token: string }) {
         headers: { "X-Employee-Token": token, "Content-Type": "application/json" },
         body: JSON.stringify({ action, ...body }),
       });
+      if (r.status === 401 || r.status === 403) {
+        localStorage.removeItem("employee_token");
+        window.location.reload();
+        throw new Error("SESSION_EXPIRED");
+      }
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       return await r.json();
     },
@@ -76,9 +81,9 @@ export default function VipChatTab({ token }: { token: string }) {
     poll();
   }, [peer, poll]);
 
-  // Поллинг каждые 4 сек
+  // Поллинг каждые 8 сек
   useEffect(() => {
-    const id = setInterval(poll, 4000);
+    const id = setInterval(poll, 8000);
     return () => clearInterval(id);
   }, [poll]);
 

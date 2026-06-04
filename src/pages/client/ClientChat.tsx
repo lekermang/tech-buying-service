@@ -115,15 +115,26 @@ export default function ClientChat({ token }: { token: string }) {
     if (authToken && roomId) loadRoom();
   }, [authToken, roomId, loadRoom]);
 
-  // Long-poll новых сообщений раз в 4 сек
+  // Long-poll новых сообщений раз в 8 сек
   useEffect(() => {
     if (!authToken || !roomId) return;
+    let active = true;
     const id = setInterval(async () => {
+      if (!active) return;
       try {
         const r = await fetch(
           `${CHAT_URL}?action=poll&room_id=${roomId}&since=${lastIdRef.current}`,
           { headers: { "X-Auth-Token": authToken } },
         );
+        if (r.status === 401 || r.status === 403) {
+          active = false;
+          clearInterval(id);
+          setAuthToken("");
+          localStorage.removeItem(LS_AUTH);
+          localStorage.removeItem(LS_ROOM);
+          setError("Сессия истекла. Обновите страницу.");
+          return;
+        }
         const d = await r.json();
         if (Array.isArray(d.messages) && d.messages.length) {
           setMessages((prev) => [...prev, ...d.messages]);
@@ -131,10 +142,10 @@ export default function ClientChat({ token }: { token: string }) {
           if (last) lastIdRef.current = last.id;
         }
       } catch {
-        /* ignore */
+        /* ignore network errors */
       }
-    }, 4000);
-    return () => clearInterval(id);
+    }, 8000);
+    return () => { active = false; clearInterval(id); };
   }, [authToken, roomId]);
 
   // Автоскролл при новых сообщениях

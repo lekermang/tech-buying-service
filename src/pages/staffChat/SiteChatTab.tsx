@@ -53,6 +53,11 @@ export default function SiteChatTab({ token }: { token: string }) {
   const loadRooms = useCallback(async () => {
     try {
       const r = await fetch(`${CHAT_URL}?action=staff_rooms`, { headers: { "X-Employee-Token": token } });
+      if (r.status === 401 || r.status === 403) {
+        localStorage.removeItem("employee_token");
+        window.location.reload();
+        return;
+      }
       const d = await r.json();
       if (d?.ok) {
         const newRooms: Room[] = d.rooms || [];
@@ -113,6 +118,11 @@ export default function SiteChatTab({ token }: { token: string }) {
   const pollRoom = useCallback(async (roomId: number) => {
     try {
       const r = await fetch(`${CHAT_URL}?action=poll&room_id=${roomId}&since=${lastIdRef.current}`, { headers: { "X-Employee-Token": token } });
+      if (r.status === 401 || r.status === 403) {
+        localStorage.removeItem("employee_token");
+        window.location.reload();
+        return;
+      }
       if (!r.ok) return;
       const d = await r.json();
       if (d?.messages?.length) {

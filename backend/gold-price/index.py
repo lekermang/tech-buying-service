@@ -15,6 +15,49 @@ def handler(event: dict, context) -> dict:
     if event.get('httpMethod') == 'OPTIONS':
         return {'statusCode': 200, 'headers': {**HEADERS, 'Access-Control-Allow-Methods': 'GET, OPTIONS'}, 'body': ''}
 
+    # 0. Кеш — если есть свежая запись до 10 минут, возвращаем её без внешних API
+    import psycopg2
+    conn = psycopg2.connect(os.environ['DATABASE_URL'])
+    cur = conn.cursor()
+    cur.execute(
+        f"SELECT price_rub, xau_usd, usd_rub, recorded_at FROM {SCHEMA}.gold_price_history "
+        f"WHERE recorded_at > NOW() - INTERVAL '10 minutes' ORDER BY recorded_at DESC LIMIT 1"
+    )
+    cached = cur.fetchone()
+    if cached:
+        price_rub, xau_usd_c, usd_rub_c, recorded_at = cached
+        gold_per_gram_usd_c = float(xau_usd_c) / 31.1035
+        gold_settings = {'retail_discount': 15, 'retail_deduction': 0, 'wholesale_discount': 10, 'wholesale_deduction': 0, 'bulk_discount': 5, 'bulk_deduction': 50}
+        cur.execute(f"SELECT key, value FROM {SCHEMA}.settings WHERE key LIKE 'gold_%'")
+        for key, value in cur.fetchall():
+            short = key.replace('gold_', '')
+            if value not in (None, ''):
+                try:
+                    gold_settings[short] = float(value)
+                except (ValueError, TypeError):
+                    pass
+        cur.execute(
+            f"""SELECT DATE(recorded_at + INTERVAL '3 hours') AS day, AVG(price_rub)::NUMERIC(12,2)
+                FROM {SCHEMA}.gold_price_history WHERE recorded_at > NOW() - INTERVAL '8 days'
+                GROUP BY day ORDER BY day ASC LIMIT 8"""
+        )
+        history = [{'date': str(r[0]), 'price': float(r[1])} for r in cur.fetchall()]
+        cur.close()
+        conn.close()
+        return {
+            'statusCode': 200,
+            'headers': {**HEADERS, 'Cache-Control': 'public, max-age=600'},
+            'body': json.dumps({
+                'buy': float(price_rub), 'buy_usd': round(gold_per_gram_usd_c, 2),
+                'sell': None, 'xau_usd': round(float(xau_usd_c), 2),
+                'usd_rub': round(float(usd_rub_c), 4), 'unit': 'руб/г',
+                'metal': 'Золото (Au)', 'date': str(recorded_at)[:10],
+                'history': history, 'settings': gold_settings, 'cached': True,
+            })
+        }
+    cur.close()
+    conn.close()
+
     # 1. Курс USD/RUB — биржевой (ММВБ через fxratesapi), фолбэк ЦБ
     usd_rub = None
     cbr_date = None
@@ -75,7 +118,6 @@ def handler(event: dict, context) -> dict:
         'bulk_discount': 5,
         'bulk_deduction': 50,
     }
-    import psycopg2
     conn = psycopg2.connect(os.environ['DATABASE_URL'])
     cur = conn.cursor()
 
