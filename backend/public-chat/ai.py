@@ -67,3 +67,45 @@ def ask_deepseek(user_text: str, history: list | None = None) -> str | None:
     except Exception as e:
         print(f'[ai][polza] error: {e}')
         return None
+
+
+VISION_PROMPT = SYSTEM_PROMPT + """
+
+Сейчас клиент прислал ФОТО техники. Твоя задача:
+- Определи что на фото (тип устройства, модель/бренд если видно).
+- Оцени видимое состояние (царапины, трещины, потёртости, комплект).
+- Дай ОРИЕНТИРОВОЧНУЮ цену скупки, добавь что точную назовёт менеджер после осмотра.
+- Если на фото не техника или непонятно — вежливо попроси прислать фото чётче."""
+
+
+def ask_vision(image_url: str, user_text: str = '') -> str | None:
+    """Распознаёт фото техники и даёт ориентировочную оценку. image_url — публичный URL картинки."""
+    api_key = os.environ.get('POLZA_AI_API_KEY', '').strip()
+    if not api_key or not (image_url or '').strip():
+        return None
+    user_content = [
+        {'type': 'text', 'text': (user_text or 'Что это за техника и сколько примерно стоит скупка?')[:1000]},
+        {'type': 'image_url', 'image_url': {'url': image_url}},
+    ]
+    payload = json.dumps({
+        'model': AI_MODEL,
+        'messages': [
+            {'role': 'system', 'content': VISION_PROMPT},
+            {'role': 'user', 'content': user_content},
+        ],
+        'temperature': 0.4,
+        'max_tokens': 400,
+    }).encode('utf-8')
+    req = urllib.request.Request(
+        AI_URL, data=payload,
+        headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
+        method='POST',
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+        answer = data['choices'][0]['message']['content'].strip()
+        return answer or None
+    except Exception as e:
+        print(f'[ai][vision] error: {e}')
+        return None

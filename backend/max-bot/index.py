@@ -26,7 +26,7 @@ from typing import Any
 import psycopg2
 import requests
 
-from ai import ask_deepseek
+from ai import ask_deepseek, ask_vision
 
 SCHEMA = 't_p31606708_tech_buying_service'
 MAX_API_URL = 'https://botapi.max.ru'
@@ -271,6 +271,47 @@ def _save_ai_message(room_id: int, text: str):
         conn.commit(); cur.close(); conn.close()
     except Exception as e:
         print(f'[MAX] _save_ai_message error: {e}')
+
+
+def _extract_photo_url(body: dict, msg: dict) -> str | None:
+    """Достаёт URL фото из вложений MAX (body.attachments / msg.attachments)."""
+    atts = body.get('attachments') or msg.get('attachments') or []
+    if not isinstance(atts, list):
+        return None
+    for a in atts:
+        if not isinstance(a, dict):
+            continue
+        atype = (a.get('type') or '').lower()
+        if atype in ('image', 'photo'):
+            payload = a.get('payload') or {}
+            url = payload.get('url') or payload.get('photo_url') or a.get('url')
+            if url:
+                return url
+    return None
+
+
+def try_ai_vision(room_id: int, max_chat_id: int, photo_url: str, caption: str = '') -> bool:
+    """ИИ распознаёт фото клиента в MAX, если сотрудник ещё не подключался."""
+    try:
+        if not _ai_enabled():
+            return False
+        if _staff_ever_replied(room_id):
+            return False
+        answer = ask_vision(photo_url, caption)
+        if not answer:
+            return False
+        _save_ai_message(room_id, answer)
+        send_max_message(
+            max_chat_id, answer,
+            reply_markup={'buttons': [
+                [{'type': 'callback', 'text': '☎ Позвать менеджера', 'payload': 'menu:contact'}],
+                [{'type': 'callback', 'text': '⬅ В главное меню', 'payload': 'menu:home'}],
+            ]}
+        )
+        return True
+    except Exception as e:
+        print(f'[MAX] try_ai_vision error: {e}')
+        return False
 
 
 def try_ai_reply(room_id: int, max_chat_id: int, client_text: str) -> bool:
@@ -774,6 +815,7 @@ def handle_message(msg: dict) -> dict:
 
     body = msg.get('body') or {}
     text = (body.get('text') or msg.get('text') or '').strip()
+    photo_url = _extract_photo_url(body, msg)
 
     if not max_user_id:
         _log('in', 'unknown_sender', text, payload=msg, error='no max_user_id')
@@ -790,6 +832,17 @@ def handle_message(msg: dict) -> dict:
         if text and _handle_staff_reply(text, name, max_chat_id):
             _log('in', 'staff_reply', text[:200], max_chat_id=max_chat_id, payload=msg)
             return {'ok': True}
+
+        # ИИ в группе видит фото: распознаёт технику и оценивает
+        if photo_url and _ai_enabled():
+            try:
+                answer = ask_vision(photo_url, text)
+                if answer:
+                    send_max_message(max_chat_id, answer)
+                    _log('in', 'group_ai_vision', text[:200], max_chat_id=max_chat_id, payload=msg)
+                    return {'ok': True, 'ai_answered': True}
+            except Exception as e:
+                print(f'[MAX][group-vision] {e}')
 
         # ИИ-помощник в группе: отвечает на ЛЮБОЙ вопрос (без ограничений по теме).
         # Пропускаем слишком короткие реплики (смайлы, «ок», «да») чтобы не спамить.
@@ -848,6 +901,20 @@ def handle_message(msg: dict) -> dict:
         _log('in', 'repair_status', text, max_user_id=max_user_id, max_chat_id=max_chat_id,
              pchat_client_id=client_id, payload=msg)
         return {'ok': True}
+
+    # 2.5. Фото от клиента — ИИ распознаёт технику и оценивает
+    if photo_url:
+        insert_client_message(room_id, client_id, name, text or '📷 Фото')
+        answered = try_ai_vision(room_id, max_chat_id, photo_url, text)
+        if not answered:
+            send_max_message(
+                max_chat_id,
+                "📷 Фото получено! Менеджер посмотрит и ответит в ближайшее время.",
+                reply_markup={'buttons': [[{'type': 'callback', 'text': '⬅ В главное меню', 'payload': 'menu:home'}]]}
+            )
+        _log('in', 'photo', text[:100], max_user_id=max_user_id, max_chat_id=max_chat_id,
+             pchat_client_id=client_id, pchat_room_id=room_id, payload=msg)
+        return {'ok': True, 'ai_answered': answered}
 
     # 3. Обычный текст — кладём в LIVE-чат
     if text:

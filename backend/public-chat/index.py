@@ -24,7 +24,7 @@ import psycopg2
 import psycopg2.extras
 import requests
 
-from ai import ask_deepseek
+from ai import ask_deepseek, ask_vision
 
 SCHEMA = 't_p31606708_tech_buying_service'
 
@@ -303,9 +303,10 @@ def _recent_history(room_id: int, limit: int = 8) -> list:
     return out
 
 
-def _maybe_ai_reply(room_id: int, client_text: str):
+def _maybe_ai_reply(room_id: int, client_text: str, photo_url: str = None):
     """
     Если сотрудник ещё не подключался к комнате — ИИ отвечает клиенту.
+    Если есть фото — распознаёт его (vision). Иначе отвечает по тексту.
     Ответ сохраняется как сообщение от 'staff' с пометкой ассистента.
     """
     try:
@@ -313,8 +314,11 @@ def _maybe_ai_reply(room_id: int, client_text: str):
             return
         if _staff_ever_replied(room_id):
             return
-        history = _recent_history(room_id)
-        answer = ask_deepseek(client_text, history)
+        if photo_url:
+            answer = ask_vision(photo_url, client_text)
+        else:
+            history = _recent_history(room_id)
+            answer = ask_deepseek(client_text, history)
         if not answer:
             return
         ai_msg = _post_message(room_id, 'staff', 0, '🤖 Ассистент Скупка24', answer)
@@ -748,9 +752,10 @@ def action_send(event, body):
         print(f'[public-chat][notify] {e}')
 
     # ИИ-ассистент отвечает клиенту, пока живой менеджер не подключился
+    # (на текст — обычный ответ, на фото — распознавание техники)
     ai_msg = None
-    if author_type == 'client' and text:
-        ai_msg = _maybe_ai_reply(room_id, text)
+    if author_type == 'client' and (text or photo_url):
+        ai_msg = _maybe_ai_reply(room_id, text, photo_url)
 
     return _ok({
         'ok': True,

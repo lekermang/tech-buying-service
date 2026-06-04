@@ -20,7 +20,7 @@ import psycopg2
 import boto3
 from botocore.client import Config as BotoConfig
 
-from ai import answer_staff, advise
+from ai import answer_staff, advise, vision_staff
 
 AI_BOT_ID = 6  # employees.id системного «🤖 ИИ-Советник»
 AI_TRIGGERS = ('бот', 'ии', 'ai', 'совет', 'помоги', 'подскажи', '@бот', '@ии')
@@ -581,23 +581,29 @@ def _action_send(me: dict, body: dict) -> dict:
 
     # ИИ-помощник отвечает в ОБЩЕМ чате, если к нему обратились (триггер-слово)
     ai_reply_id = None
-    if not recipient_id and text:
-        low = text.lower()
-        if any(t in low for t in AI_TRIGGERS):
-            try:
+    if not recipient_id:
+        low = (text or '').lower()
+        triggered = any(t in low for t in AI_TRIGGERS)
+        try:
+            ai_answer = None
+            # Фото с обращением к боту — распознаём технику
+            if photo_url and triggered:
+                ai_answer = vision_staff(photo_url, text)
+            # Текстовый вопрос боту
+            elif text and triggered:
                 history = _general_history()
                 ai_answer = answer_staff(text, history)
-                if ai_answer:
-                    ai_reply_id = _post_bot_message(ai_answer)
-                    _send_push_to_all_except(AI_BOT_ID, {
-                        'title': '🤖 ИИ-Советник',
-                        'body': ai_answer[:120],
-                        'url': '/staff?tab=chat',
-                        'tag': 'vip-ai-reply',
-                        'msg_id': ai_reply_id,
-                    })
-            except Exception as e:
-                print(f'[vip-ai] reply error: {e}')
+            if ai_answer:
+                ai_reply_id = _post_bot_message(ai_answer)
+                _send_push_to_all_except(AI_BOT_ID, {
+                    'title': '🤖 ИИ-Советник',
+                    'body': ai_answer[:120],
+                    'url': '/staff?tab=chat',
+                    'tag': 'vip-ai-reply',
+                    'msg_id': ai_reply_id,
+                })
+        except Exception as e:
+            print(f'[vip-ai] reply error: {e}')
 
     return _ok({'ok': True, 'id': new_id, 'created_at': created_at.isoformat(),
                 'ai_reply_id': ai_reply_id})

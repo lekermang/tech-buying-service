@@ -72,3 +72,43 @@ def advise(summary: str) -> str | None:
         {'role': 'user', 'content': summary.strip()[:3000]},
     ]
     return _call(messages, max_tokens=450)
+
+
+VISION_PROMPT = """Ты — ИИ-помощник команды «Скупка24» (Калуга): скупка, ремонт и продажа техники.
+Сотрудник прислал ФОТО техники. Помоги ему:
+- Определи устройство (тип, модель/бренд если видно).
+- Оцени видимое состояние (царапины, трещины, потёртости, комплект).
+- Дай ОРИЕНТИРОВОЧНУЮ вилку цены скупки и продажи Б/У, на что обратить внимание при оценке.
+- Отвечай коротко, по-деловому, по-русски."""
+
+
+def vision_staff(image_url: str, question: str = '') -> str | None:
+    """Распознаёт фото техники для сотрудника. image_url — публичный URL."""
+    api_key = os.environ.get('POLZA_AI_API_KEY', '').strip()
+    if not api_key or not (image_url or '').strip():
+        return None
+    user_content = [
+        {'type': 'text', 'text': (question or 'Что за техника на фото, состояние и ориентировочная цена?')[:1000]},
+        {'type': 'image_url', 'image_url': {'url': image_url}},
+    ]
+    payload = json.dumps({
+        'model': AI_MODEL,
+        'messages': [
+            {'role': 'system', 'content': VISION_PROMPT},
+            {'role': 'user', 'content': user_content},
+        ],
+        'temperature': 0.4,
+        'max_tokens': 400,
+    }).encode('utf-8')
+    req = urllib.request.Request(
+        AI_URL, data=payload,
+        headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
+        method='POST',
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+        return (data['choices'][0]['message']['content'] or '').strip() or None
+    except Exception as e:
+        print(f'[vip-ai][vision] error: {e}')
+        return None
