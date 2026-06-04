@@ -24,6 +24,8 @@ import psycopg2
 import psycopg2.extras
 import requests
 
+from ai import ask_deepseek
+
 SCHEMA = 't_p31606708_tech_buying_service'
 
 CORS = {
@@ -250,6 +252,57 @@ def _post_message(room_id: int, author_type: str, author_id: int, author_name: s
     )
     conn.commit(); cur.close(); conn.close()
     return dict(row)
+
+
+def _staff_ever_replied(room_id: int) -> bool:
+    """True, если в комнате уже есть хотя бы одно сообщение от живого сотрудника."""
+    conn = _conn()
+    cur = conn.cursor()
+    cur.execute(
+        f"SELECT 1 FROM {SCHEMA}.pchat_messages "
+        f"WHERE room_id=%s AND author_type='staff' AND is_system=false LIMIT 1",
+        (room_id,)
+    )
+    row = cur.fetchone()
+    cur.close(); conn.close()
+    return bool(row)
+
+
+def _recent_history(room_id: int, limit: int = 8) -> list:
+    """Последние сообщения комнаты в формате для ИИ (client→user, staff/ai→assistant)."""
+    conn = _conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        f"SELECT author_type, text FROM {SCHEMA}.pchat_messages "
+        f"WHERE room_id=%s AND is_system=false AND text IS NOT NULL AND text<>'' "
+        f"ORDER BY id DESC LIMIT %s",
+        (room_id, limit)
+    )
+    rows = list(reversed(cur.fetchall()))
+    cur.close(); conn.close()
+    out = []
+    for r in rows:
+        role = 'user' if r['author_type'] == 'client' else 'assistant'
+        out.append({'role': role, 'content': (r['text'] or '')[:1000]})
+    return out
+
+
+def _maybe_ai_reply(room_id: int, client_text: str):
+    """
+    Если сотрудник ещё не подключался к комнате — ИИ отвечает клиенту.
+    Ответ сохраняется как сообщение от 'staff' с пометкой ассистента.
+    """
+    try:
+        if _staff_ever_replied(room_id):
+            return
+        history = _recent_history(room_id)
+        answer = ask_deepseek(client_text, history)
+        if not answer:
+            return
+        ai_msg = _post_message(room_id, 'staff', 0, '🤖 Ассистент Скупка24', answer)
+        return ai_msg
+    except Exception as e:
+        print(f'[public-chat][ai] {e}')
 
 
 def _upload_chat_photo(b64: str, mime: str = 'image/jpeg') -> str:
@@ -676,10 +729,16 @@ def action_send(event, body):
     except Exception as e:
         print(f'[public-chat][notify] {e}')
 
+    # ИИ-ассистент отвечает клиенту, пока живой менеджер не подключился
+    ai_msg = None
+    if author_type == 'client' and text:
+        ai_msg = _maybe_ai_reply(room_id, text)
+
     return _ok({
         'ok': True,
         'message_id': msg['id'],
         'created_at': msg['created_at'],
+        'ai_reply_id': ai_msg['id'] if ai_msg else None,
     })
 
 

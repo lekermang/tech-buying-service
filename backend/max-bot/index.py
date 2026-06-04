@@ -26,6 +26,8 @@ from typing import Any
 import psycopg2
 import requests
 
+from ai import ask_deepseek
+
 SCHEMA = 't_p31606708_tech_buying_service'
 MAX_API_URL = 'https://botapi.max.ru'
 HEADERS = {
@@ -204,6 +206,85 @@ def insert_client_message(room_id: int, client_id: int, name: str, text: str) ->
     except Exception as e:
         print(f'[MAX] insert_client_message error: {e}')
         return None
+
+
+def _staff_ever_replied(room_id: int) -> bool:
+    """True, если в комнате уже есть сообщение от живого сотрудника."""
+    try:
+        conn = _conn(); cur = conn.cursor()
+        cur.execute(
+            f"SELECT 1 FROM {SCHEMA}.pchat_messages "
+            f"WHERE room_id={int(room_id)} AND author_type='staff' "
+            f"AND author_name NOT LIKE '%Ассистент%' AND is_system=FALSE LIMIT 1"
+        )
+        row = cur.fetchone(); cur.close(); conn.close()
+        return bool(row)
+    except Exception as e:
+        print(f'[MAX] _staff_ever_replied error: {e}')
+        return True  # при ошибке лучше промолчать, чем спамить
+
+
+def _recent_history(room_id: int, limit: int = 8) -> list:
+    """Последние сообщения комнаты для контекста ИИ."""
+    try:
+        conn = _conn(); cur = conn.cursor()
+        cur.execute(
+            f"SELECT author_type, text FROM {SCHEMA}.pchat_messages "
+            f"WHERE room_id={int(room_id)} AND is_system=FALSE AND text IS NOT NULL AND text<>'' "
+            f"ORDER BY id DESC LIMIT {int(limit)}"
+        )
+        rows = list(reversed(cur.fetchall())); cur.close(); conn.close()
+        out = []
+        for at, txt in rows:
+            role = 'user' if at == 'client' else 'assistant'
+            out.append({'role': role, 'content': (txt or '')[:1000]})
+        return out
+    except Exception:
+        return []
+
+
+def _save_ai_message(room_id: int, text: str):
+    """Сохраняет ответ ИИ в LIVE-чат как сообщение ассистента (виден сотрудникам)."""
+    try:
+        conn = _conn(); cur = conn.cursor()
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.pchat_messages (room_id, author_type, author_id, author_name, text) "
+            f"VALUES ({int(room_id)}, 'staff', 0, {_esc('🤖 Ассистент Скупка24')}, {_esc(text)})"
+        )
+        cur.execute(
+            f"UPDATE {SCHEMA}.pchat_rooms SET last_message_at=NOW(), last_message_text={_esc(text[:500])} "
+            f"WHERE id={int(room_id)}"
+        )
+        conn.commit(); cur.close(); conn.close()
+    except Exception as e:
+        print(f'[MAX] _save_ai_message error: {e}')
+
+
+def try_ai_reply(room_id: int, max_chat_id: int, client_text: str) -> bool:
+    """
+    ИИ отвечает клиенту в MAX, если сотрудник ещё не подключался к комнате.
+    Возвращает True, если ИИ ответил.
+    """
+    try:
+        if _staff_ever_replied(room_id):
+            return False
+        history = _recent_history(room_id)
+        answer = ask_deepseek(client_text, history)
+        if not answer:
+            return False
+        _save_ai_message(room_id, answer)
+        send_max_message(
+            max_chat_id,
+            answer,
+            reply_markup={'buttons': [
+                [{'type': 'callback', 'text': '☎ Позвать менеджера', 'payload': 'menu:contact'}],
+                [{'type': 'callback', 'text': '⬅ В главное меню', 'payload': 'menu:home'}],
+            ]}
+        )
+        return True
+    except Exception as e:
+        print(f'[MAX] try_ai_reply error: {e}')
+        return False
 
 
 def notify_staff_telegram(author: str, text: str, source: str = 'MAX'):
@@ -741,10 +822,14 @@ def handle_message(msg: dict) -> dict:
              pchat_client_id=client_id, payload=msg)
         return {'ok': True}
 
-    # 3. Обычный текст — кладём в LIVE-чат, сотрудник ответит из Staff
+    # 3. Обычный текст — кладём в LIVE-чат
     if text:
         mid = insert_client_message(room_id, client_id, name, text)
-        if len(text) > 5:
+        # ИИ-ассистент отвечает сразу, пока живой менеджер не подключился
+        answered = False
+        if len(text) > 3:
+            answered = try_ai_reply(room_id, max_chat_id, text)
+        if not answered and len(text) > 5:
             send_max_message(
                 max_chat_id,
                 "✅ Принял ваш вопрос. Менеджер ответит в ближайшие минуты прямо здесь, в MAX.",
@@ -754,7 +839,7 @@ def handle_message(msg: dict) -> dict:
             )
         _log('in', 'text', text, max_user_id=max_user_id, max_chat_id=max_chat_id,
              pchat_client_id=client_id, pchat_room_id=room_id, payload=msg)
-        return {'ok': True, 'message_id': mid}
+        return {'ok': True, 'message_id': mid, 'ai_answered': answered}
 
     return {'ok': True}
 
