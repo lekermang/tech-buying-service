@@ -82,10 +82,14 @@ export default function RepairParts({ onOrder }: { onOrder: () => void }) {
       <div className="mt-5 text-center">
         <button
           onClick={onOrder}
-          className="bg-[#FFD700] hover:bg-[#ffed4a] text-black font-oswald font-bold tracking-wide px-8 py-3.5 rounded-xl text-sm transition-all shadow-[0_0_24px_rgba(255,215,0,0.2)] inline-flex items-center gap-2"
+          className="group relative overflow-hidden text-black font-oswald font-bold uppercase tracking-wide px-8 py-3.5 rounded-xl text-sm active:scale-95 transition-all inline-flex items-center gap-2
+                     bg-[linear-gradient(180deg,#fff3a0_0%,#ffd700_45%,#d4a017_100%)]
+                     shadow-[0_0_0_1px_rgba(255,215,0,0.5),0_6px_20px_rgba(255,215,0,0.3),inset_0_1px_0_rgba(255,255,255,0.5)]
+                     hover:shadow-[0_0_0_1px_rgba(255,215,0,0.8),0_10px_28px_rgba(255,215,0,0.5),inset_0_1px_0_rgba(255,255,255,0.6)]"
         >
-          <Icon name="MessageSquare" size={16} />
-          Подобрать запчасть или заказать переклейку
+          <span className="absolute inset-0 bg-[linear-gradient(115deg,transparent_35%,rgba(255,255,255,0.7)_50%,transparent_65%)] bg-[length:200%_100%] -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
+          <Icon name="MessageSquare" size={16} className="relative" />
+          <span className="relative">Подобрать запчасть или заказать переклейку</span>
         </button>
       </div>
     </section>

@@ -143,10 +143,15 @@ export default function EvaluateInline({ source = "ocenka_page" }: { source?: st
           )}
 
           <button onClick={goStep2}
-            className="mt-6 w-full py-4 rounded-xl font-oswald font-bold uppercase tracking-wide text-black text-base transition-all flex items-center justify-center gap-2"
-            style={{ background: "linear-gradient(135deg,#FFE34D,#FFD700)", boxShadow: "0 0 30px rgba(255,215,0,0.35)" }}>
-            Далее — описать устройство
-            <Icon name="ArrowRight" size={18} />
+            className="group relative overflow-hidden mt-6 w-full py-4 rounded-xl font-oswald font-bold uppercase tracking-wide text-black text-base active:scale-95 transition-all flex items-center justify-center gap-2
+                       bg-[linear-gradient(180deg,#fff3a0_0%,#ffd700_45%,#d4a017_100%)]
+                       shadow-[0_0_0_1px_rgba(255,215,0,0.6),0_10px_30px_rgba(255,215,0,0.35),inset_0_1px_0_rgba(255,255,255,0.5)]
+                       hover:shadow-[0_0_0_1px_rgba(255,215,0,0.9),0_14px_40px_rgba(255,215,0,0.55),inset_0_1px_0_rgba(255,255,255,0.6)]">
+            <span className="absolute inset-0 bg-[linear-gradient(115deg,transparent_35%,rgba(255,255,255,0.7)_50%,transparent_65%)] bg-[length:200%_100%] -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
+            <span className="relative flex items-center gap-2">
+              Далее — описать устройство
+              <Icon name="ArrowRight" size={18} />
+            </span>
           </button>
 
           <div className="mt-4 flex items-center justify-center gap-4 text-white/25 text-[11px] font-roboto">
@@ -239,10 +244,15 @@ export default function EvaluateInline({ source = "ocenka_page" }: { source?: st
         )}
 
         <button onClick={handleSubmit}
-          className="mt-6 w-full py-4 rounded-xl font-oswald font-bold uppercase tracking-wide text-black text-base transition-all flex items-center justify-center gap-2"
-          style={{ background: "linear-gradient(135deg,#FFE34D,#FFD700)", boxShadow: "0 0 30px rgba(255,215,0,0.35)" }}>
-          <Icon name="Send" size={18} />
-          Отправить — получить оценку
+          className="group relative overflow-hidden mt-6 w-full py-4 rounded-xl font-oswald font-bold uppercase tracking-wide text-black text-base active:scale-95 transition-all flex items-center justify-center gap-2
+                     bg-[linear-gradient(180deg,#fff3a0_0%,#ffd700_45%,#d4a017_100%)]
+                     shadow-[0_0_0_1px_rgba(255,215,0,0.6),0_10px_30px_rgba(255,215,0,0.35),inset_0_1px_0_rgba(255,255,255,0.5)]
+                     hover:shadow-[0_0_0_1px_rgba(255,215,0,0.9),0_14px_40px_rgba(255,215,0,0.55),inset_0_1px_0_rgba(255,255,255,0.6)]">
+          <span className="absolute inset-0 bg-[linear-gradient(115deg,transparent_35%,rgba(255,255,255,0.7)_50%,transparent_65%)] bg-[length:200%_100%] -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
+          <span className="relative flex items-center gap-2">
+            <Icon name="Send" size={18} />
+            Отправить — получить оценку
+          </span>
         </button>
 
         <p className="mt-3 text-center text-white/25 text-[10px] font-roboto">

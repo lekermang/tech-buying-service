@@ -198,10 +198,17 @@ export default function RepairForm({
       </div>
 
       <button onClick={onSubmit} disabled={!canSubmit || sending}
-        className="w-full bg-[#FFD700] text-black font-oswald font-bold py-2.5 uppercase text-sm hover:bg-yellow-400 transition-colors disabled:opacity-40 disabled:cursor-not-allowed mt-1">
-        {sending ? "Отправляем..." : selectedPart
-          ? `Отправить заявку · ${grandTotal.toLocaleString("ru-RU")} ₽`
-          : "Отправить заявку"}
+        className="group relative overflow-hidden w-full text-black font-oswald font-bold py-2.5 uppercase text-sm active:scale-[0.98] transition-all mt-1
+                   bg-[linear-gradient(180deg,#fff3a0_0%,#ffd700_45%,#d4a017_100%)]
+                   shadow-[0_0_0_1px_rgba(255,215,0,0.5),0_6px_20px_rgba(255,215,0,0.25),inset_0_1px_0_rgba(255,255,255,0.5)]
+                   hover:shadow-[0_0_0_1px_rgba(255,215,0,0.8),0_8px_28px_rgba(255,215,0,0.45),inset_0_1px_0_rgba(255,255,255,0.6)]
+                   disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none">
+        <span className="absolute inset-0 bg-[linear-gradient(115deg,transparent_35%,rgba(255,255,255,0.7)_50%,transparent_65%)] bg-[length:200%_100%] -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
+        <span className="relative">
+          {sending ? "Отправляем..." : selectedPart
+            ? `Отправить заявку · ${grandTotal.toLocaleString("ru-RU")} ₽`
+            : "Отправить заявку"}
+        </span>
       </button>
       <div className="flex items-center justify-between">
         <div className="font-roboto text-white/20 text-[9px]">

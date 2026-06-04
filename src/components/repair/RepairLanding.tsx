@@ -163,8 +163,12 @@ export default function RepairLanding({ config }: { config: RepairLandingConfig 
               {REPAIR_PHONE_DISPLAY}
             </a>
             <button onClick={scrollToForm}
-              className="bg-[#FFD700] hover:bg-[#ffed4a] text-black font-oswald font-bold tracking-wide px-4 sm:px-5 py-2.5 rounded-lg text-sm transition-colors shadow-[0_0_20px_rgba(255,215,0,0.25)]">
-              Заявка
+              className="group relative overflow-hidden text-black font-oswald font-bold uppercase tracking-wide px-4 sm:px-5 py-2.5 rounded-lg text-sm active:scale-95 transition-all
+                         bg-[linear-gradient(180deg,#fff3a0_0%,#ffd700_45%,#d4a017_100%)]
+                         shadow-[0_0_0_1px_rgba(255,215,0,0.5),0_6px_20px_rgba(255,215,0,0.3),inset_0_1px_0_rgba(255,255,255,0.5)]
+                         hover:shadow-[0_0_0_1px_rgba(255,215,0,0.8),0_8px_28px_rgba(255,215,0,0.5),inset_0_1px_0_rgba(255,255,255,0.6)]">
+              <span className="absolute inset-0 bg-[linear-gradient(115deg,transparent_35%,rgba(255,255,255,0.7)_50%,transparent_65%)] bg-[length:200%_100%] -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
+              <span className="relative">Заявка</span>
             </button>
           </div>
         </nav>
@@ -208,15 +212,21 @@ export default function RepairLanding({ config }: { config: RepairLandingConfig 
 
             <div className="flex flex-col sm:flex-row gap-3">
               <button onClick={scrollToForm}
-                className="group relative overflow-hidden bg-[#FFD700] hover:bg-[#ffed4a] text-black font-oswald font-bold tracking-wide px-8 py-4 rounded-xl text-base transition-all shadow-[0_0_40px_rgba(255,215,0,0.3)] hover:shadow-[0_0_60px_rgba(255,215,0,0.5)] inline-flex items-center justify-center gap-2">
-                <span className="absolute inset-0 bg-[linear-gradient(115deg,transparent_35%,rgba(255,255,255,0.35)_50%,transparent_65%)] bg-[length:200%] -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
-                Рассчитать стоимость
-                <Icon name="ArrowRight" size={18} />
+                className="group relative overflow-hidden text-black font-oswald font-bold uppercase tracking-wide px-8 py-4 rounded-xl text-base active:scale-95 transition-all inline-flex items-center justify-center gap-2
+                           bg-[linear-gradient(180deg,#fff3a0_0%,#ffd700_45%,#d4a017_100%)]
+                           shadow-[0_0_0_1px_rgba(255,215,0,0.6),0_10px_30px_rgba(255,215,0,0.35),inset_0_1px_0_rgba(255,255,255,0.5)]
+                           hover:shadow-[0_0_0_1px_rgba(255,215,0,0.9),0_14px_40px_rgba(255,215,0,0.55),inset_0_1px_0_rgba(255,255,255,0.6)]">
+                <span className="absolute inset-0 bg-[linear-gradient(115deg,transparent_35%,rgba(255,255,255,0.7)_50%,transparent_65%)] bg-[length:200%_100%] -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
+                <Icon name="Zap" size={18} className="relative" />
+                <span className="relative">Рассчитать стоимость</span>
+                <Icon name="ArrowRight" size={16} className="relative opacity-70 group-hover:translate-x-1 transition-transform" />
               </button>
               <a href={REPAIR_PHONE_TEL}
                 onClick={() => ymGoal(Goals.CALL_CLICK, { place: "landing_hero" })}
-                className="border border-[#FFD700]/40 hover:border-[#FFD700] hover:bg-[#FFD700]/[0.06] text-[#FFD700] px-8 py-4 rounded-xl text-base font-oswald font-bold tracking-wide transition-all inline-flex items-center justify-center gap-2 backdrop-blur-sm">
-                <Icon name="Phone" size={18} />
+                className="group bg-black/40 backdrop-blur-sm border border-[#FFD700]/40 hover:border-[#FFD700] text-[#FFD700] px-8 py-4 rounded-xl text-base font-oswald font-bold uppercase tracking-wide active:scale-95 transition-all inline-flex items-center justify-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-[#FFD700]/15 border border-[#FFD700]/40 flex items-center justify-center group-hover:bg-[#FFD700]/25 transition-colors">
+                  <Icon name="Phone" size={14} />
+                </div>
                 {REPAIR_PHONE_DISPLAY}
               </a>
             </div>
