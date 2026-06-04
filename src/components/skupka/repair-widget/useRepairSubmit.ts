@@ -38,10 +38,13 @@ export function useRepairSubmit() {
     // Итоговая сумма заявки: суммируем выбранную запчасть (если есть) + ВСЕ позиции (динамические + статические доп.услуги).
     // Это значение придёт в Staff и автоматически встанет в поле «Принято от клиента» (repair_amount).
     const totalToSubmit = (selectedPart ? grandTotal : 0) + (selectedPart ? 0 : staticExtraTotal);
+    const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), 12000);
     try {
       const res = await fetch(REPAIR_ORDER_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: ctrl.signal,
         body: JSON.stringify({
           name: form.name,
           phone: form.phone,
@@ -88,6 +91,7 @@ export function useRepairSubmit() {
         } catch { /* noop */ }
       }
     } catch (_e) { /* ignore */ }
+    finally { clearTimeout(timeout); }
     setSending(false);
   };
 

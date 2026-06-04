@@ -11,7 +11,6 @@ export default function EvaluateModal({ onClose }: { onClose: () => void }) {
   const [photos, setPhotos] = useState<{ preview: string; base64: string }[]>([]);
   const [submitted, setSubmitted] = useState(false);
   const [leadId, setLeadId] = useState<number | null>(null);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -38,41 +37,50 @@ export default function EvaluateModal({ onClose }: { onClose: () => void }) {
     setStep(2);
   };
 
-  const handleSubmit = async () => {
-    setLoading(true);
+  const handleSubmit = () => {
+    if (submitted) return;
     setError(null);
     ymGoal(Goals.FORM_SUBMIT, {});
+
+    // Мгновенно показываем «Спасибо» — не ждём сервер.
+    // Заявка уходит в фоне с таймаутом, фото — отдельным запросом.
+    setSubmitted(true);
+    ymGoal(Goals.FORM_SUCCESS, {});
     try {
-      const res = await fetch(SEND_LEAD_URL, {
+      (window as unknown as { skypkaConvert?: (d: Record<string, unknown>) => void }).skypkaConvert?.({
+        type: "evaluate_skupka",
+        form_type: "evaluate_skupka",
+        phone: formData.phone,
+        amount: formData.client_price ? Number(String(formData.client_price).replace(/\D/g, "")) : null,
+        name: formData.name,
+      });
+    } catch { /* noop */ }
+
+    const sendBg = (body: Record<string, unknown>) => {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 12000);
+      fetch(SEND_LEAD_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...formData, photos: [], contact_channels: [], contact_time: "" }),
-      });
-      if (!res.ok) throw new Error("bad_status");
-      try { const data = await res.json(); if (data?.lead_id) setLeadId(data.lead_id); } catch { /* noop */ }
-      ymGoal(Goals.FORM_SUCCESS, {});
-      try {
-        (window as unknown as { skypkaConvert?: (d: Record<string, unknown>) => void }).skypkaConvert?.({
-          type: "evaluate_skupka",
-          form_type: "evaluate_skupka",
-          phone: formData.phone,
-          amount: formData.client_price ? Number(String(formData.client_price).replace(/\D/g, "")) : null,
-          name: formData.name,
-        });
-      } catch { /* noop */ }
-      setSubmitted(true);
-      const readyPhotos = photos.map(p => p.base64).filter(Boolean);
-      if (readyPhotos.length > 0) {
-        fetch(SEND_LEAD_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...formData, desc: `[фото] ${formData.desc}`, photos: readyPhotos }),
-        }).catch(() => {});
-      }
-    } catch {
-      setError("Ошибка отправки. Попробуйте ещё раз.");
-    } finally {
-      setLoading(false);
+        body: JSON.stringify(body),
+        keepalive: true,
+        signal: ctrl.signal,
+      })
+        .then(async (res) => {
+          if (!res.ok) return;
+          try { const data = await res.json(); if (data?.lead_id) setLeadId(data.lead_id); } catch { /* noop */ }
+        })
+        .catch(() => { /* отправка в фоне — ошибки не блокируют пользователя */ })
+        .finally(() => clearTimeout(t));
+    };
+
+    // Основная заявка (быстрая, без фото)
+    sendBg({ ...formData, photos: [], contact_channels: [], contact_time: "" });
+
+    // Фото — отдельным фоновым запросом
+    const readyPhotos = photos.map(p => p.base64).filter(Boolean);
+    if (readyPhotos.length > 0) {
+      sendBg({ ...formData, desc: `[фото] ${formData.desc}`, photos: readyPhotos });
     }
   };
 
@@ -415,11 +423,8 @@ export default function EvaluateModal({ onClose }: { onClose: () => void }) {
                   </div>
                 )}
 
-                <button onClick={handleSubmit} disabled={loading} className="btn-gold-premium btn-xl w-full">
-                  {loading
-                    ? <><Icon name="Loader" size={18} className="animate-spin" /> Отправляем...</>
-                    : <><Icon name="Check" size={18} /> Отправить заявку</>
-                  }
+                <button onClick={handleSubmit} className="btn-gold-premium btn-xl w-full">
+                  <Icon name="Check" size={18} /> Отправить заявку
                 </button>
 
                 <p className="font-roboto text-xs text-center" style={{ color: "rgba(255,255,255,0.2)" }}>
