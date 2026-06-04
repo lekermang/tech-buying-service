@@ -4,154 +4,13 @@
         xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
         http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
 
+  <!-- ===== ГЛАВНАЯ ===== -->
   <url>
     <loc>https://skypka24.com/</loc>
     <lastmod>2026-06-04</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
-
-  <url>
-    <loc>https://skypka24.com/catalog</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.9</priority>
-  </url>
-
-  <url>
-    <loc>https://skypka24.com/repair-discount</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-
-  <url>
-    <loc>https://skypka24.com/repair-status</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-
-  <url>
-    <loc>https://skypka24.com/transfer</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
-  </url>
-
-  <url>
-    <loc>https://skypka24.com/transfer/guide</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-
-  <url>
-    <loc>https://skypka24.com/safe-deals</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
-  </url>
-
-  <url>
-    <loc>https://skypka24.com/safe-deals/shop</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.85</priority>
-  </url>
-
-  <url>
-    <loc>https://skypka24.com/safe-deals/blacklist</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.6</priority>
-  </url>
-
-  <url>
-    <loc>https://skypka24.com/safe-deals/checklist</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
-
-  <url>
-    <loc>https://skypka24.com/safe-deals/kupit-iphone-kaluga</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.9</priority>
-  </url>
-
-  <url>
-    <loc>https://skypka24.com/safe-deals/srochno-prodat-telefon</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.9</priority>
-  </url>
-
-  <url>
-    <loc>https://skypka24.com/safe-deals/vykup-noutbukov</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.9</priority>
-  </url>
-
-  <url>
-    <loc>https://skypka24.com/TopGold</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-
-  <url>
-    <loc>https://skypka24.com/ancient-coins</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-
-  <url>
-    <loc>https://skypka24.com/bronze-sculptures</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-
-  <url>
-    <loc>https://skypka24.com/russian-coins</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-
-  <url>
-    <loc>https://skypka24.com/icons</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-
-  <url>
-    <loc>https://skypka24.com/porcelain</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-
-  <url>
-    <loc>https://skypka24.com/soviet-antiques</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-
-  <url>
-    <loc>https://skypka24.com/requisites</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.3</priority>
-  </url>
-
-  <!-- Якорные посадочные секции главной -->
   <url>
     <loc>https://skypka24.com/?section=catalog</loc>
     <lastmod>2026-06-04</lastmod>
@@ -165,10 +24,28 @@
     <priority>0.85</priority>
   </url>
   <url>
+    <loc>https://skypka24.com/?section=how</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/?section=guarantees</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+  </url>
+  <url>
     <loc>https://skypka24.com/?section=branches</loc>
     <lastmod>2026-06-04</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/?section=about</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
   </url>
   <url>
     <loc>https://skypka24.com/?section=reviews</loc>
@@ -177,15 +54,9 @@
     <priority>0.75</priority>
   </url>
   <url>
-    <loc>https://skypka24.com/?section=guarantees</loc>
+    <loc>https://skypka24.com/?section=avito</loc>
     <lastmod>2026-06-04</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://skypka24.com/?section=contacts</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>monthly</changefreq>
+    <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
@@ -193,6 +64,663 @@
     <lastmod>2026-06-04</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/?section=contacts</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- ===== КАТАЛОГ ТЕХНИКИ (Б/У и Новая) ===== -->
+  <url>
+    <loc>https://skypka24.com/catalog</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.95</priority>
+  </url>
+
+  <!-- iPhone 17 -->
+  <url>
+    <loc>https://skypka24.com/catalog?category=iPhone+17%2FAIR%2FPRO%2FMAX</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=iPhone+17%2FAIR%2FPRO%2FMAX&amp;model=Pro+Max</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=iPhone+17%2FAIR%2FPRO%2FMAX&amp;model=Pro</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=iPhone+17%2FAIR%2FPRO%2FMAX&amp;model=Air</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+
+  <!-- iPhone 16 -->
+  <url>
+    <loc>https://skypka24.com/catalog?category=iPhone+16%2Fe%2F%2B%2FPRO%2FMAX</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=iPhone+16%2Fe%2F%2B%2FPRO%2FMAX&amp;model=Pro+Max</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=iPhone+16%2Fe%2F%2B%2FPRO%2FMAX&amp;model=Pro</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=iPhone+16%2Fe%2F%2B%2FPRO%2FMAX&amp;model=Plus</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+
+  <!-- iPhone 15 -->
+  <url>
+    <loc>https://skypka24.com/catalog?category=iPhone+15%2F%2B%2FPRO%2FMAX</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=iPhone+15%2F%2B%2FPRO%2FMAX&amp;model=Pro+Max</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=iPhone+15%2F%2B%2FPRO%2FMAX&amp;model=Pro</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=iPhone+15%2F%2B%2FPRO%2FMAX&amp;model=Plus</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+
+  <!-- iPhone 11-14 -->
+  <url>
+    <loc>https://skypka24.com/catalog?category=iPhone+11%2F12%2F13%2F14</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=iPhone+11%2F12%2F13%2F14&amp;model=iPhone+14</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=iPhone+11%2F12%2F13%2F14&amp;model=iPhone+13</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=iPhone+11%2F12%2F13%2F14&amp;model=iPhone+12</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=iPhone+11%2F12%2F13%2F14&amp;model=iPhone+11</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+
+  <!-- MacBook -->
+  <url>
+    <loc>https://skypka24.com/catalog?category=MacBook</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=MacBook&amp;model=Air+M4</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.83</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=MacBook&amp;model=Pro+14</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.83</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=MacBook&amp;model=Pro+16</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.83</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=MacBook&amp;model=Air+M3</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.83</priority>
+  </url>
+
+  <!-- Apple Watch -->
+  <url>
+    <loc>https://skypka24.com/catalog?category=Apple+Watch</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=Apple+Watch&amp;model=Ultra+3</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=Apple+Watch&amp;model=Ultra+2</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=Apple+Watch&amp;model=S11</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=Apple+Watch&amp;model=SE3</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.78</priority>
+  </url>
+
+  <!-- AirPods -->
+  <url>
+    <loc>https://skypka24.com/catalog?category=AirPods</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=AirPods&amp;model=Pro+3</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=AirPods&amp;model=Pro+2</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=AirPods&amp;model=Max+2</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=AirPods&amp;model=4+ANC</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.78</priority>
+  </url>
+
+  <!-- Apple iPad -->
+  <url>
+    <loc>https://skypka24.com/catalog?category=Apple+iPad</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=Apple+iPad&amp;model=Air+M4</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=Apple+iPad&amp;model=Mini+7</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=Apple+iPad&amp;model=iPad+11</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.78</priority>
+  </url>
+
+  <!-- Samsung -->
+  <url>
+    <loc>https://skypka24.com/catalog?category=Samsung+S-Z</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.87</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=Samsung+S-Z&amp;model=Ultra</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.82</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=Samsung+S-Z&amp;model=S25%2B</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.82</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=Samsung+S-Z&amp;model=S25</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.82</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=Samsung+A-M</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=Samsung+A-M&amp;model=A55</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=Samsung+A-M&amp;model=A35</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- Категории устройств (русские) -->
+  <url>
+    <loc>https://skypka24.com/catalog?category=%D0%A1%D0%BC%D0%B0%D1%80%D1%82%D1%84%D0%BE%D0%BD%D1%8B</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=%D0%9F%D0%BB%D0%B0%D0%BD%D1%88%D0%B5%D1%82%D1%8B</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=%D0%9D%D0%BE%D1%83%D1%82%D0%B1%D1%83%D0%BA%D0%B8</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=%D0%9D%D0%B0%D1%83%D1%88%D0%BD%D0%B8%D0%BA%D0%B8</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.82</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=%D0%A3%D0%BC%D0%BD%D1%8B%D0%B5+%D1%87%D0%B0%D1%81%D1%8B</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.82</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=%D0%9A%D0%BE%D0%BC%D0%BF%D1%8C%D1%8E%D1%82%D0%B5%D1%80%D1%8B</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=%D0%A2%D0%B5%D1%85%D0%BD%D0%B8%D0%BA%D0%B0</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=%D0%98%D0%B3%D1%80%D0%BE%D0%B2%D1%8B%D0%B5+%D0%BA%D0%BE%D0%BD%D1%81%D0%BE%D0%BB%D0%B8</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.78</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?category=%D0%9A%D0%B0%D0%BC%D0%B5%D1%80%D1%8B</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.78</priority>
+  </url>
+
+  <!-- Фильтр по наличию -->
+  <url>
+    <loc>https://skypka24.com/catalog?availability=in_stock</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/catalog?availability=on_order</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.82</priority>
+  </url>
+
+  <!-- ===== РЕМОНТ ТЕЛЕФОНОВ ===== -->
+  <url>
+    <loc>https://skypka24.com/repair-discount</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.88</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/repair-status</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- ===== БЕЗОПАСНЫЕ СДЕЛКИ / СКУПКА ===== -->
+  <url>
+    <loc>https://skypka24.com/safe-deals</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/safe-deals/shop</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.88</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/safe-deals/checklist</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/safe-deals/blacklist</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/safe-deals/kupit-iphone-kaluga</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.92</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/safe-deals/srochno-prodat-telefon</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.92</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/safe-deals/vykup-noutbukov</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/blacklist</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/checklist</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+
+  <!-- ===== ПЕРЕДАЧА / TRADE-IN ===== -->
+  <url>
+    <loc>https://skypka24.com/transfer</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.88</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/transfer/guide</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.82</priority>
+  </url>
+
+  <!-- ===== СКУПКА ЗОЛОТА ===== -->
+  <url>
+    <loc>https://skypka24.com/TopGold</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- ===== АНТИКВАРИАТ — МОНЕТЫ ===== -->
+  <url>
+    <loc>https://skypka24.com/ancient-coins</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.78</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/ancient-coins#ancient-rome</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.72</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/ancient-coins#ancient-greece</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.72</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/ancient-coins#parthia</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/ancient-coins#ancient-rus</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <url>
+    <loc>https://skypka24.com/russian-coins</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.78</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/russian-coins#kievan-rus</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.72</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/russian-coins#golden-horde</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.72</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/russian-coins#moscow-state</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/russian-coins#russian-empire</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- ===== АНТИКВАРИАТ — БРОНЗА ===== -->
+  <url>
+    <loc>https://skypka24.com/bronze-sculptures</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.75</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/bronze-sculptures#ancient-greece</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.68</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/bronze-sculptures#ancient-rome</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.68</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/bronze-sculptures#medieval</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.68</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/bronze-sculptures#east</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.68</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/bronze-sculptures#xix-xx</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.68</priority>
+  </url>
+
+  <!-- ===== АНТИКВАРИАТ — ИКОНЫ ===== -->
+  <url>
+    <loc>https://skypka24.com/icons</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.78</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/icons#xvi-xvii</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/icons#xviii-xix</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/icons#oklady</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.68</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/icons#metal</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.68</priority>
+  </url>
+
+  <!-- ===== АНТИКВАРИАТ — ФАРФОР ===== -->
+  <url>
+    <loc>https://skypka24.com/porcelain</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.75</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/porcelain#imperial</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.68</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/porcelain#gardner</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.68</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/porcelain#kuznetsov</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.68</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/porcelain#crystal</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.65</priority>
+  </url>
+
+  <!-- ===== АНТИКВАРИАТ — СОВЕТСКОЕ ===== -->
+  <url>
+    <loc>https://skypka24.com/soviet-antiques</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.75</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/soviet-antiques#orders-medals</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.68</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/soviet-antiques#avangard</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.68</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/soviet-antiques#porcelain</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.65</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/soviet-antiques#furniture</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.65</priority>
+  </url>
+
+  <!-- ===== ПРОЧИЕ ПУБЛИЧНЫЕ СТРАНИЦЫ ===== -->
+  <url>
+    <loc>https://skypka24.com/requisites</loc>
+    <lastmod>2026-06-04</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
   </url>
 
 </urlset>
