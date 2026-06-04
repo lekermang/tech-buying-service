@@ -1,12 +1,13 @@
 """
-ИИ-ассистент Скупка24 на базе DeepSeek.
+ИИ-ассистент Скупка24 на базе Polza.ai (ChatGPT).
 Отвечает клиентам в MAX, пока живой менеджер не подключился к диалогу.
 """
 import os
 import json
 import urllib.request
 
-DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions'
+AI_URL = 'https://api.polza.ai/v1/chat/completions'
+AI_MODEL = 'gpt-4o-mini'
 
 SYSTEM_PROMPT = """Ты — вежливый ассистент компании «Скупка24» (skypka24.com) из Калуги.
 Компания: скупка и ремонт техники (телефоны, ноутбуки, технику Apple, фото, Dyson и др.),
@@ -33,7 +34,7 @@ def ask_deepseek(user_text: str, history: list | None = None) -> str | None:
     Возвращает ответ ИИ или None при ошибке/пустом ключе.
     history — список {'role': 'user'|'assistant', 'content': str} для контекста диалога.
     """
-    api_key = os.environ.get('DEEPSEEK_API_KEY', '').strip()
+    api_key = os.environ.get('POLZA_AI_API_KEY', '').strip()
     if not api_key or not (user_text or '').strip():
         return None
 
@@ -43,14 +44,14 @@ def ask_deepseek(user_text: str, history: list | None = None) -> str | None:
     messages.append({'role': 'user', 'content': user_text.strip()[:2000]})
 
     payload = json.dumps({
-        'model': 'deepseek-chat',
+        'model': AI_MODEL,
         'messages': messages,
         'temperature': 0.4,
         'max_tokens': 300,
     }).encode('utf-8')
 
     req = urllib.request.Request(
-        DEEPSEEK_URL,
+        AI_URL,
         data=payload,
         headers={
             'Authorization': f'Bearer {api_key}',
@@ -59,10 +60,10 @@ def ask_deepseek(user_text: str, history: list | None = None) -> str | None:
         method='POST',
     )
     try:
-        with urllib.request.urlopen(req, timeout=25) as resp:
+        with urllib.request.urlopen(req, timeout=45) as resp:
             data = json.loads(resp.read().decode('utf-8'))
         answer = data['choices'][0]['message']['content'].strip()
         return answer or None
     except Exception as e:
-        print(f'[ai][deepseek] error: {e}')
+        print(f'[ai][polza] error: {e}')
         return None

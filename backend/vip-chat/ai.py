@@ -1,5 +1,5 @@
 """
-ИИ-помощник команды Скупка24 для чата СКУПКА24Vip (DeepSeek).
+ИИ-помощник команды Скупка24 для чата СКУПКА24Vip (Polza.ai / ChatGPT).
 Два режима:
   1. Ответ сотруднику на вопрос/упоминание.
   2. Часовой советник: что сделать сейчас, чтобы не упустить прибыль.
@@ -9,7 +9,8 @@ import json
 import urllib.request
 import urllib.error
 
-DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions'
+AI_URL = 'https://api.polza.ai/v1/chat/completions'
+AI_MODEL = 'gpt-4o-mini'
 
 ASSISTANT_PROMPT = """Ты — ИИ-помощник команды «Скупка24» (Калуга): скупка, ремонт и продажа техники.
 Помогаешь СОТРУДНИКАМ прямо в их рабочем чате.
@@ -30,22 +31,22 @@ ADVISOR_PROMPT = """Ты — ИИ-советник по прибыли для к
 
 
 def _call(messages: list, max_tokens: int = 350) -> str | None:
-    api_key = os.environ.get('DEEPSEEK_API_KEY', '').strip()
+    api_key = os.environ.get('POLZA_AI_API_KEY', '').strip()
     if not api_key:
         return None
     payload = json.dumps({
-        'model': 'deepseek-chat',
+        'model': AI_MODEL,
         'messages': messages,
         'temperature': 0.5,
         'max_tokens': max_tokens,
     }).encode('utf-8')
     req = urllib.request.Request(
-        DEEPSEEK_URL, data=payload,
+        AI_URL, data=payload,
         headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
         method='POST',
     )
     try:
-        with urllib.request.urlopen(req, timeout=25) as resp:
+        with urllib.request.urlopen(req, timeout=45) as resp:
             data = json.loads(resp.read().decode('utf-8'))
         return (data['choices'][0]['message']['content'] or '').strip() or None
     except Exception as e:
