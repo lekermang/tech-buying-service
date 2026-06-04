@@ -58,22 +58,26 @@ export default function RepairHero({ onOrder }: { onOrder: () => void }) {
           Ремонт телефонов в Калуге
         </div>
 
-        {/* H1 в стиле Apple — крупный, с контрастным акцентом */}
-        <h1 className="font-oswald font-bold uppercase leading-[1.0] text-4xl sm:text-6xl lg:text-7xl mb-5 tracking-tight">
-          Ремонт<br />
+        {/* H1 + H2 в стиле Apple */}
+        <h1 className="font-oswald font-bold uppercase leading-[1.0] text-4xl sm:text-6xl lg:text-7xl mb-4 tracking-tight">
           <span
             className="bg-gradient-to-r from-[#fff3a0] via-[#FFD700] to-[#b8860b] bg-clip-text text-transparent"
             style={{ filter: "drop-shadow(0 0 40px rgba(255,215,0,0.3))" }}
           >
-            любых телефонов
+            Ремонт24
           </span>
           <br />
           <span className="text-white/90">в Калуге</span>
         </h1>
 
-        <p className="text-white/55 text-sm sm:text-xl max-w-2xl leading-relaxed mb-7">
+        <h2 className="font-oswald text-lg sm:text-2xl text-white/60 font-normal uppercase tracking-wide mb-6 leading-snug">
+          Сервисный центр Скупка24.<br className="hidden sm:block" />
+          Ремонт телефонов, планшетов и ноутбуков любой сложности
+        </h2>
+
+        <p className="text-white/50 text-sm sm:text-lg max-w-2xl leading-relaxed mb-7">
           iPhone, Android — все бренды мира. Замена экранов и аккумуляторов,&nbsp;
-          <strong className="text-white/80 font-medium">BGA-пайка и компонентный ремонт плат</strong>,
+          <strong className="text-white/75 font-medium">BGA-пайка и компонентный ремонт плат</strong>,
           снятие FRP, разблокировка iCloud. Срочный ремонт прямо при вас.
         </p>
 
