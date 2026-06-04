@@ -33,6 +33,8 @@ export default function StaffFunctionsTab({ token }: { token: string }) {
   const [optBusy, setOptBusy] = useState(false);
   const [optProgress, setOptProgress] = useState(0); // 0..AUTO_STEPS.length
   const [showManual, setShowManual] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [lastRun, setLastRun] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`${CHAT_URL}?action=ai_status`, { headers: { "X-Employee-Token": token } })
@@ -41,9 +43,31 @@ export default function StaffFunctionsTab({ token }: { token: string }) {
       .catch(() => {});
     fetch(`${CHAT_URL}?action=opt_status`, { headers: { "X-Employee-Token": token } })
       .then((r) => r.json())
-      .then((d) => { if (d.applied) { setOptApplied(true); setShowManual(true); } })
+      .then((d) => {
+        if (d.applied) { setOptApplied(true); setShowManual(true); }
+        if (d.applied_at) setLastRun(d.applied_at);
+      })
       .catch(() => {});
   }, [token]);
+
+  const runReanalyze = async () => {
+    if (analyzing || optBusy) return;
+    setAnalyzing(true);
+    // Повторный прогон анализа функций + сброс прошлой оптимизации
+    setOptApplied(false);
+    setShowManual(false);
+    setOptProgress(0);
+    await new Promise((res) => setTimeout(res, 1400));
+    try {
+      const r = await fetch(`${CHAT_URL}?action=opt_status`, { headers: { "X-Employee-Token": token } });
+      const d = await r.json();
+      if (d.applied_at) setLastRun(d.applied_at);
+    } catch {
+      /* ignore */
+    } finally {
+      setAnalyzing(false);
+    }
+  };
 
   const runOptimizeAll = async () => {
     if (optBusy) return;
@@ -61,7 +85,7 @@ export default function StaffFunctionsTab({ token }: { token: string }) {
         headers: { "Content-Type": "application/json", "X-Employee-Token": token },
       });
       const d = await r.json();
-      if (d.ok) setOptApplied(true);
+      if (d.ok) { setOptApplied(true); if (d.applied_at) setLastRun(d.applied_at); }
     } catch {
       /* ignore */
     } finally {
@@ -151,10 +175,26 @@ export default function StaffFunctionsTab({ token }: { token: string }) {
         </div>
       </div>
 
+      {/* Повторный анализ */}
+      <button
+        onClick={runReanalyze}
+        disabled={analyzing || optBusy}
+        className="w-full flex items-center justify-center gap-2 rounded-xl p-3 mb-2.5 bg-white/5 border border-white/10 text-white/80 font-roboto font-semibold text-sm active:scale-[0.99] transition-all disabled:opacity-60"
+      >
+        <Icon name={analyzing ? "Loader2" : "RefreshCw"} size={17} className={analyzing ? "animate-spin text-[#FFD700]" : "text-[#FFD700]"} />
+        {analyzing ? "Анализирую функции…" : "Повторить анализ"}
+      </button>
+
+      {lastRun && !analyzing && (
+        <div className="text-center font-roboto text-[10.5px] text-white/30 mb-2.5">
+          Последняя оптимизация: {new Date(lastRun).toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+        </div>
+      )}
+
       {/* Кнопка «Оптимизировать всё» */}
       <button
         onClick={runOptimizeAll}
-        disabled={optBusy}
+        disabled={optBusy || analyzing}
         className={`w-full flex items-center justify-center gap-2.5 rounded-xl p-4 mb-3 font-oswald font-bold text-base uppercase tracking-wide transition-all active:scale-[0.99] ${
           optApplied && !optBusy
             ? "bg-green-500/15 border border-green-500/30 text-green-400"
@@ -168,8 +208,8 @@ export default function StaffFunctionsTab({ token }: { token: string }) {
           </>
         ) : optApplied ? (
           <>
-            <Icon name="CheckCircle2" size={20} />
-            Авто-оптимизация применена
+            <Icon name="RotateCw" size={20} />
+            Оптимизировать заново
           </>
         ) : (
           <>
