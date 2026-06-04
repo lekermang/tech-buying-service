@@ -39,7 +39,6 @@ export default function PublicChat() {
   const [clientName, setClientName] = useState<string>(() => localStorage.getItem(LS_NAME) || "");
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState("");
-  const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -133,58 +132,74 @@ export default function PublicChat() {
     e.target.value = "";
   };
 
-  const sendMessage = async () => {
+  const sendMessage = () => {
     const text = draft.trim();
     if (!text && !photoBase64) return;
-    if (!roomId || !authToken || sending) return;
-    setSending(true);
+    if (!roomId || !authToken) return;
     setError(null);
 
-    // Пробуем до 2 раз при сетевой ошибке
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const r = await fetch(`${PUBLIC_CHAT_URL}?action=send`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-Auth-Token": authToken },
-          body: JSON.stringify({
-            room_id: roomId,
-            text: text || undefined,
-            photo_base64: photoBase64 || undefined,
-            photo_mime: photoBase64 ? photoMime : undefined,
-          }),
-        });
-        const d = await r.json();
-        if (!d || !d.ok) {
-          setError(d?.error || "Ошибка отправки. Попробуйте ещё раз.");
-          break;
-        }
-        setDraft("");
-        setPhotoBase64(null);
-        setPhotoPreview(null);
-        const optimistic: Message = {
-          id: d.message_id,
-          author_type: "client",
-          author_id: 0,
-          author_name: clientName || "Вы",
-          text: text || null,
-          is_system: false,
-          created_at: d.created_at || new Date().toISOString(),
-        };
-        setMessages(prev => [...prev, optimistic]);
-        lastIdRef.current = Math.max(lastIdRef.current, d.message_id || 0);
-        scrollToBottom();
-        setSending(false);
-        return;
-      } catch {
-        if (attempt === 0) {
-          // Ждём секунду и повторяем
-          await new Promise(res => setTimeout(res, 1000));
-        } else {
-          setError("Нет связи. Сообщение не отправлено — нажмите ещё раз.");
+    const tempId = -Date.now();
+    const sentPhotoBase64 = photoBase64;
+    const sentPhotoMime = photoMime;
+
+    // Мгновенно показываем сообщение и очищаем поле — не ждём сервер
+    const optimistic: Message = {
+      id: tempId,
+      author_type: "client",
+      author_id: 0,
+      author_name: clientName || "Вы",
+      text: text || null,
+      is_system: false,
+      created_at: new Date().toISOString(),
+    };
+    setMessages(prev => [...prev, optimistic]);
+    setDraft("");
+    setPhotoBase64(null);
+    setPhotoPreview(null);
+    scrollToBottom();
+
+    // Отправка в фоне с повтором при сетевой ошибке
+    (async () => {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const r = await fetch(`${PUBLIC_CHAT_URL}?action=send`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-Auth-Token": authToken },
+            keepalive: true,
+            body: JSON.stringify({
+              room_id: roomId,
+              text: text || undefined,
+              photo_base64: sentPhotoBase64 || undefined,
+              photo_mime: sentPhotoBase64 ? sentPhotoMime : undefined,
+            }),
+          });
+          const d = await r.json();
+          if (!d || !d.ok) {
+            // Не удалось — убираем временное сообщение и возвращаем черновик
+            setMessages(prev => prev.filter(m => m.id !== tempId));
+            setDraft(text);
+            setError(d?.error || "Ошибка отправки. Попробуйте ещё раз.");
+            return;
+          }
+          // Заменяем временный id на реальный
+          setMessages(prev => prev.map(m =>
+            m.id === tempId
+              ? { ...m, id: d.message_id, created_at: d.created_at || m.created_at }
+              : m
+          ));
+          lastIdRef.current = Math.max(lastIdRef.current, d.message_id || 0);
+          return;
+        } catch {
+          if (attempt === 0) {
+            await new Promise(res => setTimeout(res, 1000));
+          } else {
+            setMessages(prev => prev.filter(m => m.id !== tempId));
+            setDraft(text);
+            setError("Нет связи. Сообщение не отправлено — нажмите ещё раз.");
+          }
         }
       }
-    }
-    setSending(false);
+    })();
   };
 
   // Инициализация: проверяем invite-токен, или localStorage
@@ -214,7 +229,7 @@ export default function PublicChat() {
     }
   }, [authToken, roomId, loadRoom]);
 
-  // Long-poll каждые 30 сек, пропускаем при скрытой вкладке
+  // Опрос новых сообщений каждые 4 сек, пропускаем при скрытой вкладке
   useEffect(() => {
     if (!authToken || !roomId) return;
     const id = setInterval(async () => {
@@ -240,7 +255,7 @@ export default function PublicChat() {
       } catch {
         /* ignore */
       }
-    }, 30000);
+    }, 4000);
     return () => clearInterval(id);
   }, [authToken, roomId, scrollToBottom]);
 
@@ -454,15 +469,11 @@ export default function PublicChat() {
             <button
               type="button"
               onClick={sendMessage}
-              disabled={(!draft.trim() && !photoBase64) || sending}
+              disabled={!draft.trim() && !photoBase64}
               className="shrink-0 w-9 h-9 bg-[#FFD700] text-black flex items-center justify-center rounded-xl hover:bg-yellow-400 active:scale-95 transition-all disabled:opacity-35 disabled:cursor-not-allowed"
               aria-label="Отправить"
             >
-              {sending ? (
-                <Icon name="Loader" size={15} className="animate-spin" />
-              ) : (
-                <Icon name="Send" size={15} />
-              )}
+              <Icon name="Send" size={15} />
             </button>
           </div>
         </div>
