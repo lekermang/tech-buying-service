@@ -60,7 +60,7 @@ const ContactsFooter = ({ scrollTo }: ContactsFooterProps) => {
           {/* ── ГЛАВНАЯ ТЕЛЕФОННАЯ КАПСУЛА — продающий блок ───────────────── */}
           <div className="relative mb-6 md:mb-8 group">
             <div className="absolute -inset-2 bg-gradient-to-r from-[#FFD700]/30 via-[#FFD700]/10 to-[#FFD700]/30 blur-2xl pointer-events-none" />
-            <a href="tel:88006006833"
+            <a href="tel:+79929990333"
               onClick={() => ymGoal(Goals.CALL_CLICK, { place: "footer_main" })}
               className="relative block bg-gradient-to-br from-[#1a1a1a] via-black to-[#1a1a1a] border border-[#FFD700]/40 hover:border-[#FFD700] rounded-md p-5 md:p-7 transition-all overflow-hidden">
               {/* Бегущий блик */}
@@ -77,10 +77,10 @@ const ContactsFooter = ({ scrollTo }: ContactsFooterProps) => {
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <div className="font-oswald font-bold text-[10px] md:text-xs text-[#FFD700]/70 uppercase tracking-[0.3em] mb-1">Звонок бесплатный по России</div>
+                  <div className="font-oswald font-bold text-[10px] md:text-xs text-[#FFD700]/70 uppercase tracking-[0.3em] mb-1">Звоните — Калуга, ул. Кирова, 7</div>
                   <div className="font-oswald font-bold text-[#FFD700] text-3xl md:text-5xl tracking-tight leading-none whitespace-nowrap"
                        style={{ textShadow: '0 0 30px rgba(255,215,0,0.3)' }}>
-                    8 800 600-68-33
+                    8 992 999-03-33
                   </div>
                   <div className="flex items-center gap-3 mt-2">
                     <button type="button"
@@ -88,10 +88,10 @@ const ContactsFooter = ({ scrollTo }: ContactsFooterProps) => {
                          e.stopPropagation();
                          e.preventDefault();
                          ymGoal(Goals.CALL_CLICK, { place: "footer_secondary" });
-                         window.location.href = "tel:+78006006833";
+                         window.location.href = "tel:+79929990333";
                        }}
                        className="font-roboto text-white/60 hover:text-[#FFD700] text-xs md:text-sm transition-colors bg-transparent border-0 p-0 cursor-pointer">
-                      или 8 (800) 600-68-33
+                      или 8 (992) 999-03-33
                     </button>
                     <span className="text-[#FFD700]/30">·</span>
                     <span className="font-roboto text-white/40 text-xs md:text-sm flex items-center gap-1">
@@ -136,7 +136,7 @@ const ContactsFooter = ({ scrollTo }: ContactsFooterProps) => {
               <Icon name="ArrowUpRight" size={16} className="relative text-[#FFD700]/50 group-hover:text-[#FFD700] transition-colors" />
             </a>
 
-            <a href="https://wa.me/78006006833" target="_blank" rel="noopener noreferrer"
+            <a href="https://wa.me/79929990333" target="_blank" rel="noopener noreferrer"
               onClick={() => ymGoal(Goals.WHATSAPP_CLICK, { place: "footer" })}
               className="group relative overflow-hidden flex items-center gap-3 bg-gradient-to-br from-[#25D366]/15 to-[#25D366]/5 border border-[#25D366]/40 hover:border-[#25D366] rounded-md px-4 py-4 transition-all">
               <div className="absolute -inset-1 bg-gradient-to-br from-[#25D366]/20 to-transparent blur-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
@@ -199,7 +199,7 @@ const ContactsFooter = ({ scrollTo }: ContactsFooterProps) => {
                   />
                   {/* Кнопки */}
                   <div className="grid grid-cols-2 gap-px bg-[#FFD700]/15">
-                    <a href={`tel:+79929999777`}
+                    <a href={`tel:+79929990333`}
                       onClick={() => ymGoal(Goals.CALL_CLICK, { place: "footer_branch" })}
                       className="bg-black/60 hover:bg-[#FFD700]/10 text-[#FFD700] font-oswald font-bold text-xs uppercase tracking-wide py-3 transition-colors flex items-center justify-center gap-1.5">
                       <Icon name="Phone" size={13} />
@@ -256,8 +256,8 @@ const ContactsFooter = ({ scrollTo }: ContactsFooterProps) => {
             <div>
               <span className="font-oswald font-bold text-[#FFD700]">СКУПКА24</span>
               <div className="flex flex-col">
-                <a href="tel:88006006833" className="font-roboto text-[#FFD700] text-[10px] font-bold hover:opacity-80 transition-opacity leading-tight">+7 (800) 600-68-33</a>
-                <span className="font-roboto text-white/40 text-[10px] leading-tight">звонок бесплатный</span>
+                <a href="tel:+79929990333" className="font-roboto text-[#FFD700] text-[10px] font-bold hover:opacity-80 transition-opacity leading-tight">+7 (992) 999-03-33</a>
+                <span className="font-roboto text-white/40 text-[10px] leading-tight">звоните — ответим сразу</span>
               </div>
             </div>
           </div>

@@ -168,9 +168,9 @@ const CatalogOrderModal = ({ item, onClose, markup = 3500 }: Props) => {
                     </div>
                     <div className="flex-1">
                       <div className="text-xs text-[#1d1d1f]/40 mb-0.5">Номер телефона</div>
-                      <div className="text-base font-bold text-[#1d1d1f]">8 992 999-97-77</div>
+                      <div className="text-base font-bold text-[#1d1d1f]">8 992 999-03-33</div>
                       <div className="text-[11px] text-[#1d1d1f]/35 mt-0.5">Сбербанк · Получатель подтвердится</div>
-                      <button onClick={() => navigator.clipboard.writeText("89929999777")}
+                      <button onClick={() => navigator.clipboard.writeText("89929990333")}
                         className="mt-1.5 inline-flex items-center gap-1 text-[#21A038] text-xs font-medium">
                         <Icon name="Copy" size={11} /> Скопировать
                       </button>
@@ -185,8 +185,8 @@ const CatalogOrderModal = ({ item, onClose, markup = 3500 }: Props) => {
                 )}
               </div>
 
-              <a href="tel:+79929999777" className="flex items-center justify-center gap-2 w-full border border-black/10 rounded-xl py-3 text-sm font-medium text-[#1d1d1f] hover:bg-[#f5f5f7] transition-colors">
-                <Icon name="Phone" size={15} />+7 (992) 999-97-77
+              <a href="tel:+79929990333" className="flex items-center justify-center gap-2 w-full border border-black/10 rounded-xl py-3 text-sm font-medium text-[#1d1d1f] hover:bg-[#f5f5f7] transition-colors">
+                <Icon name="Phone" size={15} />+7 (992) 999-03-33
               </a>
             </div>
           ) : (

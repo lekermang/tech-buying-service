@@ -225,7 +225,7 @@ export default function SafeDealsItem() {
                   className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#FFD700] text-black font-bold text-sm">
                   <Icon name="MapPin" size={14} /> На карте
                 </a>
-                <a href="tel:+79299990333" className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border-2 border-[#2A2A2A] text-[#F0F0F0] font-bold text-sm hover:border-[#FFD700]">
+                <a href="tel:+79929990333" className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border-2 border-[#2A2A2A] text-[#F0F0F0] font-bold text-sm hover:border-[#FFD700]">
                   <Icon name="Phone" size={14} /> Позвонить
                 </a>
                 <button onClick={share}

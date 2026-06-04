@@ -4,8 +4,8 @@ import PremiumSection from "@/components/skupka/PremiumSection";
 import { ymGoal, Goals } from "@/lib/ym";
 
 const BRANCHES = [
-  { city: "Калуга", addr: "ул. Кирова, 11", metro: "г. Калуга, центр города", time: "24/7 без выходных", phones: ["+7 (992) 999-03-33", "8 (800) 600-68-33"] },
-  { city: "Калуга", addr: "ул. Кирова, 7/47", metro: "г. Калуга, центр города", time: "24/7 без выходных", phones: ["+7 (992) 999-03-33", "8 (800) 600-68-33"] },
+  { city: "Калуга", addr: "ул. Кирова, 11", metro: "г. Калуга, центр города", time: "24/7 без выходных", phones: ["+7 (992) 999-03-33"] },
+  { city: "Калуга", addr: "ул. Кирова, 7/47", metro: "г. Калуга, центр города", time: "24/7 без выходных", phones: ["+7 (992) 999-03-33"] },
 ];
 
 const InfoBranchesAbout = () => {

@@ -280,7 +280,7 @@ export default function AvitoProductModal({ item, photoIdx, setPhotoIdx, onClose
           ) : (
             <div className="grid grid-cols-2 gap-2">
               <a
-                href="tel:88005553535"
+                href="tel:+79929990333"
                 className="flex items-center justify-center gap-1.5 border border-[#FFD700]/40 text-[#FFD700] font-oswald font-bold text-sm py-2.5 rounded uppercase tracking-wide hover:bg-[#FFD700]/10 transition-colors"
               >
                 <Icon name="Phone" size={14} />

@@ -116,7 +116,7 @@ export default function SmsBlastPanel({
             <textarea
               value={smsMessage}
               onChange={e => { setSmsMessage(e.target.value.slice(0, MAX_SMS)); setSmsConfirm(false); }}
-              placeholder="Например: Скупка24 — повышенная цена за iPhone до конца недели! Звоните: +7 992 999-97-77"
+              placeholder="Например: Скупка24 — повышенная цена за iPhone до конца недели! Звоните: +7 992 999-03-33"
               rows={4}
               className="w-full bg-[#0A0A0A] border border-[#1F1F1F] text-white px-3 py-2.5 font-roboto text-sm rounded-md focus:outline-none focus:border-[#FFD700]/50 placeholder:text-white/25 resize-none"
             />

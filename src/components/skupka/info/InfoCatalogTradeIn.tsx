@@ -100,13 +100,13 @@ const InfoCatalogTradeIn = () => {
                   В магазин Скупка24
                   <Icon name="ArrowRight" size={16} />
                 </a>
-                <a href="tel:88006006833" className="btn-gold-outline btn-lg flex-col leading-none">
+                <a href="tel:+79929990333" className="btn-gold-outline btn-lg flex-col leading-none">
                   <span className="flex items-center gap-2">
                     <Icon name="Phone" size={16} />
                     Узнать детали
                   </span>
                   <span className="font-roboto font-normal normal-case text-[10px] md:text-[11px] text-[#FFD700]/70 tracking-normal mt-1">
-                    8 (800) 600-68-33 · бесплатно
+                    8 992 999-03-33 · бесплатно
                   </span>
                 </a>
               </div>

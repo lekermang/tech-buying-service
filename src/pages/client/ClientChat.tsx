@@ -298,7 +298,7 @@ export default function ClientChat({ token }: { token: string }) {
           </div>
         </div>
         <a
-          href="tel:+79929999777"
+          href="tel:+79929990333"
           className="p-2 rounded-lg bg-[#FFD700]/10 border border-[#FFD700]/30 text-[#FFD700] hover:bg-[#FFD700]/20"
           title="Позвонить"
         >

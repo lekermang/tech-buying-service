@@ -250,8 +250,8 @@ const YooKassaModal = ({ open, onClose }: YooKassaModalProps) => {
               Платёж защищён ЮKassa. Данные карты не передаются нашему сайту.
               Нажимая «Оплатить», вы соглашаетесь с условиями обработки платежей.
               <br />
-              <a href="tel:+79929999777" className="text-[#FFD700]/50 hover:text-[#FFD700] transition-colors">
-                +7 (992) 999-97-77
+              <a href="tel:+79929990333" className="text-[#FFD700]/50 hover:text-[#FFD700] transition-colors">
+                +7 (992) 999-03-33
               </a>{" "}
               · ИП Скупка24 · Калуга
             </p>

@@ -327,8 +327,8 @@ export default function BronzeSculptures() {
             </div>
           )}
           <div className="mt-4 flex items-center justify-center gap-4 flex-wrap">
-            <a href="tel:+79929999777" className="font-roboto text-white/40 text-sm hover:text-[#a78bfa] transition-colors flex items-center gap-1.5">
-              <Icon name="Phone" size={13} /> +7 (992) 999-97-77
+            <a href="tel:+79929990333" className="font-roboto text-white/40 text-sm hover:text-[#a78bfa] transition-colors flex items-center gap-1.5">
+              <Icon name="Phone" size={13} /> +7 (992) 999-03-33
             </a>
             <span className="text-white/15">·</span>
             <a href="https://t.me/skupka24" target="_blank" rel="noreferrer"

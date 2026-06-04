@@ -166,7 +166,7 @@ const GoldTickerMobile = ({
 
         {/* Телефон — на sm+ иконка, на lg+ полный с подписью */}
         <a
-          href="tel:88006006833"
+          href="tel:+79929990333"
           onClick={() => ymGoal(Goals.CALL_CLICK, { place: "ticker_mobile" })}
           title="Позвонить"
           className="hidden sm:inline-flex lg:hidden items-center justify-center w-9 h-9 rounded-md bg-black/60 border border-[#FFD700]/30 text-[#FFD700] active:scale-95 transition-all shrink-0 ml-auto"
@@ -174,12 +174,12 @@ const GoldTickerMobile = ({
           <Icon name="Phone" size={14} />
         </a>
         <a
-          href="tel:88006006833"
+          href="tel:+79929990333"
           onClick={() => ymGoal(Goals.CALL_CLICK, { place: "ticker_mobile" })}
           className="hidden lg:inline-flex items-center gap-2 h-9 px-3 rounded-md bg-black/60 hover:bg-black/80 border border-[#FFD700]/25 hover:border-[#FFD700]/55 active:scale-95 transition-all shrink-0 ml-auto"
         >
           <Icon name="Phone" size={13} className="text-[#FFD700]" />
-          <span className="font-oswald font-bold text-[#FFD700] text-[12px] tracking-wide whitespace-nowrap">8 800 600-68-33</span>
+          <span className="font-oswald font-bold text-[#FFD700] text-[12px] tracking-wide whitespace-nowrap">8 992 999-03-33</span>
         </a>
 
         {/* Продать — главный CTA */}
@@ -318,12 +318,12 @@ const GoldTickerMobile = ({
                   <span className="font-oswald font-bold text-[10px] uppercase tracking-wider">Сотрудник</span>
                 </a>
                 <a
-                  href="tel:88006006833"
+                  href="tel:+79929990333"
                   onClick={() => ymGoal(Goals.CALL_CLICK, { place: "ticker_mobile" })}
                   className="flex items-center justify-center gap-1.5 h-8 rounded-md bg-black/50 border border-[#FFD700]/30 text-[#FFD700] active:scale-95 transition-all"
                 >
                   <Icon name="Phone" size={12} />
-                  <span className="font-oswald font-bold text-[10px] tracking-wide">8 800 600-68-33</span>
+                  <span className="font-oswald font-bold text-[10px] tracking-wide">8 992 999-03-33</span>
                 </a>
                 <a
                   href={APK_URL}

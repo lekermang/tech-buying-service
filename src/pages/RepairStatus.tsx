@@ -239,9 +239,9 @@ export default function RepairStatus() {
         {/* Контакты */}
         <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-5 text-sm font-roboto space-y-2">
           <div className="font-bold text-white/60 text-xs uppercase tracking-wider mb-3">Остались вопросы?</div>
-          <a href="tel:+79929903333" className="flex items-center gap-3 text-white/70 hover:text-white transition-colors">
+          <a href="tel:+79929990333" className="flex items-center gap-3 text-white/70 hover:text-white transition-colors">
             <Icon name="Phone" size={15} className="text-[#FFD700] shrink-0" />
-            +7 (992) 990-33-33
+            +7 (992) 999-03-33
           </a>
           <a href="https://t.me/Skypkaklgbot" className="flex items-center gap-3 text-white/70 hover:text-white transition-colors">
             <Icon name="Send" size={15} className="text-[#FFD700] shrink-0" />

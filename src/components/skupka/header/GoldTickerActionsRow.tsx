@@ -86,19 +86,19 @@ const GoldTickerActionsRow = ({ onSellClick, compact }: GoldTickerActionsRowProp
       <div className="ml-auto flex items-center gap-1.5">
         {/* Телефон — десктоп */}
         <a
-          href="tel:88006006833"
+          href="tel:+79929990333"
           onClick={() => ymGoal(Goals.CALL_CLICK, { place: "ticker" })}
           className="hidden md:inline-flex items-center gap-1.5 h-7 px-3 rounded-md border border-[#FFD700]/30 bg-black/60 hover:bg-black/80 hover:border-[#FFD700]/60 active:scale-95 transition"
         >
           <Icon name="Phone" size={12} className="text-[#FFD700]" />
           <span className="font-oswald font-bold text-[#FFD700] text-[11px] tracking-wide whitespace-nowrap">
-            8 800 600-68-33
+            8 992 999-03-33
           </span>
         </a>
 
         {/* Телефон — мобила (иконка) */}
         <a
-          href="tel:88006006833"
+          href="tel:+79929990333"
           onClick={() => ymGoal(Goals.CALL_CLICK, { place: "ticker" })}
           title="Позвонить"
           className="md:hidden inline-flex items-center justify-center w-7 h-7 rounded-md bg-black/60 border border-[#FFD700]/30 text-[#FFD700] active:scale-95 transition-all"

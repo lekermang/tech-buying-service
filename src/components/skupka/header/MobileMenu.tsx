@@ -89,10 +89,10 @@ const MobileMenu = ({ open, navLinks, onNav, onPayClick }: MobileMenuProps) => {
         </a>
       </div>
       <div className="px-4 pt-4 pb-8 space-y-3">
-        <a href="tel:+78006006833"
+        <a href="tel:+79929990333"
           className="flex items-center justify-center gap-3 w-full bg-[#FFD700] text-black font-oswald font-bold text-xl py-4 uppercase tracking-wide active:scale-95 transition-all">
           <Icon name="Phone" size={22} />
-          8 (800) 600-68-33
+          8 992 999-03-33
         </a>
         <a href="https://t.me/skypka24"
           target="_blank" rel="noopener noreferrer"

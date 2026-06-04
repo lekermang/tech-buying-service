@@ -149,7 +149,7 @@ export default function DesktopStickyBar({ onOpenModal }: Props) {
                   </div>
 
                   {/* Кнопки */}
-                  <a href="tel:+79929999777"
+                  <a href="tel:+79929990333"
                     onClick={() => ymGoal(Goals.CALL_CLICK, { place: "desktop_sticky" })}
                     className="flex items-center gap-2 px-4 py-2 rounded-xl font-roboto text-sm font-semibold transition-all duration-200 active:scale-95"
                     style={{

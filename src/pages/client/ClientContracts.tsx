@@ -137,7 +137,7 @@ export default function ClientContracts({ token }: { token: string }) {
                   Открыть договор
                 </a>
                 <a
-                  href="tel:+78007777777"
+                  href="tel:+79929990333"
                   className="flex-1 px-3 py-2 rounded-lg bg-gradient-to-b from-[#FFE34D] to-[#d4a017] text-black text-[12px] font-bold uppercase tracking-wider text-center"
                 >
                   <Icon name="Phone" size={12} className="inline mr-1" />

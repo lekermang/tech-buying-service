@@ -64,12 +64,12 @@ const PorcelainCta = ({
 
           <div className="mt-4 flex items-center justify-center gap-4 flex-wrap">
             <a
-              href="tel:+79929999777"
+              href="tel:+79929990333"
               className="font-roboto text-white/40 text-sm transition-colors flex items-center gap-1.5"
               onMouseEnter={(e) => ((e.currentTarget as HTMLAnchorElement).style.color = ACCENT)}
               onMouseLeave={(e) => ((e.currentTarget as HTMLAnchorElement).style.color = "rgba(255,255,255,0.4)")}
             >
-              <Icon name="Phone" size={13} /> +7 (992) 999-97-77
+              <Icon name="Phone" size={13} /> +7 (992) 999-03-33
             </a>
             <span className="text-white/15">·</span>
             <a

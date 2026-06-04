@@ -60,7 +60,7 @@ export default function HeroLeft({ onOpenModal }: HeroLeftProps) {
           <span className="relative">Оценить онлайн</span>
           <Icon name="ArrowRight" size={16} className="relative opacity-60 group-hover:translate-x-1 transition-transform" />
         </button>
-        <a href="tel:+79929999777"
+        <a href="tel:+79929990333"
           onClick={() => ymGoal(Goals.CALL_CLICK, { place: "hero" })}
           className="group bg-black/40 backdrop-blur-sm border border-[#FFD700]/40 hover:border-[#FFD700] text-[#FFD700] font-oswald font-bold text-base sm:text-lg px-6 sm:px-8 py-4 uppercase tracking-wide active:scale-95 transition-all flex items-center justify-center gap-2.5 rounded-md">
           <div className="w-8 h-8 rounded-full bg-[#FFD700]/15 border border-[#FFD700]/40 flex items-center justify-center group-hover:bg-[#FFD700]/25 transition-colors">

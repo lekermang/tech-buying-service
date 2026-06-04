@@ -1,12 +1,20 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Icon from "@/components/ui/icon";
+import { ymGoal, Goals } from "@/lib/ym";
 import RepairWidget from "@/components/skupka/RepairWidget";
+import RepairSEO from "@/components/repair/RepairSEO";
 import RepairHero from "@/components/repair/RepairHero";
 import RepairStats from "@/components/repair/RepairStats";
 import RepairFeatures from "@/components/repair/RepairFeatures";
+import RepairPriceTable from "@/components/repair/RepairPriceTable";
 import RepairServices from "@/components/repair/RepairServices";
 import RepairHowItWorks from "@/components/repair/RepairHowItWorks";
+import RepairModels from "@/components/repair/RepairModels";
+import RepairLocation from "@/components/repair/RepairLocation";
+import RepairFAQ from "@/components/repair/RepairFAQ";
+import RepairSEOText from "@/components/repair/RepairSEOText";
+import { REPAIR_PHONE_DISPLAY, REPAIR_PHONE_TEL } from "@/components/repair/repairContacts";
 
 export default function Repair() {
   const [scrolled, setScrolled] = useState(false);
@@ -24,9 +32,11 @@ export default function Repair() {
 
   return (
     <div className="min-h-screen bg-[#0d0d0d] text-white">
+      <RepairSEO />
+
       {/* Навбар */}
       <nav
-        className={`sticky top-0 z-50 flex items-center justify-between px-4 sm:px-8 py-3.5 border-b transition-colors ${
+        className={`sticky top-0 z-50 flex items-center justify-between px-4 sm:px-8 py-3 border-b transition-colors ${
           scrolled ? "bg-[#0d0d0d]/95 border-white/10 backdrop-blur-md" : "bg-transparent border-transparent"
         }`}
       >
@@ -35,11 +45,22 @@ export default function Repair() {
           <span className="text-white/40 text-sm font-roboto font-normal hidden sm:inline">· Ремонт</span>
         </Link>
         <div className="flex items-center gap-2 sm:gap-5">
-          <a href="#services" className="hidden sm:block text-sm text-white/60 hover:text-[#FFD700] transition-colors">
+          <a href="#prices" className="hidden md:block text-sm text-white/60 hover:text-[#FFD700] transition-colors">
+            Цены
+          </a>
+          <a href="#services" className="hidden md:block text-sm text-white/60 hover:text-[#FFD700] transition-colors">
             Услуги
           </a>
-          <a href="#how" className="hidden sm:block text-sm text-white/60 hover:text-[#FFD700] transition-colors">
-            Как работает
+          <a href="#contacts" className="hidden md:block text-sm text-white/60 hover:text-[#FFD700] transition-colors">
+            Контакты
+          </a>
+          <a
+            href={REPAIR_PHONE_TEL}
+            onClick={() => ymGoal(Goals.CALL_CLICK, { place: "repair_nav" })}
+            className="hidden sm:inline-flex items-center gap-1.5 text-[#FFD700] font-oswald font-bold text-sm hover:text-[#ffed4a] transition-colors"
+          >
+            <Icon name="Phone" size={15} />
+            {REPAIR_PHONE_DISPLAY}
           </a>
           <button
             onClick={scrollToForm}
@@ -52,15 +73,18 @@ export default function Repair() {
 
       <RepairHero onOrder={scrollToForm} />
       <RepairStats />
+      <RepairPriceTable onOrder={scrollToForm} />
       <RepairFeatures />
       <RepairServices onOrder={scrollToForm} />
+      <RepairModels onOrder={scrollToForm} />
       <RepairHowItWorks />
+      <RepairLocation />
 
       {/* Форма заявки */}
       <section id="repair-form" className="px-4 sm:px-8 py-14 max-w-3xl mx-auto scroll-mt-20">
         <div className="text-center mb-7">
           <h2 className="font-oswald text-3xl sm:text-4xl font-bold uppercase">
-            Оставить <span className="text-[#FFD700]">заявку</span>
+            Рассчитать <span className="text-[#FFD700]">стоимость</span>
           </h2>
           <p className="text-white/50 text-sm mt-2">
             Опишите проблему — мастер свяжется с вами и назовёт точную цену
@@ -69,14 +93,24 @@ export default function Repair() {
         <RepairWidget />
       </section>
 
+      <RepairFAQ />
+      <RepairSEOText />
+
       {/* Подвал */}
       <footer className="border-t border-white/10 bg-[#0a0a0a] px-4 py-8 text-center text-white/40 text-sm">
         <div className="flex items-center justify-center gap-2 mb-2">
           <Icon name="Wrench" size={16} className="text-[#FFD700]" />
-          <span className="font-oswald text-white/70 uppercase tracking-wide">Ремонт телефонов · Скупка24</span>
+          <span className="font-oswald text-white/70 uppercase tracking-wide">Ремонт Apple · Калуга</span>
         </div>
-        <p>
-          Срочный ремонт при вас ·{" "}
+        <a
+          href={REPAIR_PHONE_TEL}
+          onClick={() => ymGoal(Goals.CALL_CLICK, { place: "repair_footer" })}
+          className="text-[#FFD700] font-oswald font-bold text-lg hover:underline"
+        >
+          {REPAIR_PHONE_DISPLAY}
+        </a>
+        <p className="mt-2">
+          Калуга, ул. Кирова, 7 ·{" "}
           <Link to="/" className="text-[#FFD700] hover:underline">
             На главную
           </Link>
