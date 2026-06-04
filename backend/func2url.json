@@ -1,3 +1,7 @@
 {
-  "yandex-sitemap-ping": "https://functions.poehali.dev/b837e1e4-1f9f-455a-800f-240f4c6221e0"
+  "yandex-sitemap-ping": "https://functions.poehali.dev/b837e1e4-1f9f-455a-800f-240f4c6221e0",
+  "client-auth": "https://functions.poehali.dev/420ad7e7-26c9-4540-9369-6bca5d26d3aa",
+  "client-cabinet": "https://functions.poehali.dev/58edd0bc-cce3-4ece-acca-a003e2260758",
+  "public-chat": "https://functions.poehali.dev/60644856-ff88-4875-b2a9-97c87d32a630",
+  "sl-contracts-14d": "https://functions.poehali.dev/03ebbc37-291d-4868-9d2a-d24a261399ae"
 }
