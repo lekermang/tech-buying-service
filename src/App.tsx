@@ -46,6 +46,14 @@ const NotFound = safeLazy(() => import("./pages/NotFound404"));
 const RepairStatus = safeLazy(() => import("./pages/RepairStatus"));
 const RepairDiscount = safeLazy(() => import("./pages/RepairDiscount"));
 const Repair = safeLazy(() => import("./pages/Repair"));
+const RemontIphoneKaluga = safeLazy(() => import("./pages/repair/RemontIphoneKaluga"));
+const RemontSamsungKaluga = safeLazy(() => import("./pages/repair/RemontSamsungKaluga"));
+const RemontXiaomiKaluga = safeLazy(() => import("./pages/repair/RemontXiaomiKaluga"));
+const ZamenaSteklaKaluga = safeLazy(() => import("./pages/repair/ZamenaSteklaKaluga"));
+const ZamenaAkkumulyatoraKaluga = safeLazy(() => import("./pages/repair/ZamenaAkkumulyatoraKaluga"));
+const RemontPosleVodyKaluga = safeLazy(() => import("./pages/repair/RemontPosleVodyKaluga"));
+const BgaPajkaKaluga = safeLazy(() => import("./pages/repair/BgaPajkaKaluga"));
+const SnyatieFrpKaluga = safeLazy(() => import("./pages/repair/SnyatieFrpKaluga"));
 const Requisites = safeLazy(() => import("./pages/Requisites"));
 const Act = safeLazy(() => import("./pages/Act"));
 const PublicChat = safeLazy(() => import("./pages/PublicChat"));
@@ -151,6 +159,14 @@ const App = () => {
             <Route path="/porcelain" element={<RussianPorcelain />} />
             <Route path="/soviet-antiques" element={<SovietAntiques />} />
             <Route path="/repair" element={<Repair />} />
+            <Route path="/remont-iphone-kaluga" element={<RemontIphoneKaluga />} />
+            <Route path="/remont-samsung-kaluga" element={<RemontSamsungKaluga />} />
+            <Route path="/remont-xiaomi-kaluga" element={<RemontXiaomiKaluga />} />
+            <Route path="/zamena-stekla-kaluga" element={<ZamenaSteklaKaluga />} />
+            <Route path="/zamena-akkumulyatora-kaluga" element={<ZamenaAkkumulyatoraKaluga />} />
+            <Route path="/remont-posle-vody-kaluga" element={<RemontPosleVodyKaluga />} />
+            <Route path="/bga-pajka-kaluga" element={<BgaPajkaKaluga />} />
+            <Route path="/snyatie-frp-kaluga" element={<SnyatieFrpKaluga />} />
             <Route path="/repair-status" element={<RepairStatus />} />
             <Route path="/repair-discount" element={<RepairDiscount />} />
             <Route path="/requisites" element={<Requisites />} />

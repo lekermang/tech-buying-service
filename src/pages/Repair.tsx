@@ -18,6 +18,7 @@ import RepairLocation from "@/components/repair/RepairLocation";
 import RepairReviews from "@/components/repair/RepairReviews";
 import RepairFAQ from "@/components/repair/RepairFAQ";
 import RepairSEOText from "@/components/repair/RepairSEOText";
+import RepairSEOLinks from "@/components/repair/RepairSEOLinks";
 import { REPAIR_PHONE_DISPLAY, REPAIR_PHONE_TEL } from "@/components/repair/repairContacts";
 
 export default function Repair() {
@@ -139,6 +140,7 @@ export default function Repair() {
           <RepairWidget />
         </section>
 
+        <RepairSEOLinks />
         <RepairFAQ />
         <RepairSEOText />
 
