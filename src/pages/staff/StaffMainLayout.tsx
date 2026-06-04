@@ -284,7 +284,7 @@ export function StaffMainLayout({
             {tab === "smartlombard" && <SmartLombardTab token={token} myRole={empRole} />}
             {tab === "avitopro"     && <AvitoProTab token={token} />}
             {tab === "salary"       && <SalaryTab role={empRole} token={token} employeeName={empName} />}
-            {tab === "functions"    && isOwner && <StaffFunctionsTab />}
+            {tab === "functions"    && isOwner && <StaffFunctionsTab token={token} />}
             {tab === "finance"      && isOwner && <FinanceTab token={token} />}
             {tab === "finance"      && !isOwner && (
               <div className="flex flex-col items-center justify-center py-24 px-6 text-center gap-3">

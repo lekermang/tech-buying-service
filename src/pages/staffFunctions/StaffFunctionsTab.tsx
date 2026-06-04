@@ -1,6 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Icon from "@/components/ui/icon";
+import funcUrls from "../../../backend/func2url.json";
 import { FUNC_STATS, OPTIMIZATION_STEPS, type FuncStat } from "./functionsData";
+
+const CHAT_URL = (funcUrls as Record<string, string>)["public-chat"];
 
 const STATUS_STYLE: Record<FuncStat["status"], { color: string; label: string; icon: string }> = {
   done: { color: "text-green-400 bg-green-500/10 border-green-500/20", label: "Исправлено", icon: "CheckCircle2" },
@@ -8,8 +11,36 @@ const STATUS_STYLE: Record<FuncStat["status"], { color: string; label: string; i
   crit: { color: "text-red-400 bg-red-500/10 border-red-500/20", label: "Критично", icon: "Flame" },
 };
 
-export default function StaffFunctionsTab() {
+export default function StaffFunctionsTab({ token }: { token: string }) {
   const [openFn, setOpenFn] = useState<string | null>(null);
+  const [aiEnabled, setAiEnabled] = useState<boolean | null>(null);
+  const [aiBusy, setAiBusy] = useState(false);
+
+  useEffect(() => {
+    fetch(`${CHAT_URL}?action=ai_status`, { headers: { "X-Employee-Token": token } })
+      .then((r) => r.json())
+      .then((d) => { if (typeof d.enabled === "boolean") setAiEnabled(d.enabled); })
+      .catch(() => {});
+  }, [token]);
+
+  const toggleAi = async () => {
+    if (aiEnabled === null || aiBusy) return;
+    setAiBusy(true);
+    const next = !aiEnabled;
+    try {
+      const r = await fetch(`${CHAT_URL}?action=ai_toggle`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Employee-Token": token },
+        body: JSON.stringify({ enabled: next }),
+      });
+      const d = await r.json();
+      if (typeof d.enabled === "boolean") setAiEnabled(d.enabled);
+    } catch {
+      /* ignore */
+    } finally {
+      setAiBusy(false);
+    }
+  };
 
   const totals = useMemo(() => {
     const hours = FUNC_STATS.reduce((s, f) => s + f.hours, 0);
@@ -30,6 +61,30 @@ export default function StaffFunctionsTab() {
         <div>
           <div className="font-oswald font-bold text-lg text-white uppercase tracking-wide">Функции и потребление</div>
           <div className="font-roboto text-xs text-white/40">Только для владельца · мониторинг и оптимизация</div>
+        </div>
+      </div>
+
+      {/* Переключатель ИИ-автоответов клиентам */}
+      <div className="rounded-xl bg-white/5 border border-white/10 p-3.5 mb-5">
+        <div className="flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${aiEnabled ? "bg-green-500/15" : "bg-white/10"}`}>
+            <Icon name="Bot" size={20} className={aiEnabled ? "text-green-400" : "text-white/40"} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-roboto font-semibold text-sm text-white">ИИ-ответы клиентам</div>
+            <div className="font-roboto text-[11px] text-white/40">
+              {aiEnabled === null ? "Загрузка..." : aiEnabled
+                ? "Бот отвечает клиентам в чате с сайта и MAX, пока менеджер молчит"
+                : "Автоответы выключены — отвечают только сотрудники"}
+            </div>
+          </div>
+          <button
+            onClick={toggleAi}
+            disabled={aiEnabled === null || aiBusy}
+            className={`relative w-12 h-7 rounded-full transition-colors shrink-0 disabled:opacity-50 ${aiEnabled ? "bg-green-500" : "bg-white/20"}`}
+          >
+            <span className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all ${aiEnabled ? "left-6" : "left-1"}`} />
+          </button>
         </div>
       </div>
 

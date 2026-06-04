@@ -254,6 +254,22 @@ def _post_message(room_id: int, author_type: str, author_id: int, author_name: s
     return dict(row)
 
 
+def _ai_enabled() -> bool:
+    """Глобальный флаг ИИ-автоответов клиентам (settings.ai_autoreply_enabled).
+    По умолчанию включено (если записи нет)."""
+    try:
+        conn = _conn(); cur = conn.cursor()
+        cur.execute(
+            f"SELECT value FROM {SCHEMA}.settings WHERE key='ai_autoreply_enabled' LIMIT 1"
+        )
+        row = cur.fetchone(); cur.close(); conn.close()
+        if not row:
+            return True
+        return str(row[0]).strip() in ('1', 'true', 'True', 'on', 'yes')
+    except Exception:
+        return True
+
+
 def _staff_ever_replied(room_id: int) -> bool:
     """True, если в комнате уже есть хотя бы одно сообщение от живого сотрудника."""
     conn = _conn()
@@ -293,6 +309,8 @@ def _maybe_ai_reply(room_id: int, client_text: str):
     Ответ сохраняется как сообщение от 'staff' с пометкой ассистента.
     """
     try:
+        if not _ai_enabled():
+            return
         if _staff_ever_replied(room_id):
             return
         history = _recent_history(room_id)
@@ -917,6 +935,28 @@ def action_staff_rooms(event):
     return _ok({'ok': True, 'rooms': rows})
 
 
+def action_ai_status(event):
+    """Текущее состояние ИИ-автоответов (для Staff)."""
+    if not auth_staff(event):
+        return _err(401, 'Auth required')
+    return _ok({'ok': True, 'enabled': _ai_enabled()})
+
+
+def action_ai_toggle(event, body):
+    """Включить/выключить ИИ-автоответы клиентам (settings.ai_autoreply_enabled)."""
+    if not auth_staff(event):
+        return _err(401, 'Auth required')
+    enabled = bool(body.get('enabled'))
+    conn = _conn(); cur = conn.cursor()
+    cur.execute(
+        f"INSERT INTO {SCHEMA}.settings (key, value) VALUES ('ai_autoreply_enabled', %s) "
+        f"ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value",
+        ('1' if enabled else '0',)
+    )
+    conn.commit(); cur.close(); conn.close()
+    return _ok({'ok': True, 'enabled': enabled})
+
+
 # ─────────────────────────── handler ────────────────────────────────
 
 def handler(event: dict, context) -> dict:
@@ -951,6 +991,10 @@ def handler(event: dict, context) -> dict:
             return action_mark_read(event, qp)
         if method == 'POST' and action == 'archive_room':
             return action_archive_room(event, qp)
+        if method == 'GET' and action == 'ai_status':
+            return action_ai_status(event)
+        if method == 'POST' and action == 'ai_toggle':
+            return action_ai_toggle(event, body)
         return _err(400, f'Unknown action: {action} (method={method})')
     except Exception as e:
         return _err(500, f'{type(e).__name__}: {e}')

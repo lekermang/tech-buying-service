@@ -20,6 +20,11 @@ import psycopg2
 import boto3
 from botocore.client import Config as BotoConfig
 
+from ai import answer_staff, advise
+
+AI_BOT_ID = 6  # employees.id системного «🤖 ИИ-Советник»
+AI_TRIGGERS = ('бот', 'ии', 'ai', 'совет', 'помоги', 'подскажи', '@бот', '@ии')
+
 try:
     from pywebpush import webpush, WebPushException  # type: ignore
     HAS_WEBPUSH = True
@@ -106,21 +111,173 @@ def _err(msg: str, code: int = 400) -> dict:
     return _ok({'error': msg}, code)
 
 
+def _post_bot_message(text: str) -> int | None:
+    """Вставляет сообщение от ИИ-бота в ОБЩИЙ чат (recipient_id IS NULL)."""
+    if not (text or '').strip():
+        return None
+    conn = _connect(); cur = conn.cursor()
+    try:
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.vip_chat_messages (employee_id, text, recipient_id) "
+            f"VALUES ({AI_BOT_ID}, %s, NULL) RETURNING id",
+            (text[:4000],)
+        )
+        mid = int(cur.fetchone()[0])
+        conn.commit()
+        return mid
+    except Exception as e:
+        conn.rollback()
+        print(f'[vip-ai] post_bot_message error: {e}')
+        return None
+    finally:
+        cur.close(); conn.close()
+
+
+def _general_history(limit: int = 8) -> list:
+    """Последние сообщения общего чата для контекста ИИ (бот→assistant, остальные→user)."""
+    conn = _connect(); cur = conn.cursor()
+    try:
+        cur.execute(
+            f"SELECT employee_id, text FROM {SCHEMA}.vip_chat_messages "
+            f"WHERE recipient_id IS NULL AND text IS NOT NULL AND text<>'' AND erased_at IS NULL "
+            f"ORDER BY id DESC LIMIT {int(limit)}"
+        )
+        rows = list(reversed(cur.fetchall()))
+    except Exception:
+        rows = []
+    finally:
+        cur.close(); conn.close()
+    out = []
+    for emp_id, txt in rows:
+        role = 'assistant' if emp_id == AI_BOT_ID else 'user'
+        out.append({'role': role, 'content': (txt or '')[:800]})
+    return out
+
+
+def _build_business_summary() -> str:
+    """Собирает сводку: горящие заявки, висящие ремонты, неотвеченные чаты с сайта."""
+    lines = []
+    conn = _connect(); cur = conn.cursor()
+    try:
+        # 1. Заявки за 24ч (новые/взятые/просроченные)
+        cur.execute(
+            f"SELECT "
+            f"COUNT(*) FILTER (WHERE status='new') AS new_cnt, "
+            f"COUNT(*) FILTER (WHERE status='taken') AS taken_cnt, "
+            f"COUNT(*) FILTER (WHERE status='new' AND created_at < NOW() - INTERVAL '15 minutes') AS overdue_cnt "
+            f"FROM {SCHEMA}.leads_tracking "
+            f"WHERE created_at > NOW() - INTERVAL '24 hours' AND status NOT IN ('closed','answered')"
+        )
+        r = cur.fetchone() or (0, 0, 0)
+        lines.append(f"Заявки за сутки: новых {r[0]}, в работе {r[1]}, просрочено (>15 мин без ответа) {r[2]}.")
+        # Топ горящих заявок
+        cur.execute(
+            f"SELECT id, client_name, category, "
+            f"ROUND(EXTRACT(EPOCH FROM (NOW()-created_at))/60)::int AS age_min "
+            f"FROM {SCHEMA}.leads_tracking "
+            f"WHERE status='new' AND created_at > NOW() - INTERVAL '24 hours' "
+            f"ORDER BY created_at ASC LIMIT 5"
+        )
+        for lid, cname, cat, age in cur.fetchall():
+            lines.append(f"  • Заявка #{lid}: {cname or 'клиент'} — {cat or 'без категории'}, ждёт {age} мин.")
+
+        # 2. Висящие ремонты
+        cur.execute(
+            f"SELECT COUNT(*) FROM {SCHEMA}.repair_orders "
+            f"WHERE status IN ('new','accepted','pending_approval','in_progress','waiting_parts','ready') "
+            f"AND created_at > NOW() - INTERVAL '60 days'"
+        )
+        pending = cur.fetchone()[0]
+        lines.append(f"Незакрытых ремонтов: {pending}.")
+        cur.execute(
+            f"SELECT id, status, ROUND(EXTRACT(EPOCH FROM (NOW()-created_at))/3600)::int AS hrs "
+            f"FROM {SCHEMA}.repair_orders "
+            f"WHERE status IN ('ready','waiting_parts','in_progress') "
+            f"ORDER BY created_at ASC LIMIT 5"
+        )
+        for rid, st, hrs in cur.fetchall():
+            lines.append(f"  • Ремонт #{rid}: статус {st}, висит {hrs} ч.")
+
+        # 3. Неотвеченные чаты с сайта (есть сообщение клиента без ответа сотрудника после него)
+        cur.execute(
+            f"SELECT COUNT(*) FROM {SCHEMA}.pchat_rooms r "
+            f"WHERE r.type='direct' AND r.is_archived=FALSE "
+            f"AND EXISTS (SELECT 1 FROM {SCHEMA}.pchat_messages m "
+            f"           WHERE m.room_id=r.id AND m.author_type='client' "
+            f"           AND m.created_at > NOW() - INTERVAL '24 hours')"
+        )
+        chats = cur.fetchone()[0]
+        lines.append(f"Активных чатов с сайта за сутки: {chats}.")
+    except Exception as e:
+        print(f'[vip-ai] summary error: {e}')
+    finally:
+        cur.close(); conn.close()
+    return '\n'.join(lines) if lines else 'Данных мало: новых заявок и ремонтов почти нет.'
+
+
+def _action_ai_advice(force: bool = False) -> dict:
+    """Часовой ИИ-советник: пишет в общий чат рекомендации по прибыли.
+    Вызывается cron'ом (action=ai_advice). force=true игнорирует анти-дубль."""
+    # Анти-дубль: не чаще раза в 55 минут (если не force)
+    if not force:
+        conn = _connect(); cur = conn.cursor()
+        try:
+            cur.execute(
+                f"SELECT 1 FROM {SCHEMA}.vip_chat_messages "
+                f"WHERE employee_id={AI_BOT_ID} AND recipient_id IS NULL "
+                f"AND created_at > NOW() - INTERVAL '55 minutes' LIMIT 1"
+            )
+            recent = cur.fetchone()
+        finally:
+            cur.close(); conn.close()
+        if recent:
+            return _ok({'ok': True, 'skipped': 'recent_advice_exists'})
+
+    summary = _build_business_summary()
+    advice_text = advise(summary)
+    if not advice_text:
+        return _ok({'ok': False, 'error': 'ai_unavailable'})
+    header = '📊 Совет ИИ — что сделать сейчас, чтобы не упустить прибыль:\n\n'
+    mid = _post_bot_message(header + advice_text)
+    # Push всем сотрудникам
+    if mid:
+        try:
+            _send_push_to_all_except(0, {
+                'title': '🤖 ИИ-Советник · СКУПКА24Vip',
+                'body': 'Новые рекомендации по прибыли',
+                'url': '/staff?tab=chat',
+                'tag': 'vip-ai-advice',
+                'msg_id': mid,
+            })
+        except Exception:
+            pass
+    return _ok({'ok': True, 'message_id': mid})
+
+
 def handler(event: dict, context) -> dict:
     """Чат «СКУПКА24Vip»: групповая переписка сотрудников + загрузка фото в S3 + онлайн-статусы + Web Push."""
     if event.get('httpMethod') == 'OPTIONS':
         return {'statusCode': 200, 'headers': CORS, 'body': ''}
-
-    me = _resolve_employee(event)
-    if not me:
-        return _err('Unauthorized', 401)
 
     raw = event.get('body') or '{}'
     try:
         body = json.loads(raw) if isinstance(raw, str) else (raw or {})
     except Exception:
         body = {}
-    action = body.get('action', 'poll')
+    qp = event.get('queryStringParameters') or {}
+    action = (qp.get('action') or body.get('action') or 'poll')
+
+    # Cron / служебный вызов: ИИ-советник раз в час (защищён admin-токеном)
+    if action == 'ai_advice':
+        hdrs = {k.lower(): v for k, v in (event.get('headers') or {}).items()}
+        admin = (hdrs.get('x-admin-token') or body.get('admin') or qp.get('admin') or '').strip()
+        if admin != os.environ.get('ADMIN_TOKEN', ''):
+            return _err('admin token required', 401)
+        return _action_ai_advice(force=bool(body.get('force')))
+
+    me = _resolve_employee(event)
+    if not me:
+        return _err('Unauthorized', 401)
 
     if action == 'vapid_public':
         return _ok({'public_key': os.environ.get('VAPID_PUBLIC_KEY', '')})
@@ -143,6 +300,9 @@ def handler(event: dict, context) -> dict:
         return _action_admin_set_avatar(me, body)
     if action == 'dialogs':
         return _action_dialogs(me, body)
+    if action == 'ai_advice_now':
+        # Ручной запрос совета сотрудником (кнопка в чате)
+        return _action_ai_advice(force=True)
 
     return _err(f'unknown action: {action}')
 
@@ -419,7 +579,28 @@ def _action_send(me: dict, body: dict) -> dict:
     except Exception:
         pass
 
-    return _ok({'ok': True, 'id': new_id, 'created_at': created_at.isoformat()})
+    # ИИ-помощник отвечает в ОБЩЕМ чате, если к нему обратились (триггер-слово)
+    ai_reply_id = None
+    if not recipient_id and text:
+        low = text.lower()
+        if any(t in low for t in AI_TRIGGERS):
+            try:
+                history = _general_history()
+                ai_answer = answer_staff(text, history)
+                if ai_answer:
+                    ai_reply_id = _post_bot_message(ai_answer)
+                    _send_push_to_all_except(AI_BOT_ID, {
+                        'title': '🤖 ИИ-Советник',
+                        'body': ai_answer[:120],
+                        'url': '/staff?tab=chat',
+                        'tag': 'vip-ai-reply',
+                        'msg_id': ai_reply_id,
+                    })
+            except Exception as e:
+                print(f'[vip-ai] reply error: {e}')
+
+    return _ok({'ok': True, 'id': new_id, 'created_at': created_at.isoformat(),
+                'ai_reply_id': ai_reply_id})
 
 
 def _action_upload_photo(me: dict, body: dict) -> dict:

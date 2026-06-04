@@ -208,6 +208,19 @@ def insert_client_message(room_id: int, client_id: int, name: str, text: str) ->
         return None
 
 
+def _ai_enabled() -> bool:
+    """Глобальный флаг ИИ-автоответов (settings.ai_autoreply_enabled). По умолчанию вкл."""
+    try:
+        conn = _conn(); cur = conn.cursor()
+        cur.execute(f"SELECT value FROM {SCHEMA}.settings WHERE key='ai_autoreply_enabled' LIMIT 1")
+        row = cur.fetchone(); cur.close(); conn.close()
+        if not row:
+            return True
+        return str(row[0]).strip() in ('1', 'true', 'True', 'on', 'yes')
+    except Exception:
+        return True
+
+
 def _staff_ever_replied(room_id: int) -> bool:
     """True, если в комнате уже есть сообщение от живого сотрудника."""
     try:
@@ -266,6 +279,8 @@ def try_ai_reply(room_id: int, max_chat_id: int, client_text: str) -> bool:
     Возвращает True, если ИИ ответил.
     """
     try:
+        if not _ai_enabled():
+            return False
         if _staff_ever_replied(room_id):
             return False
         history = _recent_history(room_id)
