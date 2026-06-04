@@ -46,6 +46,7 @@ const NotFound = safeLazy(() => import("./pages/NotFound404"));
 const RepairStatus = safeLazy(() => import("./pages/RepairStatus"));
 const RepairDiscount = safeLazy(() => import("./pages/RepairDiscount"));
 const Repair = safeLazy(() => import("./pages/Repair"));
+const Ocenka = safeLazy(() => import("./pages/Ocenka"));
 const RemontIphoneKaluga = safeLazy(() => import("./pages/repair/RemontIphoneKaluga"));
 const RemontSamsungKaluga = safeLazy(() => import("./pages/repair/RemontSamsungKaluga"));
 const RemontXiaomiKaluga = safeLazy(() => import("./pages/repair/RemontXiaomiKaluga"));
@@ -159,6 +160,7 @@ const App = () => {
             <Route path="/porcelain" element={<RussianPorcelain />} />
             <Route path="/soviet-antiques" element={<SovietAntiques />} />
             <Route path="/repair" element={<Repair />} />
+            <Route path="/ocenka" element={<Ocenka />} />
             <Route path="/remont-iphone-kaluga" element={<RemontIphoneKaluga />} />
             <Route path="/remont-samsung-kaluga" element={<RemontSamsungKaluga />} />
             <Route path="/remont-xiaomi-kaluga" element={<RemontXiaomiKaluga />} />
