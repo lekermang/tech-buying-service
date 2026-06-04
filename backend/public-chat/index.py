@@ -968,6 +968,45 @@ def action_ai_toggle(event, body):
     return _ok({'ok': True, 'enabled': enabled})
 
 
+def _get_setting(key: str) -> str:
+    conn = _conn(); cur = conn.cursor()
+    cur.execute(f"SELECT value FROM {SCHEMA}.settings WHERE key=%s", (key,))
+    row = cur.fetchone()
+    cur.close(); conn.close()
+    return row[0] if row else ''
+
+
+def action_opt_status(event):
+    """Статус автооптимизации функций (для владельца)."""
+    if not auth_staff(event):
+        return _err(401, 'Auth required')
+    return _ok({'ok': True, 'applied': _get_setting('optimization_applied') == '1',
+                'applied_at': _get_setting('optimization_applied_at')})
+
+
+def action_opt_apply(event):
+    """Применяет все доступные из кода оптимизации и фиксирует флаг."""
+    if not auth_staff(event):
+        return _err(401, 'Auth required')
+    import datetime
+    now = datetime.datetime.utcnow().isoformat()
+    conn = _conn(); cur = conn.cursor()
+    # Серверные оптимизации, которые реально применяются из кода:
+    # замедление фонового опроса leads-monitor и включение кэшей.
+    for k, v in (
+        ('optimization_applied', '1'),
+        ('optimization_applied_at', now),
+        ('leads_monitor_interval_sec', '180'),
+        ('analytics_cache_sec', '10'),
+        ('gold_cache_sec', '600'),
+    ):
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.settings (key, value) VALUES (%s, %s) "
+            f"ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value", (k, v))
+    conn.commit(); cur.close(); conn.close()
+    return _ok({'ok': True, 'applied': True, 'applied_at': now})
+
+
 # ─────────────────────────── handler ────────────────────────────────
 
 def handler(event: dict, context) -> dict:
@@ -1004,6 +1043,10 @@ def handler(event: dict, context) -> dict:
             return action_archive_room(event, qp)
         if method == 'GET' and action == 'ai_status':
             return action_ai_status(event)
+        if method == 'GET' and action == 'opt_status':
+            return action_opt_status(event)
+        if method == 'POST' and action == 'opt_apply':
+            return action_opt_apply(event)
         if method == 'POST' and action == 'ai_toggle':
             return action_ai_toggle(event, body)
         return _err(400, f'Unknown action: {action} (method={method})')

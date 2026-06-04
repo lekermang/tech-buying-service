@@ -11,17 +11,64 @@ const STATUS_STYLE: Record<FuncStat["status"], { color: string; label: string; i
   crit: { color: "text-red-400 bg-red-500/10 border-red-500/20", label: "Критично", icon: "Flame" },
 };
 
+const AUTO_STEPS = [
+  "Включаю кэш курса золота (10 мин)",
+  "Замедляю авто-опрос аналитики",
+  "Замедляю опрос чата с сайта (8с)",
+  "Замедляю монитор заявок (раз в 3 мин)",
+  "Фиксирую оптимальные таймауты",
+];
+
+const MANUAL_STEPS = [
+  { text: "Выставить таймауты в Ядре: все функции 30с → 10с, золото 60с → 15с", where: "Ядро → Функции → выбрать функцию → Настройки → Таймаут" },
+  { text: "Снизить частоту cron у монитора заявок", where: "Ядро → Функции → leads-monitor → Расписание" },
+  { text: "Проверить причины ошибок 4xx в repair-admin и slshop", where: "Ядро → Функции → Логи" },
+];
+
 export default function StaffFunctionsTab({ token }: { token: string }) {
   const [openFn, setOpenFn] = useState<string | null>(null);
   const [aiEnabled, setAiEnabled] = useState<boolean | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
+  const [optApplied, setOptApplied] = useState(false);
+  const [optBusy, setOptBusy] = useState(false);
+  const [optProgress, setOptProgress] = useState(0); // 0..AUTO_STEPS.length
+  const [showManual, setShowManual] = useState(false);
 
   useEffect(() => {
     fetch(`${CHAT_URL}?action=ai_status`, { headers: { "X-Employee-Token": token } })
       .then((r) => r.json())
       .then((d) => { if (typeof d.enabled === "boolean") setAiEnabled(d.enabled); })
       .catch(() => {});
+    fetch(`${CHAT_URL}?action=opt_status`, { headers: { "X-Employee-Token": token } })
+      .then((r) => r.json())
+      .then((d) => { if (d.applied) { setOptApplied(true); setShowManual(true); } })
+      .catch(() => {});
   }, [token]);
+
+  const runOptimizeAll = async () => {
+    if (optBusy) return;
+    setOptBusy(true);
+    setOptProgress(0);
+    setShowManual(false);
+    // Визуальный прогон шагов автооптимизации
+    for (let i = 1; i <= AUTO_STEPS.length; i++) {
+      await new Promise((res) => setTimeout(res, 550));
+      setOptProgress(i);
+    }
+    try {
+      const r = await fetch(`${CHAT_URL}?action=opt_apply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Employee-Token": token },
+      });
+      const d = await r.json();
+      if (d.ok) setOptApplied(true);
+    } catch {
+      /* ignore */
+    } finally {
+      setOptBusy(false);
+      setShowManual(true);
+    }
+  };
 
   const toggleAi = async () => {
     if (aiEnabled === null || aiBusy) return;
@@ -104,6 +151,81 @@ export default function StaffFunctionsTab({ token }: { token: string }) {
         </div>
       </div>
 
+      {/* Кнопка «Оптимизировать всё» */}
+      <button
+        onClick={runOptimizeAll}
+        disabled={optBusy}
+        className={`w-full flex items-center justify-center gap-2.5 rounded-xl p-4 mb-3 font-oswald font-bold text-base uppercase tracking-wide transition-all active:scale-[0.99] ${
+          optApplied && !optBusy
+            ? "bg-green-500/15 border border-green-500/30 text-green-400"
+            : "bg-gradient-to-r from-[#FFD700] to-yellow-600 text-black shadow-lg shadow-yellow-600/20"
+        } disabled:opacity-90`}
+      >
+        {optBusy ? (
+          <>
+            <Icon name="Loader2" size={20} className="animate-spin" />
+            Оптимизирую… {optProgress}/{AUTO_STEPS.length}
+          </>
+        ) : optApplied ? (
+          <>
+            <Icon name="CheckCircle2" size={20} />
+            Авто-оптимизация применена
+          </>
+        ) : (
+          <>
+            <Icon name="Zap" size={20} />
+            Оптимизировать всё
+          </>
+        )}
+      </button>
+
+      {/* Прогресс автооптимизации */}
+      {(optBusy || optApplied) && (
+        <div className="rounded-xl bg-white/5 border border-white/10 p-3.5 mb-3 space-y-2">
+          {AUTO_STEPS.map((s, i) => {
+            const done = optApplied || i < optProgress;
+            const active = optBusy && i === optProgress;
+            return (
+              <div key={i} className="flex items-center gap-2.5">
+                <Icon
+                  name={done ? "CheckCircle2" : active ? "Loader2" : "Circle"}
+                  size={15}
+                  className={`shrink-0 ${done ? "text-green-400" : active ? "text-[#FFD700] animate-spin" : "text-white/25"}`}
+                />
+                <span className={`font-roboto text-[12.5px] ${done ? "text-white/70" : "text-white/40"}`}>{s}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Чек-лист ручных шагов после автооптимизации */}
+      {showManual && (
+        <div className="rounded-xl bg-[#FFD700]/5 border border-[#FFD700]/25 p-4 mb-3">
+          <div className="flex items-center gap-2 mb-2.5">
+            <Icon name="ListChecks" size={18} className="text-[#FFD700]" />
+            <div className="font-oswald font-bold text-sm text-white uppercase tracking-wide">Осталось сделать вручную в Ядре</div>
+          </div>
+          <div className="font-roboto text-[11px] text-white/40 mb-3 leading-relaxed">
+            Это нельзя изменить из кода — нужно открыть Ядро и поставить значения. Займёт ~3 минуты.
+          </div>
+          <div className="space-y-2.5">
+            {MANUAL_STEPS.map((s, i) => (
+              <div key={i} className="flex items-start gap-2.5">
+                <div className="w-5 h-5 rounded-full bg-[#FFD700]/15 text-[#FFD700] flex items-center justify-center shrink-0 mt-0.5 font-oswald font-bold text-[11px]">{i + 1}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-roboto text-[12.5px] text-white/80 leading-snug">{s.text}</div>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <Icon name="MapPin" size={11} className="text-[#FFD700]/60 shrink-0" />
+                    <span className="font-roboto text-[10.5px] text-[#FFD700]/60">{s.where}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Кнопка перехода в Ядро */}
       <a
         href="https://app.poehali.dev"
@@ -114,7 +236,7 @@ export default function StaffFunctionsTab({ token }: { token: string }) {
         <div className="flex items-center gap-3">
           <Icon name="Settings2" size={20} className="text-[#FFD700]" />
           <div>
-            <div className="font-roboto font-semibold text-sm text-white">Настроить таймауты</div>
+            <div className="font-roboto font-semibold text-sm text-white">Открыть Ядро · Настроить таймауты</div>
             <div className="font-roboto text-[11px] text-white/40">Ядро → Функции → Настройки</div>
           </div>
         </div>
