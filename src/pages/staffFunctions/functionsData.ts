@@ -121,3 +121,30 @@ export const OPTIMIZATION_STEPS = [
     text: "После стабилизации расход должен упасть в 4–5 раз, что позволит кратно понизить тариф.",
   },
 ];
+
+// Активный план оптимизации — План B «Сбалансированный» (~65–70% экономии).
+// Чек-лист: что уже сделано и что осталось.
+export type PlanStep = {
+  text: string;
+  done: boolean;
+  hint?: string;
+};
+
+export const ACTIVE_PLAN = {
+  name: "План B — «Сбалансированный»",
+  goal: "≈ 65–70% экономии · итог ~60–70 ч/неделю",
+  subtitle: "Лёгкие компромиссы, почти незаметные на практике. Цель «минус 75–80%» почти достигнута, работа не страдает.",
+  steps: [
+    { text: "Таймауты по всем функциям (30с→10с, золото 60с→15с)", done: false,
+      hint: "Ядро → Функции → Настройки. Половина экономии без изменения логики." } as PlanStep,
+    { text: "Кэш курса золота на 10 мин", done: true } as PlanStep,
+    { text: "Аналитика: ручной режим + замедленный опрос", done: true } as PlanStep,
+    { text: "Чат с сайта: polling 4с→8с + стоп при истёкшей сессии", done: true } as PlanStep,
+    { text: "Командный чат: polling оставить 20с", done: true } as PlanStep,
+    { text: "leads-monitor pulse: раз в минуту → раз в 3 минуты (−65% по функции)", done: false,
+      hint: "Ядро → Функции → leads-monitor → Расписание. Заявка эскалируется максимум на 2 мин позже — некритично." } as PlanStep,
+    { text: "employee-auth / auth-client: проверять токен на клиенте перед запросом (−17% ложных вызовов)", done: false,
+      hint: "Уберёт ошибки 401 от протухших сессий." } as PlanStep,
+    { text: "Разобрать причины ошибок 4xx в repair-admin и slshop", done: false } as PlanStep,
+  ] as PlanStep[],
+};

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import Icon from "@/components/ui/icon";
 import funcUrls from "../../../backend/func2url.json";
 import VipChatSidebar from "./VipChatSidebar";
 import VipChatConversation from "./VipChatConversation";
@@ -116,6 +117,20 @@ export default function VipChatTab({ token }: { token: string }) {
     }
   };
 
+  const [advising, setAdvising] = useState(false);
+  const askAdvice = async () => {
+    if (advising) return;
+    setAdvising(true);
+    try {
+      await apiCall("ai_advice_now", {});
+      await poll();
+    } catch (e) {
+      setError("ИИ-советник недоступен: " + (e as Error).message);
+    } finally {
+      setAdvising(false);
+    }
+  };
+
   const uploadPhoto = async (file: File) => {
     setSending(true);
     try {
@@ -208,27 +223,41 @@ export default function VipChatTab({ token }: { token: string }) {
         setShowAvatarModal={setShowAvatarModal}
       />
 
-      <VipChatConversation
-        token={token}
-        peer={peer}
-        peerMember={peerMember}
-        members={members}
-        me={me}
-        messages={messages}
-        loading={loading}
-        error={error}
-        text={text}
-        sending={sending}
-        showEmoji={showEmoji}
-        scrollRef={scrollRef}
-        fileInputRef={fileInputRef}
-        setText={setText}
-        setShowEmoji={setShowEmoji}
-        setShowMobileSidebar={setShowMobileSidebar}
-        send={send}
-        onKeyDown={onKeyDown}
-        uploadPhoto={uploadPhoto}
-      />
+      <div className="relative flex-1 flex min-w-0">
+        <VipChatConversation
+          token={token}
+          peer={peer}
+          peerMember={peerMember}
+          members={members}
+          me={me}
+          messages={messages}
+          loading={loading}
+          error={error}
+          text={text}
+          sending={sending}
+          showEmoji={showEmoji}
+          scrollRef={scrollRef}
+          fileInputRef={fileInputRef}
+          setText={setText}
+          setShowEmoji={setShowEmoji}
+          setShowMobileSidebar={setShowMobileSidebar}
+          send={send}
+          onKeyDown={onKeyDown}
+          uploadPhoto={uploadPhoto}
+        />
+        {/* Кнопка «Совет ИИ» — только в общем чате */}
+        {peer === 0 && (
+          <button
+            onClick={askAdvice}
+            disabled={advising}
+            title="Запросить совет ИИ по прибыли"
+            className="absolute top-2 right-2 z-20 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-[#FFD700] to-yellow-500 text-black text-[12px] font-bold shadow-lg shadow-[#FFD700]/20 active:scale-95 transition-transform disabled:opacity-60"
+          >
+            <Icon name={advising ? "Loader" : "Sparkles"} size={14} className={advising ? "animate-spin" : ""} />
+            {advising ? "Думаю..." : "Совет ИИ"}
+          </button>
+        )}
+      </div>
 
       {showAvatarModal && me && (
         <VipChatAvatarModal

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Icon from "@/components/ui/icon";
 import funcUrls from "../../../backend/func2url.json";
-import { FUNC_STATS, OPTIMIZATION_STEPS, type FuncStat } from "./functionsData";
+import { FUNC_STATS, OPTIMIZATION_STEPS, ACTIVE_PLAN, type FuncStat } from "./functionsData";
 
 const CHAT_URL = (funcUrls as Record<string, string>)["public-chat"];
 
@@ -120,6 +120,35 @@ export default function StaffFunctionsTab({ token }: { token: string }) {
         </div>
         <Icon name="ExternalLink" size={16} className="text-white/40" />
       </a>
+
+      {/* Активный план оптимизации (План B) */}
+      <div className="rounded-xl bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border border-emerald-500/20 p-4 mb-6">
+        <div className="flex items-center gap-2 mb-1">
+          <Icon name="Target" size={18} className="text-emerald-400" />
+          <div className="font-oswald font-bold text-base text-white uppercase tracking-wide">{ACTIVE_PLAN.name}</div>
+        </div>
+        <div className="font-roboto text-[12px] text-emerald-300/80 font-semibold mb-1">{ACTIVE_PLAN.goal}</div>
+        <div className="font-roboto text-[11px] text-white/40 mb-3 leading-relaxed">{ACTIVE_PLAN.subtitle}</div>
+        <div className="space-y-1.5">
+          {ACTIVE_PLAN.steps.map((s, i) => (
+            <div key={i} className="flex items-start gap-2.5">
+              <Icon
+                name={s.done ? "CheckCircle2" : "Circle"}
+                size={16}
+                className={`shrink-0 mt-0.5 ${s.done ? "text-emerald-400" : "text-white/25"}`}
+              />
+              <div className="flex-1 min-w-0">
+                <div className={`font-roboto text-[12.5px] leading-snug ${s.done ? "text-white/50 line-through" : "text-white/80"}`}>
+                  {s.text}
+                </div>
+                {!s.done && s.hint && (
+                  <div className="font-roboto text-[10.5px] text-white/35 mt-0.5">{s.hint}</div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* Список функций */}
       <div className="font-oswald font-bold text-sm text-white/70 uppercase tracking-wide mb-2">Топ функций по нагрузке</div>
