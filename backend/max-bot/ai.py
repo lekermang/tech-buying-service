@@ -19,10 +19,12 @@ SYSTEM_PROMPT = """Ты — дружелюбный умный ассистент
 - Телефон: +7 (992) 999-03-33
 - Адрес: г. Калуга, ул. Кирова, 11
 
-КАК СЧИТАТЬ ЦЕНУ СКУПКИ (когда спрашивают «сколько дадите»):
-- База — рыночная цена б/у устройства на Avito.ru в среднем состоянии.
-- АЙФОНЫ (iPhone): цена скупки = рыночная цена б/у на Avito МИНУС 5000 ₽.
-- ВСЯ ОСТАЛЬНАЯ техника: цена скупки = 50% от рыночной цены на Avito.
+КАК СЧИТАТЬ ЦЕНУ СКУПКИ (по приоритету, когда спрашивают «сколько дадите»):
+1) ЕСЛИ ниже есть блок «РЕАЛЬНАЯ ИСТОРИЯ ЗАКУПОК СмартЛомбард» с похожей моделью —
+   опирайся на эти реальные цены (за сколько мы реально брали такое). Назови цену в их диапазоне.
+2) ЕСЛИ похожих закупок нет — по формуле от рынка Avito.ru:
+   - АЙФОНЫ (iPhone): скупка = рыночная цена б/у на Avito МИНУС 5000 ₽.
+   - ОСТАЛЬНАЯ техника: скупка = 50% от рыночной цены на Avito.
 - Назови ОРИЕНТИРОВОЧНУЮ сумму и добавь, что точную назовёт менеджер после осмотра.
 
 Стиль:
@@ -31,7 +33,7 @@ SYSTEM_PROMPT = """Ты — дружелюбный умный ассистент
 - Не выдумывай факты, которых не знаешь. Будь честным и полезным."""
 
 
-def ask_deepseek(user_text: str, history: list | None = None) -> str | None:
+def ask_deepseek(user_text: str, history: list | None = None, extra: str = '') -> str | None:
     """
     Возвращает ответ ИИ или None при ошибке/пустом ключе.
     history — список {'role': 'user'|'assistant', 'content': str} для контекста диалога.
@@ -40,7 +42,8 @@ def ask_deepseek(user_text: str, history: list | None = None) -> str | None:
     if not api_key or not (user_text or '').strip():
         return None
 
-    messages = [{'role': 'system', 'content': SYSTEM_PROMPT}]
+    sys_prompt = SYSTEM_PROMPT + ('\n\n' + extra if extra else '')
+    messages = [{'role': 'system', 'content': sys_prompt}]
     if history:
         messages.extend(history[-8:])
     messages.append({'role': 'user', 'content': user_text.strip()[:2000]})
@@ -75,20 +78,23 @@ VISION_PROMPT = """Ты — ассистент компании «Скупка24
 Клиент прислал ФОТО. Твоя задача:
 - Определи что на фото (тип устройства, модель/бренд если видно).
 - Оцени видимое состояние (царапины, трещины, потёртости, комплект).
-- Если это техника — посчитай ОРИЕНТИРОВОЧНУЮ цену скупки по правилам:
-  • База — рыночная цена б/у на Avito.ru в среднем состоянии.
-  • АЙФОНЫ (iPhone): цена скупки = рыночная цена б/у на Avito МИНУС 5000 ₽.
-  • ОСТАЛЬНАЯ техника: цена скупки = 50% от рыночной цены на Avito.
+- Если это техника — посчитай ОРИЕНТИРОВОЧНУЮ цену скупки по приоритету:
+  1) ЕСЛИ ниже есть блок «РЕАЛЬНАЯ ИСТОРИЯ ЗАКУПОК СмартЛомбард» с похожей моделью —
+     опирайся на эти реальные цены (за сколько мы реально брали такое).
+  2) ИНАЧЕ по формуле от рынка Avito.ru:
+     • АЙФОНЫ (iPhone): скупка = рыночная цена б/у на Avito МИНУС 5000 ₽.
+     • ОСТАЛЬНАЯ техника: скупка = 50% от рыночной цены на Avito.
   Назови сумму и добавь, что точную назовёт менеджер после осмотра.
 - Если на фото не техника — просто дружелюбно опиши, что видишь.
 - Отвечай по-русски, на «вы», коротко и по делу."""
 
 
-def ask_vision(image_url: str, user_text: str = '') -> str | None:
+def ask_vision(image_url: str, user_text: str = '', extra: str = '') -> str | None:
     """Распознаёт фото и даёт оценку техники. image_url — публичный URL картинки."""
     api_key = os.environ.get('POLZA_AI_API_KEY', '').strip()
     if not api_key or not (image_url or '').strip():
         return None
+    sys_prompt = VISION_PROMPT + ('\n\n' + extra if extra else '')
     user_content = [
         {'type': 'text', 'text': (user_text or 'Что на фото? Если техника — сколько примерно стоит скупка?')[:1000]},
         {'type': 'image_url', 'image_url': {'url': image_url}},
@@ -96,7 +102,7 @@ def ask_vision(image_url: str, user_text: str = '') -> str | None:
     payload = json.dumps({
         'model': AI_MODEL,
         'messages': [
-            {'role': 'system', 'content': VISION_PROMPT},
+            {'role': 'system', 'content': sys_prompt},
             {'role': 'user', 'content': user_content},
         ],
         'temperature': 0.4,

@@ -18,12 +18,14 @@ SYSTEM_PROMPT = """Ты — вежливый ассистент компании
 - Адрес: г. Калуга, ул. Кирова, 11
 - Принимаем технику на скупку и ремонт, делаем быструю оценку.
 
-КАК СЧИТАТЬ ЦЕНУ СКУПКИ (важно):
-- Базой служит рыночная цена б/у этого устройства на Avito.ru (avito.ru) в среднем состоянии.
-- АЙФОНЫ (iPhone): цена скупки = рыночная цена б/у на Avito МИНУС 5000 ₽.
-- ВСЯ ОСТАЛЬНАЯ техника (Android, ноутбуки, фото, Dyson и др.): цена скупки = 50% от рыночной цены на Avito.
-- Прикинь рыночную цену б/у по модели, посчитай по формуле и назови ОРИЕНТИРОВОЧНУЮ сумму.
-- Всегда добавляй, что точную сумму назовёт менеджер после осмотра (зависит от состояния и комплекта).
+КАК СЧИТАТЬ ЦЕНУ СКУПКИ (по приоритету):
+1) ЕСЛИ ниже есть блок «РЕАЛЬНАЯ ИСТОРИЯ ЗАКУПОК СмартЛомбард» с похожей моделью —
+   опирайся в первую очередь на эти реальные цены (за сколько мы реально брали такое).
+   Назови цену скупки в диапазоне наших реальных закупок похожей модели.
+2) ЕСЛИ похожих закупок нет — считай по формуле от рынка Avito.ru:
+   - АЙФОНЫ (iPhone): цена скупки = рыночная цена б/у на Avito МИНУС 5000 ₽.
+   - ОСТАЛЬНАЯ техника: цена скупки = 50% от рыночной цены на Avito.
+- Назови ОРИЕНТИРОВОЧНУЮ сумму. Всегда добавляй, что точную назовёт менеджер после осмотра.
 
 Правила общения:
 - Отвечай коротко, дружелюбно, по-русски, на «вы».
@@ -34,16 +36,18 @@ SYSTEM_PROMPT = """Ты — вежливый ассистент компании
 - Отвечай 1–3 короткими предложениями, без длинных списков."""
 
 
-def ask_deepseek(user_text: str, history: list | None = None) -> str | None:
+def ask_deepseek(user_text: str, history: list | None = None, extra: str = '') -> str | None:
     """
     Возвращает ответ ИИ или None при ошибке/пустом ключе.
     history — список {'role': 'user'|'assistant', 'content': str} для контекста диалога.
+    extra — доп. контекст (например, история закупок СмартЛомбард).
     """
     api_key = os.environ.get('POLZA_AI_API_KEY', '').strip()
     if not api_key or not (user_text or '').strip():
         return None
 
-    messages = [{'role': 'system', 'content': SYSTEM_PROMPT}]
+    sys_prompt = SYSTEM_PROMPT + ('\n\n' + extra if extra else '')
+    messages = [{'role': 'system', 'content': sys_prompt}]
     if history:
         messages.extend(history[-8:])
     messages.append({'role': 'user', 'content': user_text.strip()[:2000]})
@@ -83,11 +87,12 @@ VISION_PROMPT = SYSTEM_PROMPT + """
 - Если на фото не техника или непонятно — вежливо попроси прислать фото чётче."""
 
 
-def ask_vision(image_url: str, user_text: str = '') -> str | None:
+def ask_vision(image_url: str, user_text: str = '', extra: str = '') -> str | None:
     """Распознаёт фото техники и даёт ориентировочную оценку. image_url — публичный URL картинки."""
     api_key = os.environ.get('POLZA_AI_API_KEY', '').strip()
     if not api_key or not (image_url or '').strip():
         return None
+    sys_prompt = VISION_PROMPT + ('\n\n' + extra if extra else '')
     user_content = [
         {'type': 'text', 'text': (user_text or 'Что это за техника и сколько примерно стоит скупка?')[:1000]},
         {'type': 'image_url', 'image_url': {'url': image_url}},
@@ -95,7 +100,7 @@ def ask_vision(image_url: str, user_text: str = '') -> str | None:
     payload = json.dumps({
         'model': AI_MODEL,
         'messages': [
-            {'role': 'system', 'content': VISION_PROMPT},
+            {'role': 'system', 'content': sys_prompt},
             {'role': 'user', 'content': user_content},
         ],
         'temperature': 0.4,

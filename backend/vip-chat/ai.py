@@ -19,10 +19,12 @@ ASSISTANT_PROMPT = """Ты — ИИ-помощник команды «Скупк
 - Если не хватает данных — задай уточняющий вопрос.
 - Без воды, 1–4 предложения. Можно списком, если это уместно.
 
-ЦЕНА СКУПКИ (формула для оценки):
-- База — рыночная цена б/у на Avito.ru в среднем состоянии.
-- АЙФОНЫ (iPhone): скупка = рыночная цена б/у на Avito МИНУС 5000 ₽.
-- ОСТАЛЬНАЯ техника: скупка = 50% от рыночной цены на Avito."""
+ЦЕНА СКУПКИ (по приоритету):
+1) ЕСЛИ ниже есть блок «РЕАЛЬНАЯ ИСТОРИЯ ЗАКУПОК СмартЛомбард» с похожей моделью —
+   опирайся на эти реальные цены (за сколько мы реально брали такое).
+2) ИНАЧЕ по формуле от рынка Avito.ru:
+   - АЙФОНЫ (iPhone): скупка = рыночная цена б/у на Avito МИНУС 5000 ₽.
+   - ОСТАЛЬНАЯ техника: скупка = 50% от рыночной цены на Avito."""
 
 ADVISOR_PROMPT = """Ты — ИИ-советник по прибыли для команды «Скупка24» (Калуга).
 Тебе дают сводку: горящие заявки, висящие ремонты, неотвеченные чаты клиентов.
@@ -59,11 +61,12 @@ def _call(messages: list, max_tokens: int = 350) -> str | None:
         return None
 
 
-def answer_staff(question: str, history: list | None = None) -> str | None:
+def answer_staff(question: str, history: list | None = None, extra: str = '') -> str | None:
     """Ответ сотруднику на вопрос в чате."""
     if not (question or '').strip():
         return None
-    messages = [{'role': 'system', 'content': ASSISTANT_PROMPT}]
+    sys_prompt = ASSISTANT_PROMPT + ('\n\n' + extra if extra else '')
+    messages = [{'role': 'system', 'content': sys_prompt}]
     if history:
         messages.extend(history[-8:])
     messages.append({'role': 'user', 'content': question.strip()[:2000]})
@@ -83,19 +86,21 @@ VISION_PROMPT = """Ты — ИИ-помощник команды «Скупка2
 Сотрудник прислал ФОТО техники. Помоги ему:
 - Определи устройство (тип, модель/бренд если видно).
 - Оцени видимое состояние (царапины, трещины, потёртости, комплект).
-- Посчитай ОРИЕНТИРОВОЧНУЮ цену скупки по формуле:
-  • База — рыночная цена б/у на Avito.ru в среднем состоянии.
-  • АЙФОНЫ (iPhone): скупка = рыночная цена б/у на Avito МИНУС 5000 ₽.
-  • ОСТАЛЬНАЯ техника: скупка = 50% от рыночной цены на Avito.
+- Посчитай ОРИЕНТИРОВОЧНУЮ цену скупки по приоритету:
+  1) ЕСЛИ ниже есть блок «РЕАЛЬНАЯ ИСТОРИЯ ЗАКУПОК СмартЛомбард» с похожей моделью — опирайся на эти реальные цены.
+  2) ИНАЧЕ по формуле от рынка Avito.ru:
+     • АЙФОНЫ (iPhone): скупка = рыночная цена б/у на Avito МИНУС 5000 ₽.
+     • ОСТАЛЬНАЯ техника: скупка = 50% от рыночной цены на Avito.
 - Подскажи, на что обратить внимание при оценке.
 - Отвечай коротко, по-деловому, по-русски."""
 
 
-def vision_staff(image_url: str, question: str = '') -> str | None:
+def vision_staff(image_url: str, question: str = '', extra: str = '') -> str | None:
     """Распознаёт фото техники для сотрудника. image_url — публичный URL."""
     api_key = os.environ.get('POLZA_AI_API_KEY', '').strip()
     if not api_key or not (image_url or '').strip():
         return None
+    sys_prompt = VISION_PROMPT + ('\n\n' + extra if extra else '')
     user_content = [
         {'type': 'text', 'text': (question or 'Что за техника на фото, состояние и ориентировочная цена?')[:1000]},
         {'type': 'image_url', 'image_url': {'url': image_url}},
@@ -103,7 +108,7 @@ def vision_staff(image_url: str, question: str = '') -> str | None:
     payload = json.dumps({
         'model': AI_MODEL,
         'messages': [
-            {'role': 'system', 'content': VISION_PROMPT},
+            {'role': 'system', 'content': sys_prompt},
             {'role': 'user', 'content': user_content},
         ],
         'temperature': 0.4,

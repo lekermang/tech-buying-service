@@ -27,6 +27,7 @@ import psycopg2
 import requests
 
 from ai import ask_deepseek, ask_vision
+from sl_lookup import buys_hint
 
 SCHEMA = 't_p31606708_tech_buying_service'
 MAX_API_URL = 'https://botapi.max.ru'
@@ -297,7 +298,12 @@ def try_ai_vision(room_id: int, max_chat_id: int, photo_url: str, caption: str =
             return False
         if _staff_ever_replied(room_id):
             return False
-        answer = ask_vision(photo_url, caption)
+        hint = ''
+        try:
+            hint = buys_hint(caption or '')
+        except Exception as e:
+            print(f'[MAX] sl_lookup: {e}')
+        answer = ask_vision(photo_url, caption, hint)
         if not answer:
             return False
         _save_ai_message(room_id, answer)
@@ -325,7 +331,12 @@ def try_ai_reply(room_id: int, max_chat_id: int, client_text: str) -> bool:
         if _staff_ever_replied(room_id):
             return False
         history = _recent_history(room_id)
-        answer = ask_deepseek(client_text, history)
+        hint = ''
+        try:
+            hint = buys_hint(client_text or '')
+        except Exception as e:
+            print(f'[MAX] sl_lookup: {e}')
+        answer = ask_deepseek(client_text, history, hint)
         if not answer:
             return False
         _save_ai_message(room_id, answer)
@@ -836,7 +847,7 @@ def handle_message(msg: dict) -> dict:
         # ИИ в группе видит фото: распознаёт технику и оценивает
         if photo_url and _ai_enabled():
             try:
-                answer = ask_vision(photo_url, text)
+                answer = ask_vision(photo_url, text, buys_hint(text or ''))
                 if answer:
                     send_max_message(max_chat_id, answer)
                     _log('in', 'group_ai_vision', text[:200], max_chat_id=max_chat_id, payload=msg)
@@ -848,7 +859,7 @@ def handle_message(msg: dict) -> dict:
         # Пропускаем слишком короткие реплики (смайлы, «ок», «да») чтобы не спамить.
         if text and len(text.strip()) >= 4 and _ai_enabled():
             try:
-                answer = ask_deepseek(text)
+                answer = ask_deepseek(text, None, buys_hint(text))
                 if answer:
                     send_max_message(max_chat_id, answer)
                     _log('in', 'group_ai_reply', text[:200], max_chat_id=max_chat_id, payload=msg)

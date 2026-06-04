@@ -21,6 +21,7 @@ import boto3
 from botocore.client import Config as BotoConfig
 
 from ai import answer_staff, advise, vision_staff
+from sl_lookup import buys_hint
 
 AI_BOT_ID = 6  # employees.id системного «🤖 ИИ-Советник»
 AI_TRIGGERS = ('бот', 'ии', 'ai', 'совет', 'помоги', 'подскажи', '@бот', '@ии')
@@ -586,13 +587,14 @@ def _action_send(me: dict, body: dict) -> dict:
         triggered = any(t in low for t in AI_TRIGGERS)
         try:
             ai_answer = None
+            hint = buys_hint(text or '')
             # Фото с обращением к боту — распознаём технику
             if photo_url and triggered:
-                ai_answer = vision_staff(photo_url, text)
+                ai_answer = vision_staff(photo_url, text, hint)
             # Текстовый вопрос боту
             elif text and triggered:
                 history = _general_history()
-                ai_answer = answer_staff(text, history)
+                ai_answer = answer_staff(text, history, hint)
             if ai_answer:
                 ai_reply_id = _post_bot_message(ai_answer)
                 _send_push_to_all_except(AI_BOT_ID, {

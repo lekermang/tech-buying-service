@@ -25,6 +25,7 @@ import psycopg2.extras
 import requests
 
 from ai import ask_deepseek, ask_vision
+from sl_lookup import buys_hint
 
 SCHEMA = 't_p31606708_tech_buying_service'
 
@@ -314,11 +315,16 @@ def _maybe_ai_reply(room_id: int, client_text: str, photo_url: str = None):
             return
         if _staff_ever_replied(room_id):
             return
+        hint = ''
+        try:
+            hint = buys_hint(client_text or '')
+        except Exception as e:
+            print(f'[public-chat][sl_lookup] {e}')
         if photo_url:
-            answer = ask_vision(photo_url, client_text)
+            answer = ask_vision(photo_url, client_text, hint)
         else:
             history = _recent_history(room_id)
-            answer = ask_deepseek(client_text, history)
+            answer = ask_deepseek(client_text, history, hint)
         if not answer:
             return
         ai_msg = _post_message(room_id, 'staff', 0, '🤖 Ассистент Скупка24', answer)
