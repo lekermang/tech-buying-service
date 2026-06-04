@@ -961,7 +961,23 @@ def action_register(body):
 
 
 # ───────── Handler ─────────
-def handler(event, context):
+def handler(event: dict, context) -> dict:
+    import time as _t
+    try:
+        from func_metrics import track
+    except Exception:
+        track = None
+    started = _t.time()
+    resp = _handle_impl(event, context)
+    try:
+        if track and event.get('httpMethod') != 'OPTIONS':
+            track('leads-monitor', int((resp or {}).get('statusCode', 200)), started)
+    except Exception:
+        pass
+    return resp
+
+
+def _handle_impl(event, context):
     """API + cron-pulse + Telegram webhook для системы трекинга заявок"""
     method = event.get('httpMethod', 'GET')
     if method == 'OPTIONS':

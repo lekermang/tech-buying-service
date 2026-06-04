@@ -2935,6 +2935,22 @@ def import_items(body, employee):
 
 # ============ Router ============
 def handler(event: dict, context) -> dict:
+    import time as _t
+    try:
+        from func_metrics import track
+    except Exception:
+        track = None
+    started = _t.time()
+    resp = _handle_impl(event, context)
+    try:
+        if track and event.get('httpMethod') != 'OPTIONS':
+            track('slshop', int((resp or {}).get('statusCode', 200)), started)
+    except Exception:
+        pass
+    return resp
+
+
+def _handle_impl(event: dict, context) -> dict:
     """Единая точка входа SmartLombard (комиссионка): товары, операции, клиенты, статистика, ценники, импорт/экспорт"""
     if event.get('httpMethod') == 'OPTIONS':
         return {'statusCode': 200, 'headers': HEADERS, 'body': ''}

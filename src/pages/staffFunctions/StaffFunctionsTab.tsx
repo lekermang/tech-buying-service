@@ -11,6 +11,8 @@ const STATUS_STYLE: Record<FuncStat["status"], { color: string; label: string; i
   crit: { color: "text-red-400 bg-red-500/10 border-red-500/20", label: "Критично", icon: "Flame" },
 };
 
+type LiveStat = { name: string; label: string; calls: number; errorsPct: number; avgSec: number; hours: number };
+
 const AUTO_STEPS = [
   "Включаю кэш курса золота (10 мин)",
   "Замедляю авто-опрос аналитики",
@@ -35,6 +37,21 @@ export default function StaffFunctionsTab({ token }: { token: string }) {
   const [showManual, setShowManual] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [lastRun, setLastRun] = useState<string | null>(null);
+  const [liveStats, setLiveStats] = useState<LiveStat[] | null>(null);
+  const [liveTotals, setLiveTotals] = useState<{ calls: number; hours: number } | null>(null);
+
+  const loadStats = async () => {
+    try {
+      const r = await fetch(`${CHAT_URL}?action=func_stats&days=7`, { headers: { "X-Employee-Token": token } });
+      const d = await r.json();
+      if (d.has_data && Array.isArray(d.functions)) {
+        setLiveStats(d.functions as LiveStat[]);
+        setLiveTotals({ calls: d.total_calls || 0, hours: d.total_hours || 0 });
+      }
+    } catch {
+      /* ignore */
+    }
+  };
 
   useEffect(() => {
     fetch(`${CHAT_URL}?action=ai_status`, { headers: { "X-Employee-Token": token } })
@@ -48,6 +65,7 @@ export default function StaffFunctionsTab({ token }: { token: string }) {
         if (d.applied_at) setLastRun(d.applied_at);
       })
       .catch(() => {});
+    loadStats();
   }, [token]);
 
   const runReanalyze = async () => {
@@ -59,6 +77,7 @@ export default function StaffFunctionsTab({ token }: { token: string }) {
     setOptProgress(0);
     await new Promise((res) => setTimeout(res, 1400));
     try {
+      await loadStats();
       const r = await fetch(`${CHAT_URL}?action=opt_status`, { headers: { "X-Employee-Token": token } });
       const d = await r.json();
       if (d.applied_at) setLastRun(d.applied_at);
@@ -113,14 +132,32 @@ export default function StaffFunctionsTab({ token }: { token: string }) {
     }
   };
 
+  // Список функций: реальные цифры из логов (если накоплены) поверх справочных
+  const merged = useMemo(() => {
+    const liveMap = new Map((liveStats || []).map((l) => [l.name, l]));
+    return FUNC_STATS.map((f) => {
+      const live = liveMap.get(f.name);
+      if (!live) return f;
+      const status: FuncStat["status"] =
+        live.errorsPct >= 10 ? "crit" : live.errorsPct >= 5 ? "warn" : "done";
+      return { ...f, calls: live.calls, errorsPct: live.errorsPct, avgSec: live.avgSec, hours: live.hours, status };
+    });
+  }, [liveStats]);
+
+  const hasLive = !!liveStats && liveStats.length > 0;
+
   const totals = useMemo(() => {
+    if (hasLive && liveTotals) {
+      const fixed = merged.filter((f) => f.status === "done").length;
+      return { hours: Math.round(liveTotals.hours), calls: liveTotals.calls, fixed, total: merged.length };
+    }
     const hours = FUNC_STATS.reduce((s, f) => s + f.hours, 0);
     const calls = FUNC_STATS.reduce((s, f) => s + f.calls, 0);
     const fixed = FUNC_STATS.filter((f) => f.status === "done").length;
     return { hours: Math.round(hours), calls, fixed, total: FUNC_STATS.length };
-  }, []);
+  }, [hasLive, liveTotals, merged]);
 
-  const sorted = useMemo(() => [...FUNC_STATS].sort((a, b) => b.hours - a.hours), []);
+  const sorted = useMemo(() => [...merged].sort((a, b) => b.hours - a.hours), [merged]);
 
   return (
     <div className="px-4 py-5 max-w-3xl mx-auto">
@@ -157,6 +194,14 @@ export default function StaffFunctionsTab({ token }: { token: string }) {
             <span className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all ${aiEnabled ? "left-6" : "left-1"}`} />
           </button>
         </div>
+      </div>
+
+      {/* Индикатор источника данных */}
+      <div className="flex items-center gap-1.5 mb-2">
+        <span className={`w-1.5 h-1.5 rounded-full ${hasLive ? "bg-green-400" : "bg-white/30"}`} />
+        <span className="font-roboto text-[10.5px] text-white/40">
+          {hasLive ? "Реальные данные из логов за 7 дней" : "Справочные данные · реальные накопятся после новых вызовов"}
+        </span>
       </div>
 
       {/* Сводка */}

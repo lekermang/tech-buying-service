@@ -586,6 +586,22 @@ def _notify_acceptor_ready(conn, order_id: int, client_name: str, model: str, bo
 
 
 def handler(event: dict, context) -> dict:
+    import time as _t
+    try:
+        from func_metrics import track
+    except Exception:
+        track = None
+    started = _t.time()
+    resp = _handle_impl(event, context)
+    try:
+        if track and event.get('httpMethod') != 'OPTIONS':
+            track('repair-admin', int((resp or {}).get('statusCode', 200)), started)
+    except Exception:
+        pass
+    return resp
+
+
+def _handle_impl(event: dict, context) -> dict:
     """Управление заявками на ремонт: список, создание, смена статуса, аналитика по периодам, доход мастера"""
 
     if event.get('httpMethod') == 'OPTIONS':

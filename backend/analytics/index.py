@@ -770,6 +770,22 @@ def action_search(qs):
 
 # ========== Handler ==========
 def handler(event: dict, context) -> dict:
+    import time as _t
+    try:
+        from func_metrics import track
+    except Exception:
+        track = None
+    started = _t.time()
+    resp = _handle_impl(event, context)
+    try:
+        if track and event.get('httpMethod') != 'OPTIONS':
+            track('analytics', int((resp or {}).get('statusCode', 200)), started)
+    except Exception:
+        pass
+    return resp
+
+
+def _handle_impl(event: dict, context) -> dict:
     """Аналитика. Публичные: track, convert. Админ: online, stats_today, conversions, recent_events, visitor, session_events, search."""
     method = event.get('httpMethod', 'GET')
     if method == 'OPTIONS':
