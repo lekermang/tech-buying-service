@@ -15,6 +15,7 @@ export type StaffTab =
   | "sitechat"
   | "wanttobuy"
   | "finance"
+  | "functions"
   | "leads";
 
 export const PRICE_SCHEDULER_URL =
@@ -82,6 +83,7 @@ export function readSavedTab(fallback: StaffTab): StaffTab {
       "chat",
       "wanttobuy",
       "finance",
+      "functions",
       "leads",
     ];
     if (fromUrl && (allowed as string[]).includes(fromUrl)) return fromUrl as StaffTab;

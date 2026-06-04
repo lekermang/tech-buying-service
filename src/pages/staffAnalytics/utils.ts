@@ -2,9 +2,9 @@
 import { toast } from "sonner";
 import { SOURCE_LABEL, type RecentEvent } from "./api";
 
-export const POLL_ONLINE_MS = 5000;
-export const POLL_STATS_MS = 30000;
-export const POLL_EVENTS_MS = 10000;
+export const POLL_ONLINE_MS = 15000;
+export const POLL_STATS_MS = 60000;
+export const POLL_EVENTS_MS = 30000;
 
 export const fmt = (n: number) => (n || 0).toLocaleString("ru-RU");
 

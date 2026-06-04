@@ -15,6 +15,7 @@ import {
   EmployeesTab, SmartLombardTab, AvitoProTab, SalaryTab, FinanceTab,
 } from "./StaffLazy";
 const VisitorsAnalyticsTab = React.lazy(() => import("../StaffAnalytics"));
+const StaffFunctionsTab = React.lazy(() => import("../staffFunctions/StaffFunctionsTab"));
 import MyProfileModal from "./MyProfileModal";
 import StaffSectionBanner from "./StaffSectionBanner";
 import LeadsAlertWatcher from "./LeadsAlertWatcher";
@@ -175,6 +176,7 @@ export function StaffMainLayout({
     { k: "visitors",     l: "Трафик",      icon: "Activity",       tip: "Кто на сайте сейчас, источники трафика.", premium: true },
     ...(isOwnerOrAdmin ? [{ k: "gold"      as Tab, l: "Золото",  icon: "Gem",     tip: "Учёт ювелирных изделий." }] : []),
     ...(isOwnerOrAdmin ? [{ k: "employees" as Tab, l: "Команда", icon: "UserCog", tip: "Управление сотрудниками." }] : []),
+    ...(isOwner ? [{ k: "functions" as Tab, l: "Функции", icon: "Cpu", tip: "Мониторинг и оптимизация потребления функций." }] : []),
   ];
 
   // Вкладки в основной панели по роли
@@ -282,6 +284,7 @@ export function StaffMainLayout({
             {tab === "smartlombard" && <SmartLombardTab token={token} myRole={empRole} />}
             {tab === "avitopro"     && <AvitoProTab token={token} />}
             {tab === "salary"       && <SalaryTab role={empRole} token={token} employeeName={empName} />}
+            {tab === "functions"    && isOwner && <StaffFunctionsTab />}
             {tab === "finance"      && isOwner && <FinanceTab token={token} />}
             {tab === "finance"      && !isOwner && (
               <div className="flex flex-col items-center justify-center py-24 px-6 text-center gap-3">
