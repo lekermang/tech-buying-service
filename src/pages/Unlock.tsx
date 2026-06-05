@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Icon from "@/components/ui/icon";
+import PayButton from "@/components/payment/PayButton";
 
 /* ── URLs ───────────────────────────────────────────────────────────────── */
 const AUTH_URL   = "https://functions.poehali.dev/420ad7e7-26c9-4540-9369-6bca5d26d3aa";
@@ -435,6 +436,139 @@ function OrderForm({ services, prefill, onSuccess, onCancel }: {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
+   ПОПОЛНЕНИЕ БАЛАНСА
+   ══════════════════════════════════════════════════════════════════════════ */
+const TOPUP_PRESETS = [500, 1000, 2000, 5000, 10000];
+
+function TopupModal({ client, onClose }: { client: { full_name: string; phone: string; email: string }; onClose: () => void }) {
+  const [amount, setAmount] = useState(1000);
+  const [custom, setCustom] = useState("");
+  const [useCustom, setUseCustom] = useState(false);
+
+  const finalAmount = useCustom ? (parseInt(custom) || 0) : amount;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4"
+      style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)" }}
+      onClick={onClose}>
+      <div className="relative w-full max-w-md rounded-2xl overflow-hidden"
+        style={{
+          background: "linear-gradient(145deg,rgba(14,11,6,0.99) 0%,rgba(8,8,12,1) 100%)",
+          border: "1px solid rgba(255,215,0,0.25)",
+          boxShadow: "0 0 0 1px rgba(255,215,0,0.08),0 30px 60px rgba(0,0,0,0.7)",
+        }}
+        onClick={e => e.stopPropagation()}>
+        <div className="absolute top-0 left-0 right-0 h-px"
+          style={{ background: "linear-gradient(90deg,transparent,rgba(255,215,0,0.6),transparent)" }} />
+
+        <div className="p-6">
+          {/* Шапка */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{ background: "linear-gradient(135deg,#FFD700,#b8860b)", boxShadow: "0 0 20px rgba(255,215,0,0.4)" }}>
+                <Icon name="Wallet" size={18} className="text-black" />
+              </div>
+              <div>
+                <div className="font-oswald font-bold text-lg uppercase text-white">Пополнить баланс</div>
+                <div className="font-roboto text-[10px] text-white/35">Баланс зачислится на 3gsm.ru</div>
+              </div>
+            </div>
+            <button onClick={onClose}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-white/30 hover:text-white/70 transition-colors"
+              style={{ background: "rgba(255,255,255,0.05)" }}>
+              <Icon name="X" size={15} />
+            </button>
+          </div>
+
+          {/* Пресеты */}
+          <div className="mb-4">
+            <div className="font-roboto text-[10px] uppercase tracking-widest text-white/35 mb-3">Выберите сумму</div>
+            <div className="grid grid-cols-5 gap-2 mb-3">
+              {TOPUP_PRESETS.map(p => (
+                <button key={p}
+                  onClick={() => { setAmount(p); setUseCustom(false); setCustom(""); }}
+                  className="py-2.5 rounded-xl font-oswald font-bold text-sm transition-all"
+                  style={{
+                    background: !useCustom && amount === p ? "rgba(255,215,0,0.15)" : "rgba(255,255,255,0.04)",
+                    border: `1px solid ${!useCustom && amount === p ? "rgba(255,215,0,0.45)" : "rgba(255,255,255,0.08)"}`,
+                    color: !useCustom && amount === p ? "#FFD700" : "rgba(255,255,255,0.5)",
+                    boxShadow: !useCustom && amount === p ? "0 0 12px rgba(255,215,0,0.15)" : "none",
+                  }}>
+                  {p >= 1000 ? `${p / 1000}k` : p}
+                </button>
+              ))}
+            </div>
+
+            {/* Своя сумма */}
+            <div className="relative">
+              <input
+                type="number"
+                min="100"
+                max="100000"
+                placeholder="Своя сумма (мин. 100 ₽)"
+                value={custom}
+                onChange={e => { setCustom(e.target.value); setUseCustom(true); }}
+                onFocus={() => setUseCustom(true)}
+                className="w-full px-4 py-3 rounded-xl font-roboto text-sm text-white/85 outline-none transition-all pr-10"
+                style={{
+                  background: useCustom ? "rgba(255,215,0,0.06)" : "rgba(255,255,255,0.04)",
+                  border: `1px solid ${useCustom ? "rgba(255,215,0,0.35)" : "rgba(255,255,255,0.1)"}`,
+                }}
+              />
+              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 font-roboto text-xs text-white/30">₽</span>
+            </div>
+          </div>
+
+          {/* Итого */}
+          {finalAmount >= 100 && (
+            <div className="flex items-center justify-between px-4 py-3 rounded-xl mb-5"
+              style={{ background: "rgba(255,215,0,0.06)", border: "1px solid rgba(255,215,0,0.2)" }}>
+              <div>
+                <div className="font-roboto text-[10px] uppercase tracking-widest text-white/35">К оплате</div>
+                <div className="font-oswald font-bold text-2xl" style={{ color: "#FFD700" }}>
+                  {finalAmount.toLocaleString("ru-RU")} ₽
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="font-roboto text-[10px] text-white/30">Зачислится на</div>
+                <div className="font-roboto text-xs text-white/55">3gsm.ru · {client.email}</div>
+              </div>
+            </div>
+          )}
+
+          {/* Кнопка оплаты */}
+          {finalAmount >= 100 ? (
+            <PayButton
+              purpose="unlock_topup"
+              amount={finalAmount}
+              description={`Пополнение баланса 3gsm · ${client.email}`}
+              contactInfo={client.phone || client.email}
+              returnUrl={window.location.href}
+              icon="Wallet"
+              confirm={false}
+              className="w-full"
+            >
+              Пополнить на {finalAmount.toLocaleString("ru-RU")} ₽
+            </PayButton>
+          ) : (
+            <div className="w-full py-3.5 rounded-xl text-center font-oswald font-bold text-sm opacity-30"
+              style={{ background: "rgba(255,215,0,0.1)", color: "#FFD700" }}>
+              Минимум 100 ₽
+            </div>
+          )}
+
+          <div className="mt-3 text-center font-roboto text-[10px] text-white/20 leading-relaxed">
+            После оплаты свяжитесь с поддержкой для зачисления на 3gsm.ru<br />
+            или пополняйте напрямую через личный кабинет сервиса
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
    КАБИНЕТ
    ══════════════════════════════════════════════════════════════════════════ */
 type Tab = "dashboard" | "services" | "orders" | "neworder" | "profile";
@@ -455,6 +589,7 @@ function Cabinet({ onLogout }: { onLogout: () => void }) {
   const [prefillSvc, setPrefillSvc] = useState<Record<string, string> | null>(null);
   const [search, setSearch] = useState("");
   const [mobileMenu, setMobileMenu] = useState(false);
+  const [showTopup, setShowTopup] = useState(false);
 
   const fetchBalance = useCallback(async () => {
     setLoadBal(true);
@@ -524,6 +659,11 @@ function Cabinet({ onLogout }: { onLogout: () => void }) {
       <div className="fixed inset-0 pointer-events-none"
         style={{ background: "radial-gradient(ellipse 80% 35% at 50% 0%,rgba(255,215,0,0.06) 0%,transparent 60%)" }} />
 
+      {/* Модалка пополнения */}
+      {showTopup && client && (
+        <TopupModal client={client} onClose={() => setShowTopup(false)} />
+      )}
+
       {/* ── Шапка ──────────────────────────────────────────────────────── */}
       <header className="relative z-20 border-b" style={{ borderColor: "rgba(255,215,0,0.1)", background: "rgba(6,4,6,0.95)", backdropFilter: "blur(12px)" }}>
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
@@ -538,14 +678,26 @@ function Cabinet({ onLogout }: { onLogout: () => void }) {
             </div>
           </div>
 
-          {/* Баланс в шапке */}
-          <div className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl"
-            style={{ background: "rgba(255,215,0,0.07)", border: "1px solid rgba(255,215,0,0.18)" }}>
-            <Icon name="Wallet" size={14} style={{ color: "#FFD700" }} />
-            {loadBal
-              ? <div className="h-4 w-16 rounded animate-pulse" style={{ background: "rgba(255,215,0,0.2)" }} />
-              : <span className="font-oswald font-bold text-base" style={{ color: "#FFD700" }}>{balance ?? "—"} {currency}</span>
-            }
+          {/* Баланс + кнопка пополнить */}
+          <div className="hidden sm:flex items-center gap-2">
+            <div className="flex items-center gap-2 px-4 py-2 rounded-xl"
+              style={{ background: "rgba(255,215,0,0.07)", border: "1px solid rgba(255,215,0,0.18)" }}>
+              <Icon name="Wallet" size={14} style={{ color: "#FFD700" }} />
+              {loadBal
+                ? <div className="h-4 w-16 rounded animate-pulse" style={{ background: "rgba(255,215,0,0.2)" }} />
+                : <span className="font-oswald font-bold text-base" style={{ color: "#FFD700" }}>{balance ?? "—"} {currency}</span>
+              }
+            </div>
+            <button onClick={() => setShowTopup(true)}
+              className="group relative overflow-hidden flex items-center gap-1.5 px-3 py-2 rounded-xl font-oswald font-bold text-xs uppercase tracking-wide text-black transition-all"
+              style={{
+                background: "linear-gradient(180deg,#fff3a0 0%,#FFD700 45%,#d4a017 100%)",
+                boxShadow: "0 0 0 1px rgba(255,215,0,0.5),0 4px 12px rgba(255,215,0,0.25)",
+              }}>
+              <span className="absolute inset-0 bg-[linear-gradient(115deg,transparent_35%,rgba(255,255,255,0.6)_50%,transparent_65%)] bg-[length:200%_100%] -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
+              <Icon name="Plus" size={13} className="relative" />
+              <span className="relative">Пополнить</span>
+            </button>
           </div>
 
           <div className="flex items-center gap-2">
@@ -555,6 +707,16 @@ function Cabinet({ onLogout }: { onLogout: () => void }) {
                 <div className="font-roboto text-[10px] text-white/30">{client.email}</div>
               </div>
             )}
+            {/* Пополнить — только мобильный */}
+            <button onClick={() => setShowTopup(true)}
+              className="sm:hidden flex items-center gap-1.5 px-3 py-2 rounded-xl font-oswald font-bold text-xs uppercase text-black"
+              style={{
+                background: "linear-gradient(180deg,#fff3a0 0%,#FFD700 45%,#d4a017 100%)",
+                boxShadow: "0 0 0 1px rgba(255,215,0,0.5)",
+              }}>
+              <Icon name="Plus" size={13} />
+              Пополнить
+            </button>
             <button onClick={() => { clearToken(); onLogout(); }}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl font-roboto text-xs text-white/40 hover:text-white/70 transition-all"
               style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
@@ -830,17 +992,54 @@ function Cabinet({ onLogout }: { onLogout: () => void }) {
                 </div>
               </Panel>
 
-              {/* Баланс карточка */}
+              {/* Баланс + пополнение */}
               <Panel>
-                <div className="p-5 flex items-center justify-between">
-                  <div>
-                    <div className="font-roboto text-[10px] uppercase tracking-widest text-white/35 mb-1">Баланс 3gsm</div>
-                    {loadBal ? <Skeleton h="h-7" w="w-24" /> : <div className="font-oswald font-bold text-2xl" style={{ color: "#FFD700" }}>{balance ?? "—"} {currency}</div>}
+                <div className="p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <div className="font-roboto text-[10px] uppercase tracking-widest text-white/35 mb-1">Баланс 3gsm.ru</div>
+                      {loadBal
+                        ? <Skeleton h="h-7" w="w-24" />
+                        : <div className="font-oswald font-bold text-3xl" style={{ color: "#FFD700", textShadow: "0 0 20px rgba(255,215,0,0.3)" }}>
+                            {balance ?? "—"} {currency}
+                          </div>
+                      }
+                    </div>
+                    <button onClick={fetchBalance}
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl font-roboto text-xs transition-all"
+                      style={{ background: "rgba(255,215,0,0.07)", border: "1px solid rgba(255,215,0,0.2)", color: "rgba(255,215,0,0.7)" }}>
+                      <Icon name="RefreshCw" size={12} />Обновить
+                    </button>
                   </div>
-                  <button onClick={fetchBalance}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl font-roboto text-xs transition-all"
-                    style={{ background: "rgba(255,215,0,0.07)", border: "1px solid rgba(255,215,0,0.2)", color: "rgba(255,215,0,0.7)" }}>
-                    <Icon name="RefreshCw" size={12} />Обновить
+
+                  {/* Пресеты быстрого пополнения */}
+                  <div className="font-roboto text-[10px] uppercase tracking-widest text-white/30 mb-3">Быстрое пополнение</div>
+                  <div className="grid grid-cols-5 gap-2 mb-3">
+                    {TOPUP_PRESETS.map(p => (
+                      <button key={p}
+                        onClick={() => setShowTopup(true)}
+                        className="py-2.5 rounded-xl font-oswald font-bold text-xs transition-all hover:scale-105"
+                        style={{
+                          background: "rgba(255,215,0,0.07)",
+                          border: "1px solid rgba(255,215,0,0.15)",
+                          color: "rgba(255,215,0,0.7)",
+                        }}
+                        onMouseEnter={e => { const el = e.currentTarget; el.style.background = "rgba(255,215,0,0.14)"; el.style.borderColor = "rgba(255,215,0,0.35)"; el.style.color = "#FFD700"; }}
+                        onMouseLeave={e => { const el = e.currentTarget; el.style.background = "rgba(255,215,0,0.07)"; el.style.borderColor = "rgba(255,215,0,0.15)"; el.style.color = "rgba(255,215,0,0.7)"; }}>
+                        {p >= 1000 ? `${p/1000}k` : p} ₽
+                      </button>
+                    ))}
+                  </div>
+
+                  <button onClick={() => setShowTopup(true)}
+                    className="group relative overflow-hidden w-full py-3.5 rounded-xl font-oswald font-bold uppercase tracking-wide text-sm text-black transition-all flex items-center justify-center gap-2"
+                    style={{
+                      background: "linear-gradient(180deg,#fff3a0 0%,#FFD700 45%,#d4a017 100%)",
+                      boxShadow: "0 0 0 1px rgba(255,215,0,0.5),0 8px 24px rgba(255,215,0,0.3)",
+                    }}>
+                    <span className="absolute inset-0 bg-[linear-gradient(115deg,transparent_35%,rgba(255,255,255,0.7)_50%,transparent_65%)] bg-[length:200%_100%] -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
+                    <Icon name="Plus" size={16} className="relative" />
+                    <span className="relative">Пополнить баланс</span>
                   </button>
                 </div>
               </Panel>
