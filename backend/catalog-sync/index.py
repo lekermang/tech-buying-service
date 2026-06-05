@@ -144,20 +144,24 @@ def handler(event: dict, context) -> dict:
 
     # POST — синхронизация
     if method == "POST":
-        # Парсим body заранее чтобы _is_admin мог читать admin_token из него
         try:
             body_parsed = json.loads(event.get("body") or "{}")
         except Exception:
             body_parsed = {}
-        # Временно подкладываем уже распарсенный body обратно как строку — не нужно,
-        # _is_admin сам парсит. Но добавим fallback через прямую проверку:
+
         hdrs = {k.lower(): v for k, v in (event.get("headers") or {}).items()}
-        token_ok = (
-            hdrs.get("x-admin-token","") == os.environ.get("ADMIN_TOKEN","__none__")
-            or body_parsed.get("admin_token","") == os.environ.get("ADMIN_TOKEN","__none__")
-        )
+        expected = os.environ.get("ADMIN_TOKEN", "__none__")
+
+        token_hdr  = hdrs.get("x-admin-token", "")
+        token_body = body_parsed.get("admin_token", "")
+        qs         = event.get("queryStringParameters") or {}
+        token_qs   = qs.get("admin_token", "")
+
+        print(f"[auth] expected={expected!r} hdr={token_hdr!r} body={token_body!r} qs={token_qs!r}")
+
+        token_ok = expected in (token_hdr, token_body, token_qs)
         if not token_ok:
-            return _err("Forbidden", 403)
+            return _err(f"Forbidden: token mismatch", 403)
 
         products = _fetch_products()
         if not products:
