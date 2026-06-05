@@ -11,7 +11,6 @@ from datetime import datetime, timezone
 
 SCHEMA = "t_p31606708_tech_buying_service"
 SMARTBERY_URL = "https://smartbery-qrcode.ru/api/v1/products/"
-SMARTBERY_TOKEN = "ZA6GiJuUJShlQC50idfmr8ApsvpTBzmPZkn2Rsnsi5w"
 SOURCE_TAG = "smartbery"
 
 CORS = {
@@ -44,9 +43,10 @@ def _is_admin(event):
 
 
 def _fetch_products() -> list:
+    token = os.environ.get("SMARTBERY_TOKEN", "")
     req = urllib.request.Request(
         SMARTBERY_URL,
-        headers={"Authorization": f"Bearer {SMARTBERY_TOKEN}"}
+        headers={"Authorization": f"Bearer {token}"}
     )
     with urllib.request.urlopen(req, timeout=20) as r:
         return json.loads(r.read())
