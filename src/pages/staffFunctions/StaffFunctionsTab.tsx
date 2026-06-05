@@ -4,7 +4,8 @@ import funcUrls from "../../../backend/func2url.json";
 import { FUNC_STATS, OPTIMIZATION_STEPS, ACTIVE_PLAN, type FuncStat } from "./functionsData";
 import { adminHeaders } from "@/lib/adminFetch";
 
-const SYNC_URL = "https://functions.poehali.dev/bc6598ed-2eb1-4f4f-9de6-7409ce74149e";
+const SYNC_URL        = "https://functions.poehali.dev/bc6598ed-2eb1-4f4f-9de6-7409ce74149e";
+const PRICE_EMAIL_URL = "https://functions.poehali.dev/9e9486d9-57f0-454c-bc19-b46e3d4bc682";
 
 const CHAT_URL = (funcUrls as Record<string, string>)["public-chat"];
 
@@ -41,6 +42,43 @@ export default function StaffFunctionsTab({ token }: { token: string }) {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<{ inserted: number; updated: number; total: number } | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
+
+  // Прайс
+  const [priceMarkup, setPriceMarkup]     = useState("0");
+  const [priceEmail, setPriceEmail]       = useState("");
+  const [priceSendMax, setPriceSendMax]   = useState(false);
+  const [priceSending, setPriceSending]   = useState(false);
+  const [priceResult, setPriceResult]     = useState<string | null>(null);
+  const [priceError, setPriceError]       = useState<string | null>(null);
+  const [priceExpanded, setPriceExpanded] = useState(false);
+
+  const handleSendPrice = async () => {
+    if (!priceEmail && !priceSendMax) return;
+    setPriceSending(true); setPriceResult(null); setPriceError(null);
+    try {
+      const res = await fetch(PRICE_EMAIL_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          admin_token: "Mark2015N",
+          markup: parseInt(priceMarkup) || 0,
+          email: priceEmail.trim() || undefined,
+          send_max: priceSendMax,
+          only_available: true,
+        }),
+      });
+      const d = await res.json();
+      if (d.ok) {
+        const parts = [];
+        if (d.email_sent) parts.push(`✉️ отправлено на ${d.email_to}`);
+        if (d.max_sent)   parts.push(`📨 отправлено в MAX`);
+        setPriceResult(`${d.total} позиций · ${parts.join(" · ")}`);
+      } else {
+        setPriceError(d.error || "Ошибка отправки");
+      }
+    } catch { setPriceError("Ошибка сети"); }
+    setPriceSending(false);
+  };
 
   const handleSync = async () => {
     setSyncing(true); setSyncResult(null); setSyncError(null);
@@ -187,6 +225,112 @@ export default function StaffFunctionsTab({ token }: { token: string }) {
           <div className="mt-2.5 flex items-center gap-2 font-roboto text-[11px] text-red-400">
             <Icon name="AlertCircle" size={13} />
             {syncError}
+          </div>
+        )}
+      </div>
+
+      {/* Отправка прайса */}
+      <div className="rounded-xl bg-white/5 border border-white/10 mb-4 overflow-hidden">
+        {/* Шапка — всегда видна */}
+        <button
+          onClick={() => { setPriceExpanded(v => !v); setPriceResult(null); setPriceError(null); }}
+          className="w-full flex items-center gap-3 p-3.5 text-left"
+        >
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-[#FFD700]/10">
+            <Icon name="Mail" size={18} className="text-[#FFD700]" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-roboto font-semibold text-sm text-white">Отправить прайс</div>
+            <div className="font-roboto text-[11px] text-white/40">
+              Актуальные цены Smartbery · на почту и/или в MAX
+            </div>
+          </div>
+          <Icon name={priceExpanded ? "ChevronUp" : "ChevronDown"} size={16} className="text-white/30 shrink-0" />
+        </button>
+
+        {/* Форма — раскрывается */}
+        {priceExpanded && (
+          <div className="px-3.5 pb-3.5 pt-0 border-t border-white/[0.06] space-y-3">
+
+            {/* Наценка */}
+            <div>
+              <div className="font-roboto text-[11px] text-white/40 mb-1.5 mt-3">Наценка к каждой позиции</div>
+              <div className="flex gap-2 flex-wrap">
+                {["0","200","500","1000","2000"].map(v => (
+                  <button key={v} onClick={() => setPriceMarkup(v)}
+                    className="px-3 py-1.5 rounded-lg font-oswald font-bold text-xs transition-all"
+                    style={{
+                      background: priceMarkup === v ? "rgba(255,215,0,0.15)" : "rgba(255,255,255,0.05)",
+                      border: `1px solid ${priceMarkup === v ? "rgba(255,215,0,0.4)" : "rgba(255,255,255,0.1)"}`,
+                      color: priceMarkup === v ? "#FFD700" : "rgba(255,255,255,0.45)",
+                    }}>
+                    {v === "0" ? "Без наценки" : `+${Number(v).toLocaleString("ru-RU")} ₽`}
+                  </button>
+                ))}
+                <input
+                  type="number" min="0" step="100"
+                  value={priceMarkup}
+                  onChange={e => setPriceMarkup(e.target.value)}
+                  placeholder="Своя сумма"
+                  className="w-28 px-3 py-1.5 rounded-lg font-roboto text-xs text-white/80 outline-none"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)" }}
+                />
+              </div>
+            </div>
+
+            {/* Email */}
+            <div>
+              <div className="font-roboto text-[11px] text-white/40 mb-1.5">Email получателя</div>
+              <input
+                type="email"
+                value={priceEmail}
+                onChange={e => setPriceEmail(e.target.value)}
+                placeholder="client@mail.ru (оставь пустым если только MAX)"
+                className="w-full px-3 py-2.5 rounded-xl font-roboto text-sm text-white/80 outline-none"
+                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" }}
+              />
+            </div>
+
+            {/* MAX toggle */}
+            <button
+              onClick={() => setPriceSendMax(v => !v)}
+              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl transition-all"
+              style={{
+                background: priceSendMax ? "rgba(125,211,252,0.08)" : "rgba(255,255,255,0.03)",
+                border: `1px solid ${priceSendMax ? "rgba(125,211,252,0.3)" : "rgba(255,255,255,0.08)"}`,
+              }}>
+              <div className={`w-5 h-5 rounded-md flex items-center justify-center transition-all ${priceSendMax ? "bg-[#7dd3fc]" : "bg-white/10"}`}>
+                {priceSendMax && <Icon name="Check" size={12} className="text-black" />}
+              </div>
+              <div className="text-left">
+                <div className="font-roboto text-sm text-white/80">Отправить в общий чат MAX</div>
+                <div className="font-roboto text-[10px] text-white/35">Группа Скупка24 · все сотрудники увидят прайс</div>
+              </div>
+            </button>
+
+            {/* Результат / ошибка */}
+            {priceResult && (
+              <div className="flex items-center gap-2 font-roboto text-[11px] text-green-400 px-1">
+                <Icon name="CheckCircle2" size={13} />
+                {priceResult}
+              </div>
+            )}
+            {priceError && (
+              <div className="flex items-center gap-2 font-roboto text-[11px] text-red-400 px-1">
+                <Icon name="AlertCircle" size={13} />
+                {priceError}
+              </div>
+            )}
+
+            {/* Кнопка отправки */}
+            <button
+              onClick={handleSendPrice}
+              disabled={priceSending || (!priceEmail.trim() && !priceSendMax)}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-oswald font-bold text-sm uppercase text-black transition-all disabled:opacity-40"
+              style={{ background: "linear-gradient(135deg,#FFD700,#d4a017)" }}>
+              <Icon name={priceSending ? "Loader2" : "Send"} size={16} className={priceSending ? "animate-spin" : ""} />
+              {priceSending ? "Отправляю…" : "Отправить прайс"}
+            </button>
           </div>
         )}
       </div>

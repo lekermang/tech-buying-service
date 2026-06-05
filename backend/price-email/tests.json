@@ -1,0 +1,17 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Без токена — 403",
+      "method": "POST",
+      "path": "/",
+      "body": {"markup": 0},
+      "expectedStatus": 403
+    }
+  ]
+}
