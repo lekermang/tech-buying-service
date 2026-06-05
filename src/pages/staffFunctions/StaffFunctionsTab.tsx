@@ -256,7 +256,7 @@ export default function StaffFunctionsTab({ token }: { token: string }) {
             <div>
               <div className="font-roboto text-[11px] text-white/40 mb-1.5 mt-3">Наценка к каждой позиции</div>
               <div className="flex gap-2 flex-wrap">
-                {["0","200","500","1000","2000"].map(v => (
+                {["0","500","1000","1500"].map(v => (
                   <button key={v} onClick={() => setPriceMarkup(v)}
                     className="px-3 py-1.5 rounded-lg font-oswald font-bold text-xs transition-all"
                     style={{

@@ -4,7 +4,112 @@
 """
 import os
 import json
+import re
 import urllib.request
+
+SMARTBERY_URL  = "https://smartbery-qrcode.ru/api/v1/products/"
+PRICE_EMAIL_URL = "https://functions.poehali.dev/9e9486d9-57f0-454c-bc19-b46e3d4bc682"
+
+# Ключевые слова для детекции запроса прайса
+PRICE_KEYWORDS = [
+    "прайс", "прайслист", "прайс-лист",
+    "цены", "ценник", "прейскурант",
+    "сколько стоит", "почём", "почем",
+    "iphone", "айфон", "ipad",
+    "samsung", "сяоми", "xiaomi",
+]
+
+def is_price_request(text: str) -> bool:
+    """True если сообщение — запрос прайса/цен на новую технику."""
+    t = text.lower()
+    # Обязательно должно быть что-то из price keywords
+    has_price_kw = any(kw in t for kw in PRICE_KEYWORDS)
+    if not has_price_kw:
+        return False
+    # Уточняющие слова — новые, продажа, купить (не скупка)
+    buy_kw = ["новый", "новые", "купить", "продаёт", "продает",
+              "продажа", "каталог", "витрина", "прайс"]
+    return any(kw in t for kw in buy_kw) or any(
+        kw in t for kw in ["прайс", "прайслист", "ценник", "прейскурант"]
+    )
+
+
+def fetch_smartbery(only_available: bool = True, category_filter: str = "") -> list:
+    """Получает товары из Smartbery API."""
+    token = os.environ.get("SMARTBERY_TOKEN", "")
+    req = urllib.request.Request(
+        SMARTBERY_URL,
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            data = json.loads(r.read())
+    except Exception:
+        return []
+    if only_available:
+        data = [p for p in data if p.get("availability")]
+    if category_filter:
+        # фильтр по первому слову имени (iPhone = числа, или конкретный бренд)
+        cf = category_filter.lower()
+        filtered = []
+        for p in data:
+            name = (p.get("name") or "").lower()
+            first = name.split()[0] if name.split() else ""
+            if cf in ("iphone", "айфон"):
+                if first.isdigit() or first in ("se2","se3","16e","17e","air","17","16","15","14","13","12","11"):
+                    filtered.append(p)
+            elif cf in ("samsung", "galaxy"):
+                if "galaxy" in name or "samsung" in name or first in ("galaxy","samsung","s25","s26","s24","s23"):
+                    filtered.append(p)
+            elif cf in ("xiaomi", "redmi", "poco", "сяоми"):
+                if first in ("redmi","poco","xiaomi"):
+                    filtered.append(p)
+            else:
+                filtered.append(p)
+        data = filtered or data  # если ничего не нашли — возвращаем всё
+    return data
+
+
+def price_hint(text: str, markup: int = 0) -> str:
+    """
+    Формирует блок с актуальными ценами Smartbery для подмешивания в промпт ИИ.
+    Определяет категорию из текста запроса.
+    """
+    t = text.lower()
+
+    # Определяем категорию
+    if any(kw in t for kw in ["iphone", "айфон", "apple", "эппл"]):
+        cat = "iphone"
+    elif any(kw in t for kw in ["samsung", "самсунг", "galaxy"]):
+        cat = "samsung"
+    elif any(kw in t for kw in ["xiaomi", "redmi", "poco", "сяоми", "редми"]):
+        cat = "xiaomi"
+    else:
+        cat = ""  # все товары
+
+    products = fetch_smartbery(only_available=True, category_filter=cat)
+    if not products:
+        return ""
+
+    # Ограничиваем — не больше 40 позиций в контексте ИИ
+    products = products[:40]
+
+    lines = ["АКТУАЛЬНЫЙ ПРАЙС СКУПКА24 (товары в наличии для продажи):"]
+    for p in products:
+        name = p.get("name") or ""
+        price = p.get("price")
+        region = p.get("country") or ""
+        if price:
+            final = int(price) + markup
+            region_str = f" [{region}]" if region else ""
+            lines.append(f"• {name}{region_str} — {final:,} ₽".replace(",", " "))
+        else:
+            lines.append(f"• {name} — цена уточняется")
+
+    markup_note = f" (наценка +{markup:,} ₽)".replace(",", " ") if markup else ""
+    lines.append(f"\nЦены актуальные, получены только что{markup_note}.")
+    lines.append("Скажи клиенту: для заказа звоните +7 (992) 990-33-33 или пишите нам.")
+    return "\n".join(lines)
 
 AI_URL = 'https://api.polza.ai/v1/chat/completions'
 AI_MODEL = 'gpt-4o-mini'
@@ -26,6 +131,11 @@ SYSTEM_PROMPT = """Ты — вежливый ассистент компании
    - АЙФОНЫ (iPhone): цена скупки = рыночная цена б/у на Avito МИНУС 5000 ₽.
    - ОСТАЛЬНАЯ техника: цена скупки = 50% от рыночной цены на Avito.
 - Назови ОРИЕНТИРОВОЧНУЮ сумму. Всегда добавляй, что точную назовёт менеджер после осмотра.
+
+ЕСЛИ НИЖЕ ЕСТЬ БЛОК «АКТУАЛЬНЫЙ ПРАЙС СКУПКА24»:
+- Используй эти данные чтобы назвать клиенту точные цены на наши товары.
+- Отвечай списком: модель — цена.
+- Скажи что товары в наличии и можно купить у нас.
 
 Правила общения:
 - Отвечай коротко, дружелюбно, по-русски, на «вы».

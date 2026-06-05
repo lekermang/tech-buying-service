@@ -24,7 +24,7 @@ import psycopg2
 import psycopg2.extras
 import requests
 
-from ai import ask_deepseek, ask_vision
+from ai import ask_deepseek, ask_vision, is_price_request, price_hint
 from sl_lookup import buys_hint
 
 SCHEMA = 't_p31606708_tech_buying_service'
@@ -308,23 +308,36 @@ def _maybe_ai_reply(room_id: int, client_text: str, photo_url: str = None):
     """
     Если сотрудник ещё не подключался к комнате — ИИ отвечает клиенту.
     Если есть фото — распознаёт его (vision). Иначе отвечает по тексту.
-    Ответ сохраняется как сообщение от 'staff' с пометкой ассистента.
+    Если клиент спрашивает прайс/цены — подтягивает актуальные данные Smartbery.
     """
     try:
         if not _ai_enabled():
             return
         if _staff_ever_replied(room_id):
             return
+
         hint = ''
-        try:
-            hint = buys_hint(client_text or '')
-        except Exception as e:
-            print(f'[public-chat][sl_lookup] {e}')
+
+        # Если запрос про прайс/цены — подтягиваем Smartbery
+        if client_text and is_price_request(client_text):
+            try:
+                hint = price_hint(client_text, markup=0)
+                print(f'[public-chat][price_hint] triggered for: {client_text[:60]}')
+            except Exception as e:
+                print(f'[public-chat][price_hint] {e}')
+        else:
+            # Иначе — история закупок СмартЛомбард (для оценки скупки)
+            try:
+                hint = buys_hint(client_text or '')
+            except Exception as e:
+                print(f'[public-chat][sl_lookup] {e}')
+
         if photo_url:
             answer = ask_vision(photo_url, client_text, hint)
         else:
             history = _recent_history(room_id)
             answer = ask_deepseek(client_text, history, hint)
+
         if not answer:
             return
         ai_msg = _post_message(room_id, 'staff', 0, '🤖 Ассистент Скупка24', answer)
@@ -758,10 +771,21 @@ def action_send(event, body):
         print(f'[public-chat][notify] {e}')
 
     # ИИ-ассистент отвечает клиенту, пока живой менеджер не подключился
-    # (на текст — обычный ответ, на фото — распознавание техники)
     ai_msg = None
     if author_type == 'client' and (text or photo_url):
         ai_msg = _maybe_ai_reply(room_id, text, photo_url)
+
+    # Сотрудник попросил прайс — ИИ формирует и отвечает прямо в чат
+    if author_type == 'staff' and text and is_price_request(text):
+        try:
+            ph = price_hint(text, markup=0)
+            if ph:
+                history = _recent_history(room_id)
+                answer = ask_deepseek(text, history, ph)
+                if answer:
+                    ai_msg = _post_message(room_id, 'staff', 0, '🤖 Ассистент Скупка24', answer)
+        except Exception as e:
+            print(f'[public-chat][staff_price] {e}')
 
     return _ok({
         'ok': True,
