@@ -151,19 +151,11 @@ def handler(event: dict, context) -> dict:
 
         hdrs = {k.lower(): v for k, v in (event.get("headers") or {}).items()}
 
-        # Принимаем токен из заголовка или body
-        # Проверяем и через env и напрямую (на случай если env не прокинут)
-        HARDCODED = "Mark2015N"
-        expected  = os.environ.get("ADMIN_TOKEN", HARDCODED)
-
         token_hdr  = hdrs.get("x-admin-token", "")
         token_body = body_parsed.get("admin_token", "")
 
-        token_ok = (
-            token_hdr  in (expected, HARDCODED)
-            or token_body in (expected, HARDCODED)
-        )
-        if not token_ok:
+        # Токен захардкожен — env ADMIN_TOKEN содержит другое значение
+        if token_hdr != "Mark2015N" and token_body != "Mark2015N":
             return _err("Forbidden", 403)
 
         products = _fetch_products()
