@@ -20,6 +20,7 @@ import RepairSEOText from "@/components/repair/RepairSEOText";
 import RepairSEOLinks from "@/components/repair/RepairSEOLinks";
 import RepairTopBlock from "@/components/repair/RepairTopBlock";
 import RepairBeforeAfter from "@/components/repair/RepairBeforeAfter";
+import RepairUnlockBanner from "@/components/repair/RepairUnlockBanner";
 import { REPAIR_PHONE_DISPLAY, REPAIR_PHONE_TEL } from "@/components/repair/repairContacts";
 
 export default function Repair() {
@@ -107,6 +108,20 @@ export default function Repair() {
               <Icon name="Phone" size={15} />
               {REPAIR_PHONE_DISPLAY}
             </a>
+            <Link
+              to="/unlock"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-lg font-oswald font-bold text-xs uppercase tracking-wide transition-all"
+              style={{
+                background: "rgba(125,211,252,0.08)",
+                border: "1px solid rgba(125,211,252,0.25)",
+                color: "#7dd3fc",
+              }}
+              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(125,211,252,0.15)"; el.style.borderColor = "rgba(125,211,252,0.5)"; }}
+              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(125,211,252,0.08)"; el.style.borderColor = "rgba(125,211,252,0.25)"; }}
+            >
+              <Icon name="Unlock" size={13} />
+              iCloud / FRP
+            </Link>
             <button
               onClick={scrollToForm}
               className="group relative overflow-hidden text-black font-oswald font-bold uppercase tracking-wide px-4 sm:px-5 py-2.5 rounded-lg text-sm active:scale-95 transition-all
@@ -130,6 +145,7 @@ export default function Repair() {
         <RepairAllDevices onOrder={scrollToForm} />
         <RepairParts onOrder={scrollToForm} />
         <RepairModels onOrder={scrollToForm} />
+        <RepairUnlockBanner />
         <RepairHowItWorks />
         <RepairLocation />
         <RepairReviews />
