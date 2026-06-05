@@ -68,6 +68,82 @@ def gsm_call(params):
     with urllib.request.urlopen(req, timeout=20) as r:
         return r.read().decode("utf-8")
 
+def gsm_fetch_services_from_html() -> list:
+    """
+    Парсит HTML страницы 3gsm и извлекает услуги из <select> с data-price.
+    Возвращает список dict с полями: serviceid, title, credits, category_group.
+    """
+    # Страница заказа IMEI — там полный список услуг в <select>
+    page_url = "https://3gsm.ru/resellerplaceorder/imei"
+    api_key = os.environ.get("GSMSM_API_KEY","")
+    # Строим cookie авторизации через API ключ (передаём как GET-параметр)
+    # Альтернативно — используем endpoint getServices из API
+    try:
+        params = {"key": api_key, "api": "true", "action": "getServices"}
+        data = urllib.parse.urlencode(params).encode()
+        req = urllib.request.Request(GSM_BASE, data=data, method="POST")
+        req.add_header("Content-Type","application/x-www-form-urlencoded")
+        with urllib.request.urlopen(req, timeout=25) as r:
+            raw = r.read().decode("utf-8")
+    except Exception as e:
+        return []
+
+    # Пробуем разные форматы ответа 3gsm API
+    services = []
+
+    # Формат 1: XML <service> теги
+    for block in re.findall(r"<service[\s\S]*?</service>", raw):
+        obj = {}
+        for m in re.finditer(r"<(\w+)[^>]*>([^<]*)</\1>", block):
+            obj[m.group(1)] = m.group(2).strip()
+        if obj.get("serviceid") or obj.get("id"):
+            sid = obj.get("serviceid") or obj.get("id","")
+            services.append({
+                "serviceid": sid,
+                "title": obj.get("title") or obj.get("name",""),
+                "credits": obj.get("credits") or obj.get("price",""),
+                "time": obj.get("time",""),
+                "category_group": obj.get("categoryname") or obj.get("category",""),
+            })
+
+    # Формат 2: HTML <option value="..." data-price="...">
+    if not services:
+        current_group = ""
+        for line in raw.split("\n"):
+            label_m = re.search(r'<optgroup\s+label="([^"]+)"', line)
+            if label_m:
+                current_group = label_m.group(1).strip()
+            opt_m = re.search(r'<option[^>]+value="([^"]+)"[^>]*data-price="([^"]*)"[^>]*>\s*(.+?)\s*</option>', line)
+            if opt_m:
+                sid, price, title = opt_m.group(1), opt_m.group(2), opt_m.group(3)
+                # Убираем цену из названия (обычно в конце "- 0.03 usd")
+                title_clean = re.sub(r'\s*[-–]\s*[\d.]+\s*usd\s*$', '', title, flags=re.IGNORECASE).strip()
+                services.append({
+                    "serviceid": sid,
+                    "title": title_clean,
+                    "credits": price,
+                    "time": "",
+                    "category_group": current_group,
+                })
+
+    # Формат 3: JSON массив
+    if not services:
+        try:
+            data_json = json.loads(raw)
+            if isinstance(data_json, list):
+                for s in data_json:
+                    services.append({
+                        "serviceid": str(s.get("id") or s.get("serviceid","")),
+                        "title": s.get("title") or s.get("name",""),
+                        "credits": str(s.get("credits") or s.get("price","")),
+                        "time": str(s.get("time","")),
+                        "category_group": s.get("category",""),
+                    })
+        except Exception:
+            pass
+
+    return services
+
 def xf(xml, tag):
     m = re.search("<" + tag + r"[^>]*>([^<]*)</" + tag + ">", xml)
     return m.group(1) if m else ""
@@ -225,14 +301,9 @@ def handler(event: dict, context) -> dict:
             if cached:
                 return _ok({"services": apply_markup(cached, markup_map), "from_cache": True})
 
-        # Идём в 3gsm
+        # Идём в 3gsm через умный парсер
         try:
-            raw = gsm_call({"action": "getServices"})
-            items = xi(raw, "service")
-            if not items:
-                # Пробуем JSON
-                try: items = json.loads(raw)
-                except Exception: items = []
+            items = gsm_fetch_services_from_html()
             if items:
                 save_services_to_cache(items)
                 return _ok({"services": apply_markup(items, markup_map)})
@@ -258,6 +329,115 @@ def handler(event: dict, context) -> dict:
             finally:
                 cur2.close(); c2.close()
             return _ok({"services": apply_markup(old, markup_map), "from_cache": True, "error": str(e)})
+
+    # ── ADMIN: синхронизация услуг 3gsm → кэш ───────────────────────────────
+    if action == "syncServices":
+        if not is_admin(event):
+            return _err("Forbidden", 403)
+        services = gsm_fetch_services_from_html()
+        if services:
+            save_services_to_cache(services)
+            return _ok({"ok": True, "count": len(services), "sample": services[:3]})
+        # Если парсер не дал ничего — возвращаем raw для диагностики
+        try:
+            params = {"key": os.environ.get("GSMSM_API_KEY",""), "api": "true", "action": "getServices"}
+            data_enc = urllib.parse.urlencode(params).encode()
+            req = urllib.request.Request(GSM_BASE, data=data_enc, method="POST")
+            req.add_header("Content-Type","application/x-www-form-urlencoded")
+            with urllib.request.urlopen(req, timeout=20) as r:
+                raw_diag = r.read().decode("utf-8")
+        except Exception as e:
+            raw_diag = str(e)
+        return _ok({"ok": False, "count": 0, "raw_preview": raw_diag[:800]})
+
+    # ── ADMIN: список всех клиентов unlock ────────────────────────────────────
+    if action == "adminGetClients":
+        if not is_admin(event):
+            return _err("Forbidden", 403)
+        c = _db(); cur = c.cursor()
+        try:
+            cur.execute(
+                f"SELECT c.id, c.full_name, c.email, c.phone, c.registered_at, "
+                f"COUNT(o.id) as order_count, "
+                f"COALESCE(SUM(o.price_client),0) as total_spent "
+                f"FROM {SCHEMA}.clients c "
+                f"LEFT JOIN {SCHEMA}.unlock_orders o ON o.client_id = c.id "
+                f"WHERE c.auth_token IS NOT NULL "
+                f"GROUP BY c.id ORDER BY c.registered_at DESC LIMIT 100"
+            )
+            rows = cur.fetchall()
+            clients = [{"id":r[0],"full_name":r[1],"email":r[2],"phone":r[3],
+                        "registered_at":r[4].isoformat() if r[4] else None,
+                        "order_count":r[5],"total_spent":str(r[6])} for r in rows]
+            return _ok({"clients": clients})
+        finally:
+            cur.close(); c.close()
+
+    # ── ADMIN: все заказы (всех клиентов) ────────────────────────────────────
+    if action == "adminGetOrders":
+        if not is_admin(event):
+            return _err("Forbidden", 403)
+        page = int(qs.get("page", body.get("page", 1)) or 1)
+        per_page = 50
+        offset = (page - 1) * per_page
+        status_filter = qs.get("status", body.get("status", ""))
+        c = _db(); cur = c.cursor()
+        try:
+            where = "WHERE 1=1"
+            args = []
+            if status_filter:
+                where += " AND o.status=%s"; args.append(status_filter)
+            cur.execute(
+                f"SELECT o.id, o.client_id, cl.full_name, cl.email, "
+                f"o.gsm_order_id, o.service_name, o.imei, o.quantity, "
+                f"o.price_credits, o.price_client, o.status, o.created_at "
+                f"FROM {SCHEMA}.unlock_orders o "
+                f"JOIN {SCHEMA}.clients cl ON cl.id = o.client_id "
+                f"{where} ORDER BY o.created_at DESC LIMIT %s OFFSET %s",
+                args + [per_page, offset]
+            )
+            rows = cur.fetchall()
+            orders = [{"id":r[0],"client_id":r[1],"client_name":r[2],"client_email":r[3],
+                       "gsm_order_id":r[4],"service_name":r[5],"imei":r[6],"quantity":r[7],
+                       "price_credits":str(r[8]) if r[8] else None,
+                       "price_client":str(r[9]) if r[9] else None,
+                       "status":r[10],
+                       "created_at":r[11].isoformat() if r[11] else None} for r in rows]
+            cur.execute(f"SELECT COUNT(*) FROM {SCHEMA}.unlock_orders o {where}", args)
+            total = cur.fetchone()[0]
+            return _ok({"orders": orders, "total": total, "page": page, "per_page": per_page})
+        finally:
+            cur.close(); c.close()
+
+    # ── ADMIN: все транзакции ────────────────────────────────────────────────
+    if action == "adminGetTransactions":
+        if not is_admin(event):
+            return _err("Forbidden", 403)
+        c = _db(); cur = c.cursor()
+        try:
+            cur.execute(
+                f"SELECT t.id, t.client_id, cl.full_name, cl.email, "
+                f"t.type, t.amount, t.payment_status, t.description, t.created_at "
+                f"FROM {SCHEMA}.unlock_transactions t "
+                f"JOIN {SCHEMA}.clients cl ON cl.id = t.client_id "
+                f"ORDER BY t.created_at DESC LIMIT 200"
+            )
+            rows = cur.fetchall()
+            txs = [{"id":r[0],"client_id":r[1],"client_name":r[2],"client_email":r[3],
+                    "type":r[4],"amount":str(r[5]),"payment_status":r[6],
+                    "description":r[7],
+                    "created_at":r[8].isoformat() if r[8] else None} for r in rows]
+            # Сводка
+            cur.execute(f"SELECT COUNT(*), COALESCE(SUM(amount),0) FROM {SCHEMA}.unlock_transactions WHERE type='deposit' AND payment_status='succeeded'")
+            dep = cur.fetchone()
+            cur.execute(f"SELECT COUNT(*), COALESCE(SUM(amount),0) FROM {SCHEMA}.unlock_transactions WHERE type='order_payment'")
+            pay = cur.fetchone()
+            return _ok({"transactions": txs, "summary": {
+                "deposits_count": dep[0], "deposits_total": str(dep[1]),
+                "payments_count": pay[0], "payments_total": str(pay[1]),
+            }})
+        finally:
+            cur.close(); c.close()
 
     # ── ADMIN: наценки (без клиентского токена) ───────────────────────────────
     if action == "getMarkup":

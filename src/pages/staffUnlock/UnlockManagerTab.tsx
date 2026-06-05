@@ -4,9 +4,8 @@ import Icon from "@/components/ui/icon";
 const UNLOCK_URL = "https://functions.poehali.dev/06607e09-1cc5-4df8-bccf-ed619806e834";
 const ADMIN_TOKEN = "Mark2015N";
 
-/* ── helpers ─────────────────────────────────────────────────────────────── */
-async function apiGet(action: string) {
-  const r = await fetch(`${UNLOCK_URL}?action=${action}`, {
+async function apiGet(action: string, extra = "") {
+  const r = await fetch(`${UNLOCK_URL}?action=${action}${extra}`, {
     headers: { "X-Admin-Token": ADMIN_TOKEN },
   });
   return r.json();
@@ -20,41 +19,35 @@ async function apiPost(body: object) {
   return r.json();
 }
 
-/* ── типы ────────────────────────────────────────────────────────────────── */
 interface MarkupRow { id: number; category: string; multiplier: string; pct: string; note: string; }
-interface StatsRow  { status: string; cnt: string; }
-interface Order     {
+interface Order {
   id: number; gsm_order_id: string | null; service_name: string;
   imei: string; quantity: number; price_credits: string | null;
   price_client: string | null; status: string; created_at: string;
+  client_name?: string; client_email?: string; client_id?: number;
 }
 interface Tx {
   id: number; type: string; amount: string; payment_status: string;
   description: string | null; created_at: string;
+  client_name?: string; client_email?: string; client_id?: number;
+}
+interface Client {
+  id: number; full_name: string; email: string; phone: string;
+  registered_at: string; order_count: number; total_spent: string;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
-  default: "Все остальные",
-  icloud:  "iCloud unlock",
-  frp:     "FRP / Google",
-  server:  "Server unlock",
-  imei:    "IMEI check",
-};
-const CATEGORY_ICONS: Record<string, string> = {
-  default: "Settings2",
-  icloud:  "Apple",
-  frp:     "ShieldOff",
-  server:  "Cpu",
-  imei:    "Smartphone",
+  default: "Все остальные", icloud: "iCloud unlock",
+  frp: "FRP / Google", server: "Server unlock", imei: "IMEI check",
 };
 const CATEGORY_COLORS: Record<string, string> = {
-  default: "#FFD700",
-  icloud:  "#fff3a0",
-  frp:     "#7dd3fc",
-  server:  "#fca5a5",
-  imei:    "#86efac",
+  default: "#FFD700", icloud: "#fff3a0", frp: "#7dd3fc",
+  server: "#fca5a5", imei: "#86efac",
 };
-
+const CATEGORY_ICONS: Record<string, string> = {
+  default: "Settings2", icloud: "Apple", frp: "ShieldOff",
+  server: "Cpu", imei: "Smartphone",
+};
 const STATUS_COLOR: Record<string, string> = {
   sent: "#7dd3fc", completed: "#6ee7b7", approved: "#6ee7b7",
   pending: "#FFD700", processing: "#c4b5fd", error: "#fca5a5",
@@ -83,8 +76,6 @@ function MarkupCard({ row, onSaved }: { row: MarkupRow; onSaved: () => void }) {
     } else {
       const rub = parseFloat(rubInput);
       if (isNaN(rub) || rub < 0) return;
-      // Для фиксированной надбавки в рублях сохраняем как специальное значение
-      // multiplier < 0 означает фиксированная надбавка в рублях (напр. -100 = +100₽)
       newMult = -Math.abs(rub);
     }
     setSaving(true); setMsg(null);
@@ -98,22 +89,14 @@ function MarkupCard({ row, onSaved }: { row: MarkupRow; onSaved: () => void }) {
     setSaving(false);
   }
 
-  const presets = mode === "pct"
-    ? ["10", "20", "30", "40", "50", "100"]
-    : ["50", "100", "200", "500"];
+  const presets = mode === "pct" ? ["10","20","30","40","50","100"] : ["50","100","200","500"];
 
   return (
     <div className="relative rounded-2xl overflow-hidden"
-      style={{
-        background: "linear-gradient(145deg,rgba(12,10,6,0.98),rgba(8,7,10,0.99))",
-        border: `1px solid ${color}22`,
-        boxShadow: `0 0 0 1px ${color}08,0 12px 28px rgba(0,0,0,0.45)`,
-      }}>
+      style={{ background: "linear-gradient(145deg,rgba(12,10,6,0.98),rgba(8,7,10,0.99))", border: `1px solid ${color}22` }}>
       <div className="absolute top-0 left-0 right-0 h-px"
         style={{ background: `linear-gradient(90deg,transparent,${color}55,transparent)` }} />
-
       <div className="p-4 sm:p-5">
-        {/* Шапка */}
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
             style={{ background: `${color}16`, border: `1px solid ${color}28` }}>
@@ -125,7 +108,6 @@ function MarkupCard({ row, onSaved }: { row: MarkupRow; onSaved: () => void }) {
             </div>
             <div className="font-roboto text-[10px] text-white/35 mt-0.5">{row.note}</div>
           </div>
-          {/* Текущая наценка */}
           <div className="text-right shrink-0">
             <div className="font-oswald font-black text-2xl" style={{ color }}>
               {currentPct > 0 ? `+${currentPct}%` : row.multiplier}
@@ -133,11 +115,9 @@ function MarkupCard({ row, onSaved }: { row: MarkupRow; onSaved: () => void }) {
             <div className="font-roboto text-[9px] text-white/30">сейчас</div>
           </div>
         </div>
-
-        {/* Переключатель режима */}
         <div className="flex rounded-xl overflow-hidden mb-3"
           style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-          {(["pct", "rub"] as const).map(m => (
+          {(["pct","rub"] as const).map(m => (
             <button key={m} onClick={() => { setMode(m); setMsg(null); }}
               className="flex-1 py-2 font-roboto text-xs font-medium transition-all flex items-center justify-center gap-1.5"
               style={{
@@ -150,44 +130,27 @@ function MarkupCard({ row, onSaved }: { row: MarkupRow; onSaved: () => void }) {
             </button>
           ))}
         </div>
-
-        {/* Ввод */}
         <div className="space-y-3">
           <div className="relative">
             {mode === "pct" ? (
-              <input
-                type="number" min="0" max="999" step="1"
-                value={pctInput}
+              <input type="number" min="0" max="999" step="1" value={pctInput}
                 onChange={e => setPctInput(e.target.value)}
                 className="w-full px-4 py-3 pr-14 rounded-xl font-oswald font-bold text-lg text-white/90 outline-none transition-all"
                 style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${color}25` }}
-                onFocus={e => (e.currentTarget.style.borderColor = `${color}55`)}
-                onBlur={e => (e.currentTarget.style.borderColor = `${color}25`)}
-                placeholder="40"
-              />
+                placeholder="40" />
             ) : (
-              <input
-                type="number" min="0" step="10"
-                value={rubInput}
+              <input type="number" min="0" step="10" value={rubInput}
                 onChange={e => setRubInput(e.target.value)}
                 className="w-full px-4 py-3 pr-14 rounded-xl font-oswald font-bold text-lg text-white/90 outline-none transition-all"
                 style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${color}25` }}
-                onFocus={e => (e.currentTarget.style.borderColor = `${color}55`)}
-                onBlur={e => (e.currentTarget.style.borderColor = `${color}25`)}
-                placeholder="100"
-              />
+                placeholder="100" />
             )}
             <div className="absolute right-3.5 top-1/2 -translate-y-1/2 font-oswald font-bold text-sm pointer-events-none"
-              style={{ color: `${color}80` }}>
-              {mode === "pct" ? "%" : "₽"}
-            </div>
+              style={{ color: `${color}80` }}>{mode === "pct" ? "%" : "₽"}</div>
           </div>
-
-          {/* Быстрые пресеты */}
           <div className="flex gap-1.5 flex-wrap">
             {presets.map(p => (
-              <button key={p}
-                onClick={() => mode === "pct" ? setPctInput(p) : setRubInput(p)}
+              <button key={p} onClick={() => mode === "pct" ? setPctInput(p) : setRubInput(p)}
                 className="px-2.5 py-1 rounded-lg font-oswald font-bold text-xs transition-all"
                 style={{
                   background: (mode === "pct" ? pctInput : rubInput) === p ? `${color}20` : "rgba(255,255,255,0.04)",
@@ -198,28 +161,13 @@ function MarkupCard({ row, onSaved }: { row: MarkupRow; onSaved: () => void }) {
               </button>
             ))}
           </div>
-
-          {/* Превью результата */}
           {mode === "pct" && pctInput && !isNaN(parseFloat(pctInput)) && (
             <div className="px-3 py-2 rounded-xl text-xs font-roboto flex items-center justify-between"
               style={{ background: `${color}08`, border: `1px solid ${color}15` }}>
-              <span style={{ color: "rgba(255,255,255,0.45)" }}>Пример: услуга 1000 ₽ → клиент заплатит</span>
-              <span className="font-bold" style={{ color }}>
-                {(1000 * (1 + parseFloat(pctInput) / 100)).toFixed(0)} ₽
-              </span>
+              <span style={{ color: "rgba(255,255,255,0.45)" }}>Пример: услуга 1000 ₽ → клиент</span>
+              <span className="font-bold" style={{ color }}>{(1000*(1+parseFloat(pctInput)/100)).toFixed(0)} ₽</span>
             </div>
           )}
-          {mode === "rub" && rubInput && !isNaN(parseFloat(rubInput)) && (
-            <div className="px-3 py-2 rounded-xl text-xs font-roboto flex items-center justify-between"
-              style={{ background: `${color}08`, border: `1px solid ${color}15` }}>
-              <span style={{ color: "rgba(255,255,255,0.45)" }}>Пример: услуга 1000 ₽ → клиент заплатит</span>
-              <span className="font-bold" style={{ color }}>
-                {(1000 + parseFloat(rubInput)).toFixed(0)} ₽
-              </span>
-            </div>
-          )}
-
-          {/* Сообщение */}
           {msg && (
             <div className="flex items-center gap-2 px-3 py-2 rounded-xl font-roboto text-xs"
               style={{
@@ -231,15 +179,9 @@ function MarkupCard({ row, onSaved }: { row: MarkupRow; onSaved: () => void }) {
               {msg.text}
             </div>
           )}
-
-          {/* Кнопка */}
           <button onClick={save} disabled={saving}
             className="group relative w-full overflow-hidden py-3 rounded-xl font-oswald font-bold uppercase text-sm text-black transition-all disabled:opacity-40 flex items-center justify-center gap-2"
-            style={{
-              background: `linear-gradient(180deg,${color}dd 0%,${color} 50%,${color}99 100%)`,
-              boxShadow: `0 0 0 1px ${color}55,0 6px 20px ${color}30`,
-            }}>
-            <span className="absolute inset-0 bg-[linear-gradient(115deg,transparent_35%,rgba(255,255,255,0.5)_50%,transparent_65%)] bg-[length:200%_100%] -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
+            style={{ background: `linear-gradient(180deg,${color}dd 0%,${color} 50%,${color}99 100%)` }}>
             {saving
               ? <><Icon name="Loader" size={14} className="animate-spin relative" />Сохраняю...</>
               : <><Icon name="Save" size={14} className="relative" />Сохранить наценку</>
@@ -252,41 +194,66 @@ function MarkupCard({ row, onSaved }: { row: MarkupRow; onSaved: () => void }) {
 }
 
 /* ── Основной компонент ──────────────────────────────────────────────────── */
-export default function UnlockManagerTab({ token }: { token: string }) {
-  const [section, setSection] = useState<"markup" | "orders" | "finance">("markup");
+type Section = "markup" | "orders" | "clients" | "finance" | "services";
+
+export default function UnlockManagerTab({ token: _token }: { token: string }) {
+  const [section, setSection] = useState<Section>("markup");
   const [markup, setMarkup]   = useState<MarkupRow[]>([]);
   const [orders, setOrders]   = useState<Order[]>([]);
   const [txs, setTxs]         = useState<Tx[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Синхронизация услуг
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ count: number; sample?: object[] } | null>(null);
+  const [syncRaw, setSyncRaw] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [m, o, t] = await Promise.all([
+    const [m, o, t, cl] = await Promise.all([
       apiGet("getMarkup").catch(() => null),
-      fetch(`${UNLOCK_URL}?action=myOrders`, { headers: { "X-Admin-Token": ADMIN_TOKEN } }).then(r=>r.json()).catch(()=>null),
-      fetch(`${UNLOCK_URL}?action=getTransactions`, { headers: { "X-Admin-Token": ADMIN_TOKEN } }).then(r=>r.json()).catch(()=>null),
+      apiGet("adminGetOrders").catch(() => null),
+      apiGet("adminGetTransactions").catch(() => null),
+      apiGet("adminGetClients").catch(() => null),
     ]);
     if (m?.markup) setMarkup(m.markup);
     if (o?.orders) setOrders(o.orders);
     if (t?.transactions) setTxs(t.transactions);
+    if (cl?.clients) setClients(cl.clients);
     setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
+  async function handleSync() {
+    setSyncing(true); setSyncResult(null); setSyncRaw(null);
+    const d = await apiPost({ action: "syncServices" });
+    if (d.ok) setSyncResult({ count: d.count, sample: d.sample });
+    else setSyncRaw(d.raw_preview || d.error || "Нет данных");
+    setSyncing(false);
+  }
+
   const totalOrders = orders.length;
   const doneOrders  = orders.filter(o => ["completed","approved"].includes(o.status)).length;
   const totalIn     = txs.filter(t => t.type === "deposit").reduce((s,t) => s + parseFloat(t.amount||"0"), 0);
   const totalSpent  = txs.filter(t => t.type === "order_payment").reduce((s,t) => s + parseFloat(t.amount||"0"), 0);
+  const totalProfit = orders.reduce((s,o) => {
+    if (o.price_client && o.price_credits)
+      return s + (parseFloat(o.price_client) - parseFloat(o.price_credits));
+    return s;
+  }, 0);
 
-  const SECTIONS = [
-    { id: "markup",  icon: "Tag",           label: "Наценки"    },
-    { id: "orders",  icon: "ClipboardList", label: "Заказы"     },
-    { id: "finance", icon: "Wallet",        label: "Финансы"    },
-  ] as const;
+  const SECTIONS: { id: Section; icon: string; label: string }[] = [
+    { id: "markup",   icon: "Tag",           label: "Наценки"  },
+    { id: "services", icon: "RefreshCcw",    label: "Услуги"   },
+    { id: "clients",  icon: "Users",         label: "Клиенты"  },
+    { id: "orders",   icon: "ClipboardList", label: "Заказы"   },
+    { id: "finance",  icon: "Wallet",        label: "Финансы"  },
+  ];
 
   return (
-    <div className="p-4 pb-8 max-w-3xl mx-auto">
+    <div className="p-4 pb-8 max-w-4xl mx-auto">
       {/* Шапка */}
       <div className="flex items-center gap-3 mb-5">
         <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
@@ -295,7 +262,7 @@ export default function UnlockManagerTab({ token }: { token: string }) {
         </div>
         <div>
           <h2 className="font-oswald font-black text-xl uppercase text-white">Управление Unlock</h2>
-          <div className="font-roboto text-[10px] text-white/35">Наценки · Заказы · Транзакции</div>
+          <div className="font-roboto text-[10px] text-white/35">skypka24.com/unlock · Полное управление</div>
         </div>
         <button onClick={load}
           className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-roboto text-xs text-white/40 hover:text-white/70 transition-all"
@@ -304,38 +271,39 @@ export default function UnlockManagerTab({ token }: { token: string }) {
         </button>
       </div>
 
-      {/* Статы */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-5">
+      {/* Сводка */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-5">
         {[
-          { label: "Заказов",    value: String(totalOrders), color: "#7dd3fc" },
-          { label: "Выполнено",  value: String(doneOrders),  color: "#6ee7b7" },
-          { label: "Пополнено",  value: `${totalIn.toLocaleString("ru-RU")} ₽`, color: "#6ee7b7" },
-          { label: "Списано",    value: `${totalSpent.toLocaleString("ru-RU")} ₽`, color: "#fca5a5" },
+          { label: "Клиентов",   value: String(clients.length),                       color: "#7dd3fc" },
+          { label: "Заказов",    value: String(totalOrders),                          color: "#7dd3fc" },
+          { label: "Выполнено",  value: String(doneOrders),                           color: "#6ee7b7" },
+          { label: "Прибыль",    value: `${totalProfit.toLocaleString("ru-RU")} ₽`,   color: "#6ee7b7" },
+          { label: "Пополнено",  value: `${totalIn.toLocaleString("ru-RU")} ₽`,       color: "#FFD700" },
         ].map(s => (
           <div key={s.label} className="px-3 py-2.5 rounded-xl"
             style={{ background: `${s.color}08`, border: `1px solid ${s.color}18` }}>
             <div className="font-roboto text-[9px] uppercase tracking-widest text-white/30 mb-0.5">{s.label}</div>
             {loading
               ? <div className="h-5 w-14 rounded animate-pulse" style={{ background: "rgba(255,255,255,0.07)" }} />
-              : <div className="font-oswald font-bold text-base" style={{ color: s.color }}>{s.value}</div>
+              : <div className="font-oswald font-bold text-sm" style={{ color: s.color }}>{s.value}</div>
             }
           </div>
         ))}
       </div>
 
-      {/* Переключатель разделов */}
-      <div className="flex rounded-xl overflow-hidden mb-5"
+      {/* Навигация по разделам */}
+      <div className="flex rounded-xl overflow-hidden mb-5 flex-wrap gap-px"
         style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
         {SECTIONS.map((s, i) => (
           <button key={s.id} onClick={() => setSection(s.id)}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 font-roboto text-xs font-medium transition-all"
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 font-roboto text-xs font-medium transition-all min-w-[70px]"
             style={{
               background: section === s.id ? "rgba(125,211,252,0.12)" : "transparent",
               color: section === s.id ? "#7dd3fc" : "rgba(255,255,255,0.4)",
               borderRight: i < SECTIONS.length - 1 ? "1px solid rgba(255,255,255,0.08)" : "none",
             }}>
             <Icon name={s.icon} size={13} />
-            {s.label}
+            <span className="hidden sm:inline">{s.label}</span>
           </button>
         ))}
       </div>
@@ -345,7 +313,6 @@ export default function UnlockManagerTab({ token }: { token: string }) {
         <div>
           <div className="font-roboto text-[11px] text-white/30 mb-4 leading-relaxed">
             Наценка применяется автоматически ко всем услугам при отображении цены клиенту.
-            Меняй в процентах (<span className="text-white/60">цена × коэффициент</span>) или фиксированно (<span className="text-white/60">цена + X ₽</span>).
           </div>
           {loading
             ? <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -358,59 +325,185 @@ export default function UnlockManagerTab({ token }: { token: string }) {
         </div>
       )}
 
-      {/* ── ЗАКАЗЫ ──────────────────────────────────────────────────────── */}
-      {section === "orders" && (
+      {/* ── УСЛУГИ 3GSM ─────────────────────────────────────────────────── */}
+      {section === "services" && (
+        <div>
+          <div className="rounded-2xl overflow-hidden mb-4"
+            style={{ background: "rgba(8,7,10,0.98)", border: "1px solid rgba(125,211,252,0.15)" }}>
+            <div className="px-5 py-4 border-b flex items-center justify-between gap-3"
+              style={{ borderColor: "rgba(255,255,255,0.07)" }}>
+              <div>
+                <div className="font-oswald font-bold text-base text-white uppercase">Синхронизация услуг</div>
+                <div className="font-roboto text-[10px] text-white/35 mt-0.5">
+                  Загружает актуальный каталог из 3gsm.ru → сохраняет в кэш → клиенты видят свежие цены
+                </div>
+              </div>
+              <button onClick={handleSync} disabled={syncing}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-oswald font-bold text-xs uppercase text-black transition-all disabled:opacity-40 shrink-0"
+                style={{ background: "linear-gradient(135deg,#7dd3fc,#0ea5e9)" }}>
+                <Icon name={syncing ? "Loader" : "RefreshCcw"} size={14} className={syncing ? "animate-spin" : ""} />
+                {syncing ? "Синхронизирую..." : "Синхронизировать"}
+              </button>
+            </div>
+            <div className="px-5 py-4">
+              {syncResult && (
+                <div className="flex items-start gap-3 p-3 rounded-xl mb-3"
+                  style={{ background: "rgba(110,231,183,0.08)", border: "1px solid rgba(110,231,183,0.25)" }}>
+                  <Icon name="CheckCircle" size={16} className="text-[#6ee7b7] shrink-0 mt-0.5" />
+                  <div>
+                    <div className="font-oswald font-bold text-sm text-[#6ee7b7]">
+                      Загружено {syncResult.count} услуг из 3gsm.ru
+                    </div>
+                    {syncResult.sample && syncResult.sample.length > 0 && (
+                      <div className="font-roboto text-[10px] text-white/40 mt-1">
+                        Примеры: {(syncResult.sample as Record<string,string>[]).slice(0,2).map(s => s.title || s.serviceid).join(" · ")}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              {syncRaw && (
+                <div className="p-3 rounded-xl mb-3"
+                  style={{ background: "rgba(252,165,165,0.08)", border: "1px solid rgba(252,165,165,0.25)" }}>
+                  <div className="font-oswald font-bold text-sm text-[#fca5a5] mb-1">Ответ 3gsm (диагностика):</div>
+                  <pre className="font-mono text-[10px] text-white/40 overflow-x-auto whitespace-pre-wrap">{syncRaw}</pre>
+                </div>
+              )}
+              <div className="font-roboto text-[11px] text-white/30 leading-relaxed">
+                <b className="text-white/50">Как это работает:</b><br />
+                1. Кэш хранится 1 час — клиенты видят услуги мгновенно<br />
+                2. При первом входе кэш пустой — нажми «Синхронизировать»<br />
+                3. После синхронизации услуги появятся на /unlock в разделе «Услуги»<br />
+                4. Наценки применяются автоматически к каждой цене из 3gsm
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── КЛИЕНТЫ ─────────────────────────────────────────────────────── */}
+      {section === "clients" && (
         <div>
           {loading
-            ? <div className="space-y-2">{[1,2,3].map(i=><div key={i} className="h-14 rounded-xl animate-pulse" style={{ background: "rgba(255,255,255,0.04)" }} />)}</div>
-            : !orders.length
+            ? <div className="space-y-2">{[1,2,3,4].map(i=><div key={i} className="h-14 rounded-xl animate-pulse" style={{ background: "rgba(255,255,255,0.04)" }}/>)}</div>
+            : !clients.length
               ? <div className="text-center py-14 text-white/25">
-                  <Icon name="Inbox" size={32} className="mx-auto mb-2 opacity-30" />
-                  <div className="font-oswald uppercase text-sm">Заказов ещё нет</div>
+                  <Icon name="Users" size={32} className="mx-auto mb-2 opacity-30"/>
+                  <div className="font-oswald uppercase text-sm">Клиентов ещё нет</div>
                 </div>
               : <div className="rounded-2xl overflow-hidden"
                   style={{ background: "rgba(8,7,10,0.98)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                  <div className="px-4 py-3 border-b flex items-center gap-2"
+                    style={{ borderColor: "rgba(255,255,255,0.07)" }}>
+                    <Icon name="Users" size={14} style={{ color: "#7dd3fc" }} />
+                    <span className="font-oswald font-bold text-sm uppercase text-white">
+                      {clients.length} клиентов
+                    </span>
+                  </div>
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[580px]">
+                    <table className="w-full min-w-[600px]">
                       <thead>
-                        <tr className="border-b" style={{ borderColor: "rgba(255,255,255,0.07)" }}>
-                          {["ID","Клиент/Услуга","IMEI","Дата","Оптом","Розница","Статус"].map(h => (
+                        <tr className="border-b" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+                          {["#","Имя / Email","Телефон","Зарегистрирован","Заказов","Потрачено"].map(h=>(
                             <th key={h} className="px-4 py-3 text-left font-roboto text-[10px] uppercase tracking-widest text-white/25">{h}</th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
-                        {orders.map((o, i) => {
+                        {clients.map(cl => (
+                          <tr key={cl.id} className="border-b transition-colors hover:bg-white/[0.015]"
+                            style={{ borderColor: "rgba(255,255,255,0.04)" }}>
+                            <td className="px-4 py-3 font-mono text-xs text-white/30">#{cl.id}</td>
+                            <td className="px-4 py-3">
+                              <div className="font-roboto text-sm text-white/80">{cl.full_name || "—"}</div>
+                              <div className="font-roboto text-[10px] text-white/35">{cl.email}</div>
+                            </td>
+                            <td className="px-4 py-3 font-roboto text-xs text-white/40">{cl.phone || "—"}</td>
+                            <td className="px-4 py-3 font-roboto text-[10px] text-white/30 whitespace-nowrap">
+                              {cl.registered_at ? new Date(cl.registered_at).toLocaleDateString("ru-RU",{day:"2-digit",month:"short",year:"numeric"}) : "—"}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="font-oswald font-bold text-sm" style={{ color: "#7dd3fc" }}>
+                                {cl.order_count}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 font-oswald font-bold text-sm" style={{ color: "#FFD700" }}>
+                              {parseFloat(cl.total_spent || "0") > 0
+                                ? `${parseFloat(cl.total_spent).toLocaleString("ru-RU")} ₽`
+                                : "—"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+          }
+        </div>
+      )}
+
+      {/* ── ЗАКАЗЫ (все клиенты) ────────────────────────────────────────── */}
+      {section === "orders" && (
+        <div>
+          {loading
+            ? <div className="space-y-2">{[1,2,3].map(i=><div key={i} className="h-14 rounded-xl animate-pulse" style={{ background: "rgba(255,255,255,0.04)" }}/>)}</div>
+            : !orders.length
+              ? <div className="text-center py-14 text-white/25">
+                  <Icon name="Inbox" size={32} className="mx-auto mb-2 opacity-30"/>
+                  <div className="font-oswald uppercase text-sm">Заказов ещё нет</div>
+                </div>
+              : <div className="rounded-2xl overflow-hidden"
+                  style={{ background: "rgba(8,7,10,0.98)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                  <div className="px-4 py-3 border-b flex items-center gap-2"
+                    style={{ borderColor: "rgba(255,255,255,0.07)" }}>
+                    <Icon name="ClipboardList" size={14} style={{ color: "#7dd3fc" }} />
+                    <span className="font-oswald font-bold text-sm uppercase text-white">
+                      {orders.length} заказов · прибыль {totalProfit.toLocaleString("ru-RU")} ₽
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[700px]">
+                      <thead>
+                        <tr className="border-b" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+                          {["ID","Клиент","Услуга","IMEI","Дата","3gsm","Клиент","Прибыль","Статус"].map(h=>(
+                            <th key={h} className="px-3 py-3 text-left font-roboto text-[10px] uppercase tracking-widest text-white/25">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {orders.map(o => {
                           const sc = STATUS_COLOR[o.status] ?? "#94a3b8";
                           const sl = STATUS_LABEL[o.status] ?? o.status;
                           const profit = o.price_client && o.price_credits
-                            ? (parseFloat(o.price_client) - parseFloat(o.price_credits)).toFixed(0)
-                            : null;
+                            ? parseFloat(o.price_client) - parseFloat(o.price_credits) : 0;
                           return (
-                            <tr key={o.id}
-                              className="border-b transition-colors hover:bg-white/[0.015]"
+                            <tr key={o.id} className="border-b transition-colors hover:bg-white/[0.015]"
                               style={{ borderColor: "rgba(255,255,255,0.04)" }}>
-                              <td className="px-4 py-3 font-mono text-xs text-white/35">#{o.id}</td>
-                              <td className="px-4 py-3 max-w-[180px]">
+                              <td className="px-3 py-3 font-mono text-xs text-white/30">#{o.id}</td>
+                              <td className="px-3 py-3 max-w-[120px]">
+                                <div className="font-roboto text-xs text-white/70 truncate">{o.client_name || "—"}</div>
+                                <div className="font-roboto text-[9px] text-white/30 truncate">{o.client_email}</div>
+                              </td>
+                              <td className="px-3 py-3 max-w-[160px]">
                                 <div className="font-roboto text-xs text-white/75 truncate">{o.service_name}</div>
                               </td>
-                              <td className="px-4 py-3 font-mono text-xs text-white/40">{o.imei || "—"}</td>
-                              <td className="px-4 py-3 font-roboto text-[10px] text-white/30 whitespace-nowrap">
+                              <td className="px-3 py-3 font-mono text-xs text-white/40">{o.imei || "—"}</td>
+                              <td className="px-3 py-3 font-roboto text-[10px] text-white/30 whitespace-nowrap">
                                 {o.created_at ? new Date(o.created_at).toLocaleDateString("ru-RU",{day:"2-digit",month:"short"}) : "—"}
                               </td>
-                              <td className="px-4 py-3 font-roboto text-xs text-white/40">
-                                {o.price_credits ? `${o.price_credits} ₽` : "—"}
+                              <td className="px-3 py-3 font-roboto text-xs text-white/40">
+                                {o.price_credits ? `${o.price_credits}₽` : "—"}
                               </td>
-                              <td className="px-4 py-3">
-                                <div className="font-oswald font-bold text-sm" style={{ color: "#FFD700" }}>
-                                  {o.price_client ? `${o.price_client} ₽` : "—"}
-                                </div>
-                                {profit && parseInt(profit) > 0 && (
-                                  <div className="font-roboto text-[9px]" style={{ color: "#6ee7b7" }}>+{profit} ₽</div>
-                                )}
+                              <td className="px-3 py-3 font-oswald font-bold text-sm" style={{ color: "#FFD700" }}>
+                                {o.price_client ? `${o.price_client}₽` : "—"}
                               </td>
-                              <td className="px-4 py-3">
-                                <span className="px-2 py-1 rounded-full font-roboto text-[10px] font-bold uppercase tracking-wide"
+                              <td className="px-3 py-3">
+                                {profit > 0
+                                  ? <span className="font-oswald font-bold text-sm" style={{ color: "#6ee7b7" }}>+{profit.toFixed(0)}₽</span>
+                                  : <span className="text-white/20">—</span>}
+                              </td>
+                              <td className="px-3 py-3">
+                                <span className="px-2 py-1 rounded-full font-roboto text-[10px] font-bold uppercase"
                                   style={{ background: `${sc}18`, border: `1px solid ${sc}35`, color: sc }}>
                                   {sl}
                                 </span>
@@ -429,16 +522,30 @@ export default function UnlockManagerTab({ token }: { token: string }) {
       {/* ── ФИНАНСЫ ─────────────────────────────────────────────────────── */}
       {section === "finance" && (
         <div>
+          {/* Сводка */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+            {[
+              { label: "Всего пополнено",   value: `${totalIn.toLocaleString("ru-RU")} ₽`,     color: "#6ee7b7" },
+              { label: "Всего списано",      value: `${totalSpent.toLocaleString("ru-RU")} ₽`,  color: "#fca5a5" },
+              { label: "Прибыль (заказы)",   value: `${totalProfit.toLocaleString("ru-RU")} ₽`, color: "#FFD700" },
+            ].map(s => (
+              <div key={s.label} className="px-4 py-3 rounded-xl"
+                style={{ background: `${s.color}08`, border: `1px solid ${s.color}20` }}>
+                <div className="font-roboto text-[10px] uppercase tracking-widest mb-1 text-white/35">{s.label}</div>
+                <div className="font-oswald font-bold text-xl" style={{ color: s.color }}>{s.value}</div>
+              </div>
+            ))}
+          </div>
           {loading
-            ? <div className="space-y-2">{[1,2,3].map(i=><div key={i} className="h-14 rounded-xl animate-pulse" style={{ background: "rgba(255,255,255,0.04)" }} />)}</div>
+            ? <div className="space-y-2">{[1,2,3].map(i=><div key={i} className="h-14 rounded-xl animate-pulse" style={{ background: "rgba(255,255,255,0.04)" }}/>)}</div>
             : !txs.length
               ? <div className="text-center py-14 text-white/25">
-                  <Icon name="CreditCard" size={32} className="mx-auto mb-2 opacity-30" />
-                  <div className="font-oswald uppercase text-sm">Транзакций ещё нет</div>
+                  <Icon name="CreditCard" size={32} className="mx-auto mb-2 opacity-30"/>
+                  <div className="font-oswald uppercase text-sm">Транзакций нет</div>
                 </div>
               : <div className="rounded-2xl overflow-hidden"
                   style={{ background: "rgba(8,7,10,0.98)", border: "1px solid rgba(255,255,255,0.07)" }}>
-                  {txs.map((tx, i) => {
+                  {txs.map(tx => {
                     const isIn = tx.type === "deposit";
                     const color = isIn ? "#6ee7b7" : "#fca5a5";
                     const typeLabel: Record<string,string> = { deposit:"Пополнение", order_payment:"Заказ", refund:"Возврат" };
@@ -451,9 +558,12 @@ export default function UnlockManagerTab({ token }: { token: string }) {
                           <Icon name={isIn ? "ArrowDownLeft" : "ArrowUpRight"} size={14} style={{ color }} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="font-roboto text-sm text-white/70 truncate">{tx.description || typeLabel[tx.type] || tx.type}</div>
-                          <div className="font-roboto text-[10px] text-white/30">
-                            {tx.created_at ? new Date(tx.created_at).toLocaleString("ru-RU",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}) : "—"}
+                          <div className="font-roboto text-sm text-white/70 truncate">
+                            {tx.description || typeLabel[tx.type] || tx.type}
+                          </div>
+                          <div className="font-roboto text-[10px] text-white/30 flex items-center gap-2">
+                            <span>{tx.created_at ? new Date(tx.created_at).toLocaleString("ru-RU",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}) : "—"}</span>
+                            {tx.client_name && <span className="text-white/20">· {tx.client_name}</span>}
                           </div>
                         </div>
                         <div className="font-oswald font-bold text-base shrink-0" style={{ color }}>
