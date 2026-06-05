@@ -179,6 +179,7 @@ def handler(event: dict, context) -> dict:
     if action == 'request_reset_direct':
         return _request_reset_direct(body)
 
+
     return _err(f'unknown action: {action}')
 
 
@@ -573,7 +574,7 @@ def _request_reset_direct(body):
     conn = _connect()
     cur = conn.cursor()
     try:
-        cur.execute(f"SELECT id FROM {SCHEMA}.clients WHERE LOWER(email)=%s AND password_hash IS NOT NULL LIMIT 1", (email,))
+        cur.execute(f"SELECT id FROM {SCHEMA}.clients WHERE LOWER(email)=%s LIMIT 1", (email,))
         row = cur.fetchone()
         if not row:
             return _err('Аккаунт с таким email не найден')

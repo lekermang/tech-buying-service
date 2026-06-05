@@ -26,6 +26,13 @@
       "path": "/",
       "body": {"action": "request_reset_direct", "email": "noone@example.com", "new_password": "test123456"},
       "expectedStatus": 400
+    },
+    {
+      "name": "login — неверный пароль → 401",
+      "method": "POST",
+      "path": "/",
+      "body": {"action": "login", "email": "test@example.com", "password": "wrongpassword"},
+      "expectedStatus": 401
     }
   ]
 }
