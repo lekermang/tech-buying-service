@@ -19,6 +19,7 @@ import RepairFAQ from "@/components/repair/RepairFAQ";
 import RepairSEOText from "@/components/repair/RepairSEOText";
 import RepairSEOLinks from "@/components/repair/RepairSEOLinks";
 import RepairTopBlock from "@/components/repair/RepairTopBlock";
+import RepairBeforeAfter from "@/components/repair/RepairBeforeAfter";
 import { REPAIR_PHONE_DISPLAY, REPAIR_PHONE_TEL } from "@/components/repair/repairContacts";
 
 export default function Repair() {
@@ -128,6 +129,7 @@ export default function Repair() {
         <RepairAllDevices onOrder={scrollToForm} />
         <RepairParts onOrder={scrollToForm} />
         <RepairModels onOrder={scrollToForm} />
+        <RepairBeforeAfter onOrder={scrollToForm} />
         <RepairHowItWorks />
         <RepairLocation />
         <RepairReviews />
