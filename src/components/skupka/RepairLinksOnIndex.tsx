@@ -1,32 +1,32 @@
 /**
- * Компактная полоска прямых ссылок на подстраницы ремонта — для главной страницы.
+ * Блок прямых ссылок на подстраницы ремонта — для главной страницы.
  * Располагается после PremiumServicesGrid.
  */
 import { Link } from "react-router-dom";
 import Icon from "@/components/ui/icon";
 
 const LINKS = [
-  { href: "/remont-iphone-kaluga",        icon: "Smartphone",      label: "Ремонт iPhone",      accent: "#fff3a0" },
-  { href: "/remont-samsung-kaluga",       icon: "Smartphone",      label: "Ремонт Samsung",     accent: "#93c5fd" },
-  { href: "/remont-xiaomi-kaluga",        icon: "Smartphone",      label: "Ремонт Xiaomi",      accent: "#86efac" },
-  { href: "/zamena-stekla-kaluga",        icon: "Layers",          label: "Замена стекла",      accent: "#c4b5fd" },
-  { href: "/zamena-akkumulyatora-kaluga", icon: "BatteryCharging", label: "Замена аккумулятора", accent: "#6ee7b7" },
-  { href: "/remont-posle-vody-kaluga",    icon: "Droplets",        label: "После воды",         accent: "#7dd3fc" },
-  { href: "/bga-pajka-kaluga",            icon: "Cpu",             label: "BGA-пайка",          accent: "#fca5a5" },
-  { href: "/snyatie-frp-kaluga",          icon: "Unlock",          label: "Снятие FRP",         accent: "#fdba74" },
+  { href: "/remont-iphone-kaluga",        icon: "Smartphone",      label: "Ремонт iPhone в Калуге",  keywords: "ремонт айфона калуга · замена экрана · аккумулятор", accent: "#fff3a0" },
+  { href: "/remont-samsung-kaluga",       icon: "Smartphone",      label: "Ремонт Samsung в Калуге", keywords: "ремонт samsung galaxy калуга · снятие frp",           accent: "#93c5fd" },
+  { href: "/remont-xiaomi-kaluga",        icon: "Smartphone",      label: "Ремонт Xiaomi в Калуге",  keywords: "ремонт xiaomi redmi poco калуга",                     accent: "#86efac" },
+  { href: "/zamena-stekla-kaluga",        icon: "Layers",          label: "Замена стекла в Калуге",  keywords: "переклейка тачскрина калуга · oca-клей",              accent: "#c4b5fd" },
+  { href: "/zamena-akkumulyatora-kaluga", icon: "BatteryCharging", label: "Замена аккумулятора",     keywords: "замена аккумулятора телефона калуга",                 accent: "#6ee7b7" },
+  { href: "/remont-posle-vody-kaluga",    icon: "Droplets",        label: "Ремонт после воды",       keywords: "ремонт утопленника калуга · уз-промывка",             accent: "#7dd3fc" },
+  { href: "/bga-pajka-kaluga",            icon: "Cpu",             label: "BGA-пайка в Калуге",      keywords: "bga пайка компонентный ремонт калуга",                accent: "#fca5a5" },
+  { href: "/snyatie-frp-kaluga",          icon: "Unlock",          label: "Снятие FRP и iCloud",     keywords: "снятие frp samsung xiaomi · разблокировка icloud",    accent: "#fdba74" },
 ];
 
 export default function RepairLinksOnIndex() {
   return (
-    <section className="relative px-4 pb-6 -mt-2 max-w-6xl mx-auto">
+    <section className="relative px-4 pb-8 -mt-2 max-w-6xl mx-auto">
       {/* Заголовок-разделитель */}
-      <div className="flex items-center gap-3 mb-3">
+      <div className="flex items-center gap-3 mb-4">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-md flex items-center justify-center"
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center"
             style={{ background: "rgba(255,140,0,0.15)", border: "1px solid rgba(255,140,0,0.25)" }}>
-            <Icon name="Wrench" size={12} style={{ color: "#ff8c00" }} />
+            <Icon name="Wrench" size={14} style={{ color: "#ff8c00" }} />
           </div>
-          <span className="font-oswald font-bold text-sm uppercase tracking-wide text-white/70">
+          <span className="font-oswald font-bold text-base uppercase tracking-wide text-white/70">
             Ремонт телефонов
           </span>
         </div>
@@ -41,38 +41,57 @@ export default function RepairLinksOnIndex() {
         </Link>
       </div>
 
-      {/* Горизонтальная прокрутка на мобиле, сетка на десктопе */}
-      <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-0 sm:grid sm:grid-cols-4 lg:grid-cols-8 snap-x snap-mandatory scrollbar-none">
+      {/* Сетка: 2 колонки на мобиле, 4 на планшете, 4 на десктопе */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
         {LINKS.map(l => (
           <Link
             key={l.href}
             to={l.href}
-            className="group flex-none snap-start sm:flex-auto flex items-center gap-2 rounded-xl px-3 py-2.5 transition-all duration-200"
+            className="group relative flex flex-col gap-2 rounded-xl p-3.5 overflow-hidden transition-all duration-200"
             style={{
               background: "rgba(255,255,255,0.03)",
               border: "1px solid rgba(255,255,255,0.07)",
-              minWidth: "130px",
             }}
             onMouseEnter={e => {
               const el = e.currentTarget as HTMLElement;
               el.style.background = `${l.accent}0d`;
-              el.style.borderColor = `${l.accent}30`;
-              el.style.transform = "translateY(-1px)";
+              el.style.borderColor = `${l.accent}35`;
+              el.style.transform = "translateY(-2px)";
+              el.style.boxShadow = `0 8px 20px rgba(0,0,0,0.35), 0 0 14px ${l.accent}18`;
             }}
             onMouseLeave={e => {
               const el = e.currentTarget as HTMLElement;
               el.style.background = "rgba(255,255,255,0.03)";
               el.style.borderColor = "rgba(255,255,255,0.07)";
               el.style.transform = "translateY(0)";
+              el.style.boxShadow = "none";
             }}
           >
-            <Icon name={l.icon} size={13} style={{ color: l.accent, filter: `drop-shadow(0 0 4px ${l.accent}60)`, flexShrink: 0 }} />
-            <span className="font-roboto text-[12px] leading-tight whitespace-nowrap" style={{ color: "rgba(255,255,255,0.7)" }}>
-              {l.label}
-            </span>
-            <Icon name="ChevronRight" size={10}
-              className="ml-auto opacity-0 group-hover:opacity-60 transition-opacity shrink-0"
-              style={{ color: l.accent }} />
+            {/* Верхняя линия-акцент при hover */}
+            <div className="absolute top-0 left-0 right-0 h-px opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+              style={{ background: `linear-gradient(90deg,transparent,${l.accent}70,transparent)` }} />
+
+            {/* Иконка + стрелка */}
+            <div className="flex items-center justify-between">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                style={{ background: `${l.accent}18`, border: `1px solid ${l.accent}28` }}>
+                <Icon name={l.icon} size={15} style={{ color: l.accent, filter: `drop-shadow(0 0 5px ${l.accent}70)` }} />
+              </div>
+              <Icon name="ChevronRight" size={12}
+                className="opacity-0 group-hover:opacity-70 transition-all group-hover:translate-x-0.5 shrink-0"
+                style={{ color: l.accent }} />
+            </div>
+
+            {/* Название */}
+            <div>
+              <div className="font-oswald font-bold text-[13px] sm:text-sm uppercase leading-tight text-white/90 group-hover:text-white transition-colors">
+                {l.label}
+              </div>
+              <div className="font-roboto text-[10px] leading-snug mt-1"
+                style={{ color: `${l.accent}70` }}>
+                {l.keywords}
+              </div>
+            </div>
           </Link>
         ))}
       </div>
