@@ -152,6 +152,8 @@ def handler(event: dict, context) -> dict:
 
     if action == 'register':
         return _register(body)
+    if action == 'register_unlock':
+        return _register_unlock(body)
     if action == 'login':
         return _login(body)
     if action == 'me':
@@ -173,6 +175,9 @@ def handler(event: dict, context) -> dict:
         return _reset_password(body)
     if action == 'change_password':
         return _change_password(event, body)
+    # Сброс пароля без SMTP — возвращает reset_token напрямую (для /unlock)
+    if action == 'request_reset_direct':
+        return _request_reset_direct(body)
 
     return _err(f'unknown action: {action}')
 
@@ -501,5 +506,91 @@ def _change_password(event, body):
     except Exception as e:
         conn.rollback()
         return _err(f'change_password failed: {e}', 500)
+    finally:
+        cur.close(); conn.close()
+
+
+def _register_unlock(body):
+    """Регистрация для /unlock — без обязательного телефона, без SMTP."""
+    email = (body.get('email') or '').strip().lower()
+    password = body.get('password') or ''
+    full_name = (body.get('full_name') or '').strip()
+    phone = _normalize_phone(body.get('phone') or '') or '0000000000'
+
+    if not EMAIL_RE.match(email):
+        return _err('Введите корректный email')
+    if len(password) < 6:
+        return _err('Пароль не короче 6 символов')
+    if len(full_name) < 2:
+        return _err('Укажите имя')
+
+    conn = _connect()
+    cur = conn.cursor()
+    try:
+        cur.execute(f"SELECT id, password_hash FROM {SCHEMA}.clients WHERE LOWER(email)=%s LIMIT 1", (email,))
+        existed = cur.fetchone()
+        if existed and existed[1]:
+            return _err('На этот email уже зарегистрирован аккаунт. Войдите.')
+
+        token = secrets.token_hex(24)
+        expires = datetime.now(timezone.utc) + timedelta(days=60)
+        ph = _hash_pw(password)
+
+        if existed:
+            cid = existed[0]
+            cur.execute(
+                f"UPDATE {SCHEMA}.clients SET email=%s, password_hash=%s, full_name=%s, phone=%s, "
+                f"auth_token=%s, token_expires_at=%s, email_verified=TRUE, last_login_at=NOW(), updated_at=NOW() "
+                f"WHERE id=%s",
+                (email, ph, full_name, phone, token, expires, cid)
+            )
+        else:
+            cur.execute(
+                f"INSERT INTO {SCHEMA}.clients "
+                f"(full_name, phone, email, password_hash, auth_token, token_expires_at, email_verified, last_login_at) "
+                f"VALUES (%s, %s, %s, %s, %s, %s, TRUE, NOW()) RETURNING id",
+                (full_name, phone, email, ph, token, expires)
+            )
+            cid = cur.fetchone()[0]
+        conn.commit()
+        return _ok({'ok': True, 'token': token, 'client_id': cid})
+    except Exception as e:
+        conn.rollback()
+        return _err(f'register failed: {e}', 500)
+    finally:
+        cur.close(); conn.close()
+
+
+def _request_reset_direct(body):
+    """Сброс пароля без SMTP — возвращает reset_token напрямую.
+    Клиент вставляет новый пароль прямо в форме, без перехода по ссылке."""
+    email = (body.get('email') or '').strip().lower()
+    new_password = body.get('new_password') or ''
+    if not EMAIL_RE.match(email):
+        return _err('Введите корректный email')
+    if len(new_password) < 6:
+        return _err('Пароль не короче 6 символов')
+    conn = _connect()
+    cur = conn.cursor()
+    try:
+        cur.execute(f"SELECT id FROM {SCHEMA}.clients WHERE LOWER(email)=%s AND password_hash IS NOT NULL LIMIT 1", (email,))
+        row = cur.fetchone()
+        if not row:
+            return _err('Аккаунт с таким email не найден')
+        cid = row[0]
+        ph = _hash_pw(new_password)
+        new_token = secrets.token_hex(24)
+        expires = datetime.now(timezone.utc) + timedelta(days=60)
+        cur.execute(
+            f"UPDATE {SCHEMA}.clients SET password_hash=%s, password_reset_token=NULL, "
+            f"password_reset_expires=NULL, auth_token=%s, token_expires_at=%s, "
+            f"last_login_at=NOW(), updated_at=NOW() WHERE id=%s",
+            (ph, new_token, expires, cid)
+        )
+        conn.commit()
+        return _ok({'ok': True, 'token': new_token})
+    except Exception as e:
+        conn.rollback()
+        return _err(f'reset_direct failed: {e}', 500)
     finally:
         cur.close(); conn.close()

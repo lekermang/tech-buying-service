@@ -109,7 +109,7 @@ type AuthMode = "login" | "register" | "reset";
 
 function AuthScreen({ onAuth }: { onAuth: () => void }) {
   const [mode, setMode] = useState<AuthMode>("login");
-  const [form, setForm] = useState({ email: "", password: "", full_name: "", phone: "", confirm: "" });
+  const [form, setForm] = useState({ email: "", password: "", new_password: "", full_name: "", confirm: "" });
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -123,15 +123,29 @@ function AuthScreen({ onAuth }: { onAuth: () => void }) {
         const d = await authCall({ action: "login", email: form.email, password: form.password });
         if (d.token) { setToken(d.token); onAuth(); }
         else setMsg({ ok: false, text: d.error || "Неверный email или пароль" });
+
       } else if (mode === "register") {
         if (form.password !== form.confirm) { setMsg({ ok: false, text: "Пароли не совпадают" }); setLoading(false); return; }
-        const d = await authCall({ action: "register", email: form.email, password: form.password, full_name: form.full_name, phone: form.phone });
+        if (!form.full_name.trim()) { setMsg({ ok: false, text: "Введите имя" }); setLoading(false); return; }
+        // Используем register_unlock — без обязательного телефона, без SMTP
+        const d = await authCall({ action: "register_unlock", email: form.email, password: form.password, full_name: form.full_name });
         if (d.token) { setToken(d.token); onAuth(); }
         else setMsg({ ok: false, text: d.error || "Ошибка регистрации" });
+
       } else {
-        const d = await authCall({ action: "request_reset", email: form.email });
-        if (d.ok) setMsg({ ok: true, text: "Письмо со ссылкой отправлено на " + form.email });
-        else setMsg({ ok: false, text: d.error || "Ошибка" });
+        // Сброс пароля напрямую — без писем
+        if (!form.new_password || form.new_password.length < 6) {
+          setMsg({ ok: false, text: "Введите новый пароль (мин. 6 символов)" });
+          setLoading(false); return;
+        }
+        const d = await authCall({ action: "request_reset_direct", email: form.email, new_password: form.new_password });
+        if (d.token) {
+          setToken(d.token);
+          setMsg({ ok: true, text: "Пароль изменён! Входим..." });
+          setTimeout(onAuth, 900);
+        } else {
+          setMsg({ ok: false, text: d.error || "Аккаунт не найден" });
+        }
       }
     } catch { setMsg({ ok: false, text: "Ошибка сети" }); }
     setLoading(false);
@@ -183,17 +197,25 @@ function AuthScreen({ onAuth }: { onAuth: () => void }) {
 
             {/* Поля */}
             {mode === "register" && (
-              <>
-                <input className={INP} placeholder="Имя и фамилия *" value={form.full_name} onChange={set("full_name")} />
-                <input className={INP} placeholder="Телефон *" value={form.phone} onChange={set("phone")} type="tel" />
-              </>
+              <input className={INP} placeholder="Имя *" value={form.full_name} onChange={set("full_name")} autoComplete="name" />
             )}
             <input className={INP} placeholder="Email *" value={form.email} onChange={set("email")} type="email" autoComplete="email" />
-            {mode !== "reset" && (
-              <input className={INP} placeholder="Пароль *" value={form.password} onChange={set("password")} type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} />
+            {mode === "login" && (
+              <input className={INP} placeholder="Пароль *" value={form.password} onChange={set("password")} type="password" autoComplete="current-password" />
             )}
             {mode === "register" && (
-              <input className={INP} placeholder="Повторите пароль *" value={form.confirm} onChange={set("confirm")} type="password" />
+              <>
+                <input className={INP} placeholder="Пароль * (мин. 6 символов)" value={form.password} onChange={set("password")} type="password" autoComplete="new-password" />
+                <input className={INP} placeholder="Повторите пароль *" value={form.confirm} onChange={set("confirm")} type="password" />
+              </>
+            )}
+            {mode === "reset" && (
+              <>
+                <input className={INP} placeholder="Новый пароль * (мин. 6 символов)" value={form.new_password} onChange={set("new_password")} type="password" autoComplete="new-password" />
+                <div className="font-roboto text-[11px] text-white/30 -mt-2 px-1">
+                  Введи новый пароль — он сразу применится без письма на почту
+                </div>
+              </>
             )}
 
             {/* Сообщение */}
@@ -219,7 +241,7 @@ function AuthScreen({ onAuth }: { onAuth: () => void }) {
               <span className="absolute inset-0 bg-[linear-gradient(115deg,transparent_35%,rgba(255,255,255,0.7)_50%,transparent_65%)] bg-[length:200%_100%] -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
               {loading
                 ? <><Icon name="Loader" size={15} className="animate-spin relative" />Загрузка...</>
-                : <span className="relative">{mode === "login" ? "Войти" : mode === "register" ? "Создать аккаунт" : "Отправить письмо"}</span>
+                : <span className="relative">{mode === "login" ? "Войти" : mode === "register" ? "Создать аккаунт" : "Сменить пароль"}</span>
               }
             </button>
 
