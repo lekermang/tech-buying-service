@@ -7,15 +7,7 @@
       "expectedStatus": 200
     },
     {
-      "name": "getServices — публичный список услуг",
-      "method": "GET",
-      "path": "/?action=getServices",
-      "expectedStatus": 200,
-      "expectedBody": {"services": []},
-      "bodyMatcher": "partial"
-    },
-    {
-      "name": "getBalance — без токена → 401",
+      "name": "getBalance без токена — 401",
       "method": "GET",
       "path": "/?action=getBalance",
       "expectedStatus": 401

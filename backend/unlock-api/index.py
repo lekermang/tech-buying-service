@@ -18,7 +18,8 @@ CACHE_TTL_SERVICES = 3600   # 1 час — услуги меняются ред�
 CACHE_TTL_BALANCE  = 120    # 2 минуты — баланс обновляется чаще
 
 SCHEMA = "t_p31606708_tech_buying_service"
-GSM_BASE = "https://3gsm.ru/index.php"
+GSM_BASE     = "https://3gsm.ru/index.php"
+GSM_API_BASE = "https://3gsm.ru/api.php"   # Dhru Fusion API endpoint
 
 CORS = {
     "Access-Control-Allow-Origin": "*",
@@ -78,54 +79,62 @@ def gsm_call(params):
 
 def gsm_fetch_services_from_html() -> list:
     """
-    Парсит HTML страницы 3gsm и извлекает услуги из <select> с data-price.
-    Возвращает список dict с полями: serviceid, title, credits, category_group.
+    Получает услуги из 3gsm через Dhru Fusion API.
+    Пробует несколько endpoint'ов в порядке приоритета.
     """
-    # Страница заказа IMEI — там полный список услуг в <select>
-    page_url = "https://3gsm.ru/resellerplaceorder/imei"
-    api_key = os.environ.get("GSMSM_API_KEY","")
-    # Строим cookie авторизации через API ключ (передаём как GET-параметр)
-    # Альтернативно — используем endpoint getServices из API
-    try:
-        params = {"key": api_key, "api": "true", "action": "getServices"}
-        data = urllib.parse.urlencode(params).encode()
-        req = urllib.request.Request(GSM_BASE, data=data, method="POST")
-        req.add_header("Content-Type","application/x-www-form-urlencoded")
-        with urllib.request.urlopen(req, timeout=25) as r:
-            raw = r.read().decode("utf-8")
-    except Exception as e:
-        return []
-
-    # Пробуем разные форматы ответа 3gsm API
+    api_key = os.environ.get("GSMSM_API_KEY", "")
     services = []
 
-    # Формат 1: XML <service> теги
-    for block in re.findall(r"<service[\s\S]*?</service>", raw):
-        obj = {}
-        for m in re.finditer(r"<(\w+)[^>]*>([^<]*)</\1>", block):
-            obj[m.group(1)] = m.group(2).strip()
-        if obj.get("serviceid") or obj.get("id"):
-            sid = obj.get("serviceid") or obj.get("id","")
-            services.append({
-                "serviceid": sid,
-                "title": obj.get("title") or obj.get("name",""),
-                "credits": obj.get("credits") or obj.get("price",""),
-                "time": obj.get("time",""),
-                "category_group": obj.get("categoryname") or obj.get("category",""),
-            })
+    # ── Попытка 1: Dhru Fusion API endpoint /api.php ──────────────────────────
+    try:
+        params = urllib.parse.urlencode({
+            "key": api_key, "type": "json", "action": "services"
+        }).encode()
+        req = urllib.request.Request(GSM_API_BASE, data=params, method="POST")
+        req.add_header("Content-Type", "application/x-www-form-urlencoded")
+        with urllib.request.urlopen(req, timeout=20) as r:
+            raw1 = r.read().decode("utf-8")
+        print(f"[gsm api.php] status={r.status if hasattr(r,'status') else '?'} len={len(raw1)} preview={raw1[:200]}")
+        services = _parse_gsm_response(raw1)
+        if services:
+            return services
+    except Exception as e:
+        print(f"[gsm api.php] error: {e}")
 
-    # Формат 2: HTML <option value="..." data-price="...">
-    if not services:
-        current_group = ""
-        for line in raw.split("\n"):
-            label_m = re.search(r'<optgroup\s+label="([^"]+)"', line)
-            if label_m:
-                current_group = label_m.group(1).strip()
-            opt_m = re.search(r'<option[^>]+value="([^"]+)"[^>]*data-price="([^"]*)"[^>]*>\s*(.+?)\s*</option>', line)
-            if opt_m:
-                sid, price, title = opt_m.group(1), opt_m.group(2), opt_m.group(3)
-                # Убираем цену из названия (обычно в конце "- 0.03 usd")
-                title_clean = re.sub(r'\s*[-–]\s*[\d.]+\s*usd\s*$', '', title, flags=re.IGNORECASE).strip()
+    # ── Попытка 2: index.php с action=services ────────────────────────────────
+    for action_name in ["services", "getServices", "getservices"]:
+        try:
+            params2 = urllib.parse.urlencode({
+                "key": api_key, "api": "true", "action": action_name,
+                "type": "json"
+            }).encode()
+            req2 = urllib.request.Request(GSM_BASE, data=params2, method="POST")
+            req2.add_header("Content-Type", "application/x-www-form-urlencoded")
+            with urllib.request.urlopen(req2, timeout=20) as r2:
+                raw2 = r2.read().decode("utf-8")
+            print(f"[gsm index action={action_name}] len={len(raw2)} preview={raw2[:200]}")
+            services = _parse_gsm_response(raw2)
+            if services:
+                return services
+        except Exception as e:
+            print(f"[gsm index action={action_name}] error: {e}")
+
+    return services
+
+
+def _parse_select_html(html: str) -> list:
+    """Парсит HTML со страницы 3gsm — <optgroup> + <option data-price>"""
+    services = []
+    current_group = ""
+    for line in html.split("\n"):
+        g = re.search(r'<optgroup[^>]+label="([^"]+)"', line, re.IGNORECASE)
+        if g: current_group = g.group(1).strip()
+        # <option value="abc123" data-price="0.03">Название - 0.03 usd</option>
+        o = re.search(r'<option[^>]+value="([a-f0-9]{32,})"[^>]*data-price="([^"]*)"[^>]*>\s*(.+?)\s*</option>', line, re.IGNORECASE)
+        if o:
+            sid, price, title = o.group(1).strip(), o.group(2).strip(), o.group(3).strip()
+            title_clean = re.sub(r'\s*[-–]\s*[\d.]+\s*usd\s*$', '', title, flags=re.IGNORECASE).strip()
+            if sid and title_clean:
                 services.append({
                     "serviceid": sid,
                     "title": title_clean,
@@ -133,22 +142,66 @@ def gsm_fetch_services_from_html() -> list:
                     "time": "",
                     "category_group": current_group,
                 })
+    return services
 
-    # Формат 3: JSON массив
-    if not services:
-        try:
-            data_json = json.loads(raw)
-            if isinstance(data_json, list):
-                for s in data_json:
-                    services.append({
-                        "serviceid": str(s.get("id") or s.get("serviceid","")),
-                        "title": s.get("title") or s.get("name",""),
-                        "credits": str(s.get("credits") or s.get("price","")),
-                        "time": str(s.get("time","")),
-                        "category_group": s.get("category",""),
-                    })
-        except Exception:
-            pass
+
+def _parse_gsm_response(raw: str) -> list:
+    """Парсит ответ 3gsm в любом формате (JSON, XML, HTML)."""
+    services = []
+    if not raw or raw.strip().lower() in ("forbidden", "unauthorized", "error"):
+        return []
+
+    # JSON массив / объект
+    try:
+        data = json.loads(raw)
+        items = data if isinstance(data, list) else data.get("services") or data.get("data") or []
+        for s in items:
+            if not isinstance(s, dict): continue
+            sid = str(s.get("id") or s.get("serviceid") or s.get("service_id") or "")
+            title = s.get("title") or s.get("name") or s.get("service_name") or ""
+            if sid and title:
+                services.append({
+                    "serviceid": sid,
+                    "title": str(title),
+                    "credits": str(s.get("credits") or s.get("price") or ""),
+                    "time": str(s.get("time") or s.get("eta") or ""),
+                    "category_group": str(s.get("category") or s.get("categoryname") or ""),
+                })
+        if services: return services
+    except Exception:
+        pass
+
+    # XML <service> теги
+    for block in re.findall(r"<service[\s\S]*?</service>", raw, re.IGNORECASE):
+        obj = {}
+        for m in re.finditer(r"<(\w+)[^>]*>\s*([^<]*?)\s*</\1>", block):
+            obj[m.group(1).lower()] = m.group(2).strip()
+        sid = obj.get("serviceid") or obj.get("id") or ""
+        title = obj.get("title") or obj.get("name") or obj.get("servicename") or ""
+        if sid and title:
+            services.append({
+                "serviceid": sid,
+                "title": title,
+                "credits": obj.get("credits") or obj.get("price") or "",
+                "time": obj.get("time") or "",
+                "category_group": obj.get("categoryname") or obj.get("category") or "",
+            })
+    if services: return services
+
+    # HTML <option value="..." data-price="...">
+    current_group = ""
+    for line in raw.split("\n"):
+        g = re.search(r'<optgroup[^>]+label="([^"]+)"', line, re.IGNORECASE)
+        if g: current_group = g.group(1).strip()
+        o = re.search(r'<option[^>]+value="([^"]+)"[^>]*data-price="([^"]*)"[^>]*>\s*(.+?)\s*</option>', line, re.IGNORECASE)
+        if o:
+            sid, price, title = o.group(1), o.group(2), o.group(3)
+            title_clean = re.sub(r'\s*[-–]\s*[\d.]+\s*usd\s*$', '', title, flags=re.IGNORECASE).strip()
+            services.append({
+                "serviceid": sid, "title": title_clean,
+                "credits": price, "time": "",
+                "category_group": current_group,
+            })
 
     return services
 
@@ -342,21 +395,39 @@ def handler(event: dict, context) -> dict:
     if action == "syncServices":
         if not is_admin(event):
             return _err("Forbidden", 403)
+
+        # Если передан html_source — парсим его напрямую (из браузера)
+        html_source = body.get("html_source","")
+        if html_source:
+            services = _parse_gsm_response(html_source)
+            if not services:
+                # Специальный парсер для <option value="..." data-price="...">
+                services = _parse_select_html(html_source)
+            if services:
+                save_services_to_cache(services)
+                return _ok({"ok": True, "count": len(services), "sample": services[:3], "source": "html"})
+
+        # Иначе пробуем API
         services = gsm_fetch_services_from_html()
         if services:
             save_services_to_cache(services)
-            return _ok({"ok": True, "count": len(services), "sample": services[:3]})
-        # Если парсер не дал ничего — возвращаем raw для диагностики
-        try:
-            params = {"key": os.environ.get("GSMSM_API_KEY",""), "api": "true", "action": "getServices"}
-            data_enc = urllib.parse.urlencode(params).encode()
-            req = urllib.request.Request(GSM_BASE, data=data_enc, method="POST")
-            req.add_header("Content-Type","application/x-www-form-urlencoded")
-            with urllib.request.urlopen(req, timeout=20) as r:
-                raw_diag = r.read().decode("utf-8")
-        except Exception as e:
-            raw_diag = str(e)
-        return _ok({"ok": False, "count": 0, "raw_preview": raw_diag[:800]})
+            return _ok({"ok": True, "count": len(services), "sample": services[:3], "source": "api"})
+
+        # Диагностика — что вернул 3gsm
+        diag = {}
+        for attempt_action in ["getBalance", "balance"]:
+            try:
+                params_d = {"key": os.environ.get("GSMSM_API_KEY",""), "api": "true", "action": attempt_action}
+                data_d = urllib.parse.urlencode(params_d).encode()
+                req_d = urllib.request.Request(GSM_BASE, data=data_d, method="POST")
+                req_d.add_header("Content-Type","application/x-www-form-urlencoded")
+                with urllib.request.urlopen(req_d, timeout=10) as rd:
+                    diag[attempt_action] = rd.read().decode("utf-8")[:300]
+                break
+            except Exception as e:
+                diag[attempt_action] = str(e)
+        return _ok({"ok": False, "count": 0, "diag": diag,
+                    "hint": "API 3gsm не возвращает каталог. Используй кнопку 'Загрузить из браузера' или добавь услуги вручную."})
 
     # ── ADMIN: список всех клиентов unlock ────────────────────────────────────
     if action == "adminGetClients":

@@ -47,7 +47,7 @@ export default function StaffFunctionsTab({ token }: { token: string }) {
     try {
       const res = await fetch(SYNC_URL, {
         method: "POST",
-        headers: { ...adminHeaders(token), "Content-Type": "application/json", "X-Admin-Token": "Mark2015N" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "sync", admin_token: "Mark2015N" }),
       });
       const d = await res.json();

@@ -206,6 +206,7 @@ export default function UnlockManagerTab({ token: _token }: { token: string }) {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<{ count: number; sample?: object[] } | null>(null);
   const [syncRaw, setSyncRaw] = useState<string | null>(null);
+  const [htmlSource, setHtmlSource] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -226,9 +227,16 @@ export default function UnlockManagerTab({ token: _token }: { token: string }) {
 
   async function handleSync() {
     setSyncing(true); setSyncResult(null); setSyncRaw(null);
-    const d = await apiPost({ action: "syncServices" });
-    if (d.ok) setSyncResult({ count: d.count, sample: d.sample });
-    else setSyncRaw(d.raw_preview || d.error || "Нет данных");
+    const payload: Record<string, unknown> = { action: "syncServices" };
+    if (htmlSource.trim()) payload.html_source = htmlSource.trim();
+    const d = await apiPost(payload);
+    if (d.ok) {
+      setSyncResult({ count: d.count, sample: d.sample });
+      setHtmlSource("");
+    } else {
+      const msg = d.hint || d.error || JSON.stringify(d.diag || {}).slice(0, 300);
+      setSyncRaw(msg);
+    }
     setSyncing(false);
   }
 
@@ -362,17 +370,43 @@ export default function UnlockManagerTab({ token: _token }: { token: string }) {
               )}
               {syncRaw && (
                 <div className="p-3 rounded-xl mb-3"
-                  style={{ background: "rgba(252,165,165,0.08)", border: "1px solid rgba(252,165,165,0.25)" }}>
-                  <div className="font-oswald font-bold text-sm text-[#fca5a5] mb-1">Ответ 3gsm (диагностика):</div>
-                  <pre className="font-mono text-[10px] text-white/40 overflow-x-auto whitespace-pre-wrap">{syncRaw}</pre>
+                  style={{ background: "rgba(252,165,165,0.06)", border: "1px solid rgba(252,165,165,0.2)" }}>
+                  <div className="font-roboto text-xs text-[#fca5a5] font-bold mb-1">API 3gsm недоступен. Используй ручную загрузку ↓</div>
+                  <div className="font-mono text-[10px] text-white/30 truncate">{syncRaw.slice(0,200)}</div>
                 </div>
               )}
-              <div className="font-roboto text-[11px] text-white/30 leading-relaxed">
-                <b className="text-white/50">Как это работает:</b><br />
-                1. Кэш хранится 1 час — клиенты видят услуги мгновенно<br />
-                2. При первом входе кэш пустой — нажми «Синхронизировать»<br />
-                3. После синхронизации услуги появятся на /unlock в разделе «Услуги»<br />
-                4. Наценки применяются автоматически к каждой цене из 3gsm
+
+              {/* Ручная загрузка HTML */}
+              <div className="mt-4 p-4 rounded-xl" style={{ background: "rgba(255,215,0,0.04)", border: "1px solid rgba(255,215,0,0.15)" }}>
+                <div className="font-oswald font-bold text-sm text-white/70 uppercase mb-1 flex items-center gap-2">
+                  <Icon name="Code" size={14} style={{ color: "#FFD700" }} />
+                  Загрузить HTML вручную
+                </div>
+                <div className="font-roboto text-[10px] text-white/35 mb-3 leading-relaxed">
+                  1. Открой <a href="https://3gsm.ru/resellerplaceorder/imei" target="_blank" className="text-[#7dd3fc] underline">3gsm.ru/resellerplaceorder/imei</a><br />
+                  2. Нажми F12 → Elements → найди <code className="text-[#FFD700]">&lt;select id="service_id"&gt;</code><br />
+                  3. Правой кнопкой → «Copy → OuterHTML» → вставь сюда
+                </div>
+                <textarea
+                  value={htmlSource}
+                  onChange={e => setHtmlSource(e.target.value)}
+                  placeholder='<select id="service_id">...<optgroup label="IMEI Check">...<option value="45c48..." data-price="0.018">Apple FMI check - 0.018 usd</option>...'
+                  rows={4}
+                  className="w-full px-3 py-2.5 rounded-lg font-mono text-[10px] text-white/70 outline-none resize-none mb-2"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)" }}
+                />
+                <button
+                  onClick={handleSync}
+                  disabled={syncing || !htmlSource.trim()}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg font-oswald font-bold text-xs uppercase text-black disabled:opacity-40 transition-all"
+                  style={{ background: "linear-gradient(135deg,#FFD700,#b8860b)" }}>
+                  <Icon name={syncing ? "Loader" : "Upload"} size={13} className={syncing ? "animate-spin" : ""} />
+                  {syncing ? "Загружаю..." : "Загрузить и сохранить"}
+                </button>
+              </div>
+
+              <div className="mt-3 font-roboto text-[10px] text-white/20 leading-relaxed">
+                Кэш хранится 1 час · После загрузки услуги сразу появятся на /unlock · Наценки применяются автоматически
               </div>
             </div>
           </div>
