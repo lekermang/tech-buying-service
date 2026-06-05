@@ -4,6 +4,7 @@
  */
 import { useEffect, useState } from "react";
 import Icon from "@/components/ui/icon";
+import ApplePriceEmailModal from "./ApplePriceEmailModal";
 
 const SALE_END = new Date("2026-06-13T23:59:59");
 const CATALOG_URL = "https://preview--tech-buying-service.poehali.dev/catalog";
@@ -44,9 +45,12 @@ function Sep() {
 
 export default function AppleSaleBanner() {
   const time = useCountdown();
+  const [priceOpen, setPriceOpen] = useState(false);
   if (!time) return null; // акция завершена — баннер скрывается автоматически
 
   return (
+    <>
+    {priceOpen && <ApplePriceEmailModal onClose={() => setPriceOpen(false)} />}
     <section className="relative overflow-hidden py-0">
       {/* Общий контейнер с золотым градиентом */}
       <div className="relative mx-4 sm:mx-8 my-4 rounded-2xl overflow-hidden"
@@ -134,23 +138,32 @@ export default function AppleSaleBanner() {
                 </div>
               </div>
 
-              {/* Кнопка */}
-              <a href={CATALOG_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group relative overflow-hidden inline-flex items-center gap-2 bg-black text-[#FFD700] font-oswald font-bold uppercase tracking-wide px-6 py-3 rounded-xl text-sm active:scale-95 transition-all
-                           shadow-[0_4px_20px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.05)]
-                           hover:shadow-[0_6px_28px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.08)]">
-                <span className="absolute inset-0 bg-[linear-gradient(115deg,transparent_35%,rgba(255,215,0,0.1)_50%,transparent_65%)] bg-[length:200%_100%] -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
-                <Icon name="ShoppingBag" size={16} className="relative" />
-                <span className="relative">Смотреть каталог</span>
-                <Icon name="ArrowRight" size={14} className="relative opacity-70 group-hover:translate-x-1 transition-transform" />
-              </a>
+              {/* Кнопки */}
+              <div className="flex flex-col gap-2 w-full sm:w-auto">
+                <button
+                  onClick={() => setPriceOpen(true)}
+                  className="group relative overflow-hidden inline-flex items-center gap-2 bg-black text-[#FFD700] font-oswald font-bold uppercase tracking-wide px-6 py-3 rounded-xl text-sm active:scale-95 transition-all
+                             shadow-[0_4px_20px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.05)]
+                             hover:shadow-[0_6px_28px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.08)]">
+                  <span className="absolute inset-0 bg-[linear-gradient(115deg,transparent_35%,rgba(255,215,0,0.1)_50%,transparent_65%)] bg-[length:200%_100%] -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
+                  <Icon name="Mail" size={16} className="relative" />
+                  <span className="relative">Получить прайс</span>
+                </button>
+                <a href={CATALOG_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-2 text-black/60 font-roboto text-xs font-semibold hover:text-black/80 transition-colors">
+                  <Icon name="ShoppingBag" size={13} />
+                  Смотреть каталог
+                  <Icon name="ArrowRight" size={12} className="opacity-60" />
+                </a>
+              </div>
             </div>
 
           </div>
         </div>
       </div>
     </section>
+    </>
   );
 }
