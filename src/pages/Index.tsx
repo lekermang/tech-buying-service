@@ -23,6 +23,7 @@ import WholesaleBanner from "@/components/skupka/WholesaleBanner";
 import AntiquesPreviewBlock from "@/components/skupka/AntiquesPreviewBlock";
 import WantToBuySection from "@/components/skupka/WantToBuySection";
 import DesktopStickyBar from "@/components/skupka/DesktopStickyBar";
+import AppleSaleBanner from "@/components/skupka/AppleSaleBanner";
 
 const scrollTo = (href: string) => {
   const el = document.querySelector(href);
@@ -393,6 +394,7 @@ const Index = ({ goldOpen = false }: { goldOpen?: boolean }) => {
       <HolidayCornerDecor />
       <Header scrollTo={scrollTo} goldOpen={goldOpen} />
       <HeroSection scrollTo={scrollTo} externalModalOpen={evalOpen} onExternalModalClose={() => setEvalOpen(false)} />
+      <AppleSaleBanner />
       <SafeDealsBanner />
       <PremiumServicesGrid />
       <WantToBuySection />
