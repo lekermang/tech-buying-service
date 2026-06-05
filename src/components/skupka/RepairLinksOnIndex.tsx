@@ -84,11 +84,11 @@ export default function RepairLinksOnIndex() {
 
             {/* Название */}
             <div>
-              <div className="font-oswald font-bold text-[13px] sm:text-sm uppercase leading-tight text-white/90 group-hover:text-white transition-colors">
+              <div className="font-oswald font-bold text-base sm:text-lg uppercase leading-tight text-white/90 group-hover:text-white transition-colors">
                 {l.label}
               </div>
-              <div className="font-roboto text-[10px] leading-snug mt-1"
-                style={{ color: `${l.accent}70` }}>
+              <div className="font-roboto text-[11px] sm:text-xs leading-snug mt-1.5"
+                style={{ color: `${l.accent}85` }}>
                 {l.keywords}
               </div>
             </div>
