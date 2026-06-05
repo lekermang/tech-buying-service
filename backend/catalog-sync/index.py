@@ -52,66 +52,130 @@ def _fetch_products() -> list:
         return json.loads(r.read())
 
 
+BRAND_MAP = {
+    "Redmi":    ("Xiaomi", "Redmi"),
+    "Poco":     ("Xiaomi", "Poco"),
+    "Xiaomi":   ("Xiaomi", "Xiaomi"),
+    "Samsung":  ("Samsung", "Samsung"),
+    "Galaxy":   ("Samsung", "Galaxy"),
+    "Honor":    ("Honor", "Honor"),
+    "iPad":     ("Apple", "iPad"),
+    "AirPods":  ("Apple", "AirPods"),
+    "Earpods":  ("Apple", "EarPods"),
+    "EarPods":  ("Apple", "EarPods"),
+    "MacBook":  ("Apple", "MacBook"),
+    "Watch":    ("Apple", "Apple Watch"),
+    "Pencil":   ("Apple", "Apple Pencil"),
+    "PS5":      ("Sony", "PlayStation"),
+    "JBL":      ("JBL", "JBL"),
+    "SE2":      ("Apple", "iPhone SE2"),
+    "SE3":      ("Apple", "iPhone SE3"),
+    "16e":      ("Apple", "iPhone 16e"),
+    "17e":      ("Apple", "iPhone 17e"),
+    "Air":      ("Apple", "iPhone Air"),
+    "17":       ("Apple", "iPhone 17"),
+    "16":       ("Apple", "iPhone 16"),
+    "15":       ("Apple", "iPhone 15"),
+    "14":       ("Apple", "iPhone 14"),
+    "13":       ("Apple", "iPhone 13"),
+    "12":       ("Apple", "iPhone 12"),
+    "11":       ("Apple", "iPhone 11"),
+    "Tab":      ("Samsung", "Galaxy Tab"),
+    "Кабель":   ("Аксессуары", "Кабель"),
+    "Стекло":   ("Аксессуары", "Стекло"),
+    "Чехол":    ("Аксессуары", "Чехол"),
+}
+
+# Категории для каталога
+CATEGORY_MAP = {
+    "Redmi":   "Смартфоны Xiaomi",
+    "Poco":    "Смартфоны Xiaomi",
+    "Xiaomi":  "Смартфоны Xiaomi",
+    "Samsung": "Смартфоны Samsung",
+    "Galaxy":  "Смартфоны Samsung",
+    "Honor":   "Смартфоны Honor",
+    "iPad":    "Планшеты",
+    "AirPods": "Наушники",
+    "Earpods": "Наушники",
+    "EarPods": "Наушники",
+    "MacBook": "Ноутбуки",
+    "Watch":   "Умные часы",
+    "Pencil":  "Аксессуары Apple",
+    "PS5":     "Игровые консоли",
+    "JBL":     "Наушники",
+    "Tab":     "Планшеты",
+    "Кабель":  "Аксессуары",
+    "Стекло":  "Аксессуары",
+    "Чехол":   "Аксессуары",
+    "SE2":     "iPhone",
+    "SE3":     "iPhone",
+    "16e":     "iPhone",
+    "17e":     "iPhone",
+    "Air":     "iPhone",
+    "17":      "iPhone",
+    "16":      "iPhone",
+    "15":      "iPhone",
+    "14":      "iPhone",
+    "13":      "iPhone",
+    "12":      "iPhone",
+    "11":      "iPhone",
+}
+
 def _parse_name(name: str) -> dict:
     """
-    Парсит строку вида "15 256 Black" или "13 Pro Max 256 Graphite"
-    Возвращает { model, storage, color, category }
+    Парсит строку Smartbery: "15 256 Black", "Redmi Note 13 128 Blue", "AirPods Pro 2"
+    Возвращает { model, brand, storage, color, category }
     """
-    name = (name or "").strip()
-    parts = name.split()
+    raw = (name or "").strip()
+    parts = raw.split()
     if not parts:
-        return {"model": name, "storage": None, "color": None, "category": "iPhone"}
+        return {"model": raw, "brand": "Прочее", "storage": None, "color": None, "category": "Прочее"}
 
-    # Первый токен всегда — номер модели (13, 14, 15, 16 и т.д.)
-    model_num = parts[0]  # "15", "13", "16"
+    first = parts[0]
 
-    # Ищем объём памяти: число (128, 256, 512, 1024 или 64)
+    # Определяем бренд и категорию по первому слову
+    brand_info = BRAND_MAP.get(first)
+    category   = CATEGORY_MAP.get(first)
+
+    # Ищем storage: число кратное 2 в диапазоне 16–2048
     storage = None
     storage_idx = None
-    for i, p in enumerate(parts[1:], 1):
-        if re.fullmatch(r'\d+', p) and int(p) in (32, 64, 128, 256, 512, 1024):
+    for i, p in enumerate(parts):
+        if re.fullmatch(r'\d+', p) and int(p) in (16, 32, 64, 128, 256, 512, 1024, 2048):
             storage = f"{p}GB"
             storage_idx = i
             break
 
-    # Всё между model_num и storage — суффикс модели (Pro, Max, Plus, Pro Max)
-    if storage_idx is not None:
-        suffix_parts = parts[1:storage_idx]
-        color_parts  = parts[storage_idx + 1:]
+    if brand_info:
+        brand_name, series = brand_info
+        # Цвет — после storage, или последнее слово
+        if storage_idx is not None:
+            color_parts = parts[storage_idx + 1:]
+            model_parts = parts[:storage_idx]
+        else:
+            color_parts = [parts[-1]] if len(parts) > 1 else []
+            model_parts = parts[:-1] if len(parts) > 1 else parts
+
+        color = " ".join(color_parts) if color_parts else None
+        model = " ".join(model_parts)
+        # Добавляем "iPhone" если это iPhone без префикса (первый токен — число)
+        if re.fullmatch(r'\d+', first) or first in ("SE2","SE3","16e","17e","Air"):
+            model = f"iPhone {model}"
     else:
-        # нет числа — берём последнее слово как цвет
-        suffix_parts = parts[1:-1] if len(parts) > 2 else []
-        color_parts  = [parts[-1]] if len(parts) > 1 else []
+        # Неизвестный товар — берём как есть
+        brand_name = "Прочее"
+        category   = "Прочее"
+        color_parts = [parts[-1]] if len(parts) > 1 else []
+        color = " ".join(color_parts) if color_parts else None
+        model = raw
 
-    suffix = " ".join(suffix_parts)  # "Pro Max", "Plus", ""
-    color  = " ".join(color_parts) if color_parts else None
-
-    if suffix:
-        full_model = f"iPhone {model_num} {suffix}"
-        category   = f"iPhone {model_num} {suffix}".replace("Max", "MAX").replace("Plus", "+")
-    else:
-        full_model = f"iPhone {model_num}"
-        category   = f"iPhone {model_num}"
-
-    # Нормализуем категорию к формату в БД (e.g. "iPhone 15/+/PRO/MAX")
-    # Упрощённо: используем model как есть — каталог может сам сгруппировать
     return {
-        "model":    full_model,
+        "model":    model,
+        "brand":    brand_name,
         "storage":  storage,
         "color":    color,
-        "category": _normalize_category(model_num, suffix),
+        "category": category or "Прочее",
     }
-
-
-def _normalize_category(num: str, suffix: str) -> str:
-    """Приводит к формату вида 'iPhone 15/+/PRO/MAX'"""
-    cats = {
-        "13": "iPhone 13/mini/PRO/MAX",
-        "14": "iPhone 14/+/PRO/MAX",
-        "15": "iPhone 15/+/PRO/MAX",
-        "16": "iPhone 16/+/PRO/MAX",
-    }
-    return cats.get(num, f"iPhone {num}")
 
 
 def handler(event: dict, context) -> dict:
@@ -192,10 +256,13 @@ def handler(event: dict, context) -> dict:
                 if existing:
                     cur.execute(
                         f"UPDATE {SCHEMA}.catalog SET "
+                        f"category=%s, brand=%s, model=%s, color=%s, storage=%s, "
                         f"availability=%s, price=%s, region=%s, photo_url=%s, "
                         f"has_photo=%s, is_active=true, updated_at=NOW() "
                         f"WHERE sku=%s",
-                        (availability, price, region, photo_url,
+                        (parsed["category"], parsed["brand"], parsed["model"],
+                         parsed["color"], parsed["storage"],
+                         availability, price, region, photo_url,
                          bool(photo_url), sku)
                     )
                     updated += 1
@@ -205,7 +272,7 @@ def handler(event: dict, context) -> dict:
                         f"(category, brand, model, color, storage, region, "
                         f"availability, price, photo_url, has_photo, sku, is_active) "
                         f"VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,true)",
-                        (parsed["category"], "Apple", parsed["model"],
+                        (parsed["category"], parsed["brand"], parsed["model"],
                          parsed["color"], parsed["storage"], region,
                          availability, price, photo_url,
                          bool(photo_url), sku)
