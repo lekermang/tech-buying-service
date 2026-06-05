@@ -14,8 +14,8 @@ POST / action=setMarkup         — изменить наценку (тольк�
 import os, json, re, urllib.request, urllib.parse, psycopg2
 from datetime import datetime, timezone, timedelta
 
-CACHE_TTL_SERVICES = 3600   # 1 час — услуги меняются редко
-CACHE_TTL_BALANCE  = 120    # 2 минуты — баланс обновляется чаще
+CACHE_TTL_SERVICES = 86400 * 30  # 30 дней — обновляем вручную через Staff
+CACHE_TTL_BALANCE  = 120         # 2 минуты — баланс обновляется чаще
 
 SCHEMA = "t_p31606708_tech_buying_service"
 GSM_BASE     = "https://3gsm.ru/index.php"
