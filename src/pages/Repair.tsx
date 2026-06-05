@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import Icon from "@/components/ui/icon";
 import { ymGoal, Goals } from "@/lib/ym";
 import DigitalParticles from "@/components/fx/DigitalParticles";
-import RepairWidget from "@/components/skupka/RepairWidget";
 import RepairSEO from "@/components/repair/RepairSEO";
 import RepairHero from "@/components/repair/RepairHero";
 import RepairStats from "@/components/repair/RepairStats";
@@ -19,6 +18,7 @@ import RepairReviews from "@/components/repair/RepairReviews";
 import RepairFAQ from "@/components/repair/RepairFAQ";
 import RepairSEOText from "@/components/repair/RepairSEOText";
 import RepairSEOLinks from "@/components/repair/RepairSEOLinks";
+import RepairTopBlock from "@/components/repair/RepairTopBlock";
 import { REPAIR_PHONE_DISPLAY, REPAIR_PHONE_TEL } from "@/components/repair/repairContacts";
 
 export default function Repair() {
@@ -119,6 +119,7 @@ export default function Repair() {
           </div>
         </nav>
 
+        <RepairTopBlock />
         <RepairHero onOrder={scrollToForm} />
         <RepairStats />
         <RepairPriceTable onOrder={scrollToForm} />
@@ -130,20 +131,6 @@ export default function Repair() {
         <RepairHowItWorks />
         <RepairLocation />
         <RepairReviews />
-
-        {/* Форма заявки */}
-        <section id="repair-form" className="px-4 sm:px-8 py-14 max-w-3xl mx-auto scroll-mt-20">
-          <div className="text-center mb-7">
-            <h2 className="font-oswald text-3xl sm:text-4xl font-bold uppercase">
-              Рассчитать <span className="text-[#FFD700]">стоимость</span>
-            </h2>
-            <p className="text-white/50 text-sm mt-2">
-              Опишите проблему — мастер свяжется с вами и назовёт точную цену
-            </p>
-          </div>
-          <RepairWidget />
-        </section>
-
         <RepairSEOLinks />
         <RepairFAQ />
         <RepairSEOText />
