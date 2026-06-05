@@ -657,36 +657,42 @@ def handler(event: dict, context) -> dict:
         if not service_id or not imei:
             return _err("Укажите услугу и IMEI")
 
-        # Отправляем заказ в 3gsm
+        # Сохраняем заказ локально и пробуем отправить в 3gsm
         raw = ""
         gsm_order_id = None
         gsm_status   = ""
-        gsm_msg      = ""
+        gsm_msg      = "Заказ принят, обрабатывается"
+        gsm_sent     = False
+
         try:
             raw = gsm_call({"action": "createOrder", "serviceid": service_id,
                             "imei": imei, "quantity": str(quantity)})
             print(f"[createOrder] raw={raw[:300]}")
 
-            # Парсим XML
-            gsm_order_id = xf(raw, "orderid") or xf(raw, "id") or xf(raw, "OrderID")
-            gsm_status   = xf(raw, "status") or xf(raw, "Status")
-            gsm_msg      = xf(raw, "message") or xf(raw, "error") or xf(raw, "description")
-
-            # Пробуем JSON если XML не дал результата
-            if not gsm_order_id and not gsm_status:
-                try:
-                    j = json.loads(raw)
-                    gsm_order_id = str(j.get("orderid") or j.get("order_id") or j.get("id") or "")
-                    gsm_status   = str(j.get("status") or "")
-                    gsm_msg      = str(j.get("message") or j.get("error") or "")
-                except Exception:
-                    pass
+            # Не HTML — парсим
+            if not (raw.strip().startswith("<!") or raw.strip().startswith("<html")):
+                gsm_order_id = xf(raw, "orderid") or xf(raw, "id") or xf(raw, "OrderID")
+                gsm_status   = xf(raw, "status") or xf(raw, "Status")
+                gsm_msg      = xf(raw, "message") or xf(raw, "error") or xf(raw, "description") or ""
+                if not gsm_order_id:
+                    try:
+                        j = json.loads(raw)
+                        gsm_order_id = str(j.get("orderid") or j.get("order_id") or j.get("id") or "")
+                        gsm_status   = str(j.get("status") or "")
+                        gsm_msg      = str(j.get("message") or j.get("error") or "")
+                    except Exception:
+                        pass
+                gsm_sent = bool(gsm_order_id or gsm_status in ("1","success","Success"))
+            else:
+                # 3gsm вернул HTML — API недоступен, заказ сохраняем локально
+                gsm_msg = "Заказ принят и будет обработан"
+                raw = raw[:200]  # не сохраняем весь HTML в БД
 
         except Exception as e:
-            gsm_msg = str(e)
-            raw = gsm_msg
+            gsm_msg = "Заказ принят"
+            raw = str(e)[:200]
 
-        order_status = "sent" if (gsm_order_id or gsm_status in ("1","success","Success")) else "pending"
+        order_status = "sent" if gsm_sent else "pending"
 
         c = _db(); cur = c.cursor()
         local_id = None
@@ -719,12 +725,11 @@ def handler(event: dict, context) -> dict:
             cur.close(); c.close()
 
         return _ok({
-            "success": order_status == "sent",
+            "success": True,  # заказ всегда принят — клиент видит подтверждение
             "local_id": local_id,
             "gsm_order_id": gsm_order_id,
             "status": order_status,
-            "message": gsm_msg or ("Заказ принят" if order_status == "sent" else "Заказ сохранён, ожидает отправки"),
-            "raw_preview": raw[:200],
+            "message": gsm_msg or "Заказ принят и обрабатывается",
         })
 
     # ── Записать транзакцию пополнения ──────────────────────────────────────
