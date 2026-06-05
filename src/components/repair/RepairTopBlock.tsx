@@ -127,7 +127,7 @@ const STATS = [
    ═══════════════════════════════════════════════════════════════════════════ */
 export default function RepairTopBlock() {
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-8 pt-5 pb-2 flex flex-col gap-5">
+    <div className="max-w-5xl mx-auto px-4 sm:px-8 pt-3 pb-2 flex flex-col gap-5">
       <style>{KEYFRAMES}</style>
 
       {/* ══════════════════════════════════════════════════════════════════

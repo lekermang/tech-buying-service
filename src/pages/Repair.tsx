@@ -69,71 +69,97 @@ export default function Repair() {
       </div>
 
       <div className="relative z-10">
-        {/* Навбар */}
-        <nav
-          className={`sticky top-0 z-50 flex items-center justify-between px-4 sm:px-8 py-3 border-b transition-colors ${
-            scrolled ? "bg-[#0d0d0d]/90 border-[#FFD700]/15 backdrop-blur-md" : "bg-transparent border-transparent"
-          }`}
-        >
-          {/* Возврат в Скупку24 — премиум-лейбл */}
-          <Link
-            to="/"
-            className="group flex items-center gap-2.5"
-            aria-label="Вернуться в Скупка24"
-          >
-            <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-[#FFD700]/10 border border-[#FFD700]/30 group-hover:bg-[#FFD700]/20 transition-colors">
-              <Icon name="ChevronLeft" size={18} className="text-[#FFD700]" />
-            </span>
-            <span className="font-oswald text-xl sm:text-2xl font-bold leading-none">
-              <span className="bg-gradient-to-r from-[#fff3a0] via-[#FFD700] to-[#b8860b] bg-clip-text text-transparent">
-                Скупка 24
-              </span>
-              <span className="block text-[9px] sm:text-[10px] text-white/35 font-roboto font-normal uppercase tracking-[0.25em] mt-0.5">
-                Сервис ремонта
-              </span>
-            </span>
-          </Link>
 
-          <div className="flex items-center gap-2 sm:gap-5">
-            <a href="#prices" className="hidden md:block text-sm text-white/60 hover:text-[#FFD700] transition-colors">Цены</a>
-            <a href="#services" className="hidden md:block text-sm text-white/60 hover:text-[#FFD700] transition-colors">Услуги</a>
-            <a href="#all-devices" className="hidden lg:block text-sm text-white/60 hover:text-[#FFD700] transition-colors">Все бренды</a>
-            <a href="#reviews" className="hidden lg:block text-sm text-white/60 hover:text-[#FFD700] transition-colors">Отзывы</a>
-            <a href="#contacts" className="hidden md:block text-sm text-white/60 hover:text-[#FFD700] transition-colors">Контакты</a>
-            <a
-              href={REPAIR_PHONE_TEL}
-              onClick={() => ymGoal(Goals.CALL_CLICK, { place: "repair_nav" })}
-              className="hidden sm:inline-flex items-center gap-1.5 text-[#FFD700] font-oswald font-bold text-sm hover:text-[#ffed4a] transition-colors"
-            >
-              <Icon name="Phone" size={15} />
-              {REPAIR_PHONE_DISPLAY}
-            </a>
-            <Link
-              to="/unlock"
-              className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-lg font-oswald font-bold text-xs uppercase tracking-wide transition-all"
-              style={{
-                background: "rgba(125,211,252,0.08)",
-                border: "1px solid rgba(125,211,252,0.25)",
-                color: "#7dd3fc",
-              }}
-              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(125,211,252,0.15)"; el.style.borderColor = "rgba(125,211,252,0.5)"; }}
-              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.background = "rgba(125,211,252,0.08)"; el.style.borderColor = "rgba(125,211,252,0.25)"; }}
-            >
-              <Icon name="Unlock" size={13} />
-              iCloud / FRP
-            </Link>
-            <button
-              onClick={scrollToForm}
-              className="group relative overflow-hidden text-black font-oswald font-bold uppercase tracking-wide px-4 sm:px-5 py-2.5 rounded-lg text-sm active:scale-95 transition-all
-                         bg-[linear-gradient(180deg,#fff3a0_0%,#ffd700_45%,#d4a017_100%)]
-                         shadow-[0_0_0_1px_rgba(255,215,0,0.5),0_6px_20px_rgba(255,215,0,0.3),inset_0_1px_0_rgba(255,255,255,0.5)]
-                         hover:shadow-[0_0_0_1px_rgba(255,215,0,0.8),0_8px_28px_rgba(255,215,0,0.5),inset_0_1px_0_rgba(255,255,255,0.6)]"
-            >
-              <span className="absolute inset-0 bg-[linear-gradient(115deg,transparent_35%,rgba(255,255,255,0.7)_50%,transparent_65%)] bg-[length:200%_100%] -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
-              <span className="relative">Заявка</span>
-            </button>
+        {/* ══ БРЕНДОВАЯ ШАПКА — самый верх, видна сразу на мобильном ══ */}
+        <div className="w-full border-b border-[#FFD700]/10 bg-[#0a0a0a]/60 backdrop-blur-sm">
+          <div className="max-w-5xl mx-auto px-4 sm:px-8 py-3 flex items-center justify-between gap-3">
+            {/* Лого + бренд */}
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                style={{ background: "linear-gradient(135deg,#FFD700,#b8860b)", boxShadow: "0 0 16px rgba(255,215,0,0.35)" }}>
+                <Icon name="Wrench" size={17} className="text-black" />
+              </div>
+              <div className="min-w-0">
+                <div className="font-oswald font-black text-lg sm:text-2xl leading-none tracking-wide"
+                  style={{ background: "linear-gradient(90deg,#fff3a0,#FFD700,#b8860b)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+                  Ремонт24
+                </div>
+                <div className="font-roboto text-[9px] sm:text-[10px] uppercase tracking-[0.22em] text-white/35 mt-0.5">
+                  Сервисный центр · Калуга
+                </div>
+              </div>
+            </div>
+            {/* Телефон + кнопка */}
+            <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+              <a href={REPAIR_PHONE_TEL}
+                onClick={() => ymGoal(Goals.CALL_CLICK, { place: "repair_brand" })}
+                className="hidden sm:inline-flex items-center gap-1.5 text-[#FFD700] font-oswald font-bold text-sm hover:text-[#ffed4a] transition-colors">
+                <Icon name="Phone" size={14} />
+                {REPAIR_PHONE_DISPLAY}
+              </a>
+              <a href={REPAIR_PHONE_TEL}
+                onClick={() => ymGoal(Goals.CALL_CLICK, { place: "repair_brand_mobile" })}
+                className="sm:hidden w-9 h-9 rounded-xl bg-[#FFD700]/15 border border-[#FFD700]/30 flex items-center justify-center text-[#FFD700] active:bg-[#FFD700]/25 transition-colors">
+                <Icon name="Phone" size={17} />
+              </a>
+              <button onClick={scrollToForm}
+                className="inline-flex items-center gap-1.5 text-black font-oswald font-bold uppercase tracking-wide px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-sm active:scale-95 transition-all"
+                style={{ background: "linear-gradient(180deg,#fff3a0 0%,#ffd700 45%,#d4a017 100%)", boxShadow: "0 0 0 1px rgba(255,215,0,0.5),0 4px 14px rgba(255,215,0,0.3)" }}>
+                <Icon name="Zap" size={14} />
+                <span>Заявка</span>
+              </button>
+            </div>
           </div>
-        </nav>
+        </div>
+
+        {/* ══ ГОРИЗОНТАЛЬНАЯ НАВИГАЦИЯ — все услуги, скролл на мобиле ══ */}
+        <div className="sticky top-0 z-50 border-b border-[#FFD700]/10 backdrop-blur-md"
+          style={{ background: scrolled ? "rgba(13,13,13,0.97)" : "rgba(13,13,13,0.85)" }}>
+          {/* Строка 1 — разделы страницы */}
+          <div className="flex items-center gap-1 px-3 sm:px-6 overflow-x-auto scrollbar-none border-b border-white/[0.05]"
+            style={{ WebkitOverflowScrolling: "touch" }}>
+            {[
+              { href: "#repair-form",  label: "Заявка",     icon: "Zap" },
+              { href: "#prices",       label: "Цены",        icon: "Tag" },
+              { href: "#services",     label: "Услуги",      icon: "Wrench" },
+              { href: "#all-devices",  label: "Бренды",      icon: "Smartphone" },
+              { href: "#reviews",      label: "Отзывы",      icon: "Star" },
+              { href: "#contacts",     label: "Контакты",    icon: "MapPin" },
+            ].map(item => (
+              <a key={item.href} href={item.href}
+                className="flex items-center gap-1.5 whitespace-nowrap px-3 py-2.5 font-roboto text-xs text-white/50 hover:text-[#FFD700] transition-colors shrink-0">
+                <Icon name={item.icon} size={12} />
+                {item.label}
+              </a>
+            ))}
+            <div className="ml-auto pl-2 shrink-0 hidden sm:block">
+              <Link to="/" className="flex items-center gap-1 text-white/30 hover:text-white/60 text-xs font-roboto transition-colors">
+                <Icon name="ChevronLeft" size={12} />
+                Скупка24
+              </Link>
+            </div>
+          </div>
+          {/* Строка 2 — услуги по устройствам */}
+          <div className="flex items-center gap-1 px-3 sm:px-6 overflow-x-auto scrollbar-none py-1"
+            style={{ WebkitOverflowScrolling: "touch" }}>
+            {[
+              { to: "/remont-iphone-kaluga",        label: "iPhone",       color: "#fff3a0" },
+              { to: "/remont-samsung-kaluga",        label: "Samsung",      color: "#93c5fd" },
+              { to: "/remont-xiaomi-kaluga",         label: "Xiaomi",       color: "#86efac" },
+              { to: "/zamena-stekla-kaluga",         label: "Стекло",       color: "#c4b5fd" },
+              { to: "/zamena-akkumulyatora-kaluga",  label: "Аккумулятор",  color: "#6ee7b7" },
+              { to: "/remont-posle-vody-kaluga",     label: "После воды",   color: "#7dd3fc" },
+              { to: "/bga-pajka-kaluga",             label: "BGA-пайка",    color: "#fca5a5" },
+              { to: "/snyatie-frp-kaluga",           label: "FRP/iCloud",   color: "#fdba74" },
+            ].map(s => (
+              <Link key={s.to} to={s.to}
+                className="whitespace-nowrap px-3 py-1.5 rounded-lg font-roboto text-[11px] font-semibold shrink-0 transition-all active:scale-95"
+                style={{ background: s.color + "12", color: s.color, border: `1px solid ${s.color}25` }}>
+                {s.label}
+              </Link>
+            ))}
+          </div>
+        </div>
 
         <RepairTopBlock />
         <RepairBeforeAfter onOrder={scrollToForm} />
