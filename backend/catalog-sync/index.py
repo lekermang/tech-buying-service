@@ -363,8 +363,9 @@ def handler(event: dict, context) -> dict:
                 sku = f"smartbery_{name.replace(' ', '_').lower()}"
 
                 availability = "in_stock" if p.get("availability") else "on_order"
-                price     = int(p["price"]) if p.get("price") else None
-                region    = p.get("country")  # EU, US, null
+                price        = int(p["price"]) if p.get("price") else None
+                retail_price = (price + 3000) if price is not None else None
+                region       = p.get("country")  # EU, US, null
                 photo_tg  = p.get("photo_tg")  # telegram link вида t.me/...
 
                 # Проверяем — есть ли уже CDN-фото для этого товара
@@ -393,12 +394,12 @@ def handler(event: dict, context) -> dict:
                     cur.execute(
                         f"UPDATE {SCHEMA}.catalog SET "
                         f"category=%s, brand=%s, model=%s, color=%s, storage=%s, "
-                        f"availability=%s, price=%s, region=%s, photo_url=%s, "
+                        f"availability=%s, price=%s, retail_price=%s, region=%s, photo_url=%s, "
                         f"has_photo=%s, is_active=true, updated_at=NOW() "
                         f"WHERE sku=%s",
                         (parsed["category"], parsed["brand"], parsed["model"],
                          parsed["color"], parsed["storage"],
-                         availability, price, region, photo_url,
+                         availability, price, retail_price, region, photo_url,
                          bool(photo_url), sku)
                     )
                     updated += 1
@@ -406,11 +407,11 @@ def handler(event: dict, context) -> dict:
                     cur.execute(
                         f"INSERT INTO {SCHEMA}.catalog "
                         f"(category, brand, model, color, storage, region, "
-                        f"availability, price, photo_url, has_photo, sku, is_active) "
-                        f"VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,true)",
+                        f"availability, price, retail_price, photo_url, has_photo, sku, is_active) "
+                        f"VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,true)",
                         (parsed["category"], parsed["brand"], parsed["model"],
                          parsed["color"], parsed["storage"], region,
-                         availability, price, photo_url,
+                         availability, price, retail_price, photo_url,
                          bool(photo_url), sku)
                     )
                     inserted += 1
