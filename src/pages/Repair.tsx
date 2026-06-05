@@ -121,6 +121,7 @@ export default function Repair() {
         </nav>
 
         <RepairTopBlock />
+        <RepairBeforeAfter onOrder={scrollToForm} />
         <RepairHero onOrder={scrollToForm} />
         <RepairStats />
         <RepairPriceTable onOrder={scrollToForm} />
@@ -129,7 +130,6 @@ export default function Repair() {
         <RepairAllDevices onOrder={scrollToForm} />
         <RepairParts onOrder={scrollToForm} />
         <RepairModels onOrder={scrollToForm} />
-        <RepairBeforeAfter onOrder={scrollToForm} />
         <RepairHowItWorks />
         <RepairLocation />
         <RepairReviews />
