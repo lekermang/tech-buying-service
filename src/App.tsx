@@ -46,6 +46,7 @@ const NotFound = safeLazy(() => import("./pages/NotFound404"));
 const RepairStatus = safeLazy(() => import("./pages/RepairStatus"));
 const RepairDiscount = safeLazy(() => import("./pages/RepairDiscount"));
 const Repair = safeLazy(() => import("./pages/Repair"));
+const Unlock = safeLazy(() => import("./pages/Unlock"));
 const Ocenka = safeLazy(() => import("./pages/Ocenka"));
 const SkupkaAntikvariata = safeLazy(() => import("./pages/SkupkaAntikvariata"));
 const RemontIphoneKaluga = safeLazy(() => import("./pages/repair/RemontIphoneKaluga"));
@@ -162,6 +163,7 @@ const App = () => {
             <Route path="/soviet-antiques" element={<SovietAntiques />} />
             <Route path="/skupka-antikvariata" element={<SkupkaAntikvariata />} />
             <Route path="/repair" element={<Repair />} />
+            <Route path="/unlock" element={<Unlock />} />
             <Route path="/ocenka" element={<Ocenka />} />
             <Route path="/remont-iphone-kaluga" element={<RemontIphoneKaluga />} />
             <Route path="/remont-samsung-kaluga" element={<RemontSamsungKaluga />} />

@@ -1,0 +1,18 @@
+{
+  "tests": [
+    {
+      "name": "getBalance — получить баланс аккаунта",
+      "method": "GET",
+      "path": "/?action=getBalance",
+      "expectedStatus": 200,
+      "expectedBody": {"format": "string"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "OPTIONS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    }
+  ]
+}
