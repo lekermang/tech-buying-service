@@ -11,6 +11,7 @@ Allow: /safe-deals/blacklist
 Allow: /safe-deals/kupit-iphone-kaluga
 Allow: /safe-deals/srochno-prodat-telefon
 Allow: /safe-deals/vykup-noutbukov
+Allow: /blog
 Disallow: /admin
 Disallow: /cabinet
 Disallow: /staff
@@ -26,6 +27,7 @@ Allow: /catalog
 Allow: /repair-discount
 Allow: /transfer
 Allow: /transfer/guide
+Allow: /blog
 Disallow: /admin
 Disallow: /cabinet
 Disallow: /staff
@@ -40,6 +42,7 @@ Allow: /catalog
 Allow: /repair-discount
 Allow: /transfer
 Allow: /transfer/guide
+Allow: /blog
 Disallow: /admin
 Disallow: /cabinet
 Disallow: /staff
@@ -53,6 +56,7 @@ Allow: /catalog
 Allow: /repair-discount
 Allow: /transfer
 Allow: /transfer/guide
+Allow: /blog
 Disallow: /admin
 Disallow: /cabinet
 Disallow: /staff

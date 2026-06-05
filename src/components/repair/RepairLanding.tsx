@@ -13,10 +13,14 @@ import RepairHowItWorks from "@/components/repair/RepairHowItWorks";
 import { REPAIR_PHONE_DISPLAY, REPAIR_PHONE_TEL } from "@/components/repair/repairContacts";
 
 /* ── SEO-вставка в <head> ────────────────────────────────────────────────── */
-function LandingSEO({ title, desc, url, faqItems }: {
+function LandingSEO({ title, desc, url, keywords, serviceName, serviceDesc, minPrice, faqItems }: {
   title: string;
   desc: string;
   url: string;
+  keywords?: string;
+  serviceName?: string;
+  serviceDesc?: string;
+  minPrice?: string;
   faqItems?: { q: string; a: string }[];
 }) {
   useEffect(() => {
@@ -36,12 +40,68 @@ function LandingSEO({ title, desc, url, faqItems }: {
     push(setMeta(`meta[property="og:description"]`, "property", "og:description", desc));
     push(setMeta(`meta[property="og:url"]`, "property", "og:url", url));
     push(setMeta(`meta[property="og:type"]`, "property", "og:type", "website"));
+    if (keywords) push(setMeta(`meta[name="keywords"]`, "name", "keywords", keywords));
 
     let canonical = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
     if (!canonical) { canonical = document.createElement("link"); canonical.setAttribute("rel", "canonical"); document.head.appendChild(canonical); }
     canonical.setAttribute("href", url);
 
     const scripts: HTMLScriptElement[] = [];
+
+    const localBusiness = {
+      "@context": "https://schema.org",
+      "@type": "LocalBusiness",
+      name: "Скупка24 — Сервисный центр",
+      url: "https://skypka24.com",
+      telephone: "+79929990333",
+      address: {
+        "@type": "PostalAddress",
+        streetAddress: "ул. Кирова, 7",
+        addressLocality: "Калуга",
+        addressCountry: "RU",
+        postalCode: "248000",
+      },
+      geo: { "@type": "GeoCoordinates", latitude: 54.5293, longitude: 36.2754 },
+      openingHours: "Mo-Su 09:00-21:00",
+      priceRange: "₽₽",
+      image: "https://skypka24.com/og-repair.jpg",
+      sameAs: ["https://yandex.ru/maps/-/CHtqKn1w"],
+    };
+    const lbScript = document.createElement("script");
+    lbScript.type = "application/ld+json";
+    lbScript.text = JSON.stringify(localBusiness);
+    document.head.appendChild(lbScript);
+    scripts.push(lbScript);
+
+    if (serviceName) {
+      const service = {
+        "@context": "https://schema.org",
+        "@type": "Service",
+        name: serviceName,
+        description: serviceDesc ?? desc,
+        provider: {
+          "@type": "LocalBusiness",
+          name: "Скупка24",
+          telephone: "+79929990333",
+          address: { "@type": "PostalAddress", streetAddress: "ул. Кирова, 7", addressLocality: "Калуга", addressCountry: "RU" },
+        },
+        areaServed: { "@type": "City", name: "Калуга" },
+        ...(minPrice ? {
+          offers: {
+            "@type": "Offer",
+            priceCurrency: "RUB",
+            price: minPrice,
+            priceSpecification: { "@type": "PriceSpecification", minPrice, priceCurrency: "RUB" },
+          },
+        } : {}),
+      };
+      const svcScript = document.createElement("script");
+      svcScript.type = "application/ld+json";
+      svcScript.text = JSON.stringify(service);
+      document.head.appendChild(svcScript);
+      scripts.push(svcScript);
+    }
+
     if (faqItems?.length) {
       const s = document.createElement("script");
       s.type = "application/ld+json";
@@ -63,7 +123,7 @@ function LandingSEO({ title, desc, url, faqItems }: {
       created.forEach(el => el.remove());
       scripts.forEach(s => s.remove());
     };
-  }, [title, desc, url, faqItems]);
+  }, [title, desc, url, keywords, serviceName, serviceDesc, minPrice, faqItems]);
   return null;
 }
 
@@ -84,6 +144,10 @@ export type RepairLandingConfig = {
   title: string;
   desc: string;
   url: string;
+  keywords?: string;
+  serviceName?: string;
+  serviceDesc?: string;
+  minPrice?: string;
   /** Hero */
   badge: string;
   h1line1: string;
@@ -125,7 +189,16 @@ export default function RepairLanding({ config }: { config: RepairLandingConfig 
 
   return (
     <div className="relative min-h-screen bg-[#0d0d0d] text-white overflow-x-hidden">
-      <LandingSEO title={config.title} desc={config.desc} url={config.url} faqItems={config.faq} />
+      <LandingSEO
+        title={config.title}
+        desc={config.desc}
+        url={config.url}
+        keywords={config.keywords}
+        serviceName={config.serviceName}
+        serviceDesc={config.serviceDesc}
+        minPrice={config.minPrice}
+        faqItems={config.faq}
+      />
 
       {/* Фон — частицы + свечения */}
       <div aria-hidden className="fixed inset-0 z-0 pointer-events-none">
@@ -320,6 +393,15 @@ export default function RepairLanding({ config }: { config: RepairLandingConfig 
             <div className="text-white/40 text-sm leading-relaxed font-roboto"
               dangerouslySetInnerHTML={{ __html: config.seoText }} />
           </section>
+        )}
+
+        {/* ── Скрытый SEO-блок с H2 и ключевыми словами ── */}
+        {config.keywords && (
+          <div aria-hidden style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0,0,0,0)", whiteSpace: "nowrap" }}>
+            <h2>{config.serviceName ?? config.title}</h2>
+            <p>{config.keywords}</p>
+            <p>Сервисный центр Скупка24, Калуга, ул. Кирова 7, ежедневно 9:00–21:00, телефон +7 992 999-03-33</p>
+          </div>
         )}
 
         {/* Подвал */}

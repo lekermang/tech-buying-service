@@ -84,6 +84,10 @@ const RussianCoins = safeLazy(() => import("./pages/RussianCoins"));
 const RussianIcons = safeLazy(() => import("./pages/RussianIcons"));
 const RussianPorcelain = safeLazy(() => import("./pages/RussianPorcelain"));
 const SovietAntiques = safeLazy(() => import("./pages/SovietAntiques"));
+const Blog = safeLazy(() => import("./pages/Blog"));
+const BlogChtoDelatVoda = safeLazy(() => import("./pages/blog/ChtoDelatTelefonVoda"));
+const BlogTop5Iphone = safeLazy(() => import("./pages/blog/Top5PolomokIphone"));
+const BlogVybratServis = safeLazy(() => import("./pages/blog/KakVybratServisnyjCentr"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -200,6 +204,10 @@ const App = () => {
             <Route path="/blacklist" element={<Navigate to="/safe-deals/blacklist" replace />} />
             <Route path="/checklist" element={<Navigate to="/safe-deals/checklist" replace />} />
             <Route path="/qr/:code" element={<SafeDealQR />} />
+            <Route path="/blog" element={<Blog />} />
+            <Route path="/blog/chto-delat-esli-telefon-upal-v-vodu" element={<BlogChtoDelatVoda />} />
+            <Route path="/blog/top-5-polomok-iphone" element={<BlogTop5Iphone />} />
+            <Route path="/blog/kak-vybrat-servisnyj-centr-v-kaluge" element={<BlogVybratServis />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

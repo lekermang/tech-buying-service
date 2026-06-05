@@ -723,4 +723,30 @@
     <priority>0.4</priority>
   </url>
 
+  <!-- ===== БЛОГ ===== -->
+  <url>
+    <loc>https://skypka24.com/blog</loc>
+    <lastmod>2026-06-05</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.82</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/blog/chto-delat-esli-telefon-upal-v-vodu</loc>
+    <lastmod>2026-05-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.78</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/blog/top-5-polomok-iphone</loc>
+    <lastmod>2026-05-28</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.78</priority>
+  </url>
+  <url>
+    <loc>https://skypka24.com/blog/kak-vybrat-servisnyj-centr-v-kaluge</loc>
+    <lastmod>2026-06-02</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.78</priority>
+  </url>
+
 </urlset>
