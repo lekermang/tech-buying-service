@@ -6,12 +6,15 @@ GET  /                        — последний лог синхрониза
 Парсинг name: "<модель> <storage_gb> <color>"
 Пример: "15 256 Black" → model=iPhone 15, storage=256GB, color=Black
 """
-import os, json, urllib.request, psycopg2, re
+import os, json, urllib.request, psycopg2, re, boto3
 from datetime import datetime, timezone
 
-SCHEMA = "t_p31606708_tech_buying_service"
+SCHEMA        = "t_p31606708_tech_buying_service"
 SMARTBERY_URL = "https://smartbery-qrcode.ru/api/v1/products/"
-SOURCE_TAG = "smartbery"
+SOURCE_TAG    = "smartbery"
+TG_API        = "https://api.telegram.org"
+# Канал appledysonphoto — его числовой ID (публичный, можно читать через бота)
+PHOTO_CHANNEL = "@appledysonphoto"
 
 CORS = {
     "Access-Control-Allow-Origin": "*",
@@ -29,6 +32,124 @@ def _err(msg, code=400):
 
 def _db():
     return psycopg2.connect(os.environ["DATABASE_URL"])
+
+
+# ── S3 ────────────────────────────────────────────────────────────────────────
+def _s3():
+    return boto3.client(
+        "s3",
+        endpoint_url="https://bucket.poehali.dev",
+        aws_access_key_id=os.environ["AWS_ACCESS_KEY_ID"],
+        aws_secret_access_key=os.environ["AWS_SECRET_ACCESS_KEY"],
+    )
+
+def _cdn_url(key: str) -> str:
+    aid = os.environ.get("AWS_ACCESS_KEY_ID", "")
+    return f"https://cdn.poehali.dev/projects/{aid}/bucket/{key}"
+
+
+# ── Telegram фото ─────────────────────────────────────────────────────────────
+def _tg_photo_to_s3(photo_tg_url: str) -> str | None:
+    """
+    Скачивает фото из поста Telegram-канала через Bot API и сохраняет в S3.
+    photo_tg_url вида: https://t.me/appledysonphoto/724
+    Возвращает CDN URL или None.
+    """
+    token = os.environ.get("CATALOG_BOT_TOKEN", "")
+    if not token:
+        return None
+
+    # Извлекаем message_id из URL
+    m = re.search(r"/(\d+)$", photo_tg_url or "")
+    if not m:
+        return None
+    msg_id = int(m.group(1))
+
+    # Получаем сообщение через getMessages (forwardMessages trick)
+    # Используем getUpdates нельзя. Используем copyMessage trick или sendMessage.
+    # Правильный способ: bot.forwardMessage в приватный чат себе, потом getFile.
+    # Более простой: использовать messages.getHistory через MTProto — но у нас нет.
+    # Используем: bot копирует сообщение в чат бота и получает file_id.
+
+    # Сначала пробуем через экспорт: t.me/c/{channel_id}/{msg_id} API не работает без MTProto.
+    # Рабочий способ: forwardMessage к боту от имени бота.
+
+    try:
+        # Шаг 1: получить chat_id канала
+        url_get = f"{TG_API}/bot{token}/getChat"
+        req1 = urllib.request.Request(
+            url_get, data=json.dumps({"chat_id": PHOTO_CHANNEL}).encode(),
+            method="POST", headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req1, timeout=10) as r:
+            chat_data = json.loads(r.read())
+        channel_chat_id = chat_data.get("result", {}).get("id")
+        if not channel_chat_id:
+            return None
+
+        # Шаг 2: forwardMessage из канала боту (в чат бота с самим собой — getMe)
+        url_me = f"{TG_API}/bot{token}/getMe"
+        with urllib.request.urlopen(url_me, timeout=8) as r:
+            me = json.loads(r.read()).get("result", {})
+        bot_id = me.get("id")
+        if not bot_id:
+            return None
+
+        url_fwd = f"{TG_API}/bot{token}/forwardMessage"
+        req2 = urllib.request.Request(
+            url_fwd,
+            data=json.dumps({
+                "chat_id": bot_id,
+                "from_chat_id": channel_chat_id,
+                "message_id": msg_id,
+            }).encode(),
+            method="POST",
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req2, timeout=10) as r:
+            fwd = json.loads(r.read())
+
+        # Шаг 3: извлекаем file_id из пересланного сообщения
+        msg = fwd.get("result", {})
+        photos = msg.get("photo")
+        if not photos:
+            return None
+        # Берём самое большое фото
+        best = max(photos, key=lambda p: p.get("file_size", 0))
+        file_id = best["file_id"]
+
+        # Шаг 4: getFile — получаем путь
+        url_gf = f"{TG_API}/bot{token}/getFile"
+        req3 = urllib.request.Request(
+            url_gf,
+            data=json.dumps({"file_id": file_id}).encode(),
+            method="POST",
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req3, timeout=10) as r:
+            gf = json.loads(r.read())
+        file_path = gf.get("result", {}).get("file_path")
+        if not file_path:
+            return None
+
+        # Шаг 5: скачиваем файл
+        url_dl = f"https://api.telegram.org/file/bot{token}/{file_path}"
+        with urllib.request.urlopen(url_dl, timeout=20) as r:
+            img_bytes = r.read()
+
+        # Шаг 6: загружаем в S3
+        s3 = _s3()
+        key = f"smartbery-photos/{msg_id}.jpg"
+        s3.put_object(
+            Bucket="files", Key=key, Body=img_bytes,
+            ContentType="image/jpeg",
+        )
+        return _cdn_url(key)
+
+    except Exception as e:
+        print(f"[tg_photo] msg_id={msg_id} error={e}")
+        return None
+
 
 def _is_admin(event):
     hdrs = {k.lower(): v for k, v in (event.get("headers") or {}).items()}
@@ -242,9 +363,24 @@ def handler(event: dict, context) -> dict:
                 sku = f"smartbery_{name.replace(' ', '_').lower()}"
 
                 availability = "in_stock" if p.get("availability") else "on_order"
-                price  = int(p["price"]) if p.get("price") else None
-                region = p.get("country")  # EU, US, null
-                photo_url = p.get("photo_tg")  # telegram link
+                price     = int(p["price"]) if p.get("price") else None
+                region    = p.get("country")  # EU, US, null
+                photo_tg  = p.get("photo_tg")  # telegram link вида t.me/...
+
+                # Проверяем — есть ли уже CDN-фото для этого товара
+                photo_url = photo_tg  # по умолчанию сохраняем tg-ссылку
+                if photo_tg and "cdn.poehali.dev" not in (photo_tg or ""):
+                    # Пробуем конвертировать в прямую CDN-ссылку
+                    m = re.search(r"/(\d+)$", photo_tg)
+                    if m:
+                        s3_key = f"smartbery-photos/{m.group(1)}.jpg"
+                        cdn = _cdn_url(s3_key)
+                        # Проверяем есть ли уже в S3 (HEAD запрос через boto3)
+                        try:
+                            _s3().head_object(Bucket="files", Key=s3_key)
+                            photo_url = cdn  # уже есть в S3
+                        except Exception:
+                            pass  # нет — оставляем tg-ссылку, скачаем отдельно
 
                 # Upsert по sku
                 cur.execute(
@@ -293,5 +429,69 @@ def handler(event: dict, context) -> dict:
             return _err(f"Sync failed: {e}", 500)
         finally:
             cur.close(); conn.close()
+
+    # POST action=sync_photos — скачать фото из Telegram в S3
+    if method == "POST":
+        try:
+            body_p2 = json.loads(event.get("body") or "{}")
+        except Exception:
+            body_p2 = {}
+        if body_p2.get("action") == "sync_photos":
+            hdrs2 = {k.lower(): v for k, v in (event.get("headers") or {}).items()}
+            if hdrs2.get("x-admin-token","") != "Mark2015N" and body_p2.get("admin_token","") != "Mark2015N":
+                return _err("Forbidden", 403)
+
+            limit = int(body_p2.get("limit", 30))  # за раз не более 30
+
+            conn2 = _db(); cur2 = conn2.cursor()
+            try:
+                # Берём записи у которых photo_url — ссылка t.me (не CDN)
+                cur2.execute(
+                    f"SELECT id, photo_url FROM {SCHEMA}.catalog "
+                    f"WHERE sku LIKE 'smartbery_%' "
+                    f"AND photo_url LIKE 'https://t.me/%' "
+                    f"LIMIT %s",
+                    (limit,)
+                )
+                rows2 = cur2.fetchall()
+            finally:
+                cur2.close(); conn2.close()
+
+            downloaded = 0
+            failed     = 0
+            for item_id, tg_url in rows2:
+                cdn = _tg_photo_to_s3(tg_url)
+                if cdn:
+                    conn3 = _db(); cur3 = conn3.cursor()
+                    try:
+                        cur3.execute(
+                            f"UPDATE {SCHEMA}.catalog SET photo_url=%s, has_photo=true, updated_at=NOW() WHERE id=%s",
+                            (cdn, item_id)
+                        )
+                        conn3.commit()
+                        downloaded += 1
+                    except Exception:
+                        conn3.rollback()
+                    finally:
+                        cur3.close(); conn3.close()
+                else:
+                    failed += 1
+
+            # Считаем сколько ещё осталось
+            conn4 = _db(); cur4 = conn4.cursor()
+            try:
+                cur4.execute(
+                    f"SELECT COUNT(*) FROM {SCHEMA}.catalog WHERE sku LIKE 'smartbery_%' AND photo_url LIKE 'https://t.me/%'"
+                )
+                remaining = cur4.fetchone()[0]
+            finally:
+                cur4.close(); conn4.close()
+
+            return _ok({
+                "ok": True,
+                "downloaded": downloaded,
+                "failed": failed,
+                "remaining": remaining,
+            })
 
     return _err("Method not allowed", 405)

@@ -42,6 +42,8 @@ export default function StaffFunctionsTab({ token }: { token: string }) {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<{ inserted: number; updated: number; total: number } | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [photoSyncing, setPhotoSyncing] = useState(false);
+  const [photoResult, setPhotoResult] = useState<{ downloaded: number; remaining: number } | null>(null);
 
   // Прайс
   const [priceMarkup, setPriceMarkup]     = useState("0");
@@ -78,6 +80,20 @@ export default function StaffFunctionsTab({ token }: { token: string }) {
       }
     } catch { setPriceError("Ошибка сети"); }
     setPriceSending(false);
+  };
+
+  const handlePhotoSync = async () => {
+    setPhotoSyncing(true); setPhotoResult(null);
+    try {
+      const res = await fetch(SYNC_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "sync_photos", admin_token: "Mark2015N", limit: 30 }),
+      });
+      const d = await res.json();
+      if (d.ok) setPhotoResult({ downloaded: d.downloaded, remaining: d.remaining });
+    } catch { /* ignore */ }
+    setPhotoSyncing(false);
   };
 
   const handleSync = async () => {
@@ -206,19 +222,36 @@ export default function StaffFunctionsTab({ token }: { token: string }) {
               Загрузить актуальные цены и наличие из smartbery-qrcode.ru
             </div>
           </div>
-          <button
-            onClick={handleSync}
-            disabled={syncing}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg font-oswald font-bold text-xs uppercase border border-[#7dd3fc]/40 text-[#7dd3fc] hover:bg-[#7dd3fc]/10 transition-colors disabled:opacity-40 shrink-0"
-          >
-            <Icon name={syncing ? "Loader2" : "RefreshCcw"} size={13} className={syncing ? "animate-spin" : ""} />
-            {syncing ? "Синхронизирую…" : "Smartbery"}
-          </button>
+          <div className="flex gap-2 shrink-0">
+            <button
+              onClick={handleSync}
+              disabled={syncing}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg font-oswald font-bold text-xs uppercase border border-[#7dd3fc]/40 text-[#7dd3fc] hover:bg-[#7dd3fc]/10 transition-colors disabled:opacity-40"
+            >
+              <Icon name={syncing ? "Loader2" : "RefreshCcw"} size={13} className={syncing ? "animate-spin" : ""} />
+              {syncing ? "…" : "Цены"}
+            </button>
+            <button
+              onClick={handlePhotoSync}
+              disabled={photoSyncing}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg font-oswald font-bold text-xs uppercase border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10 transition-colors disabled:opacity-40"
+            >
+              <Icon name={photoSyncing ? "Loader2" : "Image"} size={13} className={photoSyncing ? "animate-spin" : ""} />
+              {photoSyncing ? "…" : "Фото"}
+            </button>
+          </div>
         </div>
         {syncResult && (
           <div className="mt-2.5 flex items-center gap-2 font-roboto text-[11px] text-green-400">
             <Icon name="CheckCircle2" size={13} />
             Готово: {syncResult.total} позиций · добавлено {syncResult.inserted} · обновлено {syncResult.updated}
+          </div>
+        )}
+        {photoResult && (
+          <div className="mt-2.5 flex items-center gap-2 font-roboto text-[11px] text-[#FFD700]">
+            <Icon name="Image" size={13} />
+            Фото скачано: {photoResult.downloaded} · осталось в очереди: {photoResult.remaining}
+            {photoResult.remaining > 0 && <span className="text-white/30">· нажми ещё раз</span>}
           </div>
         )}
         {syncError && (

@@ -12,7 +12,10 @@ POST /
   "only_available": true   -- только в наличии (по умолч. true)
 }
 """
-import json, os, smtplib, ssl, urllib.request
+import json, os, re, smtplib, ssl, urllib.request
+import psycopg2
+
+SCHEMA = "t_p31606708_tech_buying_service"
 from datetime import datetime, timezone, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -71,6 +74,37 @@ def fetch_products(only_available: bool) -> list:
 # SIM данных в Smartbery API нет — поле не предусмотрено источником
 
 
+# ── Фото из БД ────────────────────────────────────────────────────────────────
+def load_cdn_photos() -> dict:
+    """
+    Загружает CDN-фото из таблицы catalog для всех smartbery-товаров.
+    Ключ — нормализованное название (lowercase без пробелов), значение — cdn URL.
+    """
+    try:
+        conn = psycopg2.connect(os.environ["DATABASE_URL"])
+        cur  = conn.cursor()
+        cur.execute(
+            f"SELECT sku, photo_url FROM {SCHEMA}.catalog "
+            f"WHERE sku LIKE 'smartbery_%' "
+            f"AND photo_url LIKE 'https://cdn.poehali.dev/%'"
+        )
+        rows = cur.fetchall()
+        cur.close(); conn.close()
+        # sku вида "smartbery_15_256_black" → убираем "smartbery_" → "15_256_black"
+        return {
+            row[0].replace("smartbery_", ""): row[1]
+            for row in rows if row[1]
+        }
+    except Exception as e:
+        print(f"[price-email][photos] {e}")
+        return {}
+
+
+def _sku_key(name: str) -> str:
+    """Нормализует название в sku-ключ: '15 256 Black' → '15_256_black'"""
+    return name.strip().lower().replace(" ", "_")
+
+
 # ── Категория ─────────────────────────────────────────────────────────────────
 CATEGORY_ORDER = [
     "iPhone", "MacBook", "iPad", "Apple Watch", "AirPods",
@@ -109,13 +143,16 @@ def detect_category(name: str) -> str:
 
 
 # ── Группировка ────────────────────────────────────────────────────────────────
-def group_products(products: list, markup: int) -> dict:
+def group_products(products: list, markup: int, cdn_photos: dict | None = None) -> dict:
     groups: dict = {}
+    cdn_photos = cdn_photos or {}
     for p in products:
         raw_name  = (p.get("name") or "").strip()
         raw_price = p.get("price")
         region    = p.get("country") or ""
         category  = detect_category(raw_name)
+        # Ищем CDN-фото по ключу
+        photo = cdn_photos.get(_sku_key(raw_name))
 
         price_str = "—"
         if raw_price is not None:
@@ -127,6 +164,7 @@ def group_products(products: list, markup: int) -> dict:
             "price": price_str,
             "has_price": raw_price is not None,
             "region": region,
+            "photo": photo,
         })
 
     ordered = {}
@@ -159,9 +197,24 @@ def build_price_html(groups: dict, markup: int, generated_at: str, only_availabl
                                 f'border:1px solid {rc}44;border-radius:4px;padding:1px 5px;'
                                 f'margin-left:5px;vertical-align:middle">{item["region"]}</span>')
             price_color = "#FFD700" if item["has_price"] else "#555"
+            # Фото — маленькое превью слева
+            photo_cell = ""
+            if item.get("photo"):
+                photo_cell = (
+                    f'<td style="width:52px;padding:4px 0 4px 10px;background:{bg};border-bottom:1px solid #222;vertical-align:middle">'
+                    f'<img src="{item["photo"]}" width="44" height="44" '
+                    f'style="border-radius:6px;object-fit:cover;display:block" alt="">'
+                    f'</td>'
+                )
+                name_td_style = f"padding:7px 8px 7px 8px;background:{bg};border-bottom:1px solid #222;font-size:13px;color:#ddd"
+            else:
+                photo_cell = f'<td style="width:0;padding:0;background:{bg};border-bottom:1px solid #222"></td>'
+                name_td_style = f"padding:7px 12px;background:{bg};border-bottom:1px solid #222;font-size:13px;color:#ddd"
+
             rows += f"""
             <tr>
-              <td style="padding:7px 12px;background:{bg};border-bottom:1px solid #222;font-size:13px;color:#ddd">
+              {photo_cell}
+              <td style="{name_td_style}">
                 {item["name"]}{region_badge}
               </td>
               <td style="padding:7px 16px;background:{bg};border-bottom:1px solid #222;
@@ -395,14 +448,19 @@ def handler(event: dict, context) -> dict:
     if not products:
         return _err("Smartbery вернул пустой список")
 
-    # 2. Группировка
-    groups  = group_products(products, markup)
+    # 2. Фото из S3 (только для email — MAX текстовый)
+    cdn_photos: dict = {}
+    if email:
+        cdn_photos = load_cdn_photos()
+
+    # 3. Группировка
+    groups  = group_products(products, markup, cdn_photos)
     msk_now = datetime.now(timezone(timedelta(hours=3)))
     gen_at  = msk_now.strftime("%d.%m.%Y %H:%M МСК")
 
-    results: dict = {"total": total, "markup": markup}
+    results: dict = {"total": total, "markup": markup, "photos": len(cdn_photos)}
 
-    # 3. Email
+    # 4. Email
     if email:
         html = build_price_html(groups, markup, gen_at, only_available)
         send_email(email, html, markup)
