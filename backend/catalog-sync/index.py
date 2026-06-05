@@ -1,6 +1,6 @@
 """
-Синхронизация каталога iPhone из smartbery-qrcode.ru API.
-POST / { "action": "sync" }  — запустить синхронизацию (X-Admin-Token)
+Синхронизация каталога iPhone из smartbery-qrcode.ru API. v2
+POST / { "action": "sync", "admin_token": "..." }  — запустить синхронизацию
 GET  /                        — последний лог синхронизации
 
 Парсинг name: "<модель> <storage_gb> <color>"
