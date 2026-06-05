@@ -19,6 +19,13 @@
       "path": "/",
       "body": {"action": "me"},
       "expectedStatus": 401
+    },
+    {
+      "name": "request_reset_direct — аккаунт не найден",
+      "method": "POST",
+      "path": "/",
+      "body": {"action": "request_reset_direct", "email": "noone@example.com", "new_password": "test123456"},
+      "expectedStatus": 400
     }
   ]
 }
