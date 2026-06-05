@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import Icon from "@/components/ui/icon";
 
 const COINS_IMG    = "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/0d17247e-bac8-456f-9aa9-00bfe13e451d.jpg";
@@ -121,13 +122,22 @@ export default function AntiquesPreviewBlock() {
             <Icon name="Landmark" size={11} />
             Антиквариат · Скупка24
           </div>
-          <h2 className="font-oswald font-bold text-3xl md:text-4xl uppercase">
-            Покупаем{" "}
-            <span className="text-[#FFD700]">антиквариат</span>
-          </h2>
-          <p className="font-roboto text-white/45 text-sm md:text-base mt-1.5 max-w-xl">
-            Честная оценка по аукционным стандартам. Выплата в день обращения.
-          </p>
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+            <div>
+              <h2 className="font-oswald font-bold text-3xl md:text-4xl uppercase">
+                Покупаем{" "}
+                <span className="text-[#FFD700]">антиквариат</span>
+              </h2>
+              <p className="font-roboto text-white/45 text-sm md:text-base mt-1.5 max-w-xl">
+                Честная оценка по аукционным стандартам. Выплата в день обращения.
+              </p>
+            </div>
+            <Link to="/skupka-antikvariata"
+              className="group shrink-0 inline-flex items-center gap-2 border border-[#FFD700]/40 hover:border-[#FFD700] text-[#FFD700] font-oswald font-bold uppercase text-sm px-5 py-2.5 rounded-xl transition-all hover:bg-[#FFD700]/[0.06] self-start sm:self-auto">
+              Все направления
+              <Icon name="ArrowRight" size={14} className="group-hover:translate-x-0.5 transition-transform" />
+            </Link>
+          </div>
         </div>
 
         {/* Сетка: 2 колонки на мобиле → 3 на десктопе */}
