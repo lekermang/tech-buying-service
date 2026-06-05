@@ -12,7 +12,7 @@ POST /
   "only_available": true   -- только в наличии (по умолч. true)
 }
 """
-import json, os, re, smtplib, ssl, urllib.request
+import json, os, smtplib, ssl, urllib.request
 from datetime import datetime, timezone, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -68,39 +68,7 @@ def fetch_products(only_available: bool) -> list:
     return data
 
 
-# ── SIM парсинг ────────────────────────────────────────────────────────────────
-SIM_KEYWORDS = {
-    "esim+sim": "eSIM+SIM",
-    "esim + sim": "eSIM+SIM",
-    "dual esim": "eSIM+SIM",
-    "2 esim": "eSIM+eSIM",
-    "esim": "eSIM",
-    "sim sim": "Dual SIM",
-    "2sim": "Dual SIM",
-    "dual sim": "Dual SIM",
-    "2 sim": "Dual SIM",
-    "sim": "SIM",
-}
-
-def parse_sim(name: str) -> str | None:
-    """Извлекает тип SIM из названия товара."""
-    lower = name.lower()
-    for kw, label in SIM_KEYWORDS.items():
-        if kw in lower:
-            return label
-    return None
-
-def clean_sim_from_name(name: str) -> str:
-    """Убирает упоминания SIM из названия чтобы не дублировать."""
-    patterns = [
-        r"\beSIM\s*\+\s*SIM\b", r"\bDual\s*eSIM\b", r"\b2\s*eSIM\b",
-        r"\beSIM\b", r"\bDual\s*SIM\b", r"\b2\s*SIM\b", r"\bSIM\s*SIM\b",
-        r"\b2sim\b", r"\bSIM\b",
-    ]
-    result = name
-    for p in patterns:
-        result = re.sub(p, "", result, flags=re.IGNORECASE)
-    return re.sub(r"\s{2,}", " ", result).strip().rstrip(",- ").strip()
+# SIM данных в Smartbery API нет — поле не предусмотрено источником
 
 
 # ── Категория ─────────────────────────────────────────────────────────────────
@@ -148,9 +116,6 @@ def group_products(products: list, markup: int) -> dict:
         raw_price = p.get("price")
         region    = p.get("country") or ""
         category  = detect_category(raw_name)
-        sim_type  = parse_sim(raw_name)
-        # Убираем SIM из названия — покажем отдельно
-        display_name = clean_sim_from_name(raw_name) if sim_type else raw_name
 
         price_str = "—"
         if raw_price is not None:
@@ -158,11 +123,10 @@ def group_products(products: list, markup: int) -> dict:
             price_str = f"{final:,}".replace(",", " ") + " ₽"
 
         groups.setdefault(category, []).append({
-            "name": display_name,
+            "name": raw_name,
             "price": price_str,
             "has_price": raw_price is not None,
             "region": region,
-            "sim": sim_type,
         })
 
     ordered = {}
@@ -176,14 +140,6 @@ def group_products(products: list, markup: int) -> dict:
 
 
 # ── HTML прайс ─────────────────────────────────────────────────────────────────
-SIM_COLOR = {
-    "eSIM+SIM": "#a78bfa",
-    "eSIM+eSIM": "#818cf8",
-    "eSIM":     "#c084fc",
-    "Dual SIM": "#60a5fa",
-    "SIM":      "#94a3b8",
-}
-
 def build_price_html(groups: dict, markup: int, generated_at: str, only_available: bool) -> str:
     markup_note = f"наценка +{markup:,} ₽".replace(",", " ") if markup > 0 else "цены без наценки"
     avail_note  = "только в наличии" if only_available else "включая под заказ"
@@ -202,18 +158,11 @@ def build_price_html(groups: dict, markup: int, generated_at: str, only_availabl
                 region_badge = (f'<span style="font-size:9px;background:{rc}22;color:{rc};'
                                 f'border:1px solid {rc}44;border-radius:4px;padding:1px 5px;'
                                 f'margin-left:5px;vertical-align:middle">{item["region"]}</span>')
-            # SIM badge
-            sim_badge = ""
-            if item["sim"]:
-                sc = SIM_COLOR.get(item["sim"], "#94a3b8")
-                sim_badge = (f'<span style="font-size:9px;background:{sc}18;color:{sc};'
-                             f'border:1px solid {sc}40;border-radius:4px;padding:1px 6px;'
-                             f'margin-left:5px;vertical-align:middle">{item["sim"]}</span>')
             price_color = "#FFD700" if item["has_price"] else "#555"
             rows += f"""
             <tr>
               <td style="padding:7px 12px;background:{bg};border-bottom:1px solid #222;font-size:13px;color:#ddd">
-                {item["name"]}{region_badge}{sim_badge}
+                {item["name"]}{region_badge}
               </td>
               <td style="padding:7px 16px;background:{bg};border-bottom:1px solid #222;
                          text-align:right;font-size:13px;font-weight:700;
@@ -338,27 +287,49 @@ def build_price_html(groups: dict, markup: int, generated_at: str, only_availabl
 </html>"""
 
 
-# ── MAX сообщение ──────────────────────────────────────────────────────────────
-def build_max_message(groups: dict, markup: int, total: int, generated_at: str) -> str:
+MAX_MSG_LIMIT = 3800  # символов на одно сообщение MAX
+
+# ── MAX сообщения (разбитые на части) ────────────────────────────────────────
+def build_max_parts(groups: dict, markup: int, total: int, generated_at: str) -> list:
+    """Возвращает список строк — каждая ≤ MAX_MSG_LIMIT символов."""
     markup_note = f"наценка +{markup:,} ₽".replace(",", " ") if markup > 0 else "без наценки"
-    lines = [f"🏷️ *Прайс Скупка24* — {generated_at}\n_{markup_note} · {total} позиций_\n"]
+    header = f"🏷️ *Прайс Скупка24* — {generated_at}\n_{markup_note} · {total} позиций_"
+
+    parts = []
+    current = header + "\n"
+
     for cat, items in groups.items():
         emoji = CAT_EMOJI.get(cat, "📦")
-        lines.append(f"\n*{emoji} {cat}*")
+        cat_lines = [f"\n*{emoji} {cat}*"]
         for item in items:
-            parts = [item["name"]]
-            if item["region"]:
-                parts.append(f"[{item['region']}]")
-            if item["sim"]:
-                parts.append(f"({item['sim']})")
-            parts.append(f"— {item['price']}")
-            lines.append("• " + " ".join(parts))
-    lines.append("\n📞 +7 (992) 990-33-33 | skypka24.com")
-    return "\n".join(lines)
+            region = f" [{item['region']}]" if item["region"] else ""
+            cat_lines.append(f"• {item['name']}{region} — {item['price']}")
+
+        block = "\n".join(cat_lines)
+
+        # Если блок не влезает — закрываем текущую часть, открываем новую
+        if len(current) + len(block) > MAX_MSG_LIMIT:
+            parts.append(current.strip())
+            current = block + "\n"
+        else:
+            current += block + "\n"
+
+    if current.strip():
+        parts.append(current.strip())
+
+    # Добавляем контакты в последнюю часть
+    footer = "\n\n📞 +7 (992) 990-33-33 | skypka24.com"
+    if parts:
+        if len(parts[-1]) + len(footer) <= MAX_MSG_LIMIT:
+            parts[-1] += footer
+        else:
+            parts.append(footer.strip())
+
+    return parts
 
 
-def send_max_staff(text: str):
-    """Отправляет в общий staff-чат через max-bot?action=staff_send."""
+def send_max_staff_part(text: str):
+    """Отправляет одну часть в общий staff-чат через max-bot?action=staff_send."""
     payload = json.dumps({"text": text}).encode()
     req = urllib.request.Request(
         f"{MAX_BOT_URL}?action=staff_send",
@@ -366,8 +337,15 @@ def send_max_staff(text: str):
         method="POST",
         headers={"Content-Type": "application/json"},
     )
-    with urllib.request.urlopen(req, timeout=12) as r:
+    with urllib.request.urlopen(req, timeout=15) as r:
         return json.loads(r.read())
+
+
+def send_max_staff(groups: dict, markup: int, total: int, generated_at: str):
+    """Разбивает прайс на части и отправляет каждую отдельным сообщением."""
+    parts = build_max_parts(groups, markup, total, generated_at)
+    for part in parts:
+        send_max_staff_part(part)
 
 
 # ── Email ──────────────────────────────────────────────────────────────────────
@@ -431,10 +409,9 @@ def handler(event: dict, context) -> dict:
         results["email_sent"] = True
         results["email_to"]   = email
 
-    # 4. MAX staff_send
+    # 4. MAX staff_send (разбивается на части автоматически)
     if send_max_flag:
-        text = build_max_message(groups, markup, total, gen_at)
-        send_max_staff(text)
+        send_max_staff(groups, markup, total, gen_at)
         results["max_sent"] = True
 
     return _ok({"ok": True, **results})
