@@ -5,11 +5,21 @@ import PayButton from "@/components/payment/PayButton";
 /* ── URLs ───────────────────────────────────────────────────────────────── */
 const AUTH_URL   = "https://functions.poehali.dev/420ad7e7-26c9-4540-9369-6bca5d26d3aa";
 const UNLOCK_URL = "https://functions.poehali.dev/06607e09-1cc5-4df8-bccf-ed619806e834";
+const AI_URL     = "https://functions.poehali.dev/fe968c8f-eb07-4a9c-9993-341972bfef48";
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
 function getToken() { return localStorage.getItem("unlock_token") || ""; }
 function setToken(t: string) { localStorage.setItem("unlock_token", t); }
 function clearToken() { localStorage.removeItem("unlock_token"); }
+
+async function aiCall(body: object) {
+  const r = await fetch(AI_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Client-Token": getToken() },
+    body: JSON.stringify(body),
+  });
+  return r.json();
+}
 
 async function authCall(body: object) {
   const r = await fetch(AUTH_URL, {
@@ -295,6 +305,8 @@ function OrdersTable({ orders, loading, onRefresh }: {
 /* Карточка услуги */
 function ServiceCard({ s, onOrder }: { s: Record<string, string>; onOrder: (s: Record<string, string>) => void }) {
   const accent = "#FFD700";
+  const clientPrice = s.price_client ?? s.credits;
+  const hasMarkup = s.price_client && s.credits && s.price_client !== s.credits;
   return (
     <button onClick={() => onOrder(s)}
       className="group text-left rounded-xl p-4 transition-all duration-200 flex flex-col gap-2 w-full"
@@ -306,17 +318,29 @@ function ServiceCard({ s, onOrder }: { s: Record<string, string>; onOrder: (s: R
           <div className="font-roboto text-sm text-white/80 group-hover:text-white transition-colors leading-snug line-clamp-2">
             {s.title ?? s.servicename ?? "Услуга"}
           </div>
-          {s.time && (
-            <div className="flex items-center gap-1 mt-1 font-roboto text-[10px] text-white/30">
-              <Icon name="Clock" size={9} />{s.time}
-            </div>
-          )}
+          <div className="flex items-center gap-2 mt-1">
+            {s.time && (
+              <div className="flex items-center gap-1 font-roboto text-[10px] text-white/30">
+                <Icon name="Clock" size={9} />{s.time}
+              </div>
+            )}
+            {s.markup_pct && s.markup_pct !== "—" && (
+              <span className="font-roboto text-[9px] px-1.5 py-0.5 rounded-md"
+                style={{ background: "rgba(110,231,183,0.1)", color: "#6ee7b7", border: "1px solid rgba(110,231,183,0.2)" }}>
+                наценка {s.markup_pct}
+              </span>
+            )}
+          </div>
         </div>
         <div className="shrink-0 text-right">
           <div className="font-oswald font-bold text-base" style={{ color: accent }}>
-            {s.credits ? `${s.credits} ₽` : "—"}
+            {clientPrice ? `${parseFloat(clientPrice).toLocaleString("ru-RU")} ₽` : "—"}
           </div>
-          <div className="font-roboto text-[9px] text-white/25">за ед.</div>
+          {hasMarkup && (
+            <div className="font-roboto text-[10px] line-through text-white/20">
+              {parseFloat(s.credits).toLocaleString("ru-RU")} ₽
+            </div>
+          )}
         </div>
       </div>
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -351,6 +375,7 @@ function OrderForm({ services, prefill, onSuccess, onCancel }: {
       imei: imei.trim(),
       quantity: parseInt(qty) || 1,
       price_credits: selected?.credits ?? null,
+      price_client: selected?.price_client ?? selected?.credits ?? null,
     }, "POST");
     if (d.success) {
       setResult({ ok: true, msg: `Заказ #${d.gsm_order_id || d.local_id} успешно создан!` });
@@ -361,7 +386,9 @@ function OrderForm({ services, prefill, onSuccess, onCancel }: {
     setLoading(false);
   }
 
-  const total = selected?.credits ? parseFloat(selected.credits) * (parseInt(qty) || 1) : null;
+  // Считаем итог по цене клиента (с наценкой)
+  const clientPrice = selected?.price_client ?? selected?.credits;
+  const total = clientPrice ? parseFloat(clientPrice) * (parseInt(qty) || 1) : null;
 
   return (
     <div className="space-y-4">
@@ -397,10 +424,20 @@ function OrderForm({ services, prefill, onSuccess, onCancel }: {
       </div>
 
       {total !== null && imei && (
-        <div className="flex items-center justify-between px-4 py-3 rounded-xl"
+        <div className="px-4 py-3 rounded-xl"
           style={{ background: "rgba(255,215,0,0.06)", border: "1px solid rgba(255,215,0,0.18)" }}>
-          <div className="font-roboto text-xs text-white/40">Итого к списанию</div>
-          <div className="font-oswald font-bold text-xl" style={{ color: "#FFD700" }}>{total} ₽</div>
+          <div className="flex items-center justify-between">
+            <div className="font-roboto text-xs text-white/40">К оплате клиенту</div>
+            <div className="font-oswald font-bold text-xl" style={{ color: "#FFD700" }}>
+              {total.toLocaleString("ru-RU")} ₽
+            </div>
+          </div>
+          {selected?.markup_pct && selected.markup_pct !== "—" && (
+            <div className="flex items-center justify-between mt-1">
+              <div className="font-roboto text-[10px] text-white/25">Наценка</div>
+              <div className="font-roboto text-[10px]" style={{ color: "#6ee7b7" }}>{selected.markup_pct}</div>
+            </div>
+          )}
         </div>
       )}
 
@@ -569,9 +606,225 @@ function TopupModal({ client, onClose }: { client: { full_name: string; phone: s
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
+   AI ЧАТ ВИДЖЕТ
+   ══════════════════════════════════════════════════════════════════════════ */
+interface ChatMsg { role: "user" | "assistant"; content: string; }
+
+function AiChatWidget() {
+  const [open, setOpen] = useState(false);
+  const [msgs, setMsgs] = useState<ChatMsg[]>([
+    { role: "assistant", content: "👋 Привет! Я AI-ассистент Skypka24.\n\nПомогу выбрать услугу разблокировки, объясню как оформить заказ и отвечу на вопросы.\n\nС чего начнём?" }
+  ]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [sessionId, setSessionId] = useState<number | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (open) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [msgs, open]);
+
+  async function send() {
+    const text = input.trim();
+    if (!text || loading) return;
+    setInput("");
+    setMsgs(p => [...p, { role: "user", content: text }]);
+    setLoading(true);
+    try {
+      const d = await aiCall({ action: "chat", message: text, session_id: sessionId });
+      if (d.reply) {
+        setMsgs(p => [...p, { role: "assistant", content: d.reply }]);
+        if (d.session_id) setSessionId(d.session_id);
+      } else {
+        setMsgs(p => [...p, { role: "assistant", content: "Ошибка: " + (d.error || "нет ответа") }]);
+      }
+    } catch {
+      setMsgs(p => [...p, { role: "assistant", content: "Ошибка соединения. Попробуйте снова." }]);
+    }
+    setLoading(false);
+    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+  }
+
+  function onKey(e: React.KeyboardEvent) {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+  }
+
+  const QUICK = ["Как разблокировать iPhone?", "Что такое FRP?", "Как найти IMEI?", "Статус заказа"];
+
+  return (
+    <>
+      {/* Плавающая кнопка */}
+      <button
+        onClick={() => { setOpen(v => !v); setTimeout(() => inputRef.current?.focus(), 100); }}
+        className="fixed bottom-24 right-5 lg:bottom-6 lg:right-6 z-40 w-14 h-14 rounded-2xl flex items-center justify-center shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95"
+        style={{
+          background: open ? "rgba(20,16,8,0.95)" : "linear-gradient(135deg,#FFD700,#b8860b)",
+          border: open ? "2px solid rgba(255,215,0,0.4)" : "2px solid transparent",
+          boxShadow: "0 0 0 1px rgba(255,215,0,0.3),0 8px 32px rgba(255,215,0,0.35)",
+        }}
+        title="AI-ассистент">
+        <Icon name={open ? "X" : "MessageCircle"} size={22}
+          style={{ color: open ? "#FFD700" : "#000" }} />
+        {!open && (
+          <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center"
+            style={{ background: "#6ee7b7", color: "#000" }}>AI</span>
+        )}
+      </button>
+
+      {/* Окно чата */}
+      {open && (
+        <div className="fixed bottom-44 right-4 lg:bottom-24 lg:right-6 z-40 w-[calc(100vw-2rem)] max-w-sm flex flex-col rounded-2xl overflow-hidden shadow-2xl"
+          style={{
+            background: "linear-gradient(145deg,rgba(12,9,5,0.98) 0%,rgba(6,6,10,0.99) 100%)",
+            border: "1px solid rgba(255,215,0,0.2)",
+            boxShadow: "0 0 0 1px rgba(255,215,0,0.06),0 24px 60px rgba(0,0,0,0.7)",
+            maxHeight: "70vh",
+          }}>
+          {/* Шапка */}
+          <div className="flex items-center gap-2.5 px-4 py-3 border-b shrink-0"
+            style={{ borderColor: "rgba(255,215,0,0.12)", background: "rgba(255,215,0,0.04)" }}>
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: "linear-gradient(135deg,#FFD700,#b8860b)", boxShadow: "0 0 12px rgba(255,215,0,0.4)" }}>
+              <Icon name="Bot" size={15} className="text-black" />
+            </div>
+            <div className="flex-1">
+              <div className="font-oswald font-bold text-sm uppercase text-white">Sky AI</div>
+              <div className="font-roboto text-[9px] text-white/35 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#6ee7b7] animate-pulse inline-block" />
+                DeepSeek · Онлайн
+              </div>
+            </div>
+            <button onClick={() => setOpen(false)} className="text-white/25 hover:text-white/60 transition-colors">
+              <Icon name="X" size={15} />
+            </button>
+          </div>
+
+          {/* Сообщения */}
+          <div className="flex-1 overflow-y-auto p-3 space-y-3" style={{ minHeight: 0 }}>
+            {msgs.map((m, i) => (
+              <div key={i} className={`flex gap-2 ${m.role === "user" ? "flex-row-reverse" : ""}`}>
+                {m.role === "assistant" && (
+                  <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
+                    style={{ background: "rgba(255,215,0,0.15)", border: "1px solid rgba(255,215,0,0.25)" }}>
+                    <Icon name="Bot" size={11} style={{ color: "#FFD700" }} />
+                  </div>
+                )}
+                <div className={`max-w-[80%] px-3 py-2 rounded-xl font-roboto text-[13px] leading-relaxed whitespace-pre-wrap ${
+                  m.role === "user"
+                    ? "text-white/90 rounded-tr-sm"
+                    : "text-white/80 rounded-tl-sm"
+                }`}
+                  style={{
+                    background: m.role === "user"
+                      ? "linear-gradient(135deg,rgba(255,215,0,0.15),rgba(255,215,0,0.08))"
+                      : "rgba(255,255,255,0.05)",
+                    border: m.role === "user"
+                      ? "1px solid rgba(255,215,0,0.25)"
+                      : "1px solid rgba(255,255,255,0.07)",
+                  }}>
+                  {m.content}
+                </div>
+              </div>
+            ))}
+            {loading && (
+              <div className="flex gap-2">
+                <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
+                  style={{ background: "rgba(255,215,0,0.15)", border: "1px solid rgba(255,215,0,0.25)" }}>
+                  <Icon name="Bot" size={11} style={{ color: "#FFD700" }} />
+                </div>
+                <div className="px-3 py-2.5 rounded-xl rounded-tl-sm flex items-center gap-1"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                  {[0,1,2].map(i => (
+                    <div key={i} className="w-1.5 h-1.5 rounded-full bg-[#FFD700] animate-bounce"
+                      style={{ animationDelay: `${i * 0.15}s`, opacity: 0.7 }} />
+                  ))}
+                </div>
+              </div>
+            )}
+            <div ref={bottomRef} />
+          </div>
+
+          {/* Быстрые вопросы */}
+          {msgs.length <= 1 && (
+            <div className="px-3 pb-2 flex flex-wrap gap-1.5 shrink-0">
+              {QUICK.map(q => (
+                <button key={q} onClick={() => { setInput(q); setTimeout(() => send(), 0); }}
+                  className="px-2.5 py-1 rounded-lg font-roboto text-[10px] transition-all"
+                  style={{ background: "rgba(255,215,0,0.07)", border: "1px solid rgba(255,215,0,0.18)", color: "rgba(255,215,0,0.7)" }}
+                  onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,215,0,0.14)")}
+                  onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,215,0,0.07)")}>
+                  {q}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Ввод */}
+          <div className="p-3 border-t shrink-0 flex gap-2 items-end"
+            style={{ borderColor: "rgba(255,215,0,0.1)" }}>
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={onKey}
+              placeholder="Спросите AI... (Enter — отправить)"
+              rows={1}
+              className="flex-1 resize-none px-3 py-2.5 rounded-xl font-roboto text-sm text-white/85 outline-none transition-all"
+              style={{
+                background: "rgba(255,255,255,0.05)",
+                border: "1px solid rgba(255,215,0,0.15)",
+                maxHeight: "80px",
+                lineHeight: "1.4",
+              }}
+              onFocus={e => (e.currentTarget.style.borderColor = "rgba(255,215,0,0.4)")}
+              onBlur={e => (e.currentTarget.style.borderColor = "rgba(255,215,0,0.15)")}
+            />
+            <button onClick={send} disabled={loading || !input.trim()}
+              className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all disabled:opacity-40"
+              style={{
+                background: "linear-gradient(135deg,#FFD700,#b8860b)",
+                boxShadow: "0 0 12px rgba(255,215,0,0.3)",
+              }}>
+              <Icon name="Send" size={16} className="text-black" />
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+/* ── Таблица транзакций ──────────────────────────────────────────────────── */
+function TransactionRow({ tx }: { tx: Record<string, string> }) {
+  const isIn = tx.type === "deposit";
+  const color = isIn ? "#6ee7b7" : "#fca5a5";
+  const icon = isIn ? "ArrowDownLeft" : "ArrowUpRight";
+  const label: Record<string, string> = { deposit: "Пополнение", order_payment: "Оплата заказа", refund: "Возврат" };
+  return (
+    <div className="flex items-center gap-3 py-3 border-b last:border-0"
+      style={{ borderColor: "rgba(255,255,255,0.05)" }}>
+      <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+        style={{ background: `${color}14`, border: `1px solid ${color}28` }}>
+        <Icon name={icon} size={14} style={{ color }} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="font-roboto text-sm text-white/75 truncate">{tx.description || label[tx.type] || tx.type}</div>
+        <div className="font-roboto text-[10px] text-white/30">
+          {tx.created_at ? new Date(tx.created_at).toLocaleString("ru-RU", { day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit" }) : "—"}
+        </div>
+      </div>
+      <div className="font-oswald font-bold text-base shrink-0" style={{ color }}>
+        {isIn ? "+" : "−"}{parseFloat(tx.amount || "0").toLocaleString("ru-RU")} ₽
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
    КАБИНЕТ
    ══════════════════════════════════════════════════════════════════════════ */
-type Tab = "dashboard" | "services" | "orders" | "neworder" | "profile";
+type Tab = "dashboard" | "services" | "orders" | "neworder" | "profile" | "transactions";
 
 interface Client { id: number; full_name: string; email: string; phone: string; email_verified: boolean; }
 
@@ -583,9 +836,11 @@ function Cabinet({ onLogout }: { onLogout: () => void }) {
   const [services, setServices] = useState<Record<string, string>[]>([]);
   const [myOrders, setMyOrders] = useState<Record<string, string>[]>([]);
   const [gsmOrders, setGsmOrders] = useState<Record<string, string>[]>([]);
+  const [transactions, setTransactions] = useState<Record<string, string>[]>([]);
   const [loadBal, setLoadBal] = useState(true);
   const [loadSvc, setLoadSvc] = useState(true);
   const [loadOrd, setLoadOrd] = useState(true);
+  const [loadTx, setLoadTx] = useState(false);
   const [prefillSvc, setPrefillSvc] = useState<Record<string, string> | null>(null);
   const [search, setSearch] = useState("");
   const [mobileMenu, setMobileMenu] = useState(false);
@@ -622,12 +877,25 @@ function Cabinet({ onLogout }: { onLogout: () => void }) {
     else { clearToken(); onLogout(); }
   }, [onLogout]);
 
+  const fetchTransactions = useCallback(async () => {
+    setLoadTx(true);
+    const d = await apiCall("getTransactions", {}, "GET").catch(() => null);
+    if (d?.transactions) setTransactions(d.transactions);
+    setLoadTx(false);
+  }, []);
+
   useEffect(() => {
     fetchClient();
     fetchBalance();
     fetchServices();
     fetchOrders();
   }, [fetchClient, fetchBalance, fetchServices, fetchOrders]);
+
+  // Загружаем транзакции при открытии вкладки
+  useEffect(() => {
+    if (tab === "transactions" && transactions.length === 0) fetchTransactions();
+    if (tab === "profile" && transactions.length === 0) fetchTransactions();
+  }, [tab, transactions.length, fetchTransactions]);
 
   async function refreshOrderStatus(o: Record<string, string>) {
     if (!o.gsm_order_id) return;
@@ -644,11 +912,12 @@ function Cabinet({ onLogout }: { onLogout: () => void }) {
   const allOrders = myOrders.length ? myOrders : gsmOrders;
 
   const TABS: { id: Tab; icon: string; label: string }[] = [
-    { id: "dashboard", icon: "LayoutDashboard", label: "Главная" },
-    { id: "services",  icon: "Grid3X3",         label: "Услуги"  },
-    { id: "orders",    icon: "ClipboardList",    label: "Заказы"  },
-    { id: "neworder",  icon: "PlusCircle",       label: "Заказать"},
-    { id: "profile",   icon: "User",             label: "Профиль" },
+    { id: "dashboard",    icon: "LayoutDashboard", label: "Главная"  },
+    { id: "services",     icon: "Grid3X3",         label: "Услуги"   },
+    { id: "orders",       icon: "ClipboardList",   label: "Заказы"   },
+    { id: "neworder",     icon: "PlusCircle",      label: "Заказать" },
+    { id: "transactions", icon: "ArrowLeftRight",  label: "Финансы"  },
+    { id: "profile",      icon: "User",            label: "Профиль"  },
   ];
 
   const completedCnt = allOrders.filter(o => ["completed","approved","success"].includes((o.status ?? "").toLowerCase())).length;
@@ -663,6 +932,9 @@ function Cabinet({ onLogout }: { onLogout: () => void }) {
       {showTopup && client && (
         <TopupModal client={client} onClose={() => setShowTopup(false)} />
       )}
+
+      {/* AI виджет — плавающий чат */}
+      <AiChatWidget />
 
       {/* ── Шапка ──────────────────────────────────────────────────────── */}
       <header className="relative z-20 border-b" style={{ borderColor: "rgba(255,215,0,0.1)", background: "rgba(6,4,6,0.95)", backdropFilter: "blur(12px)" }}>
@@ -948,6 +1220,81 @@ function Cabinet({ onLogout }: { onLogout: () => void }) {
                     onCancel={() => setTab("dashboard")}
                   />
                 </div>
+              </div>
+            </Panel>
+          )}
+
+          {/* ТРАНЗАКЦИИ */}
+          {tab === "transactions" && (
+            <Panel>
+              <div className="p-5 sm:p-6">
+                <div className="flex items-center justify-between gap-4 mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+                      style={{ background: "linear-gradient(135deg,#6ee7b7,#059669)", boxShadow: "0 0 16px rgba(110,231,183,0.3)" }}>
+                      <Icon name="ArrowLeftRight" size={17} className="text-black" />
+                    </div>
+                    <div>
+                      <h2 className="font-oswald font-bold text-xl uppercase text-white">Финансы</h2>
+                      <div className="font-roboto text-[10px] text-white/30 mt-0.5">
+                        {loadTx ? "Загрузка..." : `${transactions.length} операций`}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setShowTopup(true)}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl font-oswald font-bold text-xs uppercase text-black transition-all"
+                      style={{
+                        background: "linear-gradient(180deg,#fff3a0 0%,#FFD700 45%,#d4a017 100%)",
+                        boxShadow: "0 0 0 1px rgba(255,215,0,0.5)",
+                      }}>
+                      <Icon name="Plus" size={13} />Пополнить
+                    </button>
+                    <button onClick={fetchTransactions}
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl font-roboto text-xs transition-all"
+                      style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.4)" }}
+                      onMouseEnter={e => (e.currentTarget.style.borderColor = "rgba(255,215,0,0.3)")}
+                      onMouseLeave={e => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)")}>
+                      <Icon name="RefreshCw" size={12} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Сводка */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
+                  {[
+                    { label: "Пополнено", value: transactions.filter(t=>t.type==="deposit").reduce((s,t)=>s+parseFloat(t.amount||"0"),0), color: "#6ee7b7" },
+                    { label: "Потрачено", value: transactions.filter(t=>t.type==="order_payment").reduce((s,t)=>s+parseFloat(t.amount||"0"),0), color: "#fca5a5" },
+                    { label: "Операций", value: transactions.length, color: "#FFD700", noRub: true },
+                  ].map(({ label, value, color, noRub }) => (
+                    <div key={label} className="px-4 py-3 rounded-xl"
+                      style={{ background: `${color}08`, border: `1px solid ${color}20` }}>
+                      <div className="font-roboto text-[10px] uppercase tracking-widest mb-1" style={{ color: "rgba(255,255,255,0.35)" }}>{label}</div>
+                      {loadTx
+                        ? <Skeleton h="h-6" w="w-16" />
+                        : <div className="font-oswald font-bold text-xl" style={{ color }}>
+                            {noRub ? value : `${(value as number).toLocaleString("ru-RU")} ₽`}
+                          </div>
+                      }
+                    </div>
+                  ))}
+                </div>
+
+                {/* Список транзакций */}
+                {loadTx
+                  ? <div className="space-y-2">{[1,2,3].map(i=><Skeleton key={i} h="h-14"/>)}</div>
+                  : transactions.length
+                    ? <div>{transactions.map(tx=><TransactionRow key={tx.id} tx={tx}/>)}</div>
+                    : <div className="text-center py-12 text-white/25">
+                        <Icon name="CreditCard" size={36} className="mx-auto mb-3 opacity-30"/>
+                        <div className="font-oswald uppercase tracking-wide text-sm">Операций пока нет</div>
+                        <button onClick={()=>setShowTopup(true)}
+                          className="mt-4 px-4 py-2 rounded-xl font-roboto text-xs transition-all"
+                          style={{ background:"rgba(255,215,0,0.08)", border:"1px solid rgba(255,215,0,0.2)", color:"rgba(255,215,0,0.7)" }}>
+                          Пополнить баланс
+                        </button>
+                      </div>
+                }
               </div>
             </Panel>
           )}
