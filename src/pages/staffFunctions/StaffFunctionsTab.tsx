@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import Icon from "@/components/ui/icon";
 import funcUrls from "../../../backend/func2url.json";
 import { FUNC_STATS, OPTIMIZATION_STEPS, ACTIVE_PLAN, type FuncStat } from "./functionsData";
+import { adminHeaders } from "@/lib/adminFetch";
+
+const SYNC_URL = "https://functions.poehali.dev/bc6598ed-2eb1-4f4f-9de6-7409ce74149e";
 
 const CHAT_URL = (funcUrls as Record<string, string>)["public-chat"];
 
@@ -31,10 +34,28 @@ export default function StaffFunctionsTab({ token }: { token: string }) {
   const [aiBusy, setAiBusy] = useState(false);
   const [optApplied, setOptApplied] = useState(false);
   const [optBusy, setOptBusy] = useState(false);
-  const [optProgress, setOptProgress] = useState(0); // 0..AUTO_STEPS.length
+  const [optProgress, setOptProgress] = useState(0);
   const [showManual, setShowManual] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [lastRun, setLastRun] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ inserted: number; updated: number; total: number } | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
+
+  const handleSync = async () => {
+    setSyncing(true); setSyncResult(null); setSyncError(null);
+    try {
+      const res = await fetch(SYNC_URL, {
+        method: "POST",
+        headers: { ...adminHeaders(token), "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "sync" }),
+      });
+      const d = await res.json();
+      if (d.ok) setSyncResult({ inserted: d.inserted, updated: d.updated, total: d.total });
+      else setSyncError(d.error || "Ошибка синхронизации");
+    } catch { setSyncError("Ошибка сети"); }
+    setSyncing(false);
+  };
 
   useEffect(() => {
     fetch(`${CHAT_URL}?action=ai_status`, { headers: { "X-Employee-Token": token } })
@@ -133,6 +154,41 @@ export default function StaffFunctionsTab({ token }: { token: string }) {
           <div className="font-oswald font-bold text-lg text-white uppercase tracking-wide">Функции и потребление</div>
           <div className="font-roboto text-xs text-white/40">Только для владельца · мониторинг и оптимизация</div>
         </div>
+      </div>
+
+      {/* Синхронизация каталога iPhone из Smartbery */}
+      <div className="rounded-xl bg-white/5 border border-white/10 p-3.5 mb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-[#7dd3fc]/10">
+            <Icon name="RefreshCcw" size={18} className="text-[#7dd3fc]" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-roboto font-semibold text-sm text-white">Каталог iPhone · Smartbery</div>
+            <div className="font-roboto text-[11px] text-white/40">
+              Загрузить актуальные цены и наличие из smartbery-qrcode.ru
+            </div>
+          </div>
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg font-oswald font-bold text-xs uppercase border border-[#7dd3fc]/40 text-[#7dd3fc] hover:bg-[#7dd3fc]/10 transition-colors disabled:opacity-40 shrink-0"
+          >
+            <Icon name={syncing ? "Loader2" : "RefreshCcw"} size={13} className={syncing ? "animate-spin" : ""} />
+            {syncing ? "Синхронизирую…" : "Smartbery"}
+          </button>
+        </div>
+        {syncResult && (
+          <div className="mt-2.5 flex items-center gap-2 font-roboto text-[11px] text-green-400">
+            <Icon name="CheckCircle2" size={13} />
+            Готово: {syncResult.total} позиций · добавлено {syncResult.inserted} · обновлено {syncResult.updated}
+          </div>
+        )}
+        {syncError && (
+          <div className="mt-2.5 flex items-center gap-2 font-roboto text-[11px] text-red-400">
+            <Icon name="AlertCircle" size={13} />
+            {syncError}
+          </div>
+        )}
       </div>
 
       {/* Переключатель ИИ-автоответов клиентам */}

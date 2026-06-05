@@ -146,6 +146,36 @@ def handler(event: dict, context) -> dict:
         items_with_markup = apply_markup(items, markup_map)
         return _ok({"services": items_with_markup})
 
+    # ── ADMIN: наценки (без клиентского токена) ───────────────────────────────
+    if action == "getMarkup":
+        c = _db(); cur = c.cursor()
+        try:
+            cur.execute(f"SELECT id, category, multiplier, note FROM {SCHEMA}.unlock_markup_config ORDER BY id")
+            rows = cur.fetchall()
+            markup = [{"id":r[0],"category":r[1],"multiplier":str(r[2]),
+                       "pct": str(round((float(r[2])-1)*100))+'%',"note":r[3]} for r in rows]
+            return _ok({"markup": markup})
+        finally:
+            cur.close(); c.close()
+
+    if action == "setMarkup":
+        if not is_admin(event):
+            return _err("Forbidden", 403)
+        category   = body.get("category","default")
+        multiplier = body.get("multiplier")
+        if not multiplier:
+            return _err("Укажите multiplier (напр. 1.40)")
+        c = _db(); cur = c.cursor()
+        try:
+            cur.execute(
+                f"UPDATE {SCHEMA}.unlock_markup_config SET multiplier=%s, updated_at=NOW() WHERE category=%s",
+                (float(multiplier), category)
+            )
+            c.commit()
+            return _ok({"ok": True, "category": category, "multiplier": multiplier})
+        finally:
+            cur.close(); c.close()
+
     # ── Остальное только авторизованным ──────────────────────────────────────
     client = resolve_client(event)
     if not client:
@@ -199,18 +229,6 @@ def handler(event: dict, context) -> dict:
             txs = [{"id":r[0],"type":r[1],"amount":str(r[2]),"payment_status":r[3],
                     "description":r[4],"created_at":r[5].isoformat() if r[5] else None} for r in rows]
             return _ok({"transactions": txs})
-        finally:
-            cur.close(); c.close()
-
-    # ── Текущие наценки ──────────────────────────────────────────────────────
-    if action == "getMarkup":
-        c = _db(); cur = c.cursor()
-        try:
-            cur.execute(f"SELECT id, category, multiplier, note FROM {SCHEMA}.unlock_markup_config ORDER BY id")
-            rows = cur.fetchall()
-            markup = [{"id":r[0],"category":r[1],"multiplier":str(r[2]),
-                       "pct": str(round((float(r[2])-1)*100))+'%',"note":r[3]} for r in rows]
-            return _ok({"markup": markup})
         finally:
             cur.close(); c.close()
 
@@ -309,24 +327,5 @@ def handler(event: dict, context) -> dict:
             finally:
                 cur.close(); c.close()
         return _ok({"gsm_order_id":order_id,"status":new_status,"info":info})
-
-    # ── Изменить наценку (admin) ──────────────────────────────────────────────
-    if action == "setMarkup":
-        if not is_admin(event):
-            return _err("Forbidden", 403)
-        category   = body.get("category","default")
-        multiplier = body.get("multiplier")
-        if not multiplier:
-            return _err("Укажите multiplier (напр. 1.40)")
-        c = _db(); cur = c.cursor()
-        try:
-            cur.execute(
-                f"UPDATE {SCHEMA}.unlock_markup_config SET multiplier=%s, updated_at=NOW() WHERE category=%s",
-                (float(multiplier), category)
-            )
-            c.commit()
-            return _ok({"ok": True, "category": category, "multiplier": multiplier})
-        finally:
-            cur.close(); c.close()
 
     return _err(f"Неизвестный action: {action}")

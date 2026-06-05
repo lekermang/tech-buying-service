@@ -19,9 +19,12 @@ export async function aiCall(body: object) {
 }
 
 export async function authCall(body: object) {
+  const token = getToken();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers["X-Client-Token"] = token;
   const r = await fetch(AUTH_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(body),
   });
   return r.json();
