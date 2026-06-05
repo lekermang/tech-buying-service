@@ -179,7 +179,6 @@ def group_products(products: list, markup: int, cdn_photos: dict | None = None) 
 
 # ── HTML прайс ─────────────────────────────────────────────────────────────────
 def build_price_html(groups: dict, markup: int, generated_at: str, only_available: bool) -> str:
-    markup_note = f"наценка +{markup:,} ₽".replace(",", " ") if markup > 0 else "цены без наценки"
     avail_note  = "только в наличии" if only_available else "включая под заказ"
     total       = sum(len(v) for v in groups.values())
 
@@ -281,7 +280,7 @@ def build_price_html(groups: dict, markup: int, generated_at: str, only_availabl
         <td style="font-size:12px;color:#888">
           📅 {generated_at} · {avail_note} · {total} позиций
         </td>
-        <td align="right" style="font-size:12px;color:#aaa">{markup_note}</td>
+        <td></td>
       </tr></table>
     </td>
   </tr>
@@ -345,8 +344,7 @@ MAX_MSG_LIMIT = 3800  # символов на одно сообщение MAX
 # ── MAX сообщения (разбитые на части) ────────────────────────────────────────
 def build_max_parts(groups: dict, markup: int, total: int, generated_at: str) -> list:
     """Возвращает список строк — каждая ≤ MAX_MSG_LIMIT символов."""
-    markup_note = f"наценка +{markup:,} ₽".replace(",", " ") if markup > 0 else "без наценки"
-    header = f"🏷️ *Прайс Скупка24* — {generated_at}\n_{markup_note} · {total} позиций_"
+    header = f"🏷️ *Прайс Скупка24* — {generated_at}\n_{total} позиций в наличии_"
 
     parts = []
     current = header + "\n"
@@ -405,8 +403,7 @@ def send_max_staff(groups: dict, markup: int, total: int, generated_at: str):
 def send_email(to_email: str, html_body: str, markup: int):
     password = os.environ.get("YANDEX_SMTP_PASSWORD", "").strip()
     msk_now  = datetime.now(timezone(timedelta(hours=3)))
-    markup_sfx = f" (+{markup:,} ₽)".replace(",", " ") if markup > 0 else ""
-    subject  = f"Скупка24 — Прайс-лист {msk_now.strftime('%d.%m.%Y')}{markup_sfx}"
+    subject  = f"Скупка24 — Прайс-лист {msk_now.strftime('%d.%m.%Y')}"
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
