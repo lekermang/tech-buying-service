@@ -242,7 +242,7 @@ export default function StaffFunctionsTab({ token }: { token: string }) {
           <div className="flex-1 min-w-0">
             <div className="font-roboto font-semibold text-sm text-white">Отправить прайс</div>
             <div className="font-roboto text-[11px] text-white/40">
-              Актуальные цены Smartbery · на почту и/или в MAX
+              Актуальные цены Smartbery · с SIM/eSIM · на почту и/или в MAX
             </div>
           </div>
           <Icon name={priceExpanded ? "ChevronUp" : "ChevronDown"} size={16} className="text-white/30 shrink-0" />
