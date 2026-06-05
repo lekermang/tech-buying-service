@@ -166,11 +166,15 @@ export function OrderForm({ services, prefill, onSuccess, onCancel }: {
       price_credits: selected?.credits ?? null,
       price_client: selected?.price_client ?? selected?.credits ?? null,
     }, "POST");
-    if (d.success) {
-      setResult({ ok: true, msg: `Заказ #${d.gsm_order_id || d.local_id} успешно создан!` });
+    if (d.success || d.status === "sent") {
+      setResult({ ok: true, msg: `Заказ #${d.gsm_order_id || d.local_id} отправлен в 3gsm!` });
       setTimeout(onSuccess, 1500);
+    } else if (d.local_id) {
+      // Заказ сохранён локально, но ответ 3gsm неоднозначен
+      setResult({ ok: true, msg: `Заказ #${d.local_id} принят (${d.status}). ${d.raw_preview ? "Ответ 3gsm: " + d.raw_preview.slice(0,80) : ""}` });
+      setTimeout(onSuccess, 2000);
     } else {
-      setResult({ ok: false, msg: d.message || d.error || "Ошибка при создании заказа" });
+      setResult({ ok: false, msg: (d.message || d.error || "Ошибка при создании заказа") + (d.raw_preview ? " | " + d.raw_preview.slice(0,120) : "") });
     }
     setLoading(false);
   }

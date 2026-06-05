@@ -627,46 +627,75 @@ def handler(event: dict, context) -> dict:
         if not service_id or not imei:
             return _err("Укажите услугу и IMEI")
 
-        raw = gsm_call({"action":"createOrder","serviceid":service_id,"imei":imei,"quantity":str(quantity)})
-        gsm_order_id = xf(raw, "orderid") or xf(raw, "id")
-        gsm_status   = xf(raw, "status")
-        gsm_msg      = xf(raw, "message") or xf(raw, "error")
+        # Отправляем заказ в 3gsm
+        raw = ""
+        gsm_order_id = None
+        gsm_status   = ""
+        gsm_msg      = ""
+        try:
+            raw = gsm_call({"action": "createOrder", "serviceid": service_id,
+                            "imei": imei, "quantity": str(quantity)})
+            print(f"[createOrder] raw={raw[:300]}")
 
-        order_status = "sent" if (gsm_status == "1" or gsm_order_id) else "error"
+            # Парсим XML
+            gsm_order_id = xf(raw, "orderid") or xf(raw, "id") or xf(raw, "OrderID")
+            gsm_status   = xf(raw, "status") or xf(raw, "Status")
+            gsm_msg      = xf(raw, "message") or xf(raw, "error") or xf(raw, "description")
+
+            # Пробуем JSON если XML не дал результата
+            if not gsm_order_id and not gsm_status:
+                try:
+                    j = json.loads(raw)
+                    gsm_order_id = str(j.get("orderid") or j.get("order_id") or j.get("id") or "")
+                    gsm_status   = str(j.get("status") or "")
+                    gsm_msg      = str(j.get("message") or j.get("error") or "")
+                except Exception:
+                    pass
+
+        except Exception as e:
+            gsm_msg = str(e)
+            raw = gsm_msg
+
+        order_status = "sent" if (gsm_order_id or gsm_status in ("1","success","Success")) else "pending"
 
         c = _db(); cur = c.cursor()
+        local_id = None
         try:
-            # Добавляем поле price_client если таблица ещё без него
             cur.execute(
                 f"INSERT INTO {SCHEMA}.unlock_orders "
-                f"(client_id, gsm_order_id, service_id, service_name, imei, quantity, price_credits, status, gsm_response) "
-                f"VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+                f"(client_id, gsm_order_id, service_id, service_name, imei, quantity, "
+                f"price_credits, price_client, status, gsm_response) "
+                f"VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
                 (client["id"], gsm_order_id or None, service_id, service_name,
-                 imei, quantity, price_base, order_status,
-                 json.dumps({"raw":raw,"gsm_status":gsm_status,"message":gsm_msg}))
+                 imei, quantity,
+                 float(price_base) if price_base else None,
+                 float(price_client) if price_client else None,
+                 order_status,
+                 json.dumps({"raw": raw[:1000], "gsm_status": gsm_status, "message": gsm_msg}))
             )
             local_id = cur.fetchone()[0]
 
-            # Записываем транзакцию списания если известна цена
+            # Транзакция списания
             if price_client:
-                try:
-                    cur.execute(
-                        f"INSERT INTO {SCHEMA}.unlock_transactions "
-                        f"(client_id, type, amount, payment_status, order_id, description) "
-                        f"VALUES (%s,'order_payment',%s,'succeeded',%s,%s)",
-                        (client["id"], float(price_client), local_id,
-                         f"Заказ #{local_id}: {service_name} | IMEI: {imei}")
-                    )
-                except Exception:
-                    pass  # поле может отсутствовать в старых записях
-
+                cur.execute(
+                    f"INSERT INTO {SCHEMA}.unlock_transactions "
+                    f"(client_id, type, amount, payment_status, order_id, description) "
+                    f"VALUES (%s,'order_payment',%s,'succeeded',%s,%s)",
+                    (client["id"], float(price_client), local_id,
+                     f"Заказ #{local_id}: {service_name} | IMEI: {imei}")
+                )
             c.commit()
         finally:
             cur.close(); c.close()
 
-        return _ok({"success": order_status == "sent", "local_id": local_id,
-                    "gsm_order_id": gsm_order_id, "status": order_status,
-                    "message": gsm_msg})
+        return _ok({
+            "success": order_status == "sent",
+            "local_id": local_id,
+            "gsm_order_id": gsm_order_id,
+            "status": order_status,
+            "message": gsm_msg or ("Заказ принят" if order_status == "sent" else "Заказ сохранён, ожидает отправки"),
+            "raw_preview": raw[:200],
+        })
 
     # ── Записать транзакцию пополнения ──────────────────────────────────────
     if action == "addTransaction":
