@@ -67,7 +67,8 @@ def handler(event: dict, context) -> dict:
 
         cur.execute(
             f"""SELECT id, category, brand, model, color, storage, ram, region,
-                       availability, price, has_photo, photo_url, description, specs, sim_type
+                       availability, price, has_photo, photo_url, description, specs, sim_type,
+                       wholesale_price, retail_price
                 FROM {SCHEMA}.catalog
                 WHERE {where_sql}
                 ORDER BY availability DESC, price ASC NULLS LAST
@@ -92,10 +93,34 @@ def handler(event: dict, context) -> dict:
             'id': r[0], 'category': r[1], 'brand': r[2], 'model': r[3],
             'color': r[4], 'storage': r[5], 'ram': r[6], 'region': r[7],
             'availability': r[8], 'price': r[9], 'has_photo': r[10], 'photo_url': r[11],
-            'description': r[12], 'specs': r[13], 'sim_type': r[14]
+            'description': r[12], 'specs': r[13], 'sim_type': r[14],
+            'wholesale_price': r[15], 'retail_price': r[16],
         } for r in rows]
 
         return ok({'items': items, 'total': total, 'categories': categories, 'markup': markup})
+
+    # GET /catalog?action=bulk_markup — массовое применение наценки
+    if method == 'GET' and params.get('action') == 'bulk_markup':
+        if not admin_token or admin_token != os.environ.get('ADMIN_TOKEN', ''):
+            return err(403, 'Нет доступа')
+        wholesale_delta = int(params.get('wholesale_delta', 500))
+        retail_delta    = int(params.get('retail_delta', 1000))
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute(
+            f"""UPDATE {SCHEMA}.catalog
+                SET wholesale_price = CASE WHEN price IS NOT NULL THEN price + %s ELSE NULL END,
+                    retail_price    = CASE WHEN price IS NOT NULL THEN price + %s ELSE NULL END,
+                    updated_at = NOW()
+                WHERE is_active = true""",
+            (wholesale_delta, retail_delta)
+        )
+        affected = cur.rowcount
+        conn.commit()
+        cur.close()
+        conn.close()
+        return ok({'ok': True, 'updated': affected,
+                   'wholesale_delta': wholesale_delta, 'retail_delta': retail_delta})
 
     # POST /catalog — добавить товар (admin)
     if method == 'POST':
@@ -104,15 +129,26 @@ def handler(event: dict, context) -> dict:
         raw = event.get('body', '')
         body = json.loads(raw) if raw else {}
 
+        # Вычисляем цены автоматически если не переданы явно
+        base_price = body.get('price')
+        wholesale = body.get('wholesale_price')
+        retail    = body.get('retail_price')
+        if base_price and wholesale is None:
+            wholesale = int(base_price) + 500
+        if base_price and retail is None:
+            retail = int(base_price) + 1000
+
         conn = get_conn()
         cur = conn.cursor()
         cur.execute(
             f"""INSERT INTO {SCHEMA}.catalog
-                (category, brand, model, color, storage, ram, region, availability, price, has_photo, photo_url)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+                (category, brand, model, color, storage, ram, region, availability, price,
+                 has_photo, photo_url, wholesale_price, retail_price)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
             (body['category'], body['brand'], body['model'], body.get('color'), body.get('storage'),
              body.get('ram'), body.get('region'), body.get('availability', 'in_stock'),
-             body.get('price'), body.get('has_photo', False), body.get('photo_url'))
+             base_price, body.get('has_photo', False), body.get('photo_url'),
+             wholesale, retail)
         )
         new_id = cur.fetchone()[0]
         conn.commit()
@@ -133,11 +169,14 @@ def handler(event: dict, context) -> dict:
             f"""UPDATE {SCHEMA}.catalog SET
                 category=%s, brand=%s, model=%s, color=%s, storage=%s, ram=%s,
                 region=%s, availability=%s, price=%s, has_photo=%s, photo_url=%s,
-                is_active=%s, updated_at=now() WHERE id=%s""",
+                is_active=%s, wholesale_price=%s, retail_price=%s, updated_at=now()
+                WHERE id=%s""",
             (body['category'], body['brand'], body['model'], body.get('color'), body.get('storage'),
              body.get('ram'), body.get('region'), body.get('availability', 'in_stock'),
              body.get('price'), body.get('has_photo', False), body.get('photo_url'),
-             body.get('is_active', True), item_id)
+             body.get('is_active', True),
+             body.get('wholesale_price'), body.get('retail_price'),
+             item_id)
         )
         conn.commit()
         cur.close()

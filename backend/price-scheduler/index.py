@@ -1513,6 +1513,135 @@ def post_max_news_if_due(topic: str, text: str) -> dict:
         return {'ok': False, 'error': str(e)}
 
 
+import smtplib, ssl
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.utils import formataddr
+
+SMTP_HOST = 'smtp.yandex.ru'
+SMTP_PORT = 465
+SMTP_USER = 'lekermanya@yandex.ru'
+
+
+def get_catalog_with_prices():
+    """Загружает каталог включая wholesale_price и retail_price."""
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT category, brand, model, storage, color, region, availability, price,"
+        "       wholesale_price, retail_price"
+        " FROM " + SCHEMA + ".catalog"
+        " WHERE is_active = true"
+        " ORDER BY category, availability DESC, brand, model, price ASC NULLS LAST"
+        " LIMIT 500"
+    )
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return [
+        {
+            'category': r[0], 'brand': r[1], 'model': r[2],
+            'storage': r[3], 'color': r[4], 'region': r[5],
+            'availability': r[6], 'price': r[7],
+            'wholesale_price': r[8], 'retail_price': r[9],
+        }
+        for r in rows
+    ]
+
+
+def build_price_html(items, price_type='retail'):
+    """Формирует красивый HTML-прайс для отправки на email."""
+    AVAIL_HTML = {'in_stock': '✅ В наличии', 'on_order': '🚗 Под заказ'}
+    REG = {'EU': '🇪🇺', 'US': '🇺🇸', 'RU': '🇷🇺', 'CN': '🇨🇳', 'HK': '🇭🇰', 'UK': '🇬🇧', 'JP': '🇯🇵', 'KZ': '🇰🇿'}
+    PRICE_COL = 'wholesale_price' if price_type == 'wholesale' else 'retail_price'
+    PRICE_LABEL = 'Оптовая цена' if price_type == 'wholesale' else 'Розничная цена'
+
+    by_cat = {}
+    for it in items:
+        by_cat.setdefault(it['category'], []).append(it)
+
+    now_str = datetime.now(MSK).strftime('%d.%m.%Y')
+    rows_html = ''
+    for cat, cat_items in sorted(by_cat.items()):
+        rows_html += f'''
+        <tr style="background:#1a1a1a;">
+          <td colspan="5" style="padding:10px 14px;font-family:Arial;font-size:13px;font-weight:bold;color:#FFD700;border-top:2px solid #333;">{cat}</td>
+        </tr>'''
+        for it in cat_items:
+            avail_label = AVAIL_HTML.get(it['availability'], it['availability'])
+            avail_color = '#6ee7b7' if it['availability'] == 'in_stock' else '#fbbf24'
+            reg = REG.get((it['region'] or '').upper(), '')
+            name_parts = [it['model'] or it['brand'] or '']
+            if it['storage']: name_parts.append(it['storage'])
+            if it['color']:   name_parts.append(it['color'])
+            name = ' '.join(name_parts)
+            price_val = it.get(PRICE_COL) or it.get('price')
+            price_str = f"{int(price_val):,} ₽".replace(',', '\u00a0') if price_val else 'по запросу'
+            rows_html += f'''
+        <tr style="border-bottom:1px solid #222;">
+          <td style="padding:8px 14px;font-family:Arial;font-size:12px;color:#e5e5e5;">{reg} {name}</td>
+          <td style="padding:8px 14px;font-family:Arial;font-size:12px;color:#aaa;text-align:center;">{it.get('region') or '—'}</td>
+          <td style="padding:8px 14px;font-family:Arial;font-size:12px;color:{avail_color};text-align:center;">{avail_label}</td>
+          <td style="padding:8px 14px;font-family:Arial;font-size:13px;font-weight:bold;color:#FFD700;text-align:right;">{price_str}</td>
+        </tr>'''
+
+    return f"""<!DOCTYPE html>
+<html><body style="margin:0;padding:0;background:#0a0a0a;font-family:Arial,sans-serif;">
+<div style="max-width:680px;margin:0 auto;padding:24px 16px;">
+  <div style="text-align:center;margin-bottom:20px;">
+    <div style="font-size:26px;font-weight:bold;color:#FFD700;letter-spacing:2px;">СКУПКА 24</div>
+    <div style="font-size:11px;color:#666;letter-spacing:1px;text-transform:uppercase;margin-top:4px;">{PRICE_LABEL} — {now_str}</div>
+  </div>
+  <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:#111;border-radius:8px;overflow:hidden;">
+    <thead>
+      <tr style="background:#1e1e1e;">
+        <th style="padding:10px 14px;font-family:Arial;font-size:11px;color:#777;text-align:left;text-transform:uppercase;letter-spacing:1px;">Модель</th>
+        <th style="padding:10px 14px;font-family:Arial;font-size:11px;color:#777;text-align:center;text-transform:uppercase;letter-spacing:1px;">Регион</th>
+        <th style="padding:10px 14px;font-family:Arial;font-size:11px;color:#777;text-align:center;text-transform:uppercase;letter-spacing:1px;">Наличие</th>
+        <th style="padding:10px 14px;font-family:Arial;font-size:11px;color:#777;text-align:right;text-transform:uppercase;letter-spacing:1px;">{PRICE_LABEL}</th>
+      </tr>
+    </thead>
+    <tbody>{rows_html}
+    </tbody>
+  </table>
+  <div style="text-align:center;margin-top:20px;">
+    <a href="https://skypka24.com/catalog" style="display:inline-block;background:#FFD700;color:#000;padding:12px 28px;text-decoration:none;font-weight:bold;font-size:13px;border-radius:6px;letter-spacing:1px;text-transform:uppercase;">Открыть каталог →</a>
+  </div>
+  <p style="color:#555;font-size:11px;text-align:center;margin-top:20px;">
+    Скупка 24 · Калуга · ул. Кирова 11 · +7 (992) 999-03-33 · skypka24.com
+  </p>
+</div>
+</body></html>"""
+
+
+def send_price_email(to_email: str, price_type: str = 'retail') -> dict:
+    """Отправляет прайс-лист на указанный email."""
+    pw = os.environ.get('YANDEX_SMTP_PASSWORD', '').strip()
+    if not pw:
+        return {'ok': False, 'error': 'SMTP password not configured'}
+
+    items = get_catalog_with_prices()
+    html = build_price_html(items, price_type)
+    label = 'Оптовый' if price_type == 'wholesale' else 'Розничный'
+    now_str = datetime.now(MSK).strftime('%d.%m.%Y')
+    subject = f'Скупка 24 · {label} прайс · {now_str}'
+
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = subject
+    msg['From']    = formataddr(('Скупка 24', SMTP_USER))
+    msg['To']      = to_email
+    msg.attach(MIMEText(html, 'html', 'utf-8'))
+
+    ctx = ssl.create_default_context()
+    try:
+        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=ctx, timeout=20) as srv:
+            srv.login(SMTP_USER, pw)
+            srv.sendmail(SMTP_USER, [to_email], msg.as_string())
+        return {'ok': True, 'to': to_email, 'subject': subject, 'items': len(items)}
+    except Exception as e:
+        return {'ok': False, 'error': str(e)}
+
+
 def handler(event: dict, context) -> dict:
     """Отправка прайса в Telegram + ping sitemap в Яндекс.Вебмастер (10:00 МСК) + автопостинг новостей каждый час"""
     if event.get('httpMethod') == 'OPTIONS':
@@ -1526,6 +1655,20 @@ def handler(event: dict, context) -> dict:
         if not chat_id:
             return err(400, 'chat_id required')
         result = do_send_price(chat_id)
+        return ok(result)
+
+    if action == 'send_price_email':
+        raw = event.get('body', '')
+        body_data = {}
+        try:
+            body_data = json.loads(raw) if raw else {}
+        except Exception:
+            pass
+        to_email   = body_data.get('email') or params.get('email', '')
+        price_type = body_data.get('price_type') or params.get('price_type', 'retail')
+        if not to_email:
+            return err(400, 'email required')
+        result = send_price_email(to_email, price_type)
         return ok(result)
 
     if action == 'setup_webhook':
