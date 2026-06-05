@@ -12,7 +12,10 @@ POST / action=addTransaction    — записать транзакцию поп
 POST / action=setMarkup         — изменить наценку (только admin-token)
 """
 import os, json, re, urllib.request, urllib.parse, psycopg2
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+
+CACHE_TTL_SERVICES = 3600   # 1 час — услуги меняются редко
+CACHE_TTL_BALANCE  = 120    # 2 минуты — баланс обновляется чаще
 
 SCHEMA = "t_p31606708_tech_buying_service"
 GSM_BASE = "https://3gsm.ru/index.php"
@@ -79,6 +82,82 @@ def xi(xml, tag):
     return items
 
 
+# ── Кэш услуг ────────────────────────────────────────────────────────────────
+def get_services_from_cache():
+    """Возвращает услуги из кэша если не устарел, иначе None."""
+    c = _db(); cur = c.cursor()
+    try:
+        cur.execute(
+            f"SELECT service_id, title, credits, time, category_group, raw_data "
+            f"FROM {SCHEMA}.unlock_services_cache "
+            f"WHERE cached_at > NOW() - INTERVAL '{CACHE_TTL_SERVICES} seconds' "
+            f"ORDER BY id"
+        )
+        rows = cur.fetchall()
+        if not rows:
+            return None
+        return [{"serviceid": r[0], "title": r[1], "credits": r[2],
+                 "time": r[3], "category_group": r[4],
+                 **(r[5] if r[5] else {})} for r in rows]
+    finally:
+        cur.close(); c.close()
+
+def save_services_to_cache(services: list):
+    """Сохраняет услуги в кэш (upsert)."""
+    if not services:
+        return
+    c = _db(); cur = c.cursor()
+    try:
+        cur.execute(f"DELETE FROM {SCHEMA}.unlock_services_cache")
+        for s in services:
+            cur.execute(
+                f"INSERT INTO {SCHEMA}.unlock_services_cache "
+                f"(service_id, title, credits, time, category_group, raw_data, cached_at) "
+                f"VALUES (%s,%s,%s,%s,%s,%s,NOW())",
+                (
+                    str(s.get("serviceid") or s.get("id") or ""),
+                    str(s.get("title") or s.get("servicename") or ""),
+                    str(s.get("credits") or ""),
+                    str(s.get("time") or ""),
+                    str(s.get("category_group") or ""),
+                    json.dumps(s),
+                )
+            )
+        c.commit()
+    except Exception:
+        c.rollback()
+    finally:
+        cur.close(); c.close()
+
+def get_balance_from_cache():
+    """Возвращает баланс из кэша если не устарел."""
+    c = _db(); cur = c.cursor()
+    try:
+        cur.execute(
+            f"SELECT credits, currency FROM {SCHEMA}.unlock_balance_cache "
+            f"WHERE cached_at > NOW() - INTERVAL '{CACHE_TTL_BALANCE} seconds' "
+            f"ORDER BY id DESC LIMIT 1"
+        )
+        row = cur.fetchone()
+        return {"credits": row[0], "currency": row[1]} if row else None
+    finally:
+        cur.close(); c.close()
+
+def save_balance_to_cache(credits: str, currency: str):
+    c = _db(); cur = c.cursor()
+    try:
+        cur.execute(f"DELETE FROM {SCHEMA}.unlock_balance_cache")
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.unlock_balance_cache (credits, currency) VALUES (%s,%s)",
+            (credits, currency)
+        )
+        c.commit()
+    except Exception:
+        c.rollback()
+    finally:
+        cur.close(); c.close()
+
+
 # ── Наценка ───────────────────────────────────────────────────────────────────
 def get_markup_map():
     """Возвращает dict {category: multiplier}"""
@@ -137,14 +216,48 @@ def handler(event: dict, context) -> dict:
 
     # ── ПУБЛИЧНОЕ: каталог с наценкой ────────────────────────────────────────
     if action == "getServices":
-        raw = gsm_call({"action": "getServices"})
-        items = xi(raw, "service")
-        if not items:
-            try: items = json.loads(raw)
-            except Exception: items = []
+        force_refresh = qs.get("refresh") == "1"
         markup_map = get_markup_map()
-        items_with_markup = apply_markup(items, markup_map)
-        return _ok({"services": items_with_markup})
+
+        # Сначала пробуем кэш
+        if not force_refresh:
+            cached = get_services_from_cache()
+            if cached:
+                return _ok({"services": apply_markup(cached, markup_map), "from_cache": True})
+
+        # Идём в 3gsm
+        try:
+            raw = gsm_call({"action": "getServices"})
+            items = xi(raw, "service")
+            if not items:
+                # Пробуем JSON
+                try: items = json.loads(raw)
+                except Exception: items = []
+            if items:
+                save_services_to_cache(items)
+                return _ok({"services": apply_markup(items, markup_map)})
+            else:
+                # 3gsm вернул пустоту — отдаём кэш (любой давности)
+                old_cache = get_services_from_cache() or []
+                # попробуем без TTL
+                c = _db(); cur = c.cursor()
+                try:
+                    cur.execute(f"SELECT service_id, title, credits, time, category_group, raw_data FROM {SCHEMA}.unlock_services_cache ORDER BY id")
+                    rows = cur.fetchall()
+                    old_cache = [{"serviceid": r[0], "title": r[1], "credits": r[2], "time": r[3], "category_group": r[4], **(r[5] if r[5] else {})} for r in rows]
+                finally:
+                    cur.close(); c.close()
+                return _ok({"services": apply_markup(old_cache, markup_map), "from_cache": True, "raw": raw[:500]})
+        except Exception as e:
+            # 3gsm недоступен — отдаём кэш
+            c2 = _db(); cur2 = c2.cursor()
+            try:
+                cur2.execute(f"SELECT service_id, title, credits, time, category_group, raw_data FROM {SCHEMA}.unlock_services_cache ORDER BY id")
+                rows2 = cur2.fetchall()
+                old = [{"serviceid": r[0], "title": r[1], "credits": r[2], "time": r[3], "category_group": r[4], **(r[5] if r[5] else {})} for r in rows2]
+            finally:
+                cur2.close(); c2.close()
+            return _ok({"services": apply_markup(old, markup_map), "from_cache": True, "error": str(e)})
 
     # ── ADMIN: наценки (без клиентского токена) ───────────────────────────────
     if action == "getMarkup":
@@ -183,10 +296,21 @@ def handler(event: dict, context) -> dict:
 
     # ── Баланс ───────────────────────────────────────────────────────────────
     if action == "getBalance":
-        raw = gsm_call({"action": "getBalance"})
-        credits = xf(raw, "credits") or xf(raw, "balance")
-        currency = xf(raw, "currency") or "₽"
-        return _ok({"credits": credits, "currency": currency})
+        # Сначала кэш (2 минуты)
+        cached_bal = get_balance_from_cache()
+        if cached_bal and qs.get("refresh") != "1":
+            return _ok({**cached_bal, "from_cache": True})
+        try:
+            raw = gsm_call({"action": "getBalance"})
+            credits = xf(raw, "credits") or xf(raw, "balance") or xf(raw, "Credit")
+            currency = xf(raw, "currency") or xf(raw, "Currency") or "USD"
+            if credits:
+                save_balance_to_cache(credits, currency)
+            return _ok({"credits": credits, "currency": currency})
+        except Exception as e:
+            if cached_bal:
+                return _ok({**cached_bal, "from_cache": True})
+            return _ok({"credits": None, "currency": "USD", "error": str(e)})
 
     # ── Заказы из 3gsm ───────────────────────────────────────────────────────
     if action == "getOrderList":

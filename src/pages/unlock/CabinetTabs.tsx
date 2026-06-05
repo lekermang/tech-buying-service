@@ -33,6 +33,7 @@ interface Props {
   pendingCnt: number;
   fetchOrders: () => void;
   fetchBalance: () => void;
+  fetchServices: (force?: boolean) => void;
   fetchTransactions: () => void;
   refreshOrderStatus: (o: Record<string, string>) => void;
   onTopup: () => void;
@@ -46,7 +47,7 @@ export function CabinetTabs({
   search, setSearch,
   loadBal, loadSvc, loadOrd, loadTx,
   completedCnt, pendingCnt,
-  fetchOrders, fetchBalance, fetchTransactions,
+  fetchOrders, fetchBalance, fetchServices, fetchTransactions,
   refreshOrderStatus, onTopup,
 }: Props) {
   const filteredSvc = services.filter(s =>
@@ -145,17 +146,28 @@ export function CabinetTabs({
       {tab === "services" && (
         <Panel>
           <div className="p-5">
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-                style={{ background: "linear-gradient(135deg,#FFD700,#b8860b)", boxShadow: "0 0 16px rgba(255,215,0,0.35)" }}>
-                <Icon name="Grid3X3" size={17} className="text-black" />
-              </div>
-              <div>
-                <h2 className="font-oswald font-bold text-xl uppercase text-white">Каталог услуг</h2>
-                <div className="font-roboto text-[10px] text-white/30 mt-0.5">
-                  {loadSvc ? "Загрузка..." : `${services.length} услуг`}
+            <div className="flex items-center justify-between gap-3 mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+                  style={{ background: "linear-gradient(135deg,#FFD700,#b8860b)", boxShadow: "0 0 16px rgba(255,215,0,0.35)" }}>
+                  <Icon name="Grid3X3" size={17} className="text-black" />
+                </div>
+                <div>
+                  <h2 className="font-oswald font-bold text-xl uppercase text-white">Каталог услуг</h2>
+                  <div className="font-roboto text-[10px] text-white/30 mt-0.5">
+                    {loadSvc ? "Загрузка..." : `${services.length} услуг`}
+                  </div>
                 </div>
               </div>
+              <button onClick={() => fetchServices(true)}
+                disabled={loadSvc}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl font-roboto text-xs transition-all disabled:opacity-40"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)" }}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = "rgba(255,215,0,0.3)")}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)")}>
+                <Icon name="RefreshCw" size={12} className={loadSvc ? "animate-spin" : ""} />
+                Обновить из 3gsm
+              </button>
             </div>
 
             <div className="relative mb-4">

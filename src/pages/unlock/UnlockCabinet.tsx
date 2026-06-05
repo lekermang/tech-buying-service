@@ -33,9 +33,10 @@ export function Cabinet({ onLogout }: { onLogout: () => void }) {
     setLoadBal(false);
   }, []);
 
-  const fetchServices = useCallback(async () => {
+  const fetchServices = useCallback(async (forceRefresh = false) => {
     setLoadSvc(true);
-    const d = await apiCall("getServices").catch(() => null);
+    const action = forceRefresh ? "getServices&refresh=1" : "getServices";
+    const d = await apiCall(action).catch(() => null);
     if (d?.services) setServices(d.services);
     setLoadSvc(false);
   }, []);
@@ -133,6 +134,7 @@ export function Cabinet({ onLogout }: { onLogout: () => void }) {
           pendingCnt={pendingCnt}
           fetchOrders={fetchOrders}
           fetchBalance={fetchBalance}
+          fetchServices={fetchServices}
           fetchTransactions={fetchTransactions}
           refreshOrderStatus={refreshOrderStatus}
           onTopup={() => setShowTopup(true)}
