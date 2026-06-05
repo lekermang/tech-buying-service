@@ -64,7 +64,6 @@ export default function ApplePriceEmailModal({ onClose }: Props) {
             </div>
             <div>
               <div className="font-oswald font-bold text-white text-base uppercase tracking-wide">Прайс Apple</div>
-              <div className="font-roboto text-[11px] text-white/40">Актуальные цены · наценка +3 000 ₽</div>
             </div>
           </div>
           <button
