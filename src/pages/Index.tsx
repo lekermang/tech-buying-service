@@ -24,6 +24,7 @@ import AntiquesPreviewBlock from "@/components/skupka/AntiquesPreviewBlock";
 import WantToBuySection from "@/components/skupka/WantToBuySection";
 import DesktopStickyBar from "@/components/skupka/DesktopStickyBar";
 import AppleSaleBanner from "@/components/skupka/AppleSaleBanner";
+import RepairLinksOnIndex from "@/components/skupka/RepairLinksOnIndex";
 
 const scrollTo = (href: string) => {
   const el = document.querySelector(href);
@@ -397,6 +398,7 @@ const Index = ({ goldOpen = false }: { goldOpen?: boolean }) => {
       <AppleSaleBanner />
       <SafeDealsBanner />
       <PremiumServicesGrid />
+      <RepairLinksOnIndex />
       <WantToBuySection />
       <WholesaleBanner />
       <InfoSections />

@@ -145,15 +145,24 @@ export default function RepairLanding({ config }: { config: RepairLandingConfig 
       <div className="relative z-10">
         {/* Навбар */}
         <nav className={`sticky top-0 z-50 flex items-center justify-between px-4 sm:px-8 py-3 border-b transition-colors ${scrolled ? "bg-[#0d0d0d]/90 border-[#FFD700]/15 backdrop-blur-md" : "bg-transparent border-transparent"}`}>
-          <Link to="/" className="group flex items-center gap-2.5">
-            <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-[#FFD700]/10 border border-[#FFD700]/30 group-hover:bg-[#FFD700]/20 transition-colors">
-              <Icon name="ChevronLeft" size={18} className="text-[#FFD700]" />
-            </span>
-            <span className="font-oswald text-xl font-bold">
-              <span className="bg-gradient-to-r from-[#fff3a0] via-[#FFD700] to-[#b8860b] bg-clip-text text-transparent">Скупка 24</span>
-              <span className="block text-[9px] text-white/35 font-roboto font-normal uppercase tracking-[0.25em] mt-0.5">Сервис ремонта</span>
-            </span>
-          </Link>
+          {/* Хлебная крошка: ← Скупка24 / Ремонт */}
+          <div className="flex items-center gap-1.5 min-w-0">
+            <Link to="/"
+              className="group flex items-center gap-1.5 shrink-0 transition-opacity hover:opacity-100 opacity-70">
+              <span className="flex items-center justify-center w-6 h-6 rounded-md transition-colors"
+                style={{ background: "rgba(255,215,0,0.08)", border: "1px solid rgba(255,215,0,0.2)" }}>
+                <Icon name="ChevronLeft" size={13} className="text-[#FFD700]" />
+              </span>
+              <span className="font-oswald font-bold text-sm text-white/75 group-hover:text-white transition-colors hidden xs:block">
+                Скупка<span className="text-[#FFD700]">24</span>
+              </span>
+            </Link>
+            <Icon name="ChevronRight" size={11} className="text-white/20 shrink-0" />
+            <Link to="/repair"
+              className="font-roboto text-xs text-white/50 hover:text-white/80 transition-colors truncate">
+              Ремонт
+            </Link>
+          </div>
           <div className="flex items-center gap-3 sm:gap-5">
             <Link to="/repair" className="hidden sm:block text-sm text-white/60 hover:text-[#FFD700] transition-colors">Все услуги</Link>
             <a href={REPAIR_PHONE_TEL}
