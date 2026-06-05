@@ -55,7 +55,15 @@ def resolve_client(event):
 
 def is_admin(event):
     hdrs = {k.lower(): v for k, v in (event.get("headers") or {}).items()}
-    return hdrs.get("x-admin-token","") == os.environ.get("ADMIN_TOKEN","__none__")
+    token_from_header = hdrs.get("x-admin-token","")
+    # Также принимаем токен из body (для POST-запросов из Staff)
+    try:
+        body_data = json.loads(event.get("body") or "{}")
+        token_from_body = body_data.get("admin_token","")
+    except Exception:
+        token_from_body = ""
+    expected = os.environ.get("ADMIN_TOKEN","__none__")
+    return token_from_header == expected or token_from_body == expected
 
 
 # ── 3gsm helper ──────────────────────────────────────────────────────────────

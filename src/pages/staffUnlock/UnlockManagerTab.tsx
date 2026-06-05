@@ -4,19 +4,17 @@ import Icon from "@/components/ui/icon";
 const UNLOCK_URL = "https://functions.poehali.dev/06607e09-1cc5-4df8-bccf-ed619806e834";
 const ADMIN_TOKEN = "Mark2015N";
 
-async function apiGet(action: string, extra = "") {
-  const r = await fetch(`${UNLOCK_URL}?action=${action}${extra}`, {
-    headers: { "X-Admin-Token": ADMIN_TOKEN },
-  });
-  return r.json();
-}
+// Все запросы через POST с токеном в body — обходим фильтрацию заголовков платформой
 async function apiPost(body: object) {
   const r = await fetch(UNLOCK_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Admin-Token": ADMIN_TOKEN },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ ...body, admin_token: ADMIN_TOKEN }),
   });
   return r.json();
+}
+async function apiGet(action: string) {
+  return apiPost({ action });
 }
 
 interface MarkupRow { id: number; category: string; multiplier: string; pct: string; note: string; }

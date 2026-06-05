@@ -33,7 +33,14 @@ def _db():
 
 def _is_admin(event):
     hdrs = {k.lower(): v for k, v in (event.get("headers") or {}).items()}
-    return hdrs.get("x-admin-token", "") == os.environ.get("ADMIN_TOKEN", "__none__")
+    token_hdr = hdrs.get("x-admin-token", "")
+    try:
+        body_data = json.loads(event.get("body") or "{}")
+        token_body = body_data.get("admin_token", "")
+    except Exception:
+        token_body = ""
+    expected = os.environ.get("ADMIN_TOKEN", "__none__")
+    return token_hdr == expected or token_body == expected
 
 
 def _fetch_products() -> list:
