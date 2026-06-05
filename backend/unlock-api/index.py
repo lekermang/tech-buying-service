@@ -19,7 +19,7 @@ CACHE_TTL_BALANCE  = 120         # 2 минуты — баланс обновл�
 
 SCHEMA = "t_p31606708_tech_buying_service"
 GSM_BASE     = "https://3gsm.ru/index.php"
-GSM_API_BASE = "https://3gsm.ru/api.php"   # Dhru Fusion API endpoint
+GSM_API_BASE = "https://3gsm.ru/api/"       # Dhru Fusion REST API endpoint
 
 CORS = {
     "Access-Control-Allow-Origin": "*",
@@ -69,13 +69,43 @@ def is_admin(event):
 
 # ── 3gsm helper ──────────────────────────────────────────────────────────────
 def gsm_call(params):
-    params["key"] = os.environ.get("GSMSM_API_KEY","")
-    params["api"] = "true"
-    data = urllib.parse.urlencode(params).encode()
-    req = urllib.request.Request(GSM_BASE, data=data, method="POST")
-    req.add_header("Content-Type","application/x-www-form-urlencoded")
-    with urllib.request.urlopen(req, timeout=20) as r:
-        return r.read().decode("utf-8")
+    """
+    Пробует Dhru Fusion API в порядке:
+    1) /api/  (REST endpoint)
+    2) /index.php (legacy)
+    Возвращает строку ответа.
+    """
+    api_key = os.environ.get("GSMSM_API_KEY", "")
+
+    # Попытка 1: Dhru Fusion /api/ endpoint
+    try:
+        p = dict(params)
+        p["key"] = api_key
+        p["type"] = "json"
+        data1 = urllib.parse.urlencode(p).encode()
+        req1 = urllib.request.Request(GSM_API_BASE, data=data1, method="POST")
+        req1.add_header("Content-Type", "application/x-www-form-urlencoded")
+        with urllib.request.urlopen(req1, timeout=20) as r1:
+            raw1 = r1.read().decode("utf-8")
+        # Если вернул HTML — не то
+        if raw1.strip().startswith("<!") or raw1.strip().startswith("<html"):
+            raise ValueError("html_response")
+        print(f"[gsm /api/] action={params.get('action')} raw={raw1[:150]}")
+        return raw1
+    except Exception as e1:
+        print(f"[gsm /api/ failed] {e1}")
+
+    # Попытка 2: legacy index.php
+    p2 = dict(params)
+    p2["key"] = api_key
+    p2["api"] = "true"
+    data2 = urllib.parse.urlencode(p2).encode()
+    req2 = urllib.request.Request(GSM_BASE, data=data2, method="POST")
+    req2.add_header("Content-Type", "application/x-www-form-urlencoded")
+    with urllib.request.urlopen(req2, timeout=20) as r2:
+        raw2 = r2.read().decode("utf-8")
+    print(f"[gsm index.php] action={params.get('action')} raw={raw2[:150]}")
+    return raw2
 
 def gsm_fetch_services_from_html() -> list:
     """
