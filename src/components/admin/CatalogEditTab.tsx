@@ -4,6 +4,7 @@ import { adminHeaders } from "@/lib/adminFetch";
 
 const CATALOG_URL = "https://functions.poehali.dev/e0e6576c-f000-4288-86ef-1de08ad7bcc4";
 const PHOTOS_URL = "https://functions.poehali.dev/06375f20-54a8-439c-921c-6cff0f1cecf2";
+const SYNC_URL   = "https://functions.poehali.dev/bc6598ed-2eb1-4f4f-9de6-7409ce74149e";
 const MAX_PHOTOS = 5;
 
 const CATEGORIES = ["Смартфоны", "Планшеты", "Ноутбуки", "Наушники", "Умные часы", "Компьютеры", "Техника", "Игровые консоли", "Камеры", "Прочее"];
@@ -276,8 +277,33 @@ export default function CatalogEditTab({ token }: { token: string }) {
   const [deleting, setDeleting] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ inserted: number; updated: number; total: number } | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const LIMIT = 50;
+
+  const handleSync = async () => {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await fetch(SYNC_URL, {
+        method: "POST",
+        headers: { ...adminHeaders(token), "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "sync" }),
+      });
+      const d = await res.json();
+      if (d.ok) {
+        setSyncResult({ inserted: d.inserted, updated: d.updated, total: d.total });
+        load(search, filterCat, filterAvail, 1);
+        setPage(1);
+      } else {
+        alert(d.error || "Ошибка синхронизации");
+      }
+    } catch {
+      alert("Ошибка сети");
+    }
+    setSyncing(false);
+  };
 
   const load = useCallback(async (q: string, cat: string, avail: string, p: number) => {
     setLoading(true);
@@ -349,11 +375,28 @@ export default function CatalogEditTab({ token }: { token: string }) {
           <Icon name="RefreshCw" size={14} />
         </button>
 
+        <button onClick={handleSync} disabled={syncing}
+          className="flex items-center gap-1.5 border border-[#7dd3fc]/40 text-[#7dd3fc] font-oswald font-bold px-3 py-1.5 text-xs uppercase hover:bg-[#7dd3fc]/10 transition-colors disabled:opacity-40">
+          <Icon name={syncing ? "Loader" : "RefreshCcw"} size={13} className={syncing ? "animate-spin" : ""} />
+          {syncing ? "Синхронизация..." : "Smartbery"}
+        </button>
+
         <button onClick={() => setEditing("new")}
           className="flex items-center gap-1.5 bg-[#FFD700] text-black font-oswald font-bold px-3 py-1.5 text-xs uppercase hover:bg-yellow-400 transition-colors ml-auto">
           <Icon name="Plus" size={13} /> Добавить товар
         </button>
       </div>
+
+      {/* Результат синхронизации */}
+      {syncResult && (
+        <div className="flex items-center gap-3 mb-3 px-3 py-2 border border-[#6ee7b7]/25 bg-[#6ee7b7]/05 font-roboto text-xs text-[#6ee7b7]">
+          <Icon name="CheckCircle" size={13} />
+          Синхронизировано {syncResult.total} позиций · добавлено {syncResult.inserted} · обновлено {syncResult.updated}
+          <button onClick={() => setSyncResult(null)} className="ml-auto text-[#6ee7b7]/40 hover:text-[#6ee7b7]">
+            <Icon name="X" size={11} />
+          </button>
+        </div>
+      )}
 
       {/* Счётчик */}
       <div className="font-roboto text-white/20 text-[10px] mb-2">

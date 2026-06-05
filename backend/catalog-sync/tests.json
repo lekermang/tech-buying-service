@@ -1,0 +1,25 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "GET — статус синхронизации",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {"total_synced": 0},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "POST без токена → 403",
+      "method": "POST",
+      "path": "/",
+      "body": {"action": "sync"},
+      "expectedStatus": 403
+    }
+  ]
+}
