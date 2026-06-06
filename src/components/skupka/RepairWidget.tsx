@@ -33,7 +33,7 @@ export default function RepairWidget() {
   }, []);
 
   const [form, setForm] = useState({ name: "", phone: "", model: "", fault: "" });
-  const [agreed, setAgreed] = useState(false);
+  const [agreed, setAgreed] = useState(true);
   const [contactChannels, setContactChannels] = useState<string[]>([]);
   const [contactTime, setContactTime] = useState("");
 

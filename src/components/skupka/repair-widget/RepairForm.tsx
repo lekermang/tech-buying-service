@@ -1,3 +1,4 @@
+import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import ContactChannelsBlock from "@/components/forms/ContactChannelsBlock";
 import { formatPhone } from "@/lib/phoneFormat";
@@ -45,6 +46,13 @@ export default function RepairForm({
   contactChannels, setContactChannels, contactTime, setContactTime,
   onCheckStatus, setStatusId, setTab,
 }: Props) {
+  const [attempted, setAttempted] = useState(false);
+  const handleSubmit = () => {
+    setAttempted(true);
+    if (canSubmit) onSubmit();
+  };
+  const isPhoneOk = form.phone.replace(/\D/g,"").length === 11;
+
   if (orderId) {
     return (
       <div className="border-t border-[#FFD700]/20 pt-3">
@@ -129,22 +137,28 @@ export default function RepairForm({
     );
   }
 
+  const errBorder = "1px solid rgba(239,68,68,0.7)";
+  const okBorder  = "1px solid rgba(255,215,0,0.35)";
+
   return (
     <div className="flex flex-col gap-1.5">
       <input type="text" value={form.name}
-        onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
-        placeholder="Ваше имя *" className={INP} />
+        onChange={e => { setAttempted(false); setForm(p => ({ ...p, name: e.target.value })); }}
+        placeholder="Ваше имя *" className={INP}
+        style={attempted && !form.name ? { border: errBorder } : form.name ? { border: okBorder } : undefined} />
       <input type="tel" inputMode="tel" value={form.phone}
-        onChange={e => setForm(p => ({ ...p, phone: formatPhone(e.target.value) }))}
+        onChange={e => { setAttempted(false); setForm(p => ({ ...p, phone: formatPhone(e.target.value) })); }}
         onFocus={() => { if (!form.phone) setForm(p => ({ ...p, phone: "+7" })); }}
         required
-        placeholder="+7 (___) ___-__-__" className={INP} />
+        placeholder="+7 (___) ___-__-__" className={INP}
+        style={attempted && !isPhoneOk ? { border: errBorder } : isPhoneOk ? { border: okBorder } : undefined} />
 
       {/* Модель + поиск запчастей */}
       <div>
         <input type="text" value={form.model}
-          onChange={e => setForm(p => ({ ...p, model: e.target.value }))}
-          placeholder="Модель телефона * (напр: iPhone 13)" className={INP} />
+          onChange={e => { setAttempted(false); setForm(p => ({ ...p, model: e.target.value })); }}
+          placeholder="Модель телефона * (напр: iPhone 13)" className={INP}
+          style={attempted && !form.model ? { border: errBorder } : form.model ? { border: okBorder } : undefined} />
 
         <RepairPartsSelector
           form={form}
@@ -165,9 +179,10 @@ export default function RepairForm({
       </div>
 
       <input type="text" value={form.fault}
-        onChange={e => setForm(p => ({ ...p, fault: e.target.value }))}
+        onChange={e => { setAttempted(false); setForm(p => ({ ...p, fault: e.target.value })); }}
         placeholder="Опишите проблему * (не включается, разбит экран...)"
-        className={INP} />
+        className={INP}
+        style={attempted && !form.fault ? { border: errBorder } : form.fault ? { border: okBorder } : undefined} />
 
       <div className="mt-1">
         <ContactChannelsBlock
@@ -197,7 +212,7 @@ export default function RepairForm({
         </a>
       </div>
 
-      <button onClick={onSubmit} disabled={!canSubmit || sending}
+      <button onClick={handleSubmit} disabled={sending}
         className="group relative overflow-hidden w-full text-black font-oswald font-bold py-2.5 uppercase text-sm active:scale-[0.98] transition-all mt-1
                    bg-[linear-gradient(180deg,#fff3a0_0%,#ffd700_45%,#d4a017_100%)]
                    shadow-[0_0_0_1px_rgba(255,215,0,0.5),0_6px_20px_rgba(255,215,0,0.25),inset_0_1px_0_rgba(255,255,255,0.5)]
