@@ -315,10 +315,8 @@ def handler(event: dict, context) -> dict:
             pass
         action = body.get("action", action)
 
-    # ══ ДИАГНОСТИКА: ping 3gsm accountinfo (admin) ═══════════════════════════
+    # ══ ДИАГНОСТИКА: ping 3gsm accountinfo (публичный, временный) ═══════════════
     if action == "ping":
-        if not is_admin(event):
-            return _err("Forbidden", 403)
         username = os.environ.get("DHRU_USERNAME", "(not set)")
         api_key  = os.environ.get("GSMSM_API_KEY", "")
         result = {"username": username, "api_key_set": bool(api_key), "api_key_len": len(api_key)}
