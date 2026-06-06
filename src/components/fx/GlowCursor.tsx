@@ -12,7 +12,7 @@ export default function GlowCursor() {
   const raf = useRef(0);
 
   useEffect(() => {
-    const mq = window.matchMedia("(pointer: fine)");
+    const mq = window.matchMedia("(pointer: fine) and (min-width: 1024px)");
     if (!mq.matches) return;
 
     const onMove = (e: MouseEvent) => {

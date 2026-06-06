@@ -187,18 +187,39 @@ export default function Repair() {
         <RepairStats />
         <RepairPriceTable onOrder={scrollToForm} />
         <RepairServices onOrder={scrollToForm} />
-        <RepairFeatures />
-        <RepairBeforeAfter onOrder={scrollToForm} />
-        <RepairAllDevices onOrder={scrollToForm} />
-        <RepairParts onOrder={scrollToForm} />
-        <RepairModels onOrder={scrollToForm} />
-        <RepairUnlockBanner />
-        <RepairHowItWorks />
-        <RepairLocation />
-        <RepairReviews />
-        <RepairSEOLinks />
-        <RepairFAQ />
-        <RepairSEOText />
+        {/* content-visibility: auto — браузер не рендерит секции вне экрана */}
+        <div style={{ contentVisibility: "auto", containIntrinsicSize: "0 400px" }}>
+          <RepairFeatures />
+        </div>
+        <div style={{ contentVisibility: "auto", containIntrinsicSize: "0 500px" }}>
+          <RepairBeforeAfter onOrder={scrollToForm} />
+        </div>
+        <div style={{ contentVisibility: "auto", containIntrinsicSize: "0 600px" }}>
+          <RepairAllDevices onOrder={scrollToForm} />
+        </div>
+        <div style={{ contentVisibility: "auto", containIntrinsicSize: "0 400px" }}>
+          <RepairParts onOrder={scrollToForm} />
+        </div>
+        <div style={{ contentVisibility: "auto", containIntrinsicSize: "0 400px" }}>
+          <RepairModels onOrder={scrollToForm} />
+        </div>
+        <div style={{ contentVisibility: "auto", containIntrinsicSize: "0 300px" }}>
+          <RepairUnlockBanner />
+        </div>
+        <div style={{ contentVisibility: "auto", containIntrinsicSize: "0 400px" }}>
+          <RepairHowItWorks />
+        </div>
+        <div style={{ contentVisibility: "auto", containIntrinsicSize: "0 350px" }}>
+          <RepairLocation />
+        </div>
+        <div style={{ contentVisibility: "auto", containIntrinsicSize: "0 500px" }}>
+          <RepairReviews />
+        </div>
+        <div style={{ contentVisibility: "auto", containIntrinsicSize: "0 300px" }}>
+          <RepairSEOLinks />
+          <RepairFAQ />
+          <RepairSEOText />
+        </div>
 
         {/* Подвал */}
         <footer className="border-t border-[#FFD700]/10 bg-[#0a0a0a] px-4 py-10 text-center text-white/40 text-sm">
