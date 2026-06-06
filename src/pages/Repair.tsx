@@ -23,13 +23,24 @@ import RepairBeforeAfter from "@/components/repair/RepairBeforeAfter";
 import RepairUnlockBanner from "@/components/repair/RepairUnlockBanner";
 import { REPAIR_PHONE_DISPLAY, REPAIR_PHONE_TEL } from "@/components/repair/repairContacts";
 
+const SERVICE_LINKS = [
+  { to: "/remont-iphone-kaluga",       label: "iPhone",      color: "#fff3a0" },
+  { to: "/remont-samsung-kaluga",      label: "Samsung",     color: "#93c5fd" },
+  { to: "/remont-xiaomi-kaluga",       label: "Xiaomi",      color: "#86efac" },
+  { to: "/zamena-stekla-kaluga",       label: "Стекло",      color: "#c4b5fd" },
+  { to: "/zamena-akkumulyatora-kaluga",label: "Аккумулятор", color: "#6ee7b7" },
+  { to: "/remont-posle-vody-kaluga",   label: "После воды",  color: "#7dd3fc" },
+  { to: "/bga-pajka-kaluga",           label: "BGA-пайка",   color: "#fca5a5" },
+  { to: "/snyatie-frp-kaluga",         label: "FRP / iCloud",color: "#fdba74" },
+];
+
 export default function Repair() {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    const onScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", onScroll);
+    const onScroll = () => setScrolled(window.scrollY > 60);
+    window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
@@ -41,133 +52,131 @@ export default function Repair() {
     <div className="relative min-h-screen bg-[#0d0d0d] text-white overflow-x-hidden">
       <RepairSEO />
 
-      {/* ── Премиум-фон: золотые частицы + свечения, как на главной ── */}
+      {/* Фон */}
       <div aria-hidden className="fixed inset-0 z-0 pointer-events-none">
         <DigitalParticles />
-        <div
-          className="absolute -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[400px] rounded-full blur-[120px]"
-          style={{ background: "rgba(255,215,0,0.10)" }}
-        />
-        <div
-          className="absolute top-1/3 -right-40 w-[500px] h-[500px] rounded-full blur-[140px]"
-          style={{ background: "rgba(255,215,0,0.06)" }}
-        />
-        <div
-          className="absolute bottom-0 -left-40 w-[500px] h-[500px] rounded-full blur-[140px]"
-          style={{ background: "rgba(34,158,217,0.05)" }}
-        />
-        {/* тонкая золотая сетка */}
-        <div
-          className="absolute inset-0 opacity-[0.4]"
+        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[400px] rounded-full blur-[120px]"
+          style={{ background: "rgba(255,215,0,0.10)" }} />
+        <div className="absolute top-1/3 -right-40 w-[500px] h-[500px] rounded-full blur-[140px]"
+          style={{ background: "rgba(255,215,0,0.06)" }} />
+        <div className="absolute inset-0 opacity-[0.35]"
           style={{
-            backgroundImage:
-              "linear-gradient(rgba(255,215,0,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,215,0,0.025) 1px, transparent 1px)",
+            backgroundImage: "linear-gradient(rgba(255,215,0,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,215,0,0.025) 1px,transparent 1px)",
             backgroundSize: "56px 56px",
-            maskImage: "radial-gradient(ellipse at 50% 0%, black, transparent 75%)",
-          }}
-        />
+            maskImage: "radial-gradient(ellipse at 50% 0%,black,transparent 75%)",
+          }} />
       </div>
 
       <div className="relative z-10">
 
-        {/* ══ БРЕНДОВАЯ ШАПКА — самый верх, видна сразу на мобильном ══ */}
-        <div className="w-full border-b border-[#FFD700]/10 bg-[#0a0a0a]/60 backdrop-blur-sm">
-          <div className="max-w-5xl mx-auto px-4 sm:px-8 py-3 flex items-center justify-between gap-3">
-            {/* Лого + бренд */}
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                style={{ background: "linear-gradient(135deg,#FFD700,#b8860b)", boxShadow: "0 0 16px rgba(255,215,0,0.35)" }}>
-                <Icon name="Wrench" size={17} className="text-black" />
-              </div>
-              <div className="min-w-0">
-                <div className="font-oswald font-black text-lg sm:text-2xl leading-none tracking-wide"
+        {/* ══════════════════════════════════════════════════════════
+            STICKY HEADER — одна шапка на всю страницу
+            ══════════════════════════════════════════════════════════ */}
+        <header className={`sticky top-0 z-50 transition-all duration-300 ${
+          scrolled
+            ? "bg-[#0d0d0d]/95 border-b border-[#FFD700]/15 backdrop-blur-lg shadow-[0_4px_24px_rgba(0,0,0,0.5)]"
+            : "bg-[#0d0d0d]/70 border-b border-white/[0.06] backdrop-blur-sm"
+        }`}>
+
+          {/* Строка 1 — бренд + действия */}
+          <div className="max-w-6xl mx-auto px-4 sm:px-8 h-14 flex items-center justify-between gap-3">
+
+            {/* Левая часть: кнопка назад + бренд */}
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <Link to="/" aria-label="На главную Скупка24"
+                className="flex items-center justify-center w-9 h-9 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] hover:border-[#FFD700]/30 transition-all shrink-0 active:scale-95">
+                <Icon name="ChevronLeft" size={18} className="text-white/60" />
+              </Link>
+              <div className="min-w-0 hidden xs:block">
+                <div className="font-oswald font-black text-base sm:text-xl leading-none tracking-wide truncate"
                   style={{ background: "linear-gradient(90deg,#fff3a0,#FFD700,#b8860b)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
                   Ремонт24
                 </div>
-                <div className="font-roboto text-[9px] sm:text-[10px] uppercase tracking-[0.22em] text-white/35 mt-0.5">
+                <div className="font-roboto text-[9px] uppercase tracking-[0.2em] text-white/30 mt-0.5 hidden sm:block">
                   Сервисный центр · Калуга
                 </div>
               </div>
             </div>
-            {/* Телефон + кнопка */}
-            <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+
+            {/* Правая часть: телефон + заявка */}
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
               <a href={REPAIR_PHONE_TEL}
-                onClick={() => ymGoal(Goals.CALL_CLICK, { place: "repair_brand" })}
-                className="hidden sm:inline-flex items-center gap-1.5 text-[#FFD700] font-oswald font-bold text-sm hover:text-[#ffed4a] transition-colors">
+                onClick={() => ymGoal(Goals.CALL_CLICK, { place: "repair_header" })}
+                className="hidden md:inline-flex items-center gap-1.5 text-[#FFD700] font-oswald font-bold text-sm hover:text-[#ffed4a] transition-colors">
                 <Icon name="Phone" size={14} />
                 {REPAIR_PHONE_DISPLAY}
               </a>
               <a href={REPAIR_PHONE_TEL}
-                onClick={() => ymGoal(Goals.CALL_CLICK, { place: "repair_brand_mobile" })}
-                className="sm:hidden w-9 h-9 rounded-xl bg-[#FFD700]/15 border border-[#FFD700]/30 flex items-center justify-center text-[#FFD700] active:bg-[#FFD700]/25 transition-colors">
-                <Icon name="Phone" size={17} />
+                onClick={() => ymGoal(Goals.CALL_CLICK, { place: "repair_header_mobile" })}
+                className="md:hidden flex items-center justify-center w-9 h-9 rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700] active:bg-[#FFD700]/20 transition-all">
+                <Icon name="Phone" size={16} />
               </a>
               <button onClick={scrollToForm}
-                className="inline-flex items-center gap-1.5 text-black font-oswald font-bold uppercase tracking-wide px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-sm active:scale-95 transition-all"
-                style={{ background: "linear-gradient(180deg,#fff3a0 0%,#ffd700 45%,#d4a017 100%)", boxShadow: "0 0 0 1px rgba(255,215,0,0.5),0 4px 14px rgba(255,215,0,0.3)" }}>
-                <Icon name="Zap" size={14} />
-                <span>Заявка</span>
+                className="inline-flex items-center gap-1.5 text-black font-oswald font-bold uppercase tracking-wide px-4 sm:px-6 py-2.5 rounded-xl text-xs sm:text-sm active:scale-95 transition-all"
+                style={{
+                  background: "linear-gradient(180deg,#fff3a0 0%,#ffd700 45%,#d4a017 100%)",
+                  boxShadow: "0 0 0 1px rgba(255,215,0,0.4),0 4px 16px rgba(255,215,0,0.25)",
+                }}>
+                <Icon name="Zap" size={13} />
+                Заявка
               </button>
             </div>
           </div>
-        </div>
 
-        {/* ══ ГОРИЗОНТАЛЬНАЯ НАВИГАЦИЯ — все услуги, скролл на мобиле ══ */}
-        <div className="sticky top-0 z-50 border-b border-[#FFD700]/10 backdrop-blur-md"
-          style={{ background: scrolled ? "rgba(13,13,13,0.97)" : "rgba(13,13,13,0.85)" }}>
-          {/* Строка 1 — разделы страницы */}
-          <div className="flex items-center gap-1 px-3 sm:px-6 overflow-x-auto scrollbar-none border-b border-white/[0.05]"
-            style={{ WebkitOverflowScrolling: "touch" }}>
-            {[
-              { href: "#repair-form",  label: "Заявка",     icon: "Zap" },
-              { href: "#prices",       label: "Цены",        icon: "Tag" },
-              { href: "#services",     label: "Услуги",      icon: "Wrench" },
-              { href: "#all-devices",  label: "Бренды",      icon: "Smartphone" },
-              { href: "#reviews",      label: "Отзывы",      icon: "Star" },
-              { href: "#contacts",     label: "Контакты",    icon: "MapPin" },
-            ].map(item => (
-              <a key={item.href} href={item.href}
-                className="flex items-center gap-1.5 whitespace-nowrap px-3 py-2.5 font-roboto text-xs text-white/50 hover:text-[#FFD700] transition-colors shrink-0">
-                <Icon name={item.icon} size={12} />
-                {item.label}
-              </a>
-            ))}
-            <div className="ml-auto pl-2 shrink-0 hidden sm:block">
-              <Link to="/" className="flex items-center gap-1 text-white/30 hover:text-white/60 text-xs font-roboto transition-colors">
-                <Icon name="ChevronLeft" size={12} />
-                Скупка24
-              </Link>
+          {/* Строка 2 — навигация по услугам (горизонтальный скролл) */}
+          <div className="border-t border-white/[0.05] overflow-x-auto"
+            style={{ WebkitOverflowScrolling: "touch", scrollbarWidth: "none" }}>
+            <div className="flex items-center gap-1 px-4 sm:px-8 py-1.5 min-w-max">
+              {/* Разделы страницы */}
+              {[
+                { href: "#repair-form", label: "Заявка"   },
+                { href: "#prices",      label: "Цены"     },
+                { href: "#services",    label: "Услуги"   },
+                { href: "#all-devices", label: "Бренды"   },
+                { href: "#reviews",     label: "Отзывы"   },
+                { href: "#contacts",    label: "Контакты" },
+              ].map(item => (
+                <a key={item.href} href={item.href}
+                  className="whitespace-nowrap px-3 py-1.5 font-roboto text-[11px] text-white/40 hover:text-white/80 transition-colors shrink-0">
+                  {item.label}
+                </a>
+              ))}
+
+              <span className="w-px h-4 bg-white/10 mx-1 shrink-0" />
+
+              {/* Услуги */}
+              {SERVICE_LINKS.map(s => (
+                <Link key={s.to} to={s.to}
+                  className="whitespace-nowrap px-2.5 py-1 rounded-md font-roboto text-[11px] font-medium shrink-0 transition-all active:scale-95"
+                  style={{ background: s.color + "14", color: s.color, border: `1px solid ${s.color}28` }}>
+                  {s.label}
+                </Link>
+              ))}
             </div>
           </div>
-          {/* Строка 2 — услуги по устройствам */}
-          <div className="flex items-center gap-1 px-3 sm:px-6 overflow-x-auto scrollbar-none py-1"
-            style={{ WebkitOverflowScrolling: "touch" }}>
-            {[
-              { to: "/remont-iphone-kaluga",        label: "iPhone",       color: "#fff3a0" },
-              { to: "/remont-samsung-kaluga",        label: "Samsung",      color: "#93c5fd" },
-              { to: "/remont-xiaomi-kaluga",         label: "Xiaomi",       color: "#86efac" },
-              { to: "/zamena-stekla-kaluga",         label: "Стекло",       color: "#c4b5fd" },
-              { to: "/zamena-akkumulyatora-kaluga",  label: "Аккумулятор",  color: "#6ee7b7" },
-              { to: "/remont-posle-vody-kaluga",     label: "После воды",   color: "#7dd3fc" },
-              { to: "/bga-pajka-kaluga",             label: "BGA-пайка",    color: "#fca5a5" },
-              { to: "/snyatie-frp-kaluga",           label: "FRP/iCloud",   color: "#fdba74" },
-            ].map(s => (
-              <Link key={s.to} to={s.to}
-                className="whitespace-nowrap px-3 py-1.5 rounded-lg font-roboto text-[11px] font-semibold shrink-0 transition-all active:scale-95"
-                style={{ background: s.color + "12", color: s.color, border: `1px solid ${s.color}25` }}>
-                {s.label}
-              </Link>
-            ))}
-          </div>
-        </div>
+        </header>
 
-        <RepairTopBlock />
-        <RepairBeforeAfter onOrder={scrollToForm} />
+        {/* ══════════════════════════════════════════════════════════
+            HERO — сразу под шапкой, без лишних отступов
+            ══════════════════════════════════════════════════════════ */}
         <RepairHero onOrder={scrollToForm} />
+
+        {/* ══════════════════════════════════════════════════════════
+            ОСНОВНОЙ КОНТЕНТ — логика поведенческого сайта:
+            1. Форма + услуги (конверсия)
+            2. Цены (убеждение)
+            3. Как работаем (доверие)
+            4. Все бренды + модели
+            5. Доп. услуги
+            6. Отзывы + локация (социальное доказательство)
+            7. FAQ + SEO
+            ══════════════════════════════════════════════════════════ */}
+        <RepairTopBlock />
         <RepairStats />
         <RepairPriceTable onOrder={scrollToForm} />
-        <RepairFeatures />
         <RepairServices onOrder={scrollToForm} />
+        <RepairFeatures />
+        <RepairBeforeAfter onOrder={scrollToForm} />
         <RepairAllDevices onOrder={scrollToForm} />
         <RepairParts onOrder={scrollToForm} />
         <RepairModels onOrder={scrollToForm} />
@@ -180,27 +189,23 @@ export default function Repair() {
         <RepairSEOText />
 
         {/* Подвал */}
-        <footer className="border-t border-[#FFD700]/10 bg-[#0a0a0a]/80 px-4 py-10 text-center text-white/40 text-sm">
+        <footer className="border-t border-[#FFD700]/10 bg-[#0a0a0a] px-4 py-10 text-center text-white/40 text-sm">
           <div className="flex items-center justify-center gap-2 mb-3">
-            <Icon name="Wrench" size={16} className="text-[#FFD700]" />
-            <span className="font-oswald text-white/70 uppercase tracking-wide">Скупка 24 · Сервис ремонта · Калуга</span>
+            <Icon name="Wrench" size={15} className="text-[#FFD700]" />
+            <span className="font-oswald text-white/60 uppercase tracking-wide text-sm">
+              Ремонт24 · Сервисный центр · Калуга
+            </span>
           </div>
-          <a
-            href={REPAIR_PHONE_TEL}
+          <a href={REPAIR_PHONE_TEL}
             onClick={() => ymGoal(Goals.CALL_CLICK, { place: "repair_footer" })}
-            className="text-[#FFD700] font-oswald font-bold text-2xl hover:underline"
-          >
+            className="text-[#FFD700] font-oswald font-bold text-2xl hover:underline block mb-2">
             {REPAIR_PHONE_DISPLAY}
           </a>
-          <p className="mt-3">
-            Калуга, ул. Кирова, 7 · ежедневно 9:00–21:00
-          </p>
-          <Link
-            to="/"
-            className="inline-flex items-center gap-1.5 mt-4 text-[#FFD700] hover:text-[#ffed4a] font-roboto transition-colors"
-          >
-            <Icon name="ArrowLeft" size={15} />
-            Вернуться в Скупку24
+          <p className="text-white/35">Калуга, ул. Кирова, 7 · ежедневно 9:00–21:00</p>
+          <Link to="/"
+            className="inline-flex items-center gap-1.5 mt-5 text-white/30 hover:text-[#FFD700] font-roboto text-sm transition-colors">
+            <Icon name="ChevronLeft" size={14} />
+            Скупка24 — главная
           </Link>
         </footer>
       </div>
