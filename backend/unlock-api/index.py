@@ -315,6 +315,30 @@ def handler(event: dict, context) -> dict:
             pass
         action = body.get("action", action)
 
+    # ══ ДИАГНОСТИКА: ping 3gsm accountinfo (admin) ═══════════════════════════
+    if action == "ping":
+        if not is_admin(event):
+            return _err("Forbidden", 403)
+        username = os.environ.get("DHRU_USERNAME", "(not set)")
+        api_key  = os.environ.get("GSMSM_API_KEY", "")
+        result = {"username": username, "api_key_set": bool(api_key), "api_key_len": len(api_key)}
+        try:
+            resp = _dhru_call("accountinfo")
+            result["dhru_raw"] = resp
+            success = _dhru_success(resp)
+            if success:
+                info = success.get("AccoutInfo") or success.get("AccountInfo") or {}
+                result["balance"] = info.get("credit")
+                result["email"]   = info.get("mail")
+                result["ok"] = True
+            else:
+                result["ok"]    = False
+                result["error"] = _dhru_error(resp)
+        except Exception as e:
+            result["ok"]    = False
+            result["error"] = str(e)
+        return _ok(result)
+
     # ══ ПУБЛИЧНОЕ: каталог услуг с наценкой ══════════════════════════════════
     if action == "getServices":
         force_refresh = qs.get("refresh") == "1"

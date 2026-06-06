@@ -36,6 +36,13 @@
       "method": "GET",
       "path": "/?action=getMarkup",
       "expectedStatus": 200
+    },
+    {
+      "name": "syncServices без токена — 403",
+      "method": "POST",
+      "path": "/",
+      "body": { "action": "syncServices" },
+      "expectedStatus": 403
     }
   ]
 }
