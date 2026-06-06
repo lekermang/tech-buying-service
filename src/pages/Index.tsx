@@ -28,6 +28,7 @@ import RepairLinksOnIndex from "@/components/skupka/RepairLinksOnIndex";
 import CarBuyoutBanner from "@/components/skupka/CarBuyoutBanner";
 import SpecTechBuyoutBanner from "@/components/skupka/SpecTechBuyoutBanner";
 import LandBuyoutBanner from "@/components/skupka/LandBuyoutBanner";
+import { useScrollReveal } from "@/hooks/useScrollReveal";
 
 const scrollTo = (href: string) => {
   const el = document.querySelector(href);
@@ -358,6 +359,7 @@ const Index = ({ goldOpen = false }: { goldOpen?: boolean }) => {
   const [evalOpen, setEvalOpen] = useState(false);
   useAutoScroll(splashDone);
   useDynamicSeo(splashDone);
+  useScrollReveal();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [installed, setInstalled] = useState(false);
@@ -398,27 +400,27 @@ const Index = ({ goldOpen = false }: { goldOpen?: boolean }) => {
       <HolidayCornerDecor />
       <Header scrollTo={scrollTo} goldOpen={goldOpen} />
       <HeroSection scrollTo={scrollTo} externalModalOpen={evalOpen} onExternalModalClose={() => setEvalOpen(false)} />
-      <AppleSaleBanner />
-      <CarBuyoutBanner />
-      <SpecTechBuyoutBanner />
-      <LandBuyoutBanner />
-      <SafeDealsBanner />
-      <PremiumServicesGrid />
-      <RepairLinksOnIndex />
-      <WantToBuySection />
-      <WholesaleBanner />
+      <div className="scroll-reveal"><AppleSaleBanner /></div>
+      <div className="scroll-reveal scroll-reveal-delay-1"><CarBuyoutBanner /></div>
+      <div className="scroll-reveal scroll-reveal-delay-2"><SpecTechBuyoutBanner /></div>
+      <div className="scroll-reveal scroll-reveal-delay-3"><LandBuyoutBanner /></div>
+      <div className="scroll-reveal"><SafeDealsBanner /></div>
+      <div className="scroll-reveal"><PremiumServicesGrid /></div>
+      <div className="scroll-reveal"><RepairLinksOnIndex /></div>
+      <div className="scroll-reveal"><WantToBuySection /></div>
+      <div className="scroll-reveal"><WholesaleBanner /></div>
       <InfoSections />
 
       {/* Антиквариат — 2 блока-превью */}
-      <AntiquesPreviewBlock />
+      <div className="scroll-reveal"><AntiquesPreviewBlock /></div>
 
       {/* С нами стало проще — премиум-блок (приложения + преимущества), стиль Trade In */}
-      <EasierWithUsBlock />
+      <div className="scroll-reveal"><EasierWithUsBlock /></div>
 
       {/* Быстрая связь — 4 канала: телефон, чат, telegram, офисы */}
-      <QuickContactSection />
+      <div className="scroll-reveal"><QuickContactSection /></div>
 
-      <JobsSection />
+      <div className="scroll-reveal"><JobsSection /></div>
 
       <ContactsFooter scrollTo={scrollTo} />
       <ExitPopup onOpenEval={() => setEvalOpen(true)} />

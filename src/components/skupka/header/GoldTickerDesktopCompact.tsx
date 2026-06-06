@@ -20,6 +20,7 @@ interface Props {
   market: MarketStatus;
   updatedAgo: string;
   flash: "up" | "down" | null;
+  delta?: number | null;
   onSellClick: () => void;
   compact: boolean;
 }
@@ -27,7 +28,7 @@ interface Props {
 const GoldTickerDesktopCompact = ({
   goldPrice, priceRetail999, priceWholesale999,
   filteredHistory, period, setPeriod,
-  market, updatedAgo, flash, onSellClick, compact,
+  market, updatedAgo, flash, delta, onSellClick, compact,
 }: Props) => {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -101,6 +102,13 @@ const GoldTickerDesktopCompact = ({
             </span>
           ) : <span className="text-white/40 text-xs">—</span>}
         </div>
+
+        {/* Delta-бейдж при изменении цены — Эффект 4 */}
+        {delta !== null && delta !== undefined && (
+          <span key={delta} className={`gold-delta-badge ${delta > 0 ? "gold-delta-up" : "gold-delta-down"}`}>
+            {delta > 0 ? "+" : ""}{delta > 0 ? Math.round(delta) : Math.round(delta)} ₽
+          </span>
+        )}
 
         {/* Мини-стрелка с %-изменением (если есть) */}
         {chart && (

@@ -30,7 +30,7 @@ const InfoCatalogTradeIn = () => {
             <Reveal key={cat.title} delay={(i % 4) as 0|1|2|3|4|5}>
               <div className="relative group h-full">
                 <div className="absolute -inset-1 bg-gradient-to-br from-[#FFD700]/15 to-transparent blur-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-                <div className="relative bg-[#0D0D0D] border border-[#FFD700]/15 hover:border-[#FFD700]/40 p-4 sm:p-5 md:p-6 transition-colors h-full flex flex-col">
+                <div className="service-card relative bg-[#0D0D0D] border border-[#FFD700]/15 p-4 sm:p-5 md:p-6 h-full flex flex-col">
                   <div className="w-11 h-11 md:w-12 md:h-12 bg-[#FFD700]/10 border border-[#FFD700]/30 rounded-md flex items-center justify-center mb-3 group-hover:bg-[#FFD700]/20 transition-colors">
                     <Icon name={cat.icon} size={22} className="text-[#FFD700]" />
                   </div>

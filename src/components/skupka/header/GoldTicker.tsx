@@ -42,14 +42,17 @@ const GoldTicker = ({
   const market = getMarketStatus();
   const updatedAgo = timeAgo(goldPrice?.date);
 
-  // Подсветка-вспышка при изменении цены
+  // Подсветка-вспышка при изменении цены + дельта
   const [flash, setFlash] = useState<"up" | "down" | null>(null);
   const [prevBuy, setPrevBuy] = useState<number | null>(null);
+  const [delta, setDelta] = useState<number | null>(null);
   useEffect(() => {
     if (!goldPrice?.buy) return;
     if (prevBuy !== null && goldPrice.buy !== prevBuy) {
-      setFlash(goldPrice.buy > prevBuy ? "up" : "down");
-      const t = setTimeout(() => setFlash(null), 1500);
+      const diff = goldPrice.buy - prevBuy;
+      setFlash(diff > 0 ? "up" : "down");
+      setDelta(diff);
+      const t = setTimeout(() => { setFlash(null); setDelta(null); }, 3000);
       setPrevBuy(goldPrice.buy);
       return () => clearTimeout(t);
     }
@@ -95,6 +98,7 @@ const GoldTicker = ({
         market={market}
         updatedAgo={updatedAgo}
         flash={flash}
+        delta={delta}
         onSellClick={onSellClick}
         compact={compact}
       />
