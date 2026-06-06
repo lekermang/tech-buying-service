@@ -1,11 +1,4 @@
-/** Главный дашборд аналитики посетителей. Содержит:
- * - Polling: /online, /stats_today + /conversions, /recent_events
- * - Шапку модуля с переключателем звука и индикатором Live
- * - KPI карточки
- * - Левую (OnlineList + SourcesBlock) и правую (PhoneSearch + ConversionsBlock) колонки
- *
- * ЛОГИКА И СТРУКТУРА — 1:1 как было в StaffAnalytics.tsx, изменений нет.
- */
+/** Главный дашборд аналитики посетителей. */
 import { useEffect, useRef, useState } from "react";
 import Icon from "@/components/ui/icon";
 import {
@@ -16,10 +9,17 @@ import { fmt, POLL_ONLINE_MS, POLL_STATS_MS, POLL_EVENTS_MS, toastForEvent } fro
 import { Kpi, OnlineList } from "./VisitorCard";
 import { SourcesBlock, ConversionsBlock, PhoneSearch } from "./AnalyticsBlocks";
 import VisitorsHistory from "./VisitorsHistory";
+import AnalyticsGraph from "./AnalyticsGraph";
+import AnalyticsFunnel from "./AnalyticsFunnel";
+import AnalyticsHeatmap from "./AnalyticsHeatmap";
+import AnalyticsAB from "./AnalyticsAB";
+import AnalyticsPerf from "./AnalyticsPerf";
+import AnalyticsCohort from "./AnalyticsCohort";
+import AnalyticsAnomalies from "./AnalyticsAnomalies";
 
 export default function AnalyticsDashboard({ token }: { token: string }) {
-  const [tab, setTab] = useState<"live" | "history">(() =>
-    (localStorage.getItem("sk_an_tab") as "live" | "history") || "live"
+  const [tab, setTab] = useState<"live" | "history" | "charts" | "advanced">(() =>
+    (localStorage.getItem("sk_an_tab") as "live" | "history" | "charts" | "advanced") || "live"
   );
   const [online, setOnline] = useState<OnlineSession[]>([]);
   const [stats, setStats] = useState<StatsToday | null>(null);
@@ -119,75 +119,72 @@ export default function AnalyticsDashboard({ token }: { token: string }) {
     });
   };
 
-  const switchTab = (t: "live" | "history") => {
+  const switchTab = (t: "live" | "history" | "charts" | "advanced") => {
     setTab(t);
     try { localStorage.setItem("sk_an_tab", t); } catch {/* */}
   };
 
   return (
     <div className="space-y-3">
-      {/* Шапка модуля */}
-      <div className="rounded-xl bg-[#101010] border border-[#1A1A1A] p-2.5 flex items-center gap-3 flex-wrap">
-        <div className="w-9 h-9 rounded-lg bg-[#FFD700]/15 flex items-center justify-center shrink-0">
-          <Icon name="Activity" size={18} className="text-[#FFD700]" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="font-oswald uppercase font-bold text-[15px] tracking-wide">Аналитика посетителей</div>
-          <div className="text-[10px] text-white/45">
-            {tab === "live"
-              ? (autoRefresh ? "Реальное время · авто-обновление вкл." : "Ручной режим · нажмите «Обновить»")
-              : "История · фильтры по дате и источнику"}
+      {/* ─── Шапка с вкладками ─── */}
+      <div className="rounded-xl bg-[#101010] border border-[#1A1A1A] overflow-hidden">
+        {/* Верхняя строка */}
+        <div className="p-2.5 flex items-center gap-3 flex-wrap border-b border-[#1A1A1A]">
+          <div className="w-9 h-9 rounded-lg bg-[#FFD700]/15 flex items-center justify-center shrink-0">
+            <Icon name="Activity" size={18} className="text-[#FFD700]" />
           </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-oswald uppercase font-bold text-[15px] tracking-wide">Аналитика посетителей</div>
+            <div className="text-[10px] text-white/45">
+              {tab === "live" ? (autoRefresh ? "Реальное время · авто-обновление вкл." : "Ручной режим · нажмите «Обновить»")
+                : tab === "charts" ? "Графики · воронка · клики"
+                : tab === "advanced" ? "A/B тест · производительность · когорты"
+                : "История · фильтры по дате и источнику"}
+            </div>
+          </div>
+          {tab === "live" && (
+            <>
+              <button onClick={refreshAll} disabled={refreshing}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] uppercase tracking-wider font-bold bg-[#FFD700]/15 text-[#FFD700] border border-[#FFD700]/30 disabled:opacity-50">
+                <Icon name="RefreshCw" size={12} className={refreshing ? "animate-spin" : ""} /> Обновить
+              </button>
+              <button onClick={toggleAuto}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] uppercase tracking-wider font-bold ${autoRefresh ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30" : "bg-[#2A2A2A] text-white/55"}`}>
+                <Icon name={autoRefresh ? "Pause" : "Play"} size={12} /> {autoRefresh ? "Авто вкл." : "Авто выкл."}
+              </button>
+              <button onClick={toggleMute}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] uppercase tracking-wider font-bold ${muted ? "bg-[#2A2A2A] text-white/55" : "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"}`}>
+                <Icon name={muted ? "BellOff" : "BellRing"} size={12} /> {muted ? "Звук вкл." : "Звук выкл."}
+              </button>
+            </>
+          )}
         </div>
 
-        {/* Переключатель Live / История */}
-        <div className="flex rounded overflow-hidden border border-[#2A2A2A]">
-          <button
-            onClick={() => switchTab("live")}
-            className={`flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-all ${
-              tab === "live" ? "bg-emerald-500/20 text-emerald-300" : "bg-[#1A1A1A] text-white/40 hover:text-white/70"
-            }`}
-          >
-            <span className={`w-1.5 h-1.5 rounded-full bg-emerald-400 ${tab === "live" && pulse % 2 ? "animate-pulse" : ""}`} />
-            Live
-          </button>
-          <button
-            onClick={() => switchTab("history")}
-            className={`flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-all border-l border-[#2A2A2A] ${
-              tab === "history" ? "bg-[#FFD700]/15 text-[#FFD700]" : "bg-[#1A1A1A] text-white/40 hover:text-white/70"
-            }`}
-          >
-            <Icon name="CalendarDays" size={11} />
-            История
-          </button>
+        {/* Вкладки */}
+        <div className="flex overflow-x-auto scrollbar-none">
+          {[
+            { key: "live" as const, label: "Live", icon: "Radio", color: "text-emerald-300", active: "bg-emerald-500/15 border-b-2 border-emerald-400" },
+            { key: "charts" as const, label: "Графики", icon: "BarChart2", color: "text-blue-300", active: "bg-blue-500/15 border-b-2 border-blue-400" },
+            { key: "history" as const, label: "История", icon: "CalendarDays", color: "text-[#FFD700]", active: "bg-[#FFD700]/15 border-b-2 border-[#FFD700]" },
+            { key: "advanced" as const, label: "A/B · Перф", icon: "FlaskConical", color: "text-purple-300", active: "bg-purple-500/15 border-b-2 border-purple-400" },
+          ].map(t => (
+            <button key={t.key} onClick={() => switchTab(t.key)}
+              className={`flex items-center gap-1.5 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap transition-all ${
+                tab === t.key ? `${t.active} ${t.color}` : "text-white/35 hover:text-white/60 hover:bg-white/[0.03]"
+              }`}>
+              {t.key === "live" && (
+                <span className={`w-1.5 h-1.5 rounded-full bg-emerald-400 ${tab === "live" && pulse % 2 ? "animate-pulse" : ""}`} />
+              )}
+              <Icon name={t.icon as Parameters<typeof Icon>[0]["name"]} size={11} />
+              {t.label}
+            </button>
+          ))}
         </div>
-
-        {tab === "live" && (
-          <>
-            <button onClick={refreshAll} disabled={refreshing}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] uppercase tracking-wider font-bold bg-[#FFD700]/15 text-[#FFD700] border border-[#FFD700]/30 disabled:opacity-50">
-              <Icon name="RefreshCw" size={12} className={refreshing ? "animate-spin" : ""} /> Обновить
-            </button>
-            <button onClick={toggleAuto}
-              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] uppercase tracking-wider font-bold ${
-                autoRefresh ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30" : "bg-[#2A2A2A] text-white/55"
-              }`}>
-              <Icon name={autoRefresh ? "Pause" : "Play"} size={12} /> {autoRefresh ? "Авто вкл." : "Авто выкл."}
-            </button>
-            <button onClick={toggleMute}
-              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] uppercase tracking-wider font-bold ${
-                muted ? "bg-[#2A2A2A] text-white/55" : "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
-              }`}>
-              <Icon name={muted ? "BellOff" : "BellRing"} size={12} /> {muted ? "Звук вкл." : "Звук выкл."}
-            </button>
-          </>
-        )}
       </div>
 
       {/* === Вкладка Live === */}
       {tab === "live" && (
         <>
-          {/* KPI карточки */}
           {stats && (
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
               <Kpi label="Сейчас онлайн" value={fmt(stats.online_now)} color="green" icon="Users" big />
@@ -197,7 +194,6 @@ export default function AnalyticsDashboard({ token }: { token: string }) {
               <Kpi label="Конверсия" value={`${stats.conversion_rate}%`} color="gold" icon="TrendingUp" />
             </div>
           )}
-
           <div className="grid lg:grid-cols-[1fr_320px] gap-3">
             <div className="space-y-3">
               <OnlineList items={online} />
@@ -211,8 +207,41 @@ export default function AnalyticsDashboard({ token }: { token: string }) {
         </>
       )}
 
+      {/* === Вкладка Графики === */}
+      {tab === "charts" && (
+        <div className="space-y-3">
+          {/* KPI строчка из live данных */}
+          {stats && (
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+              <Kpi label="Сейчас онлайн" value={fmt(stats.online_now)} color="green" icon="Users" big />
+              <Kpi label="Уник. сегодня" value={fmt(stats.uniq_today)} color="gold" icon="User" />
+              <Kpi label="Сессий" value={fmt(stats.sessions_today)} color="blue" icon="Activity" />
+              <Kpi label="Заявок" value={fmt(stats.conv_today)} color="orange" icon="Inbox" />
+              <Kpi label="Конверсия" value={`${stats.conversion_rate}%`} color="gold" icon="TrendingUp" />
+            </div>
+          )}
+          <AnalyticsGraph token={token} />
+          <div className="grid md:grid-cols-2 gap-3">
+            <AnalyticsFunnel token={token} />
+            <AnalyticsHeatmap token={token} />
+          </div>
+          <AnalyticsAnomalies token={token} />
+        </div>
+      )}
+
       {/* === Вкладка История === */}
       {tab === "history" && <VisitorsHistory token={token} />}
+
+      {/* === Вкладка A/B · Перф === */}
+      {tab === "advanced" && (
+        <div className="space-y-3">
+          <div className="grid md:grid-cols-2 gap-3">
+            <AnalyticsAB token={token} />
+            <AnalyticsPerf token={token} />
+          </div>
+          <AnalyticsCohort token={token} />
+        </div>
+      )}
     </div>
   );
 }

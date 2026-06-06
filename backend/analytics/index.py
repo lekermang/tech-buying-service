@@ -768,9 +768,382 @@ def action_search(qs):
     return _ok({'items': items})
 
 
+# ========== Новые аналитические эндпоинты ==========
+
+def action_graph_hours(qs):
+    """График посещений по часам / дням. period=today|7d|30d"""
+    period = (qs.get('period') or 'today').strip()
+    conn = _get_conn(); cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    if period == 'today':
+        cur.execute(
+            f"SELECT EXTRACT(HOUR FROM started_at AT TIME ZONE 'Europe/Moscow')::int AS hour, "
+            f"COUNT(*) AS sessions, COUNT(DISTINCT visitor_id) AS visitors "
+            f"FROM {SCHEMA}.an_sessions "
+            f"WHERE started_at::date = CURRENT_DATE "
+            f"GROUP BY hour ORDER BY hour",
+        )
+        rows = [dict(r) for r in cur.fetchall()]
+        # Заполнить пропущенные часы
+        hour_map = {r['hour']: r for r in rows}
+        result = []
+        for h in range(24):
+            result.append({'label': f'{h:02d}:00', 'sessions': hour_map.get(h, {}).get('sessions', 0), 'visitors': hour_map.get(h, {}).get('visitors', 0)})
+
+        # CTA-клики по часам
+        cur.execute(
+            f"SELECT EXTRACT(HOUR FROM timestamp AT TIME ZONE 'Europe/Moscow')::int AS hour, COUNT(*) AS cta "
+            f"FROM {SCHEMA}.an_events "
+            f"WHERE timestamp::date = CURRENT_DATE AND event_type = 'cta_click' "
+            f"GROUP BY hour ORDER BY hour",
+        )
+        cta_map = {r['hour']: r['cta'] for r in cur.fetchall()}
+        for item in result:
+            h_num = int(item['label'][:2])
+            item['cta'] = cta_map.get(h_num, 0)
+    else:
+        days = 7 if period == '7d' else 30
+        cur.execute(
+            f"SELECT (started_at AT TIME ZONE 'Europe/Moscow')::date AS day, "
+            f"COUNT(*) AS sessions, COUNT(DISTINCT visitor_id) AS visitors "
+            f"FROM {SCHEMA}.an_sessions "
+            f"WHERE started_at >= NOW() - INTERVAL '{days} days' "
+            f"GROUP BY day ORDER BY day",
+        )
+        rows = [dict(r) for r in cur.fetchall()]
+        day_map = {str(r['day']): r for r in rows}
+
+        cur.execute(
+            f"SELECT (timestamp AT TIME ZONE 'Europe/Moscow')::date AS day, COUNT(*) AS cta "
+            f"FROM {SCHEMA}.an_events "
+            f"WHERE timestamp >= NOW() - INTERVAL '{days} days' AND event_type = 'cta_click' "
+            f"GROUP BY day ORDER BY day",
+        )
+        cta_map = {str(r['day']): r['cta'] for r in cur.fetchall()}
+
+        from datetime import date, timedelta
+        result = []
+        today = date.today()
+        for i in range(days - 1, -1, -1):
+            d = (today - timedelta(days=i)).isoformat()
+            data = day_map.get(d, {})
+            result.append({'label': d[5:], 'sessions': data.get('sessions', 0), 'visitors': data.get('visitors', 0), 'cta': cta_map.get(d, 0)})
+
+    cur.close(); conn.close()
+    return _ok({'points': result, 'period': period})
+
+
+def action_funnel(qs):
+    """Воронка конверсии за period (today/7d/30d)."""
+    period = (qs.get('period') or 'today').strip()
+    days = {'today': 0, '7d': 7, '30d': 30}.get(period, 0)
+    date_cond = "started_at::date = CURRENT_DATE" if days == 0 else f"started_at >= NOW() - INTERVAL '{days} days'"
+
+    conn = _get_conn(); cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    # Всего сессий
+    cur.execute(f"SELECT COUNT(*) AS n FROM {SCHEMA}.an_sessions WHERE {date_cond}")
+    total = int((cur.fetchone() or {}).get('n') or 0)
+
+    # Скролл > 10% (увидели CTA)
+    scroll_cond = date_cond.replace('started_at', 'timestamp')
+    cur.execute(
+        f"SELECT COUNT(DISTINCT session_id) AS n FROM {SCHEMA}.an_events "
+        f"WHERE {scroll_cond} AND event_type='scroll' "
+        f"AND (event_data->>'percent')::float >= 10"
+    )
+    saw_cta = int((cur.fetchone() or {}).get('n') or 0)
+
+    # Любой CTA клик
+    cur.execute(
+        f"SELECT COUNT(DISTINCT session_id) AS n FROM {SCHEMA}.an_events "
+        f"WHERE {scroll_cond} AND event_type='cta_click'"
+    )
+    cta_click = int((cur.fetchone() or {}).get('n') or 0)
+
+    # Открытие формы (form_start)
+    cur.execute(
+        f"SELECT COUNT(DISTINCT session_id) AS n FROM {SCHEMA}.an_events "
+        f"WHERE {scroll_cond} AND event_type='form_start'"
+    )
+    form_open = int((cur.fetchone() or {}).get('n') or 0)
+
+    # Отправка формы
+    cur.execute(
+        f"SELECT COUNT(DISTINCT session_id) AS n FROM {SCHEMA}.an_events "
+        f"WHERE {scroll_cond} AND event_type='form_submit'"
+    )
+    form_submit = int((cur.fetchone() or {}).get('n') or 0)
+
+    cur.close(); conn.close()
+
+    def pct(a, b): return round(a / b * 100, 1) if b else 0.0
+
+    steps = [
+        {'label': 'Зашли на сайт',         'value': total,       'pct': 100.0},
+        {'label': 'Увидели CTA (скролл>10%)', 'value': saw_cta,   'pct': pct(saw_cta, total)},
+        {'label': 'Нажали CTA кнопку',      'value': cta_click,   'pct': pct(cta_click, total)},
+        {'label': 'Открыли форму',           'value': form_open,   'pct': pct(form_open, total)},
+        {'label': 'Отправили форму',         'value': form_submit, 'pct': pct(form_submit, total)},
+    ]
+    return _ok({'steps': steps, 'period': period})
+
+
+def action_heatmap(qs):
+    """Топ кликаемых data-track элементов + процентное распределение."""
+    period = (qs.get('period') or 'today').strip()
+    days = {'today': 0, '7d': 7, '30d': 30}.get(period, 0)
+    date_cond = "timestamp::date = CURRENT_DATE" if days == 0 else f"timestamp >= NOW() - INTERVAL '{days} days'"
+
+    conn = _get_conn(); cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        f"SELECT event_data->>'track' AS track, "
+        f"event_data->>'text' AS text, page_url, "
+        f"COUNT(*) AS clicks, COUNT(DISTINCT session_id) AS sessions "
+        f"FROM {SCHEMA}.an_events "
+        f"WHERE {date_cond} AND event_type='cta_click' "
+        f"AND event_data->>'track' IS NOT NULL "
+        f"GROUP BY track, text, page_url ORDER BY clicks DESC LIMIT 30"
+    )
+    items = [dict(r) for r in cur.fetchall()]
+    total_clicks = sum(i['clicks'] for i in items)
+    for item in items:
+        item['pct'] = round(item['clicks'] / total_clicks * 100, 1) if total_clicks else 0
+
+    # Топ страниц по кликам
+    cur.execute(
+        f"SELECT page_url, COUNT(*) AS clicks "
+        f"FROM {SCHEMA}.an_events "
+        f"WHERE {date_cond} AND event_type IN ('cta_click','phone_click','form_submit') "
+        f"GROUP BY page_url ORDER BY clicks DESC LIMIT 10"
+    )
+    top_pages = [dict(r) for r in cur.fetchall()]
+    cur.close(); conn.close()
+    return _ok({'items': items, 'top_pages': top_pages, 'total_clicks': total_clicks, 'period': period})
+
+
+def action_ab_stats(qs):
+    """A/B тест статистика."""
+    period = (qs.get('period') or '7d').strip()
+    days = {'today': 0, '7d': 7, '30d': 30}.get(period, 7)
+    date_cond = "started_at::date = CURRENT_DATE" if days == 0 else f"started_at >= NOW() - INTERVAL '{days} days'"
+
+    conn = _get_conn(); cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    # Сессии по группам
+    cur.execute(
+        f"SELECT COALESCE(ab_group, 'unknown') AS ab_group, COUNT(DISTINCT visitor_id) AS users, COUNT(*) AS sessions "
+        f"FROM {SCHEMA}.an_sessions WHERE {date_cond} AND ab_group IS NOT NULL "
+        f"GROUP BY ab_group"
+    )
+    groups = {r['ab_group']: dict(r) for r in cur.fetchall()}
+
+    # CTA клики по группам
+    click_cond = date_cond.replace('started_at', 'timestamp')
+    cur.execute(
+        f"SELECT s.ab_group, COUNT(DISTINCT e.session_id) AS cta_sessions "
+        f"FROM {SCHEMA}.an_events e "
+        f"JOIN {SCHEMA}.an_sessions s ON s.session_id = e.session_id "
+        f"WHERE {click_cond} AND e.event_type = 'cta_click' AND s.ab_group IS NOT NULL "
+        f"GROUP BY s.ab_group"
+    )
+    for r in cur.fetchall():
+        if r['ab_group'] in groups:
+            groups[r['ab_group']]['cta_sessions'] = r['cta_sessions']
+
+    result = {}
+    import math
+    for g, data in groups.items():
+        sessions = int(data.get('sessions') or 0)
+        cta = int(data.get('cta_sessions') or 0)
+        result[g] = {
+            'users': int(data.get('users') or 0),
+            'sessions': sessions,
+            'cta_clicks': cta,
+            'conversion': round(cta / sessions * 100, 2) if sessions else 0.0,
+        }
+
+    # Z-тест для пропорций A vs B
+    significance = None
+    if 'A' in result and 'B' in result:
+        na = result['A']['sessions']; ca = result['A']['cta_clicks']
+        nb = result['B']['sessions']; cb = result['B']['cta_clicks']
+        if na > 30 and nb > 30:
+            pa = ca / na if na else 0
+            pb = cb / nb if nb else 0
+            p_pool = (ca + cb) / (na + nb) if (na + nb) else 0
+            se = math.sqrt(p_pool * (1 - p_pool) * (1/na + 1/nb)) if p_pool else 0
+            z = abs(pa - pb) / se if se else 0
+            # Приближение p-value (двустороннее): 2*(1-Φ(|z|))
+            # Используем аппроксимацию через erfc
+            import math as _m
+            p_val = 2 * (1 - (1 - _m.erfc(z / _m.sqrt(2)) / 2))
+            confidence = round((1 - p_val) * 100, 1)
+            winner = 'B' if pb > pa else ('A' if pa > pb else None)
+            significance = {'z': round(z, 3), 'confidence': confidence, 'winner': winner, 'sufficient_data': True}
+        else:
+            significance = {'sufficient_data': False, 'reason': f'Нужно минимум 30 сессий в каждой группе (A={na}, B={nb})'}
+
+    cur.close(); conn.close()
+    return _ok({'groups': result, 'significance': significance, 'period': period})
+
+
+def action_perf_stats(qs):
+    """Производительность: средние LCP/FCP/TTFB/CLS по дням."""
+    period = (qs.get('period') or '7d').strip()
+    days = {'today': 0, '7d': 7, '30d': 30}.get(period, 7)
+
+    conn = _get_conn(); cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    # Достаём перф-данные из event_data где event_type='performance'
+    if days == 0:
+        date_cond = "timestamp::date = CURRENT_DATE"
+    else:
+        date_cond = f"timestamp >= NOW() - INTERVAL '{days} days'"
+
+    cur.execute(
+        f"SELECT "
+        f"  AVG((event_data->>'lcp')::float) AS avg_lcp, "
+        f"  AVG((event_data->>'fcp')::float) AS avg_fcp, "
+        f"  AVG((event_data->>'ttfb')::float) AS avg_ttfb, "
+        f"  AVG((event_data->>'cls')::float) AS avg_cls, "
+        f"  COUNT(*) AS samples "
+        f"FROM {SCHEMA}.an_events "
+        f"WHERE {date_cond} AND event_type = 'performance' "
+        f"  AND event_data->>'lcp' IS NOT NULL"
+    )
+    avg = dict(cur.fetchone() or {})
+    for k in ['avg_lcp', 'avg_fcp', 'avg_ttfb', 'avg_cls']:
+        if avg.get(k) is not None:
+            avg[k] = round(float(avg[k]), 1)
+
+    # Динамика по дням
+    if days > 0:
+        cur.execute(
+            f"SELECT timestamp::date AS day, "
+            f"AVG((event_data->>'lcp')::float) AS lcp, "
+            f"AVG((event_data->>'fcp')::float) AS fcp, "
+            f"AVG((event_data->>'ttfb')::float) AS ttfb "
+            f"FROM {SCHEMA}.an_events "
+            f"WHERE {date_cond} AND event_type = 'performance' "
+            f"  AND event_data->>'lcp' IS NOT NULL "
+            f"GROUP BY day ORDER BY day",
+        )
+        daily = [{'day': str(r['day']), 'lcp': round(float(r['lcp'] or 0), 1), 'fcp': round(float(r['fcp'] or 0), 1), 'ttfb': round(float(r['ttfb'] or 0), 1)} for r in cur.fetchall()]
+    else:
+        daily = []
+
+    cur.close(); conn.close()
+    return _ok({'avg': avg, 'daily': daily, 'period': period})
+
+
+def action_anomalies(qs):
+    """Обнаружение аномалий: часы с резким падением / ростом трафика."""
+    conn = _get_conn(); cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    # Сравниваем часовой трафик сегодня vs 7 дней
+    cur.execute(
+        f"SELECT EXTRACT(HOUR FROM started_at AT TIME ZONE 'Europe/Moscow')::int AS hour, "
+        f"COUNT(*) AS sessions "
+        f"FROM {SCHEMA}.an_sessions "
+        f"WHERE started_at >= NOW() - INTERVAL '7 days' "
+        f"GROUP BY hour ORDER BY hour"
+    )
+    week_avg = {}
+    for r in cur.fetchall():
+        h = r['hour']
+        week_avg[h] = (week_avg.get(h, 0) + r['sessions'])
+    for h in week_avg:
+        week_avg[h] = round(week_avg[h] / 7, 1)
+
+    cur.execute(
+        f"SELECT EXTRACT(HOUR FROM started_at AT TIME ZONE 'Europe/Moscow')::int AS hour, "
+        f"COUNT(*) AS sessions "
+        f"FROM {SCHEMA}.an_sessions "
+        f"WHERE started_at::date = CURRENT_DATE "
+        f"GROUP BY hour ORDER BY hour"
+    )
+    today_hours = {r['hour']: r['sessions'] for r in cur.fetchall()}
+
+    anomalies = []
+    import datetime as _dt
+    current_hour = _dt.datetime.now().hour
+    for h in range(current_hour + 1):
+        today_v = today_hours.get(h, 0)
+        avg_v = week_avg.get(h, 1)
+        if avg_v >= 2:
+            ratio = today_v / avg_v
+            if ratio < 0.4:
+                anomalies.append({'hour': h, 'type': 'traffic_drop', 'today': today_v, 'avg': avg_v,
+                                   'severity': 'high' if ratio < 0.2 else 'medium',
+                                   'message': f'Трафик в {h:02d}:xx упал до {int(ratio*100)}% от нормы ({today_v} vs обычно {avg_v:.0f})'})
+            elif ratio > 3:
+                anomalies.append({'hour': h, 'type': 'traffic_spike', 'today': today_v, 'avg': avg_v,
+                                   'severity': 'info',
+                                   'message': f'Трафик в {h:02d}:xx вырос в {ratio:.1f}x ({today_v} vs обычно {avg_v:.0f})'})
+
+    # Топ-10 городов сегодня vs обычно
+    cur.execute(
+        f"SELECT city, COUNT(DISTINCT visitor_id) AS today_v "
+        f"FROM {SCHEMA}.an_sessions "
+        f"WHERE started_at::date = CURRENT_DATE AND city IS NOT NULL "
+        f"GROUP BY city ORDER BY today_v DESC LIMIT 10"
+    )
+    today_cities = {r['city']: r['today_v'] for r in cur.fetchall()}
+
+    cur.execute(
+        f"SELECT city, COUNT(DISTINCT visitor_id) AS total_v "
+        f"FROM {SCHEMA}.an_sessions "
+        f"WHERE started_at >= NOW() - INTERVAL '30 days' AND city IS NOT NULL "
+        f"GROUP BY city ORDER BY total_v DESC LIMIT 20"
+    )
+    hist_cities = {r['city']: r['total_v'] for r in cur.fetchall()}
+
+    for city, cnt in today_cities.items():
+        if city not in hist_cities and cnt >= 3:
+            anomalies.append({'hour': None, 'type': 'new_city', 'severity': 'info',
+                               'message': f'Новый город: {city} — {cnt} визитов сегодня'})
+
+    cur.close(); conn.close()
+    anomalies.sort(key=lambda x: (x['severity'] == 'high', x['severity'] == 'medium'), reverse=True)
+    return _ok({'anomalies': anomalies[:10]})
+
+
+def action_cohort(qs):
+    """Когортный анализ: недели первого визита vs. возвраты."""
+    conn = _get_conn(); cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    # Когорты за последние 8 недель
+    cur.execute(
+        f"SELECT "
+        f"  DATE_TRUNC('week', v.first_seen AT TIME ZONE 'Europe/Moscow')::date AS cohort_week, "
+        f"  COUNT(DISTINCT v.visitor_id) AS cohort_size, "
+        f"  SUM(CASE WHEN v.visit_count >= 2 THEN 1 ELSE 0 END) AS returned_w1, "
+        f"  SUM(CASE WHEN v.visit_count >= 3 THEN 1 ELSE 0 END) AS returned_w2 "
+        f"FROM {SCHEMA}.an_visitors v "
+        f"WHERE v.first_seen >= NOW() - INTERVAL '8 weeks' "
+        f"GROUP BY cohort_week ORDER BY cohort_week DESC LIMIT 8"
+    )
+    rows = [dict(r) for r in cur.fetchall()]
+    result = []
+    for r in rows:
+        size = int(r['cohort_size'] or 0)
+        w1 = int(r.get('returned_w1') or 0)
+        w2 = int(r.get('returned_w2') or 0)
+        result.append({
+            'week': str(r['cohort_week']),
+            'size': size,
+            'w1_pct': round(w1 / size * 100, 1) if size else 0,
+            'w2_pct': round(w2 / size * 100, 1) if size else 0,
+        })
+
+    cur.close(); conn.close()
+    return _ok({'rows': result})
+
+
 # ========== Handler ==========
 def handler(event: dict, context) -> dict:
-    """Аналитика. Публичные: track, convert. Админ: online, stats_today, conversions, recent_events, visitor, session_events, search."""
+    """Аналитика. Публичные: track, convert. Админ: online, stats_today, conversions, recent_events, visitor, session_events, search, graph_hours, funnel, heatmap, ab_stats, perf_stats, anomalies, cohort."""
     method = event.get('httpMethod', 'GET')
     if method == 'OPTIONS':
         return {'statusCode': 200, 'headers': HEADERS, 'body': ''}
@@ -793,7 +1166,9 @@ def handler(event: dict, context) -> dict:
         return action_convert(body, event)
 
     # Админ
-    admin = {'online', 'stats_today', 'conversions', 'recent_events', 'visitor', 'session_events', 'search', 'visitors', 'stats_range'}
+    admin = {'online', 'stats_today', 'conversions', 'recent_events', 'visitor', 'session_events',
+             'search', 'visitors', 'stats_range', 'graph_hours', 'funnel', 'heatmap',
+             'ab_stats', 'perf_stats', 'anomalies', 'cohort'}
     if action in admin:
         headers = event.get('headers') or {}
         token = headers.get('X-Employee-Token') or headers.get('x-employee-token') or ''
@@ -813,5 +1188,12 @@ def handler(event: dict, context) -> dict:
         if action == 'search': return action_search(qs)
         if action == 'visitors': return action_visitors(qs)
         if action == 'stats_range': return action_stats_range(qs)
+        if action == 'graph_hours': return action_graph_hours(qs)
+        if action == 'funnel': return action_funnel(qs)
+        if action == 'heatmap': return action_heatmap(qs)
+        if action == 'ab_stats': return action_ab_stats(qs)
+        if action == 'perf_stats': return action_perf_stats(qs)
+        if action == 'anomalies': return action_anomalies(qs)
+        if action == 'cohort': return action_cohort(qs)
 
     return _err(400, f'Unknown action: {action}')
