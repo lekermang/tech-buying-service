@@ -422,6 +422,9 @@ const Index = ({ goldOpen = false }: { goldOpen?: boolean }) => {
 
       <div className="scroll-reveal"><JobsSection /></div>
 
+      {/* Подписка на канал MAX — новости, акции, новые поступления */}
+      <div className="scroll-reveal"><MaxChannelBanner /></div>
+
       <ContactsFooter scrollTo={scrollTo} />
       <ExitPopup onOpenEval={() => setEvalOpen(true)} />
       <CookieBanner />

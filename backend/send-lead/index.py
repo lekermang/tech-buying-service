@@ -2,12 +2,41 @@ import base64
 import json
 import os
 import re
+import smtplib
+import ssl
 import urllib.parse
 import requests
 import psycopg2
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.utils import formataddr
 
 HEADERS = {'Access-Control-Allow-Origin': '*'}
 SCHEMA = 't_p31606708_tech_buying_service'
+
+SMTP_HOST   = 'smtp.yandex.ru'
+SMTP_PORT   = 465
+SMTP_USER   = 'lekermanya@yandex.ru'
+SMTP_FROM   = 'Скупка24'
+
+
+def _send_lead_email(subject: str, html: str) -> None:
+    """Дублирует заявку на lekermanya@yandex.ru. Тихо игнорирует ошибки."""
+    try:
+        password = os.environ.get('YANDEX_SMTP_PASSWORD', '').strip()
+        if not password:
+            return
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = subject
+        msg['From']    = formataddr((SMTP_FROM, SMTP_USER))
+        msg['To']      = SMTP_USER
+        msg.attach(MIMEText(html, 'html', 'utf-8'))
+        ctx = ssl.create_default_context()
+        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=ctx, timeout=15) as s:
+            s.login(SMTP_USER, password)
+            s.sendmail(SMTP_USER, [SMTP_USER], msg.as_string())
+    except Exception as e:
+        print(f'[send-lead][email] error: {e}')
 
 S3_BUCKET = 'files'
 S3_ENDPOINT = 'https://bucket.poehali.dev'
@@ -496,6 +525,45 @@ def handler(event: dict, context) -> dict:
             send_sms_confirmation(phone, lead_id, name)
         except Exception:
             pass
+
+    # 📧 Email-дубль на lekermanya@yandex.ru
+    try:
+        import threading
+        lead_num = f'#{lead_id}' if lead_id else ''
+        email_subject = f'Новая заявка {lead_num} — Скупка24'
+        rows_html = ''.join(
+            f'<tr><td style="padding:6px 12px;color:#888;white-space:nowrap">{k}</td>'
+            f'<td style="padding:6px 12px;font-weight:500">{v}</td></tr>'
+            for k, v in [
+                ('Имя',         name or '—'),
+                ('Телефон',     phone or '—'),
+                ('Категория',   category or '—'),
+                ('Устройство',  device or '—'),
+                ('Описание',    desc or '—'),
+                ('Цена клиента', (f'{client_price} ₽' if client_price else '—')),
+                ('Доставка',    delivery_info or '—'),
+                ('Связь',       channels_str or '—'),
+                ('Тип клиента', client_type or '—'),
+            ] if v and v != '—'
+        )
+        email_html = f'''<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f5f5f5;padding:20px">
+<div style="max-width:560px;margin:auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)">
+  <div style="background:#1a1a1a;padding:20px 24px">
+    <span style="color:#FFD700;font-size:20px;font-weight:bold">📦 Новая заявка {lead_num}</span>
+    <span style="color:#888;font-size:13px;margin-left:12px">Скупка24</span>
+  </div>
+  <table style="width:100%;border-collapse:collapse;font-size:14px">{rows_html}</table>
+  <div style="padding:16px 24px;background:#fafafa;border-top:1px solid #eee;font-size:13px;color:#888">
+    Скупка24 · skypka24.com · +7 (800) 600-68-33
+  </div>
+</div></body></html>'''
+        threading.Thread(
+            target=_send_lead_email,
+            args=(email_subject, email_html),
+            daemon=True,
+        ).start()
+    except Exception:
+        pass
 
     # 💬 MAX-бот: уведомить клиента о принятии заявки (если он писал нашему MAX-боту)
     if lead_id:

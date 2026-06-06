@@ -1,10 +1,66 @@
 import json
 import os
+import urllib.request
 from datetime import datetime
 import psycopg2
 
 HEADERS = {'Access-Control-Allow-Origin': '*'}
 SCHEMA = 't_p31606708_tech_buying_service'
+MAX_BOT_URL = 'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c'
+
+
+def _notify_max_new_good(good: dict) -> None:
+    """Отправляет красивое уведомление в MAX-канал о новом поступлении в смартломбард."""
+    try:
+        title = good.get('title', '').strip()
+        brand = good.get('brand') or ''
+        model = good.get('model') or ''
+        storage = good.get('storage') or ''
+        color = good.get('color') or ''
+        condition = good.get('condition') or ''
+        sell_price = good.get('sell_price')
+        description = (good.get('description') or '').strip()
+        photo_url = good.get('photo_url') or ''
+
+        # Строим красивое название
+        name_parts = [p for p in [brand, model, storage, color] if p]
+        name = ' '.join(name_parts) if name_parts else title
+
+        price_str = f"{int(sell_price):,} ₽".replace(',', '\u00a0') if sell_price else 'Уточняйте'
+
+        condition_emoji = {
+            'отличное': '⭐', 'хорошее': '👍', 'удовлетворительное': '✔️',
+        }.get((condition or '').lower(), '📱')
+
+        lines = [
+            "🆕 *Новое поступление в Скупка24!*\n",
+            f"*{name}*",
+        ]
+        if condition:
+            lines.append(f"{condition_emoji} Состояние: {condition}")
+        if description:
+            lines.append(f"📝 {description[:200]}")
+        lines += [
+            f"\n💰 *Цена: {price_str}*",
+            "",
+            "📍 Калуга, ул. Кирова 11 · Работаем 24/7",
+            "🌐 [skypka24.com/catalog](https://skypka24.com/catalog)",
+        ]
+        text = '\n'.join(lines)
+
+        payload: dict = {'text': text}
+        if photo_url:
+            payload['photo_urls'] = [photo_url]
+
+        body = json.dumps(payload).encode('utf-8')
+        req = urllib.request.Request(
+            f'{MAX_BOT_URL}?action=staff_send',
+            data=body,
+            headers={'Content-Type': 'application/json'},
+        )
+        urllib.request.urlopen(req, timeout=8)
+    except Exception as e:
+        print(f'[goods-api][MAX notify] error: {e}')
 
 
 def get_conn():
@@ -86,6 +142,20 @@ def handler(event: dict, context) -> dict:
              body.get('client_id'), emp['id']))
         new_id = cur.fetchone()[0]
         conn.commit(); cur.close(); conn.close()
+
+        # Уведомляем MAX-канал о новом товаре
+        _notify_max_new_good({
+            'title': title,
+            'brand': body.get('brand'),
+            'model': body.get('model'),
+            'storage': body.get('storage'),
+            'color': body.get('color'),
+            'condition': body.get('condition', 'хорошее'),
+            'sell_price': body.get('sell_price'),
+            'description': body.get('description'),
+            'photo_url': body.get('photo_url'),
+        })
+
         return _ok({'id': new_id, 'ok': True})
 
     # PUT — изменить статус или цену

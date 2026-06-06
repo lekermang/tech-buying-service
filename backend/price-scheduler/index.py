@@ -1642,6 +1642,77 @@ def send_price_email(to_email: str, price_type: str = 'retail') -> dict:
         return {'ok': False, 'error': str(e)}
 
 
+MAX_BOT_URL = 'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c'
+
+
+def do_send_price_to_max() -> dict:
+    """Отправляет ежедневный прайс скупки в MAX-канал в 10:00.
+    Новая техника (on_order / wholesale) — скрыта, показываем только б/у и золото."""
+    channel_id = get_max_news_channel_id()
+    if not channel_id:
+        return {'ok': False, 'skipped': True, 'reason': 'no_max_channel'}
+
+    items = get_catalog_with_prices()
+    if not items:
+        return {'ok': False, 'reason': 'catalog_empty'}
+
+    now_str = datetime.now(MSK).strftime('%d.%m.%Y')
+    markup = get_price_markup()
+
+    # Скрываем новую технику (on_order) — оставляем только in_stock б/у
+    public_items = [it for it in items if it.get('availability') == 'in_stock']
+    if not public_items:
+        public_items = items  # fallback — показываем всё если вдруг всё on_order
+
+    by_cat = {}
+    for it in public_items:
+        by_cat.setdefault(it['category'] or 'Другое', []).append(it)
+
+    lines = [
+        f"📋 *Прайс Скупка24 — {now_str}*\n",
+        "Покупаем у вас по этим ценам прямо сейчас 👇\n",
+    ]
+
+    AVAIL = {'in_stock': '✅', 'on_order': '🚗'}
+    REG = {'EU': '🇪🇺', 'US': '🇺🇸', 'RU': '🇷🇺', 'CN': '🇨🇳',
+           'HK': '🇭🇰', 'UK': '🇬🇧', 'JP': '🇯🇵', 'KZ': '🇰🇿'}
+
+    for cat, cat_items in sorted(by_cat.items()):
+        lines.append(f"\n*{cat}*")
+        for it in cat_items:
+            avail = AVAIL.get(it.get('availability', ''), '•')
+            reg = REG.get((it.get('region') or '').upper(), '')
+            parts = [it['model'] or it['brand'] or '']
+            if it.get('storage'): parts.append(it['storage'])
+            name = ' '.join(parts)
+            # Цена закупки (сколько мы платим клиенту) — price без наценки
+            buy_price = it.get('price')
+            price_str = f"{int(buy_price):,} ₽".replace(',', '\u00a0') if buy_price else 'по запросу'
+            lines.append(f"{avail} {reg} {name} — *{price_str}*")
+
+    lines += [
+        "",
+        "📍 Калуга, ул. Кирова 11 · Работаем 24/7",
+        "📞 8 (800) 600-68-33 — звонок бесплатный",
+        "🌐 [skypka24.com](https://skypka24.com)",
+    ]
+
+    text = '\n'.join(lines)
+
+    try:
+        body = json.dumps({'text': text}).encode('utf-8')
+        req = urllib.request.Request(
+            f'{MAX_BOT_URL}?action=send_to_chat',
+            data=body,
+            headers={'Content-Type': 'application/json'},
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            d = json.loads(resp.read())
+        return {'ok': True, 'channel_id': channel_id, 'items': len(public_items), 'response': d}
+    except Exception as e:
+        return {'ok': False, 'error': str(e)}
+
+
 def handler(event: dict, context) -> dict:
     """Отправка прайса в Telegram + ping sitemap в Яндекс.Вебмастер (10:00 МСК) + автопостинг новостей каждый час"""
     if event.get('httpMethod') == 'OPTIONS':
@@ -1776,12 +1847,18 @@ def handler(event: dict, context) -> dict:
             mark_sent()
 
         # Пингуем sitemap в Яндекс.Вебмастер (тот же час 10:00)
-        # Ошибки YM не должны ломать отправку прайса
         try:
             sitemap_result = ping_sitemap_to_yandex()
         except Exception as e:
             sitemap_result = {'ok': False, 'error': str(e)}
         result['sitemap_ping'] = sitemap_result
+
+        # Отправляем красивый прайс в MAX-канал (БЕЗ цен на новую технику)
+        try:
+            max_result = do_send_price_to_max()
+            result['max_price'] = max_result
+        except Exception as e:
+            result['max_price'] = {'ok': False, 'error': str(e)}
 
         return ok(result)
 
