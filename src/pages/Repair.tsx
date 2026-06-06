@@ -1,52 +1,123 @@
-import { useCallback, useEffect, useState } from "react";
+/**
+ * Repair.tsx — главная страница ремонта.
+ * Оптимизация для слабого мобильного интернета:
+ * - Только Hero + шапка грузятся сразу (~8 КБ)
+ * - Все секции ниже — lazy + Suspense (отдельные чанки)
+ * - fx-эффекты — только десктоп, lazy
+ * - Сплэш пропускается на saveData / slow connection (2G/3G)
+ * - contentVisibility: auto на всех секциях ниже первого экрана
+ */
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import Icon from "@/components/ui/icon";
 import { ymGoal, Goals } from "@/lib/ym";
-import DigitalParticles from "@/components/fx/DigitalParticles";
-import AuroraBackground from "@/components/fx/AuroraBackground";
-import GlowCursor from "@/components/fx/GlowCursor";
-import NoiseBg from "@/components/fx/NoiseBg";
-import RepairSplash from "@/components/repair/RepairSplash";
 import RepairSEO from "@/components/repair/RepairSEO";
 import RepairHero from "@/components/repair/RepairHero";
-import RepairStats from "@/components/repair/RepairStats";
-import RepairFeatures from "@/components/repair/RepairFeatures";
-import RepairPriceTable from "@/components/repair/RepairPriceTable";
-import RepairServices from "@/components/repair/RepairServices";
-import RepairAllDevices from "@/components/repair/RepairAllDevices";
-import RepairParts from "@/components/repair/RepairParts";
-import RepairHowItWorks from "@/components/repair/RepairHowItWorks";
-import RepairModels from "@/components/repair/RepairModels";
-import RepairLocation from "@/components/repair/RepairLocation";
-import RepairReviews from "@/components/repair/RepairReviews";
-import RepairFAQ from "@/components/repair/RepairFAQ";
-import RepairSEOText from "@/components/repair/RepairSEOText";
-import RepairSEOLinks from "@/components/repair/RepairSEOLinks";
-import RepairTopBlock from "@/components/repair/RepairTopBlock";
-import RepairBeforeAfter from "@/components/repair/RepairBeforeAfter";
-import RepairUnlockBanner from "@/components/repair/RepairUnlockBanner";
 import { REPAIR_PHONE_DISPLAY, REPAIR_PHONE_TEL } from "@/components/repair/repairContacts";
 
+/* ── Lazy-компоненты (каждый = отдельный чанк, грузится по мере скролла) ── */
+const RepairSplash      = lazy(() => import("@/components/repair/RepairSplash"));
+const RepairTopBlock    = lazy(() => import("@/components/repair/RepairTopBlock"));
+const RepairStats       = lazy(() => import("@/components/repair/RepairStats"));
+const RepairPriceTable  = lazy(() => import("@/components/repair/RepairPriceTable"));
+const RepairServices    = lazy(() => import("@/components/repair/RepairServices"));
+const RepairFeatures    = lazy(() => import("@/components/repair/RepairFeatures"));
+const RepairBeforeAfter = lazy(() => import("@/components/repair/RepairBeforeAfter"));
+const RepairAllDevices  = lazy(() => import("@/components/repair/RepairAllDevices"));
+const RepairParts       = lazy(() => import("@/components/repair/RepairParts"));
+const RepairModels      = lazy(() => import("@/components/repair/RepairModels"));
+const RepairUnlockBanner= lazy(() => import("@/components/repair/RepairUnlockBanner"));
+const RepairHowItWorks  = lazy(() => import("@/components/repair/RepairHowItWorks"));
+const RepairLocation    = lazy(() => import("@/components/repair/RepairLocation"));
+const RepairReviews     = lazy(() => import("@/components/repair/RepairReviews"));
+const RepairFAQ         = lazy(() => import("@/components/repair/RepairFAQ"));
+const RepairSEOText     = lazy(() => import("@/components/repair/RepairSEOText"));
+const RepairSEOLinks    = lazy(() => import("@/components/repair/RepairSEOLinks"));
+
+/* fx — только desktop, минимальный приоритет */
+const DigitalParticles  = lazy(() => import("@/components/fx/DigitalParticles"));
+const AuroraBackground  = lazy(() => import("@/components/fx/AuroraBackground"));
+const GlowCursor        = lazy(() => import("@/components/fx/GlowCursor"));
+const NoiseBg           = lazy(() => import("@/components/fx/NoiseBg"));
+
+/* ── Определяем, нужен ли сплэш ──────────────────────────────────────────── */
+function shouldSkipSplash(): boolean {
+  try {
+    const nav = (navigator as Navigator & {
+      connection?: { saveData?: boolean; effectiveType?: string };
+    }).connection;
+    if (nav?.saveData) return true;
+    if (nav?.effectiveType && ["slow-2g", "2g", "3g"].includes(nav.effectiveType)) return true;
+  } catch { /* ignore */ }
+  // Пропускаем если уже был на странице в этой сессии
+  if (sessionStorage.getItem("repair_splash_done")) return true;
+  return false;
+}
+
+/* ── Минимальный skeleton-заполнитель для секций ─────────────────────────── */
+const SectionSkeleton = () => (
+  <div className="h-32 mx-4 my-2 rounded-2xl bg-white/[0.025] animate-pulse" />
+);
+
 const SERVICE_LINKS = [
-  { to: "/remont-iphone-kaluga",       label: "iPhone",      color: "#fff3a0" },
-  { to: "/remont-samsung-kaluga",      label: "Samsung",     color: "#93c5fd" },
-  { to: "/remont-xiaomi-kaluga",       label: "Xiaomi",      color: "#86efac" },
-  { to: "/zamena-stekla-kaluga",       label: "Стекло",      color: "#c4b5fd" },
-  { to: "/zamena-akkumulyatora-kaluga",label: "Аккумулятор", color: "#6ee7b7" },
-  { to: "/remont-posle-vody-kaluga",   label: "После воды",  color: "#7dd3fc" },
-  { to: "/bga-pajka-kaluga",           label: "BGA-пайка",   color: "#fca5a5" },
-  { to: "/snyatie-frp-kaluga",         label: "FRP / iCloud",color: "#fdba74" },
+  { to: "/remont-iphone-kaluga",        label: "iPhone",       color: "#fff3a0" },
+  { to: "/remont-samsung-kaluga",       label: "Samsung",      color: "#93c5fd" },
+  { to: "/remont-xiaomi-kaluga",        label: "Xiaomi",       color: "#86efac" },
+  { to: "/zamena-stekla-kaluga",        label: "Стекло",       color: "#c4b5fd" },
+  { to: "/zamena-akkumulyatora-kaluga", label: "Аккумулятор",  color: "#6ee7b7" },
+  { to: "/remont-posle-vody-kaluga",    label: "После воды",   color: "#7dd3fc" },
+  { to: "/bga-pajka-kaluga",            label: "BGA-пайка",    color: "#fca5a5" },
+  { to: "/snyatie-frp-kaluga",          label: "FRP / iCloud", color: "#fdba74" },
 ];
 
+/* ── Компонент секции с lazy-содержимым и contentVisibility ─────────────── */
+function LazySection({
+  children,
+  height = "400px",
+}: {
+  children: React.ReactNode;
+  height?: string;
+}) {
+  return (
+    <div style={{ contentVisibility: "auto", containIntrinsicSize: `0 ${height}` }}>
+      <Suspense fallback={<SectionSkeleton />}>{children}</Suspense>
+    </div>
+  );
+}
+
 export default function Repair() {
-  const [scrolled,  setScrolled]  = useState(false);
-  const [splashDone, setSplashDone] = useState(false);
+  const [scrolled,   setScrolled]   = useState(false);
+  const [splashDone, setSplashDone] = useState(() => shouldSkipSplash());
+  const prefetchedRef = useRef(false);
 
   useEffect(() => {
     window.scrollTo(0, 0);
     const onScroll = () => setScrolled(window.scrollY > 60);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  /* Prefetch нижних секций через idle — не блокирует первый рендер */
+  useEffect(() => {
+    if (!splashDone || prefetchedRef.current) return;
+    prefetchedRef.current = true;
+    const cb = () => {
+      import("@/components/repair/RepairPriceTable");
+      import("@/components/repair/RepairServices");
+      import("@/components/repair/RepairAllDevices");
+      import("@/components/repair/RepairReviews");
+    };
+    if ("requestIdleCallback" in window) {
+      (window as Window & { requestIdleCallback: (cb: () => void) => void })
+        .requestIdleCallback(cb);
+    } else {
+      setTimeout(cb, 2000);
+    }
+  }, [splashDone]);
+
+  const handleSplashDone = useCallback(() => {
+    sessionStorage.setItem("repair_splash_done", "1");
+    setSplashDone(true);
   }, []);
 
   const scrollToForm = useCallback(() => {
@@ -57,25 +128,32 @@ export default function Repair() {
     <div className="relative min-h-screen bg-[#0d0d0d] text-white overflow-x-hidden">
       <RepairSEO />
 
-      {/* ── Сплэш-скрин ── */}
-      {!splashDone && <RepairSplash onDone={() => setSplashDone(true)} />}
+      {/* Сплэш — пропускается на slow connection */}
+      {!splashDone && (
+        <Suspense fallback={null}>
+          <RepairSplash onDone={handleSplashDone} />
+        </Suspense>
+      )}
 
-      {/* GlowCursor + NoiseBg — только десктоп (lg+) */}
-      <GlowCursor />
-      <NoiseBg opacity={0.022} />
+      {/* fx-эффекты — только десктоп, lazy */}
+      <Suspense fallback={null}>
+        <GlowCursor />
+        <NoiseBg opacity={0.022} />
+      </Suspense>
 
-      {/* Фон — статичный на мобиле, анимированный на десктопе */}
+      {/* Фон */}
       <div aria-hidden className="fixed inset-0 z-0 pointer-events-none">
-        {/* Canvas particles — только md+ */}
-        <DigitalParticles />
-        {/* Aurora blob'ы — только lg+ (hidden на мобиле внутри компонента) */}
-        <AuroraBackground />
-        {/* Статичные свечения — работают на всех устройствах без анимации */}
-        <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[600px] h-[400px] rounded-full pointer-events-none"
+        {/* Canvas + Aurora — только md/lg, lazy */}
+        <Suspense fallback={null}>
+          <DigitalParticles />
+          <AuroraBackground />
+        </Suspense>
+        {/* Статичные градиенты — для всех, без JS */}
+        <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[600px] h-[400px] rounded-full"
           style={{ background: "radial-gradient(ellipse,rgba(255,215,0,0.09) 0%,transparent 70%)", filter: "blur(80px)" }} />
-        <div className="absolute bottom-0 right-0 w-[300px] h-[300px] rounded-full pointer-events-none"
+        <div className="absolute bottom-0 right-0 w-[300px] h-[300px] rounded-full"
           style={{ background: "radial-gradient(ellipse,rgba(255,140,0,0.05) 0%,transparent 70%)", filter: "blur(60px)" }} />
-        <div className="absolute inset-0 opacity-[0.25]"
+        <div className="absolute inset-0 opacity-[0.22]"
           style={{
             backgroundImage: "linear-gradient(rgba(255,215,0,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,215,0,0.025) 1px,transparent 1px)",
             backgroundSize: "56px 56px",
@@ -85,19 +163,13 @@ export default function Repair() {
 
       <div className="relative z-10">
 
-        {/* ══════════════════════════════════════════════════════════
-            STICKY HEADER — одна шапка на всю страницу
-            ══════════════════════════════════════════════════════════ */}
+        {/* ── STICKY HEADER ── */}
         <header className={`sticky top-0 z-50 transition-all duration-300 ${
           scrolled
             ? "bg-[#0d0d0d]/95 border-b border-[#FFD700]/15 backdrop-blur-lg shadow-[0_4px_24px_rgba(0,0,0,0.5)]"
             : "bg-[#0d0d0d]/70 border-b border-white/[0.06] backdrop-blur-sm"
         }`}>
-
-          {/* Строка 1 — бренд + действия */}
           <div className="max-w-6xl mx-auto px-4 sm:px-8 h-14 flex items-center justify-between gap-3">
-
-            {/* Левая часть: кнопка назад + бренд */}
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               <Link to="/" aria-label="На главную Скупка24"
                 className="flex items-center justify-center w-9 h-9 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] hover:border-[#FFD700]/30 transition-all shrink-0 active:scale-95">
@@ -113,8 +185,6 @@ export default function Repair() {
                 </div>
               </div>
             </div>
-
-            {/* Правая часть: телефон + заявка */}
             <div className="flex items-center gap-2 sm:gap-3 shrink-0">
               <a href={REPAIR_PHONE_TEL}
                 onClick={() => ymGoal(Goals.CALL_CLICK, { place: "repair_header" })}
@@ -139,11 +209,10 @@ export default function Repair() {
             </div>
           </div>
 
-          {/* Строка 2 — навигация по услугам (горизонтальный скролл) */}
+          {/* Навигация по услугам */}
           <div className="border-t border-white/[0.05] overflow-x-auto"
             style={{ WebkitOverflowScrolling: "touch", scrollbarWidth: "none" }}>
             <div className="flex items-center gap-1 px-4 sm:px-8 py-1.5 min-w-max">
-              {/* Разделы страницы */}
               {[
                 { href: "#repair-form", label: "Заявка"   },
                 { href: "#prices",      label: "Цены"     },
@@ -157,10 +226,7 @@ export default function Repair() {
                   {item.label}
                 </a>
               ))}
-
               <span className="w-px h-4 bg-white/10 mx-1 shrink-0" />
-
-              {/* Услуги */}
               {SERVICE_LINKS.map(s => (
                 <Link key={s.to} to={s.to}
                   className="whitespace-nowrap px-2.5 py-1 rounded-md font-roboto text-[11px] font-medium shrink-0 transition-all active:scale-95"
@@ -172,58 +238,69 @@ export default function Repair() {
           </div>
         </header>
 
-        {/* ══════════════════════════════════════════════════════════
-            HERO — сразу под шапкой, без лишних отступов
-            ══════════════════════════════════════════════════════════ */}
+        {/* ── HERO — грузится сразу, не lazy ── */}
         <RepairHero onOrder={scrollToForm} />
 
-        {/* ══════════════════════════════════════════════════════════
-            ОСНОВНОЙ КОНТЕНТ — логика поведенческого сайта:
-            1. Форма + услуги (конверсия)
-            2. Цены (убеждение)
-            3. Как работаем (доверие)
-            4. Все бренды + модели
-            5. Доп. услуги
-            6. Отзывы + локация (социальное доказательство)
-            7. FAQ + SEO
-            ══════════════════════════════════════════════════════════ */}
-        <RepairTopBlock />
-        <RepairStats />
-        <RepairPriceTable onOrder={scrollToForm} />
-        <RepairServices onOrder={scrollToForm} />
-        {/* content-visibility: auto — браузер не рендерит секции вне экрана */}
-        <div style={{ contentVisibility: "auto", containIntrinsicSize: "0 400px" }}>
+        {/* ── ОСНОВНОЙ КОНТЕНТ — всё lazy ── */}
+
+        {/* Форма заявки — высокий приоритет, но всё же lazy */}
+        <Suspense fallback={<SectionSkeleton />}>
+          <RepairTopBlock />
+        </Suspense>
+
+        <Suspense fallback={<SectionSkeleton />}>
+          <RepairStats />
+        </Suspense>
+
+        <LazySection height="480px">
+          <RepairPriceTable onOrder={scrollToForm} />
+        </LazySection>
+
+        <LazySection height="500px">
+          <RepairServices onOrder={scrollToForm} />
+        </LazySection>
+
+        <LazySection height="400px">
           <RepairFeatures />
-        </div>
-        <div style={{ contentVisibility: "auto", containIntrinsicSize: "0 500px" }}>
+        </LazySection>
+
+        <LazySection height="500px">
           <RepairBeforeAfter onOrder={scrollToForm} />
-        </div>
-        <div style={{ contentVisibility: "auto", containIntrinsicSize: "0 600px" }}>
+        </LazySection>
+
+        <LazySection height="600px">
           <RepairAllDevices onOrder={scrollToForm} />
-        </div>
-        <div style={{ contentVisibility: "auto", containIntrinsicSize: "0 400px" }}>
+        </LazySection>
+
+        <LazySection height="400px">
           <RepairParts onOrder={scrollToForm} />
-        </div>
-        <div style={{ contentVisibility: "auto", containIntrinsicSize: "0 400px" }}>
+        </LazySection>
+
+        <LazySection height="400px">
           <RepairModels onOrder={scrollToForm} />
-        </div>
-        <div style={{ contentVisibility: "auto", containIntrinsicSize: "0 300px" }}>
+        </LazySection>
+
+        <LazySection height="300px">
           <RepairUnlockBanner />
-        </div>
-        <div style={{ contentVisibility: "auto", containIntrinsicSize: "0 400px" }}>
+        </LazySection>
+
+        <LazySection height="400px">
           <RepairHowItWorks />
-        </div>
-        <div style={{ contentVisibility: "auto", containIntrinsicSize: "0 350px" }}>
+        </LazySection>
+
+        <LazySection height="350px">
           <RepairLocation />
-        </div>
-        <div style={{ contentVisibility: "auto", containIntrinsicSize: "0 500px" }}>
+        </LazySection>
+
+        <LazySection height="500px">
           <RepairReviews />
-        </div>
-        <div style={{ contentVisibility: "auto", containIntrinsicSize: "0 300px" }}>
+        </LazySection>
+
+        <LazySection height="600px">
           <RepairSEOLinks />
           <RepairFAQ />
           <RepairSEOText />
-        </div>
+        </LazySection>
 
         {/* Подвал */}
         <footer className="border-t border-[#FFD700]/10 bg-[#0a0a0a] px-4 py-10 text-center text-white/40 text-sm">

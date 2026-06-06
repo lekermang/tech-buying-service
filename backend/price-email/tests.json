@@ -7,11 +7,18 @@
       "expectedStatus": 200
     },
     {
-      "name": "Без токена — 403",
+      "name": "Без email — 400",
       "method": "POST",
       "path": "/",
-      "body": {"markup": 0},
-      "expectedStatus": 403
+      "body": {},
+      "expectedStatus": 400
+    },
+    {
+      "name": "Некорректный email — 400",
+      "method": "POST",
+      "path": "/",
+      "body": { "email": "notanemail" },
+      "expectedStatus": 400
     }
   ]
 }

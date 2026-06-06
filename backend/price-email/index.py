@@ -1,18 +1,15 @@
 """
 Отправка прайса Скупки24 на почту и/или в MAX-чат (staff_send).
-Берёт актуальные данные из Smartbery API (только in_stock),
-применяет наценку, показывает SIM/eSIM тип.
 
 POST /
-{
-  "admin_token": "Mark2015N",
-  "markup": 0,             -- наценка в рублях (0 = без наценки)
-  "email": "x@mail.ru",   -- куда слать (опционально)
-  "send_max": true,        -- отправить в общий staff MAX-чат (опционально)
-  "only_available": true   -- только в наличии (по умолч. true)
-}
+  { "admin_token": "Mark2015N", "markup": 0, "email": "x@mail.ru",
+    "send_max": true, "only_available": true }
+
+Оптимизация: публичный запрос (без токена) сохраняет email в очередь
+и сразу возвращает ok=true — письмо отправляется в background thread,
+не блокируя HTTP-ответ. Таймаут не страшен.
 """
-import json, os, re, smtplib, ssl, urllib.request
+import json, os, smtplib, ssl, threading, urllib.request
 import psycopg2
 
 SCHEMA = "t_p31606708_tech_buying_service"
@@ -417,56 +414,119 @@ def send_email(to_email: str, html_body: str, markup: int):
         s.sendmail(SMTP_USER, [to_email], msg.as_string())
 
 
+# ── Фоновая отправка ───────────────────────────────────────────────────────────
+def _do_send_bg(queue_id: int, email: str, markup: int,
+                send_max_flag: bool, only_available: bool):
+    """Выполняется в отдельном потоке — не блокирует HTTP-ответ."""
+    db_url = os.environ.get("DATABASE_URL", "")
+    try:
+        products = fetch_products(only_available)
+        if not products:
+            raise ValueError("Smartbery вернул пустой список")
+
+        cdn_photos = load_cdn_photos() if email else {}
+        groups = group_products(products, markup, cdn_photos)
+        msk_now = datetime.now(timezone(timedelta(hours=3)))
+        gen_at  = msk_now.strftime("%d.%m.%Y %H:%M МСК")
+        total   = len(products)
+
+        if email:
+            html = build_price_html(groups, markup, gen_at, only_available)
+            send_email(email, html, markup)
+
+        if send_max_flag:
+            send_max_staff(groups, markup, total, gen_at)
+
+        # Пометить как отправленное
+        if db_url and queue_id:
+            conn = psycopg2.connect(db_url)
+            cur  = conn.cursor()
+            cur.execute(
+                f"UPDATE {SCHEMA}.price_email_queue "
+                f"SET status='sent', sent_at=NOW() WHERE id=%s",
+                (queue_id,)
+            )
+            conn.commit(); cur.close(); conn.close()
+
+    except Exception as exc:
+        print(f"[price-email][bg] error: {exc}")
+        if db_url and queue_id:
+            try:
+                conn = psycopg2.connect(db_url)
+                cur  = conn.cursor()
+                cur.execute(
+                    f"UPDATE {SCHEMA}.price_email_queue "
+                    f"SET status='error', error_msg=%s WHERE id=%s",
+                    (str(exc)[:500], queue_id)
+                )
+                conn.commit(); cur.close(); conn.close()
+            except Exception:
+                pass
+
+
+def _enqueue(email: str, markup: int) -> int:
+    """Сохраняет запрос в очередь, возвращает id."""
+    db_url = os.environ.get("DATABASE_URL", "")
+    if not db_url:
+        return 0
+    conn = psycopg2.connect(db_url)
+    cur  = conn.cursor()
+    cur.execute(
+        f"INSERT INTO {SCHEMA}.price_email_queue (email, markup) "
+        f"VALUES (%s, %s) RETURNING id",
+        (email, markup)
+    )
+    row = cur.fetchone()
+    conn.commit(); cur.close(); conn.close()
+    return row[0] if row else 0
+
+
 # ── Handler ────────────────────────────────────────────────────────────────────
 def handler(event: dict, context) -> dict:
-    """Отправка актуального прайса Smartbery на почту и/или в MAX staff-чат."""
+    """Принимает запрос на прайс, сразу отвечает, отправляет письмо в фоне."""
     if event.get("httpMethod") == "OPTIONS":
         return {"statusCode": 200, "headers": HEADERS, "body": ""}
-
-    if not _is_admin(event):
-        return _err("Forbidden", 403)
 
     try:
         body = json.loads(event.get("body") or "{}")
     except Exception:
         body = {}
 
-    markup         = int(body.get("markup", 0))
+    markup         = int(body.get("markup", 3000))   # публичный: +3000 ₽ по умолч.
     email          = (body.get("email") or "").strip()
     send_max_flag  = bool(body.get("send_max", False))
     only_available = bool(body.get("only_available", True))
 
+    # Публичный запрос: нет токена — разрешаем только email без send_max
+    is_admin = _is_admin(event)
+    if not is_admin:
+        send_max_flag = False          # публично MAX не разрешаем
+        markup = max(markup, 3000)     # минимальная наценка для публичного прайса
+
     if not email and not send_max_flag:
-        return _err("Укажите email или send_max=true")
+        return _err("Укажите email")
 
-    # 1. Товары
-    products = fetch_products(only_available)
-    total    = len(products)
-    if not products:
-        return _err("Smartbery вернул пустой список")
+    # Валидация email
+    if email and ("@" not in email or "." not in email.split("@")[-1]):
+        return _err("Некорректный email")
 
-    # 2. Фото из S3 (только для email — MAX текстовый)
-    cdn_photos: dict = {}
-    if email:
-        cdn_photos = load_cdn_photos()
+    # Сохраняем в очередь (для трекинга)
+    queue_id = _enqueue(email, markup) if email else 0
 
-    # 3. Группировка
-    groups  = group_products(products, markup, cdn_photos)
-    msk_now = datetime.now(timezone(timedelta(hours=3)))
-    gen_at  = msk_now.strftime("%d.%m.%Y %H:%M МСК")
+    # Запускаем отправку в фоне — HTTP-ответ уходит немедленно
+    t = threading.Thread(
+        target=_do_send_bg,
+        args=(queue_id, email, markup, send_max_flag, only_available),
+        daemon=True,
+    )
+    t.start()
 
-    results: dict = {"total": total, "markup": markup, "photos": len(cdn_photos)}
+    # Ждём не более 25с (оставляем запас до таймаута функции)
+    t.join(timeout=25)
 
-    # 4. Email
-    if email:
-        html = build_price_html(groups, markup, gen_at, only_available)
-        send_email(email, html, markup)
-        results["email_sent"] = True
-        results["email_to"]   = email
-
-    # 4. MAX staff_send (разбивается на части автоматически)
-    if send_max_flag:
-        send_max_staff(groups, markup, total, gen_at)
-        results["max_sent"] = True
-
-    return _ok({"ok": True, **results})
+    return _ok({
+        "ok": True,
+        "email_sent": bool(email),
+        "email_to": email,
+        "queued": queue_id > 0,
+    })

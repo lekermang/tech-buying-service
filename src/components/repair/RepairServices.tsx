@@ -8,6 +8,44 @@ import Icon from "@/components/ui/icon";
 import funcUrls from "../../../backend/func2url.json";
 
 const SKFRP_URL = (funcUrls as Record<string, string>)["skfrp-proxy"];
+const CACHE_KEY = "repair_services_v1";
+const CACHE_TTL = 30 * 60 * 1000; // 30 минут
+
+/* Кэш в localStorage — работает офлайн и при плохом сигнале */
+function readCache(): Service[] | null {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const { ts, data } = JSON.parse(raw);
+    if (Date.now() - ts > CACHE_TTL) return null;
+    return data;
+  } catch { return null; }
+}
+function writeCache(data: Service[]) {
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data })); } catch { /* ignore */ }
+}
+
+/* Fetch с таймаутом и retry */
+async function fetchWithRetry(url: string, timeoutMs = 8000, retries = 2): Promise<Service[]> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { signal: ctrl.signal });
+      clearTimeout(tid);
+      const d = await res.json();
+      if (d.ok && Array.isArray(d.services)) {
+        return d.services.filter((s: Service) => s.is_active !== false);
+      }
+      throw new Error(d.error || "bad response");
+    } catch (e) {
+      clearTimeout(tid);
+      if (attempt === retries) throw e;
+      await new Promise(r => setTimeout(r, 1000 * (attempt + 1))); // backoff
+    }
+  }
+  return [];
+}
 
 type Service = {
   id: number;
@@ -49,23 +87,27 @@ function Skeleton() {
 }
 
 export default function RepairServices({ onOrder }: { onOrder: () => void }) {
-  const [services, setServices] = useState<Service[]>([]);
-  const [loading,  setLoading]  = useState(true);
+  // Сразу показываем из кэша — мгновенно даже в лесу
+  const [services, setServices] = useState<Service[]>(() => readCache() ?? []);
+  const [loading,  setLoading]  = useState(() => !readCache());
   const [error,    setError]    = useState(false);
   const [activeTab, setActiveTab] = useState("Все");
   const [expanded, setExpanded]   = useState<number | null>(null);
 
   useEffect(() => {
     let alive = true;
-    fetch(SKFRP_URL)
-      .then(r => r.json())
-      .then(d => {
+    fetchWithRetry(SKFRP_URL, 8000, 2)
+      .then(data => {
         if (!alive) return;
-        if (d.ok && Array.isArray(d.services)) {
-          setServices(d.services.filter((s: Service) => s.is_active !== false));
-        } else setError(true);
+        if (data.length > 0) {
+          setServices(data);
+          writeCache(data);
+          setError(false);
+        } else if (!readCache()) {
+          setError(true);
+        }
       })
-      .catch(() => alive && setError(true))
+      .catch(() => { if (alive && !readCache()) setError(true); })
       .finally(() => alive && setLoading(false));
     return () => { alive = false; };
   }, []);
