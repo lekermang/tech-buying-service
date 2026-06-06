@@ -3,7 +3,7 @@
  * Запускается когда элемент появляется в viewport (IntersectionObserver).
  * Современный эффект — используется на лендингах для статистики.
  */
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 
 interface Props {
   to: number;
@@ -14,7 +14,7 @@ interface Props {
   className?: string;
 }
 
-export default function CountUp({ to, duration = 1800, suffix = "", prefix = "", decimals = 0, className = "" }: Props) {
+const CountUp = memo(function CountUp({ to, duration = 1800, suffix = "", prefix = "", decimals = 0, className = "" }: Props) {
   const [value, setValue] = useState(0);
   const [started, setStarted] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
@@ -50,4 +50,6 @@ export default function CountUp({ to, duration = 1800, suffix = "", prefix = "",
       {prefix}{decimals ? value.toFixed(decimals) : Math.round(value).toLocaleString("ru-RU")}{suffix}
     </span>
   );
-}
+});
+
+export default CountUp;

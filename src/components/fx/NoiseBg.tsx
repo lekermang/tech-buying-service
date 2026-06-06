@@ -5,7 +5,7 @@
  */
 export default function NoiseBg({ opacity = 0.028 }: { opacity?: number }) {
   return (
-    <div aria-hidden className="fixed inset-0 z-[1] pointer-events-none"
+    <div aria-hidden className="fixed inset-0 z-[1] pointer-events-none hidden lg:block"
       style={{ opacity, mixBlendMode: "overlay" }}>
       <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
         <filter id="repair-noise">
