@@ -24,7 +24,7 @@ CACHE_TTL_BALANCE  = 120         # 2 минуты
 SCHEMA = "t_p31606708_tech_buying_service"
 
 # ── Dhru Fusion API endpoint (официальный) ────────────────────────────────────
-DHRU_API_URL = "https://3gsm.ru/api.php"
+DHRU_API_URL = "https://3gsm.ru/includes/api.php"
 
 CORS = {
     "Access-Control-Allow-Origin": "*",
