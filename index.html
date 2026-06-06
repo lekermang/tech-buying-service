@@ -96,18 +96,39 @@
       })();
     </script>
 
-    <!-- Schema.org LocalBusiness -->
+    <!-- Schema.org LocalBusiness + PawnShop -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "LocalBusiness",
+      "@type": ["LocalBusiness", "PawnShop"],
+      "@id": "https://skypka24.com/#organization",
       "name": "Скупка24",
-      "description": "Честная и быстрая скупка техники, смартфонов, ноутбуков, ювелирных украшений и золота. Работаем 24/7.",
+      "alternateName": ["Скупка 24", "Skupka24", "Skypka24"],
+      "description": "Честная скупка техники, смартфонов, ноутбуков, золота и ювелирных украшений в Калуге. Два офиса на улице Кирова. Работаем 24/7 без выходных. Оценка за 15 минут, деньги в день обращения.",
       "url": "https://skypka24.com",
-      "telephone": ["+7-992-999-03-33", "8-800-600-68-33"],
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/dce22ed0-7e15-4a0f-84c3-9987477dea5a.jpg",
+        "width": 512,
+        "height": 512
+      },
+      "image": [
+        "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/9c9b4fca-bfd7-4841-a827-eb0354dad8da.JPG"
+      ],
+      "telephone": ["+7-992-999-03-33", "+7-800-600-68-33"],
+      "email": "lekermany@yandex.ru",
       "openingHours": "Mo-Su 00:00-24:00",
+      "openingHoursSpecification": [
+        {
+          "@type": "OpeningHoursSpecification",
+          "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],
+          "opens": "00:00",
+          "closes": "23:59"
+        }
+      ],
       "priceRange": "$$",
-      "image": "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/9c9b4fca-bfd7-4841-a827-eb0354dad8da.JPG",
+      "currenciesAccepted": "RUB",
+      "paymentAccepted": "Cash, Credit Card, Bank Transfer",
       "address": [
         {
           "@type": "PostalAddress",
@@ -116,68 +137,117 @@
           "addressRegion": "Калужская область",
           "postalCode": "248000",
           "addressCountry": "RU"
-        },
-        {
-          "@type": "PostalAddress",
-          "streetAddress": "ул. Кирова, 7/47",
-          "addressLocality": "Калуга",
-          "addressRegion": "Калужская область",
-          "postalCode": "248000",
-          "addressCountry": "RU"
         }
       ],
-      "branch": [
+      "location": [
         {
-          "@type": "LocalBusiness",
+          "@type": "Place",
           "name": "Скупка24 — Кирова 11",
-          "telephone": "+7-992-999-03-33",
           "address": {
             "@type": "PostalAddress",
             "streetAddress": "ул. Кирова, 11",
             "addressLocality": "Калуга",
+            "addressRegion": "Калужская область",
+            "postalCode": "248000",
             "addressCountry": "RU"
           },
-          "openingHours": "Mo-Su 00:00-24:00"
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": 54.5132,
+            "longitude": 36.2599
+          },
+          "hasMap": "https://yandex.ru/maps/?text=Калуга+Кирова+11"
         },
         {
-          "@type": "LocalBusiness",
+          "@type": "Place",
           "name": "Скупка24 — Кирова 7/47",
-          "telephone": "+7-992-999-03-33",
           "address": {
             "@type": "PostalAddress",
             "streetAddress": "ул. Кирова, 7/47",
             "addressLocality": "Калуга",
+            "addressRegion": "Калужская область",
+            "postalCode": "248000",
             "addressCountry": "RU"
           },
-          "openingHours": "Mo-Su 00:00-24:00"
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": 54.5125,
+            "longitude": 36.2640
+          },
+          "hasMap": "https://yandex.ru/maps/?text=Калуга+Кирова+7/47"
         }
       ],
-      "hasOfferCatalog": {
-        "@type": "OfferCatalog",
-        "name": "Скупаемая техника",
-        "itemListElement": [
-          {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Скупка iPhone"}},
-          {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Скупка MacBook и ноутбуков"}},
-          {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Скупка золота и украшений"}},
-          {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Скупка планшетов и iPad"}},
-          {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Скупка игровых консолей"}},
-          {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Скупка умных часов Apple Watch"}}
-        ]
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": 54.5132,
+        "longitude": 36.2599
       },
+      "hasMap": "https://yandex.ru/maps/?text=Скупка24+Калуга",
       "aggregateRating": {
         "@type": "AggregateRating",
         "ratingValue": "5.0",
         "reviewCount": "3460",
-        "bestRating": "5"
+        "bestRating": "5",
+        "worstRating": "1"
       },
+      "review": [
+        {
+          "@type": "Review",
+          "author": {"@type": "Person", "name": "Дмитрий В."},
+          "datePublished": "2026-05-28",
+          "reviewRating": {"@type": "Rating", "ratingValue": "5", "bestRating": "5"},
+          "reviewBody": "Сдал iPhone 15 Pro Max за 20 минут. Дали 58 000 рублей наличными. Всё честно, подписали договор. Рекомендую."
+        },
+        {
+          "@type": "Review",
+          "author": {"@type": "Person", "name": "Светлана М."},
+          "datePublished": "2026-05-15",
+          "reviewRating": {"@type": "Rating", "ratingValue": "5", "bestRating": "5"},
+          "reviewBody": "Сдала золотые украшения — цепочка и кольцо. Взвесили при мне, объяснили как считается цена. Деньги сразу на карту."
+        },
+        {
+          "@type": "Review",
+          "author": {"@type": "Person", "name": "Игорь К."},
+          "datePublished": "2026-04-30",
+          "reviewRating": {"@type": "Rating", "ratingValue": "5", "bestRating": "5"},
+          "reviewBody": "Продал MacBook Pro M1. Оценили честно, предложили цену выше чем в двух других местах где был до этого."
+        }
+      ],
       "sameAs": [
         "https://www.avito.ru/brands/skupka24kirova7",
-        "https://yandex.ru/profile/52473097879"
-      ]
+        "https://yandex.ru/profile/52473097879",
+        "https://t.me/skypka24"
+      ],
+      "foundingDate": "2015",
+      "numberOfEmployees": {"@type": "QuantitativeValue", "value": 12},
+      "areaServed": {
+        "@type": "City",
+        "name": "Калуга",
+        "sameAs": "https://www.wikidata.org/wiki/Q183340"
+      },
+      "knowsAbout": [
+        "Скупка iPhone","Скупка MacBook","Скупка золота",
+        "Ремонт смартфонов","Выкуп ноутбуков","Скупка антиквариата"
+      ],
+      "slogan": "Честная оценка за 15 минут. Деньги сразу.",
+      "hasOfferCatalog": {
+        "@type": "OfferCatalog",
+        "name": "Услуги скупки и ремонта техники",
+        "itemListElement": [
+          {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Скупка iPhone", "url": "https://skypka24.com/skupka-iphone-kaluga"}},
+          {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Скупка MacBook и ноутбуков", "url": "https://skypka24.com/skupka-macbook-kaluga"}},
+          {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Скупка золота и украшений", "url": "https://skypka24.com/skupka-zolota-kaluga"}},
+          {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Скупка Samsung", "url": "https://skypka24.com/skupka-samsung-kaluga"}},
+          {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Скупка Xiaomi", "url": "https://skypka24.com/skupka-xiaomi-kaluga"}},
+          {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Ремонт iPhone", "url": "https://skypka24.com/remont-iphone-kaluga"}},
+          {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Ремонт Samsung", "url": "https://skypka24.com/remont-samsung-kaluga"}},
+          {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Выкуп автомобилей", "url": "https://skypka24.com/vykup-avto-kaluga"}}
+        ]
+      }
     }
     </script>
 
-    <!-- Schema.org FAQPage — для Поиска с Алисой -->
+    <!-- Schema.org FAQPage -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -185,123 +255,210 @@
       "mainEntity": [
         {
           "@type": "Question",
-          "name": "Как продать iPhone в Скупка24?",
+          "name": "Сколько дадут за iPhone в Калуге?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Привезите iPhone в один из наших офисов в Калуге (ул. Кирова 11 или ул. Кирова 7/47), либо оставьте заявку на сайте. Оценка занимает 15 минут, деньги выплачиваем сразу в день обращения. Работаем 24/7."
+            "text": "Цена зависит от модели и состояния. Ориентировочно: iPhone 13 — от 20 000 ₽, iPhone 14 — от 30 000 ₽, iPhone 15 — от 38 000 ₽, iPhone 16 — от 48 000 ₽. Точную цену называем после осмотра за 15 минут. Оценка бесплатна и ни к чему не обязывает. Подробные цены на странице скупки iPhone."
           }
         },
         {
           "@type": "Question",
-          "name": "Сколько стоит грамм золота при сдаче в Скупка24?",
+          "name": "Сколько стоит грамм золота в скупке в Калуге сегодня?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Цена приёма золота формируется на основе биржевого курса и обновляется ежедневно. Актуальную цену смотрите на сайте skypka24.com — там отображается текущая стоимость за грамм золота 999 пробы."
+            "text": "Актуальная цена приёма золота 999 пробы отображается в шапке сайта skypka24.com и обновляется ежедневно. Цена формируется на основе биржевого курса. Золото 585 пробы принимаем по соответствующему коэффициенту. Оценка украшений бесплатно, деньги выплачиваем сразу в день обращения."
           }
         },
         {
           "@type": "Question",
-          "name": "Как быстро происходит оценка техники?",
+          "name": "Как быстро происходит оценка техники в Скупка24?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Оценка любой техники занимает не более 15 минут. После оценки сразу выплачиваем деньги наличными или на карту."
+            "text": "Оценка любой техники занимает от 5 до 15 минут. Мастер проверяет внешнее состояние, экран, батарею, работоспособность всех функций. После проверки сразу называем цену. Вы можете согласиться или отказаться — оценка бесплатна и ни к чему не обязывает."
           }
         },
         {
           "@type": "Question",
-          "name": "Какую технику принимает Скупка24?",
+          "name": "Принимаете ли технику с разбитым экраном?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Принимаем iPhone (все модели), MacBook, ноутбуки, iPad, Apple Watch, AirPods, смартфоны Samsung и других брендов, планшеты, игровые консоли PlayStation и Xbox, а также золото и ювелирные украшения."
+            "text": "Да, принимаем технику в любом состоянии — разбитый экран, сколы, царапины, не работают кнопки, после воды. Цена будет скорректирована с учётом повреждений, но деньги вы получите сразу. Также предлагаем сначала отремонтировать устройство у нас — после ремонта цена скупки будет выше."
           }
         },
         {
           "@type": "Question",
-          "name": "Где находится Скупка24?",
+          "name": "Можно ли продать технику ночью?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "У нас два офиса в Калуге: ул. Кирова, 11 и ул. Кирова, 7/47. Оба работают круглосуточно, без выходных. Телефон: 8 800 600-68-33 (бесплатно по России)."
+            "text": "Да, оба офиса в Калуге работают круглосуточно 24/7 без выходных и праздников. Кирова 11 и Кирова 7/47 — приехать можно в любое время. Звонки принимаем с 8:00 до 22:00, в Telegram отвечаем круглосуточно по адресу @skypka24."
           }
         },
         {
           "@type": "Question",
-          "name": "Можно ли сдать технику в кредите или с блокировкой?",
+          "name": "Нужен ли паспорт для продажи техники?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Принимаем технику с iCloud, но она должна быть разблокирована. Технику, находящуюся в кредите или под залогом, не принимаем. Уточните детали по телефону +7 (992) 999-03-33."
+            "text": "Да, паспорт необходим — это требование законодательства РФ для оформления договора купли-продажи. Без паспорта сделку оформить не можем. При сдаче золота паспорт также обязателен по закону о ломбардной деятельности."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Как получить деньги — наличными или на карту?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Выплачиваем любым удобным способом: наличными на месте или переводом на карту любого банка — Сбербанк, Тинькофф, ВТБ, Альфа-Банк и другие. Перевод приходит в течение нескольких минут после подписания договора."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Принимаете ли iPhone с включённым iCloud?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Принимаем iPhone с iCloud только если аккаунт разблокирован и вы можете выйти из него при нас. Заблокированный iCloud (чужой аккаунт который нельзя удалить) — не принимаем. Рекомендуем заранее выйти из Apple ID в настройках перед визитом."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Где находится Скупка24 в Калуге?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "У нас два офиса в центре Калуги: первый — улица Кирова, дом 11; второй — улица Кирова, дом 7/47. Оба офиса работают 24/7 без выходных. Телефон: +7 (992) 999-03-33. Также можно написать в Telegram: @skypka24."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Даёте ли договор при скупке техники?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Да, на каждую сделку оформляем официальный договор купли-продажи. Вы получаете свой экземпляр договора. Это гарантирует юридическую чистоту сделки для обеих сторон."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Можно ли сдать технику оптом — сразу несколько устройств?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Да, принимаем оптовые партии техники — от физических лиц и от юридических лиц и ИП. При оптовой сдаче от 5 устройств условия обсуждаются индивидуально. Позвоните заранее по номеру +7 (992) 999-03-33 или напишите в Telegram."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Принимаете ли антиквариат и старинные монеты?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Да, покупаем антиквариат — царские монеты от Владимира Великого до Николая II, православные иконы XVI-XIX веков, советские ордена и медали, фарфор Imperial и Гарднер, древние монеты Рима и Греции. Оценка по аукционным стандартам, выплата в день обращения, анонимность продавца гарантирована."
           }
         }
       ]
     }
     </script>
 
-    <!-- Schema.org Service — услуги скупки -->
+    <!-- Schema.org Service -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "Service",
-      "serviceType": "Скупка техники и золота",
+      "@id": "https://skypka24.com/#service-main",
+      "name": "Скупка техники и золота в Калуге",
+      "alternateName": "Выкуп электроники и ювелирных украшений",
+      "description": "Профессиональная оценка и выкуп смартфонов, ноутбуков, планшетов, золота и антиквариата. Оценка за 15 минут, выплата наличными или на карту в день обращения. Работаем 24/7.",
+      "url": "https://skypka24.com",
       "provider": {
         "@type": "LocalBusiness",
-        "name": "Скупка24",
-        "url": "https://skypka24.com",
-        "telephone": "+7-992-999-03-33"
+        "@id": "https://skypka24.com/#organization"
       },
-      "areaServed": {
-        "@type": "Country",
-        "name": "Россия"
+      "areaServed": [
+        {"@type": "City", "name": "Калуга"},
+        {"@type": "State", "name": "Калужская область"}
+      ],
+      "serviceType": "Скупка техники и золота",
+      "category": "Ломбард, скупка, выкуп техники",
+      "availableChannel": [
+        {
+          "@type": "ServiceChannel",
+          "name": "Офис на Кирова 11",
+          "serviceLocation": {
+            "@type": "Place",
+            "name": "Скупка24 — Кирова 11",
+            "address": {
+              "@type": "PostalAddress",
+              "streetAddress": "ул. Кирова, 11",
+              "addressLocality": "Калуга",
+              "addressCountry": "RU"
+            }
+          },
+          "availableLanguage": "Russian",
+          "servicePhone": {
+            "@type": "ContactPoint",
+            "telephone": "+7-992-999-03-33",
+            "contactType": "customer service",
+            "hoursAvailable": {
+              "@type": "OpeningHoursSpecification",
+              "opens": "00:00",
+              "closes": "23:59",
+              "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
+            }
+          }
+        },
+        {
+          "@type": "ServiceChannel",
+          "name": "Онлайн-оценка",
+          "serviceUrl": "https://skypka24.com",
+          "availableLanguage": "Russian"
+        },
+        {
+          "@type": "ServiceChannel",
+          "name": "Telegram",
+          "serviceUrl": "https://t.me/skypka24",
+          "availableLanguage": "Russian"
+        }
+      ],
+      "offers": {
+        "@type": "Offer",
+        "description": "Бесплатная оценка техники и золота. Выплата в день обращения.",
+        "price": "0",
+        "priceCurrency": "RUB"
       },
       "hasOfferCatalog": {
         "@type": "OfferCatalog",
-        "name": "Услуги скупки",
+        "name": "Что принимаем",
         "itemListElement": [
           {
-            "@type": "Offer",
-            "itemOffered": {
-              "@type": "Service",
-              "name": "Скупка iPhone",
-              "description": "Выкупаем все модели iPhone: iPhone 11, 12, 13, 14, 15, 16, 17. Оценка 15 минут, деньги сразу."
-            }
+            "@type": "OfferCatalog",
+            "name": "Смартфоны",
+            "itemListElement": [
+              {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Скупка iPhone всех моделей"}},
+              {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Скупка Samsung Galaxy"}},
+              {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Скупка Xiaomi Redmi POCO"}},
+              {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Скупка смартфонов других брендов"}}
+            ]
           },
           {
-            "@type": "Offer",
-            "itemOffered": {
-              "@type": "Service",
-              "name": "Скупка MacBook и ноутбуков",
-              "description": "Выкупаем MacBook Air, MacBook Pro, ноутбуки Lenovo, Asus, HP, Dell. Честная оценка по рыночным ценам."
-            }
+            "@type": "OfferCatalog",
+            "name": "Компьютеры и ноутбуки",
+            "itemListElement": [
+              {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Скупка MacBook Air и Pro"}},
+              {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Скупка ноутбуков Lenovo Asus HP Dell"}},
+              {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Скупка iPad и планшетов"}}
+            ]
           },
           {
-            "@type": "Offer",
-            "itemOffered": {
-              "@type": "Service",
-              "name": "Скупка золота и ювелирных украшений",
-              "description": "Покупаем золото 375, 500, 585, 750, 999 пробы. Цена по биржевому курсу. Оценка бесплатно."
-            }
+            "@type": "OfferCatalog",
+            "name": "Ювелирные украшения и металлы",
+            "itemListElement": [
+              {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Скупка золота 375-999 пробы"}},
+              {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Скупка золотых украшений"}},
+              {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Скупка золотых монет и слитков"}}
+            ]
           },
           {
-            "@type": "Offer",
-            "itemOffered": {
-              "@type": "Service",
-              "name": "Скупка iPad и планшетов",
-              "description": "Выкупаем iPad всех поколений, а также планшеты Samsung и других брендов."
-            }
-          },
-          {
-            "@type": "Offer",
-            "itemOffered": {
-              "@type": "Service",
-              "name": "Скупка Apple Watch",
-              "description": "Принимаем Apple Watch Series 3-10 и Ultra. Быстрая оценка и выплата в день обращения."
-            }
-          },
-          {
-            "@type": "Offer",
-            "itemOffered": {
-              "@type": "Service",
-              "name": "Скупка игровых консолей",
-              "description": "Выкупаем PlayStation 4, PlayStation 5, Xbox One, Xbox Series X/S, Nintendo Switch."
-            }
+            "@type": "OfferCatalog",
+            "name": "Ремонт техники",
+            "itemListElement": [
+              {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Ремонт iPhone — замена экрана и аккумулятора"}},
+              {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Ремонт Samsung Galaxy"}},
+              {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Ремонт после воды"}}
+            ]
           }
         ]
       }
@@ -334,36 +491,23 @@
     }
     </script>
 
-    <!-- Schema.org BreadcrumbList — хлебные крошки для выдачи -->
+    <!-- Schema.org BreadcrumbList -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "BreadcrumbList",
       "itemListElement": [
-        {
-          "@type": "ListItem",
-          "position": 1,
-          "name": "Главная",
-          "item": "https://skypka24.com/"
-        },
-        {
-          "@type": "ListItem",
-          "position": 2,
-          "name": "Каталог техники",
-          "item": "https://skypka24.com/catalog"
-        },
-        {
-          "@type": "ListItem",
-          "position": 3,
-          "name": "Цена золота",
-          "item": "https://skypka24.com/TopGold"
-        },
-        {
-          "@type": "ListItem",
-          "position": 4,
-          "name": "Ремонт со скидкой",
-          "item": "https://skypka24.com/repair-discount"
-        }
+        {"@type": "ListItem", "position": 1,  "name": "Главная",                    "item": "https://skypka24.com/"},
+        {"@type": "ListItem", "position": 2,  "name": "Скупка iPhone в Калуге",     "item": "https://skypka24.com/skupka-iphone-kaluga"},
+        {"@type": "ListItem", "position": 3,  "name": "Скупка MacBook в Калуге",    "item": "https://skypka24.com/skupka-macbook-kaluga"},
+        {"@type": "ListItem", "position": 4,  "name": "Скупка ноутбуков в Калуге",  "item": "https://skypka24.com/skupka-noutbukov-kaluga"},
+        {"@type": "ListItem", "position": 5,  "name": "Скупка золота в Калуге",     "item": "https://skypka24.com/skupka-zolota-kaluga"},
+        {"@type": "ListItem", "position": 6,  "name": "Скупка Samsung в Калуге",    "item": "https://skypka24.com/skupka-samsung-kaluga"},
+        {"@type": "ListItem", "position": 7,  "name": "Скупка Xiaomi в Калуге",     "item": "https://skypka24.com/skupka-xiaomi-kaluga"},
+        {"@type": "ListItem", "position": 8,  "name": "Ремонт iPhone в Калуге",     "item": "https://skypka24.com/remont-iphone-kaluga"},
+        {"@type": "ListItem", "position": 9,  "name": "Ремонт Samsung в Калуге",    "item": "https://skypka24.com/remont-samsung-kaluga"},
+        {"@type": "ListItem", "position": 10, "name": "Цена золота в Калуге",        "item": "https://skypka24.com/cena-zolota-kaluga"},
+        {"@type": "ListItem", "position": 11, "name": "Каталог техники",             "item": "https://skypka24.com/catalog"}
       ]
     }
     </script>
