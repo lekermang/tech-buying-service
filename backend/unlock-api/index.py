@@ -323,11 +323,11 @@ def handler(event: dict, context) -> dict:
 
     # ══ ДИАГНОСТИКА: ping 3gsm accountinfo (публичный, временный) ═══════════════
     if action == "ping":
-        import socket
         try:
-            our_ip = socket.gethostbyname(socket.gethostname())
-        except Exception:
-            our_ip = "unknown"
+            with urllib.request.urlopen("https://api.ipify.org", timeout=5) as _r:
+                our_ip = _r.read().decode("utf-8").strip()
+        except Exception as _e:
+            our_ip = f"error: {_e}"
         username = os.environ.get("DHRU_USERNAME", "(not set)")
         api_key  = os.environ.get("GSMSM_API_KEY", "")
         result = {"username": username, "api_key_set": bool(api_key), "api_key_len": len(api_key), "our_ip": our_ip}
