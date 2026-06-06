@@ -27,6 +27,7 @@ import AppleSaleBanner from "@/components/skupka/AppleSaleBanner";
 import RepairLinksOnIndex from "@/components/skupka/RepairLinksOnIndex";
 import CarBuyoutBanner from "@/components/skupka/CarBuyoutBanner";
 import SpecTechBuyoutBanner from "@/components/skupka/SpecTechBuyoutBanner";
+import LandBuyoutBanner from "@/components/skupka/LandBuyoutBanner";
 
 const scrollTo = (href: string) => {
   const el = document.querySelector(href);
@@ -400,6 +401,7 @@ const Index = ({ goldOpen = false }: { goldOpen?: boolean }) => {
       <AppleSaleBanner />
       <CarBuyoutBanner />
       <SpecTechBuyoutBanner />
+      <LandBuyoutBanner />
       <SafeDealsBanner />
       <PremiumServicesGrid />
       <RepairLinksOnIndex />
