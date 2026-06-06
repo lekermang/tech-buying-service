@@ -10,7 +10,6 @@ import { Link } from "react-router-dom";
 
 const GOLD_URL = (funcUrls as Record<string, string>)["gold-price"];
 const TODAY_DATE = new Date().toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" });
-const TODAY_ISO = new Date().toISOString().split("T")[0];
 const A = "#FFD700";
 const A2 = "#b8860b";
 
