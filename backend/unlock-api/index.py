@@ -99,16 +99,22 @@ def _dhru_call(action: str, parameters: dict = None) -> dict:
     req  = urllib.request.Request(DHRU_API_URL, data=data, method="POST")
     req.add_header("Content-Type", "application/x-www-form-urlencoded")
     req.add_header("Accept", "application/json")
+    req.add_header("User-Agent", "Mozilla/5.0 (compatible; DhruClient/1.0)")
 
-    with urllib.request.urlopen(req, timeout=25) as r:
-        raw = r.read().decode("utf-8")
+    try:
+        with urllib.request.urlopen(req, timeout=25) as r:
+            raw = r.read().decode("utf-8")
+            status = r.status
+    except urllib.error.HTTPError as e:
+        raw = e.read().decode("utf-8")
+        status = e.code
 
-    print(f"[dhru] action={action} status={r.status} raw={raw[:300]}")
+    print(f"[dhru] action={action} status={status} raw={raw[:500]}")
 
     try:
         return json.loads(raw)
     except Exception:
-        return {"_raw": raw}
+        return {"_raw": raw, "_status": status}
 
 
 def _dhru_success(resp: dict):
