@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import Icon from "@/components/ui/icon";
 import { ymGoal, Goals } from "@/lib/ym";
+import MagneticButton from "@/components/fx/MagneticButton";
 
 interface HeroLeftProps {
   onOpenModal: () => void;
@@ -91,29 +92,43 @@ export default function HeroLeft({ onOpenModal }: HeroLeftProps) {
         ))}
       </div>
 
-      {/* Премиум-CTA — Эффект 1 */}
+      {/* Премиум-CTA — магнитные кнопки */}
       <div className="flex flex-col sm:flex-row gap-3 mb-7 md:mb-9">
-        <button
+        {/* Кнопка «Оценить онлайн» с магнитным эффектом */}
+        <MagneticButton
+          strength={0.4}
           onClick={() => { onOpenModal(); ymGoal(Goals.FORM_OPEN, { place: "hero" }); }}
-          className="btn-cta-yellow group relative overflow-hidden font-oswald font-bold text-black text-base sm:text-lg px-7 sm:px-9 py-4 uppercase tracking-wide active:scale-95 flex items-center justify-center gap-2 rounded-md
+          className="btn-cta-yellow group relative overflow-hidden font-oswald font-bold text-black text-base sm:text-lg px-7 sm:px-9 py-4 uppercase tracking-wide flex items-center justify-center gap-2 rounded-md
                      bg-[linear-gradient(180deg,#fff3a0_0%,#ffd700_45%,#d4a017_100%)]
                      shadow-[0_0_0_1px_rgba(255,215,0,0.6),0_10px_30px_rgba(255,215,0,0.3),inset_0_1px_0_rgba(255,255,255,0.5)]">
-          <span className="absolute inset-0 bg-[linear-gradient(115deg,transparent_35%,rgba(255,255,255,0.7)_50%,transparent_65%)] bg-[length:200%_100%] -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
-          <Icon name="Zap" size={18} className="relative" />
+          {/* Бегущий блик */}
+          <span className="absolute inset-0 bg-[linear-gradient(115deg,transparent_35%,rgba(255,255,255,0.7)_50%,transparent_65%)] bg-[length:200%_100%] -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
+          {/* Пульсирующий ореол */}
+          <span className="absolute inset-0 rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+            style={{ boxShadow: "0 0 40px 8px rgba(255,215,0,0.35)" }} />
+          <Icon name="Zap" size={18} className="relative drop-shadow-[0_0_6px_rgba(0,0,0,0.4)]" />
           <span className="relative">Оценить онлайн</span>
-          <Icon name="ArrowRight" size={16} className="relative opacity-60 group-hover:translate-x-1 transition-transform" />
-        </button>
-        <a href="tel:+79929990333"
+          <Icon name="ArrowRight" size={16} className="relative opacity-70 group-hover:translate-x-1.5 transition-transform duration-200" />
+        </MagneticButton>
+
+        {/* Кнопка «Позвонить» — горячая линия 8-800 */}
+        <MagneticButton
+          as="a"
+          href="tel:+78006006833"
+          strength={0.3}
           onClick={() => ymGoal(Goals.CALL_CLICK, { place: "hero" })}
-          className="group bg-black/40 backdrop-blur-sm border border-[#FFD700]/40 hover:border-[#FFD700] text-[#FFD700] font-oswald font-bold text-base sm:text-lg px-6 sm:px-8 py-4 uppercase tracking-wide active:scale-95 transition-all flex items-center justify-center gap-2.5 rounded-md">
-          <div className="w-8 h-8 rounded-full bg-[#FFD700]/15 border border-[#FFD700]/40 flex items-center justify-center group-hover:bg-[#FFD700]/25 transition-colors">
-            <Icon name="Phone" size={14} />
+          className="group relative bg-black/40 backdrop-blur-sm border border-[#FFD700]/40 hover:border-[#FFD700] hover:bg-[#FFD700]/5 text-[#FFD700] font-oswald font-bold text-base sm:text-lg px-6 sm:px-8 py-4 uppercase tracking-wide transition-all flex items-center justify-center gap-2.5 rounded-md overflow-hidden">
+          {/* Фоновый блик при hover */}
+          <span className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-md"
+            style={{ background: "radial-gradient(ellipse at center, rgba(255,215,0,0.08) 0%, transparent 70%)" }} />
+          <div className="relative w-9 h-9 rounded-full bg-[#FFD700]/15 border border-[#FFD700]/40 flex items-center justify-center group-hover:bg-[#FFD700]/30 group-hover:scale-110 transition-all duration-200">
+            <Icon name="Phone" size={15} className="group-hover:rotate-12 transition-transform duration-200" />
           </div>
-          <div className="flex flex-col items-start leading-none">
-            <span className="text-[10px] text-[#FFD700]/60 tracking-wider">Звонок бесплатный</span>
-            <span>Позвонить</span>
+          <div className="relative flex flex-col items-start leading-none">
+            <span className="text-[10px] text-[#FFD700]/55 tracking-wider font-roboto normal-case">8 (800) 600-68-33 · бесплатно</span>
+            <span className="mt-0.5">Позвонить</span>
           </div>
-        </a>
+        </MagneticButton>
       </div>
 
       {/* Счётчики доверия — Эффект 5 */}
