@@ -1,8 +1,12 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Icon from "@/components/ui/icon";
 import { ymGoal, Goals } from "@/lib/ym";
 import DigitalParticles from "@/components/fx/DigitalParticles";
+import AuroraBackground from "@/components/fx/AuroraBackground";
+import GlowCursor from "@/components/fx/GlowCursor";
+import NoiseBg from "@/components/fx/NoiseBg";
+import RepairSplash from "@/components/repair/RepairSplash";
 import RepairSEO from "@/components/repair/RepairSEO";
 import RepairHero from "@/components/repair/RepairHero";
 import RepairStats from "@/components/repair/RepairStats";
@@ -35,7 +39,8 @@ const SERVICE_LINKS = [
 ];
 
 export default function Repair() {
-  const [scrolled, setScrolled] = useState(false);
+  const [scrolled,  setScrolled]  = useState(false);
+  const [splashDone, setSplashDone] = useState(false);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -44,22 +49,29 @@ export default function Repair() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const scrollToForm = () => {
+  const scrollToForm = useCallback(() => {
     document.getElementById("repair-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
+  }, []);
 
   return (
     <div className="relative min-h-screen bg-[#0d0d0d] text-white overflow-x-hidden">
       <RepairSEO />
 
+      {/* ── Сплэш-скрин ── */}
+      {!splashDone && <RepairSplash onDone={() => setSplashDone(true)} />}
+
+      {/* ── GlowCursor — золотой blob за курсором ── */}
+      <GlowCursor />
+
+      {/* ── Film grain texture ── */}
+      <NoiseBg opacity={0.025} />
+
       {/* Фон */}
       <div aria-hidden className="fixed inset-0 z-0 pointer-events-none">
         <DigitalParticles />
-        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[400px] rounded-full blur-[120px]"
-          style={{ background: "rgba(255,215,0,0.10)" }} />
-        <div className="absolute top-1/3 -right-40 w-[500px] h-[500px] rounded-full blur-[140px]"
-          style={{ background: "rgba(255,215,0,0.06)" }} />
-        <div className="absolute inset-0 opacity-[0.35]"
+        {/* Aurora — живые blob'ы */}
+        <AuroraBackground />
+        <div className="absolute inset-0 opacity-[0.3]"
           style={{
             backgroundImage: "linear-gradient(rgba(255,215,0,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,215,0,0.025) 1px,transparent 1px)",
             backgroundSize: "56px 56px",

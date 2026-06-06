@@ -217,38 +217,36 @@ export default function RepairLanding({ config }: { config: RepairLandingConfig 
 
       <div className="relative z-10">
         {/* Навбар */}
-        <nav className={`sticky top-0 z-50 flex items-center justify-between px-4 sm:px-8 py-3 border-b transition-colors ${scrolled ? "bg-[#0d0d0d]/90 border-[#FFD700]/15 backdrop-blur-md" : "bg-transparent border-transparent"}`}>
-          {/* Хлебная крошка: ← Скупка24 / Ремонт */}
-          <div className="flex items-center gap-1.5 min-w-0">
-            <Link to="/"
-              className="group flex items-center gap-1.5 shrink-0 transition-opacity hover:opacity-100 opacity-70">
-              <span className="flex items-center justify-center w-6 h-6 rounded-md transition-colors"
-                style={{ background: "rgba(255,215,0,0.08)", border: "1px solid rgba(255,215,0,0.2)" }}>
-                <Icon name="ChevronLeft" size={13} className="text-[#FFD700]" />
-              </span>
-              <span className="font-oswald font-bold text-sm text-white/75 group-hover:text-white transition-colors hidden xs:block">
-                Скупка<span className="text-[#FFD700]">24</span>
-              </span>
+        <nav className={`sticky top-0 z-50 flex items-center justify-between px-4 sm:px-8 py-3 border-b transition-all duration-300 ${scrolled ? "bg-[#0d0d0d]/95 border-[#FFD700]/15 backdrop-blur-lg shadow-[0_4px_24px_rgba(0,0,0,0.4)]" : "bg-transparent border-transparent"}`}>
+          {/* Левая часть: ← назад + бренд */}
+          <div className="flex items-center gap-2 min-w-0">
+            <Link to="/repair" aria-label="Назад к ремонту"
+              className="flex items-center justify-center w-9 h-9 rounded-xl border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] hover:border-[#FFD700]/30 transition-all shrink-0 active:scale-95">
+              <Icon name="ChevronLeft" size={18} className="text-white/60" />
             </Link>
-            <Icon name="ChevronRight" size={11} className="text-white/20 shrink-0" />
-            <Link to="/repair"
-              className="font-roboto text-xs text-white/50 hover:text-white/80 transition-colors truncate">
-              Ремонт
-            </Link>
+            <div className="hidden xs:flex items-center gap-1.5 text-white/30 text-xs font-roboto">
+              <Link to="/" className="hover:text-[#FFD700] transition-colors">Скупка24</Link>
+              <Icon name="ChevronRight" size={10} className="text-white/20" />
+              <Link to="/repair" className="hover:text-white/60 transition-colors">Ремонт</Link>
+            </div>
           </div>
-          <div className="flex items-center gap-3 sm:gap-5">
-            <Link to="/repair" className="hidden sm:block text-sm text-white/60 hover:text-[#FFD700] transition-colors">Все услуги</Link>
+          <div className="flex items-center gap-2 sm:gap-4">
             <a href={REPAIR_PHONE_TEL}
               onClick={() => ymGoal(Goals.CALL_CLICK, { place: "landing_nav" })}
-              className="hidden sm:inline-flex items-center gap-1.5 text-[#FFD700] font-oswald font-bold text-sm hover:text-[#ffed4a] transition-colors">
+              className="hidden md:inline-flex items-center gap-1.5 text-[#FFD700] font-oswald font-bold text-sm hover:text-[#ffed4a] transition-colors">
               <Icon name="Phone" size={14} />
               {REPAIR_PHONE_DISPLAY}
+            </a>
+            <a href={REPAIR_PHONE_TEL}
+              onClick={() => ymGoal(Goals.CALL_CLICK, { place: "landing_nav_mobile" })}
+              className="md:hidden flex items-center justify-center w-9 h-9 rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700] active:bg-[#FFD700]/20 transition-all">
+              <Icon name="Phone" size={16} />
             </a>
             <button onClick={scrollToForm}
               className="group relative overflow-hidden text-black font-oswald font-bold uppercase tracking-wide px-4 sm:px-5 py-2.5 rounded-lg text-sm active:scale-95 transition-all
                          bg-[linear-gradient(180deg,#fff3a0_0%,#ffd700_45%,#d4a017_100%)]
                          shadow-[0_0_0_1px_rgba(255,215,0,0.5),0_6px_20px_rgba(255,215,0,0.3),inset_0_1px_0_rgba(255,255,255,0.5)]
-                         hover:shadow-[0_0_0_1px_rgba(255,215,0,0.8),0_8px_28px_rgba(255,215,0,0.5),inset_0_1px_0_rgba(255,255,255,0.6)]">
+                         hover:shadow-[0_0_0_1px_rgba(255,215,0,0.8),0_8px_28px_rgba(255,215,0,0.5)]">
               <span className="absolute inset-0 bg-[linear-gradient(115deg,transparent_35%,rgba(255,255,255,0.7)_50%,transparent_65%)] bg-[length:200%_100%] -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
               <span className="relative">Заявка</span>
             </button>
