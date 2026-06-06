@@ -7,10 +7,35 @@
       "expectedStatus": 200
     },
     {
+      "name": "getServices — публичный каталог",
+      "method": "GET",
+      "path": "/?action=getServices",
+      "expectedStatus": 200
+    },
+    {
       "name": "getBalance без токена — 401",
       "method": "GET",
       "path": "/?action=getBalance",
       "expectedStatus": 401
+    },
+    {
+      "name": "myOrders без токена — 401",
+      "method": "GET",
+      "path": "/?action=myOrders",
+      "expectedStatus": 401
+    },
+    {
+      "name": "createOrder без токена — 401",
+      "method": "POST",
+      "path": "/",
+      "body": { "action": "createOrder", "serviceid": "1", "imei": "123456789012345" },
+      "expectedStatus": 401
+    },
+    {
+      "name": "getMarkup — публичное",
+      "method": "GET",
+      "path": "/?action=getMarkup",
+      "expectedStatus": 200
     }
   ]
 }
