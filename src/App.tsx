@@ -91,6 +91,14 @@ const BlogVybratServis = safeLazy(() => import("./pages/blog/KakVybratServisnyjC
 const VykupAvto = safeLazy(() => import("./pages/VykupAvto"));
 const VykupSpectehniki = safeLazy(() => import("./pages/VykupSpectehniki"));
 const KupimUchastok = safeLazy(() => import("./pages/KupimUchastok"));
+const SkupkaIphoneKaluga = safeLazy(() => import("./pages/seo/SkupkaIphoneKaluga"));
+const SkupkaMacbookKaluga = safeLazy(() => import("./pages/seo/SkupkaMacbookKaluga"));
+const SkupkaNoutbukovKaluga = safeLazy(() => import("./pages/seo/SkupkaNoutbukovKaluga"));
+const SkupkaZolotaKaluga = safeLazy(() => import("./pages/seo/SkupkaZolotaKaluga"));
+const SkupkaSamsungKaluga = safeLazy(() => import("./pages/seo/SkupkaSamsungKaluga"));
+const SkupkaXiaomiKaluga = safeLazy(() => import("./pages/seo/SkupkaXiaomiKaluga"));
+const RemontIphoneKalugaSeo = safeLazy(() => import("./pages/seo/RemontIphoneKalugaSeo"));
+const RemontSamsungKaluga = safeLazy(() => import("./pages/seo/RemontSamsungKaluga"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -214,6 +222,15 @@ const App = () => {
             <Route path="/vykup-avto" element={<VykupAvto />} />
             <Route path="/vykup-spectehniki" element={<VykupSpectehniki />} />
             <Route path="/kupim-uchastok" element={<KupimUchastok />} />
+            {/* SEO-посадочные страницы */}
+            <Route path="/skupka-iphone-kaluga"    element={<SkupkaIphoneKaluga />} />
+            <Route path="/skupka-macbook-kaluga"   element={<SkupkaMacbookKaluga />} />
+            <Route path="/skupka-noutbukov-kaluga" element={<SkupkaNoutbukovKaluga />} />
+            <Route path="/skupka-zolota-kaluga"    element={<SkupkaZolotaKaluga />} />
+            <Route path="/skupka-samsung-kaluga"   element={<SkupkaSamsungKaluga />} />
+            <Route path="/skupka-xiaomi-kaluga"    element={<SkupkaXiaomiKaluga />} />
+            <Route path="/remont-iphone-kaluga"    element={<RemontIphoneKalugaSeo />} />
+            <Route path="/remont-samsung-kaluga"   element={<RemontSamsungKaluga />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
