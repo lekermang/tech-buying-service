@@ -89,6 +89,7 @@ const BlogChtoDelatVoda = safeLazy(() => import("./pages/blog/ChtoDelatTelefonVo
 const BlogTop5Iphone = safeLazy(() => import("./pages/blog/Top5PolomokIphone"));
 const BlogVybratServis = safeLazy(() => import("./pages/blog/KakVybratServisnyjCentr"));
 const VykupAvto = safeLazy(() => import("./pages/VykupAvto"));
+const VykupSpectehniki = safeLazy(() => import("./pages/VykupSpectehniki"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -210,6 +211,7 @@ const App = () => {
             <Route path="/blog/top-5-polomok-iphone" element={<BlogTop5Iphone />} />
             <Route path="/blog/kak-vybrat-servisnyj-centr-v-kaluge" element={<BlogVybratServis />} />
             <Route path="/vykup-avto" element={<VykupAvto />} />
+            <Route path="/vykup-spectehniki" element={<VykupSpectehniki />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -26,6 +26,7 @@ import DesktopStickyBar from "@/components/skupka/DesktopStickyBar";
 import AppleSaleBanner from "@/components/skupka/AppleSaleBanner";
 import RepairLinksOnIndex from "@/components/skupka/RepairLinksOnIndex";
 import CarBuyoutBanner from "@/components/skupka/CarBuyoutBanner";
+import SpecTechBuyoutBanner from "@/components/skupka/SpecTechBuyoutBanner";
 
 const scrollTo = (href: string) => {
   const el = document.querySelector(href);
@@ -398,6 +399,7 @@ const Index = ({ goldOpen = false }: { goldOpen?: boolean }) => {
       <HeroSection scrollTo={scrollTo} externalModalOpen={evalOpen} onExternalModalClose={() => setEvalOpen(false)} />
       <AppleSaleBanner />
       <CarBuyoutBanner />
+      <SpecTechBuyoutBanner />
       <SafeDealsBanner />
       <PremiumServicesGrid />
       <RepairLinksOnIndex />
