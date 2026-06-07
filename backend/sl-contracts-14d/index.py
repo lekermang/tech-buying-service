@@ -2,12 +2,64 @@ import json
 import os
 import base64
 import uuid
+import requests
 from datetime import datetime, date, timedelta
 from decimal import Decimal
 
 import psycopg2
 import psycopg2.extras
 import boto3
+
+MAX_BOT_URL = 'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c'
+GOODS_API_URL = 'https://functions.poehali.dev/de4c1e8e-0c7b-4f25-a3fd-155c46fa3399'
+
+
+def _notify_contract_closed(contract_number: str, client_name: str, item_name: str,
+                             amount: float, profit: float, actor_name: str) -> None:
+    """Уведомляет сотрудников в MAX о том, что клиент вышел с договора."""
+    try:
+        text = (
+            f"✅ *Клиент вышел с договора*\n\n"
+            f"📋 {contract_number}\n"
+            f"👤 {client_name}\n"
+            f"📱 {item_name}\n"
+            f"💵 Выдано: *{int(amount):,} ₽*\n".replace(',', '\u00a0') +
+            f"📈 Прибыль: *{int(profit):,} ₽*\n".replace(',', '\u00a0') +
+            f"🕐 Срок: 14 дней\n"
+            f"👨‍💼 Принял: {actor_name}"
+        )
+        requests.post(
+            f'{MAX_BOT_URL}?action=staff_send',
+            json={'text': text},
+            timeout=6,
+        )
+    except Exception as e:
+        print(f'[sl-contracts][notify_closed] error: {e}')
+
+
+def _notify_contract_closed_tg(contract_number: str, client_name: str, item_name: str,
+                                amount: float, profit: float) -> None:
+    """Дублирует уведомление о закрытии в Telegram."""
+    try:
+        tg_token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+        tg_chat = os.environ.get('TELEGRAM_CHAT_ID', '')
+        if not tg_token or not tg_chat:
+            return
+        text = (
+            f"✅ *Клиент вышел с договора*\n\n"
+            f"📋 {contract_number}\n"
+            f"👤 {client_name}\n"
+            f"📱 {item_name}\n"
+            f"💵 Выдано: {int(amount):,} ₽\n".replace(',', '\u00a0') +
+            f"📈 Прибыль: {int(profit):,} ₽"
+        )
+        requests.post(
+            f'https://api.telegram.org/bot{tg_token}/sendMessage',
+            json={'chat_id': tg_chat, 'text': text, 'parse_mode': 'Markdown'},
+            timeout=6,
+        )
+    except Exception as e:
+        print(f'[sl-contracts][notify_tg] error: {e}')
 
 HEADERS = {
     'Access-Control-Allow-Origin': '*',
@@ -874,13 +926,19 @@ def action_close(body, actor):
     conn = get_conn(); cur = conn.cursor()
     try:
         cur.execute(
-            f"SELECT remaining_debt FROM {SCHEMA}.contracts_14d WHERE id=%s AND status='active'",
+            f"""SELECT c.remaining_debt, c.contract_number, c.amount, c.paid_total,
+                       cl.full_name, i.brand, i.model, i.item_type
+                FROM {SCHEMA}.contracts_14d c
+                LEFT JOIN {SCHEMA}.contracts_14d_clients cl ON cl.contract_id = c.id
+                LEFT JOIN {SCHEMA}.contracts_14d_items i ON i.contract_id = c.id
+                WHERE c.id=%s AND c.status='active'""",
             (int(cid),)
         )
         row = cur.fetchone()
         if not row:
             return _err(404, 'Активный договор не найден')
-        if Decimal(str(row[0])) > Decimal('0.01'):
+        remaining_debt, contract_number, amount, paid_total, client_name, brand, model, item_type = row
+        if Decimal(str(remaining_debt)) > Decimal('0.01'):
             return _err(400, 'Нельзя закрыть договор с остатком долга')
         cur.execute(
             f"UPDATE {SCHEMA}.contracts_14d SET status='closed', closed_at=NOW(), updated_at=NOW() WHERE id=%s",
@@ -888,6 +946,30 @@ def action_close(body, actor):
         )
         _log(cur, int(cid), 'close', {}, actor)
         conn.commit()
+
+        # Уведомляем сотрудников в MAX и Telegram
+        item_name = ' '.join(filter(None, [brand, model])) or item_type or 'Устройство'
+        profit = float(paid_total or 0) - float(amount or 0)
+        actor_name = (actor or {}).get('full_name', 'Сотрудник')
+        try:
+            _notify_contract_closed(
+                contract_number or f'#{cid}',
+                client_name or '—',
+                item_name,
+                float(amount or 0),
+                profit,
+                actor_name,
+            )
+            _notify_contract_closed_tg(
+                contract_number or f'#{cid}',
+                client_name or '—',
+                item_name,
+                float(amount or 0),
+                profit,
+            )
+        except Exception as notify_err:
+            print(f'[sl-contracts][close] notify error: {notify_err}')
+
         return _ok({'ok': True, 'status': 'closed'})
     except Exception as e:
         conn.rollback()
@@ -1204,8 +1286,126 @@ def action_extend(body, actor):
         cur.close(); conn.close()
 
 
+def action_to_warehouse(body, actor):
+    """Перевести товар из договора на склад б/у товаров.
+    Процент обнуляется — берём сумму закупки (amount) как purchase_price,
+    sell_price задаёт сотрудник (рекомендуется x2 от закупки)."""
+    cid = body.get('contract_id')
+    sell_price = body.get('sell_price')
+    if not cid:
+        return _err(400, 'contract_id required')
+    if not sell_price or int(sell_price) < 1:
+        return _err(400, 'sell_price required')
+
+    conn = get_conn(); cur = conn.cursor()
+    try:
+        cur.execute(
+            f"""SELECT c.id, c.contract_number, c.amount, c.status,
+                       cl.full_name, cl.phone,
+                       i.brand, i.model, i.item_type, i.serial_number, i.condition,
+                       p.file_url
+                FROM {SCHEMA}.contracts_14d c
+                LEFT JOIN {SCHEMA}.contracts_14d_clients cl ON cl.contract_id = c.id
+                LEFT JOIN {SCHEMA}.contracts_14d_items i ON i.contract_id = c.id
+                LEFT JOIN {SCHEMA}.contracts_14d_photos p ON p.contract_id = c.id AND p.photo_type='device'
+                WHERE c.id=%s AND c.status='active'
+                LIMIT 1""",
+            (int(cid),)
+        )
+        row = cur.fetchone()
+        if not row:
+            return _err(404, 'Активный договор не найден')
+
+        (contract_id, contract_number, amount, status,
+         client_name, client_phone,
+         brand, model, item_type, serial_number, condition,
+         photo_url) = row
+
+        purchase_price = int(float(amount or 0))
+        sp = int(sell_price)
+
+        # Формируем название товара
+        title_parts = [brand, model] if brand or model else [item_type or 'Товар из ломбарда']
+        title = ' '.join(filter(None, title_parts))
+
+        # Добавляем товар в goods через goods-api (через HTTP, токен сотрудника)
+        employee_token = ''
+        try:
+            emp_token_raw = os.environ.get('ADMIN_TOKEN', '')
+            # Используем токен актора из сессии
+            conn2 = get_conn(); cur2 = conn2.cursor()
+            cur2.execute(
+                f"SELECT auth_token FROM {SCHEMA}.employees WHERE id=%s LIMIT 1",
+                (actor['id'],)
+            )
+            emp_row = cur2.fetchone()
+            cur2.close(); conn2.close()
+            if emp_row:
+                employee_token = emp_row[0]
+        except Exception:
+            pass
+
+        goods_payload = {
+            'action': 'add',
+            'title': title,
+            'category': item_type or 'Смартфон',
+            'brand': brand,
+            'model': model,
+            'condition': condition or 'хорошее',
+            'purchase_price': purchase_price,
+            'sell_price': sp,
+            'imei': serial_number,
+            'photo_url': photo_url,
+            'description': f'Из ломбарда {contract_number}. Выкуп: {purchase_price} ₽',
+        }
+
+        goods_result = {}
+        try:
+            r = requests.post(
+                GOODS_API_URL,
+                json=goods_payload,
+                headers={'X-Employee-Token': employee_token, 'Content-Type': 'application/json'},
+                timeout=10,
+            )
+            goods_result = r.json() if r.status_code == 200 else {'error': f'HTTP {r.status_code}'}
+        except Exception as ge:
+            goods_result = {'error': str(ge)}
+
+        # Логируем перевод на склад
+        _log(cur, int(cid), 'to_warehouse', {
+            'sell_price': sp,
+            'purchase_price': purchase_price,
+            'goods_id': goods_result.get('id'),
+        }, actor)
+        conn.commit()
+
+        # Уведомляем сотрудников
+        try:
+            text = (
+                f"📦 *Товар переведён на склад*\n\n"
+                f"📋 {contract_number}\n"
+                f"📱 {title}\n"
+                f"💵 Закупка: {purchase_price:,} ₽ → Продажа: {sp:,} ₽\n".replace(',', '\u00a0') +
+                f"👨‍💼 {actor.get('full_name', 'Сотрудник')}"
+            )
+            requests.post(
+                f'{MAX_BOT_URL}?action=staff_send',
+                json={'text': text},
+                timeout=5,
+            )
+        except Exception:
+            pass
+
+        return _ok({'ok': True, 'goods_id': goods_result.get('id'), 'sell_price': sp})
+    except Exception as e:
+        conn.rollback()
+        return _err(500, f'DB error: {e}')
+    finally:
+        cur.close(); conn.close()
+
+
 def handler(event: dict, context) -> dict:
-    """Договоры продажи на 14 дней (СмартЛомбард). Действия: list, get, create, calculate, payment, terminate, close, stats, upload_photo, public_view, extend."""
+    """Договоры продажи на 14 дней (СмартЛомбард). Действия: list, get, create, calculate, payment, terminate, close, stats, upload_photo, public_view, extend, to_warehouse."""
     method = event.get('httpMethod', 'GET')
     if method == 'OPTIONS':
         return {'statusCode': 200, 'headers': HEADERS, 'body': ''}
@@ -1265,6 +1465,8 @@ def handler(event: dict, context) -> dict:
             return action_upload_photo(body, actor)
         if action == 'extend':
             return action_extend(body, actor)
+        if action == 'to_warehouse':
+            return action_to_warehouse(body, actor)
         return _err(400, f'Unknown POST action: {action}')
 
     return _err(405, 'Method not allowed')
