@@ -45,10 +45,10 @@ Allow: /blacklist
 Allow: /checklist
 Allow: /chat
 Allow: /repair-status
+Allow: /tools
 Disallow: /admin
 Disallow: /cabinet
 Disallow: /staff
-Disallow: /tools
 Disallow: /tools-sync
 Disallow: /investor/
 Disallow: /p/c/
@@ -95,10 +95,10 @@ Allow: /soviet-antiques
 Allow: /TopGold
 Allow: /requisites
 Allow: /safe-deals
+Allow: /tools
 Disallow: /admin
 Disallow: /cabinet
 Disallow: /staff
-Disallow: /tools
 Disallow: /tools-sync
 Disallow: /investor/
 Disallow: /p/c/
@@ -162,10 +162,10 @@ Allow: /soviet-antiques
 Allow: /TopGold
 Allow: /requisites
 Allow: /safe-deals
+Allow: /tools
 Disallow: /admin
 Disallow: /cabinet
 Disallow: /staff
-Disallow: /tools
 Disallow: /tools-sync
 Disallow: /investor/
 Disallow: /p/c/

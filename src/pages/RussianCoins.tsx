@@ -1,4 +1,5 @@
 import { useState } from "react";
+import PageSEO from "@/components/seo/PageSEO";
 import Header from "@/components/skupka/Header";
 import ContactsFooter from "@/components/skupka/ContactsFooter";
 import RussianCoinsHero from "./russianCoins/RussianCoinsHero";
@@ -16,6 +17,21 @@ export default function RussianCoins() {
 
   return (
     <div className="min-h-screen bg-[#080808] text-white">
+      <PageSEO
+        title="Скупка русских монет в Калуге — царские, советские | Скупка24"
+        description="Купим русские монеты: царская Россия, советский период, Киевская Русь. Бесплатная оценка, честная цена. Скупка24 Калуга — Кирова 11."
+        keywords="скупка русских монет Калуга, царские монеты Калуга, советские монеты Калуга, оценка монет, нумизматика"
+        url="https://skypka24.com/russian-coins"
+        schema={{
+          "@context": "https://schema.org",
+          "@type": ["LocalBusiness", "PawnShop"],
+          name: "Скупка24 — Скупка русских монет",
+          description: "Скупка русских монет всех периодов в Калуге.",
+          url: "https://skypka24.com/russian-coins",
+          telephone: "+79929990333",
+          address: { "@type": "PostalAddress", streetAddress: "ул. Кирова, 7", addressLocality: "Калуга", addressCountry: "RU" },
+        }}
+      />
       <Header scrollTo={() => {}} />
 
       <RussianCoinsHero onOpenForm={() => setFormOpen(true)} />

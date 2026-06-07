@@ -1,4 +1,5 @@
 import { useState } from "react";
+import PageSEO from "@/components/seo/PageSEO";
 import Header from "@/components/skupka/Header";
 import ContactsFooter from "@/components/skupka/ContactsFooter";
 import PorcelainHero from "./porcelain/PorcelainHero";
@@ -29,6 +30,21 @@ export default function RussianPorcelain() {
 
   return (
     <div className="min-h-screen bg-[#080808] text-white">
+      <PageSEO
+        title="Скупка фарфора и хрусталя в Калуге — ИФЗ, Гарднер | Скупка24"
+        description="Купим старинный фарфор в Калуге: ИФЗ, Гарднер, Кузнецов, советский ЛФЗ, хрусталь. Бесплатная оценка, честная цена. Скупка24 — Кирова 11."
+        keywords="скупка фарфора Калуга, ИФЗ купить Калуга, Гарднер фарфор Калуга, Кузнецов фарфор, антиквариат фарфор"
+        url="https://skypka24.com/porcelain"
+        schema={{
+          "@context": "https://schema.org",
+          "@type": ["LocalBusiness", "PawnShop"],
+          name: "Скупка24 — Скупка фарфора",
+          description: "Скупка антикварного фарфора и хрусталя в Калуге.",
+          url: "https://skypka24.com/porcelain",
+          telephone: "+79929990333",
+          address: { "@type": "PostalAddress", streetAddress: "ул. Кирова, 7", addressLocality: "Калуга", addressCountry: "RU" },
+        }}
+      />
       <Header scrollTo={() => {}} />
 
       <PorcelainHero onOpenForm={() => setFormOpen(true)} />

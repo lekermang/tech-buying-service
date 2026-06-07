@@ -1,5 +1,6 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
+import PageSEO from "@/components/seo/PageSEO";
 import Header from "@/components/skupka/Header";
 import ContactsFooter from "@/components/skupka/ContactsFooter";
 
@@ -95,6 +96,21 @@ export default function BronzeSculptures() {
 
   return (
     <div className="min-h-screen bg-[#080808] text-white">
+      <PageSEO
+        title="Скупка бронзовой скульптуры в Калуге — антиквариат | Скупка24"
+        description="Купим бронзовую скульптуру и статуэтки: Античность, Рим, Средневековье, Восток, XIX–XX вв. Бесплатная оценка эксперта. Скупка24 Калуга."
+        keywords="скупка бронзы Калуга, бронзовые статуэтки Калуга, антиквариат бронза Калуга, оценка скульптуры"
+        url="https://skypka24.com/bronze-sculptures"
+        schema={{
+          "@context": "https://schema.org",
+          "@type": ["LocalBusiness", "PawnShop"],
+          name: "Скупка24 — Скупка бронзы",
+          description: "Скупка бронзовых скульптур и антиквариата в Калуге.",
+          url: "https://skypka24.com/bronze-sculptures",
+          telephone: "+79929990333",
+          address: { "@type": "PostalAddress", streetAddress: "ул. Кирова, 7", addressLocality: "Калуга", addressCountry: "RU" },
+        }}
+      />
       <Header />
 
       {/* ══ HERO ══ */}

@@ -5,6 +5,7 @@ import ToolsProductCard from "@/components/tools/ToolsProductCard";
 import ToolsCartModal from "@/components/tools/ToolsCartModal";
 import ToolsSidebar from "@/components/tools/ToolsSidebar";
 import ToolsBanners from "@/components/tools/ToolsBanners";
+import PageSEO from "@/components/seo/PageSEO";
 
 const TOOLS_API = "https://functions.poehali.dev/434ea4ea-de14-4074-a738-e5db6e4f9697";
 const PAGE_SIZE = 48;
@@ -181,6 +182,19 @@ export default function ToolsPage() {
 
   return (
     <div className="min-h-screen bg-gray-950">
+      <PageSEO
+        title="Каталог инструментов — купить электроинструмент в Калуге | Скупка24"
+        description="Купить электроинструмент и ручной инструмент в Калуге. Большой выбор, доступные цены. Скупка24 — надёжный партнёр для бизнеса и частных мастеров."
+        keywords="купить инструмент Калуга, электроинструмент Калуга, строительный инструмент, ручной инструмент Калуга"
+        url="https://skypka24.com/tools"
+        schema={{
+          "@context": "https://schema.org",
+          "@type": "ItemList",
+          name: "Каталог инструментов Скупка24",
+          description: "Большой выбор электро- и ручного инструмента",
+          url: "https://skypka24.com/tools",
+        }}
+      />
 
       {/* ── Шапка ── */}
       <header className="bg-gray-900 border-b border-gray-800 sticky top-0 z-30 shadow-lg">

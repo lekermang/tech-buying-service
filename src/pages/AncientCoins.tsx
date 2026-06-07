@@ -1,4 +1,5 @@
 import { useState } from "react";
+import PageSEO from "@/components/seo/PageSEO";
 import Header from "@/components/skupka/Header";
 import ContactsFooter from "@/components/skupka/ContactsFooter";
 import AncientCoinsHero from "./ancientCoins/AncientCoinsHero";
@@ -21,6 +22,21 @@ export default function AncientCoins() {
 
   return (
     <div className="min-h-screen bg-[#080808] text-white">
+      <PageSEO
+        title="Скупка древних монет в Калуге — оценка бесплатно | Скупка24"
+        description="Купим древние монеты в Калуге: Античная Греция, Рим, Парфия, Древняя Русь. Бесплатная оценка нумизмата, выплата в день обращения. ☎ +7 (992) 999-03-33"
+        keywords="скупка монет Калуга, купить старинные монеты Калуга, оценка монет Калуга, нумизматика Калуга, античные монеты"
+        url="https://skypka24.com/ancient-coins"
+        schema={{
+          "@context": "https://schema.org",
+          "@type": ["LocalBusiness", "PawnShop"],
+          name: "Скупка24 — Скупка монет",
+          description: "Скупка древних и старинных монет в Калуге. Бесплатная оценка, выплата в день обращения.",
+          url: "https://skypka24.com/ancient-coins",
+          telephone: "+79929990333",
+          address: { "@type": "PostalAddress", streetAddress: "ул. Кирова, 7", addressLocality: "Калуга", addressCountry: "RU" },
+        }}
+      />
       <Header />
 
       <AncientCoinsHero onOpenForm={() => setFormOpen(true)} />

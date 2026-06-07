@@ -510,6 +510,14 @@
     <priority>0.82</priority>
   </url>
 
+  <!-- ===== ИНСТРУМЕНТЫ ===== -->
+  <url>
+    <loc>https://skypka24.com/tools</loc>
+    <lastmod>2026-06-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+  </url>
+
   <!-- ===== СКУПКА ЗОЛОТА ===== -->
   <url>
     <loc>https://skypka24.com/TopGold</loc>

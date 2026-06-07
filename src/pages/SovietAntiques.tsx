@@ -1,4 +1,5 @@
 import { useState } from "react";
+import PageSEO from "@/components/seo/PageSEO";
 import Header from "@/components/skupka/Header";
 import ContactsFooter from "@/components/skupka/ContactsFooter";
 import SovietHero from "./soviet/SovietHero";
@@ -29,6 +30,21 @@ export default function SovietAntiques() {
 
   return (
     <div className="min-h-screen bg-[#080808] text-white">
+      <PageSEO
+        title="Скупка советского антиквариата в Калуге — ордена, фарфор | Скупка24"
+        description="Купим советский антиквариат в Калуге: ордена, медали, фарфор ЛФЗ, авангард, мебель. Бесплатная оценка, выплата в день обращения."
+        keywords="скупка советского антиквариата Калуга, советские ордена Калуга, медали СССР, ЛФЗ фарфор, советский авангард"
+        url="https://skypka24.com/soviet-antiques"
+        schema={{
+          "@context": "https://schema.org",
+          "@type": ["LocalBusiness", "PawnShop"],
+          name: "Скупка24 — Советский антиквариат",
+          description: "Скупка советского антиквариата, орденов и фарфора в Калуге.",
+          url: "https://skypka24.com/soviet-antiques",
+          telephone: "+79929990333",
+          address: { "@type": "PostalAddress", streetAddress: "ул. Кирова, 7", addressLocality: "Калуга", addressCountry: "RU" },
+        }}
+      />
       <Header scrollTo={() => {}} />
 
       <SovietHero onOpenForm={() => setFormOpen(true)} />
