@@ -1376,17 +1376,11 @@ def action_to_warehouse(body, actor):
         title_parts = [brand, model] if (brand or model) else [item_type or 'Товар из ломбарда']
         title = ' '.join(filter(None, title_parts))
 
-        # Генерируем SKU
-        year = datetime.now().year
-        cur.execute(
-            f"SELECT COUNT(*) FROM {SCHEMA}.slshop_items WHERE sku LIKE %s",
-            (f'SL-{year}-%',)
-        )
-        sku_n = (cur.fetchone()[0] or 0) + 1
-        sku = f'SL-{year}-{sku_n:04d}'
+        # Генерируем уникальный SKU через uuid-хвост (нет дублей)
+        sku = f'SL-{contract_number}'
 
-        # Фото: если есть — передаём как массив
-        images_val = '{' + photo_url + '}' if photo_url else '{}'
+        # Фото: передаём как Python-list → psycopg2 конвертирует в массив
+        images_list = [photo_url] if photo_url else []
 
         # Вставляем товар напрямую в slshop_items
         cur.execute(
@@ -1404,7 +1398,7 @@ def action_to_warehouse(body, actor):
                 serial_number, serial_number,
                 purchase_price, sp,
                 f'Из ломбарда {contract_number}. Выкуп: {int(purchase_price)} ₽',
-                images_val, sku, actor_name,
+                images_list, sku, actor_name,
             )
         )
         new_item_id = cur.fetchone()[0]
