@@ -8,6 +8,7 @@ import Header from "@/components/skupka/Header";
 import ContactsFooter from "@/components/skupka/ContactsFooter";
 import Icon from "@/components/ui/icon";
 import { CatalogItem, CATALOG_URL } from "@/pages/catalog.types";
+import PageSEO from "@/components/seo/PageSEO";
 
 const MODEL_FILTERS: Record<string, string[]> = {
   "iPhone 17/AIR/PRO/MAX":   ["Все", "Pro Max", "Pro", "Air", "iPhone 17"],
@@ -210,6 +211,20 @@ const Catalog = () => {
 
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-white">
+      <PageSEO
+        title="Каталог б/у техники — iPhone, MacBook, Android | Скупка24 Калуга"
+        description="Купить б/у iPhone, MacBook, Android в Калуге. Проверенная техника с гарантией 30 дней. Честные цены, возврат 7 дней. Скупка24 — Кирова 11."
+        keywords="купить iPhone Калуга, б/у iPhone Калуга, MacBook б/у Калуга, каталог техники Калуга, скупка24 каталог"
+        url="https://skypka24.com/catalog"
+        schema={{
+          "@context": "https://schema.org",
+          "@type": "CollectionPage",
+          name: "Каталог б/у техники Скупка24",
+          description: "Проверенные смартфоны, ноутбуки и гаджеты с гарантией",
+          url: "https://skypka24.com/catalog",
+          provider: { "@type": "LocalBusiness", name: "Скупка24", url: "https://skypka24.com" },
+        }}
+      />
 
       {/* Шапка главной */}
       <Header scrollTo={scrollTo} />

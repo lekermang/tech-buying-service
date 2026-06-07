@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import Icon from "@/components/ui/icon";
+import PageSEO from "@/components/seo/PageSEO";
 
 const Requisites = () => {
   const navigate = useNavigate();
@@ -26,6 +27,11 @@ const Requisites = () => {
 
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-white">
+      <PageSEO
+        title="Реквизиты — ИП Мамедов | Скупка24 Калуга"
+        description="Юридические и банковские реквизиты ИП Мамедов Адиль Мирза Оглы (Скупка24). ИНН 402810962699, ОГРНИП 307402814200032."
+        url="https://skypka24.com/requisites"
+      />
       <div className="max-w-3xl mx-auto px-4 py-10 md:py-16">
         <button
           onClick={() => navigate(-1)}

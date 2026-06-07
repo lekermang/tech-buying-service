@@ -3,6 +3,7 @@ import Icon from "@/components/ui/icon";
 import { getToken, clearToken, authCall } from "./unlock/unlockConstants";
 import { AuthScreen } from "./unlock/UnlockAuth";
 import { Cabinet } from "./unlock/UnlockCabinet";
+import PageSEO from "@/components/seo/PageSEO";
 
 export default function Unlock() {
   const [authed, setAuthed] = useState<boolean | null>(null);
@@ -35,6 +36,15 @@ export default function Unlock() {
     );
   }
 
-  if (!authed) return <AuthScreen onAuth={() => setAuthed(true)} />;
-  return <Cabinet onLogout={() => setAuthed(false)} />;
+  return (
+    <>
+      <PageSEO
+        title="Разблокировка iPhone — снятие iCloud, FRP | Скупка24 Калуга"
+        description="Разблокировка iPhone от iCloud, снятие FRP на Android в Калуге. Официальные методы, гарантия результата. Скупка24 — Кирова 11."
+        keywords="разблокировка iPhone Калуга, снятие iCloud Калуга, FRP Android, разблокировка телефона Калуга"
+        url="https://skypka24.com/unlock"
+      />
+      {!authed ? <AuthScreen onAuth={() => setAuthed(true)} /> : <Cabinet onLogout={() => setAuthed(false)} />}
+    </>
+  );
 }

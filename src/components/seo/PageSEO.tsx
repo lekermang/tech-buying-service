@@ -47,9 +47,13 @@ export default function PageSEO({
     push(setMeta('meta[property="og:url"]', "property", "og:url", url));
     push(setMeta('meta[property="og:type"]', "property", "og:type", ogType));
     push(setMeta('meta[property="og:image"]', "property", "og:image", ogImage));
+    push(setMeta('meta[property="og:image:type"]', "property", "og:image:type", "image/jpeg"));
+    push(setMeta('meta[property="og:image:width"]', "property", "og:image:width", "1200"));
+    push(setMeta('meta[property="og:image:height"]', "property", "og:image:height", "630"));
     push(setMeta('meta[name="twitter:card"]', "name", "twitter:card", "summary_large_image"));
     push(setMeta('meta[name="twitter:title"]', "name", "twitter:title", title));
     push(setMeta('meta[name="twitter:description"]', "name", "twitter:description", description));
+    push(setMeta('meta[name="twitter:image"]', "name", "twitter:image", ogImage));
 
     let canonical = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
     if (!canonical) {
