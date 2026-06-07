@@ -23,6 +23,46 @@ SCHEMA = 't_p31606708_tech_buying_service'
 
 # URL пуш-хаба (см. backend/notify-push)
 PUSH_URL = "https://functions.poehali.dev/0a041e7f-92ab-4dbf-86f0-cd09e3eabfbd"
+MAX_BOT_URL = "https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c"
+
+
+def _notify_sale(title: str, item_name: str, amount: float, employee_name: str, qty: int = 1) -> None:
+    """Уведомляет сотрудников в MAX и Telegram о продаже со смартломбарда."""
+    try:
+        qty_text = f' ({qty} шт)' if qty > 1 else ''
+        text = (
+            f"💰 *Продажа со склада*\n\n"
+            f"📱 {item_name}{qty_text}\n"
+            f"💵 *{int(amount):,} ₽*\n".replace(',', '\u00a0') +
+            f"👨‍💼 {employee_name}"
+        )
+        data = json.dumps({'text': text}).encode('utf-8')
+        req = urllib.request.Request(
+            f'{MAX_BOT_URL}?action=staff_send', data=data, method='POST',
+            headers={'Content-Type': 'application/json'},
+        )
+        urllib.request.urlopen(req, timeout=5).read()
+    except Exception as e:
+        print(f'[slshop][notify_sale MAX] {e}')
+    try:
+        tg_token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+        tg_chat = os.environ.get('TELEGRAM_CHAT_ID', '')
+        if tg_token and tg_chat:
+            qty_text = f' ({qty} шт)' if qty > 1 else ''
+            text = (
+                f"💰 *Продажа со склада*\n\n"
+                f"📱 {item_name}{qty_text}\n"
+                f"💵 *{int(amount):,} ₽*\n".replace(',', '\u00a0') +
+                f"👨‍💼 {employee_name}"
+            )
+            data = json.dumps({'chat_id': tg_chat, 'text': text, 'parse_mode': 'Markdown'}).encode('utf-8')
+            req = urllib.request.Request(
+                f'https://api.telegram.org/bot{tg_token}/sendMessage', data=data, method='POST',
+                headers={'Content-Type': 'application/json'},
+            )
+            urllib.request.urlopen(req, timeout=5).read()
+    except Exception as e:
+        print(f'[slshop][notify_sale TG] {e}')
 
 
 def _send_push_event(title: str, body: str, url: str = "/staff", tag: str = "slshop") -> None:
@@ -2512,6 +2552,14 @@ def sell_item(body, employee):
             )
             cur.execute(f"UPDATE {SCHEMA}.slshop_cash_accounts SET balance={new_balance} WHERE id={acc_id}")
     conn.commit(); cur.close(); conn.close()
+
+    # Уведомляем сотрудников о продаже в MAX и Telegram
+    try:
+        emp_name = (employee.get('full_name') if employee else None) or 'Сотрудник'
+        _notify_sale(sold_title or 'Товар', sold_title or 'Товар', float(amount), emp_name, sell_qty)
+    except Exception as ne:
+        print(f'[slshop][sell_item] notify error: {ne}')
+
     return _ok({'op_id': op_id})
 
 

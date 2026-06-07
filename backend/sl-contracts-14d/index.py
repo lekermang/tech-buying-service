@@ -786,15 +786,63 @@ def action_terminate(body, actor):
     conn = get_conn(); cur = conn.cursor()
     try:
         cur.execute(
+            f"""SELECT c.contract_number, c.amount,
+                       cl.full_name, cl.phone,
+                       i.brand, i.model, i.item_type
+                FROM {SCHEMA}.contracts_14d c
+                LEFT JOIN {SCHEMA}.contracts_14d_clients cl ON cl.contract_id = c.id
+                LEFT JOIN {SCHEMA}.contracts_14d_items i ON i.contract_id = c.id
+                WHERE c.id=%s AND c.status='active' LIMIT 1""",
+            (int(cid),)
+        )
+        info = cur.fetchone()
+        if not info:
+            return _err(404, 'Активный договор не найден')
+        contract_number, amount, client_name, client_phone, brand, model, item_type = info
+
+        cur.execute(
             f"UPDATE {SCHEMA}.contracts_14d SET status='terminated', closed_at=NOW(), "
             f"updated_at=NOW(), terminate_reason=%s WHERE id=%s AND status='active' RETURNING id",
             (reason, int(cid))
         )
-        row = cur.fetchone()
-        if not row:
+        if not cur.fetchone():
             return _err(404, 'Активный договор не найден')
         _log(cur, int(cid), 'terminate', {'reason': reason}, actor)
         conn.commit()
+
+        # Уведомляем сотрудников: клиент не выкупил — товар переходит магазину
+        item_name = ' '.join(filter(None, [brand, model])) or item_type or 'Устройство'
+        actor_name = (actor or {}).get('full_name', 'Сотрудник')
+        reason_text = f'\n📝 {reason}' if reason else ''
+        try:
+            text = (
+                f"🔴 *Расторжение договора*\n\n"
+                f"📋 {contract_number or f'#{cid}'}\n"
+                f"👤 {client_name or '—'}"
+                + (f" · {client_phone}" if client_phone else '') + "\n"
+                f"📱 {item_name}\n"
+                f"💵 Выдано: *{int(float(amount or 0)):,} ₽*\n".replace(',', '\u00a0') +
+                f"📦 Товар переходит на склад магазина"
+                + reason_text + "\n"
+                f"👨‍💼 {actor_name}"
+            )
+            requests.post(
+                f'{MAX_BOT_URL}?action=staff_send',
+                json={'text': text},
+                timeout=5,
+            )
+            # Telegram
+            tg_token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+            tg_chat = os.environ.get('TELEGRAM_CHAT_ID', '')
+            if tg_token and tg_chat:
+                requests.post(
+                    f'https://api.telegram.org/bot{tg_token}/sendMessage',
+                    json={'chat_id': tg_chat, 'text': text, 'parse_mode': 'Markdown'},
+                    timeout=5,
+                )
+        except Exception as ne:
+            print(f'[sl-contracts][terminate] notify error: {ne}')
+
         return _ok({'ok': True, 'status': 'terminated'})
     except Exception as e:
         conn.rollback()
