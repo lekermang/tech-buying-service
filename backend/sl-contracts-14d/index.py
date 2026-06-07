@@ -789,8 +789,8 @@ def action_terminate(body, actor):
                        cl.full_name, cl.phone,
                        i.brand, i.model, i.item_type
                 FROM {SCHEMA}.contracts_14d c
-                LEFT JOIN {SCHEMA}.contracts_14d_clients cl ON cl.contract_id = c.id
-                LEFT JOIN {SCHEMA}.contracts_14d_items i ON i.contract_id = c.id
+                LEFT JOIN {SCHEMA}.contracts_14d_clients cl ON cl.id = c.client_id
+                LEFT JOIN {SCHEMA}.contracts_14d_items i ON i.id = c.item_id
                 WHERE c.id=%s AND c.status='active' LIMIT 1""",
             (int(cid),)
         )
@@ -1352,8 +1352,8 @@ def action_to_warehouse(body, actor):
                        i.brand, i.model, i.item_type, i.serial_number, i.condition,
                        p.file_url
                 FROM {SCHEMA}.contracts_14d c
-                LEFT JOIN {SCHEMA}.contracts_14d_clients cl ON cl.contract_id = c.id
-                LEFT JOIN {SCHEMA}.contracts_14d_items i ON i.contract_id = c.id
+                LEFT JOIN {SCHEMA}.contracts_14d_clients cl ON cl.id = c.client_id
+                LEFT JOIN {SCHEMA}.contracts_14d_items i ON i.id = c.item_id
                 LEFT JOIN {SCHEMA}.contracts_14d_photos p ON p.contract_id = c.id AND p.photo_type='device'
                 WHERE c.id=%s AND c.status='active'
                 LIMIT 1""",
