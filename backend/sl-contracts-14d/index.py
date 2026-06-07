@@ -11,7 +11,6 @@ import psycopg2.extras
 import boto3
 
 MAX_BOT_URL = 'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c'
-GOODS_API_URL = 'https://functions.poehali.dev/de4c1e8e-0c7b-4f25-a3fd-155c46fa3399'
 
 
 def _notify_contract_closed(contract_number: str, client_name: str, item_name: str,
@@ -1335,8 +1334,8 @@ def action_extend(body, actor):
 
 
 def action_to_warehouse(body, actor):
-    """Перевести товар из договора на склад б/у товаров.
-    Процент обнуляется — берём сумму закупки (amount) как purchase_price,
+    """Перевести товар из договора напрямую на склад (slshop_items).
+    Процент обнуляется — берём сумму закупки (amount) как buy_price,
     sell_price задаёт сотрудник (рекомендуется x2 от закупки)."""
     cid = body.get('contract_id')
     sell_price = body.get('sell_price')
@@ -1369,61 +1368,53 @@ def action_to_warehouse(body, actor):
          brand, model, item_type, serial_number, condition,
          photo_url) = row
 
-        purchase_price = int(float(amount or 0))
+        purchase_price = float(amount or 0)
         sp = int(sell_price)
+        actor_name = (actor or {}).get('full_name', 'Сотрудник')
 
         # Формируем название товара
-        title_parts = [brand, model] if brand or model else [item_type or 'Товар из ломбарда']
+        title_parts = [brand, model] if (brand or model) else [item_type or 'Товар из ломбарда']
         title = ' '.join(filter(None, title_parts))
 
-        # Добавляем товар в goods через goods-api (через HTTP, токен сотрудника)
-        employee_token = ''
-        try:
-            emp_token_raw = os.environ.get('ADMIN_TOKEN', '')
-            # Используем токен актора из сессии
-            conn2 = get_conn(); cur2 = conn2.cursor()
-            cur2.execute(
-                f"SELECT auth_token FROM {SCHEMA}.employees WHERE id=%s LIMIT 1",
-                (actor['id'],)
+        # Генерируем SKU
+        year = datetime.now().year
+        cur.execute(
+            f"SELECT COUNT(*) FROM {SCHEMA}.slshop_items WHERE sku LIKE %s",
+            (f'SL-{year}-%',)
+        )
+        sku_n = (cur.fetchone()[0] or 0) + 1
+        sku = f'SL-{year}-{sku_n:04d}'
+
+        # Фото: если есть — передаём как массив
+        images_val = '{' + photo_url + '}' if photo_url else '{}'
+
+        # Вставляем товар напрямую в slshop_items
+        cur.execute(
+            f"""INSERT INTO {SCHEMA}.slshop_items
+                (title, brand, model, condition, serial_number, imei,
+                 buy_price, sell_price, status, source, description,
+                 images, sku, created_by, buy_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s,
+                        %s, %s, 'stock', 'buyout', %s,
+                        %s, %s, %s, NOW(), NOW())
+                RETURNING id""",
+            (
+                title, brand, model,
+                condition or 'хорошее',
+                serial_number, serial_number,
+                purchase_price, sp,
+                f'Из ломбарда {contract_number}. Выкуп: {int(purchase_price)} ₽',
+                images_val, sku, actor_name,
             )
-            emp_row = cur2.fetchone()
-            cur2.close(); conn2.close()
-            if emp_row:
-                employee_token = emp_row[0]
-        except Exception:
-            pass
+        )
+        new_item_id = cur.fetchone()[0]
 
-        goods_payload = {
-            'action': 'add',
-            'title': title,
-            'category': item_type or 'Смартфон',
-            'brand': brand,
-            'model': model,
-            'condition': condition or 'хорошее',
-            'purchase_price': purchase_price,
-            'sell_price': sp,
-            'imei': serial_number,
-            'photo_url': photo_url,
-            'description': f'Из ломбарда {contract_number}. Выкуп: {purchase_price} ₽',
-        }
-
-        goods_result = {}
-        try:
-            r = requests.post(
-                GOODS_API_URL,
-                json=goods_payload,
-                headers={'X-Employee-Token': employee_token, 'Content-Type': 'application/json'},
-                timeout=10,
-            )
-            goods_result = r.json() if r.status_code == 200 else {'error': f'HTTP {r.status_code}'}
-        except Exception as ge:
-            goods_result = {'error': str(ge)}
-
-        # Логируем перевод на склад
+        # Логируем перевод на склад в договоре
         _log(cur, int(cid), 'to_warehouse', {
             'sell_price': sp,
-            'purchase_price': purchase_price,
-            'goods_id': goods_result.get('id'),
+            'purchase_price': int(purchase_price),
+            'slshop_item_id': new_item_id,
+            'sku': sku,
         }, actor)
         conn.commit()
 
@@ -1433,8 +1424,9 @@ def action_to_warehouse(body, actor):
                 f"📦 *Товар переведён на склад*\n\n"
                 f"📋 {contract_number}\n"
                 f"📱 {title}\n"
-                f"💵 Закупка: {purchase_price:,} ₽ → Продажа: {sp:,} ₽\n".replace(',', '\u00a0') +
-                f"👨‍💼 {actor.get('full_name', 'Сотрудник')}"
+                f"💵 Закупка: {int(purchase_price):,} ₽  →  Продажа: {sp:,} ₽\n".replace(',', '\u00a0') +
+                f"🏷 SKU: {sku}\n"
+                f"👨‍💼 {actor_name}"
             )
             requests.post(
                 f'{MAX_BOT_URL}?action=staff_send',
@@ -1444,7 +1436,7 @@ def action_to_warehouse(body, actor):
         except Exception:
             pass
 
-        return _ok({'ok': True, 'goods_id': goods_result.get('id'), 'sell_price': sp})
+        return _ok({'ok': True, 'slshop_item_id': new_item_id, 'sku': sku, 'sell_price': sp})
     except Exception as e:
         conn.rollback()
         return _err(500, f'DB error: {e}')
