@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import Icon from "@/components/ui/icon";
+import PageSEO, { LOCAL_BUSINESS_SCHEMA } from "@/components/seo/PageSEO";
 
 const PUBLIC_PRICE_URL = "https://functions.poehali.dev/b39f271a-3a63-4998-b83b-3c64eeace265";
 const SEND_LEAD_URL    = "https://functions.poehali.dev/52666ff7-db52-4b6a-a90e-d60aeed699de";
@@ -884,46 +885,226 @@ function SkeletonLoader() {
 }
 
 
-// ── SEO-блок ──────────────────────────────────────────────────────────────────
-const SEO_MODELS = [
-  "iPhone 16", "iPhone 16 Plus", "iPhone 16 Pro", "iPhone 16 Pro Max",
-  "iPhone 15", "iPhone 15 Plus", "iPhone 15 Pro", "iPhone 15 Pro Max",
-  "iPhone 14", "iPhone 14 Plus", "iPhone 14 Pro", "iPhone 14 Pro Max",
-  "iPhone 13", "iPhone 13 mini", "iPhone 13 Pro", "iPhone 13 Pro Max",
-  "MacBook Air M2", "MacBook Air M3", "MacBook Pro 14", "MacBook Pro 16",
-  "iPad Air", "iPad Pro", "iPad mini", "Apple Watch Series 9",
-  "AirPods Pro 2", "Samsung Galaxy S24", "Samsung Galaxy S23",
+// ── SEO константы ─────────────────────────────────────────────────────────────
+const SEO_PRICE_TABLE = [
+  { model: "iPhone 16 128GB", price: "от 50 000 ₽" },
+  { model: "iPhone 16 256GB", price: "от 55 000 ₽" },
+  { model: "iPhone 16 Pro 128GB", price: "от 75 000 ₽" },
+  { model: "iPhone 16 Pro Max 256GB", price: "от 90 000 ₽" },
+  { model: "iPhone 15 128GB", price: "от 47 000 ₽" },
+  { model: "iPhone 15 Pro 128GB", price: "от 65 000 ₽" },
+  { model: "iPhone 14 128GB", price: "от 38 000 ₽" },
+  { model: "iPhone 13 128GB", price: "от 28 000 ₽" },
+  { model: "MacBook Air M2", price: "от 75 000 ₽" },
+  { model: "MacBook Air M3", price: "от 90 000 ₽" },
+  { model: "iPad Air M2", price: "от 55 000 ₽" },
+  { model: "Apple Watch Series 9", price: "от 22 000 ₽" },
+];
+
+const SEO_FAQ = [
+  { q: "Где купить iPhone в Калуге с гарантией?", a: "В Скупка24 на Кирова 7/47 и Кирова 11. Продаём новые и б/у iPhone с гарантией от 3 до 12 месяцев. Работаем ежедневно 10:00–21:00." },
+  { q: "Есть ли в наличии iPhone 17 в Калуге?", a: "Да, iPhone 17 и 17 Pro Max можно заказать через раздел «Привезём завтра». Доставка 1–2 дня, цену уточняйте по телефону +7 (992) 990-33-33." },
+  { q: "Можно ли купить iPhone в рассрочку?", a: "Да, оформляем рассрочку 0% через наших партнёров. Уточните условия у менеджера по телефону или в магазине." },
+  { q: "Как проверить iPhone перед покупкой?", a: "Все телефоны проверяем при вас: диагностика АКБ, IMEI, iCloud. Вы видите весь процесс проверки." },
+  { q: "Принимаете ли старый iPhone в зачёт?", a: "Да! Принимаем ваш старый iPhone, MacBook или другой смартфон в счёт оплаты нового. Оценка бесплатно — 15 минут." },
+  { q: "Есть ли доставка iPhone по Калуге?", a: "Да, доставляем по Калуге курьером. Подробности уточняйте по телефону +7 (992) 990-33-33." },
+];
+
+const SEO_MODELS_FULL = [
+  "iPhone 17 Pro Max", "iPhone 17 Pro", "iPhone 17 Plus", "iPhone 17",
+  "iPhone 16e", "iPhone 16 Pro Max", "iPhone 16 Pro", "iPhone 16 Plus", "iPhone 16",
+  "iPhone 15 Pro Max", "iPhone 15 Pro", "iPhone 15 Plus", "iPhone 15",
+  "iPhone 14 Pro Max", "iPhone 14 Pro", "iPhone 14 Plus", "iPhone 14",
+  "iPhone 13 Pro Max", "iPhone 13 Pro", "iPhone 13 mini", "iPhone 13",
+  "MacBook Pro M4", "MacBook Pro M3", "MacBook Pro M2", "MacBook Air M3", "MacBook Air M2",
+  "iPad Pro M4", "iPad Air M2", "iPad mini 7", "iPad 10",
+  "Apple Watch Ultra 2", "Apple Watch Series 10", "Apple Watch Series 9",
+  "AirPods Pro 2", "AirPods 4",
+  "Samsung Galaxy S25 Ultra", "Samsung Galaxy S25", "Samsung Galaxy S24",
+  "Xiaomi 15 Pro", "Xiaomi 14",
+];
+
+const SEO_KEYWORDS_CLOUD = [
+  "купить iPhone Калуга", "iPhone Калуга цена", "магазин Apple Калуга",
+  "купить MacBook Калуга", "iPad купить Калуга", "Apple Watch Калуга",
+  "iPhone 16 Pro Калуга", "iPhone 15 купить", "iPhone 17 Калуга",
+  "б/у iPhone Калуга", "новый iPhone Калуга", "скупка iPhone Калуга",
+  "обмен iPhone Калуга", "iPhone в рассрочку Калуга", "AirPods Калуга",
 ];
 
 function SeoBlock() {
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
+
   return (
-    <section style={{ background: "#0d0d0d", borderTop: "1px solid rgba(255,255,255,0.06)", padding: "40px 16px" }}>
-      <div style={{ maxWidth: 960, margin: "0 auto" }}>
-        <h2 style={{ color: "#FFD700", fontFamily: "oswald, sans-serif", fontSize: 18, fontWeight: 700,
-          textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
-          Купить iPhone и технику Apple в Калуге
+    <footer aria-label="SEO информация" style={{ background: "#080808", borderTop: "1px solid rgba(255,255,255,0.07)" }}>
+
+      {/* 1. Почему мы */}
+      <section style={{ padding: "48px 16px 0", maxWidth: 960, margin: "0 auto" }}>
+        <h2 style={{ fontFamily: "oswald,sans-serif", fontWeight: 900, fontSize: 22, color: "#FFD700",
+          textTransform: "uppercase", letterSpacing: 1, marginBottom: 12 }}>
+          Купить iPhone и технику Apple в Калуге — Скупка24
         </h2>
-        <p style={{ color: "rgba(255,255,255,0.35)", fontSize: 12, lineHeight: 1.8, marginBottom: 20, maxWidth: 680 }}>
-          Скупка24 — официальная продажа новых и б/у iPhone, MacBook, iPad, Apple Watch в Калуге.
-          Все устройства проверены, с гарантией. Доставка по Калуге и РФ.
+        <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 14, lineHeight: 1.9, maxWidth: 740, marginBottom: 24 }}>
+          Скупка24 — магазин Apple-техники в Калуге с живым актуальным прайсом. Продаём новые и
+          проверенные б/у <strong style={{ color: "rgba(255,255,255,0.75)" }}>iPhone, MacBook, iPad, Apple Watch, AirPods</strong>.
+          Все устройства с гарантией от 3 до 12 месяцев. Принимаем старые телефоны в зачёт.
+          Два офиса: <strong style={{ color: "rgba(255,255,255,0.75)" }}>ул. Кирова 7/47 и ул. Кирова 11</strong>.
         </p>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          {SEO_MODELS.map(m => (
+
+        {/* Преимущества */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 12, marginBottom: 40 }}>
+          {[
+            { icon: "⚡", title: "Актуальные цены", desc: "Обновляются каждые 3 часа автоматически" },
+            { icon: "✅", title: "Гарантия", desc: "От 3 до 12 месяцев на каждое устройство" },
+            { icon: "🚗", title: "Под заказ", desc: "Любую модель привезём за 1–2 дня" },
+            { icon: "🔄", title: "Trade-in", desc: "Принимаем ваш старый телефон в зачёт" },
+            { icon: "🔍", title: "Проверка при вас", desc: "Диагностика АКБ, IMEI, iCloud" },
+            { icon: "📞", title: "Работаем 24/7", desc: "+7 (992) 990-33-33" },
+          ].map(f => (
+            <div key={f.title} style={{
+              padding: "14px 16px", borderRadius: 12,
+              background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
+            }}>
+              <div style={{ fontSize: 22, marginBottom: 6 }}>{f.icon}</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.7)", marginBottom: 3 }}>{f.title}</div>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", lineHeight: 1.5 }}>{f.desc}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* 2. Таблица цен */}
+      <section style={{ padding: "0 16px 40px", maxWidth: 960, margin: "0 auto" }}>
+        <h2 style={{ fontFamily: "oswald,sans-serif", fontWeight: 800, fontSize: 17, color: "rgba(255,255,255,0.7)",
+          textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 14 }}>
+          Примерные цены на iPhone в Калуге
+        </h2>
+        <div style={{ borderRadius: 12, overflow: "hidden", border: "1px solid rgba(255,255,255,0.08)" }}>
+          {SEO_PRICE_TABLE.map((row, i) => (
+            <div key={row.model} style={{
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              padding: "10px 16px",
+              background: i % 2 === 0 ? "rgba(255,255,255,0.025)" : "transparent",
+              borderBottom: i < SEO_PRICE_TABLE.length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none",
+            }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.65)" }}>{row.model}</span>
+              <span style={{ fontSize: 13, fontWeight: 800, color: "#FFD700", whiteSpace: "nowrap" }}>{row.price}</span>
+            </div>
+          ))}
+        </div>
+        <p style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", marginTop: 8 }}>
+          * Цены ориентировочные. Актуальный прайс обновляется автоматически в таблице выше.
+        </p>
+      </section>
+
+      {/* 3. FAQ */}
+      <section style={{ padding: "0 16px 40px", maxWidth: 960, margin: "0 auto" }}>
+        <h2 style={{ fontFamily: "oswald,sans-serif", fontWeight: 800, fontSize: 17, color: "rgba(255,255,255,0.7)",
+          textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 14 }}>
+          Частые вопросы
+        </h2>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {SEO_FAQ.map((item, i) => (
+            <div key={i} style={{
+              borderRadius: 12, overflow: "hidden",
+              border: `1px solid ${openFaq === i ? "rgba(255,215,0,0.25)" : "rgba(255,255,255,0.08)"}`,
+              background: openFaq === i ? "rgba(255,215,0,0.04)" : "rgba(255,255,255,0.02)",
+              transition: "border-color 0.2s, background 0.2s",
+            }}>
+              <button
+                onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                style={{
+                  width: "100%", textAlign: "left", padding: "13px 16px",
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  background: "none", border: "none", cursor: "pointer", gap: 12,
+                }}
+              >
+                <span style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.75)", lineHeight: 1.4 }}>
+                  {item.q}
+                </span>
+                <span style={{
+                  fontSize: 18, color: openFaq === i ? "#FFD700" : "rgba(255,255,255,0.3)",
+                  transform: openFaq === i ? "rotate(45deg)" : "none",
+                  transition: "transform 0.2s, color 0.2s", flexShrink: 0,
+                }}>+</span>
+              </button>
+              {openFaq === i && (
+                <div style={{ padding: "0 16px 14px", fontSize: 13, color: "rgba(255,255,255,0.45)", lineHeight: 1.7 }}>
+                  {item.a}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* 4. Облако моделей */}
+      <section style={{ padding: "0 16px 40px", maxWidth: 960, margin: "0 auto" }}>
+        <h3 style={{ fontFamily: "oswald,sans-serif", fontWeight: 700, fontSize: 14, color: "rgba(255,255,255,0.35)",
+          textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12 }}>
+          Все модели в наличии и под заказ
+        </h3>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {SEO_MODELS_FULL.map(m => (
             <span key={m} style={{
-              padding: "5px 12px", borderRadius: 8, fontSize: 12,
-              fontWeight: 700, letterSpacing: 0.3,
-              background: "rgba(255,255,255,0.05)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              color: "rgba(255,255,255,0.6)",
-              cursor: "default",
+              padding: "4px 10px", borderRadius: 6, fontSize: 11,
+              fontWeight: 700, letterSpacing: 0.2,
+              background: "rgba(255,255,255,0.04)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              color: "rgba(255,255,255,0.4)",
             }}>{m}</span>
           ))}
         </div>
-        <p style={{ color: "rgba(255,255,255,0.2)", fontSize: 11, marginTop: 16 }}>
-          Адрес: г. Калуга, ул. Кирова, 7/47 и ул. Кирова, 11 · Режим работы: ежедневно 10:00–21:00
-        </p>
+      </section>
+
+      {/* 5. Ключевые слова (скрытые для поисковиков — мелкий серый текст) */}
+      <section style={{ padding: "0 16px 32px", maxWidth: 960, margin: "0 auto" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {SEO_KEYWORDS_CLOUD.map(k => (
+            <span key={k} style={{ fontSize: 10, color: "rgba(255,255,255,0.12)" }}>{k}</span>
+          ))}
+        </div>
+      </section>
+
+      {/* 6. Контакты и адрес */}
+      <section style={{
+        padding: "20px 16px", maxWidth: 960, margin: "0 auto",
+        borderTop: "1px solid rgba(255,255,255,0.06)",
+        display: "flex", flexWrap: "wrap", gap: 24, justifyContent: "space-between",
+      }}>
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>Адрес</div>
+          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", lineHeight: 1.7 }}>
+            г. Калуга, ул. Кирова, 7/47<br />
+            г. Калуга, ул. Кирова, 11
+          </div>
+        </div>
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>Телефон</div>
+          <a href="tel:+79929903333" style={{ fontSize: 14, fontWeight: 800, color: "#FFD700", textDecoration: "none" }}>
+            +7 (992) 990-33-33
+          </a>
+        </div>
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>Режим работы</div>
+          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.3)", lineHeight: 1.7 }}>
+            Ежедневно 10:00 – 21:00<br />
+            Без выходных
+          </div>
+        </div>
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.5)", marginBottom: 4 }}>Сайт</div>
+          <a href="https://skypka24.com" style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", textDecoration: "none" }}>
+            skypka24.com
+          </a>
+        </div>
+      </section>
+
+      {/* Копирайт */}
+      <div style={{ textAlign: "center", padding: "12px 16px 20px", fontSize: 10, color: "rgba(255,255,255,0.15)" }}>
+        © {new Date().getFullYear()} Скупка24 · Прайс Apple · Калуга · Все цены актуальны на сегодня
       </div>
-    </section>
+    </footer>
   );
 }
 
@@ -993,8 +1174,61 @@ export default function ApplePrice() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [nextRefresh]);
 
+  const seoSchemas = [
+    LOCAL_BUSINESS_SCHEMA,
+    {
+      "@context": "https://schema.org",
+      "@type": "ItemList",
+      "name": "Прайс-лист Apple техники в Калуге",
+      "description": "Актуальные цены на iPhone, MacBook, iPad, Apple Watch в Скупка24 Калуга",
+      "url": "https://skypka24.com/Apple",
+      "numberOfItems": data?.total ?? 0,
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": SEO_FAQ.map(f => ({
+        "@type": "Question",
+        "name": f.q,
+        "acceptedAnswer": { "@type": "Answer", "text": f.a },
+      })),
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Главная", "item": "https://skypka24.com/" },
+        { "@type": "ListItem", "position": 2, "name": "Прайс Apple", "item": "https://skypka24.com/Apple" },
+      ],
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "WebPage",
+      "name": "Прайс Apple — купить iPhone в Калуге | Скупка24",
+      "description": "Актуальный прайс-лист iPhone, MacBook, iPad. Цены обновляются каждые 3 часа. Под заказ любая модель за 1–2 дня.",
+      "url": "https://skypka24.com/Apple",
+      "inLanguage": "ru-RU",
+      "dateModified": new Date().toISOString().slice(0, 10),
+      "publisher": {
+        "@type": "Organization",
+        "name": "Скупка24",
+        "url": "https://skypka24.com",
+        "telephone": "+79929903333",
+        "logo": { "@type": "ImageObject", "url": "https://skypka24.com/og-main.jpg" },
+      },
+    },
+  ];
+
   return (
     <>
+      <PageSEO
+        title="Прайс Apple в Калуге — iPhone, MacBook, iPad | Скупка24"
+        description="Актуальный прайс на iPhone 16, 17, MacBook, iPad в Калуге. Цены обновляются каждые 3 часа. Покупаем и продаём 24/7. Два магазина: Кирова 7/47 и Кирова 11. ☎ +7 (992) 990-33-33"
+        keywords="прайс iPhone Калуга, купить iPhone Калуга, цены iPhone 16 Калуга, MacBook Калуга купить, iPad цена Калуга, Apple Watch Калуга, iPhone 17 Калуга, скупка iPhone Калуга, обмен iPhone Калуга, магазин Apple Калуга"
+        url="https://skypka24.com/Apple"
+        ogImage="https://skypka24.com/og-main.jpg"
+        schema={seoSchemas}
+      />
       <style>{`
         @keyframes progressBar {
           0%   { transform: translateX(-100%); }

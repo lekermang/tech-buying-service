@@ -11,6 +11,14 @@
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
+
+  <!-- ===== ПРАЙС APPLE ===== -->
+  <url>
+    <loc>https://skypka24.com/Apple</loc>
+    <lastmod>2026-06-08</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.95</priority>
+  </url>
   <url>
     <loc>https://skypka24.com/?section=catalog</loc>
     <lastmod>2026-06-04</lastmod>

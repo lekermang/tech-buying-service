@@ -1,5 +1,6 @@
 User-agent: *
 Allow: /
+Allow: /Apple
 Allow: /catalog
 Allow: /repair
 Allow: /repair-discount
@@ -62,6 +63,7 @@ Sitemap: https://skypka24.com/sitemap.xml
 # Яндекс
 User-agent: Yandex
 Allow: /
+Allow: /Apple
 Allow: /catalog
 Allow: /repair
 Allow: /repair-discount
@@ -109,6 +111,7 @@ Crawl-delay: 1
 # Поиск с Алисой
 User-agent: YandexAdditionalBot
 Allow: /
+Allow: /Apple
 Allow: /catalog
 Allow: /repair
 Allow: /blog
@@ -129,6 +132,7 @@ Disallow: /tools-sync
 # Google
 User-agent: Googlebot
 Allow: /
+Allow: /Apple
 Allow: /catalog
 Allow: /repair
 Allow: /repair-discount
