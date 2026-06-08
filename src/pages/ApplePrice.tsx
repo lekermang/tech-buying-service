@@ -4,6 +4,7 @@ import Icon from "@/components/ui/icon";
 const PUBLIC_PRICE_URL = "https://functions.poehali.dev/b39f271a-3a63-4998-b83b-3c64eeace265";
 const SEND_LEAD_URL    = "https://functions.poehali.dev/52666ff7-db52-4b6a-a90e-d60aeed699de";
 const PRICE_EMAIL_URL  = "https://functions.poehali.dev/9e9486d9-57f0-454c-bc19-b46e3d4bc682";
+const PRICE_PDF_URL    = "https://functions.poehali.dev/eff3d143-8966-4a6d-bbea-ddc77a6e5373";
 const DEFAULT_MARKUP   = 2000;
 const REFRESH_MS       = 3 * 60 * 60 * 1000;
 
@@ -587,7 +588,29 @@ export default function ApplePrice() {
   const [timer, setTimer]             = useState("");
   const [orderItem, setOrderItem]     = useState<PriceItem | null>(null);
   const [emailModal, setEmailModal]   = useState(false);
+  const [pdfLoading, setPdfLoading]   = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const handleDownloadPdf = useCallback(async () => {
+    setPdfLoading(true);
+    try {
+      const res = await fetch(PRICE_PDF_URL);
+      if (!res.ok) throw new Error("Ошибка сервера");
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      const date = new Date().toLocaleDateString("ru-RU").replace(/\./g, "");
+      a.href     = url;
+      a.download = `price-skypka24-${date}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      alert("Не удалось сформировать PDF. Попробуйте ещё раз.");
+    }
+    setPdfLoading(false);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -619,17 +642,6 @@ export default function ApplePrice() {
     timerRef.current = setInterval(tick, 30000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [nextRefresh]);
-
-  const handlePrint = () => {
-    if (!data) return;
-    const html = buildPrintHtml(data);
-    const win = window.open("", "_blank");
-    if (win) {
-      win.document.write(html);
-      win.document.close();
-      win.onload = () => { win.focus(); win.print(); };
-    }
-  };
 
   return (
     <>
@@ -696,11 +708,15 @@ export default function ApplePrice() {
               <Icon name="Mail" size={13} />
               <span className="hidden sm:inline">На почту</span>
             </button>
-            <button onClick={handlePrint} disabled={!data || loading}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-bold text-black transition-all active:scale-95 disabled:opacity-40"
-              style={{ background: "linear-gradient(135deg,#FFD700,#d97706)" }}>
-              <Icon name="Printer" size={13} />
-              Печать А4
+            <button
+              onClick={handleDownloadPdf}
+              disabled={pdfLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-bold text-black transition-all active:scale-95 disabled:opacity-50"
+              style={{ background: "linear-gradient(135deg,#FFD700,#d97706)", minWidth: 110 }}
+            >
+              <Icon name={pdfLoading ? "Loader2" : "FileDown"} size={13}
+                className={pdfLoading ? "animate-spin" : ""} />
+              {pdfLoading ? "Готовим…" : "Скачать PDF"}
             </button>
           </div>
         </div>
@@ -858,13 +874,20 @@ export default function ApplePrice() {
                 <button
                   onClick={() => setEmailModal(true)}
                   className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl font-oswald font-bold text-[15px] uppercase transition-all hover:bg-white/10"
-                  style={{
-                    border: "1px solid rgba(255,255,255,0.2)",
-                    color: "rgba(255,255,255,0.7)",
-                  }}
+                  style={{ border: "1px solid rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.7)" }}
                 >
                   <Icon name="Mail" size={17} />
                   Прайс на почту
+                </button>
+                <button
+                  onClick={handleDownloadPdf}
+                  disabled={pdfLoading}
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl font-oswald font-bold text-[15px] uppercase transition-all disabled:opacity-50"
+                  style={{ border: "1px solid rgba(255,215,0,0.3)", color: "#FFD700", background: "rgba(255,215,0,0.07)" }}
+                >
+                  <Icon name={pdfLoading ? "Loader2" : "FileDown"} size={17}
+                    className={pdfLoading ? "animate-spin" : ""} />
+                  {pdfLoading ? "Готовим…" : "Скачать PDF"}
                 </button>
               </div>
               <div className="text-white/25 text-[11px] mt-4">
