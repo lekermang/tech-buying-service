@@ -1,479 +1,511 @@
-import { useState, useEffect } from "react";
-import DigitalParticles from "@/components/fx/DigitalParticles";
+import { useState, useEffect, useCallback } from "react";
 import Header from "@/components/skupka/Header";
-import HeroSection from "@/components/skupka/HeroSection";
-import InfoSections from "@/components/skupka/InfoSections";
 import ContactsFooter from "@/components/skupka/ContactsFooter";
 import Icon from "@/components/ui/icon";
 import { ymGoal, Goals } from "@/lib/ym";
 import ExitPopup from "@/components/skupka/ExitPopup";
 import CookieBanner from "@/components/skupka/CookieBanner";
-import JobsSection from "@/components/skupka/JobsSection";
-import HolidayBanner from "@/components/holidays/HolidayBanner";
-import HolidayCornerDecor from "@/components/holidays/HolidayCornerDecor";
-import PremiumServicesGrid from "@/components/skupka/PremiumServicesGrid";
-
-import SafeDealsBanner from "@/components/skupka/SafeDealsBanner";
-import MaxChannelBanner from "@/components/skupka/MaxChannelBanner";
 import PublicChatFab from "@/components/skupka/PublicChatFab";
-import AppDownloadCard from "@/components/AppDownloadCard";
-import EasierWithUsBlock from "@/components/EasierWithUsBlock";
-import QuickContactSection from "@/components/QuickContactSection";
-import WholesaleBanner from "@/components/skupka/WholesaleBanner";
-import AntiquesPreviewBlock from "@/components/skupka/AntiquesPreviewBlock";
-import WantToBuySection from "@/components/skupka/WantToBuySection";
 import DesktopStickyBar from "@/components/skupka/DesktopStickyBar";
-import AppleSaleBanner from "@/components/skupka/AppleSaleBanner";
-import RepairLinksOnIndex from "@/components/skupka/RepairLinksOnIndex";
-import CarBuyoutBanner from "@/components/skupka/CarBuyoutBanner";
-import SpecTechBuyoutBanner from "@/components/skupka/SpecTechBuyoutBanner";
-import LandBuyoutBanner from "@/components/skupka/LandBuyoutBanner";
-import { useScrollReveal } from "@/hooks/useScrollReveal";
+import EvaluateModal from "@/components/skupka/hero/EvaluateModal";
 
-const scrollTo = (href: string) => {
-  const el = document.querySelector(href);
-  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-};
+// ── Константы ─────────────────────────────────────────────────────────────────
+const PHONE_TEL  = "tel:+79929990333";
+const PHONE_800  = "tel:+78006006833";
+const PHONE_DISP = "8 (800) 600-68-33";
 
-/** Автоскролл к якорю из URL: поддерживает #section и ?section=xxx (для Яндекс.Директа) */
-const useAutoScroll = (ready: boolean) => {
+const SERVICES = [
+  { icon: "Smartphone",      label: "Скупка iPhone",     sub: "до 95 000 ₽",      href: "/skupka-iphone-kaluga",   accent: "#FFD700" },
+  { icon: "Laptop",          label: "Скупка MacBook",    sub: "до 150 000 ₽",     href: "/skupka-macbook-kaluga",  accent: "#FFD700" },
+  { icon: "Gem",             label: "Скупка золота",     sub: "до 500 000 ₽",     href: "/skupka-zolota-kaluga",   accent: "#fbbf24" },
+  { icon: "Wrench",          label: "Ремонт телефонов",  sub: "от 300 ₽ · 20 мин",href: "/repair",                 accent: "#fb923c" },
+  { icon: "RefreshCw",       label: "Trade In",          sub: "обмен с доплатой",  href: "/?section=tradein",       accent: "#4ade80" },
+  { icon: "Shield",          label: "Безопасная сделка", sub: "гарант Скупка24",   href: "/safe-deals",             accent: "#a78bfa" },
+  { icon: "ArrowLeftRight",  label: "Перенос данных",    sub: "фото, контакты",    href: "/transfer",               accent: "#60a5fa" },
+  { icon: "ShoppingBag",     label: "Каталог техники",   sub: "новая + б/у",       href: "/catalog",                accent: "#34d399" },
+];
+
+const STATS = [
+  { value: "50 000+", label: "клиентов" },
+  { value: "9 лет",   label: "на рынке"  },
+  { value: "4.9 ★",   label: "на картах" },
+  { value: "15 мин",  label: "оценка"    },
+];
+
+const ACCEPT = [
+  { icon: "Smartphone", title: "Смартфоны",        price: "до 95 000 ₽" },
+  { icon: "Laptop",     title: "Ноутбуки",          price: "до 150 000 ₽" },
+  { icon: "Tablet",     title: "Планшеты",          price: "до 70 000 ₽" },
+  { icon: "Watch",      title: "Умные часы",        price: "до 40 000 ₽" },
+  { icon: "Gem",        title: "Ювелирные",         price: "до 500 000 ₽" },
+  { icon: "Camera",     title: "Фотоаппараты",      price: "до 80 000 ₽" },
+  { icon: "Gamepad2",   title: "Игровые консоли",   price: "до 45 000 ₽" },
+  { icon: "Headphones", title: "Аудио",             price: "до 30 000 ₽" },
+];
+
+const HOW_STEPS = [
+  { n: "01", icon: "MessageSquare", title: "Оставьте заявку",   desc: "Через форму или по телефону" },
+  { n: "02", icon: "Calculator",    title: "Получите оценку",   desc: "Честная цена за 15 минут" },
+  { n: "03", icon: "MapPin",        title: "Приезжайте",        desc: "Кирова 11 или Кирова 7/47" },
+  { n: "04", icon: "Banknote",      title: "Получите деньги",   desc: "Наличными или на карту — сегодня" },
+];
+
+const REPAIR_LINKS = [
+  { href: "/remont-iphone-kaluga",          label: "Ремонт iPhone" },
+  { href: "/remont-samsung-kaluga",         label: "Ремонт Samsung" },
+  { href: "/remont-xiaomi-kaluga",          label: "Ремонт Xiaomi" },
+  { href: "/zamena-stekla-kaluga",          label: "Замена стекла" },
+  { href: "/zamena-akkumulyatora-kaluga",   label: "Замена аккумулятора" },
+  { href: "/remont-posle-vody-kaluga",      label: "Ремонт после воды" },
+  { href: "/bga-pajka-kaluga",              label: "BGA-пайка" },
+  { href: "/snyatie-frp-kaluga",            label: "Снятие FRP / iCloud" },
+];
+
+// ── Компонент ─────────────────────────────────────────────────────────────────
+export default function Index() {
+  const [modalOpen, setModalOpen] = useState(false);
+
+  // Автоскролл к якорю
   useEffect(() => {
-    if (!ready) return;
     const params = new URLSearchParams(window.location.search);
-    const section = params.get("section") || params.get("block");
-    const hash = window.location.hash.replace("#", "");
-    const target = section || hash;
+    const target = params.get("section") || params.get("block") || window.location.hash.replace("#", "");
     if (!target) return;
     const t = setTimeout(() => {
-      const el = document.getElementById(target);
-      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 200);
     return () => clearTimeout(t);
-  }, [ready]);
-};
-
-/** Динамические SEO-метатеги в зависимости от ?section= (для рекламы в Яндекс.Директе) */
-const SECTION_SEO: Record<string, { title: string; description: string }> = {
-  catalog: {
-    title: "Что принимаем в скупку — Скупка24 Калуга | iPhone, MacBook, золото",
-    description: "Принимаем: iPhone до 95 000 ₽, MacBook и ноутбуки до 150 000 ₽, iPad, Apple Watch, PlayStation, Xbox, золото и украшения до 500 000 ₽. Честная оценка за 15 минут в Калуге.",
-  },
-  tradein: {
-    title: "Trade In Скупка24 — Обмен старой техники на новую | Эко-утилизация",
-    description: "Программа Скупка24 Trade In: сдайте старое устройство и получите скидку на новое онлайн или в магазине. Не подходит для обмена — бесплатно и безопасно утилизируем. Выгодно для вас и планеты.",
-  },
-  how: {
-    title: "Как работает Скупка24 — 4 шага до денег | Калуга",
-    description: "Оставьте заявку → получите оценку за 15 минут → приезжайте в офис на Кирова 11 или 7/47 → получите деньги в день обращения. Наличные или перевод на карту.",
-  },
-  guarantees: {
-    title: "Наши гарантии — Скупка24 | Честная оценка и официальный договор",
-    description: "Работаем с 2015 года, 50 000+ сделок, 4.9 на Яндекс Картах. Честная оценка, официальный договор, выплата день в день. Никаких скрытых комиссий.",
-  },
-  branches: {
-    title: "Наши офисы в Калуге — Кирова 11 и Кирова 7/47 | Скупка24",
-    description: "Два офиса Скупка24 в центре Калуги: ул. Кирова, 11 и ул. Кирова, 7/47. Работаем 24/7 без выходных. Телефон: +7 (992) 999-03-33.",
-  },
-  reviews: {
-    title: "Отзывы клиентов Скупка24 на Яндекс Картах | Рейтинг 5.0",
-    description: "Более 200 отзывов на Яндекс Картах. Рейтинг 5.0. Клиенты отмечают честную оценку, быстрое оформление и выплату день в день.",
-  },
-  avito: {
-    title: "Скупка24 на Авито — Проверенный продавец | Безопасная сделка",
-    description: "Актуальные объявления Скупка24 на Авито. Проверенный продавец, быстрый ответ, безопасные сделки с гарантией Авито Доставки.",
-  },
-  contacts: {
-    title: "Контакты Скупка24 Калуга | Телефон, Telegram, адреса офисов",
-    description: "Телефон: +7 (992) 999-03-33. Telegram @skypka24. Два офиса в Калуге: Кирова 11 и 7/47. Работаем круглосуточно.",
-  },
-  jobs: {
-    title: "Работа в Скупка24 Калуга — Вакансии | Менеджер, оценщик, кассир",
-    description: "Открыты вакансии в Скупка24: менеджер онлайн, оценщик техники, кассир-приёмщик. Стабильная зарплата, обучение, удобный график. Откликнитесь онлайн.",
-  },
-};
-
-const useDynamicSeo = (ready: boolean) => {
-  useEffect(() => {
-    if (!ready) return;
-    const params = new URLSearchParams(window.location.search);
-    const section = params.get("section") || params.get("block") || window.location.hash.replace("#", "");
-    if (!section) return;
-    const seo = SECTION_SEO[section];
-    if (!seo) return;
-
-    const prevTitle = document.title;
-    document.title = seo.title;
-    const setMeta = (selector: string, value: string) => {
-      const el = document.querySelector<HTMLMetaElement>(selector);
-      if (el) el.setAttribute("content", value);
-    };
-    setMeta('meta[name="description"]', seo.description);
-    setMeta('meta[property="og:title"]', seo.title);
-    setMeta('meta[property="og:description"]', seo.description);
-    setMeta('meta[name="twitter:title"]', seo.title);
-    setMeta('meta[name="twitter:description"]', seo.description);
-
-    return () => {
-      document.title = prevTitle;
-    };
-  }, [ready]);
-};
-
-// Хук для активного праздника на сплеше
-const useActiveHoliday = () => {
-  const [h, setH] = useState<{ holiday: { id: string; name: string; emoji: string; greeting: string; primaryColor: string; secondaryColor: string; pattern: string }; daysToHoliday: number } | null>(null);
-  useEffect(() => {
-    import("@/components/holidays/holidays").then(m => {
-      setH(m.getActiveHoliday() as typeof h);
-    }).catch(() => { /* noop */ });
   }, []);
-  return h;
-};
 
-const SplashScreen = ({ onDone }: { onDone: () => void }) => {
-  const [hiding, setHiding] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const holiday = useActiveHoliday();
-
-  useEffect(() => {
-    const start = performance.now();
-    const duration = 2300;
-    let raf = 0;
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / duration);
-      const eased = 1 - Math.pow(1 - t, 3);
-      setProgress(Math.round(eased * 100));
-      if (t < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    const t1 = setTimeout(() => setHiding(true), 2500);
-    const t2 = setTimeout(() => onDone(), 2900);
-    return () => { cancelAnimationFrame(raf); clearTimeout(t1); clearTimeout(t2); };
-  }, [onDone]);
-
-  // Точки-частицы (золотая пыль)
-  const particles = Array.from({ length: 14 }, (_, i) => i);
+  const openModal = useCallback(() => {
+    ymGoal(Goals.FORM_OPEN, { place: "hero" });
+    setModalOpen(true);
+  }, []);
 
   return (
-    <div className={`fixed inset-0 z-[100] flex flex-col items-center justify-center transition-opacity duration-500 overflow-hidden ${hiding ? "opacity-0" : "opacity-100"}`}
-      style={{ background: "radial-gradient(ellipse at center, #1a1400 0%, #0D0D0D 60%, #000 100%)" }}>
+    <div style={{ background: "#0D0D0D", color: "#fff", minHeight: "100dvh", fontFamily: "Roboto, sans-serif" }}>
+      <Header />
 
-      {/* Premium-фон: сетка + свечения по углам + золотые рамки */}
-      <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: "linear-gradient(rgba(255,215,0,0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(255,215,0,0.07) 1px, transparent 1px)", backgroundSize: "60px 60px", maskImage: "radial-gradient(ellipse at center, #000 30%, transparent 80%)", WebkitMaskImage: "radial-gradient(ellipse at center, #000 30%, transparent 80%)" }} />
-      <div className="absolute -top-32 -left-32 w-[500px] h-[500px] rounded-full blur-3xl pointer-events-none animate-pulse" style={{ background: "rgba(255,215,0,0.12)", animationDuration: "4s" }} />
-      <div className="absolute -bottom-32 -right-32 w-[500px] h-[500px] rounded-full blur-3xl pointer-events-none animate-pulse" style={{ background: "rgba(255,184,0,0.08)", animationDuration: "5s" }} />
-      <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at center, rgba(255,215,0,0.10) 0%, transparent 65%)" }} />
+      {/* ── HERO ── */}
+      <section style={{
+        position: "relative", overflow: "hidden",
+        padding: "64px 16px 48px",
+        background: "linear-gradient(160deg,#131000 0%,#0D0D0D 60%)",
+        borderBottom: "1px solid rgba(255,215,0,0.12)",
+      }}>
+        {/* Фоновое свечение */}
+        <div style={{
+          position: "absolute", top: "-80px", right: "-80px",
+          width: 400, height: 400, borderRadius: "50%",
+          background: "radial-gradient(circle,rgba(255,215,0,0.12) 0%,transparent 70%)",
+          pointerEvents: "none",
+        }} />
 
-      {/* Золотые рамки-углы (премиум-фрейм) */}
-      <div className="absolute top-4 left-4 w-10 h-10 border-l-2 border-t-2 border-[#FFD700]/60" />
-      <div className="absolute top-4 right-4 w-10 h-10 border-r-2 border-t-2 border-[#FFD700]/60" />
-      <div className="absolute bottom-4 left-4 w-10 h-10 border-l-2 border-b-2 border-[#FFD700]/60" />
-      <div className="absolute bottom-4 right-4 w-10 h-10 border-r-2 border-b-2 border-[#FFD700]/60" />
+        <div style={{ maxWidth: 900, margin: "0 auto" }}>
+          {/* Бейдж */}
+          <div style={{
+            display: "inline-flex", alignItems: "center", gap: 6,
+            background: "rgba(255,215,0,0.1)", border: "1px solid rgba(255,215,0,0.3)",
+            borderRadius: 99, padding: "4px 12px", marginBottom: 20,
+          }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#4ade80", boxShadow: "0 0 6px #4ade80", flexShrink: 0 }} />
+            <span style={{ fontSize: 11, fontWeight: 700, color: "#FFD700", letterSpacing: "0.15em", textTransform: "uppercase" }}>
+              Работаем 24/7 · Калуга
+            </span>
+          </div>
 
-      {/* Праздничная полоса сверху на сплеше — Георгиевская лента / снежинки / триколор */}
-      {holiday && holiday.holiday.pattern === "snow" && (
-        <div aria-hidden className="absolute inset-0 pointer-events-none overflow-hidden z-10">
-          {[...Array(20)].map((_, i) => (
-            <span
-              key={i}
-              className="absolute text-white/55 select-none"
+          {/* H1 */}
+          <h1 style={{
+            fontFamily: "Oswald, sans-serif", fontWeight: 900,
+            fontSize: "clamp(42px,9vw,80px)", lineHeight: 1,
+            textTransform: "uppercase", marginBottom: 16, letterSpacing: "-0.01em",
+          }}>
+            <span style={{ color: "#fff" }}>Продай технику</span><br />
+            <span style={{
+              background: "linear-gradient(90deg,#b8860b,#FFD700,#fff3a0,#FFD700,#b8860b)",
+              backgroundSize: "200% auto", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+            }}>выгодно</span>
+          </h1>
+
+          <p style={{ fontSize: 16, color: "rgba(255,255,255,0.6)", lineHeight: 1.7, maxWidth: 520, marginBottom: 28 }}>
+            Честная оценка за <strong style={{ color: "#fff" }}>15 минут</strong>. Смартфоны, ноутбуки,
+            ювелирные украшения — принимаем всё.<br />
+            <strong style={{ color: "#FFD700" }}>Выплата день в день.</strong>
+          </p>
+
+          {/* USP-чипы */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 32 }}>
+            {["⚡ За 15 минут", "✓ Честная цена", "💰 Деньги сразу", "📄 Договор"].map(t => (
+              <span key={t} style={{
+                padding: "5px 12px", borderRadius: 99,
+                background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
+                fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.8)",
+              }}>{t}</span>
+            ))}
+          </div>
+
+          {/* CTA */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 36 }}>
+            <button
+              onClick={openModal}
               style={{
-                left: `${(i * 7 + 3) % 100}%`,
-                top: "-10px",
-                fontSize: `${10 + (i % 3) * 6}px`,
-                animation: `splashParticle ${8 + (i % 5) * 2}s linear ${i * 0.4}s infinite`,
+                padding: "14px 28px", borderRadius: 12, border: "none", cursor: "pointer",
+                background: "linear-gradient(135deg,#FFD700,#f59e0b)",
+                fontFamily: "Oswald, sans-serif", fontWeight: 800,
+                fontSize: 15, letterSpacing: "0.05em", textTransform: "uppercase",
+                color: "#000", boxShadow: "0 4px 24px rgba(255,215,0,0.4)",
+                display: "flex", alignItems: "center", gap: 8,
               }}
             >
-              ❄
-            </span>
-          ))}
-        </div>
-      )}
-
-      {/* Боковые золотые линии */}
-      <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-transparent via-[#FFD700] to-transparent" />
-      <div className="absolute right-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-transparent via-[#FFD700]/40 to-transparent" />
-
-      {/* Золотая пыль — частицы */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        {particles.map((i) => {
-          const left = (i * 37) % 100;
-          const delay = (i * 0.4) % 5;
-          const dur = 6 + (i % 5);
-          const size = 2 + (i % 3);
-          return (
-            <span key={i}
-              className="absolute rounded-full bg-[#FFD700]"
+              <Icon name="Zap" size={16} />
+              Оценить онлайн
+            </button>
+            <a
+              href={PHONE_800}
+              onClick={() => ymGoal(Goals.CALL_CLICK, { place: "hero" })}
               style={{
-                left: `${left}%`,
-                bottom: `-10px`,
-                width: `${size}px`,
-                height: `${size}px`,
-                opacity: 0.5,
-                boxShadow: "0 0 8px rgba(255,215,0,0.8)",
-                animation: `splashParticle ${dur}s linear ${delay}s infinite`,
+                padding: "14px 24px", borderRadius: 12, cursor: "pointer",
+                background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,215,0,0.35)",
+                fontWeight: 700, fontSize: 14, color: "#FFD700", textDecoration: "none",
+                display: "flex", alignItems: "center", gap: 8,
               }}
-            />
-          );
-        })}
-      </div>
-
-      <div className="relative flex flex-col items-center gap-7 px-4">
-
-        {/* Премиум-медальон: вращающееся золотое кольцо + статичный логотип внутри */}
-        <div className="relative">
-          <style>{`
-            @keyframes logoSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-            @keyframes logoSpinR { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
-            @keyframes logoGlow { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
-            .logo-spin { animation: logoSpin 8s linear infinite; will-change: transform; transform: translateZ(0); backface-visibility: hidden; }
-            .logo-spin-slow { animation: logoSpin 18s linear infinite; will-change: transform; transform: translateZ(0); backface-visibility: hidden; }
-            .logo-spin-reverse { animation: logoSpinR 8s linear infinite; will-change: transform; transform: translateZ(0); backface-visibility: hidden; }
-            .logo-glow { animation: logoGlow 2.4s ease-in-out infinite; will-change: opacity; }
-          `}</style>
-
-          {/* мощное свечение вокруг (только opacity — без layout) */}
-          <div className="absolute inset-0 -m-4 rounded-full blur-2xl logo-glow pointer-events-none" style={{ background: "rgba(255,215,0,0.45)" }} />
-
-          {/* внешнее тонкое кольцо-орбита */}
-          <div className="absolute -inset-3 rounded-full border border-[#FFD700]/25 logo-spin-slow pointer-events-none">
-            <span className="absolute -top-[3px] left-1/2 w-1.5 h-1.5 -translate-x-1/2 rounded-full bg-[#FFD700]" style={{ boxShadow: "0 0 10px #FFD700" }} />
-            <span className="absolute top-1/2 -right-[3px] w-1 h-1 -translate-y-1/2 rounded-full bg-[#fff3a0]" style={{ boxShadow: "0 0 8px #FFD700" }} />
+            >
+              <Icon name="Phone" size={16} />
+              {PHONE_DISP} · бесплатно
+            </a>
           </div>
 
-          {/* основной золотой ободок (вращается плавно) */}
-          <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-full p-[2px] logo-spin
-                          bg-[conic-gradient(from_0deg,#b8860b,#ffd700,#fff3a0,#ffd700,#b8860b)]
-                          shadow-[0_0_50px_rgba(255,215,0,0.55)]">
-            {/* Логотип внутри — компенсируем вращение родителя обратной анимацией, чтобы картинка стояла ровно */}
-            <div className="w-full h-full rounded-full bg-black p-1 logo-spin-reverse">
-              <img
-                src="https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/9c9b4fca-bfd7-4841-a827-eb0354dad8da.JPG"
-                alt="Скупка24"
-                className="w-full h-full rounded-full object-cover"
-                draggable={false}
-              />
-            </div>
+          {/* Статистика */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 24 }}>
+            {STATS.map(s => (
+              <div key={s.label}>
+                <div style={{ fontFamily: "Oswald, sans-serif", fontSize: 22, fontWeight: 900, color: "#FFD700", lineHeight: 1 }}>
+                  {s.value}
+                </div>
+                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 2, textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                  {s.label}
+                </div>
+              </div>
+            ))}
           </div>
-
-          {/* искры в углах */}
-          <Icon name="Sparkles" size={14} className="absolute -top-2 -right-2 text-[#FFD700] animate-pulse pointer-events-none" />
-          <Icon name="Sparkles" size={10} className="absolute -bottom-1 -left-2 text-[#fff3a0] animate-pulse pointer-events-none" />
         </div>
+      </section>
 
-        {/* Бренд + бейдж */}
-        <div className="flex flex-col items-center gap-2 animate-[fadeIn_0.4s_ease_0.15s_both]">
-          <span className="font-oswald font-bold text-3xl sm:text-4xl text-[#FFD700] tracking-[0.3em] uppercase"
-                style={{ textShadow: '0 0 20px rgba(255,215,0,0.5), 0 0 40px rgba(255,215,0,0.2)' }}>
-            Скупка24
-          </span>
-          <span className="inline-flex items-center gap-1.5 bg-[#FFD700]/10 border border-[#FFD700]/40 px-3 py-1 rounded-full backdrop-blur-sm">
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#FFD700] opacity-75" />
-              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#FFD700]" />
-            </span>
-            <Icon name="Crown" size={10} className="text-[#FFD700]" />
-            <span className="font-roboto text-[10px] text-[#FFD700] uppercase tracking-[0.25em] font-semibold">Премиум · 24/7</span>
-          </span>
-        </div>
-
-        {/* Главный слоган с золотым градиентом */}
-        <h2 className="font-oswald text-3xl sm:text-4xl md:text-5xl font-bold uppercase text-center leading-[1.1] tracking-tight animate-[fadeIn_0.5s_ease_0.2s_both] flex flex-col items-center gap-1">
-          <span className="block text-white drop-shadow-[0_0_18px_rgba(255,255,255,0.15)] py-1">Купим дорого</span>
-          <span className="block bg-gradient-to-r from-[#FFD700] via-[#fff3a0] to-[#FFD700] bg-clip-text text-transparent animate-shimmer py-1">всё!</span>
-        </h2>
-
-        {/* Праздничное приветствие на сплеше (если активен праздник) */}
-        {holiday && (
-          <div
-            className="relative inline-flex items-center gap-2.5 px-5 py-2 rounded-full border animate-[fadeIn_0.5s_ease_0.4s_both] overflow-hidden"
-            style={{
-              background: `linear-gradient(90deg, ${holiday.holiday.primaryColor}DD, ${holiday.holiday.primaryColor}99)`,
-              borderColor: holiday.holiday.secondaryColor + "AA",
-              boxShadow: `0 0 24px ${holiday.holiday.primaryColor}66, inset 0 1px 0 ${holiday.holiday.secondaryColor}40`,
+      {/* ── УСЛУГИ (сетка 4×2) ── */}
+      <section id="catalog" style={{ padding: "48px 16px", maxWidth: 960, margin: "0 auto" }}>
+        <SectionLabel text="Что мы делаем" />
+        <h2 style={h2style}>Все услуги</h2>
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))",
+          gap: 12,
+        }}>
+          {SERVICES.map(s => (
+            <a key={s.href} href={s.href} style={{
+              display: "flex", flexDirection: "column", gap: 10,
+              padding: "20px 18px", borderRadius: 16, textDecoration: "none",
+              background: "rgba(255,255,255,0.03)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              transition: "border-color 0.2s, background 0.2s",
             }}
-          >
-            <span className="relative text-xl drop-shadow-[0_2px_6px_rgba(0,0,0,0.5)]" aria-hidden>
-              {holiday.holiday.emoji}
-            </span>
-            <span
-              className="relative font-oswald font-bold text-sm uppercase tracking-wider whitespace-nowrap"
-              style={{ color: "#fff", textShadow: `0 1px 4px rgba(0,0,0,0.6), 0 0 10px ${holiday.holiday.secondaryColor}88` }}
-            >
-              {holiday.holiday.greeting}
-            </span>
-          </div>
-        )}
-
-        {/* Прогресс-бар с золотым градиентом + проценты */}
-        <div className="w-64 sm:w-80 flex flex-col gap-2 animate-[fadeIn_0.4s_ease_0.5s_both]">
-          <div className="flex items-center justify-between text-[10px] font-roboto uppercase tracking-[0.3em] font-semibold">
-            <span className="text-[#FFD700]/60">Загрузка</span>
-            <span className="text-[#FFD700] tabular-nums" style={{ textShadow: "0 0 8px rgba(255,215,0,0.6)" }}>{progress}%</span>
-          </div>
-          <div className="relative h-[6px] w-full bg-white/10 rounded-full overflow-hidden shadow-[inset_0_1px_3px_rgba(0,0,0,0.6)] border border-[#FFD700]/15">
-            <div
-              className="h-full rounded-full relative"
-              style={{
-                width: `${progress}%`,
-                background: "linear-gradient(90deg, #b8860b, #ffd700, #fff3a0, #ffd700, #b8860b)",
-                backgroundSize: "200% auto",
-                animation: "shimmer 1.5s linear infinite",
-                boxShadow: "0 0 14px rgba(255,215,0,0.7), 0 0 4px rgba(255,215,0,1)",
-                transition: "width 0.1s linear",
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLElement).style.borderColor = s.accent + "55";
+                (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.055)";
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.08)";
+                (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.03)";
               }}
             >
-              {/* блик-головка прогресса */}
-              <span className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-white" style={{ boxShadow: "0 0 12px #fff, 0 0 20px #FFD700" }} />
-            </div>
+              <div style={{
+                width: 40, height: 40, borderRadius: 10,
+                background: s.accent + "18",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <Icon name={s.icon as Parameters<typeof Icon>[0]["name"]} size={20} style={{ color: s.accent }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", marginBottom: 3 }}>{s.label}</div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>{s.sub}</div>
+              </div>
+              <Icon name="ChevronRight" size={14} style={{ color: "rgba(255,255,255,0.2)", marginTop: "auto", alignSelf: "flex-end" }} />
+            </a>
+          ))}
+        </div>
+      </section>
+
+      {/* ── ЧТО ПРИНИМАЕМ ── */}
+      <section style={{
+        padding: "48px 16px",
+        background: "linear-gradient(180deg,#0D0D0D,#0f0f00 50%,#0D0D0D)",
+        borderTop: "1px solid rgba(255,255,255,0.05)",
+        borderBottom: "1px solid rgba(255,255,255,0.05)",
+      }}>
+        <div style={{ maxWidth: 960, margin: "0 auto" }}>
+          <SectionLabel text="Что принимаем" />
+          <h2 style={h2style}>
+            Всё что имеет{" "}
+            <span style={{ color: "#FFD700" }}>ценность</span>
+          </h2>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill,minmax(180px,1fr))",
+            gap: 10,
+          }}>
+            {ACCEPT.map(a => (
+              <div key={a.title} style={{
+                padding: "16px",
+                borderRadius: 12,
+                background: "rgba(255,255,255,0.03)",
+                border: "1px solid rgba(255,215,0,0.1)",
+                display: "flex", alignItems: "center", gap: 12,
+              }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 8, flexShrink: 0,
+                  background: "rgba(255,215,0,0.1)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <Icon name={a.icon as Parameters<typeof Icon>[0]["name"]} size={18} style={{ color: "#FFD700" }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>{a.title}</div>
+                  <div style={{ fontSize: 11, color: "#FFD700", fontWeight: 700, marginTop: 2 }}>{a.price}</div>
+                </div>
+              </div>
+            ))}
           </div>
-          <div className="flex items-center justify-center gap-1.5 mt-1">
-            <div className="w-1 h-1 rounded-full bg-[#FFD700] animate-pulse" />
-            <span className="font-roboto text-[#FFD700]/70 text-[10px] uppercase tracking-[0.3em] font-semibold">
-              {progress < 35 ? "Открываем сейф" : progress < 70 ? "Считаем выгоду" : progress < 95 ? "Полируем витрину" : "Готово"}
-            </span>
-            <div className="w-1 h-1 rounded-full bg-[#FFD700] animate-pulse" />
+          <div style={{ marginTop: 28, display: "flex", justifyContent: "center" }}>
+            <button
+              onClick={openModal}
+              style={{
+                padding: "13px 32px", borderRadius: 12, border: "none", cursor: "pointer",
+                background: "linear-gradient(135deg,#FFD700,#f59e0b)",
+                fontFamily: "Oswald, sans-serif", fontWeight: 800, fontSize: 14,
+                textTransform: "uppercase", letterSpacing: "0.05em", color: "#000",
+                boxShadow: "0 4px 20px rgba(255,215,0,0.3)",
+              }}
+            >
+              Оценить бесплатно
+            </button>
           </div>
         </div>
+      </section>
 
-        {/* Триггеры доверия */}
-        <div className="flex flex-wrap items-center justify-center gap-2 max-w-md animate-[fadeIn_0.4s_ease_0.8s_both]">
-          {[
-            { icon: "Award", label: "9 лет на рынке" },
-            { icon: "Users", label: "50 000+ клиентов" },
-            { icon: "Star", label: "4.9 на картах" },
-          ].map(t => (
-            <div key={t.label} className="flex items-center gap-1.5 bg-black/50 border border-[#FFD700]/25 px-2.5 py-1 rounded-full backdrop-blur-sm shadow-[0_0_12px_rgba(255,215,0,0.08)]">
-              <Icon name={t.icon as Parameters<typeof Icon>[0]["name"]} size={10} className="text-[#FFD700]" />
-              <span className="font-roboto text-white/80 text-[10px] uppercase tracking-wide">{t.label}</span>
+      {/* ── КАК ЭТО РАБОТАЕТ ── */}
+      <section id="how" style={{ padding: "48px 16px", maxWidth: 960, margin: "0 auto" }}>
+        <SectionLabel text="Процесс" />
+        <h2 style={h2style}>
+          <span style={{ color: "#FFD700" }}>4 шага</span> до денег
+        </h2>
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))",
+          gap: 16,
+        }}>
+          {HOW_STEPS.map(step => (
+            <div key={step.n} style={{
+              padding: "24px 20px",
+              borderRadius: 16,
+              background: "rgba(255,255,255,0.025)",
+              border: "1px solid rgba(255,255,255,0.07)",
+              position: "relative",
+            }}>
+              <div style={{
+                position: "absolute", top: 20, right: 20,
+                fontFamily: "Oswald, sans-serif", fontWeight: 900, fontSize: 28,
+                color: "rgba(255,215,0,0.12)", lineHeight: 1,
+              }}>{step.n}</div>
+              <div style={{
+                width: 44, height: 44, borderRadius: 12, marginBottom: 14,
+                background: "rgba(255,215,0,0.1)", border: "1px solid rgba(255,215,0,0.2)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <Icon name={step.icon as Parameters<typeof Icon>[0]["name"]} size={20} style={{ color: "#FFD700" }} />
+              </div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginBottom: 6 }}>{step.title}</div>
+              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", lineHeight: 1.6 }}>{step.desc}</div>
             </div>
           ))}
         </div>
-      </div>
-    </div>
-  );
-};
+      </section>
 
-const Index = ({ goldOpen = false }: { goldOpen?: boolean }) => {
-  const [splashDone, setSplashDone] = useState(false);
-  const [evalOpen, setEvalOpen] = useState(false);
-  useAutoScroll(splashDone);
-  useDynamicSeo(splashDone);
-  useScrollReveal();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [installPrompt, setInstallPrompt] = useState<any>(null);
-  const [installed, setInstalled] = useState(false);
+      {/* ── ГАРАНТИИ ── */}
+      <section id="guarantees" style={{
+        padding: "48px 16px",
+        background: "rgba(255,215,0,0.03)",
+        borderTop: "1px solid rgba(255,215,0,0.1)",
+        borderBottom: "1px solid rgba(255,215,0,0.1)",
+      }}>
+        <div style={{ maxWidth: 960, margin: "0 auto" }}>
+          <SectionLabel text="Надёжность" />
+          <h2 style={h2style}>
+            Честно, официально,{" "}
+            <span style={{ color: "#FFD700" }}>уже 9 лет</span>
+          </h2>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))",
+            gap: 12,
+          }}>
+            {[
+              { icon: "ShieldCheck",  title: "Честная оценка",       desc: "Называем рыночную цену без занижения" },
+              { icon: "FileText",     title: "Официальный договор",   desc: "Договор купли-продажи при каждой сделке" },
+              { icon: "Banknote",     title: "Деньги в день обращения", desc: "Наличными или на карту сразу" },
+              { icon: "Award",        title: "9 лет на рынке",        desc: "50 000+ сделок с 2015 года" },
+              { icon: "Star",         title: "Рейтинг 4.9",           desc: "На Яндекс Картах — 3 460 отзывов" },
+              { icon: "Clock",        title: "15 минут",              desc: "Быстрая оценка без ожидания" },
+            ].map(g => (
+              <div key={g.title} style={{
+                display: "flex", gap: 14, padding: "16px 18px",
+                borderRadius: 14, background: "rgba(255,255,255,0.025)",
+                border: "1px solid rgba(255,255,255,0.07)",
+                alignItems: "flex-start",
+              }}>
+                <div style={{
+                  width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+                  background: "rgba(255,215,0,0.1)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <Icon name={g.icon as Parameters<typeof Icon>[0]["name"]} size={18} style={{ color: "#FFD700" }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", marginBottom: 3 }}>{g.title}</div>
+                  <div style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", lineHeight: 1.5 }}>{g.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
-  // ?action=eval — открыть форму оценки (для рекламных ссылок)
-  useEffect(() => {
-    if (!splashDone) return;
-    const p = new URLSearchParams(window.location.search);
-    if (p.get("action") === "eval" || p.get("action") === "evaluate") {
-      setEvalOpen(true);
-    }
-  }, [splashDone]);
+      {/* ── РЕМОНТ (ссылки) ── */}
+      <section style={{ padding: "48px 16px", maxWidth: 960, margin: "0 auto" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+          <div>
+            <SectionLabel text="Сервис" />
+            <h2 style={{ ...h2style, marginBottom: 0 }}>Ремонт телефонов</h2>
+          </div>
+          <a href="/repair" style={{
+            fontSize: 13, fontWeight: 700, color: "#FFD700", textDecoration: "none",
+            padding: "7px 14px", borderRadius: 8,
+            border: "1px solid rgba(255,215,0,0.25)", whiteSpace: "nowrap",
+          }}>
+            Все услуги →
+          </a>
+        </div>
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))",
+          gap: 8,
+        }}>
+          {REPAIR_LINKS.map(r => (
+            <a key={r.href} href={r.href} style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "13px 16px", borderRadius: 10, textDecoration: "none",
+              background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)",
+              fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.75)",
+              transition: "border-color 0.2s",
+            }}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = "rgba(251,146,60,0.35)"}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.07)"}
+            >
+              {r.label}
+              <Icon name="ChevronRight" size={14} style={{ color: "rgba(255,255,255,0.25)" }} />
+            </a>
+          ))}
+        </div>
+      </section>
 
-  useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const handler = (e: any) => { e.preventDefault(); setInstallPrompt(e); };
-    window.addEventListener("beforeinstallprompt", handler);
-    if (window.matchMedia("(display-mode: standalone)").matches) setInstalled(true);
-    return () => window.removeEventListener("beforeinstallprompt", handler);
-  }, []);
+      {/* ── ОФИСЫ + КОНТАКТЫ ── */}
+      <section id="branches" style={{
+        padding: "48px 16px",
+        background: "linear-gradient(180deg,#0D0D0D,#0f0f00 50%,#0D0D0D)",
+        borderTop: "1px solid rgba(255,255,255,0.05)",
+      }}>
+        <div style={{ maxWidth: 960, margin: "0 auto" }}>
+          <SectionLabel text="Где мы" />
+          <h2 style={h2style}>Два офиса в <span style={{ color: "#FFD700" }}>центре Калуги</span></h2>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 16 }}>
+            {[
+              { title: "Офис №1",   address: "ул. Кирова, 11",   hours: "Ежедневно 9:00 – 21:00", map: "https://yandex.ru/maps/-/CHtqKn1w" },
+              { title: "Офис №2",   address: "ул. Кирова, 7/47", hours: "Ежедневно 9:00 – 21:00", map: "https://yandex.ru/maps/-/CHtqKn1w" },
+            ].map(o => (
+              <div key={o.title} style={{
+                padding: "24px", borderRadius: 16,
+                background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,215,0,0.15)",
+              }}>
+                <div style={{ fontFamily: "Oswald, sans-serif", fontWeight: 800, fontSize: 15, color: "#FFD700", marginBottom: 8, textTransform: "uppercase" }}>
+                  {o.title}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <Icon name="MapPin" size={14} style={{ color: "rgba(255,255,255,0.4)" }} />
+                  <span style={{ fontSize: 14, color: "#fff" }}>{o.address}</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 18 }}>
+                  <Icon name="Clock" size={14} style={{ color: "rgba(255,255,255,0.4)" }} />
+                  <span style={{ fontSize: 13, color: "rgba(255,255,255,0.5)" }}>{o.hours}</span>
+                </div>
+                <a href={o.map} target="_blank" rel="noopener noreferrer" style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  fontSize: 12, fontWeight: 700, color: "#FFD700", textDecoration: "none",
+                  padding: "7px 14px", borderRadius: 8, border: "1px solid rgba(255,215,0,0.3)",
+                }}>
+                  <Icon name="Navigation" size={12} />
+                  Маршрут
+                </a>
+              </div>
+            ))}
+          </div>
 
-  const installApp = async () => {
-    if (!installPrompt) return;
-    ymGoal(Goals.INSTALL_PWA);
-    installPrompt.prompt();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { outcome } = await (installPrompt as any).userChoice;
-    if (outcome === "accepted") { setInstallPrompt(null); setInstalled(true); }
-  };
+          {/* Быстрые контакты */}
+          <div style={{ marginTop: 28, display: "flex", flexWrap: "wrap", gap: 12 }}>
+            <a href={PHONE_TEL} style={contactBtn}>
+              <Icon name="Phone" size={16} />
+              8 992 999-03-33
+            </a>
+            <a href={PHONE_800} style={{ ...contactBtn, background: "rgba(255,255,255,0.04)", borderColor: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.7)" }}>
+              <Icon name="Phone" size={16} />
+              {PHONE_DISP} · бесплатно
+            </a>
+            <a href="https://t.me/skypka24" target="_blank" rel="noopener noreferrer" style={{ ...contactBtn, background: "rgba(37,150,190,0.12)", borderColor: "rgba(37,150,190,0.3)", color: "#38bdf8" }}>
+              <Icon name="Send" size={16} />
+              Telegram
+            </a>
+          </div>
+        </div>
+      </section>
 
-  return (
-    <div className="min-h-screen bg-[#0D0D0D] text-white pb-[72px] md:pb-0">
-      <DigitalParticles />
-      {!splashDone && <SplashScreen onDone={() => setSplashDone(true)} />}
-      {/* Праздничный баннер — автоматически появляется за 3 дня до и 3 дня после праздника (9 мая, 23 фев, 8 марта и т.д.) */}
-      <HolidayBanner />
-      {/* Угловое праздничное украшение поверх всей страницы (Георгиевская лента, снежинки и т.д.) */}
-      <HolidayCornerDecor />
-      <Header scrollTo={scrollTo} goldOpen={goldOpen} />
-      <HeroSection scrollTo={scrollTo} externalModalOpen={evalOpen} onExternalModalClose={() => setEvalOpen(false)} />
-      <div className="scroll-reveal"><AppleSaleBanner /></div>
-      <div className="scroll-reveal scroll-reveal-delay-1"><CarBuyoutBanner /></div>
-      <div className="scroll-reveal scroll-reveal-delay-2"><SpecTechBuyoutBanner /></div>
-      <div className="scroll-reveal scroll-reveal-delay-3"><LandBuyoutBanner /></div>
-      <div className="scroll-reveal"><SafeDealsBanner /></div>
-      <div className="scroll-reveal"><PremiumServicesGrid /></div>
-      <div className="scroll-reveal"><RepairLinksOnIndex /></div>
-      <div className="scroll-reveal"><WantToBuySection /></div>
-      <div className="scroll-reveal"><WholesaleBanner /></div>
-      <InfoSections />
-
-      {/* Антиквариат — 2 блока-превью */}
-      <div className="scroll-reveal"><AntiquesPreviewBlock /></div>
-
-      {/* С нами стало проще — премиум-блок (приложения + преимущества), стиль Trade In */}
-      <div className="scroll-reveal"><EasierWithUsBlock /></div>
-
-      {/* Быстрая связь — 4 канала: телефон, чат, telegram, офисы */}
-      <div className="scroll-reveal"><QuickContactSection /></div>
-
-      <div className="scroll-reveal"><JobsSection /></div>
-
-      {/* Подписка на канал MAX — новости, акции, новые поступления */}
-      <div className="scroll-reveal"><MaxChannelBanner /></div>
-
-      <ContactsFooter scrollTo={scrollTo} />
-      <ExitPopup onOpenEval={() => setEvalOpen(true)} />
+      <ContactsFooter />
+      <ExitPopup />
       <CookieBanner />
       <PublicChatFab />
-      <DesktopStickyBar onOpenModal={() => setEvalOpen(true)} />
-
-      {/* Sticky нижняя панель — только мобильные */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0D0D0D]/98 backdrop-blur-sm border-t border-[#FFD700]/20 pb-safe">
-        <div className="flex h-[68px]">
-          <a
-            href="tel:+79929990333"
-            onClick={() => ymGoal(Goals.CALL_CLICK, { place: "sticky_bar" })}
-            className="flex-1 flex flex-col items-center justify-center gap-1 text-[#FFD700] hover:bg-[#FFD700]/5 active:bg-[#FFD700]/10 transition-colors">
-            <Icon name="Phone" size={22} />
-            <span className="font-roboto text-[10px] uppercase tracking-wide">Позвонить</span>
-          </a>
-          <button
-            onClick={() => { ymGoal(Goals.FORM_OPEN, { place: "sticky_bar" }); setEvalOpen(true); }}
-            className="flex-[2] flex flex-col items-center justify-center gap-1 bg-[#FFD700] text-black active:bg-yellow-400 transition-colors">
-            <Icon name="Zap" size={22} />
-            <span className="font-oswald font-bold text-sm uppercase tracking-wide">Оценить онлайн</span>
-          </button>
-          <a
-            href="/chat"
-            className="flex-1 flex flex-col items-center justify-center gap-1 text-[#FFD700] hover:bg-[#FFD700]/5 active:bg-[#FFD700]/10 transition-colors relative">
-            <Icon name="MessageSquare" size={22} />
-            <span className="font-roboto text-[10px] uppercase tracking-wide">Чат Live</span>
-            <span className="absolute top-2 right-1/3 w-2 h-2 bg-green-400 rounded-full ring-2 ring-[#0D0D0D] animate-pulse" />
-          </a>
-          {installPrompt && !installed ? (
-            <button
-              onClick={installApp}
-              className="flex-1 flex flex-col items-center justify-center gap-1 text-[#FFD700] hover:bg-[#FFD700]/5 active:bg-[#FFD700]/10 transition-colors">
-              <Icon name="Download" size={22} />
-              <span className="font-roboto text-[10px] uppercase tracking-wide">Установить</span>
-            </button>
-          ) : (
-            <a
-              href="/catalog"
-              onClick={() => ymGoal(Goals.CATALOG_OPEN, { place: "sticky_bar" })}
-              className="flex-1 flex flex-col items-center justify-center gap-1 text-white/50 hover:text-[#FFD700] active:text-[#FFD700] transition-colors">
-              <Icon name="ShoppingBag" size={22} />
-              <span className="font-roboto text-[10px] uppercase tracking-wide">Каталог</span>
-            </a>
-          )}
-        </div>
-      </div>
+      <DesktopStickyBar />
+      {modalOpen && <EvaluateModal onClose={() => setModalOpen(false)} />}
     </div>
   );
+}
+
+// ── Вспомогательные стили ─────────────────────────────────────────────────────
+const h2style: React.CSSProperties = {
+  fontFamily: "Oswald, sans-serif", fontWeight: 900, fontSize: "clamp(22px,4vw,32px)",
+  textTransform: "uppercase", color: "#fff", marginBottom: 24, lineHeight: 1.1,
 };
 
-export default Index;
+const contactBtn: React.CSSProperties = {
+  display: "inline-flex", alignItems: "center", gap: 8,
+  padding: "11px 20px", borderRadius: 10, textDecoration: "none",
+  fontWeight: 700, fontSize: 14, color: "#FFD700",
+  background: "rgba(255,215,0,0.1)", border: "1px solid rgba(255,215,0,0.3)",
+};
+
+function SectionLabel({ text }: { text: string }) {
+  return (
+    <div style={{
+      display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 8,
+      fontSize: 11, fontWeight: 700, color: "rgba(255,215,0,0.6)",
+      letterSpacing: "0.2em", textTransform: "uppercase",
+    }}>
+      <span style={{ width: 20, height: 1, background: "rgba(255,215,0,0.4)" }} />
+      {text}
+    </div>
+  );
+}
