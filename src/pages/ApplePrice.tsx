@@ -81,33 +81,38 @@ function countdown(nextMs: number) {
   return `${h}ч ${m}мин`;
 }
 
+// ── Общая утилита: форматирование телефона ────────────────────────────────────
+function formatPhone(v: string): string {
+  const d = v.replace(/\D/g, "").slice(0, 11);
+  if (!d) return "+7";
+  if (d.length <= 1) return "+7";
+  if (d.length <= 4) return `+7 (${d.slice(1)}`;
+  if (d.length <= 7) return `+7 (${d.slice(1,4)}) ${d.slice(4)}`;
+  if (d.length <= 9) return `+7 (${d.slice(1,4)}) ${d.slice(4,7)}-${d.slice(7)}`;
+  return `+7 (${d.slice(1,4)}) ${d.slice(4,7)}-${d.slice(7,9)}-${d.slice(9)}`;
+}
+
 // ── Модал заказа ───────────────────────────────────────────────────────────────
 function OrderModal({ item, onClose }: { item: PriceItem; onClose: () => void }) {
-  const [name, setName]     = useState("");
-  const [phone, setPhone]   = useState("+7");
+  const [name, setName]       = useState("");
+  const [phone, setPhone]     = useState("+7");
   const [sending, setSending] = useState(false);
-  const [done, setDone]     = useState(false);
-  const [err, setErr]       = useState<string | null>(null);
+  const [done, setDone]       = useState(false);
+  const [err, setErr]         = useState<string | null>(null);
+  const [touched, setTouched] = useState(false);
 
   const phoneDigits = phone.replace(/\D/g, "");
-  const canSend = name.trim().length >= 2 && phoneDigits.length === 11;
+  const nameOk  = name.trim().length >= 2;
+  const phoneOk = phoneDigits.length === 11;
+  const canSend = nameOk && phoneOk;
 
-  const formatPhone = (v: string) => {
-    const d = v.replace(/\D/g, "").slice(0, 11);
-    if (!d) return "+7";
-    if (d.length <= 1) return "+7";
-    if (d.length <= 4) return `+7 (${d.slice(1)}`;
-    if (d.length <= 7) return `+7 (${d.slice(1,4)}) ${d.slice(4)}`;
-    if (d.length <= 9) return `+7 (${d.slice(1,4)}) ${d.slice(4,7)}-${d.slice(7)}`;
-    return `+7 (${d.slice(1,4)}) ${d.slice(4,7)}-${d.slice(7,9)}-${d.slice(9)}`;
-  };
-
-  const handlePhone = (v: string) => {
+  const handlePhoneChange = (v: string) => {
     const raw = v.replace(/\D/g, "");
     setPhone(formatPhone(raw.startsWith("7") || raw.startsWith("8") ? raw : "7" + raw));
   };
 
   const handleSend = async () => {
+    setTouched(true);
     if (!canSend) return;
     setSending(true); setErr(null);
     try {
@@ -115,10 +120,10 @@ function OrderModal({ item, onClose }: { item: PriceItem; onClose: () => void })
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: name.trim(),
-          phone: phoneDigits,
+          name:     name.trim(),
+          phone:    phoneDigits,
           category: "Прайс Apple",
-          desc: `Хочет купить: ${item.name}${item.price_num ? ` — ${item.price}` : ""}`,
+          desc:     `Хочет купить: ${item.name}${item.price_num ? ` — ${item.price}` : " (под заказ)"}`,
         }),
       });
       setDone(true);
@@ -146,7 +151,8 @@ function OrderModal({ item, onClose }: { item: PriceItem; onClose: () => void })
             <div className="text-center py-4">
               <div className="text-5xl mb-4">✅</div>
               <div className="font-oswald font-bold text-[20px] text-white uppercase mb-2">Заявка принята!</div>
-              <div className="text-white/50 text-[13px] mb-6">Перезвоним в течение 15 минут</div>
+              <div className="text-white/50 text-[13px] mb-1">Перезвоним в течение 15 минут</div>
+              <div className="text-white/30 text-[11px] mb-6">на номер {phone}</div>
               <button onClick={onClose}
                 className="w-full py-3 rounded-2xl font-oswald font-bold text-[14px] uppercase tracking-wide text-black"
                 style={{ background: "linear-gradient(135deg,#FFD700,#d97706)" }}>
@@ -167,27 +173,55 @@ function OrderModal({ item, onClose }: { item: PriceItem; onClose: () => void })
                 )}
                 <div>
                   <div className="font-bold text-white text-[14px] leading-tight">{item.name}</div>
-                  {item.price_num && (
-                    <div className="font-oswald font-black text-[18px] mt-0.5" style={{ color: "#FFD700" }}>
-                      {item.price}
-                    </div>
+                  {item.price_num ? (
+                    <div className="font-oswald font-black text-[18px] mt-0.5" style={{ color: "#FFD700" }}>{item.price}</div>
+                  ) : (
+                    <div className="text-[11px] mt-0.5" style={{ color: "#fb923c" }}>🚗 Под заказ · привезём за 1–2 дня</div>
                   )}
                 </div>
               </div>
 
-              <div className="font-oswald font-bold text-[16px] text-white uppercase tracking-wide mb-4">
+              <div className="font-oswald font-bold text-[16px] text-white uppercase tracking-wide mb-1">
                 Заказать / уточнить
               </div>
+              <div className="text-[11px] text-white/30 mb-4">Перезвоним в течение 15 минут</div>
 
               <div className="space-y-3">
-                <input value={name} onChange={e => setName(e.target.value)}
-                  placeholder="Ваше имя"
-                  className="w-full px-4 py-3 rounded-xl text-[14px] text-white outline-none"
-                  style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }} />
-                <input value={phone} onChange={e => handlePhone(e.target.value)}
-                  type="tel" placeholder="+7 (___) ___-__-__"
-                  className="w-full px-4 py-3 rounded-xl text-[14px] text-white outline-none"
-                  style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }} />
+                {/* Имя */}
+                <div className="relative">
+                  <input value={name} onChange={e => setName(e.target.value)}
+                    placeholder="Ваше имя *"
+                    className="w-full px-4 py-3 rounded-xl text-[14px] text-white outline-none pr-10"
+                    style={{
+                      background: "rgba(255,255,255,0.06)",
+                      border: `1px solid ${touched && !nameOk ? "rgba(239,68,68,0.6)" : nameOk ? "rgba(74,222,128,0.4)" : "rgba(255,255,255,0.12)"}`,
+                    }} />
+                  {nameOk
+                    ? <Icon name="Check" size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-green-400" />
+                    : touched && <Icon name="AlertCircle" size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-red-400" />
+                  }
+                </div>
+                {touched && !nameOk && (
+                  <div className="text-red-400 text-[11px] -mt-1 px-1">Введите имя (минимум 2 символа)</div>
+                )}
+
+                {/* Телефон */}
+                <div className="relative">
+                  <input value={phone} onChange={e => handlePhoneChange(e.target.value)}
+                    type="tel" placeholder="+7 (___) ___-__-__ *"
+                    className="w-full px-4 py-3 rounded-xl text-[14px] text-white outline-none pr-10"
+                    style={{
+                      background: "rgba(255,255,255,0.06)",
+                      border: `1px solid ${touched && !phoneOk ? "rgba(239,68,68,0.6)" : phoneOk ? "rgba(74,222,128,0.4)" : "rgba(255,255,255,0.12)"}`,
+                    }} />
+                  {phoneOk
+                    ? <Icon name="Check" size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-green-400" />
+                    : touched && <Icon name="AlertCircle" size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-red-400" />
+                  }
+                </div>
+                {touched && !phoneOk && (
+                  <div className="text-red-400 text-[11px] -mt-1 px-1">Введите номер телефона полностью</div>
+                )}
               </div>
 
               {err && (
@@ -202,8 +236,8 @@ function OrderModal({ item, onClose }: { item: PriceItem; onClose: () => void })
                   style={{ border: "1px solid rgba(255,255,255,0.1)" }}>
                   Отмена
                 </button>
-                <button onClick={handleSend} disabled={sending || !canSend}
-                  className="flex-[2] flex items-center justify-center gap-2 py-3 rounded-2xl font-oswald font-bold text-[14px] uppercase tracking-wide text-black disabled:opacity-40"
+                <button onClick={handleSend} disabled={sending}
+                  className="flex-[2] flex items-center justify-center gap-2 py-3 rounded-2xl font-oswald font-bold text-[14px] uppercase tracking-wide text-black disabled:opacity-60"
                   style={{ background: "linear-gradient(135deg,#FFD700,#d97706)", boxShadow: "0 4px 20px rgba(255,215,0,0.35)" }}>
                   <Icon name={sending ? "Loader2" : "Phone"} size={16} className={sending ? "animate-spin" : ""} />
                   {sending ? "Отправка…" : "Перезвоните мне"}
@@ -221,14 +255,25 @@ function OrderModal({ item, onClose }: { item: PriceItem; onClose: () => void })
 function EmailPriceModal({ onClose }: { onClose: () => void }) {
   const [email, setEmail]     = useState("");
   const [name, setName]       = useState("");
+  const [phone, setPhone]     = useState("+7");
   const [sending, setSending] = useState(false);
   const [done, setDone]       = useState(false);
   const [err, setErr]         = useState<string | null>(null);
+  const [touched, setTouched] = useState(false);
 
+  const phoneDigits = phone.replace(/\D/g, "");
   const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-  const canSend = emailOk && name.trim().length >= 2;
+  const nameOk  = name.trim().length >= 2;
+  const phoneOk = phoneDigits.length === 11;
+  const canSend = emailOk && nameOk && phoneOk;
+
+  const handlePhoneChange = (v: string) => {
+    const raw = v.replace(/\D/g, "");
+    setPhone(formatPhone(raw.startsWith("7") || raw.startsWith("8") ? raw : "7" + raw));
+  };
 
   const handleSend = async () => {
+    setTouched(true);
     if (!canSend) return;
     setSending(true); setErr(null);
     try {
@@ -236,22 +281,21 @@ function EmailPriceModal({ onClose }: { onClose: () => void }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          markup: DEFAULT_MARKUP,
-          email:  email.trim(),
+          markup:         DEFAULT_MARKUP,
+          email:          email.trim(),
           only_available: true,
         }),
       });
       const d = await res.json();
       if (d.ok || d.queued) {
-        // Также сохраняем лид чтобы сотрудники видели запрос
         fetch(SEND_LEAD_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            name: name.trim(),
-            phone: "—",
+            name:     name.trim(),
+            phone:    phoneDigits,
             category: "Прайс Apple — Email",
-            desc: `Запросил прайс на почту: ${email.trim()}`,
+            desc:     `Запросил прайс на почту: ${email.trim()}`,
           }),
         }).catch(() => {});
         setDone(true);
@@ -338,32 +382,48 @@ function EmailPriceModal({ onClose }: { onClose: () => void }) {
               </div>
 
               {/* Форма */}
-              <div className="space-y-3">
+              <div className="space-y-2">
+                {/* Имя */}
                 <div className="relative">
-                  <input
-                    value={name}
-                    onChange={e => setName(e.target.value)}
-                    placeholder="Ваше имя"
+                  <input value={name} onChange={e => setName(e.target.value)}
+                    placeholder="Ваше имя *"
                     className="w-full px-4 py-3 rounded-xl text-[14px] text-white outline-none pr-10"
-                    style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}
+                    style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${touched && !nameOk ? "rgba(239,68,68,0.6)" : nameOk ? "rgba(74,222,128,0.4)" : "rgba(255,255,255,0.12)"}` }}
                   />
-                  {name.trim().length >= 2 && (
-                    <Icon name="Check" size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-green-400" />
-                  )}
+                  {nameOk
+                    ? <Icon name="Check" size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-green-400" />
+                    : touched && <Icon name="AlertCircle" size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-red-400" />
+                  }
                 </div>
+                {touched && !nameOk && <div className="text-red-400 text-[11px] px-1">Введите имя</div>}
+
+                {/* Телефон */}
                 <div className="relative">
-                  <input
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    type="email"
-                    placeholder="email@example.com"
+                  <input value={phone} onChange={e => handlePhoneChange(e.target.value)}
+                    type="tel" placeholder="+7 (___) ___-__-__ *"
                     className="w-full px-4 py-3 rounded-xl text-[14px] text-white outline-none pr-10"
-                    style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${emailOk && email ? "rgba(74,222,128,0.4)" : "rgba(255,255,255,0.12)"}` }}
+                    style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${touched && !phoneOk ? "rgba(239,68,68,0.6)" : phoneOk ? "rgba(74,222,128,0.4)" : "rgba(255,255,255,0.12)"}` }}
                   />
-                  {emailOk && (
-                    <Icon name="Check" size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-green-400" />
-                  )}
+                  {phoneOk
+                    ? <Icon name="Check" size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-green-400" />
+                    : touched && <Icon name="AlertCircle" size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-red-400" />
+                  }
                 </div>
+                {touched && !phoneOk && <div className="text-red-400 text-[11px] px-1">Введите номер телефона полностью</div>}
+
+                {/* Email */}
+                <div className="relative">
+                  <input value={email} onChange={e => setEmail(e.target.value)}
+                    type="email" placeholder="email@example.com *"
+                    className="w-full px-4 py-3 rounded-xl text-[14px] text-white outline-none pr-10"
+                    style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${touched && !emailOk ? "rgba(239,68,68,0.6)" : emailOk ? "rgba(74,222,128,0.4)" : "rgba(255,255,255,0.12)"}` }}
+                  />
+                  {emailOk
+                    ? <Icon name="Check" size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-green-400" />
+                    : touched && <Icon name="AlertCircle" size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-red-400" />
+                  }
+                </div>
+                {touched && !emailOk && <div className="text-red-400 text-[11px] px-1">Введите корректный email</div>}
               </div>
 
               {err && (
@@ -372,10 +432,8 @@ function EmailPriceModal({ onClose }: { onClose: () => void }) {
                 </div>
               )}
 
-              {/* Дисклеймер */}
               <div className="text-white/20 text-[10px] mt-3 leading-relaxed">
-                Нажимая кнопку, вы соглашаетесь на получение информации о ценах.
-                Мы не рассылаем спам.
+                Нажимая кнопку, вы соглашаетесь на получение информации о ценах. Мы не рассылаем спам.
               </div>
 
               {/* Кнопки */}
@@ -388,9 +446,9 @@ function EmailPriceModal({ onClose }: { onClose: () => void }) {
                   Отмена
                 </button>
                 <button
-                  onClick={handleSend}
-                  disabled={sending || !canSend}
-                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-oswald font-bold text-[14px] uppercase tracking-wide text-black disabled:opacity-40 transition-all relative overflow-hidden"
+                  onClick={() => { setTouched(true); handleSend(); }}
+                  disabled={sending}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-oswald font-bold text-[14px] uppercase tracking-wide text-black disabled:opacity-60 transition-all relative overflow-hidden"
                   style={{
                     background: "linear-gradient(135deg,#FFD700,#f59e0b,#d97706)",
                     boxShadow: canSend ? "0 4px 24px rgba(255,215,0,0.4)" : "none",
@@ -415,6 +473,8 @@ function EmailPriceModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+const TOMORROW_MARKUP = 3000;
+
 // ── Панель «Привезём завтра» ──────────────────────────────────────────────────
 function TomorrowPanel({
   groups, open, onClose, onOrder,
@@ -424,7 +484,30 @@ function TomorrowPanel({
   onClose: () => void;
   onOrder: (item: PriceItem) => void;
 }) {
-  // Собираем все позиции БЕЗ цены — это «под заказ»
+  const [priceMap, setPriceMap] = useState<Record<string, string>>({});
+  const [loadingPrices, setLoadingPrices] = useState(false);
+
+  // Загружаем цены с наценкой +3000 когда панель открывается
+  useEffect(() => {
+    if (!open) return;
+    setLoadingPrices(true);
+    fetch(`${PUBLIC_PRICE_URL}?markup=${TOMORROW_MARKUP}&_t=${Date.now()}`)
+      .then(r => r.json())
+      .then((d: PriceData) => {
+        if (!d.ok) return;
+        const map: Record<string, string> = {};
+        for (const list of Object.values(d.groups)) {
+          for (const item of list) {
+            if (item.price_num) map[item.name] = item.price;
+          }
+        }
+        setPriceMap(map);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingPrices(false));
+  }, [open]);
+
+  // Собираем все позиции БЕЗ цены в основном прайсе — это «под заказ»
   const items = Object.entries(groups).flatMap(([cat, list]) =>
     list
       .filter(it => !it.price_num)
@@ -477,7 +560,7 @@ function TomorrowPanel({
                 Привезём завтра
               </div>
               <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>
-                {items.length} позиций под заказ · доставка 1–2 дня
+                {items.length} позиций · цены с доставкой{loadingPrices ? " · загружаю…" : ""}
               </div>
             </div>
           </div>
@@ -541,7 +624,15 @@ function TomorrowPanel({
                             {sim.includes("+") ? "nano+eSIM" : sim}
                           </span>
                         )}
-                        <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)" }}>под заказ</span>
+                        {priceMap[item.name] ? (
+                          <span style={{ fontSize: 12, fontWeight: 800, color: "#FFD700" }}>
+                            {priceMap[item.name]}
+                          </span>
+                        ) : loadingPrices ? (
+                          <span style={{ fontSize: 9, color: "rgba(255,255,255,0.25)" }}>…</span>
+                        ) : (
+                          <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)" }}>цена уточняется</span>
+                        )}
                       </div>
                     </div>
 
