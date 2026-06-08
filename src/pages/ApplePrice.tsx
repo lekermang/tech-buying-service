@@ -16,6 +16,38 @@ interface PriceItem {
   photo: string | null;
 }
 
+// ── SIM-тип по имени модели и региону ─────────────────────────────────────────
+function detectSim(name: string, region: string): string {
+  const n = name.toLowerCase();
+  if (n.includes("macbook") || n.includes("airpod") || n.includes("watch") ||
+      n.includes("pencil") || n.includes("кабель") || n.includes("стекло") || n.includes("чехол"))
+    return "";
+  if (n.match(/^(13|14|se2|se3)/))  return "nano-SIM + eSIM";
+  if (n.match(/^(15|16|17|16e|17e)/)) return region === "EU" ? "eSIM" : "nano-SIM + eSIM";
+  if (n.includes("ipad")) return region === "EU" ? "eSIM" : "nano-SIM + eSIM";
+  if (n.match(/samsung|galaxy|redmi|poco|xiaomi|honor/)) return "Dual SIM";
+  return "";
+}
+
+function SimBadge({ sim }: { sim: string }) {
+  if (!sim) return null;
+  const isESim  = sim === "eSIM";
+  const isDual  = sim.includes("Dual");
+  const isBoth  = sim.includes("+");
+  const color   = isESim ? "#10b981" : isDual ? "#8b5cf6" : "#3b82f6";
+  const bg      = isESim ? "rgba(16,185,129,0.12)" : isDual ? "rgba(139,92,246,0.12)" : "rgba(59,130,246,0.12)";
+  const border  = isESim ? "rgba(16,185,129,0.3)"  : isDual ? "rgba(139,92,246,0.3)"  : "rgba(59,130,246,0.3)";
+  return (
+    <span style={{
+      fontSize: 9, padding: "1px 6px", borderRadius: 4, marginLeft: 5,
+      verticalAlign: "middle", fontWeight: 700, whiteSpace: "nowrap",
+      color, background: bg, border: `1px solid ${border}`,
+    }}>
+      {isBoth ? "nano+eSIM" : sim}
+    </span>
+  );
+}
+
 interface PriceData {
   ok: boolean;
   total: number;
@@ -383,6 +415,161 @@ function EmailPriceModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+// ── Панель «Привезём завтра» ──────────────────────────────────────────────────
+function TomorrowPanel({
+  groups, open, onClose, onOrder,
+}: {
+  groups: Record<string, PriceItem[]>;
+  open: boolean;
+  onClose: () => void;
+  onOrder: (item: PriceItem) => void;
+}) {
+  // Собираем все позиции БЕЗ цены — это «под заказ»
+  const items = Object.entries(groups).flatMap(([cat, list]) =>
+    list
+      .filter(it => !it.price_num)
+      .map(it => ({ ...it, cat }))
+  );
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        onClick={onClose}
+        style={{
+          position: "fixed", inset: 0, zIndex: 48,
+          background: "rgba(0,0,0,0.7)",
+          backdropFilter: "blur(4px)",
+          opacity: open ? 1 : 0,
+          pointerEvents: open ? "auto" : "none",
+          transition: "opacity 0.3s",
+        }}
+      />
+
+      {/* Панель снизу */}
+      <div style={{
+        position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 49,
+        maxHeight: "82dvh",
+        display: "flex", flexDirection: "column",
+        background: "linear-gradient(180deg,#141414,#0d0d0d)",
+        borderTop: "2px solid #FFD700",
+        borderRadius: "24px 24px 0 0",
+        boxShadow: "0 -12px 60px rgba(255,215,0,0.18), 0 -4px 20px rgba(0,0,0,0.6)",
+        transform: open ? "translateY(0)" : "translateY(100%)",
+        transition: "transform 0.38s cubic-bezier(0.32,0.72,0,1)",
+      }}>
+        {/* Ручка */}
+        <div style={{ display: "flex", justifyContent: "center", padding: "10px 0 6px" }}>
+          <div style={{ width: 40, height: 4, borderRadius: 2, background: "rgba(255,215,0,0.3)" }} />
+        </div>
+
+        {/* Шапка */}
+        <div style={{ padding: "0 16px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: 14, flexShrink: 0,
+              background: "linear-gradient(135deg,rgba(255,215,0,0.2),rgba(255,165,0,0.08))",
+              border: "1px solid rgba(255,215,0,0.3)",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22,
+            }}>🚗</div>
+            <div>
+              <div style={{ fontFamily: "var(--font-oswald,oswald,sans-serif)", fontWeight: 900, fontSize: 17, color: "#FFD700", textTransform: "uppercase", letterSpacing: 1, lineHeight: 1.1 }}>
+                Привезём завтра
+              </div>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: 2 }}>
+                {items.length} позиций под заказ · доставка 1–2 дня
+              </div>
+            </div>
+          </div>
+          <button onClick={onClose} style={{
+            width: 32, height: 32, borderRadius: 10, border: "1px solid rgba(255,255,255,0.12)",
+            background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)",
+            display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 16,
+          }}>✕</button>
+        </div>
+
+        {/* Список */}
+        <div style={{ overflowY: "auto", flex: 1, paddingBottom: "env(safe-area-inset-bottom,12px)" }}>
+          {items.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "40px 16px", color: "rgba(255,255,255,0.3)", fontSize: 13 }}>
+              Все позиции сейчас в наличии 🎉
+            </div>
+          ) : (
+            <div>
+              {items.map((item, i) => {
+                const sim = detectSim(item.name, item.region);
+                return (
+                  <div key={i} style={{
+                    display: "flex", alignItems: "center", gap: 0,
+                    padding: "0",
+                    borderBottom: "1px solid rgba(255,255,255,0.05)",
+                    background: i % 2 === 0 ? "rgba(255,255,255,0.015)" : "transparent",
+                  }}>
+                    {/* Иконка категории */}
+                    <div style={{ width: 48, padding: "8px 6px", flexShrink: 0, textAlign: "center" }}>
+                      <div style={{
+                        width: 36, height: 36, borderRadius: 8, margin: "0 auto",
+                        background: "rgba(255,215,0,0.08)",
+                        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17,
+                      }}>
+                        {CAT_EMOJI[item.cat] || "📦"}
+                      </div>
+                    </div>
+
+                    {/* Название + SIM + Регион */}
+                    <div style={{ flex: 1, padding: "10px 6px", minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#e5e7eb", lineHeight: 1.3 }}>
+                        {item.name}
+                        {item.region && (
+                          <span style={{
+                            fontSize: 8, marginLeft: 5, padding: "1px 5px", borderRadius: 3,
+                            verticalAlign: "middle", fontWeight: 700,
+                            background: item.region === "EU" ? "rgba(74,222,128,0.15)" : item.region === "US" ? "rgba(96,165,250,0.15)" : "rgba(251,191,36,0.15)",
+                            color: item.region === "EU" ? "#4ade80" : item.region === "US" ? "#60a5fa" : "#fbbf24",
+                            border: `1px solid ${item.region === "EU" ? "#4ade8033" : item.region === "US" ? "#60a5fa33" : "#fbbf2433"}`,
+                          }}>{item.region}</span>
+                        )}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2, flexWrap: "wrap" }}>
+                        {sim && (
+                          <span style={{
+                            fontSize: 9, padding: "1px 5px", borderRadius: 3, fontWeight: 600,
+                            color: sim === "eSIM" ? "#10b981" : sim.includes("Dual") ? "#8b5cf6" : "#3b82f6",
+                            background: sim === "eSIM" ? "rgba(16,185,129,0.1)" : sim.includes("Dual") ? "rgba(139,92,246,0.1)" : "rgba(59,130,246,0.1)",
+                            border: `1px solid ${sim === "eSIM" ? "rgba(16,185,129,0.25)" : sim.includes("Dual") ? "rgba(139,92,246,0.25)" : "rgba(59,130,246,0.25)"}`,
+                          }}>
+                            {sim.includes("+") ? "nano+eSIM" : sim}
+                          </span>
+                        )}
+                        <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)" }}>под заказ</span>
+                      </div>
+                    </div>
+
+                    {/* Кнопка */}
+                    <div style={{ padding: "4px 12px 4px 4px", flexShrink: 0 }}>
+                      <button
+                        onClick={() => onOrder(item)}
+                        style={{
+                          padding: "7px 12px", borderRadius: 10,
+                          fontSize: 11, fontWeight: 800, cursor: "pointer",
+                          color: "#000", border: "none", whiteSpace: "nowrap",
+                          background: "linear-gradient(135deg,#FFD700,#f59e0b)",
+                          boxShadow: "0 2px 10px rgba(255,215,0,0.35)",
+                        }}>
+                        Заказать
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ── Скелетон-загрузка ─────────────────────────────────────────────────────────
 function SkeletonLoader() {
   const rows = [8, 12, 7, 10, 6, 9, 5];
@@ -466,6 +653,7 @@ export default function ApplePrice() {
   const [orderItem, setOrderItem]     = useState<PriceItem | null>(null);
   const [emailModal, setEmailModal]   = useState(false);
   const [pdfLoading, setPdfLoading]   = useState(false);
+  const [tomorrowOpen, setTomorrowOpen] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const handleDownloadPdf = useCallback(async () => {
@@ -569,6 +757,16 @@ export default function ApplePrice() {
                 обновление через {timer}
               </span>
             )}
+            {data && (
+              <button
+                onClick={() => setTomorrowOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-bold transition-all active:scale-95"
+                style={{ background: "rgba(255,165,0,0.12)", border: "1px solid rgba(255,165,0,0.35)", color: "#fb923c" }}
+              >
+                <span>🚗</span>
+                <span className="hidden sm:inline">Привезём завтра</span>
+              </button>
+            )}
             <button onClick={load} disabled={loading}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-bold transition-all active:scale-95"
               style={{ background: "rgba(255,215,0,0.1)", border: "1px solid rgba(255,215,0,0.3)", color: "#FFD700" }}>
@@ -652,77 +850,109 @@ export default function ApplePrice() {
 
                     {/* Строки товаров */}
                     <div>
-                      {items.map((item, i) => (
-                        <div key={i} className="price-row flex items-center gap-0 group"
-                          style={{
-                            background: i % 2 === 0 ? "rgba(255,255,255,0.015)" : "transparent",
-                            borderBottom: "1px solid rgba(255,255,255,0.04)",
-                          }}>
-                          {/* Фото */}
-                          <div style={{ width: 52, padding: "3px 6px", flexShrink: 0 }}>
-                            {item.photo ? (
-                              <img src={item.photo} alt={item.name} width={40} height={40}
-                                style={{ borderRadius: 6, objectFit: "cover", display: "block" }} />
-                            ) : (
-                              <div style={{
-                                width: 40, height: 40, borderRadius: 6,
-                                background: `${accentColor}10`,
-                                display: "flex", alignItems: "center", justifyContent: "center",
-                                fontSize: 18,
-                              }}>{CAT_EMOJI[cat] || "📦"}</div>
-                            )}
-                          </div>
-
-                          {/* Название */}
-                          <div style={{ flex: 1, padding: "8px 6px", minWidth: 0 }}>
-                            <span style={{ fontSize: 13, fontWeight: 700, color: "#e5e7eb", lineHeight: 1.3 }}>
-                              {item.name}
-                            </span>
-                            {item.region && (
-                              <span style={{
-                                fontSize: 9, marginLeft: 6, padding: "1px 5px", borderRadius: 4,
-                                verticalAlign: "middle", fontWeight: 700,
-                                background: item.region === "EU" ? "rgba(74,222,128,0.15)"
-                                  : item.region === "US" ? "rgba(96,165,250,0.15)" : "rgba(251,191,36,0.15)",
-                                color: item.region === "EU" ? "#4ade80"
-                                  : item.region === "US" ? "#60a5fa" : "#fbbf24",
-                                border: `1px solid ${item.region === "EU" ? "#4ade8033"
-                                  : item.region === "US" ? "#60a5fa33" : "#fbbf2433"}`,
-                              }}>{item.region}</span>
-                            )}
-                          </div>
-
-                          {/* Цена */}
-                          <div style={{
-                            padding: "8px 8px 8px 4px", textAlign: "right",
-                            whiteSpace: "nowrap", flexShrink: 0,
-                          }}>
-                            <span style={{
-                              fontSize: 14, fontWeight: 800, lineHeight: 1,
-                              color: item.price_num ? "#FFD700" : "rgba(255,255,255,0.2)",
-                            }}>{item.price}</span>
-                          </div>
-
-                          {/* Кнопка Заказать */}
-                          {item.price_num && (
-                            <div style={{ padding: "4px 8px 4px 2px", flexShrink: 0 }}>
-                              <button
-                                className="order-btn"
-                                onClick={() => setOrderItem(item)}
-                                style={{
-                                  padding: "5px 10px", borderRadius: 8,
-                                  fontSize: 11, fontWeight: 700,
-                                  color: "#000", cursor: "pointer",
-                                  background: "linear-gradient(135deg,#FFD700,#f59e0b)",
-                                  border: "none", whiteSpace: "nowrap",
-                                  boxShadow: "0 2px 8px rgba(255,215,0,0.3)",
-                                }}>
-                                Заказать
-                              </button>
+                      {items.map((item, i) => {
+                        const sim = detectSim(item.name, item.region);
+                        const inStock = !!item.price_num;
+                        return (
+                          <div key={i} className="price-row flex items-center gap-0 group"
+                            style={{
+                              background: i % 2 === 0 ? "rgba(255,255,255,0.015)" : "transparent",
+                              borderBottom: "1px solid rgba(255,255,255,0.04)",
+                              opacity: inStock ? 1 : 0.55,
+                            }}>
+                            {/* Фото */}
+                            <div style={{ width: 52, padding: "3px 6px", flexShrink: 0 }}>
+                              {item.photo ? (
+                                <img src={item.photo} alt={item.name} width={40} height={40}
+                                  style={{ borderRadius: 6, objectFit: "cover", display: "block" }} />
+                              ) : (
+                                <div style={{
+                                  width: 40, height: 40, borderRadius: 6,
+                                  background: inStock ? `${accentColor}10` : "rgba(255,255,255,0.04)",
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                  fontSize: 18,
+                                }}>{CAT_EMOJI[cat] || "📦"}</div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                      ))}
+
+                            {/* Название + SIM + Регион */}
+                            <div style={{ flex: 1, padding: "8px 6px", minWidth: 0 }}>
+                              <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 0 }}>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: inStock ? "#e5e7eb" : "#9ca3af", lineHeight: 1.3 }}>
+                                  {item.name}
+                                </span>
+                                {item.region && (
+                                  <span style={{
+                                    fontSize: 8, marginLeft: 5, padding: "1px 5px", borderRadius: 4,
+                                    verticalAlign: "middle", fontWeight: 700, flexShrink: 0,
+                                    background: item.region === "EU" ? "rgba(74,222,128,0.15)"
+                                      : item.region === "US" ? "rgba(96,165,250,0.15)" : "rgba(251,191,36,0.15)",
+                                    color: item.region === "EU" ? "#4ade80"
+                                      : item.region === "US" ? "#60a5fa" : "#fbbf24",
+                                    border: `1px solid ${item.region === "EU" ? "#4ade8033"
+                                      : item.region === "US" ? "#60a5fa33" : "#fbbf2433"}`,
+                                  }}>{item.region}</span>
+                                )}
+                              </div>
+                              {sim && (
+                                <div style={{ marginTop: 2 }}>
+                                  <SimBadge sim={sim} />
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Цена или «под заказ» */}
+                            <div style={{
+                              padding: "8px 4px 8px 4px", textAlign: "right",
+                              whiteSpace: "nowrap", flexShrink: 0,
+                            }}>
+                              {inStock ? (
+                                <span style={{ fontSize: 14, fontWeight: 800, color: "#FFD700" }}>
+                                  {item.price}
+                                </span>
+                              ) : (
+                                <span style={{
+                                  fontSize: 9, fontWeight: 600, color: "#fb923c",
+                                  background: "rgba(251,146,60,0.1)", border: "1px solid rgba(251,146,60,0.25)",
+                                  borderRadius: 5, padding: "2px 6px",
+                                }}>🚗 заказ</span>
+                              )}
+                            </div>
+
+                            {/* Кнопка */}
+                            <div style={{ padding: "4px 8px 4px 2px", flexShrink: 0 }}>
+                              {inStock ? (
+                                <button
+                                  className="order-btn"
+                                  onClick={() => setOrderItem(item)}
+                                  style={{
+                                    padding: "5px 10px", borderRadius: 8,
+                                    fontSize: 11, fontWeight: 700,
+                                    color: "#000", cursor: "pointer",
+                                    background: "linear-gradient(135deg,#FFD700,#f59e0b)",
+                                    border: "none", whiteSpace: "nowrap",
+                                    boxShadow: "0 2px 8px rgba(255,215,0,0.3)",
+                                  }}>
+                                  Заказать
+                                </button>
+                              ) : (
+                                <button
+                                  className="order-btn"
+                                  onClick={() => setOrderItem(item)}
+                                  style={{
+                                    padding: "5px 10px", borderRadius: 8,
+                                    fontSize: 11, fontWeight: 700,
+                                    color: "#fb923c", cursor: "pointer",
+                                    background: "rgba(251,146,60,0.1)",
+                                    border: "1px solid rgba(251,146,60,0.3)", whiteSpace: "nowrap",
+                                  }}>
+                                  Заказать
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 );
@@ -742,6 +972,18 @@ export default function ApplePrice() {
                 Позвоните — найдём любую модель за 1–3 дня. Скупаем и покупаем 24/7.
               </div>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                <button
+                  onClick={() => setTomorrowOpen(true)}
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl font-oswald font-bold text-[16px] uppercase transition-all active:scale-95"
+                  style={{
+                    background: "linear-gradient(135deg,rgba(251,146,60,0.15),rgba(251,146,60,0.05))",
+                    border: "2px solid rgba(251,146,60,0.5)",
+                    color: "#fb923c",
+                    boxShadow: "0 4px 20px rgba(251,146,60,0.2)",
+                  }}>
+                  <span style={{ fontSize: 20 }}>🚗</span>
+                  Привезём завтра
+                </button>
                 <a href="tel:+79929903333"
                   className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl font-oswald font-bold text-[16px] uppercase text-black"
                   style={{ background: "linear-gradient(135deg,#FFD700,#d97706)", boxShadow: "0 4px 24px rgba(255,215,0,0.35)" }}>
@@ -783,6 +1025,16 @@ export default function ApplePrice() {
 
       {/* Модал отправки прайса на email */}
       {emailModal && <EmailPriceModal onClose={() => setEmailModal(false)} />}
+
+      {/* Панель «Привезём завтра» */}
+      {data && (
+        <TomorrowPanel
+          groups={data.groups}
+          open={tomorrowOpen}
+          onClose={() => setTomorrowOpen(false)}
+          onOrder={(item) => { setTomorrowOpen(false); setOrderItem(item); }}
+        />
+      )}
     </>
   );
 }
