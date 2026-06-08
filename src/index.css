@@ -1911,4 +1911,21 @@
     background-clip: text;
     animation: goldTextShift 4s ease infinite;
   }
+
+  /* ══════════════════════════════════════════════════════════════
+     LUXURY TIER — shimmerSlide (для SLButton gold shimmer sweep)
+     ══════════════════════════════════════════════════════════════ */
+  @keyframes shimmerSlide {
+    0% {
+      background-position: -200% center;
+      opacity: 0;
+    }
+    20% {
+      opacity: 1;
+    }
+    100% {
+      background-position: 200% center;
+      opacity: 0;
+    }
+  }
 }

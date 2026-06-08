@@ -158,26 +158,78 @@ const Header = ({ scrollTo, goldOpen = false }: HeaderProps) => {
   };
 
   return (
-    <header
-      className={`fixed top-0 left-0 right-0 z-50 transition-shadow duration-300 ${compact ? "shadow-[0_4px_18px_rgba(0,0,0,0.45)]" : ""}`}
-    >
-      <GoldTicker
-        goldPrice={goldPrice}
-        goldHistory={goldHistory}
-        priceRetail999={priceRetail999}
-        priceWholesale999={priceWholesale999}
-        onSellClick={() => { setSellOpen(true); setSent(false); setForm({ name: "", phone: "" }); }}
-        compact={compact}
-      />
+    <header className="fixed top-0 left-0 right-0 z-50">
+      {/* ══ Unified premium header container ══ */}
+      <div
+        className={`relative transition-shadow duration-300 ${
+          compact
+            ? "shadow-[0_8px_32px_rgba(0,0,0,0.6),0_0_0_1px_rgba(255,215,0,0.08)]"
+            : ""
+        }`}
+        style={{ background: "#07050A" }}
+      >
+        {/* Cosmic background — nebula + starfield */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          {/* Nebula gradients */}
+          <div className="absolute inset-0" style={{
+            background: "linear-gradient(135deg, rgba(255,215,0,0.04) 0%, transparent 35%, transparent 65%, rgba(255,215,0,0.03) 100%)"
+          }} />
+          <div className="absolute -top-16 left-1/4 w-64 h-64 rounded-full blur-3xl" style={{ background: "rgba(255,215,0,0.05)" }} />
+          <div className="absolute -bottom-16 right-1/3 w-48 h-48 rounded-full blur-3xl" style={{ background: "rgba(255,180,0,0.04)" }} />
+          {/* 8-point starfield */}
+          <div className="absolute inset-0" style={{
+            backgroundImage: [
+              "radial-gradient(1px 1px at 12% 30%, rgba(255,215,0,0.55) 0%, transparent 100%)",
+              "radial-gradient(1px 1px at 28% 70%, rgba(255,215,0,0.4) 0%, transparent 100%)",
+              "radial-gradient(1px 1px at 45% 20%, rgba(255,215,0,0.5) 0%, transparent 100%)",
+              "radial-gradient(1px 1px at 62% 55%, rgba(255,215,0,0.45) 0%, transparent 100%)",
+              "radial-gradient(1px 1px at 78% 35%, rgba(255,215,0,0.35) 0%, transparent 100%)",
+              "radial-gradient(1px 1px at 88% 75%, rgba(255,215,0,0.5) 0%, transparent 100%)",
+              "radial-gradient(1px 1px at 5% 60%, rgba(255,215,0,0.4) 0%, transparent 100%)",
+              "radial-gradient(1px 1px at 95% 15%, rgba(255,215,0,0.45) 0%, transparent 100%)",
+            ].join(", ")
+          }} />
+        </div>
 
-      <MainNav
-        navLinks={NAV_LINKS}
-        menuOpen={menuOpen}
-        onToggleMenu={() => setMenuOpen(!menuOpen)}
-        onNav={handleNav}
-        compact={compact}
-        onPayClick={() => setPayOpen(true)}
-      />
+        {/* Left vertical gold accent line */}
+        <div className="absolute left-0 top-0 bottom-0 w-[1.5px] pointer-events-none" style={{
+          background: "linear-gradient(180deg, transparent 0%, rgba(255,215,0,0.4) 30%, rgba(255,215,0,0.6) 50%, rgba(255,215,0,0.4) 70%, transparent 100%)"
+        }} />
+        {/* Right vertical gold accent line */}
+        <div className="absolute right-0 top-0 bottom-0 w-[1.5px] pointer-events-none" style={{
+          background: "linear-gradient(180deg, transparent 0%, rgba(255,215,0,0.4) 30%, rgba(255,215,0,0.6) 50%, rgba(255,215,0,0.4) 70%, transparent 100%)"
+        }} />
+
+        {/* GoldTicker row */}
+        <GoldTicker
+          goldPrice={goldPrice}
+          goldHistory={goldHistory}
+          priceRetail999={priceRetail999}
+          priceWholesale999={priceWholesale999}
+          onSellClick={() => { setSellOpen(true); setSent(false); setForm({ name: "", phone: "" }); }}
+          compact={compact}
+        />
+
+        {/* Internal thin divider between ticker and nav */}
+        <div className="mx-4 h-px pointer-events-none" style={{
+          background: "linear-gradient(90deg, transparent 0%, rgba(255,215,0,0.12) 20%, rgba(255,215,0,0.25) 50%, rgba(255,215,0,0.12) 80%, transparent 100%)"
+        }} />
+
+        {/* MainNav row */}
+        <MainNav
+          navLinks={NAV_LINKS}
+          menuOpen={menuOpen}
+          onToggleMenu={() => setMenuOpen(!menuOpen)}
+          onNav={handleNav}
+          compact={compact}
+          onPayClick={() => setPayOpen(true)}
+        />
+
+        {/* Single premium gold border at the bottom */}
+        <div className="absolute bottom-0 left-0 right-0 h-[1px] pointer-events-none" style={{
+          background: "linear-gradient(90deg, transparent 0%, rgba(255,215,0,0.15) 10%, rgba(255,215,0,0.55) 50%, rgba(255,215,0,0.15) 90%, transparent 100%)"
+        }} />
+      </div>
 
       <MobileMenu
         open={menuOpen}

@@ -7,22 +7,129 @@ type SectionMeta = {
   subtitle: string;
   icon: string;
   color?: string;
-  skip?: boolean;
   tag?: string;
 };
 
 const SECTION_META: Record<string, SectionMeta> = {
-  repair:       { title: "Ремонт",       subtitle: "Заявки, сроки, статусы и история обслуживания",         icon: "Wrench",      color: "#fb923c", tag: "REPAIR_SYS" },
-  clients:      { title: "Клиенты",      subtitle: "База клиентов, скидки и СМС-рассылки",                  icon: "Users",       color: "#60a5fa", tag: "CRM_DB" },
-  analytics:    { title: "Статистика",   subtitle: "Аналитика по продажам, ремонтам и сотрудникам",         icon: "BarChart2",   color: "#a78bfa", tag: "ANALYTICS" },
-  smartlombard: { title: "СмартЛомбард", subtitle: "Скупка и продажа Б/У техники",                          icon: "Coins",       color: "#FFD700",  skip: true },
-  avitopro:     { title: "Авито PRO",    subtitle: "Сводка по объявлениям, статистика и автодействия",       icon: "Zap",         color: "#34d399",  skip: true },
-  gold:         { title: "Золото",       subtitle: "Учёт ювелирных изделий и драгметаллов",                 icon: "Gem",         color: "#fbbf24", tag: "GOLD_ACC" },
-  employees:    { title: "Команда",      subtitle: "Управление сотрудниками, ролями и графиками",           icon: "UserCog",     color: "#60a5fa", tag: "TEAM_MGR" },
-  goods:        { title: "Товары",       subtitle: "Каталог товаров в наличии",                             icon: "Package",     color: "#34d399", tag: "STOCK_DB" },
-  sales:        { title: "Продажи",      subtitle: "История продаж и операций",                             icon: "Receipt",     color: "#a3e635", tag: "SALES_LOG" },
-  myday:        { title: "Мой день",     subtitle: "Чек-лист, сигналы и узкие места на сегодня",            icon: "Sunrise",     color: "#fb923c",  skip: true },
-  wanttobuy:    { title: "Хочу купить",  subtitle: "Заявки клиентов на поиск б/у и нового товара",          icon: "ShoppingBag", color: "#60a5fa",  skip: true },
+  leads: {
+    title: "Заявки",
+    subtitle: "Входящие заявки от клиентов сайта — оценка, скупка и вопросы. Отвечай быстро, пока клиент не ушёл к конкурентам.",
+    icon: "Inbox",
+    color: "#ef4444",
+    tag: "CRM",
+  },
+  myday: {
+    title: "Мой день",
+    subtitle: "Персональный чек-лист смены: задачи, мёртвые деньги, Авито-индекс и узкие места — всё в одном экране.",
+    icon: "CalendarCheck",
+    color: "#fb923c",
+    tag: "Планировщик",
+  },
+  repair: {
+    title: "Ремонт",
+    subtitle: "Заявки на ремонт техники: статусы, сроки выполнения и полная история по каждому устройству.",
+    icon: "Wrench",
+    color: "#fb923c",
+    tag: "Сервис",
+  },
+  sitechat: {
+    title: "Сайт-чат",
+    subtitle: "Чаты с посетителями сайта Скупка24 в реальном времени — отвечай быстро и конвертируй в сделки.",
+    icon: "MessageCircle",
+    color: "#4ade80",
+    tag: "Онлайн",
+  },
+  salary: {
+    title: "Зарплата",
+    subtitle: "Моя текущая смена, начисленные бонусы, ставки и итоговый заработок за любой период.",
+    icon: "Wallet",
+    color: "#34d399",
+    tag: "Финансы",
+  },
+  wanttobuy: {
+    title: "Запросы клиентов",
+    subtitle: "Заявки от клиентов на поиск конкретных моделей б/у и нового товара — предложи наличие первым.",
+    icon: "ClipboardList",
+    color: "#38bdf8",
+    tag: "Спрос",
+  },
+  clients: {
+    title: "Клиенты",
+    subtitle: "База клиентов с историей сделок, персональными скидками и инструментами рассылок.",
+    icon: "Users",
+    color: "#60a5fa",
+    tag: "CRM",
+  },
+  smartlombard: {
+    title: "Скупка · СмартЛомбард",
+    subtitle: "Полный цикл скупки и продажи Б/У техники: оценка, склад, касса и оформление договоров.",
+    icon: "Coins",
+    color: "#FFD700",
+    tag: "Премиум",
+  },
+  chat: {
+    title: "Чат команды",
+    subtitle: "Внутренний мессенджер Скупка24 — общение сотрудников, задачи и координация в одном месте.",
+    icon: "MessagesSquare",
+    color: "#818cf8",
+    tag: "Команда",
+  },
+  avitopro: {
+    title: "Авито PRO",
+    subtitle: "Статистика объявлений, авто-действия и мониторинг конкурентов на Авито — всё в одном месте.",
+    icon: "Zap",
+    color: "#34d399",
+    tag: "Маркетплейс",
+  },
+  analytics: {
+    title: "Аналитика",
+    subtitle: "Динамика продаж, ремонтов и ключевых показателей магазина — графики и сводки за любой период.",
+    icon: "BarChart2",
+    color: "#a78bfa",
+    tag: "Отчёты",
+  },
+  finance: {
+    title: "Финансы",
+    subtitle: "ДДС: банковские выписки + данные склада → умный ИИ-финансовый отчёт для принятия решений.",
+    icon: "LineChart",
+    color: "#f472b6",
+    tag: "Владелец",
+  },
+  visitors: {
+    title: "Трафик",
+    subtitle: "Кто сейчас на сайте, источники трафика, конверсии и поведение посетителей в реальном времени.",
+    icon: "Eye",
+    color: "#c084fc",
+    tag: "Аналитика",
+  },
+  gold: {
+    title: "Золото",
+    subtitle: "Учёт ювелирных изделий: приём, оценка по пробам, остатки и полная история операций.",
+    icon: "Gem",
+    color: "#fbbf24",
+    tag: "Скупка",
+  },
+  employees: {
+    title: "Сотрудники",
+    subtitle: "Управление командой: роли и доступы, графики работы, KPI и эффективность каждого сотрудника.",
+    icon: "UserCog",
+    color: "#60a5fa",
+    tag: "Команда",
+  },
+  functions: {
+    title: "Функции",
+    subtitle: "Мониторинг облачных функций: нагрузка, время выполнения, стоимость вызовов и оптимизация.",
+    icon: "Cpu",
+    color: "#94a3b8",
+    tag: "Система",
+  },
+  unlock: {
+    title: "Unlock Manager",
+    subtitle: "Управление кабинетом разблокировки: наценки на услуги, активные заказы и финансовая отчётность.",
+    icon: "Unlock",
+    color: "#fbbf24",
+    tag: "Сервис",
+  },
 };
 
 export default function StaffSectionBanner({ tab }: { tab: StaffTab }) {
@@ -41,7 +148,7 @@ export default function StaffSectionBanner({ tab }: { tab: StaffTab }) {
   useEffect(() => { const t = setTimeout(() => setMounted(true), 50); return () => clearTimeout(t); }, []);
 
   const currentMeta = SECTION_META[prevTab];
-  if (!currentMeta || currentMeta.skip) return null;
+  if (!currentMeta) return null;
 
   const color = currentMeta.color || "#FFD700";
 

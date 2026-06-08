@@ -4,6 +4,27 @@ import { PROTECTED_TABS, type StaffTab } from "./staffConstants";
 import { prefetchTab } from "./StaffLazy";
 import { SLTooltip } from "../slShop/slUI";
 
+// ── Индивидуальный цвет акцента для каждой вкладки ──────────────────────────
+const TAB_COLOR: Partial<Record<StaffTab, string>> = {
+  leads:        "#ef4444",
+  myday:        "#fb923c",
+  repair:       "#fb923c",
+  sitechat:     "#4ade80",
+  salary:       "#34d399",
+  wanttobuy:    "#38bdf8",
+  clients:      "#60a5fa",
+  smartlombard: "#FFD700",
+  chat:         "#818cf8",
+  avitopro:     "#34d399",
+  analytics:    "#a78bfa",
+  finance:      "#f472b6",
+  visitors:     "#c084fc",
+  gold:         "#fbbf24",
+  employees:    "#60a5fa",
+  functions:    "#94a3b8",
+  unlock:       "#fbbf24",
+};
+
 type TabDef = {
   k: StaffTab;
   l: string;
@@ -31,6 +52,7 @@ function NavTab({
   t: TabDef; active: boolean; locked: boolean; isHot: boolean;
   roleColor: string; onPress: (k: StaffTab) => void; prefetch: (k: string) => void;
 }) {
+  const accentColor = TAB_COLOR[t.k] || roleColor;
   const [pressed, setPressed] = useState(false);
   const [ripple, setRipple] = useState(false);
 
@@ -47,7 +69,7 @@ function NavTab({
       as="flex"
       content={
         <>
-          <b style={{ color: roleColor }}>{t.l}</b>
+          <b style={{ color: accentColor }}>{t.l}</b>
           {t.tip && <><br /><span style={{ color: "rgba(255,255,255,0.5)", fontSize: "11px" }}>{t.tip}</span></>}
           {locked && <><br /><span className="text-red-300">🔒 Только для владельца</span></>}
         </>
@@ -77,7 +99,7 @@ function NavTab({
         {/* ── Ripple ── */}
         {ripple && (
           <span className="absolute inset-0 pointer-events-none" style={{
-            background: `radial-gradient(circle at 50% 60%, ${roleColor}30 0%, transparent 65%)`,
+            background: `radial-gradient(circle at 50% 60%, ${accentColor}30 0%, transparent 65%)`,
             animation: "noirRipple 0.5s ease-out forwards",
             borderRadius: "inherit",
           }} />
@@ -88,14 +110,14 @@ function NavTab({
           <>
             <span className="absolute pointer-events-none" style={{
               inset: "3px 2px 0px 2px",
-              background: `radial-gradient(ellipse at 50% 100%, ${roleColor}22 0%, transparent 70%)`,
+              background: `radial-gradient(ellipse at 50% 100%, ${accentColor}22 0%, transparent 70%)`,
               borderRadius: "10px",
             }} />
             <span className="absolute pointer-events-none" style={{
               inset: "3px 2px 0px 2px",
-              border: `1px solid ${roleColor}18`,
+              border: `1px solid ${accentColor}18`,
               borderRadius: "10px",
-              background: `linear-gradient(180deg, ${roleColor}08 0%, transparent 60%)`,
+              background: `linear-gradient(180deg, ${accentColor}08 0%, transparent 60%)`,
             }} />
           </>
         )}
@@ -116,8 +138,8 @@ function NavTab({
             width: "40px",
             height: "3px",
             borderRadius: "0 0 4px 4px",
-            background: `linear-gradient(90deg, transparent, ${roleColor}dd, #fff8e8, ${roleColor}dd, transparent)`,
-            boxShadow: `0 0 16px ${roleColor}, 0 0 32px ${roleColor}80, 0 0 64px ${roleColor}30`,
+            background: `linear-gradient(90deg, transparent, ${accentColor}dd, #fff8e8, ${accentColor}dd, transparent)`,
+            boxShadow: `0 0 16px ${accentColor}, 0 0 32px ${accentColor}80, 0 0 64px ${accentColor}30`,
           }} />
         )}
 
@@ -138,14 +160,14 @@ function NavTab({
             size={active ? 22 : 19}
             style={{
               color: active
-                ? roleColor
+                ? accentColor
                 : t.hot
                   ? "#ef4444"
                   : t.premium
                     ? "rgba(255,215,0,0.6)"
                     : "rgba(255,255,255,0.32)",
               filter: active
-                ? `drop-shadow(0 0 6px ${roleColor}) drop-shadow(0 0 18px ${roleColor}70)`
+                ? `drop-shadow(0 0 6px ${accentColor}) drop-shadow(0 0 18px ${accentColor}70)`
                 : t.hot
                   ? "drop-shadow(0 0 6px rgba(239,68,68,0.8)) drop-shadow(0 0 14px rgba(239,68,68,0.4))"
                   : t.premium
@@ -194,9 +216,9 @@ function NavTab({
             fontSize: active ? "10px" : "9px",
             fontWeight: (active || t.hot) ? 700 : 400,
             letterSpacing: active ? "0.04em" : "0.01em",
-            color: active ? roleColor : t.hot ? "#f87171" : "rgba(255,255,255,0.3)",
+            color: active ? accentColor : t.hot ? "#f87171" : "rgba(255,255,255,0.3)",
             textShadow: active
-              ? `0 0 10px ${roleColor}90, 0 0 20px ${roleColor}40`
+              ? `0 0 10px ${accentColor}90, 0 0 20px ${accentColor}40`
               : t.hot
                 ? "0 0 8px rgba(239,68,68,0.6)"
                 : "none",
@@ -253,6 +275,7 @@ function DrawerMenu({
           {tabs.map(t => {
             const locked = PROTECTED_TABS.includes(t.k) && !isOwner && !unlocked[t.k];
             const active = tab === t.k;
+            const tabAccent = TAB_COLOR[t.k] || roleColor;
             return (
               <button
                 key={t.k}
@@ -261,17 +284,17 @@ function DrawerMenu({
                 className="relative flex flex-col items-center justify-center gap-1.5 py-3 px-1 rounded-xl transition-all active:scale-90"
                 style={{
                   background: active
-                    ? `linear-gradient(145deg, ${roleColor}18, ${roleColor}08)`
+                    ? `linear-gradient(145deg, ${tabAccent}18, ${tabAccent}08)`
                     : "rgba(255,255,255,0.03)",
                   border: active
-                    ? `1px solid ${roleColor}35`
+                    ? `1px solid ${tabAccent}30`
                     : "1px solid rgba(255,255,255,0.07)",
                 }}
               >
                 {active && (
                   <span className="absolute top-0 left-1/2 -translate-x-1/2" style={{
                     width: "32px", height: "2px", borderRadius: "0 0 4px 4px",
-                    background: `linear-gradient(90deg, transparent, ${roleColor}cc, transparent)`,
+                    background: `linear-gradient(90deg, transparent, ${tabAccent}cc, transparent)`,
                   }} />
                 )}
                 <div className="relative">
@@ -279,8 +302,8 @@ function DrawerMenu({
                     name={t.icon}
                     size={20}
                     style={{
-                      color: active ? roleColor : t.premium ? "rgba(255,215,0,0.55)" : "rgba(255,255,255,0.45)",
-                      filter: active ? `drop-shadow(0 0 6px ${roleColor}80)` : "none",
+                      color: active ? tabAccent : t.premium ? "rgba(255,215,0,0.55)" : "rgba(255,255,255,0.45)",
+                      filter: active ? `drop-shadow(0 0 6px ${tabAccent}80)` : "none",
                     }}
                   />
                   {locked && <span className="absolute -top-1.5 -right-1.5 text-[9px]">🔒</span>}
@@ -298,7 +321,7 @@ function DrawerMenu({
                   ) : null}
                 </div>
                 <span className="font-roboto text-[10px] leading-tight text-center select-none"
-                  style={{ color: active ? roleColor : "rgba(255,255,255,0.45)", fontWeight: active ? 700 : 400 }}>
+                  style={{ color: active ? tabAccent : "rgba(255,255,255,0.45)", fontWeight: active ? 700 : 400 }}>
                   {t.l}
                 </span>
               </button>

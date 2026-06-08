@@ -8,20 +8,20 @@ import Icon from "@/components/ui/icon";
 
 // ============ Базовые классы (можно использовать напрямую) ============
 export const slClasses = {
-  card: "bg-[#101010] border border-[#1A1A1A] rounded-xl shadow-[0_1px_0_rgba(255,215,0,0.04)_inset,0_8px_24px_rgba(0,0,0,0.3)]",
+  card: "bg-[#0E0C09] border border-[rgba(255,215,0,0.1)] rounded-2xl shadow-[0_1px_0_rgba(255,255,255,0.04)_inset,0_-1px_0_rgba(0,0,0,0.5)_inset,0_8px_32px_rgba(0,0,0,0.5),0_2px_8px_rgba(255,215,0,0.04)]",
   cardPad: "p-2.5 sm:p-3",
-  field: "rounded-md bg-[#0A0A0A] border border-[#1A1A1A] focus-within:border-[#FFD700]/60 focus-within:bg-[#0E0E0E] hover:border-[#262626] transition-all",
+  field: "rounded-xl bg-[#0A0A0A] border border-[#1A1A1A] focus-within:border-[rgba(255,215,0,0.6)] focus-within:shadow-[0_0_0_4px_rgba(255,215,0,0.08)] focus-within:bg-[#0E0E0E] hover:border-[#262626] transition-all",
   // На мобильных 16px шрифт + py-2.5 (40px высота) — Apple/Google рекомендуют ≥40px,
   // и ≥16px чтобы iOS не зумил страницу при фокусе.
   input: "w-full bg-transparent outline-none px-2.5 py-2.5 sm:py-1.5 text-[16px] sm:text-[13px] text-white placeholder:text-white/25",
-  label: "text-[9px] uppercase tracking-[0.08em] font-bold text-white/45",
+  label: "text-[9px] uppercase tracking-[0.08em] font-bold text-[rgba(255,215,0,0.55)]",
   pill: "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wide font-semibold border",
-  btn: "inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-bold uppercase tracking-wide transition active:scale-[0.97]",
-  btnGold: "bg-[#FFD700] hover:bg-[#FFE34D] text-black shadow-[0_2px_8px_rgba(255,215,0,0.25)]",
-  btnGoldOutline: "bg-[#FFD700]/8 hover:bg-[#FFD700]/15 border border-[#FFD700]/30 text-[#FFD700]",
-  btnDark: "bg-[#0F0F0F] border border-[#1F1F1F] hover:border-[#FFD700]/30 text-white/75",
-  btnDanger: "bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-300",
-  btnSuccess: "bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300",
+  btn: "inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold uppercase tracking-wide transition active:scale-[0.97]",
+  btnGold: "bg-[linear-gradient(135deg,#FFE34D_0%,#FFD700_45%,#c8960a_100%)] hover:brightness-110 text-black shadow-[0_2px_12px_rgba(255,215,0,0.35),0_0_0_1px_rgba(255,215,0,0.5),inset_0_1px_0_rgba(255,255,255,0.4)]",
+  btnGoldOutline: "bg-[rgba(255,215,0,0.08)] hover:bg-[rgba(255,215,0,0.15)] border border-[rgba(255,215,0,0.3)] hover:border-[rgba(255,215,0,0.5)] text-[#FFD700]",
+  btnDark: "bg-[#0F0F0F] border border-[rgba(255,215,0,0.12)] hover:border-[rgba(255,215,0,0.3)] text-white/75",
+  btnDanger: "bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 hover:border-red-400/50 text-red-300",
+  btnSuccess: "bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 hover:border-emerald-400/50 text-emerald-300",
 };
 
 // ============ Card ============
@@ -44,11 +44,22 @@ export function SLSection({
   className?: string;
 }) {
   return (
-    <div className={`${slClasses.card} ${slClasses.cardPad} ${className}`}>
+    <div className={`relative ${slClasses.card} ${slClasses.cardPad} ${className} overflow-hidden`}>
+      {/* Top gradient accent line */}
+      <div className="absolute top-0 left-0 right-0 h-[1px] pointer-events-none" style={{
+        background: "linear-gradient(90deg, transparent, rgba(255,215,0,0.3) 30%, rgba(255,215,0,0.6) 50%, rgba(255,215,0,0.3) 70%, transparent)"
+      }} />
       <div className="flex items-center justify-between gap-2 mb-2">
         <div className="flex items-center gap-1.5 min-w-0">
-          {icon && <Icon name={icon} size={12} className="text-[#FFD700] shrink-0" />}
-          <h3 className="font-oswald uppercase text-[12px] tracking-[0.06em] font-bold truncate">{title}</h3>
+          {icon && (
+            <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0" style={{
+              background: "rgba(255,215,0,0.12)",
+              border: "1px solid rgba(255,215,0,0.2)",
+            }}>
+              <Icon name={icon} size={12} className="text-[#FFD700]" />
+            </div>
+          )}
+          <h3 className="font-oswald uppercase text-[12px] tracking-[0.06em] font-bold truncate" style={{ color: "rgba(255,240,200,0.9)" }}>{title}</h3>
         </div>
         {right && <div className="shrink-0">{right}</div>}
       </div>

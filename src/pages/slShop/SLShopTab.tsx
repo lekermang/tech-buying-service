@@ -92,72 +92,106 @@ export default function SLShopTab({ token, myRole }: { token: string; myRole?: s
   return (
     <div className="px-2 pt-2 pb-1 sm:px-3 max-w-[1400px] mx-auto w-full">
 
-      {/* ── Компактная шапка модуля ── */}
-      <div className="relative rounded-2xl overflow-hidden mb-2.5"
-        style={{
-          background: "linear-gradient(135deg, rgba(255,215,0,0.1) 0%, rgba(255,215,0,0.04) 50%, transparent 100%)",
-          border: "1px solid rgba(255,215,0,0.22)",
-          boxShadow: "0 0 30px rgba(255,215,0,0.07), inset 0 1px 0 rgba(255,215,0,0.15)",
-        }}>
-        {/* Верхняя неоновая полоска */}
-        <div className="absolute top-0 left-0 right-0 h-[1px]"
-          style={{ background: "linear-gradient(90deg, transparent, rgba(255,215,0,0.7), transparent)" }} />
-        {/* Угловое свечение */}
-        <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full blur-3xl pointer-events-none"
-          style={{ background: "rgba(255,215,0,0.12)" }} />
+      {/* ══ Premium cosmic banner ══ */}
+      <div className="relative overflow-hidden rounded-2xl mb-4" style={{
+        background: "linear-gradient(145deg, rgba(14,10,4,0.99) 0%, rgba(8,6,2,1) 100%)",
+        border: "1px solid rgba(255,215,0,0.18)",
+        boxShadow: "0 8px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,215,0,0.06)",
+      }}>
+        {/* 1.5px top light line */}
+        <div className="absolute top-0 left-0 right-0 h-[1.5px]" style={{
+          background: "linear-gradient(90deg, transparent, rgba(255,215,0,0.5) 30%, rgba(255,255,220,0.8) 50%, rgba(255,215,0,0.5) 70%, transparent)"
+        }} />
+        {/* Cosmic nebula bg */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-0 left-0 w-48 h-48 rounded-full blur-3xl" style={{ background: "rgba(255,215,0,0.07)", transform: "translate(-30%,-30%)" }} />
+          <div className="absolute bottom-0 right-0 w-40 h-40 rounded-full blur-3xl" style={{ background: "rgba(255,150,0,0.05)", transform: "translate(20%,20%)" }} />
+          {/* 5-point starfield */}
+          <div className="absolute inset-0" style={{
+            backgroundImage: [
+              "radial-gradient(1px 1px at 15% 25%, rgba(255,215,0,0.6) 0%, transparent 100%)",
+              "radial-gradient(1px 1px at 70% 40%, rgba(255,215,0,0.5) 0%, transparent 100%)",
+              "radial-gradient(1px 1px at 45% 70%, rgba(255,215,0,0.4) 0%, transparent 100%)",
+              "radial-gradient(1px 1px at 85% 15%, rgba(255,215,0,0.55) 0%, transparent 100%)",
+              "radial-gradient(1px 1px at 30% 85%, rgba(255,215,0,0.45) 0%, transparent 100%)",
+            ].join(", ")
+          }} />
+        </div>
 
-        <div className="relative flex items-center gap-2.5 px-3 py-2.5">
-          {/* Иконка */}
-          <div className="relative w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-            style={{
-              background: "linear-gradient(135deg, #FFE34D 0%, #FFD700 55%, #b8860b 100%)",
-              boxShadow: "0 0 16px rgba(255,215,0,0.45), inset 0 1px 0 rgba(255,255,255,0.35)",
+        <div className="relative px-4 py-3 flex items-start gap-3">
+          {/* Icon with pulse ring */}
+          <div className="relative shrink-0 mt-0.5">
+            <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{
+              background: "linear-gradient(135deg, rgba(255,215,0,0.2) 0%, rgba(255,215,0,0.08) 100%)",
+              border: "1px solid rgba(255,215,0,0.3)",
             }}>
-            <Icon name="Gem" size={17} className="text-black" />
+              <Icon name="Coins" size={22} className="text-[#FFD700]" style={{ filter: "drop-shadow(0 0 6px rgba(255,215,0,0.6))" }} />
+            </div>
+            {/* Pulse ring */}
+            <div className="absolute inset-0 rounded-2xl border border-[#FFD700]/30 animate-ping" style={{ animationDuration: "2.5s" }} />
           </div>
 
-          {/* Текст */}
           <div className="flex-1 min-w-0">
-            <div className="font-oswald font-black uppercase text-[15px] tracking-[0.08em] leading-none"
-              style={{ color: "#FFD700", textShadow: "0 0 16px rgba(255,215,0,0.5)" }}>
-              СмартЛомбард
+            {/* Module title */}
+            <div className="flex items-center gap-2 flex-wrap mb-0.5">
+              <h2 className="font-oswald font-black text-[18px] leading-tight uppercase tracking-wide" style={{
+                background: "linear-gradient(135deg, #fff8e8 0%, #FFD700 60%, #c8960a 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}>СмартЛомбард</h2>
+              {perms?.name && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider" style={{
+                  background: "rgba(255,215,0,0.12)",
+                  border: "1px solid rgba(255,215,0,0.25)",
+                  color: "rgba(255,215,0,0.8)",
+                }}>{perms.name}</span>
+              )}
             </div>
-            <div className="text-[10px] font-roboto mt-0.5 truncate"
-              style={{ color: "rgba(255,255,255,0.38)" }}>
-              {perms?.name ? `${perms.name} · ` : ""}Скупка · Склад · Касса · Договоры
+
+            {/* Feature tags */}
+            <div className="flex flex-wrap gap-1 mb-2">
+              {["Скупка", "Склад", "Касса", "Договоры"].map(tag => (
+                <span key={tag} className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded" style={{
+                  background: "rgba(255,255,255,0.05)",
+                  color: "rgba(255,255,255,0.4)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                }}>{tag}</span>
+              ))}
             </div>
-          </div>
 
-          {/* Кнопка ИИ-оценщика */}
-          <button
-            onClick={() => navigate("/staff/evaluator")}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl shrink-0 transition-all duration-200 active:scale-95"
-            style={{
-              background: "linear-gradient(135deg, rgba(255,215,0,0.18), rgba(255,215,0,0.08))",
-              border: "1px solid rgba(255,215,0,0.4)",
-              boxShadow: "0 0 12px rgba(255,215,0,0.15)",
-            }}
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 20px rgba(255,215,0,0.35)";
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,215,0,0.7)";
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 0 12px rgba(255,215,0,0.15)";
-              (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,215,0,0.4)";
-            }}
-          >
-            <Icon name="TrendingUp" size={12} style={{ color: "#FFD700" }} />
-            <span className="text-[9px] uppercase tracking-widest font-bold" style={{ color: "#FFD700" }}>Оценить</span>
-          </button>
+            {/* CTA row */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={() => navigate("/staff/evaluator")}
+                className="relative overflow-hidden group inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-oswald font-bold text-[11px] uppercase tracking-wider text-black active:scale-95 transition-all"
+                style={{
+                  background: "linear-gradient(135deg, #FFE34D 0%, #FFD700 50%, #c8960a 100%)",
+                  boxShadow: "0 2px 12px rgba(255,215,0,0.4), inset 0 1px 0 rgba(255,255,255,0.4)",
+                }}
+              >
+                {/* Shimmer */}
+                <span className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" style={{
+                  background: "linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.5) 50%, transparent 70%)",
+                }} />
+                <Icon name="Zap" size={12} className="relative" style={{ filter: "drop-shadow(0 0 4px rgba(0,0,0,0.4))" }} />
+                <span className="relative">Оценить</span>
+              </button>
 
-          {/* Premium badge */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl shrink-0"
-            style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.2)" }}>
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
-            </span>
-            <span className="text-[9px] uppercase tracking-widest font-bold text-emerald-400">Live</span>
+              {/* Live badge */}
+              <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full" style={{
+                background: "rgba(52,211,153,0.1)",
+                border: "1px solid rgba(52,211,153,0.25)",
+              }}>
+                <div className="relative w-2 h-2 rounded-full" style={{
+                  background: "#34d399",
+                  boxShadow: "0 0 6px rgba(52,211,153,0.8), 0 0 12px rgba(52,211,153,0.4)",
+                }}>
+                  <div className="absolute inset-0 rounded-full animate-ping" style={{ background: "#34d399", opacity: 0.5 }} />
+                </div>
+                <span className="font-roboto text-[9px] font-semibold text-emerald-300 uppercase tracking-wider">Live</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

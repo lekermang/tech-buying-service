@@ -194,7 +194,7 @@ const MainNav = ({ navLinks, menuOpen, onToggleMenu, onNav, compact = false, onP
   const active = useActiveSection(hrefs);
 
   return (
-    <div className="relative bg-[#0D0D0D]/95 backdrop-blur-sm border-b border-[#FFD700]/20">
+    <div className="relative">
       {/* Премиум-фон */}
       <div className="pointer-events-none absolute inset-0" style={{ background: "linear-gradient(90deg, rgba(255,215,0,0.04) 0%, transparent 30%, transparent 70%, rgba(255,215,0,0.04) 100%)" }} />
       <div className="pointer-events-none absolute -top-16 left-10 w-60 h-60 rounded-full blur-3xl" style={{ background: "rgba(255,215,0,0.05)" }} />
