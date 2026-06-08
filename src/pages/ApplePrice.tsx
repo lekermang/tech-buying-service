@@ -3,6 +3,7 @@ import Icon from "@/components/ui/icon";
 
 const PUBLIC_PRICE_URL = "https://functions.poehali.dev/b39f271a-3a63-4998-b83b-3c64eeace265";
 const SEND_LEAD_URL    = "https://functions.poehali.dev/52666ff7-db52-4b6a-a90e-d60aeed699de";
+const PRICE_EMAIL_URL  = "https://functions.poehali.dev/9e9486d9-57f0-454c-bc19-b46e3d4bc682";
 const DEFAULT_MARKUP   = 2000;
 const REFRESH_MS       = 3 * 60 * 60 * 1000;
 
@@ -173,6 +174,204 @@ function OrderModal({ item, onClose }: { item: PriceItem; onClose: () => void })
                   style={{ background: "linear-gradient(135deg,#FFD700,#d97706)", boxShadow: "0 4px 20px rgba(255,215,0,0.35)" }}>
                   <Icon name={sending ? "Loader2" : "Phone"} size={16} className={sending ? "animate-spin" : ""} />
                   {sending ? "Отправка…" : "Перезвоните мне"}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Модал «Получить прайс на email» ───────────────────────────────────────────
+function EmailPriceModal({ onClose }: { onClose: () => void }) {
+  const [email, setEmail]     = useState("");
+  const [name, setName]       = useState("");
+  const [sending, setSending] = useState(false);
+  const [done, setDone]       = useState(false);
+  const [err, setErr]         = useState<string | null>(null);
+
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const canSend = emailOk && name.trim().length >= 2;
+
+  const handleSend = async () => {
+    if (!canSend) return;
+    setSending(true); setErr(null);
+    try {
+      const res = await fetch(PRICE_EMAIL_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          markup: DEFAULT_MARKUP,
+          email:  email.trim(),
+          only_available: true,
+        }),
+      });
+      const d = await res.json();
+      if (d.ok || d.queued) {
+        // Также сохраняем лид чтобы сотрудники видели запрос
+        fetch(SEND_LEAD_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: name.trim(),
+            phone: "—",
+            category: "Прайс Apple — Email",
+            desc: `Запросил прайс на почту: ${email.trim()}`,
+          }),
+        }).catch(() => {});
+        setDone(true);
+      } else {
+        setErr(d.error || "Не удалось отправить");
+      }
+    } catch {
+      setErr("Ошибка сети, попробуйте ещё раз");
+    }
+    setSending(false);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-sm rounded-t-3xl sm:rounded-3xl overflow-hidden"
+        style={{
+          background: "linear-gradient(160deg,#1a1a1a,#0f0f0f)",
+          border: "1px solid rgba(255,215,0,0.25)",
+          boxShadow: "0 -12px 60px rgba(255,215,0,0.15)",
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex justify-center pt-3 pb-1 sm:hidden">
+          <div className="w-10 h-1 rounded-full bg-white/20" />
+        </div>
+
+        <div className="p-6">
+          {done ? (
+            <div className="text-center py-6">
+              <div className="text-6xl mb-4">📬</div>
+              <div className="font-oswald font-bold text-[20px] text-white uppercase tracking-wide mb-2">
+                Отправлено!
+              </div>
+              <div className="text-white/40 text-[13px] mb-1">
+                Прайс-лист отправлен на
+              </div>
+              <div className="text-[#FFD700] font-bold text-[14px] mb-6">{email}</div>
+              <div className="text-white/30 text-[11px] mb-6">
+                Проверьте папку «Входящие» и «Спам». Письмо придёт в течение 1–2 минут.
+              </div>
+              <button
+                onClick={onClose}
+                className="w-full py-3 rounded-2xl font-oswald font-bold text-[14px] uppercase tracking-wide text-black"
+                style={{ background: "linear-gradient(135deg,#FFD700,#d97706)" }}
+              >
+                Отлично!
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Иконка и заголовок */}
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
+                  style={{ background: "linear-gradient(135deg,rgba(255,215,0,0.2),rgba(255,215,0,0.06))", border: "1px solid rgba(255,215,0,0.3)" }}>
+                  <Icon name="Mail" size={22} className="text-[#FFD700]" />
+                </div>
+                <div>
+                  <div className="font-oswald font-bold text-[17px] text-white uppercase tracking-wide">
+                    Получить прайс
+                  </div>
+                  <div className="text-[11px] text-white/40">
+                    Отправим актуальные цены на вашу почту
+                  </div>
+                </div>
+              </div>
+
+              {/* Преимущества */}
+              <div className="grid grid-cols-3 gap-2 mb-5">
+                {[
+                  { icon: "Zap",      label: "Актуальные\nцены" },
+                  { icon: "Shield",   label: "Гарантия\nна всё" },
+                  { icon: "Truck",    label: "Доставка\nпо РФ" },
+                ].map(f => (
+                  <div key={f.icon} className="flex flex-col items-center gap-1 py-2 rounded-xl text-center"
+                    style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                    <Icon name={f.icon as "Zap"} size={14} className="text-[#FFD700]" />
+                    <span className="text-[10px] text-white/50 whitespace-pre-line leading-tight">{f.label}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Форма */}
+              <div className="space-y-3">
+                <div className="relative">
+                  <input
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    placeholder="Ваше имя"
+                    className="w-full px-4 py-3 rounded-xl text-[14px] text-white outline-none pr-10"
+                    style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)" }}
+                  />
+                  {name.trim().length >= 2 && (
+                    <Icon name="Check" size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-green-400" />
+                  )}
+                </div>
+                <div className="relative">
+                  <input
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    type="email"
+                    placeholder="email@example.com"
+                    className="w-full px-4 py-3 rounded-xl text-[14px] text-white outline-none pr-10"
+                    style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${emailOk && email ? "rgba(74,222,128,0.4)" : "rgba(255,255,255,0.12)"}` }}
+                  />
+                  {emailOk && (
+                    <Icon name="Check" size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-green-400" />
+                  )}
+                </div>
+              </div>
+
+              {err && (
+                <div className="flex items-center gap-1.5 text-red-400 text-[12px] mt-2">
+                  <Icon name="AlertCircle" size={13} /> {err}
+                </div>
+              )}
+
+              {/* Дисклеймер */}
+              <div className="text-white/20 text-[10px] mt-3 leading-relaxed">
+                Нажимая кнопку, вы соглашаетесь на получение информации о ценах.
+                Мы не рассылаем спам.
+              </div>
+
+              {/* Кнопки */}
+              <div className="flex gap-2 mt-4">
+                <button
+                  onClick={onClose}
+                  className="px-4 py-3 rounded-2xl font-oswald font-bold text-[13px] uppercase text-white/40 transition-all hover:text-white/60"
+                  style={{ border: "1px solid rgba(255,255,255,0.1)" }}
+                >
+                  Отмена
+                </button>
+                <button
+                  onClick={handleSend}
+                  disabled={sending || !canSend}
+                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-oswald font-bold text-[14px] uppercase tracking-wide text-black disabled:opacity-40 transition-all relative overflow-hidden"
+                  style={{
+                    background: "linear-gradient(135deg,#FFD700,#f59e0b,#d97706)",
+                    boxShadow: canSend ? "0 4px 24px rgba(255,215,0,0.4)" : "none",
+                  }}
+                >
+                  <span className="absolute inset-0 bg-gradient-to-b from-white/15 to-transparent pointer-events-none" />
+                  <Icon
+                    name={sending ? "Loader2" : "Send"}
+                    size={16}
+                    className={`relative z-10 ${sending ? "animate-spin" : ""}`}
+                  />
+                  <span className="relative z-10">
+                    {sending ? "Отправляю…" : "Отправить прайс"}
+                  </span>
                 </button>
               </div>
             </>
@@ -387,6 +586,7 @@ export default function ApplePrice() {
   const [nextRefresh, setNextRefresh] = useState(Date.now() + REFRESH_MS);
   const [timer, setTimer]             = useState("");
   const [orderItem, setOrderItem]     = useState<PriceItem | null>(null);
+  const [emailModal, setEmailModal]   = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = useCallback(async () => {
@@ -486,6 +686,15 @@ export default function ApplePrice() {
               <Icon name={loading ? "Loader2" : "RefreshCw"} size={13}
                 className={loading ? "animate-spin" : ""} />
               Обновить
+            </button>
+            <button
+              onClick={() => setEmailModal(true)}
+              disabled={!data}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-bold transition-all active:scale-95 disabled:opacity-40"
+              style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.15)", color: "#fff" }}
+            >
+              <Icon name="Mail" size={13} />
+              <span className="hidden sm:inline">На почту</span>
             </button>
             <button onClick={handlePrint} disabled={!data || loading}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-bold text-black transition-all active:scale-95 disabled:opacity-40"
@@ -639,13 +848,26 @@ export default function ApplePrice() {
               <div className="text-white/50 text-[13px] mb-5">
                 Позвоните — найдём любую модель за 1–3 дня. Скупаем и покупаем 24/7.
               </div>
-              <a href="tel:+79929903333"
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl font-oswald font-bold text-[16px] uppercase text-black"
-                style={{ background: "linear-gradient(135deg,#FFD700,#d97706)", boxShadow: "0 4px 24px rgba(255,215,0,0.35)" }}>
-                <Icon name="Phone" size={18} />
-                +7 (992) 990-33-33
-              </a>
-              <div className="text-white/25 text-[11px] mt-3">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                <a href="tel:+79929903333"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl font-oswald font-bold text-[16px] uppercase text-black"
+                  style={{ background: "linear-gradient(135deg,#FFD700,#d97706)", boxShadow: "0 4px 24px rgba(255,215,0,0.35)" }}>
+                  <Icon name="Phone" size={18} />
+                  +7 (992) 990-33-33
+                </a>
+                <button
+                  onClick={() => setEmailModal(true)}
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl font-oswald font-bold text-[15px] uppercase transition-all hover:bg-white/10"
+                  style={{
+                    border: "1px solid rgba(255,255,255,0.2)",
+                    color: "rgba(255,255,255,0.7)",
+                  }}
+                >
+                  <Icon name="Mail" size={17} />
+                  Прайс на почту
+                </button>
+              </div>
+              <div className="text-white/25 text-[11px] mt-4">
                 г. Калуга, ул. Кирова 7/47 и ул. Кирова 11
               </div>
             </div>
@@ -658,6 +880,9 @@ export default function ApplePrice() {
 
       {/* Модал заказа */}
       {orderItem && <OrderModal item={orderItem} onClose={() => setOrderItem(null)} />}
+
+      {/* Модал отправки прайса на email */}
+      {emailModal && <EmailPriceModal onClose={() => setEmailModal(false)} />}
     </>
   );
 }
