@@ -85,8 +85,9 @@ export default function PriceFloatingButton({ token }: Props) {
         onMouseMove={handleMouseMove}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={handleMouseLeave}
-        className="fixed z-40 bottom-20 right-4 sm:bottom-6 sm:right-6 group"
+        className="fixed z-[55] right-4 group"
         style={{
+          bottom: "calc(72px + env(safe-area-inset-bottom, 0px) + 12px)",
           transform: `translate(${magOffset.x}px, ${magOffset.y}px)`,
           transition: isHovered ? "transform 0.15s ease-out" : "transform 0.4s cubic-bezier(0.34,1.56,0.64,1)",
         }}
