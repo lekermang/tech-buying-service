@@ -32,6 +32,7 @@ import StaffHeader from "./StaffHeader";
 import StaffBottomNav from "./StaffBottomNav";
 import StaffPasswordModal from "./StaffPasswordModal";
 import DigitalParticles from "@/components/fx/DigitalParticles";
+import PriceFloatingButton from "./PriceFloatingButton";
 
 type Tab = StaffTab;
 
@@ -301,6 +302,9 @@ export function StaffMainLayout({
           </React.Suspense>
         </TabErrorBoundary>
       </div>
+
+      {/* Плавающая кнопка «Отправить прайс» — для всех сотрудников */}
+      <PriceFloatingButton token={token} />
 
       {/* Нижняя навигация */}
       <StaffBottomNav
