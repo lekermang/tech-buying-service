@@ -318,7 +318,7 @@ const SplashScreen = ({ onDone }: { onDone: () => void }) => {
 
 export default function Index() {
   const [splashDone, setSplashDone] = useState(false);
-  const { ref: revealRef, isVisible } = useScrollReveal();
+  useScrollReveal();
 
   useAutoScroll(splashDone);
   useDynamicSeo(splashDone);
