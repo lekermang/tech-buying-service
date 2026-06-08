@@ -9,6 +9,7 @@ import { useState, useRef, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import { ymGoal, Goals } from "@/lib/ym";
 import { APK_URL, EXE_URL, type MarketStatus, type Period, PROBES_DISPLAY } from "./goldTickerUtils";
+import { S24Medallion } from "./GoldTickerMobile";
 
 interface Props {
   goldPrice: { buy: number; buy_usd?: number; xau_usd?: number; usd_rub?: number; date: string } | null;
@@ -72,19 +73,7 @@ const GoldTickerDesktopCompact = ({
       {/* ─── ОДНА КОМПАКТНАЯ СТРОКА ─── */}
       <div className={`relative max-w-7xl mx-auto px-5 flex items-center gap-2.5 transition-[padding] duration-300 ${compact ? "py-1" : "py-1.5"}`}>
         {/* Медальон + статус биржи */}
-        <div
-          className="relative shrink-0 w-7 h-7 rounded-full flex items-center justify-center
-                     bg-[radial-gradient(circle_at_30%_30%,#fff3a0,#ffd700_45%,#b8860b_100%)]
-                     shadow-[0_0_8px_rgba(255,215,0,0.3)]"
-          title={market.label}
-        >
-          <span className="text-[11px] drop-shadow-sm">🥇</span>
-          <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#0A0A0A] ${
-            market.fixing ? "bg-[#FFD700] shadow-[0_0_6px_rgba(255,215,0,0.9)] animate-pulse"
-            : market.open ? "bg-emerald-400 shadow-[0_0_5px_rgba(16,185,129,0.7)] animate-pulse"
-            : "bg-gray-500"
-          }`} />
-        </div>
+        <S24Medallion market={market} />
 
         {/* Главная цена 999 */}
         <div className={`flex items-center h-7 px-2.5 rounded-md bg-black/70 border transition-all duration-500 ${
@@ -94,9 +83,15 @@ const GoldTickerDesktopCompact = ({
         }`}>
           <span className="font-oswald font-bold text-[9px] uppercase tracking-[0.18em] text-[#FFD700]/60 mr-2">999</span>
           {goldPrice?.buy ? (
-            <span className={`font-oswald font-bold text-[15px] tracking-tight whitespace-nowrap leading-none transition-colors duration-500 ${
-              flash === "up" ? "text-emerald-300" : flash === "down" ? "text-red-300" : "text-[#FFD700]"
-            }`}>
+            <span
+              key={goldPrice.buy}
+              className={`font-oswald font-bold text-[15px] tracking-tight whitespace-nowrap leading-none ${
+                flash === "up" ? "text-emerald-300 price-flip-up price-burst-up"
+                : flash === "down" ? "text-red-300 price-flip-down price-burst-down"
+                : "text-[#FFD700]"
+              }`}
+              style={{ textShadow: flash ? "none" : "0 0 14px rgba(255,215,0,0.45)" }}
+            >
               {goldPrice.buy.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}
               <span className="text-[9px] font-bold ml-0.5 text-[#FFD700]/55">₽/г</span>
             </span>
@@ -105,7 +100,7 @@ const GoldTickerDesktopCompact = ({
 
         {/* Delta-бейдж при изменении цены — Эффект 4 */}
         {delta !== null && delta !== undefined && (
-          <span key={delta} className={`gold-delta-badge ${delta > 0 ? "gold-delta-up" : "gold-delta-down"}`}>
+          <span key={delta} className={`delta-cosmic ${delta > 0 ? "delta-cosmic-up" : "delta-cosmic-down"}`}>
             {delta > 0 ? "+" : ""}{delta > 0 ? Math.round(delta) : Math.round(delta)} ₽
           </span>
         )}
@@ -158,7 +153,7 @@ const GoldTickerDesktopCompact = ({
 
       {/* ─── РАСКРЫВАЮЩАЯСЯ ПАНЕЛЬ С ДЕТАЛЯМИ ─── */}
       {open && (
-        <div className="absolute left-0 right-0 top-full z-50 bg-[#0F0F0F] border-y border-[#FFD700]/25 shadow-[0_10px_30px_rgba(0,0,0,0.5)] animate-in fade-in slide-in-from-top-1 duration-150">
+        <div className="absolute left-0 right-0 top-full z-50 ticker-panel-glass rounded-xl animate-in fade-in slide-in-from-top-1 duration-150">
           <div className="max-w-7xl mx-auto px-5 py-4 grid grid-cols-12 gap-4">
             {/* Колонка 1: Курсы биржи */}
             <div className="col-span-3 space-y-2">
@@ -222,9 +217,16 @@ const GoldTickerDesktopCompact = ({
                         <stop offset="0%" stopColor={chart.fadeColor} />
                         <stop offset="100%" stopColor="transparent" />
                       </linearGradient>
+                      <filter id="neon-glow">
+                        <feGaussianBlur stdDeviation="2" result="blur" />
+                        <feMerge>
+                          <feMergeNode in="blur" />
+                          <feMergeNode in="SourceGraphic" />
+                        </feMerge>
+                      </filter>
                     </defs>
                     <polygon points={chart.fill} fill="url(#gchart-full)" />
-                    <polyline points={chart.pts} fill="none" stroke={chart.color} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                    <polyline points={chart.pts} fill="none" stroke={chart.color} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" filter="url(#neon-glow)" />
                   </svg>
                   <div className="flex items-center justify-between mt-1 text-[10px]">
                     <span className="text-white/40">за {period} дн.</span>

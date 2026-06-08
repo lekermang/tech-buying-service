@@ -31,9 +31,12 @@ const MobileMenu = ({ open, navLinks, onNav, onPayClick }: MobileMenuProps) => {
       <div className="px-4 py-2 flex-1">
         {navLinks.map(l => (
           <button key={l.href} onClick={() => onNav(l.href)}
-            className="flex items-center justify-between w-full py-4 font-roboto text-white/80 hover:text-[#FFD700] border-b border-white/5 uppercase tracking-wide text-base">
-            {l.label}
-            <Icon name="ChevronRight" size={16} className="text-white/20" />
+            className="flex items-center justify-between w-full py-3.5 font-oswald font-bold text-white/80 hover:text-[#FFD700] hover:bg-[#FFD700]/5 border-b border-white/5 uppercase tracking-wide text-base transition-colors pl-3 -mx-3 px-3 rounded-sm group">
+            <span className="flex items-center gap-3">
+              <span className="w-1 h-5 rounded-full bg-[#FFD700]/0 group-hover:bg-[#FFD700] transition-colors shrink-0" />
+              {l.label}
+            </span>
+            <Icon name="ChevronRight" size={16} className="text-white/20 group-hover:text-[#FFD700]/60 transition-colors" />
           </button>
         ))}
 
@@ -55,9 +58,10 @@ const MobileMenu = ({ open, navLinks, onNav, onPayClick }: MobileMenuProps) => {
                 <a
                   key={item.href}
                   href={item.href}
-                  className="flex items-center gap-2 py-2.5 px-2 rounded-lg font-roboto text-white/70 text-sm uppercase tracking-wide hover:text-white transition-colors"
+                  className="flex items-center gap-2.5 py-2.5 px-2 rounded-lg font-oswald font-bold text-white/70 text-sm uppercase tracking-wide hover:text-white hover:pl-4 transition-all duration-200"
                 >
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: item.color }} />
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0 transition-transform"
+                    style={{ background: item.color, boxShadow: `0 0 8px ${item.color}80` }} />
                   {item.label}
                 </a>
               ))}
@@ -83,45 +87,48 @@ const MobileMenu = ({ open, navLinks, onNav, onPayClick }: MobileMenuProps) => {
             <Icon name="Download" size={18} className="text-[#FFD700]" />
           </button>
         )}
-        <a href="/client" className="flex items-center justify-between w-full py-4 mt-2 px-3 -mx-3 rounded-lg bg-gradient-to-r from-[#FFD700]/15 via-[#FFD700]/8 to-transparent border border-[#FFD700]/30 font-roboto uppercase tracking-wide text-base font-bold text-[#FFD700]">
+        <a href="/client" className="flex items-center justify-between w-full py-3 mt-3 px-4 -mx-3 rounded-xl glass-card-gold font-roboto uppercase tracking-wide text-base font-bold text-[#FFD700]">
           <span className="flex items-center gap-2"><Icon name="UserCircle" size={18} />Кабинет клиента</span>
           <Icon name="ChevronRight" size={16} className="text-[#FFD700]/60" />
         </a>
       </div>
-      <div className="px-4 pt-4 pb-8 space-y-3">
+      <div className="px-4 pt-2 pb-8 space-y-3">
+        <div className="divider-gold mb-4" />
         <a href="tel:+79929990333"
-          className="flex items-center justify-center gap-3 w-full bg-[#FFD700] text-black font-oswald font-bold text-xl py-4 uppercase tracking-wide active:scale-95 transition-all">
-          <Icon name="Phone" size={22} />
+          className="btn-gold-premium btn-lg w-full rounded-xl flex items-center justify-center gap-3 text-xl">
+          <Icon name="Phone" size={20} />
           8 992 999-03-33
         </a>
-        <a href="https://t.me/skypka24"
-          target="_blank" rel="noopener noreferrer"
-          onClick={() => ymGoal(Goals.TELEGRAM_CLICK, { place: "mobile_menu" })}
-          className="flex items-center justify-center gap-3 w-full border-2 border-[#FFD700]/40 text-[#FFD700] font-oswald font-bold text-base py-3.5 uppercase tracking-wide active:scale-95 transition-all">
-          <Icon name="MessageCircle" size={18} />
-          Написать в Telegram
-        </a>
+        <div className="grid grid-cols-2 gap-2.5">
+          <a href="https://t.me/skypka24"
+            target="_blank" rel="noopener noreferrer"
+            onClick={() => ymGoal(Goals.TELEGRAM_CLICK, { place: "mobile_menu" })}
+            className="flex items-center justify-center gap-2 btn-gold-outline rounded-xl py-3.5 text-sm active:scale-95">
+            <Icon name="MessageCircle" size={16} />
+            Telegram
+          </a>
+          <a href="/chat"
+            onClick={() => ymGoal(Goals.TELEGRAM_CLICK, { place: "mobile_menu_chat" })}
+            className="flex items-center justify-center gap-2 btn-gold-outline rounded-xl py-3.5 text-sm active:scale-95">
+            <span className="relative flex items-center justify-center">
+              <Icon name="MessageSquare" size={16} />
+              <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-green-400" />
+            </span>
+            Чат Live
+          </a>
+        </div>
         {onPayClick && (
           <button
             onClick={onPayClick}
-            className="flex items-center justify-center gap-3 w-full border-2 border-emerald-500/50 text-emerald-400 font-oswald font-bold text-base py-3.5 uppercase tracking-wide active:scale-95 transition-all">
-            <Icon name="CreditCard" size={18} />
+            className="flex items-center justify-center gap-3 w-full border border-emerald-500/40 bg-emerald-500/5 text-emerald-400 font-oswald font-bold text-sm py-3 uppercase tracking-wide rounded-xl active:scale-95 transition-all">
+            <Icon name="CreditCard" size={16} />
             Оплатить услуги
           </button>
         )}
-        <a href="/chat"
-          onClick={() => ymGoal(Goals.TELEGRAM_CLICK, { place: "mobile_menu_chat" })}
-          className="flex items-center justify-center gap-3 w-full border-2 border-[#FFD700]/60 bg-[#FFD700]/10 text-[#FFD700] font-oswald font-bold text-base py-3.5 uppercase tracking-wide active:scale-95 transition-all">
-          <span className="relative flex items-center justify-center">
-            <Icon name="MessageSquare" size={18} />
-            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-green-400" />
-          </span>
-          Чат Live
-        </a>
         <a href="/staff"
-          className="flex items-center justify-center gap-2 w-full border border-[#1F1F1F] bg-[#0A0A0A] text-white/80 hover:text-white hover:border-white/30 font-oswald font-bold text-sm py-3 uppercase tracking-wide rounded-md active:scale-95 transition-all">
-          <Icon name="LogIn" size={14} />
-          Регистрация и вход сотрудника
+          className="flex items-center justify-center gap-2 w-full border border-white/8 text-white/30 hover:text-white/50 font-roboto text-xs py-2.5 uppercase tracking-widest rounded-md active:scale-95 transition-all">
+          <Icon name="LogIn" size={12} />
+          Вход сотрудника
         </a>
       </div>
       <InstallAppModal open={installOpen} onClose={() => setInstallOpen(false)} />

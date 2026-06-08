@@ -3,6 +3,18 @@ import EvaluateModal from "./hero/EvaluateModal";
 import HeroLeft from "./hero/HeroLeft";
 import HeroRight from "./hero/HeroRight";
 
+// Статичный массив ember-частиц (генерируется один раз)
+const EMBERS = Array.from({ length: 16 }, (_, i) => ({
+  id: i,
+  left: `${8 + (i * 397) % 84}%`,
+  bottom: `${(i * 211) % 40}%`,
+  size: 2 + (i % 3),
+  dur: `${3.5 + (i * 0.6) % 3}s`,
+  delay: `${(i * 0.45) % 4}s`,
+  dx: `${-8 + (i * 13) % 16}px`,
+  op: 0.4 + (i % 3) * 0.15,
+}));
+
 interface HeroSectionProps {
   scrollTo: (href: string) => void;
   externalModalOpen?: boolean;
@@ -35,6 +47,24 @@ const HeroSection = ({ scrollTo: _scrollTo, externalModalOpen, onExternalModalCl
         <div className="absolute -top-24 -left-24 w-[420px] h-[420px] rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(255,215,0,0.10)" }} />
         <div className="absolute -bottom-32 left-1/3 w-[360px] h-[360px] rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(255,184,0,0.06)" }} />
         <div className="absolute top-1/3 -right-24 w-[380px] h-[380px] rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(255,215,0,0.05)" }} />
+
+        {/* Золотые ember-частицы */}
+        {EMBERS.map(e => (
+          <div
+            key={e.id}
+            className="gold-ember"
+            style={{
+              left: e.left,
+              bottom: e.bottom,
+              width: e.size,
+              height: e.size,
+              "--ember-dur": e.dur,
+              "--ember-delay": e.delay,
+              "--ember-dx": e.dx,
+              "--ember-op": e.op,
+            } as React.CSSProperties}
+          />
+        ))}
 
         {/* Левая золотая полоска (золотой акцент-символ бренда) */}
         <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-transparent via-[#FFD700] to-transparent" />

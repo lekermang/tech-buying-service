@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Icon from "@/components/ui/icon";
 import { getActiveHoliday } from "@/components/holidays/holidays";
 
@@ -209,13 +209,53 @@ export default function PremiumServicesGrid() {
 }
 
 function ServiceTile({ card, delay, onClick }: { card: ServiceButton; delay: number; onClick: () => void }) {
+  const cardRef = useRef<HTMLButtonElement>(null);
+  const shineRef = useRef<HTMLDivElement>(null);
+  const rafRef = useRef<number>(0);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(() => {
+      const el = cardRef.current;
+      const shine = shineRef.current;
+      if (!el || !shine) return;
+      const rect = el.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / rect.width - 0.5;
+      const y = (e.clientY - rect.top) / rect.height - 0.5;
+      el.style.transform = `perspective(600px) rotateY(${x * 22}deg) rotateX(${-y * 14}deg) scale3d(1.035,1.035,1.035)`;
+      el.style.boxShadow = `${-x * 24}px ${-y * 18}px 55px -8px rgba(255,215,0,${0.18 + Math.abs(x) * 0.35}), 0 0 0 1px rgba(255,215,0,0.2)`;
+      shine.style.background = `radial-gradient(ellipse at ${(x + 0.5) * 100}% ${(y + 0.5) * 100}%, rgba(255,255,255,0.12) 0%, rgba(255,215,0,0.06) 40%, transparent 70%)`;
+      shine.style.opacity = "1";
+    });
+  }, []);
+
+  const handlePointerLeave = useCallback(() => {
+    cancelAnimationFrame(rafRef.current);
+    const el = cardRef.current;
+    const shine = shineRef.current;
+    if (!el || !shine) return;
+    el.style.transition = "transform 0.55s cubic-bezier(0.16,1,0.3,1), box-shadow 0.55s cubic-bezier(0.16,1,0.3,1)";
+    el.style.transform = "";
+    el.style.boxShadow = "";
+    shine.style.opacity = "0";
+    setTimeout(() => {
+      if (el) el.style.transition = "";
+    }, 600);
+  }, []);
+
   return (
     <button
+      ref={cardRef}
       type="button"
       onClick={onClick}
-      className="group relative block text-left rounded-2xl border-2 border-[#FFD700]/25 bg-gradient-to-br from-white/[0.06] via-white/[0.02] to-transparent backdrop-blur-sm p-5 sm:p-6 transition-all duration-500 hover:border-[#FFD700]/70 hover:-translate-y-1.5 hover:shadow-[0_25px_70px_-15px_rgba(255,215,0,0.5)] active:translate-y-0 active:scale-[0.98] overflow-hidden animate-[fadeIn_0.6s_ease_both] cursor-pointer w-full"
+      onPointerMove={handlePointerMove}
+      onPointerLeave={handlePointerLeave}
+      className="tilt-card group relative block text-left rounded-2xl border-2 border-[#FFD700]/25 bg-gradient-to-br from-white/[0.06] via-white/[0.02] to-transparent backdrop-blur-sm p-5 sm:p-6 active:scale-[0.98] overflow-hidden animate-[fadeIn_0.6s_ease_both] cursor-pointer w-full"
       style={{ animationDelay: `${delay}ms` }}
     >
+      {/* 3D shine overlay */}
+      <div ref={shineRef} className="tilt-shine" />
+
       {/* Hover-свечение */}
       <div
         aria-hidden
@@ -235,37 +275,26 @@ function ServiceTile({ card, delay, onClick }: { card: ServiceButton; delay: num
       <span aria-hidden className="absolute bottom-2 right-2 w-3.5 h-3.5 border-r-2 border-b-2 border-[#FFD700]/60 group-hover:border-[#FFD700] transition-colors" />
 
       <div className="relative flex flex-col h-full gap-3.5">
-        {/* Бейдж */}
         <span className="self-start font-roboto text-[9px] font-bold uppercase tracking-[0.25em] text-[#FFD700] bg-[#FFD700]/15 border border-[#FFD700]/40 px-2 py-0.5 rounded-sm">
           {card.badge}
         </span>
-
-        {/* Иконка-медальон с золотой обводкой */}
         <div className="relative w-16 h-16 rounded-full p-[2px] bg-[conic-gradient(from_0deg,#b8860b,#ffd700,#fff3a0,#ffd700,#b8860b)] shadow-[0_0_24px_rgba(255,215,0,0.4)] group-hover:shadow-[0_0_36px_rgba(255,215,0,0.7)] transition-all">
           <div className="w-full h-full rounded-full bg-gradient-to-br from-[#1a1a1a] to-[#0D0D0D] flex items-center justify-center group-hover:scale-105 transition-transform">
             <Icon name={card.icon as Parameters<typeof Icon>[0]["name"]} size={30} className="text-[#FFD700] drop-shadow-[0_0_8px_rgba(255,215,0,0.5)]" />
           </div>
         </div>
-
-        {/* Заголовок */}
         <h3 className="font-oswald font-bold text-lg sm:text-xl uppercase tracking-wide text-white leading-tight">
           {card.title}
         </h3>
-
-        {/* Подзаголовок */}
         <p className="font-roboto text-[13px] text-white/65 leading-relaxed flex-1">
           {card.subtitle}
         </p>
-
-        {/* Гарантия */}
         <div className="flex items-center gap-1.5 pt-3 border-t border-[#FFD700]/15 group-hover:border-[#FFD700]/40 transition-colors">
           <Icon name={card.guaranteeIcon as Parameters<typeof Icon>[0]["name"]} size={14} className="text-[#FFD700]" />
           <span className="font-roboto text-[11px] uppercase tracking-wider text-[#FFD700]/95 font-semibold">
             {card.guarantee}
           </span>
         </div>
-
-        {/* CTA-плашка как у настоящей кнопки */}
         <div className="flex items-center justify-between gap-2 mt-1 px-3.5 py-2.5 rounded-lg bg-gradient-to-r from-[#FFD700]/10 via-[#FFD700]/15 to-[#FFD700]/10 border border-[#FFD700]/30 group-hover:from-[#FFD700] group-hover:via-[#fff3a0] group-hover:to-[#FFD700] group-hover:border-[#FFD700] transition-all duration-300">
           <span className="font-oswald font-bold text-[12px] uppercase tracking-widest text-[#FFD700] group-hover:text-black transition-colors">
             {card.cta}

@@ -65,14 +65,28 @@ const GoldTicker = ({
   }, [goldHistory, period]);
 
   return (
-    <div className="relative bg-[#0A0A0A] border-b border-[#FFD700]/20">
-      {/* Фоновое золотое свечение (изолировано в overflow-hidden, чтобы не блюрить наружу) */}
+    <div className="relative bg-[#080604] border-b border-[#FFD700]/18">
+      {/* Фоновое золотое свечение — НЕ overflow-hidden, чтобы dropdown дочерних не обрезался */}
+      <div className="absolute inset-0 pointer-events-none" style={{
+        backgroundImage: [
+          "radial-gradient(1px 1px at 15% 40%, rgba(255,215,0,0.55) 0%, transparent 100%)",
+          "radial-gradient(1px 1px at 42% 20%, rgba(255,215,0,0.4) 0%, transparent 100%)",
+          "radial-gradient(1px 1px at 68% 65%, rgba(255,215,0,0.5) 0%, transparent 100%)",
+          "radial-gradient(1px 1px at 85% 30%, rgba(255,215,0,0.35) 0%, transparent 100%)",
+          "radial-gradient(1px 1px at 25% 75%, rgba(255,215,0,0.45) 0%, transparent 100%)",
+        ].join(", "),
+      }} />
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute inset-0" style={{ background: "linear-gradient(90deg, rgba(255,215,0,0.05) 0%, transparent 30%, transparent 70%, rgba(255,215,0,0.05) 100%)" }} />
         <div className="absolute -top-24 left-1/4 w-72 h-72 rounded-full blur-3xl" style={{ background: "rgba(255,215,0,0.06)" }} />
         <div className="absolute -bottom-24 right-1/4 w-72 h-72 rounded-full blur-3xl" style={{ background: "rgba(255,184,0,0.05)" }} />
-        <div className="absolute bottom-0 left-0 right-0 h-px bg-[linear-gradient(90deg,transparent,rgba(255,215,0,0.6),transparent)] bg-[length:50%_100%] animate-gold-shimmer" />
       </div>
+      {/* Нижняя анимированная gold-линия */}
+      <div className="absolute bottom-0 left-0 right-0 h-[1px] pointer-events-none" style={{
+        background: "linear-gradient(90deg, transparent 0%, rgba(255,215,0,0.15) 20%, rgba(255,215,0,0.8) 50%, rgba(255,215,0,0.15) 80%, transparent 100%)",
+        animation: "shimmer 4s linear infinite",
+        backgroundSize: "200% auto",
+      }} />
 
       {/* ═══════ МОБ + ПЛАНШЕТ + ДЕСКТОП (<xl) — компактная 1-строка с раскрывающейся панелью ═══════ */}
       <div className="xl:hidden">

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Icon from "@/components/ui/icon";
 import { ymGoal, Goals } from "@/lib/ym";
 import MagneticButton from "@/components/fx/MagneticButton";
@@ -53,6 +53,16 @@ export default function HeroLeft({ onOpenModal }: HeroLeftProps) {
   const c2 = useCountUp(STATS[2].target, STATS[2].decimals, statsVisible);
   const counts = [c0, c1, c2];
 
+  const [ripples, setRipples] = useState<{ id: number; x: number; y: number }[]>([]);
+  const addRipple = useCallback((e: React.MouseEvent<HTMLElement>) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const id = Date.now();
+    setRipples(prev => [...prev, { id, x, y }]);
+    setTimeout(() => setRipples(prev => prev.filter(r => r.id !== id)), 700);
+  }, []);
+
   return (
     <div className="flex flex-col">
 
@@ -65,7 +75,25 @@ export default function HeroLeft({ onOpenModal }: HeroLeftProps) {
       {/* Продающий заголовок */}
       <h1 className="font-oswald text-[3rem] sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-[0.92] mb-4 md:mb-5 tracking-tight">
         <span className="block text-white">ПРОДАЙ</span>
-        <span className="block bg-gradient-to-r from-[#FFD700] via-[#fff3a0] to-[#FFD700] bg-clip-text text-transparent animate-shimmer">ТЕХНИКУ</span>
+        <span className="block" aria-label="ТЕХНИКУ">
+          {"ТЕХНИКУ".split("").map((char, i) => (
+            <span
+              key={i}
+              className="letter-kinetic"
+              style={{
+                animationDelay: `${180 + i * 65}ms`,
+                backgroundImage: i % 2 === 0
+                  ? "linear-gradient(180deg, #fff3a0 0%, #ffd700 50%, #b8860b 100%)"
+                  : "linear-gradient(180deg, #ffd700 0%, #fff3a0 40%, #ffd700 100%)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}
+            >
+              {char}
+            </span>
+          ))}
+        </span>
         <span className="block text-white">
           ВЫГОДНО
           <span className="text-[#FFD700]">.</span>
@@ -97,7 +125,7 @@ export default function HeroLeft({ onOpenModal }: HeroLeftProps) {
         {/* Кнопка «Оценить онлайн» с магнитным эффектом */}
         <MagneticButton
           strength={0.4}
-          onClick={() => { onOpenModal(); ymGoal(Goals.FORM_OPEN, { place: "hero" }); }}
+          onClick={(e) => { addRipple(e); onOpenModal(); ymGoal(Goals.FORM_OPEN, { place: "hero" }); }}
           className="btn-cta-yellow group relative overflow-hidden font-oswald font-bold text-black text-base sm:text-lg px-7 sm:px-9 py-4 uppercase tracking-wide flex items-center justify-center gap-2 rounded-md
                      bg-[linear-gradient(180deg,#fff3a0_0%,#ffd700_45%,#d4a017_100%)]
                      shadow-[0_0_0_1px_rgba(255,215,0,0.6),0_10px_30px_rgba(255,215,0,0.3),inset_0_1px_0_rgba(255,255,255,0.5)]">
@@ -109,6 +137,13 @@ export default function HeroLeft({ onOpenModal }: HeroLeftProps) {
           <Icon name="Zap" size={18} className="relative drop-shadow-[0_0_6px_rgba(0,0,0,0.4)]" />
           <span className="relative">Оценить онлайн</span>
           <Icon name="ArrowRight" size={16} className="relative opacity-70 group-hover:translate-x-1.5 transition-transform duration-200" />
+          {ripples.map(rp => (
+            <span
+              key={rp.id}
+              className="ripple-gold"
+              style={{ left: rp.x, top: rp.y }}
+            />
+          ))}
         </MagneticButton>
 
         {/* Кнопка «Позвонить» — горячая линия 8-800 */}

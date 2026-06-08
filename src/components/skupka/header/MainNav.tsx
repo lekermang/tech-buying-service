@@ -91,7 +91,10 @@ const MoreMenu = ({ items, active, onNav }: { items: NavLink[]; active: string; 
         Ещё <Icon name="ChevronDown" size={11} className={`transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 min-w-[180px] bg-[#0F0F0F] border border-[#FFD700]/30 rounded-md shadow-[0_10px_30px_rgba(0,0,0,0.5)] py-1 animate-in fade-in slide-in-from-top-1 duration-150">
+        <div className="absolute right-0 top-full mt-1 z-50 min-w-[200px] dropdown-glass rounded-xl py-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+          <div className="px-3 py-1.5 mb-1 border-b border-[#FFD700]/10 flex items-center gap-2">
+            <span className="font-roboto text-[9px] uppercase tracking-widest text-white/30">Разделы сайта</span>
+          </div>
           {items.map(l => (
             <button
               key={l.href}
@@ -146,24 +149,31 @@ const AntiqueDropdown = ({ compact }: { compact?: boolean }) => {
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full mt-2 z-50 w-56 bg-[#0F0F0F] border border-[#FFD700]/25 rounded-xl shadow-[0_16px_40px_rgba(0,0,0,0.6)] py-1.5 animate-in fade-in slide-in-from-top-2 duration-150">
-          <div className="px-3 py-1.5 mb-1 border-b border-white/[0.05]">
-            <span className="font-roboto text-[10px] uppercase tracking-widest text-white/30">Антиквариат · Скупка24</span>
+        <div className="absolute left-0 top-full mt-2 z-50 w-60 dropdown-glass rounded-xl py-1.5 animate-in fade-in slide-in-from-top-2 duration-150">
+          <div className="px-3 py-2 mb-1 border-b border-[#FFD700]/12 flex items-center gap-2">
+            <span className="font-roboto text-[9px] uppercase tracking-widest text-white/30">Антиквариат · Скупка24</span>
           </div>
           {ANTIQUE_ITEMS.map(item => (
             <a
               key={item.href}
               href={item.href}
               onClick={() => setOpen(false)}
-              className={`flex items-center gap-2.5 px-3 py-2 font-oswald font-bold text-[12px] uppercase tracking-wider transition-colors group/item
-                ${pathname === item.href ? "text-[#FFD700] bg-[#FFD700]/8" : "text-white/80 hover:text-white hover:bg-white/[0.04]"}`}
+              className={`flex items-center gap-2.5 px-3 py-2 font-oswald font-bold text-[12px] uppercase tracking-wider transition-all duration-200 group/item
+                ${pathname === item.href ? "text-[#FFD700] bg-[#FFD700]/8 pl-5" : "text-white/80 hover:text-white hover:pl-5"}`}
             >
-              <span className="w-5 h-5 rounded flex items-center justify-center shrink-0" style={{ background: `${item.color}18` }}>
-                <Icon name={item.icon} size={11} style={{ color: item.color }} />
+              <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 transition-all group-hover/item:scale-110"
+                style={{ background: `${item.color}20`, boxShadow: `0 0 8px ${item.color}30` }}>
+                <Icon name={item.icon} size={12} style={{ color: item.color }} />
               </span>
               {item.label}
             </a>
           ))}
+          <div className="px-3 pt-2 mt-1 border-t border-[#FFD700]/10">
+            <a href="/antiques" className="flex items-center justify-between font-roboto text-[10px] text-[#FFD700]/50 hover:text-[#FFD700] uppercase tracking-widest transition-colors">
+              <span>Все категории</span>
+              <span>→</span>
+            </a>
+          </div>
         </div>
       )}
     </div>
@@ -184,7 +194,7 @@ const MainNav = ({ navLinks, menuOpen, onToggleMenu, onNav, compact = false, onP
   const active = useActiveSection(hrefs);
 
   return (
-    <div className="relative bg-[#0D0D0D]/95 backdrop-blur-sm border-b border-[#FFD700]/20 overflow-hidden">
+    <div className="relative bg-[#0D0D0D]/95 backdrop-blur-sm border-b border-[#FFD700]/20">
       {/* Премиум-фон */}
       <div className="pointer-events-none absolute inset-0" style={{ background: "linear-gradient(90deg, rgba(255,215,0,0.04) 0%, transparent 30%, transparent 70%, rgba(255,215,0,0.04) 100%)" }} />
       <div className="pointer-events-none absolute -top-16 left-10 w-60 h-60 rounded-full blur-3xl" style={{ background: "rgba(255,215,0,0.05)" }} />

@@ -3,6 +3,23 @@ import Icon from "@/components/ui/icon";
 import { ymGoal, Goals } from "@/lib/ym";
 import { APK_URL, EXE_URL, PROBES_DISPLAY, type MarketStatus } from "./goldTickerUtils";
 
+/** S24Medallion — вращающееся золотое кольцо с "S24" внутри */
+export const S24Medallion = ({ market }: { market: MarketStatus }) => (
+  <div className="ticker-medallion relative shrink-0 w-8 h-8" title={market.label}>
+    <div className="ticker-medallion-ring" />
+    <div className="ticker-medallion-inner">
+      <span className="font-oswald font-black text-[#FFD700] text-[9px] leading-none tracking-tight">S24</span>
+    </div>
+    {/* Live status dot */}
+    <span
+      className={`live-dot absolute -bottom-0.5 -right-0.5 border-2 border-[#0A0A0A] ${
+        market.fixing ? "bg-[#FFD700]" : market.open ? "bg-emerald-400" : "bg-gray-500"
+      }`}
+      style={{ width: 10, height: 10 }}
+    />
+  </div>
+);
+
 interface GoldTickerMobileProps {
   goldPrice: { buy: number; buy_usd?: number; xau_usd?: number; usd_rub?: number; date: string } | null;
   priceRetail999: number | null;
@@ -53,22 +70,8 @@ const GoldTickerMobile = ({
     <div ref={rootRef} className="relative">
       {/* ── Адаптивная строка: мобилка | планшет | средний десктоп ── */}
       <div className="relative max-w-7xl mx-auto px-3 sm:px-4 lg:px-5 py-1.5 flex items-center gap-2">
-        {/* Медальон со статусом */}
-        <div
-          className="relative shrink-0 w-8 h-8 rounded-full flex items-center justify-center
-                     bg-[radial-gradient(circle_at_30%_30%,#fff3a0,#ffd700_45%,#b8860b_100%)]
-                     shadow-[0_0_8px_rgba(255,215,0,0.3)]"
-          title={market.label}
-        >
-          <span className="text-[13px] drop-shadow-sm">🥇</span>
-          <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#0A0A0A] ${
-            market.fixing
-              ? "bg-[#FFD700] animate-pulse"
-              : market.open
-              ? "bg-emerald-400 animate-pulse"
-              : "bg-gray-500"
-          }`} />
-        </div>
+        {/* Медальон S24 */}
+        <S24Medallion market={market} />
 
         {/* Цена 999 — крупная, тап открывает детали */}
         <button
@@ -85,9 +88,15 @@ const GoldTickerMobile = ({
           <div className="flex items-center gap-2 min-w-0">
             <span className="font-oswald font-bold text-[9px] uppercase tracking-[0.18em] text-[#FFD700]/60 shrink-0">999</span>
             {goldPrice?.buy ? (
-              <span className={`font-oswald font-bold text-[16px] tracking-tight whitespace-nowrap leading-none transition-colors duration-500 ${
-                flash === "up" ? "text-emerald-300" : flash === "down" ? "text-red-300" : "text-[#FFD700]"
-              }`}>
+              <span
+                key={goldPrice.buy}
+                className={`font-oswald font-bold text-[16px] tracking-tight whitespace-nowrap leading-none ${
+                  flash === "up" ? "text-emerald-300 price-flip-up price-burst-up"
+                  : flash === "down" ? "text-red-300 price-flip-down price-burst-down"
+                  : "text-[#FFD700]"
+                }`}
+                style={{ textShadow: flash ? "none" : "0 0 14px rgba(255,215,0,0.45)" }}
+              >
                 {goldPrice.buy.toLocaleString('ru-RU', { maximumFractionDigits: 0 })}
                 <span className="text-[10px] font-bold ml-0.5 opacity-60">₽/г</span>
               </span>
@@ -197,7 +206,7 @@ const GoldTickerMobile = ({
       {/* ── Выпадающая панель деталей ── */}
       {openDetails && (
         <div className="absolute top-full left-0 right-0 z-[60] px-3 pb-3 animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="bg-[#0F0F0F] border border-[#FFD700]/30 rounded-lg shadow-[0_12px_32px_rgba(0,0,0,0.7)] p-3 space-y-2.5">
+          <div className="dropdown-glass rounded-xl p-3 space-y-2.5">
 
             {/* Цены физлица / опт */}
             {goldPrice?.buy && (
@@ -255,9 +264,9 @@ const GoldTickerMobile = ({
                 : market.open ? "bg-emerald-500/10 border-emerald-400/25"
                 : "bg-black/40 border-white/10"
             }`}>
-              <span className={`w-2 h-2 rounded-full ${
-                market.fixing ? "bg-[#FFD700] animate-pulse"
-                  : market.open ? "bg-emerald-400 animate-pulse"
+              <span className={`live-dot ${
+                market.fixing ? "bg-[#FFD700]"
+                  : market.open ? "bg-emerald-400"
                   : "bg-gray-500"
               }`} />
               <span className={`text-[11px] font-oswald font-bold uppercase tracking-wider ${

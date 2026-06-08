@@ -233,8 +233,7 @@ const SplashScreen = ({ onDone }: { onDone: () => void }) => {
         </div>
 
         <div className="flex flex-col items-center gap-2 animate-[fadeIn_0.4s_ease_0.15s_both]">
-          <span className="font-oswald font-bold text-3xl sm:text-4xl text-[#FFD700] tracking-[0.3em] uppercase"
-                style={{ textShadow: '0 0 20px rgba(255,215,0,0.5), 0 0 40px rgba(255,215,0,0.2)' }}>
+          <span className="font-oswald font-bold text-3xl sm:text-4xl text-gradient-gold tracking-[0.3em] uppercase">
             Скупка24
           </span>
           <span className="inline-flex items-center gap-1.5 bg-[#FFD700]/10 border border-[#FFD700]/40 px-3 py-1 rounded-full backdrop-blur-sm">
@@ -307,31 +306,34 @@ const SplashScreen = ({ onDone }: { onDone: () => void }) => {
             )}
           </div>
 
-          {/* Status — clean, no gimmicks */}
-          <div className="text-center">
+          {/* Status с анимированными dots */}
+          <div className="text-center flex items-center justify-center gap-2">
             <span className="font-roboto text-[9px] text-white/20 uppercase tracking-[0.4em]">
-              {progress < 100 ? "Инициализация" : "Добро пожаловать"}
+              {progress < 100 ? "Инициализация" : "Готово"}
             </span>
+            {progress < 100 && (
+              <span className="flex gap-1">
+                {[0, 1, 2].map(i => (
+                  <span key={i} className="w-1 h-1 rounded-full bg-[#FFD700]/40"
+                    style={{ animation: `typingDot 1.2s ease-in-out ${i * 0.2}s infinite` }} />
+                ))}
+              </span>
+            )}
           </div>
         </div>
 
         {/* Trust badges — elevated glass style */}
-        <div className="flex flex-wrap items-center justify-center gap-2 max-w-sm animate-[fadeIn_0.4s_ease_0.8s_both]">
+        <div className="flex flex-wrap items-center justify-center gap-2 max-w-sm">
           {[
-            { icon: "Award", label: "9 лет" },
-            { icon: "Users", label: "50 000+" },
-            { icon: "Star", label: "4.9 ★" },
+            { icon: "Award", label: "9 лет", delay: "0.85s" },
+            { icon: "Users", label: "50 000+", delay: "1.0s" },
+            { icon: "Star", label: "4.9 ★", delay: "1.15s" },
           ].map(t => (
             <div key={t.label}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
-              style={{
-                background: "rgba(255,215,0,0.05)",
-                border: "1px solid rgba(255,215,0,0.18)",
-                backdropFilter: "blur(8px)",
-                boxShadow: "0 0 16px rgba(255,215,0,0.05), inset 0 1px 0 rgba(255,255,255,0.04)",
-              }}>
+              className="splash-stat flex items-center gap-1.5 px-3 py-1.5 rounded-full glass-card-gold"
+              style={{ animationDelay: t.delay }}>
               <Icon name={t.icon as Parameters<typeof Icon>[0]["name"]} size={9} className="text-[#FFD700]" />
-              <span className="font-oswald text-[11px] text-white/55 font-semibold tracking-widest uppercase">{t.label}</span>
+              <span className="font-oswald text-[11px] text-white/60 font-semibold tracking-widest uppercase">{t.label}</span>
             </div>
           ))}
         </div>
