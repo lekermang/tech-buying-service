@@ -157,10 +157,14 @@ const SplashScreen = ({ onDone }: { onDone: () => void }) => {
     <div className={`fixed inset-0 z-[100] flex flex-col items-center justify-center transition-opacity duration-500 overflow-hidden ${hiding ? "opacity-0" : "opacity-100"}`}
       style={{ background: "radial-gradient(ellipse at center, #1a1400 0%, #0D0D0D 60%, #000 100%)" }}>
 
-      <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: "linear-gradient(rgba(255,215,0,0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(255,215,0,0.07) 1px, transparent 1px)", backgroundSize: "60px 60px", maskImage: "radial-gradient(ellipse at center, #000 30%, transparent 80%)", WebkitMaskImage: "radial-gradient(ellipse at center, #000 30%, transparent 80%)" }} />
-      <div className="absolute -top-32 -left-32 w-[500px] h-[500px] rounded-full blur-3xl pointer-events-none animate-pulse" style={{ background: "rgba(255,215,0,0.12)", animationDuration: "4s" }} />
-      <div className="absolute -bottom-32 -right-32 w-[500px] h-[500px] rounded-full blur-3xl pointer-events-none animate-pulse" style={{ background: "rgba(255,184,0,0.08)", animationDuration: "5s" }} />
-      <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at center, rgba(255,215,0,0.10) 0%, transparent 65%)" }} />
+      {/* Grid */}
+      <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: "linear-gradient(rgba(255,215,0,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,215,0,0.05) 1px, transparent 1px)", backgroundSize: "60px 60px", maskImage: "radial-gradient(ellipse at center, #000 20%, transparent 75%)", WebkitMaskImage: "radial-gradient(ellipse at center, #000 20%, transparent 75%)" }} />
+      {/* Ambient breathing glows */}
+      <div className="absolute -top-32 -left-32 w-[600px] h-[600px] rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(255,215,0,0.10)", animation: "ambientBreathe 5s ease-in-out infinite" }} />
+      <div className="absolute -bottom-32 -right-32 w-[500px] h-[500px] rounded-full blur-3xl pointer-events-none" style={{ background: "rgba(255,140,0,0.06)", animation: "ambientBreathe 7s ease-in-out 1.5s infinite" }} />
+      <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse 60% 50% at 50% 50%, rgba(255,215,0,0.08) 0%, transparent 70%)", animation: "ambientBreathe 4s ease-in-out 0.5s infinite" }} />
+      {/* Cinematic light beam */}
+      <div className="hero-light-beam" />
 
       {/* Частицы */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -269,44 +273,65 @@ const SplashScreen = ({ onDone }: { onDone: () => void }) => {
           </div>
         )}
 
-        <div className="w-64 sm:w-80 flex flex-col gap-2 animate-[fadeIn_0.4s_ease_0.5s_both]">
-          <div className="flex items-center justify-between text-[10px] font-roboto uppercase tracking-[0.3em] font-semibold">
-            <span className="text-[#FFD700]/60">Загрузка</span>
-            <span className="text-[#FFD700] tabular-nums" style={{ textShadow: "0 0 8px rgba(255,215,0,0.6)" }}>{progress}%</span>
+        <div className="w-64 sm:w-80 flex flex-col gap-2.5 animate-[fadeIn_0.4s_ease_0.5s_both]">
+          {/* Label row */}
+          <div className="flex items-center justify-between">
+            <span className="font-roboto text-[10px] text-[#FFD700]/40 uppercase tracking-[0.35em] font-semibold">
+              Скупка24
+            </span>
+            <span className="font-roboto text-[10px] text-[#FFD700] tabular-nums font-bold"
+              style={{ textShadow: "0 0 10px rgba(255,215,0,0.7)" }}>
+              {progress}%
+            </span>
           </div>
-          <div className="relative h-[6px] w-full bg-white/10 rounded-full overflow-hidden shadow-[inset_0_1px_3px_rgba(0,0,0,0.6)] border border-[#FFD700]/15">
+
+          {/* Progress track — thicker, more premium */}
+          <div className="relative h-[3px] w-full rounded-full overflow-hidden"
+            style={{ background: "rgba(255,215,0,0.06)", boxShadow: "inset 0 1px 2px rgba(0,0,0,0.8)" }}>
+            {/* Track fill */}
             <div
               className="h-full rounded-full relative"
               style={{
                 width: `${progress}%`,
-                background: "linear-gradient(90deg, #b8860b, #ffd700, #fff3a0, #ffd700, #b8860b)",
-                backgroundSize: "200% auto",
-                animation: "shimmer 1.5s linear infinite",
-                boxShadow: "0 0 14px rgba(255,215,0,0.7), 0 0 4px rgba(255,215,0,1)",
-                transition: "width 0.1s linear",
+                background: "linear-gradient(90deg, #7a5c00, #b8860b, #ffd700, #fff3a0, #ffd700, #b8860b)",
+                backgroundSize: "300% auto",
+                animation: "shimmer 1.8s linear infinite",
+                boxShadow: "0 0 8px rgba(255,215,0,0.6), 0 0 2px rgba(255,215,0,1)",
+                transition: "width 0.08s linear",
               }}
-            >
-              <span className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-white" style={{ boxShadow: "0 0 12px #fff, 0 0 20px #FFD700" }} />
-            </div>
+            />
+            {/* Head glow */}
+            {progress > 2 && progress < 99 && (
+              <div className="absolute top-1/2 -translate-y-1/2 w-3 h-3 -translate-x-1/2 rounded-full pointer-events-none"
+                style={{ left: `${progress}%`, background: "radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,215,0,0.6) 50%, transparent 80%)", filter: "blur(1px)" }} />
+            )}
           </div>
-          <div className="flex items-center justify-center gap-1.5 mt-1">
-            <div className="w-1 h-1 rounded-full bg-[#FFD700] animate-pulse" />
-            <span className="font-roboto text-[#FFD700]/70 text-[10px] uppercase tracking-[0.3em] font-semibold">
-              {progress < 35 ? "Открываем сейф" : progress < 70 ? "Считаем выгоду" : progress < 95 ? "Полируем витрину" : "Готово"}
+
+          {/* Status — clean, no gimmicks */}
+          <div className="text-center">
+            <span className="font-roboto text-[9px] text-white/20 uppercase tracking-[0.4em]">
+              {progress < 100 ? "Инициализация" : "Добро пожаловать"}
             </span>
-            <div className="w-1 h-1 rounded-full bg-[#FFD700] animate-pulse" />
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-2 max-w-md animate-[fadeIn_0.4s_ease_0.8s_both]">
+        {/* Trust badges — elevated glass style */}
+        <div className="flex flex-wrap items-center justify-center gap-2 max-w-sm animate-[fadeIn_0.4s_ease_0.8s_both]">
           {[
-            { icon: "Award", label: "9 лет на рынке" },
-            { icon: "Users", label: "50 000+ клиентов" },
-            { icon: "Star", label: "4.9 на картах" },
+            { icon: "Award", label: "9 лет" },
+            { icon: "Users", label: "50 000+" },
+            { icon: "Star", label: "4.9 ★" },
           ].map(t => (
-            <div key={t.label} className="flex items-center gap-1.5 bg-black/50 border border-[#FFD700]/25 px-2.5 py-1 rounded-full backdrop-blur-sm shadow-[0_0_12px_rgba(255,215,0,0.08)]">
-              <Icon name={t.icon as Parameters<typeof Icon>[0]["name"]} size={10} className="text-[#FFD700]" />
-              <span className="font-roboto text-[10px] text-white/60 font-medium">{t.label}</span>
+            <div key={t.label}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
+              style={{
+                background: "rgba(255,215,0,0.05)",
+                border: "1px solid rgba(255,215,0,0.18)",
+                backdropFilter: "blur(8px)",
+                boxShadow: "0 0 16px rgba(255,215,0,0.05), inset 0 1px 0 rgba(255,255,255,0.04)",
+              }}>
+              <Icon name={t.icon as Parameters<typeof Icon>[0]["name"]} size={9} className="text-[#FFD700]" />
+              <span className="font-oswald text-[11px] text-white/55 font-semibold tracking-widest uppercase">{t.label}</span>
             </div>
           ))}
         </div>
@@ -367,8 +392,8 @@ export default function Index() {
           <ContactsFooter />
         </div>
 
-        {/* Мобильная нижняя навигация */}
-        <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0D0D0D]/95 backdrop-blur-md border-t border-[#FFD700]/20 px-2 py-2 safe-area-pb">
+        {/* Мобильная нижняя навигация — premium frosted glass */}
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 nav-frosted px-2 py-2 safe-area-pb">
           <div className="flex items-center justify-around max-w-md mx-auto">
             {[
               { icon: "Home",        label: "Главная",  href: "/" },
@@ -381,10 +406,10 @@ export default function Index() {
                 key={item.label}
                 href={item.href}
                 onClick={item.onClick}
-                className="flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg text-white/50 hover:text-[#FFD700] transition-colors"
+                className="nav-frosted-item"
               >
-                <Icon name={item.icon as Parameters<typeof Icon>[0]["name"]} size={20} />
-                <span className="text-[9px] font-medium font-roboto">{item.label}</span>
+                <Icon name={item.icon as Parameters<typeof Icon>[0]["name"]} size={19} />
+                <span className="text-[9px] font-semibold font-roboto uppercase tracking-widest">{item.label}</span>
               </a>
             ))}
           </div>
