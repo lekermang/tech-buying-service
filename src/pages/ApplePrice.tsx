@@ -484,8 +484,10 @@ function TomorrowPanel({
   onClose: () => void;
   onOrder: (item: PriceItem) => void;
 }) {
-  const [priceMap, setPriceMap] = useState<Record<string, string>>({});
+  const [priceMap, setPriceMap]         = useState<Record<string, string>>({});
+  const [priceNumMap, setPriceNumMap]   = useState<Record<string, number>>({});
   const [loadingPrices, setLoadingPrices] = useState(false);
+  const [clarifyItem, setClarifyItem]   = useState<(PriceItem & { cat: string }) | null>(null);
 
   // Загружаем цены с наценкой +3000 когда панель открывается
   useEffect(() => {
@@ -496,12 +498,17 @@ function TomorrowPanel({
       .then((d: PriceData) => {
         if (!d.ok) return;
         const map: Record<string, string> = {};
+        const numMap: Record<string, number> = {};
         for (const list of Object.values(d.groups)) {
           for (const item of list) {
-            if (item.price_num) map[item.name] = item.price;
+            if (item.price_num) {
+              map[item.name]    = item.price;
+              numMap[item.name] = item.price_num;
+            }
           }
         }
         setPriceMap(map);
+        setPriceNumMap(numMap);
       })
       .catch(() => {})
       .finally(() => setLoadingPrices(false));
@@ -624,31 +631,48 @@ function TomorrowPanel({
                             {sim.includes("+") ? "nano+eSIM" : sim}
                           </span>
                         )}
-                        {priceMap[item.name] ? (
-                          <span style={{ fontSize: 12, fontWeight: 800, color: "#FFD700" }}>
+                        {loadingPrices ? (
+                          <span style={{ fontSize: 9, color: "rgba(255,255,255,0.25)" }}>загружаю…</span>
+                        ) : priceMap[item.name] ? (
+                          <span style={{ fontSize: 13, fontWeight: 900, color: "#FFD700" }}>
                             {priceMap[item.name]}
                           </span>
-                        ) : loadingPrices ? (
-                          <span style={{ fontSize: 9, color: "rgba(255,255,255,0.25)" }}>…</span>
                         ) : (
-                          <span style={{ fontSize: 9, color: "rgba(255,255,255,0.3)" }}>цена уточняется</span>
+                          <span style={{
+                            fontSize: 9, fontWeight: 600, padding: "1px 6px", borderRadius: 4,
+                            color: "#fb923c", background: "rgba(251,146,60,0.1)",
+                            border: "1px solid rgba(251,146,60,0.25)",
+                          }}>цену уточняем</span>
                         )}
                       </div>
                     </div>
 
-                    {/* Кнопка */}
+                    {/* Кнопка: Заказать или Уточнить цену */}
                     <div style={{ padding: "4px 12px 4px 4px", flexShrink: 0 }}>
-                      <button
-                        onClick={() => onOrder(item)}
-                        style={{
-                          padding: "7px 12px", borderRadius: 10,
-                          fontSize: 11, fontWeight: 800, cursor: "pointer",
-                          color: "#000", border: "none", whiteSpace: "nowrap",
-                          background: "linear-gradient(135deg,#FFD700,#f59e0b)",
-                          boxShadow: "0 2px 10px rgba(255,215,0,0.35)",
-                        }}>
-                        Заказать
-                      </button>
+                      {priceNumMap[item.name] ? (
+                        <button
+                          onClick={() => onOrder({ ...item, price: priceMap[item.name], price_num: priceNumMap[item.name] })}
+                          style={{
+                            padding: "7px 12px", borderRadius: 10,
+                            fontSize: 11, fontWeight: 800, cursor: "pointer",
+                            color: "#000", border: "none", whiteSpace: "nowrap",
+                            background: "linear-gradient(135deg,#FFD700,#f59e0b)",
+                            boxShadow: "0 2px 10px rgba(255,215,0,0.35)",
+                          }}>
+                          Заказать
+                        </button>
+                      ) : !loadingPrices ? (
+                        <button
+                          onClick={() => setClarifyItem(item)}
+                          style={{
+                            padding: "7px 10px", borderRadius: 10,
+                            fontSize: 11, fontWeight: 800, cursor: "pointer",
+                            color: "#fb923c", border: "1px solid rgba(251,146,60,0.4)",
+                            background: "rgba(251,146,60,0.1)", whiteSpace: "nowrap",
+                          }}>
+                          Уточнить цену
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                 );
@@ -657,7 +681,177 @@ function TomorrowPanel({
           )}
         </div>
       </div>
+
+      {/* Мини-модал «Уточнить цену» */}
+      {clarifyItem && (
+        <ClarifyModal
+          item={clarifyItem}
+          onClose={() => setClarifyItem(null)}
+        />
+      )}
     </>
+  );
+}
+
+// ── Модал «Уточнить цену» ─────────────────────────────────────────────────────
+function ClarifyModal({ item, onClose }: { item: PriceItem & { cat?: string }; onClose: () => void }) {
+  const [name, setName]       = useState("");
+  const [phone, setPhone]     = useState("+7");
+  const [sending, setSending] = useState(false);
+  const [done, setDone]       = useState(false);
+  const [err, setErr]         = useState<string | null>(null);
+  const [touched, setTouched] = useState(false);
+
+  const phoneDigits = phone.replace(/\D/g, "");
+  const nameOk  = name.trim().length >= 2;
+  const phoneOk = phoneDigits.length === 11;
+
+  const handlePhoneChange = (v: string) => {
+    const raw = v.replace(/\D/g, "");
+    setPhone(formatPhone(raw.startsWith("7") || raw.startsWith("8") ? raw : "7" + raw));
+  };
+
+  const handleSend = async () => {
+    setTouched(true);
+    if (!nameOk || !phoneOk) return;
+    setSending(true); setErr(null);
+    try {
+      await fetch(SEND_LEAD_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name:     name.trim(),
+          phone:    phoneDigits,
+          category: "Уточнить цену — Привезём завтра",
+          desc:     `Уточнить цену: ${item.name}${item.region ? ` [${item.region}]` : ""} · под заказ`,
+        }),
+      });
+      setDone(true);
+    } catch {
+      setErr("Ошибка сети, попробуйте ещё раз");
+    }
+    setSending(false);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm"
+      style={{ zIndex: 60 }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-sm rounded-t-3xl sm:rounded-3xl overflow-hidden"
+        style={{
+          background: "linear-gradient(160deg,#1c1410,#110d0a)",
+          border: "1px solid rgba(251,146,60,0.35)",
+          boxShadow: "0 -8px 50px rgba(251,146,60,0.18)",
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex justify-center pt-3 pb-1 sm:hidden">
+          <div className="w-10 h-1 rounded-full" style={{ background: "rgba(251,146,60,0.3)" }} />
+        </div>
+        <div className="p-6">
+          {done ? (
+            <div className="text-center py-4">
+              <div className="text-5xl mb-4">📞</div>
+              <div className="font-oswald font-bold text-[20px] text-white uppercase mb-2">Заявка принята!</div>
+              <div className="text-white/50 text-[13px] mb-1">
+                Перезвоним и сообщим точную цену на
+              </div>
+              <div className="font-bold text-[14px] mb-1" style={{ color: "#FFD700" }}>{item.name}</div>
+              <div className="text-white/35 text-[12px] mb-6">на номер {phone}</div>
+              <button onClick={onClose}
+                className="w-full py-3 rounded-2xl font-oswald font-bold text-[14px] uppercase text-black"
+                style={{ background: "linear-gradient(135deg,#fb923c,#ea580c)" }}>
+                Отлично, жду звонка!
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Товар */}
+              <div className="flex items-center gap-3 mb-5 p-3 rounded-2xl"
+                style={{ background: "rgba(251,146,60,0.07)", border: "1px solid rgba(251,146,60,0.2)" }}>
+                <div className="w-[48px] h-[48px] rounded-xl flex items-center justify-center text-2xl shrink-0"
+                  style={{ background: "rgba(251,146,60,0.1)" }}>🚗</div>
+                <div>
+                  <div className="font-bold text-white text-[14px] leading-tight">{item.name}</div>
+                  {item.region && (
+                    <span style={{
+                      fontSize: 9, padding: "1px 6px", borderRadius: 4, fontWeight: 700,
+                      background: item.region === "EU" ? "rgba(74,222,128,0.15)" : "rgba(96,165,250,0.15)",
+                      color: item.region === "EU" ? "#4ade80" : "#60a5fa",
+                      border: `1px solid ${item.region === "EU" ? "#4ade8033" : "#60a5fa33"}`,
+                    }}>{item.region}</span>
+                  )}
+                  <div className="text-[11px] mt-1" style={{ color: "#fb923c" }}>
+                    Цену уточним при звонке · привезём за 1–2 дня
+                  </div>
+                </div>
+              </div>
+
+              <div className="font-oswald font-bold text-[16px] text-white uppercase tracking-wide mb-1">
+                Уточнить цену
+              </div>
+              <div className="text-[11px] text-white/30 mb-4">
+                Оставьте имя и телефон — перезвоним и назовём точную цену
+              </div>
+
+              <div className="space-y-2">
+                {/* Имя */}
+                <div className="relative">
+                  <input value={name} onChange={e => setName(e.target.value)}
+                    placeholder="Ваше имя *"
+                    className="w-full px-4 py-3 rounded-xl text-[14px] text-white outline-none pr-10"
+                    style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${touched && !nameOk ? "rgba(239,68,68,0.6)" : nameOk ? "rgba(74,222,128,0.4)" : "rgba(255,255,255,0.12)"}` }} />
+                  {nameOk
+                    ? <Icon name="Check" size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-green-400" />
+                    : touched && <Icon name="AlertCircle" size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-red-400" />
+                  }
+                </div>
+                {touched && !nameOk && <div className="text-red-400 text-[11px] px-1">Введите имя</div>}
+
+                {/* Телефон */}
+                <div className="relative">
+                  <input value={phone} onChange={e => handlePhoneChange(e.target.value)}
+                    type="tel" placeholder="+7 (___) ___-__-__ *"
+                    className="w-full px-4 py-3 rounded-xl text-[14px] text-white outline-none pr-10"
+                    style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${touched && !phoneOk ? "rgba(239,68,68,0.6)" : phoneOk ? "rgba(74,222,128,0.4)" : "rgba(255,255,255,0.12)"}` }} />
+                  {phoneOk
+                    ? <Icon name="Check" size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-green-400" />
+                    : touched && <Icon name="AlertCircle" size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-red-400" />
+                  }
+                </div>
+                {touched && !phoneOk && <div className="text-red-400 text-[11px] px-1">Введите номер полностью</div>}
+              </div>
+
+              {err && (
+                <div className="flex items-center gap-1.5 text-red-400 text-[12px] mt-2">
+                  <Icon name="AlertCircle" size={13} /> {err}
+                </div>
+              )}
+
+              <div className="flex gap-2 mt-4">
+                <button onClick={onClose}
+                  className="flex-1 py-3 rounded-2xl font-oswald font-bold text-[13px] uppercase text-white/40"
+                  style={{ border: "1px solid rgba(255,255,255,0.1)" }}>
+                  Отмена
+                </button>
+                <button onClick={handleSend} disabled={sending}
+                  className="flex-[2] flex items-center justify-center gap-2 py-3 rounded-2xl font-oswald font-bold text-[14px] uppercase tracking-wide text-white disabled:opacity-60"
+                  style={{
+                    background: "linear-gradient(135deg,#fb923c,#ea580c)",
+                    boxShadow: "0 4px 20px rgba(251,146,60,0.4)",
+                  }}>
+                  <Icon name={sending ? "Loader2" : "Phone"} size={16} className={sending ? "animate-spin" : ""} />
+                  {sending ? "Отправляю…" : "Перезвоните мне"}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
