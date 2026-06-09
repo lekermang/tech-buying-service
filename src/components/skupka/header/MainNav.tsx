@@ -210,47 +210,68 @@ const MainNav = ({ navLinks, menuOpen, onToggleMenu, onNav, compact = false, onP
       <div className={`relative max-w-[1800px] mx-auto px-3 sm:px-4 flex items-center gap-3 transition-[height] duration-300 ${
         compact ? "h-11 md:h-12" : "h-12 md:h-14 lg:h-16"
       }`}>
-        {/* ── ЛЕВО: логотип ── */}
-        <a href="/" className="flex items-center gap-2.5 shrink-0 group">
-          {/* Медальон: spinning conic ring + аватар внутри (как на сплэш-экране) */}
-          <div className={`ticker-medallion shrink-0 transition-all duration-300 ${
-            compact ? "!w-7 !h-7" : "!w-9 !h-9 md:!w-10 md:!h-10"
-          }`}>
-            {/* Вращающееся золотое кольцо */}
-            <div className="ticker-medallion-ring" style={{ animation: "medallionSpin 8s linear infinite" }} />
-            {/* Аватар вместо текста S24 */}
-            <div className="ticker-medallion-inner overflow-hidden p-0" style={{ width: "78%", height: "78%" }}>
-              <img
-                src="https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/9c9b4fca-bfd7-4841-a827-eb0354dad8da.JPG"
-                alt="Скупка24"
-                className="w-full h-full object-cover rounded-full"
-                loading="eager"
-                decoding="async"
-              />
+        {/* ── ЛЕВО: логотип — точно как на сплэш-экране ── */}
+        <a href="/" className="flex items-center gap-3 shrink-0 group">
+          <style>{`
+            @keyframes navLogoSpin  { from { transform: rotate(0deg);    } to { transform: rotate(360deg);  } }
+            @keyframes navLogoSpinR { from { transform: rotate(0deg);    } to { transform: rotate(-360deg); } }
+            @keyframes navLogoGlow  { 0%,100% { opacity:.5; } 50% { opacity:1; } }
+            .nav-logo-spin       { animation: navLogoSpin   8s linear infinite; }
+            .nav-logo-spin-slow  { animation: navLogoSpin  18s linear infinite; }
+            .nav-logo-spin-r     { animation: navLogoSpinR  8s linear infinite; }
+            .nav-logo-glow       { animation: navLogoGlow 2.4s ease-in-out infinite; }
+          `}</style>
+
+          {/* Медальон */}
+          <div className={`relative shrink-0 transition-all duration-300 ${compact ? "w-8 h-8" : "w-10 h-10 md:w-11 md:h-11"}`}>
+            {/* Пульсирующее золотое свечение */}
+            <div className="absolute inset-0 -m-2 rounded-full blur-xl nav-logo-glow pointer-events-none"
+              style={{ background: "rgba(255,215,0,0.4)" }} />
+            {/* Орбитальное кольцо с точками */}
+            <div className="absolute -inset-2 rounded-full border border-[#FFD700]/20 nav-logo-spin-slow pointer-events-none">
+              <span className="absolute -top-[2px] left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-[#FFD700]"
+                style={{ boxShadow: "0 0 8px #FFD700" }} />
+              <span className="absolute top-1/2 -right-[2px] -translate-y-1/2 w-1 h-1 rounded-full bg-[#fff3a0]"
+                style={{ boxShadow: "0 0 6px #FFD700" }} />
+            </div>
+            {/* Главное вращающееся conic кольцо */}
+            <div className="w-full h-full rounded-full p-[2px] nav-logo-spin"
+              style={{
+                background: "conic-gradient(from 0deg, #b8860b, #ffd700, #fff3a0, #ffd700, #b8860b)",
+                boxShadow: "0 0 24px rgba(255,215,0,0.5)",
+              }}>
+              {/* Контр-вращение чтобы фото оставалось ровным */}
+              <div className="w-full h-full rounded-full bg-black p-[2px] nav-logo-spin-r">
+                <img
+                  src="https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/9c9b4fca-bfd7-4841-a827-eb0354dad8da.JPG"
+                  alt="Скупка24"
+                  className="w-full h-full rounded-full object-cover"
+                  loading="eager"
+                  decoding="async"
+                />
+              </div>
             </div>
             {/* Live dot */}
             <span className="live-dot absolute -bottom-0.5 -right-0.5 bg-emerald-400 border-2 border-[#07050A]"
-              style={{ width: 10, height: 10 }} />
+              style={{ width: 9, height: 9 }} />
           </div>
+
+          {/* Текст */}
           <div className="leading-tight flex flex-col items-start">
             <span className={`font-oswald font-bold tracking-wider transition-[font-size] duration-300 flex whitespace-nowrap ${
-              compact ? "text-sm md:text-base lg:text-lg" : "text-base md:text-lg lg:text-xl"
+              compact ? "text-sm md:text-base" : "text-base md:text-lg lg:text-xl"
             }`}>
               {"СКУПКА24".split("").map((char, i) => (
-                <span
-                  key={i}
-                  className="letter-kinetic inline-block"
-                  style={{
-                    animationDelay: `${i * 55}ms`,
-                    backgroundImage: i % 2 === 0
-                      ? "linear-gradient(180deg, #fff3a0 0%, #FFD700 55%, #b8860b 100%)"
-                      : "linear-gradient(180deg, #FFD700 0%, #fff3a0 40%, #FFD700 100%)",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                    backgroundClip: "text",
-                    paddingBottom: "1px",
-                  }}
-                >{char}</span>
+                <span key={i} className="letter-kinetic inline-block" style={{
+                  animationDelay: `${i * 55}ms`,
+                  backgroundImage: i % 2 === 0
+                    ? "linear-gradient(180deg, #fff3a0 0%, #FFD700 55%, #b8860b 100%)"
+                    : "linear-gradient(180deg, #FFD700 0%, #fff3a0 40%, #FFD700 100%)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                  paddingBottom: "1px",
+                }}>{char}</span>
               ))}
             </span>
             {!compact && (
