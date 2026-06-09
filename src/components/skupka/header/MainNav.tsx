@@ -233,17 +233,18 @@ const MainNav = ({ navLinks, menuOpen, onToggleMenu, onNav, compact = false, onP
             {/* Live dot */}
             <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-[#07050A] animate-pulse" />
           </div>
-          <div className="leading-tight min-w-0">
-            <span className={`font-oswald font-bold tracking-wider block transition-all duration-300 ${
+          <div className="leading-tight flex flex-col items-start">
+            <span className={`font-oswald font-bold tracking-wider transition-all duration-300 whitespace-nowrap ${
               compact ? "text-sm md:text-base lg:text-lg" : "text-base md:text-lg lg:text-xl"
             }`} style={{
-              background: "linear-gradient(135deg, #fff3a0 0%, #ffd700 40%, #d4940a 70%, #ffd700 100%)",
+              background: "linear-gradient(135deg, #fff3a0 0%, #FFD700 40%, #d4940a 70%, #FFD700 100%)",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
               backgroundClip: "text",
+              paddingBottom: "1px",
             }}>СКУПКА24</span>
             {!compact && (
-              <div className="font-roboto text-white/35 text-[10px] hidden xl:flex items-center gap-1 whitespace-nowrap">
+              <div className="font-roboto text-white/35 text-[10px] hidden xl:flex items-center gap-1 whitespace-nowrap mt-0.5">
                 <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse inline-block" />
                 Кирова 7/47 · Кирова 11
               </div>
