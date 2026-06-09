@@ -211,27 +211,26 @@ const MainNav = ({ navLinks, menuOpen, onToggleMenu, onNav, compact = false, onP
         compact ? "h-11 md:h-12" : "h-12 md:h-14 lg:h-16"
       }`}>
         {/* ── ЛЕВО: логотип ── */}
-        <a href="/" className="flex items-center gap-2.5 shrink-0 group min-w-0">
-          {/* Conic gold ring вокруг аватара */}
-          <div className={`relative shrink-0 transition-all duration-300 ${compact ? "w-7 h-7" : "w-8 h-8 md:w-9 md:h-9 lg:w-10 lg:h-10"}`}>
-            {/* Outer glow ring */}
-            <div className="absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-              style={{ background: "radial-gradient(circle, rgba(255,215,0,0.25) 0%, transparent 70%)", transform: "scale(1.4)" }} />
-            {/* Spinning conic gradient ring */}
-            <div className="absolute inset-0 rounded-full p-[1.5px]"
-              style={{ background: "conic-gradient(from 0deg, #b8860b 0%, #ffd700 25%, #fff3a0 50%, #ffd700 75%, #b8860b 100%)", animation: "medallionSpin 12s linear infinite" }}>
-              <div className="w-full h-full rounded-full bg-[#07050A]" />
+        <a href="/" className="flex items-center gap-2.5 shrink-0 group">
+          {/* Медальон: spinning conic ring + аватар внутри (как на сплэш-экране) */}
+          <div className={`ticker-medallion shrink-0 transition-all duration-300 ${
+            compact ? "!w-7 !h-7" : "!w-9 !h-9 md:!w-10 md:!h-10"
+          }`}>
+            {/* Вращающееся золотое кольцо */}
+            <div className="ticker-medallion-ring" style={{ animation: "medallionSpin 8s linear infinite" }} />
+            {/* Аватар вместо текста S24 */}
+            <div className="ticker-medallion-inner overflow-hidden p-0" style={{ width: "78%", height: "78%" }}>
+              <img
+                src="https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/9c9b4fca-bfd7-4841-a827-eb0354dad8da.JPG"
+                alt="Скупка24"
+                className="w-full h-full object-cover rounded-full"
+                loading="eager"
+                decoding="async"
+              />
             </div>
-            {/* Avatar */}
-            <img
-              src="https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/9c9b4fca-bfd7-4841-a827-eb0354dad8da.JPG"
-              alt="Скупка24"
-              className="absolute inset-[2.5px] rounded-full object-cover ring-0"
-              loading="eager"
-              decoding="async"
-            />
             {/* Live dot */}
-            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-[#07050A] animate-pulse" />
+            <span className="live-dot absolute -bottom-0.5 -right-0.5 bg-emerald-400 border-2 border-[#07050A]"
+              style={{ width: 10, height: 10 }} />
           </div>
           <div className="leading-tight flex flex-col items-start">
             <span className={`font-oswald font-bold tracking-wider transition-[font-size] duration-300 flex whitespace-nowrap ${
