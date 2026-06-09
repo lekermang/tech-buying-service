@@ -9,7 +9,7 @@ import { useState, useRef, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import { ymGoal, Goals } from "@/lib/ym";
 import { APK_URL, EXE_URL, type MarketStatus, type Period, PROBES_DISPLAY } from "./goldTickerUtils";
-import { S24Medallion } from "./GoldTickerMobile";
+
 
 interface Props {
   goldPrice: { buy: number; buy_usd?: number; xau_usd?: number; usd_rub?: number; date: string } | null;
@@ -72,8 +72,6 @@ const GoldTickerDesktopCompact = ({
     <div ref={rootRef} className="hidden xl:block relative">
       {/* ─── ОДНА КОМПАКТНАЯ СТРОКА ─── */}
       <div className={`relative max-w-7xl mx-auto px-5 flex items-center gap-2.5 transition-[padding] duration-300 ${compact ? "py-1" : "py-1.5"}`}>
-        {/* Медальон + статус биржи */}
-        <S24Medallion market={market} />
 
         {/* Главная цена 999 */}
         <div className={`flex items-center h-7 px-2.5 rounded-md bg-black/70 border transition-all duration-500 ${

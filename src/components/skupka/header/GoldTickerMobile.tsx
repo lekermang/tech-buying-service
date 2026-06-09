@@ -70,8 +70,6 @@ const GoldTickerMobile = ({
     <div ref={rootRef} className="relative">
       {/* ── Адаптивная строка: мобилка | планшет | средний десктоп ── */}
       <div className="relative max-w-7xl mx-auto px-3 sm:px-4 lg:px-5 py-1.5 flex items-center gap-2">
-        {/* Медальон S24 */}
-        <S24Medallion market={market} />
 
         {/* Цена 999 — крупная, тап открывает детали */}
         <button
