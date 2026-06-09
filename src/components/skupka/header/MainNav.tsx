@@ -251,9 +251,7 @@ const MainNav = ({ navLinks, menuOpen, onToggleMenu, onNav, compact = false, onP
                 />
               </div>
             </div>
-            {/* Live dot */}
-            <span className="live-dot absolute -bottom-0.5 -right-0.5 bg-emerald-400 border-2 border-[#07050A]"
-              style={{ width: 9, height: 9 }} />
+
           </div>
 
           {/* Текст */}
