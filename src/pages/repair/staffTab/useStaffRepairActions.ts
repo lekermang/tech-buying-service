@@ -114,14 +114,15 @@ export function useStaffRepairActions(token: string, st: StaffRepairState) {
           client_email: email || null,
           device_password: form.device_password || null,
         };
-        printAct(newOrder);
+        setShowForm(false);
+        setForm(EMPTY_FORM);
+        triggerReaction("🎉");
+        printAct(newOrder).catch(() => {});
         if (email) {
           sendIntakeEmailBundle(newOrder, email, token)
             .then(() => toast.success(`Акты отправлены на ${email}`))
             .catch(() => toast.warning("Заявка создана, но письмо не отправилось"));
         }
-        setShowForm(false);
-        setForm(EMPTY_FORM);
         loadOrders();
       } else {
         toast.update(tid, {
