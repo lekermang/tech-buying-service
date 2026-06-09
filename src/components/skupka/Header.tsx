@@ -159,48 +159,56 @@ const Header = ({ scrollTo, goldOpen = false }: HeaderProps) => {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50">
-      {/* ══ Unified premium header container ══ */}
+      {/* ══════════════════════════════════════════════════════
+          UNIFIED COSMIC HEADER — bg #07050A
+          ══════════════════════════════════════════════════════ */}
       <div
-        className={`relative transition-shadow duration-300 ${
+        className={`relative transition-all duration-500 ${
           compact
-            ? "shadow-[0_8px_32px_rgba(0,0,0,0.6),0_0_0_1px_rgba(255,215,0,0.08)]"
-            : ""
+            ? "shadow-[0_8px_48px_rgba(0,0,0,0.8),0_0_0_1px_rgba(255,215,0,0.1)]"
+            : "shadow-[0_4px_24px_rgba(0,0,0,0.4)]"
         }`}
-        style={{ background: "#07050A" }}
+        style={{ background: "linear-gradient(180deg, #07050A 0%, #080608 100%)" }}
       >
-        {/* Cosmic background — nebula + starfield */}
+        {/* ── Фоновый слой: туманность + звёздное поле ── */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          {/* Nebula gradients */}
-          <div className="absolute inset-0" style={{
-            background: "linear-gradient(135deg, rgba(255,215,0,0.04) 0%, transparent 35%, transparent 65%, rgba(255,215,0,0.03) 100%)"
-          }} />
-          <div className="absolute -top-16 left-1/4 w-64 h-64 rounded-full blur-3xl" style={{ background: "rgba(255,215,0,0.05)" }} />
-          <div className="absolute -bottom-16 right-1/3 w-48 h-48 rounded-full blur-3xl" style={{ background: "rgba(255,180,0,0.04)" }} />
-          {/* 8-point starfield */}
+          {/* Nebula — крупные размытые сферы */}
+          <div className="absolute -top-20 -left-20 w-80 h-80 rounded-full blur-3xl opacity-60"
+            style={{ background: "radial-gradient(circle, rgba(255,215,0,0.07) 0%, transparent 70%)" }} />
+          <div className="absolute -top-10 right-1/4 w-64 h-64 rounded-full blur-3xl opacity-40"
+            style={{ background: "radial-gradient(circle, rgba(255,160,0,0.05) 0%, transparent 70%)" }} />
+          <div className="absolute top-0 right-0 w-48 h-48 rounded-full blur-2xl opacity-30"
+            style={{ background: "radial-gradient(circle, rgba(255,215,0,0.06) 0%, transparent 70%)" }} />
+          {/* Горизонтальный золотой луч */}
+          <div className="absolute top-0 left-0 right-0 h-[1px] opacity-60"
+            style={{ background: "linear-gradient(90deg, transparent 0%, rgba(255,215,0,0.0) 10%, rgba(255,215,0,0.35) 35%, rgba(255,240,180,0.7) 50%, rgba(255,215,0,0.35) 65%, rgba(255,215,0,0.0) 90%, transparent 100%)" }} />
+          {/* 12-точечное звёздное поле */}
           <div className="absolute inset-0" style={{
             backgroundImage: [
-              "radial-gradient(1px 1px at 12% 30%, rgba(255,215,0,0.55) 0%, transparent 100%)",
-              "radial-gradient(1px 1px at 28% 70%, rgba(255,215,0,0.4) 0%, transparent 100%)",
-              "radial-gradient(1px 1px at 45% 20%, rgba(255,215,0,0.5) 0%, transparent 100%)",
-              "radial-gradient(1px 1px at 62% 55%, rgba(255,215,0,0.45) 0%, transparent 100%)",
-              "radial-gradient(1px 1px at 78% 35%, rgba(255,215,0,0.35) 0%, transparent 100%)",
-              "radial-gradient(1px 1px at 88% 75%, rgba(255,215,0,0.5) 0%, transparent 100%)",
-              "radial-gradient(1px 1px at 5% 60%, rgba(255,215,0,0.4) 0%, transparent 100%)",
-              "radial-gradient(1px 1px at 95% 15%, rgba(255,215,0,0.45) 0%, transparent 100%)",
+              "radial-gradient(1.2px 1.2px at 8% 25%, rgba(255,215,0,0.7) 0%, transparent 100%)",
+              "radial-gradient(1px 1px at 18% 65%, rgba(255,215,0,0.45) 0%, transparent 100%)",
+              "radial-gradient(1.5px 1.5px at 31% 15%, rgba(255,230,150,0.6) 0%, transparent 100%)",
+              "radial-gradient(1px 1px at 44% 75%, rgba(255,215,0,0.4) 0%, transparent 100%)",
+              "radial-gradient(1.2px 1.2px at 55% 30%, rgba(255,215,0,0.55) 0%, transparent 100%)",
+              "radial-gradient(1px 1px at 67% 55%, rgba(255,230,150,0.35) 0%, transparent 100%)",
+              "radial-gradient(1.3px 1.3px at 74% 20%, rgba(255,215,0,0.5) 0%, transparent 100%)",
+              "radial-gradient(1px 1px at 82% 70%, rgba(255,215,0,0.4) 0%, transparent 100%)",
+              "radial-gradient(1.4px 1.4px at 90% 40%, rgba(255,230,150,0.6) 0%, transparent 100%)",
+              "radial-gradient(1px 1px at 96% 15%, rgba(255,215,0,0.45) 0%, transparent 100%)",
+              "radial-gradient(1px 1px at 3% 80%, rgba(255,215,0,0.5) 0%, transparent 100%)",
+              "radial-gradient(1.2px 1.2px at 50% 50%, rgba(255,240,180,0.3) 0%, transparent 100%)",
             ].join(", ")
           }} />
         </div>
 
-        {/* Left vertical gold accent line */}
-        <div className="absolute left-0 top-0 bottom-0 w-[1.5px] pointer-events-none" style={{
-          background: "linear-gradient(180deg, transparent 0%, rgba(255,215,0,0.4) 30%, rgba(255,215,0,0.6) 50%, rgba(255,215,0,0.4) 70%, transparent 100%)"
-        }} />
-        {/* Right vertical gold accent line */}
-        <div className="absolute right-0 top-0 bottom-0 w-[1.5px] pointer-events-none" style={{
-          background: "linear-gradient(180deg, transparent 0%, rgba(255,215,0,0.4) 30%, rgba(255,215,0,0.6) 50%, rgba(255,215,0,0.4) 70%, transparent 100%)"
-        }} />
+        {/* ── Левая вертикальная золотая линия ── */}
+        <div className="absolute left-0 top-0 bottom-0 w-[1px] pointer-events-none"
+          style={{ background: "linear-gradient(180deg, transparent 0%, rgba(255,215,0,0.5) 20%, rgba(255,215,0,0.8) 50%, rgba(255,215,0,0.5) 80%, transparent 100%)" }} />
+        {/* ── Правая вертикальная золотая линия ── */}
+        <div className="absolute right-0 top-0 bottom-0 w-[1px] pointer-events-none"
+          style={{ background: "linear-gradient(180deg, transparent 0%, rgba(255,215,0,0.3) 20%, rgba(255,215,0,0.5) 50%, rgba(255,215,0,0.3) 80%, transparent 100%)" }} />
 
-        {/* GoldTicker row */}
+        {/* ══════════ ROW 1: GOLD TICKER ══════════ */}
         <GoldTicker
           goldPrice={goldPrice}
           goldHistory={goldHistory}
@@ -210,12 +218,14 @@ const Header = ({ scrollTo, goldOpen = false }: HeaderProps) => {
           compact={compact}
         />
 
-        {/* Internal thin divider between ticker and nav */}
-        <div className="mx-4 h-px pointer-events-none" style={{
-          background: "linear-gradient(90deg, transparent 0%, rgba(255,215,0,0.12) 20%, rgba(255,215,0,0.25) 50%, rgba(255,215,0,0.12) 80%, transparent 100%)"
+        {/* ── Внутренний разделитель между тикером и навом ── */}
+        <div className="pointer-events-none" style={{
+          height: "1px",
+          margin: "0 16px",
+          background: "linear-gradient(90deg, transparent 0%, rgba(255,215,0,0.0) 5%, rgba(255,215,0,0.2) 30%, rgba(255,215,0,0.35) 50%, rgba(255,215,0,0.2) 70%, rgba(255,215,0,0.0) 95%, transparent 100%)"
         }} />
 
-        {/* MainNav row */}
+        {/* ══════════ ROW 2: MAIN NAV ══════════ */}
         <MainNav
           navLinks={NAV_LINKS}
           menuOpen={menuOpen}
@@ -225,12 +235,12 @@ const Header = ({ scrollTo, goldOpen = false }: HeaderProps) => {
           onPayClick={() => setPayOpen(true)}
         />
 
-        {/* Single premium gold border at the bottom */}
-        <div className="absolute bottom-0 left-0 right-0 h-[1px] pointer-events-none" style={{
-          background: "linear-gradient(90deg, transparent 0%, rgba(255,215,0,0.15) 10%, rgba(255,215,0,0.55) 50%, rgba(255,215,0,0.15) 90%, transparent 100%)"
-        }} />
+        {/* ── Нижняя граница всей шапки ── */}
+        <div className="absolute bottom-0 left-0 right-0 h-[1px] pointer-events-none"
+          style={{ background: "linear-gradient(90deg, transparent 0%, rgba(255,215,0,0.1) 10%, rgba(255,215,0,0.5) 40%, rgba(255,240,180,0.8) 50%, rgba(255,215,0,0.5) 60%, rgba(255,215,0,0.1) 90%, transparent 100%)" }} />
       </div>
 
+      {/* ── Мобильное меню (вне контейнера, поверх всего) ── */}
       <MobileMenu
         open={menuOpen}
         navLinks={NAV_LINKS}

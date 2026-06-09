@@ -50,6 +50,12 @@ const NavItem = ({ link, active, onClick, compact }: NavItemProps) => (
                 ${active
                   ? "text-[#FFD700] drop-shadow-[0_0_8px_rgba(255,215,0,0.45)]"
                   : "text-white/85 hover:text-[#FFD700] hover:drop-shadow-[0_0_6px_rgba(255,215,0,0.35)]"}`}
+    style={active ? {
+      background: "linear-gradient(135deg, #fff3a0 0%, #ffd700 60%, #d4940a 100%)",
+      WebkitBackgroundClip: "text",
+      WebkitTextFillColor: "transparent",
+      backgroundClip: "text",
+    } : undefined}
   >
     {link.label}
     {/* Премиум-подчёркивание: золотой градиент с двумя «точками-засечками» */}
@@ -205,27 +211,40 @@ const MainNav = ({ navLinks, menuOpen, onToggleMenu, onNav, compact = false, onP
         compact ? "h-11 md:h-12" : "h-12 md:h-14 lg:h-16"
       }`}>
         {/* ── ЛЕВО: логотип ── */}
-        <a href="/" className="flex items-center gap-2 sm:gap-2.5 shrink-0 group min-w-0">
-          <div className={`relative shrink-0 rounded-full p-[1.5px] transition-[width,height] duration-300
-                          bg-[conic-gradient(from_0deg,#b8860b,#ffd700,#fff3a0,#ffd700,#b8860b)]
-                          shadow-[0_0_14px_rgba(255,215,0,0.25)]
-                          ${compact ? "w-7 h-7" : "w-8 h-8 md:w-9 md:h-9 lg:w-10 lg:h-10"}`}>
+        <a href="/" className="flex items-center gap-2.5 shrink-0 group min-w-0">
+          {/* Conic gold ring вокруг аватара */}
+          <div className={`relative shrink-0 transition-all duration-300 ${compact ? "w-7 h-7" : "w-8 h-8 md:w-9 md:h-9 lg:w-10 lg:h-10"}`}>
+            {/* Outer glow ring */}
+            <div className="absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+              style={{ background: "radial-gradient(circle, rgba(255,215,0,0.25) 0%, transparent 70%)", transform: "scale(1.4)" }} />
+            {/* Spinning conic gradient ring */}
+            <div className="absolute inset-0 rounded-full p-[1.5px]"
+              style={{ background: "conic-gradient(from 0deg, #b8860b 0%, #ffd700 25%, #fff3a0 50%, #ffd700 75%, #b8860b 100%)", animation: "medallionSpin 12s linear infinite" }}>
+              <div className="w-full h-full rounded-full bg-[#07050A]" />
+            </div>
+            {/* Avatar */}
             <img
               src="https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/9c9b4fca-bfd7-4841-a827-eb0354dad8da.JPG"
               alt="Скупка24"
-              className="w-full h-full rounded-full object-cover ring-1 ring-black/40"
+              className="absolute inset-[2.5px] rounded-full object-cover ring-0"
               loading="eager"
               decoding="async"
             />
+            {/* Live dot */}
+            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-[#07050A] animate-pulse" />
           </div>
           <div className="leading-tight min-w-0">
-            <span className={`font-oswald font-bold tracking-wider animate-shimmer block transition-[font-size] duration-300 ${
+            <span className={`font-oswald font-bold tracking-wider block transition-all duration-300 ${
               compact ? "text-sm md:text-base lg:text-lg" : "text-base md:text-lg lg:text-xl"
-            }`}>СКУПКА24</span>
-            {/* Адрес — только на десктопе xl+ и не в compact */}
+            }`} style={{
+              background: "linear-gradient(135deg, #fff3a0 0%, #ffd700 40%, #d4940a 70%, #ffd700 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+            }}>СКУПКА24</span>
             {!compact && (
-              <div className="font-roboto text-white/40 text-[10px] hidden xl:flex items-center gap-1 whitespace-nowrap">
-                <Icon name="MapPin" size={9} className="text-[#FFD700]/60" />
+              <div className="font-roboto text-white/35 text-[10px] hidden xl:flex items-center gap-1 whitespace-nowrap">
+                <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse inline-block" />
                 Кирова 7/47 · Кирова 11
               </div>
             )}
@@ -280,7 +299,7 @@ const MainNav = ({ navLinks, menuOpen, onToggleMenu, onNav, compact = false, onP
           {/* Каталог — на md+ : премиум контурная кнопка */}
           <a
             href="/catalog"
-            className="hidden md:inline-flex items-center gap-1.5 h-9 px-3 lg:px-3.5 rounded-md border border-[#FFD700]/35 hover:border-[#FFD700]/70 text-[#FFD700] hover:bg-[#FFD700]/[0.08] active:scale-95 transition-all hover:shadow-[0_0_15px_rgba(255,215,0,0.25)]"
+            className="hidden md:inline-flex items-center gap-1.5 h-9 px-4 rounded-full border border-[#FFD700]/25 hover:border-[#FFD700]/60 text-[#FFD700] hover:bg-[#FFD700]/[0.06] active:scale-95 transition-all duration-200 hover:shadow-[0_0_20px_rgba(255,215,0,0.2)]"
           >
             <Icon name="ShoppingBag" size={13} />
             <span className="font-oswald font-bold text-[11.5px] lg:text-[12.5px] uppercase tracking-wider">Каталог</span>
@@ -302,18 +321,18 @@ const MainNav = ({ navLinks, menuOpen, onToggleMenu, onNav, compact = false, onP
           <a
             href="tel:+79929990333"
             onClick={() => ymGoal(Goals.CALL_CLICK, { place: "header" })}
-            className="hidden xl:inline-flex items-center gap-2 h-9 pl-2 pr-3.5 rounded-md
-                       bg-gradient-to-br from-[#FFD700]/[0.12] via-[#FFD700]/[0.05] to-transparent
-                       border border-[#FFD700]/40 hover:border-[#FFD700]/70 hover:from-[#FFD700]/[0.18]
-                       hover:shadow-[0_0_18px_rgba(255,215,0,0.35)]
-                       transition-all duration-300 group"
+            className="hidden xl:inline-flex items-center gap-2 h-9 pl-2.5 pr-4 rounded-full
+                       border border-[#FFD700]/30 hover:border-[#FFD700]/70
+                       active:scale-95 transition-all duration-300 group overflow-hidden relative"
+            style={{
+              background: "linear-gradient(135deg, rgba(255,215,0,0.08) 0%, rgba(255,215,0,0.04) 100%)",
+              boxShadow: "0 0 0 1px rgba(255,215,0,0.06), inset 0 1px 0 rgba(255,255,255,0.04)",
+            }}
           >
-            <span className="relative w-6 h-6 rounded-full
-                              bg-[radial-gradient(circle_at_30%_30%,#fff3a0,#ffd700_45%,#b8860b_100%)]
-                              shadow-[0_0_8px_rgba(255,215,0,0.5),inset_0_1px_0_rgba(255,255,255,0.4)]
-                              flex items-center justify-center text-black">
-              <Icon name="Phone" size={12} />
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-[#0D0D0D] animate-pulse" aria-hidden />
+            <span className="relative w-7 h-7 rounded-full flex items-center justify-center text-black shrink-0"
+              style={{ background: "linear-gradient(135deg, #fff3a0 0%, #ffd700 50%, #c8960a 100%)", boxShadow: "0 0 12px rgba(255,215,0,0.5)" }}>
+              <Icon name="Phone" size={13} />
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-[#07050A] animate-pulse" />
             </span>
             <span className="font-oswald font-extrabold text-[13.5px] text-[#FFD700] tracking-wide whitespace-nowrap drop-shadow-[0_0_5px_rgba(255,215,0,0.35)]">
               +7 (992) 999-03-33
@@ -333,7 +352,7 @@ const MainNav = ({ navLinks, menuOpen, onToggleMenu, onNav, compact = false, onP
           <button
             onClick={onToggleMenu}
             aria-label={menuOpen ? "Закрыть меню" : "Открыть меню"}
-            className="md:hidden inline-flex items-center justify-center w-9 h-9 rounded-md text-white hover:text-[#FFD700] active:scale-95 transition-all"
+            className="md:hidden inline-flex items-center justify-center w-9 h-9 rounded-full border border-[#FFD700]/20 text-white hover:text-[#FFD700] hover:border-[#FFD700]/50 hover:bg-[#FFD700]/5 active:scale-90 transition-all duration-200"
           >
             <Icon name={menuOpen ? "X" : "Menu"} size={22} />
           </button>

@@ -77,13 +77,14 @@ const GoldTickerMobile = ({
         <button
           type="button"
           onClick={() => setOpenDetails(o => !o)}
-          className={`flex-1 sm:flex-initial min-w-0 flex items-center justify-between h-9 px-3 rounded-md border transition-all duration-300 ${
+          className={`flex-1 sm:flex-initial min-w-0 flex items-center justify-between h-9 px-3 rounded-full border transition-all duration-300 ${
             flash === "up"
-              ? "bg-emerald-500/10 border-emerald-400/60"
+              ? "bg-emerald-500/10 border-emerald-400/50 shadow-[0_0_16px_rgba(52,211,153,0.2)]"
               : flash === "down"
-              ? "bg-red-500/10 border-red-400/60"
-              : "bg-black/60 border-[#FFD700]/30"
+              ? "bg-red-500/10 border-red-400/50 shadow-[0_0_16px_rgba(239,68,68,0.2)]"
+              : "border-[#FFD700]/25 shadow-[0_0_12px_rgba(255,215,0,0.08),inset_0_1px_0_rgba(255,255,255,0.04)]"
           }`}
+          style={flash ? undefined : { background: "rgba(255,215,0,0.04)" }}
         >
           <div className="flex items-center gap-2 min-w-0">
             <span className="font-oswald font-bold text-[9px] uppercase tracking-[0.18em] text-[#FFD700]/60 shrink-0">999</span>
@@ -109,7 +110,7 @@ const GoldTickerMobile = ({
 
         {/* Цена «Физлица» — sm+ (≥640px) */}
         {priceRetail999 && (
-          <div className="hidden sm:flex items-center gap-1.5 h-9 px-3 rounded-md bg-black/50 border border-[#FFD700]/20 shrink-0">
+          <div className="hidden sm:flex items-center gap-1.5 h-9 px-3 rounded-full bg-black/50 border border-[#FFD700]/20 shrink-0">
             <Icon name="User" size={11} className="text-[#FFD700]/55" />
             <span className="text-[#FFD700]/55 text-[9px] uppercase tracking-wider font-oswald font-bold">Физ</span>
             <span className="text-[#FFD700] font-oswald font-bold text-[13px] whitespace-nowrap leading-none">
@@ -121,7 +122,7 @@ const GoldTickerMobile = ({
 
         {/* Цена «Опт» — lg+ (≥1024px) */}
         {priceWholesale999 && (
-          <div className="hidden lg:flex items-center gap-1.5 h-9 px-3 rounded-md bg-black/50 border border-[#FFD700]/20 shrink-0">
+          <div className="hidden lg:flex items-center gap-1.5 h-9 px-3 rounded-full bg-black/50 border border-[#FFD700]/20 shrink-0">
             <Icon name="Package" size={11} className="text-[#FFD700]/55" />
             <span className="text-[#FFD700]/55 text-[9px] uppercase tracking-wider font-oswald font-bold">Опт</span>
             <span className="text-[#FFD700] font-oswald font-bold text-[13px] whitespace-nowrap leading-none">
@@ -133,7 +134,7 @@ const GoldTickerMobile = ({
 
         {/* XAU/USD — на md+ (≥768px) */}
         {goldPrice?.xau_usd && (
-          <div className="hidden md:flex items-center h-9 px-3 rounded-md bg-black/40 border border-white/10 shrink-0">
+          <div className="hidden md:flex items-center h-9 px-3 rounded-full bg-black/40 border border-white/10 shrink-0">
             <span className="font-oswald font-semibold text-[9px] uppercase tracking-[0.18em] text-white/40 mr-1.5">XAU</span>
             <span className="font-oswald font-semibold text-white/85 text-[12px] whitespace-nowrap leading-none">
               ${goldPrice.xau_usd.toLocaleString('en-US', { maximumFractionDigits: 0 })}
@@ -144,7 +145,7 @@ const GoldTickerMobile = ({
 
         {/* USD/RUB — на lg+ (≥1024px) */}
         {goldPrice?.usd_rub && (
-          <div className="hidden lg:flex items-center h-9 px-3 rounded-md bg-black/40 border border-white/10 shrink-0">
+          <div className="hidden lg:flex items-center h-9 px-3 rounded-full bg-black/40 border border-white/10 shrink-0">
             <span className="font-oswald font-semibold text-[9px] uppercase tracking-[0.18em] text-white/40 mr-1.5">USD</span>
             <span className="font-oswald font-semibold text-white/85 text-[12px] whitespace-nowrap leading-none">
               {goldPrice.usd_rub.toLocaleString('ru-RU', { maximumFractionDigits: 2 })}
@@ -154,7 +155,7 @@ const GoldTickerMobile = ({
         )}
 
         {/* Статус биржи (точка + текст) — на sm+ */}
-        <div className={`hidden sm:flex items-center gap-1.5 h-9 px-2.5 rounded-md border shrink-0 ${
+        <div className={`hidden sm:flex items-center gap-1.5 h-9 px-2.5 rounded-full border shrink-0 ${
           market.fixing ? "bg-[#FFD700]/10 border-[#FFD700]/40"
             : market.open ? "bg-emerald-500/10 border-emerald-400/25"
             : "bg-black/40 border-white/10"
@@ -178,14 +179,14 @@ const GoldTickerMobile = ({
           href="tel:+79929990333"
           onClick={() => ymGoal(Goals.CALL_CLICK, { place: "ticker_mobile" })}
           title="Позвонить"
-          className="hidden sm:inline-flex lg:hidden items-center justify-center w-9 h-9 rounded-md bg-black/60 border border-[#FFD700]/30 text-[#FFD700] active:scale-95 transition-all shrink-0 ml-auto"
+          className="hidden sm:inline-flex lg:hidden items-center justify-center w-9 h-9 rounded-full bg-black/60 border border-[#FFD700]/30 text-[#FFD700] active:scale-95 transition-all shrink-0 ml-auto"
         >
           <Icon name="Phone" size={14} />
         </a>
         <a
           href="tel:+79929990333"
           onClick={() => ymGoal(Goals.CALL_CLICK, { place: "ticker_mobile" })}
-          className="hidden lg:inline-flex items-center gap-2 h-9 px-3 rounded-md bg-black/60 hover:bg-black/80 border border-[#FFD700]/25 hover:border-[#FFD700]/55 active:scale-95 transition-all shrink-0 ml-auto"
+          className="hidden lg:inline-flex items-center gap-2 h-9 px-3 rounded-full bg-black/60 hover:bg-black/80 border border-[#FFD700]/25 hover:border-[#FFD700]/55 active:scale-95 transition-all shrink-0 ml-auto"
         >
           <Icon name="Phone" size={13} className="text-[#FFD700]" />
           <span className="font-oswald font-bold text-[#FFD700] text-[12px] tracking-wide whitespace-nowrap">8 992 999-03-33</span>
@@ -194,10 +195,14 @@ const GoldTickerMobile = ({
         {/* Продать — главный CTA */}
         <button
           onClick={onSellClick}
-          className="relative overflow-hidden h-9 px-3.5 rounded-md font-oswald font-bold text-black text-[12px] uppercase tracking-wider active:scale-95 transition-all flex items-center gap-1 shrink-0
-                     bg-[linear-gradient(180deg,#fff3a0_0%,#ffd700_45%,#d4a017_100%)]
-                     shadow-[0_0_0_1px_rgba(255,215,0,0.6),0_2px_8px_rgba(255,215,0,0.25),inset_0_1px_0_rgba(255,255,255,0.5)]"
+          className="relative overflow-hidden h-9 px-4 rounded-full font-oswald font-bold text-black text-[11px] uppercase tracking-widest active:scale-95 transition-all flex items-center gap-1.5 shrink-0 group"
+          style={{
+            background: "linear-gradient(135deg, #fff3a0 0%, #ffd700 45%, #c8960a 100%)",
+            boxShadow: "0 0 0 1px rgba(255,215,0,0.5), 0 4px 20px rgba(255,215,0,0.3), inset 0 1px 0 rgba(255,255,255,0.5)",
+          }}
         >
+          <span className="absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+            style={{ background: "linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.5) 50%, transparent 70%)" }} />
           <Icon name="Zap" size={12} />
           <span>Продать</span>
         </button>
