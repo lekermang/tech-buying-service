@@ -159,7 +159,7 @@ const SellGoldModal = ({
               <button type="submit" disabled={sending}
                 className="w-full bg-[#FFD700] text-black font-oswald font-bold text-base py-3 uppercase tracking-wide hover:bg-yellow-400 transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
                 <Icon name="Send" size={16} />
-                {sending ? "Отправляем..." : totalPrice ? `Продать за ${totalPrice.toLocaleString('ru-RU')} ₽` : `Продать за ${activePrice?.toLocaleString('ru-RU')} ₽/г`}
+                {sending ? "Отправляем..." : totalPrice ? `Продать за ${totalPrice.toLocaleString('ru-RU')} ₽` : activePrice ? `Продать за ${activePrice.toLocaleString('ru-RU')} ₽/г` : "Загружаем цену..."}
               </button>
               <p className="font-roboto text-white/25 text-[10px] text-center">
                 Нажимая кнопку, вы соглашаетесь с обработкой персональных данных
