@@ -1169,50 +1169,51 @@ export default function ApplePrice() {
 
   const handleDownloadPdf = useCallback(() => downloadPdf(false), [downloadPdf]);
 
-  const CACHE_KEY = "apple_price_cache_v2";
+  const CACHE_KEY = "apple_price_v3";
 
-  const load = useCallback(async (silent = false) => {
-    if (!silent) {
-      // Сразу показываем кешированные данные если есть
-      try {
-        const cached = localStorage.getItem(CACHE_KEY);
-        if (cached) {
-          const { data: cd, ts } = JSON.parse(cached);
-          if (cd?.ok && Date.now() - ts < REFRESH_MS) {
-            setData(cd);
-            setNextRefresh(ts + REFRESH_MS);
-            setLoading(false);
-            // Обновляем фоном без лоадера
-            load(true);
-            return;
-          }
-        }
-      } catch { /* ignore */ }
+  const fetchFresh = useCallback(async () => {
+    const r = await fetch(`${PUBLIC_PRICE_URL}?markup=${DEFAULT_MARKUP}`);
+    const d: PriceData = await r.json();
+    if (d.ok) {
+      setData(d);
+      setNextRefresh(Date.now() + REFRESH_MS);
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify({ d, ts: Date.now() })); } catch { /**/ }
     }
-    if (!silent) setLoading(true);
+    return d;
+  }, []);
+
+  const load = useCallback(async () => {
+    // Пробуем кеш — показываем мгновенно
+    try {
+      const raw = localStorage.getItem(CACHE_KEY);
+      if (raw) {
+        const { d, ts } = JSON.parse(raw);
+        if (d?.ok && Date.now() - ts < REFRESH_MS) {
+          setData(d);
+          setNextRefresh(ts + REFRESH_MS);
+          setLoading(false);
+          // Фоновое обновление без лоадера
+          fetchFresh().catch(() => {});
+          return;
+        }
+      }
+    } catch { /**/ }
+    // Кеша нет — грузим с лоадером
+    setLoading(true);
     setError(null);
     try {
-      const r = await fetch(`${PUBLIC_PRICE_URL}?markup=${DEFAULT_MARKUP}`);
-      const text = await r.text();
-      const d: PriceData = JSON.parse(text);
-      if (d.ok) {
-        setData(d);
-        setNextRefresh(Date.now() + REFRESH_MS);
-        try { localStorage.setItem(CACHE_KEY, JSON.stringify({ data: d, ts: Date.now() })); } catch { /* ignore */ }
-      } else if (!silent) {
-        setError("Не удалось загрузить прайс");
-      }
+      await fetchFresh();
     } catch {
-      if (!silent) setError("Ошибка сети");
+      setError("Ошибка сети");
     }
-    if (!silent) setLoading(false);
-  }, []);
+    setLoading(false);
+  }, [fetchFresh]);
 
   useEffect(() => {
     load();
-    const id = setInterval(() => load(true), REFRESH_MS);
+    const id = setInterval(() => fetchFresh().catch(() => {}), REFRESH_MS);
     return () => clearInterval(id);
-  }, [load]);
+  }, [load, fetchFresh]);
 
   useEffect(() => {
     const tick = () => setTimer(countdown(nextRefresh));
@@ -1333,7 +1334,7 @@ export default function ApplePrice() {
                 <span className="hidden sm:inline">Привезём завтра</span>
               </button>
             )}
-            <button onClick={load} disabled={loading}
+            <button onClick={() => { try { localStorage.removeItem(CACHE_KEY); } catch {/***/} load(); }} disabled={loading}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-bold transition-all active:scale-95"
               style={{ background: "rgba(255,215,0,0.1)", border: "1px solid rgba(255,215,0,0.3)", color: "#FFD700" }}>
               <Icon name={loading ? "Loader2" : "RefreshCw"} size={13}
