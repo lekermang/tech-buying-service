@@ -1,80 +1,102 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Icon from "@/components/ui/icon";
+import { formatPhone, isPhoneValid } from "@/lib/phoneFormat";
 import funcUrls from "../../../backend/func2url.json";
 
+const LEAD_URL       = (funcUrls as Record<string, string>)["send-lead"];
 const PRICE_EMAIL_URL = (funcUrls as Record<string, string>)["price-email"];
-const LEAD_URL = (funcUrls as Record<string, string>)["send-lead"];
+const PRICE_PDF_URL   = (funcUrls as Record<string, string>)["price-pdf"];
 
-/* Бренды в наличии — краткая подсказка */
 const BRANDS = ["iPhone", "MacBook", "iPad", "Samsung", "Xiaomi", "BORK"];
+
+const INP_CLS = [
+  "w-full px-4 py-3 rounded-xl font-roboto text-sm text-white/90 outline-none transition-colors",
+  "bg-white/[0.06] border border-white/10 focus:border-[#FFD700]/40 placeholder:text-white/20",
+].join(" ");
+
+const LBL_CLS = "block font-roboto text-[11px] text-white/40 mb-1";
 
 interface Props {
   onClose: () => void;
 }
 
-/* Форматирует телефон при вводе: +7 (999) 999-99-99 */
-function formatPhone(raw: string): string {
-  const digits = raw.replace(/\D/g, "").slice(0, 11);
-  if (!digits) return "";
-  if (digits.length <= 1) return "+7";
-  if (digits.length <= 4) return `+7 (${digits.slice(1)}`;
-  if (digits.length <= 7) return `+7 (${digits.slice(1,4)}) ${digits.slice(4)}`;
-  if (digits.length <= 9) return `+7 (${digits.slice(1,4)}) ${digits.slice(4,7)}-${digits.slice(7)}`;
-  return `+7 (${digits.slice(1,4)}) ${digits.slice(4,7)}-${digits.slice(7,9)}-${digits.slice(9)}`;
-}
-
 export default function ApplePriceEmailModal({ onClose }: Props) {
   const [name,    setName]    = useState("");
   const [phone,   setPhone]   = useState("+7");
+  const [email,   setEmail]   = useState("");
   const [sending, setSending] = useState(false);
   const [done,    setDone]    = useState(false);
   const [error,   setError]   = useState<string | null>(null);
 
-  const phoneDigits = phone.replace(/\D/g, "");
-  const phoneOk = phoneDigits.length === 11;
-  const canSend = name.trim().length >= 2 && phoneOk;
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, []);
+
+  const nameOk  = name.trim().length >= 2;
+  const phoneOk = isPhoneValid(phone);
+  const canSend = nameOk && phoneOk;
 
   const handlePhone = (v: string) => {
-    const raw = v.replace(/\D/g, "");
-    if (raw.length === 0) { setPhone("+7"); return; }
-    setPhone(formatPhone(raw.startsWith("7") || raw.startsWith("8") ? raw : "7" + raw));
+    const formatted = formatPhone(v);
+    setPhone(formatted || "+7");
   };
 
   const handleSend = async () => {
-    if (!canSend) return;
-    setSending(true); setError(null);
-    try {
-      /* 1. Отправляем заявку (виден в разделе заявок у сотрудников) */
-      const leadBody: Record<string, string> = {
-        name: name.trim(),
-        phone: phone.replace(/\D/g, ""),
-        category: "Прайс Apple",
-        desc: `Запросил прайс-лист${email ? ` | Email: ${email}` : ""}`,
-      };
+    if (!canSend || sending) return;
+    if (!nameOk)  { setError("Введите ваше имя");                                       return; }
+    if (!phoneOk) { setError("Введите номер в формате +7 (___) ___-__-__");             return; }
+    setError(null);
+    setSending(true);
+
+    const sendBg = (body: Record<string, unknown>) => {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 12000);
       fetch(LEAD_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(leadBody),
-      }).catch(() => {/* ignore */});
+        body: JSON.stringify(body),
+        keepalive: true,
+        signal: ctrl.signal,
+      }).catch(() => {}).finally(() => clearTimeout(t));
+    };
 
-      /* 2. Отправляем прайс на email (если указан) */
-      if (email.trim() && email.includes("@")) {
-        await fetch(PRICE_EMAIL_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            markup: 3000,
-            email: email.trim(),
-            send_max: false,
-            only_available: true,
-          }),
-        });
-      }
-      setDone(true);
-    } catch {
-      setError("Ошибка сети. Позвоните нам: 8 992 999-03-33");
+    sendBg({
+      name: name.trim(),
+      phone: phone.replace(/\D/g, ""),
+      category: "Прайс Apple",
+      desc: `Запросил прайс-лист Apple${email ? ` | Email: ${email}` : ""}`,
+      photos: [],
+      contact_channels: [],
+      contact_time: "",
+    });
+
+    if (email.trim().includes("@")) {
+      fetch(PRICE_EMAIL_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ markup: 2000, email: email.trim(), only_available: true }),
+      }).catch(() => {});
+    } else {
+      const pdfCtrl = new AbortController();
+      const t = setTimeout(() => pdfCtrl.abort(), 20000);
+      fetch(PRICE_PDF_URL, { signal: pdfCtrl.signal })
+        .then(async res => {
+          if (!res.ok) return;
+          const blob = await res.blob();
+          const url  = URL.createObjectURL(blob);
+          const a    = document.createElement("a");
+          const date = new Date().toLocaleDateString("ru-RU").replace(/\./g, "");
+          a.href = url; a.download = `price-skypka24-${date}.pdf`;
+          document.body.appendChild(a); a.click();
+          document.body.removeChild(a); URL.revokeObjectURL(url);
+        })
+        .catch(() => {})
+        .finally(() => clearTimeout(t));
     }
+
     setSending(false);
+    setDone(true);
   };
 
   return (
@@ -130,49 +152,53 @@ export default function ApplePriceEmailModal({ onClose }: Props) {
 
               {/* Имя */}
               <div>
-                <div className="font-roboto text-[11px] text-white/40 mb-1">Ваше имя <span className="text-red-400">*</span></div>
+                <label className={LBL_CLS}>Ваше имя <span className="text-red-400">*</span></label>
                 <input
                   type="text"
                   value={name}
                   onChange={e => setName(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && handleSend()}
                   placeholder="Иван"
                   autoFocus
-                  className="w-full px-4 py-3 rounded-xl font-roboto text-sm text-white/90 outline-none"
-                  style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${name.trim().length >= 2 ? "rgba(255,215,0,0.35)" : "rgba(255,255,255,0.1)"}` }}
+                  className={INP_CLS}
                 />
               </div>
 
               {/* Телефон */}
               <div>
-                <div className="font-roboto text-[11px] text-white/40 mb-1">Телефон <span className="text-red-400">*</span></div>
+                <label className={LBL_CLS}>Телефон <span className="text-red-400">*</span></label>
                 <input
                   type="tel"
+                  inputMode="tel"
                   value={phone}
                   onChange={e => handlePhone(e.target.value)}
-                  placeholder="+7 (999) 999-99-99"
-                  className="w-full px-4 py-3 rounded-xl font-roboto text-sm text-white/90 outline-none"
-                  style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${phoneOk ? "rgba(255,215,0,0.35)" : "rgba(255,255,255,0.1)"}` }}
+                  onFocus={() => { if (!phone || phone === "") setPhone("+7"); }}
+                  onKeyDown={e => e.key === "Enter" && handleSend()}
+                  placeholder="+7 (___) ___-__-__"
+                  className={INP_CLS}
                 />
               </div>
 
-              {/* Email (опционально) */}
+              {/* Email — если указан, пришлём PDF на почту; иначе скачается */}
               <div>
-                <div className="font-roboto text-[11px] text-white/40 mb-1">Email <span className="text-white/20">(необязательно — пришлём PDF)</span></div>
+                <label className={LBL_CLS}>
+                  Email <span className="text-white/20">(необязательно — пришлём PDF)</span>
+                </label>
                 <input
                   type="email"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   onKeyDown={e => e.key === "Enter" && handleSend()}
                   placeholder="example@mail.ru"
-                  className="w-full px-4 py-3 rounded-xl font-roboto text-sm text-white/90 outline-none"
-                  style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)" }}
+                  className={INP_CLS}
                 />
               </div>
 
               {error && (
-                <div className="flex items-center gap-2 font-roboto text-[12px] text-red-400">
-                  <Icon name="AlertCircle" size={14} />
-                  {error}
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg"
+                  style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)" }}>
+                  <Icon name="AlertCircle" size={14} className="text-red-400 shrink-0" />
+                  <p className="text-red-400 text-sm font-roboto">{error}</p>
                 </div>
               )}
 
@@ -196,15 +222,23 @@ export default function ApplePriceEmailModal({ onClose }: Props) {
                 <Icon name="CheckCircle2" size={28} className="text-green-400" />
               </div>
               <div>
-                <div className="font-oswald font-bold text-white text-lg uppercase mb-1">Готово!</div>
-                <div className="font-roboto text-sm text-white/55 leading-relaxed">
-                  {email.trim() ? `Прайс отправляем на ${email}. ` : ""}
-                  Скоро перезвоним!
+                <div className="font-oswald font-bold text-white text-[18px] uppercase tracking-wide mb-1">
+                  Готово!
                 </div>
+                <p className="font-roboto text-[13px] text-white/50 leading-relaxed">
+                  {email.trim().includes("@")
+                    ? `Прайс отправлен на ${email}. Перезвоним в ближайшее время.`
+                    : "Прайс скачивается. Перезвоним в ближайшее время."}
+                </p>
               </div>
-              <button onClick={onClose}
-                className="mt-2 px-6 py-2.5 rounded-xl font-oswald font-bold text-sm uppercase text-black"
+              <a href="tel:+79929903333"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-oswald font-bold text-sm uppercase text-black"
                 style={{ background: "linear-gradient(135deg,#FFD700,#d4a017)" }}>
+                <Icon name="Phone" size={15} />
+                +7 (992) 990-33-33
+              </a>
+              <button onClick={onClose}
+                className="font-roboto text-[12px] text-white/30 hover:text-white/50 transition-colors">
                 Закрыть
               </button>
             </div>
