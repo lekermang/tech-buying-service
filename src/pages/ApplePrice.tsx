@@ -1120,6 +1120,7 @@ export default function ApplePrice() {
   const [emailModal, setEmailModal]   = useState(false);
   const [pdfLoading, setPdfLoading]   = useState(false);
   const [tomorrowOpen, setTomorrowOpen] = useState(false);
+  const [search, setSearch]           = useState("");
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const handleDownloadPdf = useCallback(async () => {
@@ -1315,6 +1316,30 @@ export default function ApplePrice() {
           </div>
         </div>
         {/* Прогресс-полоска под шапкой при обновлении */}
+        {/* Строка поиска */}
+        <div className="max-w-5xl mx-auto px-4 pb-2.5">
+          <div className="relative">
+            <Icon name="Search" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Поиск по модели, памяти, цвету…"
+              className="w-full pl-8 pr-8 py-2 text-[13px] text-white outline-none rounded-lg transition-all"
+              style={{
+                background: "rgba(255,255,255,0.06)",
+                border: search ? "1px solid rgba(255,215,0,0.4)" : "1px solid rgba(255,255,255,0.1)",
+              }}
+            />
+            {search && (
+              <button onClick={() => setSearch("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors">
+                <Icon name="X" size={13} />
+              </button>
+            )}
+          </div>
+        </div>
+
         {loading && (
           <div className="h-[3px] overflow-hidden" style={{ background: "rgba(255,215,0,0.1)" }}>
             <div className="h-full animate-progress-bar"
@@ -1353,130 +1378,160 @@ export default function ApplePrice() {
               </a>
             </div>
 
-            <div className="space-y-5">
-              {Object.entries(data.groups).map(([cat, items]) => {
-                const accentColor = CAT_COLORS[cat] || "#FFD700";
+            {(() => {
+              const q = search.trim().toLowerCase();
+
+              // Фильтрация по поиску
+              const filteredGroups = Object.entries(data.groups).reduce<[string, PriceItem[]][]>((acc, [cat, items]) => {
+                if (!q) { acc.push([cat, items]); return acc; }
+                const filtered = items.filter(it =>
+                  it.name.toLowerCase().includes(q) ||
+                  cat.toLowerCase().includes(q) ||
+                  (it.region || "").toLowerCase().includes(q)
+                );
+                if (filtered.length) acc.push([cat, filtered]);
+                return acc;
+              }, []);
+
+              if (q && filteredGroups.length === 0) {
                 return (
-                  <div key={cat}>
-                    {/* Заголовок категории */}
-                    <div className="flex items-center gap-2 px-3 py-2.5 mb-0.5 rounded-xl"
-                      style={{ background: `${accentColor}10`, borderLeft: `3px solid ${accentColor}` }}>
-                      <span className="text-[16px]">{CAT_EMOJI[cat] || "📦"}</span>
-                      <span className="font-oswald font-bold text-[15px] uppercase tracking-wide"
-                        style={{ color: accentColor }}>{cat}</span>
-                      <span className="text-[11px] text-white/25 ml-1">({items.length} шт.)</span>
+                  <div className="text-center py-16 text-white/30">
+                    <div className="text-4xl mb-3">🔍</div>
+                    <div className="font-oswald text-[15px] uppercase tracking-wide">Ничего не найдено</div>
+                    <div className="text-[12px] mt-1">Попробуйте другой запрос</div>
+                  </div>
+                );
+              }
+
+              // Рендер строки товара
+              const renderItem = (item: PriceItem, i: number, accentColor: string, cat: string) => {
+                const sim = detectSim(item.name, item.region);
+                const inStock = !!item.price_num;
+                return (
+                  <div key={i} className="price-row flex items-center gap-0 group"
+                    style={{
+                      background: i % 2 === 0 ? "rgba(255,255,255,0.015)" : "transparent",
+                      borderBottom: "1px solid rgba(255,255,255,0.04)",
+                      opacity: inStock ? 1 : 0.55,
+                    }}>
+                    <div style={{ width: 52, padding: "3px 6px", flexShrink: 0 }}>
+                      {item.photo ? (
+                        <img src={item.photo} alt={item.name} width={40} height={40}
+                          style={{ borderRadius: 6, objectFit: "cover", display: "block" }} />
+                      ) : (
+                        <div style={{
+                          width: 40, height: 40, borderRadius: 6,
+                          background: inStock ? `${accentColor}10` : "rgba(255,255,255,0.04)",
+                          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
+                        }}>{CAT_EMOJI[cat] || "📦"}</div>
+                      )}
                     </div>
-
-                    {/* Строки товаров */}
-                    <div>
-                      {items.map((item, i) => {
-                        const sim = detectSim(item.name, item.region);
-                        const inStock = !!item.price_num;
-                        return (
-                          <div key={i} className="price-row flex items-center gap-0 group"
-                            style={{
-                              background: i % 2 === 0 ? "rgba(255,255,255,0.015)" : "transparent",
-                              borderBottom: "1px solid rgba(255,255,255,0.04)",
-                              opacity: inStock ? 1 : 0.55,
-                            }}>
-                            {/* Фото */}
-                            <div style={{ width: 52, padding: "3px 6px", flexShrink: 0 }}>
-                              {item.photo ? (
-                                <img src={item.photo} alt={item.name} width={40} height={40}
-                                  style={{ borderRadius: 6, objectFit: "cover", display: "block" }} />
-                              ) : (
-                                <div style={{
-                                  width: 40, height: 40, borderRadius: 6,
-                                  background: inStock ? `${accentColor}10` : "rgba(255,255,255,0.04)",
-                                  display: "flex", alignItems: "center", justifyContent: "center",
-                                  fontSize: 18,
-                                }}>{CAT_EMOJI[cat] || "📦"}</div>
-                              )}
-                            </div>
-
-                            {/* Название + SIM + Регион */}
-                            <div style={{ flex: 1, padding: "8px 6px", minWidth: 0 }}>
-                              <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 0 }}>
-                                <span style={{ fontSize: 13, fontWeight: 700, color: inStock ? "#e5e7eb" : "#9ca3af", lineHeight: 1.3 }}>
-                                  {item.name}
-                                </span>
-                                {item.region && (
-                                  <span style={{
-                                    fontSize: 8, marginLeft: 5, padding: "1px 5px", borderRadius: 4,
-                                    verticalAlign: "middle", fontWeight: 700, flexShrink: 0,
-                                    background: item.region === "EU" ? "rgba(74,222,128,0.15)"
-                                      : item.region === "US" ? "rgba(96,165,250,0.15)" : "rgba(251,191,36,0.15)",
-                                    color: item.region === "EU" ? "#4ade80"
-                                      : item.region === "US" ? "#60a5fa" : "#fbbf24",
-                                    border: `1px solid ${item.region === "EU" ? "#4ade8033"
-                                      : item.region === "US" ? "#60a5fa33" : "#fbbf2433"}`,
-                                  }}>{item.region}</span>
-                                )}
-                              </div>
-                              {sim && (
-                                <div style={{ marginTop: 2 }}>
-                                  <SimBadge sim={sim} />
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Цена или «под заказ» */}
-                            <div style={{
-                              padding: "8px 4px 8px 4px", textAlign: "right",
-                              whiteSpace: "nowrap", flexShrink: 0,
-                            }}>
-                              {inStock ? (
-                                <span style={{ fontSize: 14, fontWeight: 800, color: "#FFD700" }}>
-                                  {item.price}
-                                </span>
-                              ) : (
-                                <span style={{
-                                  fontSize: 9, fontWeight: 600, color: "#fb923c",
-                                  background: "rgba(251,146,60,0.1)", border: "1px solid rgba(251,146,60,0.25)",
-                                  borderRadius: 5, padding: "2px 6px",
-                                }}>🚗 заказ</span>
-                              )}
-                            </div>
-
-                            {/* Кнопка */}
-                            <div style={{ padding: "4px 8px 4px 2px", flexShrink: 0 }}>
-                              {inStock ? (
-                                <button
-                                  className="order-btn"
-                                  onClick={() => setOrderItem(item)}
-                                  style={{
-                                    padding: "5px 10px", borderRadius: 8,
-                                    fontSize: 11, fontWeight: 700,
-                                    color: "#000", cursor: "pointer",
-                                    background: "linear-gradient(135deg,#FFD700,#f59e0b)",
-                                    border: "none", whiteSpace: "nowrap",
-                                    boxShadow: "0 2px 8px rgba(255,215,0,0.3)",
-                                  }}>
-                                  Заказать
-                                </button>
-                              ) : (
-                                <button
-                                  className="order-btn"
-                                  onClick={() => setOrderItem(item)}
-                                  style={{
-                                    padding: "5px 10px", borderRadius: 8,
-                                    fontSize: 11, fontWeight: 700,
-                                    color: "#fb923c", cursor: "pointer",
-                                    background: "rgba(251,146,60,0.1)",
-                                    border: "1px solid rgba(251,146,60,0.3)", whiteSpace: "nowrap",
-                                  }}>
-                                  Заказать
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
+                    <div style={{ flex: 1, padding: "8px 6px", minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 0 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: inStock ? "#e5e7eb" : "#9ca3af", lineHeight: 1.3 }}>
+                          {item.name}
+                        </span>
+                        {item.region && (
+                          <span style={{
+                            fontSize: 8, marginLeft: 5, padding: "1px 5px", borderRadius: 4,
+                            verticalAlign: "middle", fontWeight: 700, flexShrink: 0,
+                            background: item.region === "EU" ? "rgba(74,222,128,0.15)"
+                              : item.region === "US" ? "rgba(96,165,250,0.15)" : "rgba(251,191,36,0.15)",
+                            color: item.region === "EU" ? "#4ade80"
+                              : item.region === "US" ? "#60a5fa" : "#fbbf24",
+                            border: `1px solid ${item.region === "EU" ? "#4ade8033"
+                              : item.region === "US" ? "#60a5fa33" : "#fbbf2433"}`,
+                          }}>{item.region}</span>
+                        )}
+                      </div>
+                      {sim && <div style={{ marginTop: 2 }}><SimBadge sim={sim} /></div>}
+                    </div>
+                    <div style={{ padding: "8px 4px", textAlign: "right", whiteSpace: "nowrap", flexShrink: 0 }}>
+                      {inStock ? (
+                        <span style={{ fontSize: 14, fontWeight: 800, color: "#FFD700" }}>{item.price}</span>
+                      ) : (
+                        <span style={{
+                          fontSize: 9, fontWeight: 600, color: "#fb923c",
+                          background: "rgba(251,146,60,0.1)", border: "1px solid rgba(251,146,60,0.25)",
+                          borderRadius: 5, padding: "2px 6px",
+                        }}>🚗 заказ</span>
+                      )}
+                    </div>
+                    <div style={{ padding: "4px 8px 4px 2px", flexShrink: 0 }}>
+                      <button className="order-btn" onClick={() => setOrderItem(item)} style={{
+                        padding: "5px 10px", borderRadius: 8, fontSize: 11, fontWeight: 700,
+                        cursor: "pointer", border: "none", whiteSpace: "nowrap",
+                        ...(inStock
+                          ? { color: "#000", background: "linear-gradient(135deg,#FFD700,#f59e0b)", boxShadow: "0 2px 8px rgba(255,215,0,0.3)" }
+                          : { color: "#fb923c", background: "rgba(251,146,60,0.1)", border: "1px solid rgba(251,146,60,0.3)" }
+                        ),
+                      }}>Заказать</button>
                     </div>
                   </div>
                 );
-              })}
-            </div>
+              };
+
+              return (
+                <div className="space-y-5">
+                  {filteredGroups.map(([cat, items]) => {
+                    const accentColor = CAT_COLORS[cat] || "#FFD700";
+                    const isWatch = cat === "Apple Watch";
+
+                    // Apple Watch — группируем по диаметру (42mm / 46mm / прочее)
+                    if (isWatch && !q) {
+                      const bySize: Record<string, PriceItem[]> = {};
+                      items.forEach(item => {
+                        const m = item.name.match(/(\d{2}mm)/i);
+                        const key = m ? m[1] : "Другие";
+                        if (!bySize[key]) bySize[key] = [];
+                        bySize[key].push(item);
+                      });
+                      const sizeOrder = Object.keys(bySize).sort((a, b) => {
+                        const na = parseInt(a) || 999;
+                        const nb = parseInt(b) || 999;
+                        return na - nb;
+                      });
+                      return (
+                        <div key={cat}>
+                          <div className="flex items-center gap-2 px-3 py-2.5 mb-1 rounded-xl"
+                            style={{ background: `${accentColor}10`, borderLeft: `3px solid ${accentColor}` }}>
+                            <span className="text-[16px]">⌚</span>
+                            <span className="font-oswald font-bold text-[15px] uppercase tracking-wide" style={{ color: accentColor }}>{cat}</span>
+                            <span className="text-[11px] text-white/25 ml-1">({items.length} шт.)</span>
+                          </div>
+                          {sizeOrder.map(size => (
+                            <div key={size} className="mb-3">
+                              <div className="flex items-center gap-2 px-3 py-1.5 mb-0.5"
+                                style={{ borderLeft: `2px solid ${accentColor}55` }}>
+                                <span className="font-oswald font-bold text-[12px] uppercase tracking-widest" style={{ color: `${accentColor}99` }}>
+                                  {size === "Другие" ? "Другие" : `⌚ ${size}`}
+                                </span>
+                                <span className="text-[10px] text-white/20">({bySize[size].length} шт.)</span>
+                              </div>
+                              <div>{bySize[size].map((item, i) => renderItem(item, i, accentColor, cat))}</div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    }
+
+                    // Обычная категория
+                    return (
+                      <div key={cat}>
+                        <div className="flex items-center gap-2 px-3 py-2.5 mb-0.5 rounded-xl"
+                          style={{ background: `${accentColor}10`, borderLeft: `3px solid ${accentColor}` }}>
+                          <span className="text-[16px]">{CAT_EMOJI[cat] || "📦"}</span>
+                          <span className="font-oswald font-bold text-[15px] uppercase tracking-wide"
+                            style={{ color: accentColor }}>{cat}</span>
+                          <span className="text-[11px] text-white/25 ml-1">({items.length} шт.)</span>
+                        </div>
+                        <div>{items.map((item, i) => renderItem(item, i, accentColor, cat))}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
 
             {/* CTA-блок */}
             <div className="mt-10 p-6 rounded-3xl text-center"
