@@ -60,20 +60,20 @@ export default function PriceRequest() {
       signal: ctrl.signal,
     }).catch(() => {}).finally(() => clearTimeout(t));
 
-    // Если есть email — отправляем PDF на почту
+    // Если есть email — ждём отправки PDF на почту
     if (email.trim().includes("@")) {
-      fetch(PRICE_EMAIL_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ markup: 2000, email: email.trim(), only_available: true }),
-      }).catch(() => {});
+      try {
+        await fetch(PRICE_EMAIL_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ markup: 2000, email: email.trim(), only_available: true }),
+        });
+      } catch { /* ignore */ }
     } else {
-      // Без email — скачиваем PDF
-      const pCtrl = new AbortController();
-      const pt = setTimeout(() => pCtrl.abort(), 25000);
-      fetch(PRICE_PDF_URL, { signal: pCtrl.signal })
-        .then(async res => {
-          if (!res.ok) return;
+      // Без email — скачиваем PDF (ждём)
+      try {
+        const res = await fetch(PRICE_PDF_URL);
+        if (res.ok) {
           const blob = await res.blob();
           const url  = URL.createObjectURL(blob);
           const a    = document.createElement("a");
@@ -81,9 +81,8 @@ export default function PriceRequest() {
           a.href = url; a.download = `price-skypka24-${date}.pdf`;
           document.body.appendChild(a); a.click();
           document.body.removeChild(a); URL.revokeObjectURL(url);
-        })
-        .catch(() => {})
-        .finally(() => clearTimeout(pt));
+        }
+      } catch { /* ignore */ }
     }
 
     setSending(false);

@@ -72,17 +72,17 @@ export default function ApplePriceEmailModal({ onClose }: Props) {
     });
 
     if (email.trim().includes("@")) {
-      fetch(PRICE_EMAIL_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ markup: 2000, email: email.trim(), only_available: true }),
-      }).catch(() => {});
+      try {
+        await fetch(PRICE_EMAIL_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ markup: 2000, email: email.trim(), only_available: true }),
+        });
+      } catch { /* ignore */ }
     } else {
-      const pdfCtrl = new AbortController();
-      const t = setTimeout(() => pdfCtrl.abort(), 20000);
-      fetch(PRICE_PDF_URL, { signal: pdfCtrl.signal })
-        .then(async res => {
-          if (!res.ok) return;
+      try {
+        const res = await fetch(PRICE_PDF_URL);
+        if (res.ok) {
           const blob = await res.blob();
           const url  = URL.createObjectURL(blob);
           const a    = document.createElement("a");
@@ -90,9 +90,8 @@ export default function ApplePriceEmailModal({ onClose }: Props) {
           a.href = url; a.download = `price-skypka24-${date}.pdf`;
           document.body.appendChild(a); a.click();
           document.body.removeChild(a); URL.revokeObjectURL(url);
-        })
-        .catch(() => {})
-        .finally(() => clearTimeout(t));
+        }
+      } catch { /* ignore */ }
     }
 
     setSending(false);
