@@ -1146,13 +1146,15 @@ function SeoBlock() {
 
 // ── Главный компонент ─────────────────────────────────────────────────────────
 export default function ApplePrice() {
+  const qs = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+
   const [data, setData]               = useState<PriceData | null>(null);
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState<string | null>(null);
   const [nextRefresh, setNextRefresh] = useState(Date.now() + REFRESH_MS);
   const [timer, setTimer]             = useState("");
   const [orderItem, setOrderItem]     = useState<PriceItem | null>(null);
-  const [emailModal, setEmailModal]     = useState(false);
+  const [emailModal, setEmailModal]   = useState(() => qs.get("modal") === "price");
   const [pdfLoading, setPdfLoading]     = useState(false);
   const [printPdfLoading, setPrintPdfLoading] = useState(false);
   const [tomorrowOpen, setTomorrowOpen] = useState(false);
@@ -1229,6 +1231,20 @@ export default function ApplePrice() {
     const id = setInterval(() => fetchFresh().catch(() => {}), REFRESH_MS);
     return () => clearInterval(id);
   }, [load, fetchFresh]);
+
+  // Авто-действия по URL-параметрам (?pdf=1 или ?modal=price)
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    if (p.get("pdf") === "1") {
+      downloadPdf(false);
+    }
+    // Убираем параметры из адресной строки без перезагрузки
+    if (p.get("modal") || p.get("pdf")) {
+      const clean = window.location.pathname;
+      window.history.replaceState({}, "", clean);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const tick = () => setTimer(countdown(nextRefresh));
