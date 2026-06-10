@@ -1169,27 +1169,48 @@ export default function ApplePrice() {
 
   const handleDownloadPdf = useCallback(() => downloadPdf(false), [downloadPdf]);
 
-  const load = useCallback(async () => {
-    setLoading(true); setError(null);
+  const CACHE_KEY = "apple_price_cache_v2";
+
+  const load = useCallback(async (silent = false) => {
+    if (!silent) {
+      // Сразу показываем кешированные данные если есть
+      try {
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (cached) {
+          const { data: cd, ts } = JSON.parse(cached);
+          if (cd?.ok && Date.now() - ts < REFRESH_MS) {
+            setData(cd);
+            setNextRefresh(ts + REFRESH_MS);
+            setLoading(false);
+            // Обновляем фоном без лоадера
+            load(true);
+            return;
+          }
+        }
+      } catch { /* ignore */ }
+    }
+    if (!silent) setLoading(true);
+    setError(null);
     try {
-      const r = await fetch(`${PUBLIC_PRICE_URL}?markup=${DEFAULT_MARKUP}&_t=${Date.now()}`);
+      const r = await fetch(`${PUBLIC_PRICE_URL}?markup=${DEFAULT_MARKUP}`);
       const text = await r.text();
       const d: PriceData = JSON.parse(text);
       if (d.ok) {
         setData(d);
         setNextRefresh(Date.now() + REFRESH_MS);
-      } else {
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify({ data: d, ts: Date.now() })); } catch { /* ignore */ }
+      } else if (!silent) {
         setError("Не удалось загрузить прайс");
       }
     } catch {
-      setError("Ошибка сети");
+      if (!silent) setError("Ошибка сети");
     }
-    setLoading(false);
+    if (!silent) setLoading(false);
   }, []);
 
   useEffect(() => {
     load();
-    const id = setInterval(load, REFRESH_MS);
+    const id = setInterval(() => load(true), REFRESH_MS);
     return () => clearInterval(id);
   }, [load]);
 
