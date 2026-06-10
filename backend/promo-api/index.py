@@ -97,14 +97,24 @@ def handler(event: dict, context) -> dict:
     body   = json.loads(raw) if isinstance(raw, str) else (raw or {})
 
     # ── Авторизация сотрудника (для admin-действий) ──────────────────────────
+    def _get_token() -> str:
+        hdrs = event.get('headers') or {}
+        # case-insensitive поиск заголовка
+        for k, v in hdrs.items():
+            if k.lower() == 'x-employee-token':
+                return v or ''
+        return ''
+
     def _auth_owner() -> bool:
-        token = (event.get('headers') or {}).get('X-Employee-Token', '')
+        token = _get_token()
         if not token:
             return False
         try:
             with get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute(
-                    f"SELECT role FROM {SCHEMA}.employees WHERE token=%s AND is_active=true LIMIT 1",
+                    f"SELECT role FROM {SCHEMA}.employees "
+                    f"WHERE auth_token=%s AND is_active=true "
+                    f"AND (token_expires_at IS NULL OR token_expires_at > NOW()) LIMIT 1",
                     (token,)
                 )
                 row = cur.fetchone()
