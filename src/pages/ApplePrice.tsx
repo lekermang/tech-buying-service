@@ -15,8 +15,22 @@ interface PriceItem {
   price: string;
   price_num: number | null;
   region: string;
-  sim: string;
+  sim?: string;
   photo: string | null;
+}
+
+function detectSim(name: string, region: string): string {
+  const n   = name.toLowerCase();
+  const reg = (region || "").toUpperCase();
+  if (/macbook|airpod|watch|pencil|кабель|стекло|чехол|magsafe/.test(n)) return "";
+  if (/samsung|galaxy|redmi|poco|xiaomi|honor/.test(n)) return "Dual SIM (nano)";
+  const isApple = /^(13|14|15|16|17|se2|se3|16e|17e|iphone|ipad)/.test(n);
+  if (isApple) {
+    if (reg === "CN") return "Dual SIM (nano)";
+    if (reg === "" && /^(14|15|16|17|se3|16e|17e)/.test(n)) return "eSIM only";
+    return "nano-SIM + eSIM";
+  }
+  return "";
 }
 
 function SimBadge({ sim }: { sim: string }) {
@@ -1182,12 +1196,14 @@ export default function ApplePrice() {
   }, []);
 
   const load = useCallback(async () => {
-    // Пробуем кеш — показываем мгновенно
+    // Пробуем кеш — показываем мгновенно (только если данные новые и содержат sim)
     try {
       const raw = localStorage.getItem(CACHE_KEY);
       if (raw) {
         const { d, ts } = JSON.parse(raw);
-        if (d?.ok && Date.now() - ts < REFRESH_MS) {
+        const firstItem = Object.values(d?.groups || {})?.[0]?.[0];
+        const hasSimField = firstItem && "sim" in firstItem;
+        if (d?.ok && hasSimField && Date.now() - ts < REFRESH_MS) {
           setData(d);
           setNextRefresh(ts + REFRESH_MS);
           setLoading(false);
@@ -1462,7 +1478,7 @@ export default function ApplePrice() {
 
               // Рендер строки товара
               const renderItem = (item: PriceItem, i: number, accentColor: string, cat: string) => {
-                const sim = item.sim || "";
+                const sim = item.sim ?? detectSim(item.name, item.region);
                 const inStock = !!item.price_num;
                 return (
                   <div key={i} className="price-row flex items-center gap-0 group"
