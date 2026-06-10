@@ -9,6 +9,7 @@ export const loadSmartLombard  = () => import("../slShop/SLShopTab");
 export const loadAvitoPro      = () => import("../StaffAvitoProTab");
 export const loadSalary        = () => import("../staffSalary/StaffSalaryTab");
 export const loadFinance       = () => import("../staffFinance/StaffFinanceReport");
+export const loadPromo         = () => import("../staffPromo/StaffPromoTab");
 
 export const GoodsTab        = lazy(loadGoods);
 export const StaffRepairTab  = lazy(loadRepair);
@@ -21,6 +22,7 @@ export const SmartLombardTab = lazy(loadSmartLombard);
 export const AvitoProTab     = lazy(loadAvitoPro);
 export const SalaryTab       = lazy(loadSalary);
 export const FinanceTab      = lazy(loadFinance);
+export const PromoTab        = lazy(loadPromo);
 
 export const TAB_PRELOADERS: Record<string, () => Promise<unknown>> = {
   goods: loadGoods,
@@ -34,6 +36,7 @@ export const TAB_PRELOADERS: Record<string, () => Promise<unknown>> = {
   avitopro: loadAvitoPro,
   salary: loadSalary,
   finance: loadFinance,
+  promo: loadPromo,
 };
 
 export function prefetchTab(t: string): void {

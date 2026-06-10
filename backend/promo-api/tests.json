@@ -1,0 +1,34 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "GET без slug — ошибка",
+      "method": "GET",
+      "path": "/?action=get",
+      "expectedStatus": 400,
+      "expectedBody": {"error": "slug required"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "GET несуществующий slug",
+      "method": "GET",
+      "path": "/?action=get&slug=not-exists-xyzxyz",
+      "expectedStatus": 404,
+      "expectedBody": {"error": "not found"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "GET list_active",
+      "method": "GET",
+      "path": "/?action=list_active",
+      "expectedStatus": 200,
+      "expectedBody": {"promos": []},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

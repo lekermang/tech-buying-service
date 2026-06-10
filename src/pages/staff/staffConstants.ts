@@ -17,7 +17,8 @@ export type StaffTab =
   | "finance"
   | "functions"
   | "leads"
-  | "unlock";
+  | "unlock"
+  | "promo";
 
 export const PRICE_SCHEDULER_URL =
   "https://functions.poehali.dev/b09271ea-c662-4225-973f-4dd4c6a0e32c";
@@ -87,6 +88,7 @@ export function readSavedTab(fallback: StaffTab): StaffTab {
       "functions",
       "leads",
       "unlock",
+      "promo",
     ];
     if (fromUrl && (allowed as string[]).includes(fromUrl)) return fromUrl as StaffTab;
     const saved = localStorage.getItem(TAB_KEY);

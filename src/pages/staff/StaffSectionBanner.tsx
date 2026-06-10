@@ -130,6 +130,13 @@ const SECTION_META: Record<string, SectionMeta> = {
     color: "#fbbf24",
     tag: "Сервис",
   },
+  promo: {
+    title: "Акции",
+    subtitle: "Создавайте акции, публикуйте страницы для клиентов, принимайте заявки и смотрите статистику.",
+    icon: "Megaphone",
+    color: "#f472b6",
+    tag: "Маркетинг",
+  },
 };
 
 export default function StaffSectionBanner({ tab }: { tab: StaffTab }) {
