@@ -26,7 +26,6 @@ function formatPhone(raw: string): string {
 export default function ApplePriceEmailModal({ onClose }: Props) {
   const [name,    setName]    = useState("");
   const [phone,   setPhone]   = useState("+7");
-  const [email,   setEmail]   = useState("");
   const [sending, setSending] = useState(false);
   const [done,    setDone]    = useState(false);
   const [error,   setError]   = useState<string | null>(null);
