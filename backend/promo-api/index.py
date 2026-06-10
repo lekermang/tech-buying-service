@@ -194,8 +194,8 @@ def handler(event: dict, context) -> dict:
         _notify_tg(promo['title'], name, phone, lead_id)
         return resp(200, {'ok': True, 'lead_id': lead_id})
 
-    # POST /promo-api?action=upload_photo&promo_id=1 — загрузка фото без сжатия
-    # Тело запроса: бинарный файл (isBase64Encoded=true на платформе)
+    # POST /promo-api?action=upload_photo&promo_id=1
+    # Тело: JSON { image_b64: "...", mime: "image/jpeg" }
     if method == 'POST' and action == 'upload_photo':
         if not _auth_owner():
             return resp(403, {'error': 'forbidden'})
@@ -212,28 +212,28 @@ def handler(event: dict, context) -> dict:
         if not row:
             return resp(404, {'error': 'promo not found'})
         slug = row[0]
-        # Декодируем тело
-        raw_body_bytes = event.get('body') or ''
-        is_b64 = event.get('isBase64Encoded', False)
-        if is_b64:
-            img_data = base64.b64decode(raw_body_bytes)
-        else:
-            img_data = raw_body_bytes.encode('latin-1') if isinstance(raw_body_bytes, str) else raw_body_bytes
-        # Определяем тип по сигнатуре
-        ct = 'image/jpeg'
-        if img_data[:8] == b'\x89PNG\r\n\x1a\n':
-            ct = 'image/png'
-        elif img_data[:4] == b'RIFF' and img_data[8:12] == b'WEBP':
-            ct = 'image/webp'
+        # Декодируем оригинальные байты из base64
+        img_b64 = body.get('image_b64', '')
+        if not img_b64:
+            return resp(400, {'error': 'image_b64 required'})
+        try:
+            img_data = base64.b64decode(img_b64)
+        except Exception:
+            return resp(400, {'error': 'Неверный base64'})
+        # Тип файла
+        ct = body.get('mime') or 'image/jpeg'
+        if ct not in ('image/jpeg', 'image/png', 'image/webp'):
+            ct = 'image/jpeg'
         ext = {'image/png': 'png', 'image/webp': 'webp'}.get(ct, 'jpg')
         key = f'promos/{slug}/cover.{ext}'
+        print(f'[upload_photo] promo_id={promo_id} slug={slug} size={len(img_data)} ct={ct}')
         try:
             s3 = _s3_client()
             s3.put_object(Bucket=S3_BUCKET, Key=key, Body=img_data, ContentType=ct)
             image_url = _cdn_url(key)
         except Exception as e:
             print(f'[promo-api][upload_photo] s3 error: {e}')
-            return resp(500, {'error': 'Ошибка загрузки в S3'})
+            return resp(500, {'error': f'Ошибка загрузки в S3: {e}'})
         # Обновляем image_url в БД
         with get_conn() as conn, conn.cursor() as cur:
             cur.execute(

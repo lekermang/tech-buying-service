@@ -104,15 +104,17 @@ function PromoForm({
 
       const promoId = initial ? initial.id : d.id;
 
-      // 2. Загружаем фото отдельным бинарным запросом — без потери качества
+      // 2. Загружаем фото — читаем оригинальные байты, кодируем base64 без canvas
       if (imageFile && promoId) {
+        const arrayBuf = await imageFile.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuf);
+        let binary = "";
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+        const b64 = btoa(binary);
         const uploadR = await fetch(`${PROMO_API}?action=upload_photo&promo_id=${promoId}`, {
           method: "POST",
-          headers: {
-            "Content-Type": imageFile.type || "image/jpeg",
-            "X-Employee-Token": token,
-          },
-          body: imageFile,
+          headers: { "Content-Type": "application/json", "X-Employee-Token": token },
+          body: JSON.stringify({ image_b64: b64, mime: imageFile.type || "image/jpeg" }),
         });
         const uploadD = await uploadR.json();
         if (!uploadD.ok) {
