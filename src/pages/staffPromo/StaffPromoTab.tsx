@@ -70,9 +70,20 @@ function PromoForm({
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => set("image_b64", (ev.target?.result as string).split(",")[1] || "");
-    reader.readAsDataURL(file);
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX_W = 900, MAX_H = 480;
+      const scale = Math.min(MAX_W / img.width, MAX_H / img.height, 1);
+      const canvas = document.createElement("canvas");
+      canvas.width  = Math.round(img.width  * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const b64 = canvas.toDataURL("image/jpeg", 0.82).split(",")[1] || "";
+      set("image_b64", b64);
+      URL.revokeObjectURL(url);
+    };
+    img.src = url;
   };
 
   const handleSave = async () => {
