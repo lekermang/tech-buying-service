@@ -400,13 +400,17 @@ def build_pdf(groups: dict, total: int, generated_at: str, print_mode: bool = Fa
 
             # SIM
             sim = item["sim"]
-            if "eSIM" in sim and "nano" not in sim:
-                s_clr = ESIM_CLR
+            is_esim_only = sim == "eSIM"
+            if is_esim_only:
+                s_clr = colors.HexColor("#c2410c")  # оранжево-красный — предупреждение
+                sim_label = "eSIM only ⚠"
             elif "Dual" in sim:
                 s_clr = DUAL_CLR
+                sim_label = sim
             else:
                 s_clr = SIM_CLR
-            sim_p = P(sim, FONT_REG, 7, s_clr, "C") if sim else P("", FONT_REG, 7, GRAY, "C")
+                sim_label = sim
+            sim_p = P(sim_label, FONT_BOLD if is_esim_only else FONT_REG, 7, s_clr, "C") if sim else P("", FONT_REG, 7, GRAY, "C")
 
             # Цена
             if item["has_price"]:

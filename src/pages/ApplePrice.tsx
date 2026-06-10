@@ -32,12 +32,26 @@ function detectSim(name: string, region: string): string {
 
 function SimBadge({ sim }: { sim: string }) {
   if (!sim) return null;
-  const isESim  = sim === "eSIM";
-  const isDual  = sim.includes("Dual");
-  const isBoth  = sim.includes("+");
-  const color   = isESim ? "#10b981" : isDual ? "#8b5cf6" : "#3b82f6";
-  const bg      = isESim ? "rgba(16,185,129,0.12)" : isDual ? "rgba(139,92,246,0.12)" : "rgba(59,130,246,0.12)";
-  const border  = isESim ? "rgba(16,185,129,0.3)"  : isDual ? "rgba(139,92,246,0.3)"  : "rgba(59,130,246,0.3)";
+  const isESimOnly = sim === "eSIM";
+  const isDual     = sim.includes("Dual");
+  const isBoth     = sim.includes("+");
+
+  if (isESimOnly) {
+    return (
+      <span title="Только eSIM — физическая nano-SIM карта не поддерживается (EU версия)" style={{
+        fontSize: 9, padding: "1px 6px", borderRadius: 4, marginLeft: 5,
+        verticalAlign: "middle", fontWeight: 700, whiteSpace: "nowrap",
+        color: "#f97316", background: "rgba(249,115,22,0.12)", border: "1px solid rgba(249,115,22,0.35)",
+        cursor: "help",
+      }}>
+        eSIM only ⚠
+      </span>
+    );
+  }
+
+  const color  = isDual ? "#8b5cf6" : "#3b82f6";
+  const bg     = isDual ? "rgba(139,92,246,0.12)" : "rgba(59,130,246,0.12)";
+  const border = isDual ? "rgba(139,92,246,0.3)"  : "rgba(59,130,246,0.3)";
   return (
     <span style={{
       fontSize: 9, padding: "1px 6px", borderRadius: 4, marginLeft: 5,
