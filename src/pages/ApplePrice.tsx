@@ -8,6 +8,7 @@ const PRICE_EMAIL_URL  = "https://functions.poehali.dev/9e9486d9-57f0-454c-bc19-
 const PRICE_PDF_URL    = "https://functions.poehali.dev/eff3d143-8966-4a6d-bbea-ddc77a6e5373";
 const DEFAULT_MARKUP   = 2000;
 const REFRESH_MS       = 3 * 60 * 60 * 1000;
+const CACHE_KEY        = "apple_price_v3";
 
 interface PriceItem {
   name: string;
@@ -1168,8 +1169,6 @@ export default function ApplePrice() {
   }, []);
 
   const handleDownloadPdf = useCallback(() => downloadPdf(false), [downloadPdf]);
-
-  const CACHE_KEY = "apple_price_v3";
 
   const fetchFresh = useCallback(async () => {
     const r = await fetch(`${PUBLIC_PRICE_URL}?markup=${DEFAULT_MARKUP}`);
