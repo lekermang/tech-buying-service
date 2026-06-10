@@ -61,6 +61,8 @@ function PromoForm({
     image_b64:        "",
   } : {}) });
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(initial?.image_url || null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null); // 0-100 или null
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -72,14 +74,44 @@ function PromoForm({
     const file = e.target.files?.[0];
     if (!file) return;
     setImageFile(file);
-    set("image_b64", "selected"); // маркер что файл выбран
+    setImagePreview(URL.createObjectURL(file));
+    set("image_b64", "selected");
+  };
+
+  // XHR с реальным прогресс-баром — не блокирует UI
+  const uploadPhoto = (promoId: number, file: File): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const b64 = (reader.result as string).split(",")[1];
+        const body = JSON.stringify({ image_b64: b64, mime: file.type || "image/jpeg" });
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", `${PROMO_API}?action=upload_photo&promo_id=${promoId}`);
+        xhr.setRequestHeader("Content-Type", "application/json");
+        xhr.setRequestHeader("X-Employee-Token", token);
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) setUploadProgress(Math.round(e.loaded / e.total * 100));
+        };
+        xhr.onload = () => {
+          try {
+            const d = JSON.parse(xhr.responseText);
+            if (d.ok) resolve();
+            else reject(new Error(d.error || "Ошибка S3"));
+          } catch { reject(new Error("Неверный ответ")); }
+        };
+        xhr.onerror = () => reject(new Error("Нет соединения"));
+        setUploadProgress(0);
+        xhr.send(body);
+      };
+      reader.onerror = () => reject(new Error("Ошибка чтения файла"));
+      reader.readAsDataURL(file);
+    });
   };
 
   const handleSave = async () => {
     if (!form.title.trim()) { setErr("Введите название акции"); return; }
     setSaving(true); setErr(null);
     try {
-      // 1. Сохраняем поля акции (без фото)
       const action = initial ? "admin_update" : "admin_create";
       const payload: Record<string, unknown> = {
         title:            form.title.trim(),
@@ -104,26 +136,18 @@ function PromoForm({
 
       const promoId = initial ? initial.id : d.id;
 
-      // 2. Загружаем фото — читаем оригинальные байты, кодируем base64 без canvas
       if (imageFile && promoId) {
-        const arrayBuf = await imageFile.arrayBuffer();
-        const bytes = new Uint8Array(arrayBuf);
-        let binary = "";
-        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-        const b64 = btoa(binary);
-        const uploadR = await fetch(`${PROMO_API}?action=upload_photo&promo_id=${promoId}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-Employee-Token": token },
-          body: JSON.stringify({ image_b64: b64, mime: imageFile.type || "image/jpeg" }),
-        });
-        const uploadD = await uploadR.json();
-        if (!uploadD.ok) {
-          setErr("Акция сохранена, но фото не загрузилось: " + (uploadD.error || ""));
+        try {
+          await uploadPhoto(promoId, imageFile);
+        } catch (e) {
+          setErr("Акция сохранена! Но фото: " + (e as Error).message);
           setSaving(false);
+          setUploadProgress(null);
           return;
         }
       }
 
+      setUploadProgress(null);
       onSave();
     } catch {
       setErr("Ошибка сети");
@@ -199,14 +223,38 @@ function PromoForm({
             placeholder="Без ограничений" className={inputCls} style={inputStyle} />
         </div>
 
-        <div>
-          <label className={labelCls}>Фото акции (оригинал, без сжатия)</label>
+        <div className="sm:col-span-2">
+          <label className={labelCls}>Фото акции</label>
+
+          {/* Превью */}
+          {imagePreview && (
+            <div className="mb-2 rounded-xl overflow-hidden relative"
+              style={{ aspectRatio: "3/4", maxWidth: 120, border: "1px solid rgba(255,255,255,0.1)" }}>
+              <img src={imagePreview} className="w-full h-full object-cover" />
+              {uploadProgress !== null && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2"
+                  style={{ background: "rgba(0,0,0,0.65)" }}>
+                  <div className="text-white font-bold text-lg">{uploadProgress}%</div>
+                  <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.15)" }}>
+                    <div className="h-full rounded-full transition-all duration-200"
+                      style={{ width: `${uploadProgress}%`, background: "linear-gradient(90deg,#FFD700,#f59e0b)" }} />
+                  </div>
+                  <div className="text-[10px] text-white/50">Загружаю…</div>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex items-center gap-2 flex-wrap">
             <button onClick={() => fileRef.current?.click()}
               className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-bold transition-all active:scale-95"
-              style={{ background: imageFile ? "rgba(34,197,94,0.12)" : "rgba(255,255,255,0.06)", border: `1px solid ${imageFile ? "rgba(34,197,94,0.35)" : "rgba(255,255,255,0.12)"}`, color: imageFile ? "#4ade80" : "#fff" }}>
+              style={{
+                background: imageFile ? "rgba(34,197,94,0.12)" : "rgba(255,255,255,0.06)",
+                border: `1px solid ${imageFile ? "rgba(34,197,94,0.35)" : "rgba(255,255,255,0.12)"}`,
+                color: imageFile ? "#4ade80" : "#fff",
+              }}>
               <Icon name="ImagePlus" size={14} />
-              {imageFile ? `✓ ${imageFile.name}` : "Выбрать файл"}
+              {imageFile ? `✓ ${imageFile.name}` : "Выбрать фото"}
             </button>
             {imageFile && (
               <span className="text-[10px] text-white/30">
@@ -252,7 +300,9 @@ function PromoForm({
           {saving ? (
             <span className="flex items-center justify-center gap-2">
               <Icon name="Loader2" size={14} className="animate-spin" />
-              Сохраняю…
+              {uploadProgress !== null
+                ? `Фото ${uploadProgress}%…`
+                : "Сохраняю…"}
             </span>
           ) : initial ? "Сохранить изменения" : "Создать акцию"}
         </button>
