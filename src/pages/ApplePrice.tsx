@@ -1117,32 +1117,37 @@ export default function ApplePrice() {
   const [nextRefresh, setNextRefresh] = useState(Date.now() + REFRESH_MS);
   const [timer, setTimer]             = useState("");
   const [orderItem, setOrderItem]     = useState<PriceItem | null>(null);
-  const [emailModal, setEmailModal]   = useState(false);
-  const [pdfLoading, setPdfLoading]   = useState(false);
+  const [emailModal, setEmailModal]     = useState(false);
+  const [pdfLoading, setPdfLoading]     = useState(false);
+  const [printPdfLoading, setPrintPdfLoading] = useState(false);
   const [tomorrowOpen, setTomorrowOpen] = useState(false);
-  const [search, setSearch]           = useState("");
+  const [search, setSearch]             = useState("");
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const handleDownloadPdf = useCallback(async () => {
-    setPdfLoading(true);
+  const downloadPdf = useCallback(async (printMode: boolean) => {
+    const setter = printMode ? setPrintPdfLoading : setPdfLoading;
+    setter(true);
     try {
-      const res = await fetch(PRICE_PDF_URL);
+      const url = printMode ? `${PRICE_PDF_URL}?print=1` : PRICE_PDF_URL;
+      const res  = await fetch(url);
       if (!res.ok) throw new Error("Ошибка сервера");
       const blob = await res.blob();
-      const url  = URL.createObjectURL(blob);
+      const burl = URL.createObjectURL(blob);
       const a    = document.createElement("a");
       const date = new Date().toLocaleDateString("ru-RU").replace(/\./g, "");
-      a.href     = url;
-      a.download = `price-skypka24-${date}.pdf`;
+      a.href     = burl;
+      a.download = printMode ? `price-skypka24-print-${date}.pdf` : `price-skypka24-${date}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      URL.revokeObjectURL(burl);
     } catch {
       alert("Не удалось сформировать PDF. Попробуйте ещё раз.");
     }
-    setPdfLoading(false);
+    setter(false);
   }, []);
+
+  const handleDownloadPdf = useCallback(() => downloadPdf(false), [downloadPdf]);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -1307,11 +1312,22 @@ export default function ApplePrice() {
               onClick={handleDownloadPdf}
               disabled={pdfLoading}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-bold text-black transition-all active:scale-95 disabled:opacity-50"
-              style={{ background: "linear-gradient(135deg,#FFD700,#d97706)", minWidth: 110 }}
+              style={{ background: "linear-gradient(135deg,#FFD700,#d97706)", minWidth: 90 }}
             >
               <Icon name={pdfLoading ? "Loader2" : "FileDown"} size={13}
                 className={pdfLoading ? "animate-spin" : ""} />
-              {pdfLoading ? "Готовим…" : "Скачать PDF"}
+              {pdfLoading ? "Готовим…" : "PDF"}
+            </button>
+            <button
+              onClick={() => downloadPdf(true)}
+              disabled={printPdfLoading}
+              title="PDF с белым фоном — для цветного принтера"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-bold transition-all active:scale-95 disabled:opacity-50"
+              style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.2)", color: "#fff", minWidth: 90 }}
+            >
+              <Icon name={printPdfLoading ? "Loader2" : "Printer"} size={13}
+                className={printPdfLoading ? "animate-spin" : ""} />
+              {printPdfLoading ? "Готовим…" : "Печать"}
             </button>
           </div>
         </div>

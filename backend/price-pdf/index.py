@@ -244,7 +244,7 @@ def group_products(products: list, markup: int, cdn_photos: dict) -> dict:
 
 
 # ── PDF ───────────────────────────────────────────────────────────────────────
-def build_pdf(groups: dict, total: int, generated_at: str) -> bytes:
+def build_pdf(groups: dict, total: int, generated_at: str, print_mode: bool = False) -> bytes:
     FONT_REG, FONT_BOLD = setup_fonts()
 
     buf = io.BytesIO()
@@ -257,16 +257,38 @@ def build_pdf(groups: dict, total: int, generated_at: str) -> bytes:
     )
 
     # ── Цвета ──────────────────────────────────────────────────────────────────
-    GOLD      = colors.HexColor("#FFD700")
-    DARK_BG   = colors.HexColor("#111111")
-    DARK2     = colors.HexColor("#222222")
     WHITE     = colors.white
-    GRAY      = colors.HexColor("#777777")
     LGRAY     = colors.HexColor("#eeeeee")
-    PRICE_CLR = colors.HexColor("#7c2d12")   # тёмно-коричневый — читается на белом
-    SIM_CLR   = colors.HexColor("#1e40af")   # синий для SIM
-    ESIM_CLR  = colors.HexColor("#065f46")   # зелёный для eSIM
-    DUAL_CLR  = colors.HexColor("#6b21a8")   # фиолетовый для Dual
+
+    if print_mode:
+        # Версия для цветного принтера: белый фон, чёрный текст
+        GOLD      = colors.HexColor("#B8860B")   # тёмное золото — видно на белом
+        DARK_BG   = colors.HexColor("#1a1a1a")   # только шапка и CTA — тёмные
+        DARK2     = colors.HexColor("#f5f5f5")   # строка под шапкой — светло-серая
+        GRAY      = colors.HexColor("#555555")
+        PRICE_CLR = colors.HexColor("#b91c1c")   # красный — яркий на белом
+        SIM_CLR   = colors.HexColor("#1d4ed8")
+        ESIM_CLR  = colors.HexColor("#15803d")
+        DUAL_CLR  = colors.HexColor("#7e22ce")
+        ROW_ODD   = colors.HexColor("#f9f9f9")
+        ROW_EVEN  = WHITE
+        NAME_CLR  = colors.HexColor("#111111")
+        NUM_CLR   = colors.HexColor("#888888")
+        SUB_TEXT  = colors.HexColor("#444444")
+    else:
+        GOLD      = colors.HexColor("#FFD700")
+        DARK_BG   = colors.HexColor("#111111")
+        DARK2     = colors.HexColor("#222222")
+        GRAY      = colors.HexColor("#777777")
+        PRICE_CLR = colors.HexColor("#7c2d12")
+        SIM_CLR   = colors.HexColor("#1e40af")
+        ESIM_CLR  = colors.HexColor("#065f46")
+        DUAL_CLR  = colors.HexColor("#6b21a8")
+        ROW_ODD   = colors.HexColor("#f7f7f7")
+        ROW_EVEN  = WHITE
+        NAME_CLR  = colors.HexColor("#111111")
+        NUM_CLR   = colors.HexColor("#777777")
+        SUB_TEXT  = GRAY
 
     def P(text: str, fn=None, fs=9, clr=None, align=None, leading=None) -> Paragraph:
         """Быстрый конструктор параграфа."""
@@ -297,6 +319,7 @@ def build_pdf(groups: dict, total: int, generated_at: str) -> bytes:
             ], colWidths=[68*mm], style=TableStyle([
                 ("TOPPADDING",    (0,0),(-1,-1), 1),
                 ("BOTTOMPADDING", (0,0),(-1,-1), 1),
+                ("BACKGROUND",    (0,0),(-1,-1), DARK_BG),
             ])),
         ]],
         colWidths=[W - 72*mm, 72*mm],
@@ -312,8 +335,8 @@ def build_pdf(groups: dict, total: int, generated_at: str) -> bytes:
     ]))
 
     sub = Table([[
-        P(f"{total} позиций в наличии", FONT_REG, 8, GRAY),
-        P(f"Обновлено: {generated_at}", FONT_REG, 8, GRAY, "R"),
+        P(f"{total} позиций в наличии", FONT_REG, 8, SUB_TEXT),
+        P(f"Обновлено: {generated_at}", FONT_REG, 8, SUB_TEXT, "R"),
     ]], colWidths=[W/2, W/2])
     sub.setStyle(TableStyle([
         ("BACKGROUND",    (0,0),(-1,-1), DARK2),
@@ -362,7 +385,7 @@ def build_pdf(groups: dict, total: int, generated_at: str) -> bytes:
         # Строки товаров
         rows = []
         for i, item in enumerate(items):
-            bg = colors.HexColor("#f7f7f7") if i % 2 == 0 else WHITE
+            bg = ROW_ODD if i % 2 == 0 else ROW_EVEN
 
             # Регион
             if item["region"] == "EU":
@@ -392,8 +415,8 @@ def build_pdf(groups: dict, total: int, generated_at: str) -> bytes:
                 price_p = P("нет цены", FONT_REG, 8, LGRAY, "R")
 
             rows.append([
-                P(str(i+1), FONT_REG, 7, GRAY, "C"),
-                P(item["name"], FONT_BOLD, 9, colors.HexColor("#111111")),
+                P(str(i+1), FONT_REG, 7, NUM_CLR, "C"),
+                P(item["name"], FONT_BOLD, 9, NAME_CLR),
                 sim_p,
                 region_p,
                 price_p,
@@ -411,7 +434,7 @@ def build_pdf(groups: dict, total: int, generated_at: str) -> bytes:
             ("ALIGN",         (3,0),(3,-1),  "CENTER"),
         ]
         for i in range(len(rows)):
-            bg = colors.HexColor("#f7f7f7") if i % 2 == 0 else WHITE
+            bg = ROW_ODD if i % 2 == 0 else ROW_EVEN
             ts.append(("BACKGROUND", (0,i), (-1,i), bg))
             # Цветной фон для региона
             item = items[i]
@@ -478,6 +501,8 @@ def handler(event: dict, context) -> dict:
     if not is_admin:
         markup = DEFAULT_MARKUP
 
+    print_mode = qs.get("print") in ("1", "true", "yes")
+
     products   = fetch_products()
     cdn_photos = load_cdn_photos()
     groups     = group_products(products, markup, cdn_photos)
@@ -486,9 +511,10 @@ def handler(event: dict, context) -> dict:
     msk_now    = datetime.now(timezone(timedelta(hours=3)))
     gen_at     = msk_now.strftime("%d.%m.%Y %H:%M МСК")
 
-    pdf_bytes  = build_pdf(groups, total, gen_at)
+    pdf_bytes  = build_pdf(groups, total, gen_at, print_mode=print_mode)
     pdf_b64    = base64.b64encode(pdf_bytes).decode()
-    filename   = f"price-skypka24-{msk_now.strftime('%d%m%Y')}.pdf"
+    suffix     = "-print" if print_mode else ""
+    filename   = f"price-skypka24{suffix}-{msk_now.strftime('%d%m%Y')}.pdf"
 
     return {
         "statusCode": 200,
