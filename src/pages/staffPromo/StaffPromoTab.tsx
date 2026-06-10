@@ -73,13 +73,27 @@ function PromoForm({
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = () => {
-      const MAX_W = 900, MAX_H = 480;
-      const scale = Math.min(MAX_W / img.width, MAX_H / img.height);
+      const TARGET_W = 1600, TARGET_H = 2000;
       const canvas = document.createElement("canvas");
-      canvas.width  = Math.round(img.width  * scale);
-      canvas.height = Math.round(img.height * scale);
-      canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
-      const b64 = canvas.toDataURL("image/jpeg", 0.82).split(",")[1] || "";
+      canvas.width  = TARGET_W;
+      canvas.height = TARGET_H;
+      const ctx = canvas.getContext("2d")!;
+      // Заполняем чёрным фоном
+      ctx.fillStyle = "#000";
+      ctx.fillRect(0, 0, TARGET_W, TARGET_H);
+      // Cover: масштабируем с обрезкой по центру
+      const srcRatio = img.width / img.height;
+      const dstRatio = TARGET_W / TARGET_H;
+      let sx = 0, sy = 0, sw = img.width, sh = img.height;
+      if (srcRatio > dstRatio) {
+        sw = img.height * dstRatio;
+        sx = (img.width - sw) / 2;
+      } else {
+        sh = img.width / dstRatio;
+        sy = (img.height - sh) / 2;
+      }
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, TARGET_W, TARGET_H);
+      const b64 = canvas.toDataURL("image/jpeg", 0.92).split(",")[1] || "";
       set("image_b64", b64);
       URL.revokeObjectURL(url);
     };

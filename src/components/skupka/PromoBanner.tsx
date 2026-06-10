@@ -64,7 +64,7 @@ export default function PromoBanner() {
 
         {/* Фото */}
         {promo.image_url && (
-          <div className="shrink-0 hidden sm:block" style={{ width: 120, height: 80, overflow: "hidden" }}>
+          <div className="shrink-0 hidden sm:block" style={{ width: 60, height: 80, overflow: "hidden" }}>
             <img src={promo.image_url} alt={promo.title}
               className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
               style={{ borderRadius: 0 }} />

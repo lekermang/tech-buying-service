@@ -168,7 +168,7 @@ export default function PromoPage() {
 
         {/* Фото */}
         {promo.image_url && (
-          <div className="rounded-2xl overflow-hidden" style={{ aspectRatio: "900/480", border: "1px solid rgba(255,255,255,0.08)" }}>
+          <div className="rounded-2xl overflow-hidden" style={{ aspectRatio: "3/4", border: "1px solid rgba(255,255,255,0.08)" }}>
             <img src={promo.image_url} alt={promo.title}
               className="w-full h-full object-cover" />
           </div>
