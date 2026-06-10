@@ -35,6 +35,29 @@ CAT_MAP = {
     "SE2": "iPhone", "SE3": "iPhone", "16e": "iPhone", "17e": "iPhone", "Air": "iPhone",
 }
 
+def detect_sim(name: str, region: str) -> str:
+    """
+    EU  → nano-SIM + eSIM
+    CN  → Dual SIM (nano)
+    US / "" + iPhone 14+ → eSIM only
+    остальные → nano-SIM + eSIM
+    """
+    n   = name.lower()
+    reg = (region or "").upper()
+    if any(x in n for x in ["macbook", "airpod", "watch", "pencil",
+                              "кабель", "стекло", "чехол", "magsafe"]):
+        return ""
+    if any(x in n for x in ["samsung", "galaxy", "redmi", "poco", "xiaomi", "honor"]):
+        return "Dual SIM (nano)"
+    is_apple = (n.startswith(("13","14","15","16","17","se2","se3","16e","17e","iphone","ipad")))
+    if is_apple:
+        if reg == "CN":
+            return "Dual SIM (nano)"
+        if reg in ("US", "") and n.startswith(("14","15","16","17","se3","16e","17e")):
+            return "eSIM only"
+        return "nano-SIM + eSIM"
+    return ""
+
 def detect_category(name: str) -> str:
     first = name.strip().split()[0] if name.strip() else ""
     if first in CAT_MAP:
@@ -92,6 +115,7 @@ def group_products(products: list, markup: int, cdn_photos: dict) -> dict:
             "price":     price_str,
             "price_num": price_num,
             "region":    region,
+            "sim":       detect_sim(raw_name, region),
             "photo":     photo,
         })
 

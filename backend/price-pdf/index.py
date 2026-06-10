@@ -96,29 +96,43 @@ CAT_MAP = {
 # Samsung/Xiaomi — обычно Dual SIM (nano+nano) или eSIM
 
 def detect_sim(name: str, region: str) -> str:
-    """Определяет тип SIM по названию и региону."""
-    name_lower = name.lower()
-    # iPhone
-    if name_lower.startswith(("13", "14", "se2", "se3")):
-        return "nano-SIM + eSIM"
-    if name_lower.startswith(("15", "16", "17", "16e", "17e")):
-        if region == "EU":
-            return "eSIM"
-        return "nano-SIM + eSIM"
-    # MacBook — без SIM
-    if "macbook" in name_lower:
+    """
+    Определяет тип SIM по названию и региону поставки.
+
+    Регионы из Smartbery:
+      EU  — Европа/ОАЭ/Сингапур и др.  → nano-SIM + eSIM (физическая SIM сохранена)
+      CN  — Китай                       → Dual SIM (2×nano, без eSIM)
+      ""  — США (LL/A)                  → eSIM only (с iPhone 14)
+      US  — США явный                   → eSIM only (с iPhone 14)
+    """
+    n   = name.lower()
+    reg = (region or "").upper()
+
+    # Устройства без SIM
+    if any(x in n for x in ["macbook", "airpod", "watch", "pencil",
+                              "кабель", "стекло", "чехол", "magsafe"]):
         return ""
-    # AirPods, Watch, аксессуары — без SIM
-    if any(x in name_lower for x in ["airpod", "watch", "pencil", "кабель", "стекло", "чехол", "magsafe"]):
-        return ""
-    # Samsung/Xiaomi/Honor — обычно dual
-    if any(x in name_lower for x in ["samsung", "galaxy", "redmi", "poco", "xiaomi", "honor"]):
+
+    # Samsung / Xiaomi / Honor — всегда Dual nano-SIM
+    if any(x in n for x in ["samsung", "galaxy", "redmi", "poco", "xiaomi", "honor"]):
         return "Dual SIM (nano)"
-    # iPad — eSIM в EU, nano+eSIM остальные
-    if "ipad" in name_lower:
-        if region == "EU":
-            return "eSIM"
+
+    is_iphone = (
+        n.startswith(("13", "14", "15", "16", "17", "se2", "se3", "16e", "17e"))
+        or n.startswith(("iphone",))
+    )
+    is_ipad   = "ipad" in n
+
+    if is_iphone or is_ipad:
+        # Китай — две физические SIM, без eSIM
+        if reg == "CN":
+            return "Dual SIM (nano)"
+        # США — только eSIM начиная с iPhone 14 (SE3 тоже)
+        if reg in ("US", "") and n.startswith(("14", "15", "16", "17", "se3", "16e", "17e")):
+            return "eSIM only"
+        # Все остальные регионы (EU, AE, ZA, RU и пустая строка для 13/SE2) — nano + eSIM
         return "nano-SIM + eSIM"
+
     return ""
 
 
@@ -400,9 +414,9 @@ def build_pdf(groups: dict, total: int, generated_at: str, print_mode: bool = Fa
 
             # SIM
             sim = item["sim"]
-            is_esim_only = sim == "eSIM"
+            is_esim_only = sim == "eSIM only"
             if is_esim_only:
-                s_clr = colors.HexColor("#c2410c")  # оранжево-красный — предупреждение
+                s_clr = colors.HexColor("#c2410c")
                 sim_label = "eSIM only ⚠"
             elif "Dual" in sim:
                 s_clr = DUAL_CLR

@@ -14,31 +14,16 @@ interface PriceItem {
   price: string;
   price_num: number | null;
   region: string;
+  sim: string;
   photo: string | null;
-}
-
-// ── SIM-тип по имени модели и региону ─────────────────────────────────────────
-function detectSim(name: string, region: string): string {
-  const n = name.toLowerCase();
-  if (n.includes("macbook") || n.includes("airpod") || n.includes("watch") ||
-      n.includes("pencil") || n.includes("кабель") || n.includes("стекло") || n.includes("чехол"))
-    return "";
-  if (n.match(/^(13|14|se2|se3)/))  return "nano-SIM + eSIM";
-  if (n.match(/^(15|16|17|16e|17e)/)) return region === "EU" ? "eSIM" : "nano-SIM + eSIM";
-  if (n.includes("ipad")) return region === "EU" ? "eSIM" : "nano-SIM + eSIM";
-  if (n.match(/samsung|galaxy|redmi|poco|xiaomi|honor/)) return "Dual SIM";
-  return "";
 }
 
 function SimBadge({ sim }: { sim: string }) {
   if (!sim) return null;
-  const isESimOnly = sim === "eSIM";
-  const isDual     = sim.includes("Dual");
-  const isBoth     = sim.includes("+");
 
-  if (isESimOnly) {
+  if (sim === "eSIM only") {
     return (
-      <span title="Только eSIM — физическая nano-SIM карта не поддерживается (EU версия)" style={{
+      <span title="Только eSIM — физической nano-SIM нет. США версия (LL/A)" style={{
         fontSize: 9, padding: "1px 6px", borderRadius: 4, marginLeft: 5,
         verticalAlign: "middle", fontWeight: 700, whiteSpace: "nowrap",
         color: "#f97316", background: "rgba(249,115,22,0.12)", border: "1px solid rgba(249,115,22,0.35)",
@@ -48,17 +33,38 @@ function SimBadge({ sim }: { sim: string }) {
       </span>
     );
   }
-
-  const color  = isDual ? "#8b5cf6" : "#3b82f6";
-  const bg     = isDual ? "rgba(139,92,246,0.12)" : "rgba(59,130,246,0.12)";
-  const border = isDual ? "rgba(139,92,246,0.3)"  : "rgba(59,130,246,0.3)";
+  if (sim === "Dual SIM (nano)") {
+    return (
+      <span title="Два физических слота nano-SIM. Китайская версия (CH/A) — без поддержки eSIM" style={{
+        fontSize: 9, padding: "1px 6px", borderRadius: 4, marginLeft: 5,
+        verticalAlign: "middle", fontWeight: 700, whiteSpace: "nowrap",
+        color: "#8b5cf6", background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.3)",
+        cursor: "help",
+      }}>
+        2×nano SIM
+      </span>
+    );
+  }
+  if (sim === "nano-SIM + eSIM") {
+    return (
+      <span title="Физическая nano-SIM + eSIM. Европа, ОАЭ, Россия и другие регионы" style={{
+        fontSize: 9, padding: "1px 6px", borderRadius: 4, marginLeft: 5,
+        verticalAlign: "middle", fontWeight: 700, whiteSpace: "nowrap",
+        color: "#3b82f6", background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.3)",
+        cursor: "help",
+      }}>
+        nano+eSIM
+      </span>
+    );
+  }
+  // fallback
   return (
     <span style={{
       fontSize: 9, padding: "1px 6px", borderRadius: 4, marginLeft: 5,
       verticalAlign: "middle", fontWeight: 700, whiteSpace: "nowrap",
-      color, background: bg, border: `1px solid ${border}`,
+      color: "#6b7280", background: "rgba(107,114,128,0.1)", border: "1px solid rgba(107,114,128,0.2)",
     }}>
-      {isBoth ? "nano+eSIM" : sim}
+      {sim}
     </span>
   );
 }
@@ -1435,7 +1441,7 @@ export default function ApplePrice() {
 
               // Рендер строки товара
               const renderItem = (item: PriceItem, i: number, accentColor: string, cat: string) => {
-                const sim = detectSim(item.name, item.region);
+                const sim = item.sim || "";
                 const inStock = !!item.price_num;
                 return (
                   <div key={i} className="price-row flex items-center gap-0 group"
