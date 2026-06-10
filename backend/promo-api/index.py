@@ -194,62 +194,76 @@ def handler(event: dict, context) -> dict:
         _notify_tg(promo['title'], name, phone, lead_id)
         return resp(200, {'ok': True, 'lead_id': lead_id})
 
-    # GET /promo-api?action=get_upload_url&promo_id=1&mime=image/jpeg
-    # Возвращает presigned PUT URL для прямой загрузки в S3 с фронта
-    if method == 'GET' and action == 'get_upload_url':
+    # POST /promo-api?action=upload_chunk
+    # Тело: { promo_id, mime, chunk_b64, chunk_index, total_chunks }
+    # Накапливает чанки в /tmp, при последнем — собирает и кладёт в S3
+    if method == 'POST' and action == 'upload_chunk':
         if not _auth_owner():
             return resp(403, {'error': 'forbidden'})
         try:
-            promo_id = int(qs.get('promo_id') or 0)
-        except ValueError:
-            promo_id = 0
+            promo_id   = int(body.get('promo_id') or 0)
+            chunk_idx  = int(body.get('chunk_index') or 0)
+            total      = int(body.get('total_chunks') or 1)
+        except (ValueError, TypeError):
+            return resp(400, {'error': 'Неверные параметры'})
         if not promo_id:
             return resp(400, {'error': 'promo_id required'})
-        with get_conn() as conn, conn.cursor() as cur:
-            cur.execute(f"SELECT slug FROM {SCHEMA}.promos WHERE id=%s", (promo_id,))
-            row = cur.fetchone()
-        if not row:
-            return resp(404, {'error': 'promo not found'})
-        slug = row[0]
-        mime = qs.get('mime') or 'image/jpeg'
+
+        chunk_b64 = body.get('chunk_b64', '')
+        if not chunk_b64:
+            return resp(400, {'error': 'chunk_b64 required'})
+
+        mime = body.get('mime') or 'image/jpeg'
         if mime not in ('image/jpeg', 'image/png', 'image/webp'):
             mime = 'image/jpeg'
-        ext = {'image/png': 'png', 'image/webp': 'webp'}.get(mime, 'jpg')
-        key = f'promos/{slug}/cover.{ext}'
-        cdn_url = _cdn_url(key)
-        try:
-            s3 = _s3_client()
-            upload_url = s3.generate_presigned_url(
-                'put_object',
-                Params={'Bucket': S3_BUCKET, 'Key': key, 'ContentType': mime},
-                ExpiresIn=300,
-            )
-            print(f'[get_upload_url] promo_id={promo_id} key={key}')
-        except Exception as e:
-            print(f'[get_upload_url] error: {e}')
-            return resp(500, {'error': str(e)})
-        return resp(200, {'ok': True, 'upload_url': upload_url, 'cdn_url': cdn_url, 'key': key})
+        ext  = {'image/png': 'png', 'image/webp': 'webp'}.get(mime, 'jpg')
 
-    # POST /promo-api?action=confirm_photo
-    # Тело: { promo_id, cdn_url } — сохраняем image_url в БД после успешной загрузки
-    if method == 'POST' and action == 'confirm_photo':
-        if not _auth_owner():
-            return resp(403, {'error': 'forbidden'})
-        try:
-            promo_id = int(body.get('promo_id') or 0)
-        except (ValueError, TypeError):
-            promo_id = 0
-        cdn_url = (body.get('cdn_url') or '').strip()
-        if not promo_id or not cdn_url:
-            return resp(400, {'error': 'promo_id и cdn_url обязательны'})
-        with get_conn() as conn, conn.cursor() as cur:
-            cur.execute(
-                f"UPDATE {SCHEMA}.promos SET image_url=%s, updated_at=NOW() WHERE id=%s",
-                (cdn_url, promo_id)
-            )
-            conn.commit()
-        print(f'[confirm_photo] promo_id={promo_id} url={cdn_url}')
-        return resp(200, {'ok': True, 'image_url': cdn_url})
+        import tempfile, os as _os
+        tmp_dir  = tempfile.gettempdir()
+        tmp_file = _os.path.join(tmp_dir, f'promo_{promo_id}.bin')
+
+        chunk_data = base64.b64decode(chunk_b64)
+
+        # Первый чанк — перезаписываем файл, остальные — дописываем
+        mode = 'wb' if chunk_idx == 0 else 'ab'
+        with open(tmp_file, mode) as f:
+            f.write(chunk_data)
+
+        print(f'[chunk] promo={promo_id} {chunk_idx+1}/{total} size={len(chunk_data)}')
+
+        # Последний чанк — загружаем в S3
+        if chunk_idx == total - 1:
+            with get_conn() as conn, conn.cursor() as cur:
+                cur.execute(f"SELECT slug FROM {SCHEMA}.promos WHERE id=%s", (promo_id,))
+                row = cur.fetchone()
+            if not row:
+                return resp(404, {'error': 'promo not found'})
+            slug = row[0]
+            key  = f'promos/{slug}/cover.{ext}'
+            with open(tmp_file, 'rb') as f:
+                img_data = f.read()
+            try:
+                _os.remove(tmp_file)
+            except Exception:
+                pass
+            total_size = len(img_data)
+            print(f'[chunk] uploading to S3: key={key} total={total_size}')
+            try:
+                s3 = _s3_client()
+                s3.put_object(Bucket=S3_BUCKET, Key=key, Body=img_data, ContentType=mime)
+                cdn_url = _cdn_url(key)
+            except Exception as e:
+                print(f'[chunk] s3 error: {e}')
+                return resp(500, {'error': f'S3: {e}'})
+            with get_conn() as conn, conn.cursor() as cur:
+                cur.execute(
+                    f"UPDATE {SCHEMA}.promos SET image_url=%s, updated_at=NOW() WHERE id=%s",
+                    (cdn_url, promo_id)
+                )
+                conn.commit()
+            return resp(200, {'ok': True, 'done': True, 'image_url': cdn_url})
+
+        return resp(200, {'ok': True, 'done': False})
 
     # ════════════════════════════════════════════════════════════════
     # ADMIN ЭНДПОИНТЫ (требуют owner/admin токен)
