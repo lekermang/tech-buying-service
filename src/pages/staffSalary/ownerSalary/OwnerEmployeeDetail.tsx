@@ -34,6 +34,7 @@ export default function OwnerEmployeeDetail({
   onOpenPayout,
   onDeletePayout,
   onResync,
+  token,
 }: {
   selected: EmployeeOverview;
   detail: DetailState | null;
