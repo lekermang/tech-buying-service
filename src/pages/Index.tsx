@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import DigitalParticles from "@/components/fx/DigitalParticles";
 import Header from "@/components/skupka/Header";
 import HeroSection from "@/components/skupka/HeroSection";
+import PromoBanner from "@/components/skupka/PromoBanner";
 import InfoSections from "@/components/skupka/InfoSections";
 import ContactsFooter from "@/components/skupka/ContactsFooter";
 import Icon from "@/components/ui/icon";
@@ -368,6 +369,7 @@ export default function Index() {
           <Header />
           <HeroSection />
 
+          <PromoBanner />
           <AppleSaleBanner />
           <CarBuyoutBanner />
           <SpecTechBuyoutBanner />

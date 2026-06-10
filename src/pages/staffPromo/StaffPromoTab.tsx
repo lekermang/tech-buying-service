@@ -74,7 +74,7 @@ function PromoForm({
     const url = URL.createObjectURL(file);
     img.onload = () => {
       const MAX_W = 900, MAX_H = 480;
-      const scale = Math.min(MAX_W / img.width, MAX_H / img.height, 1);
+      const scale = Math.min(MAX_W / img.width, MAX_H / img.height);
       const canvas = document.createElement("canvas");
       canvas.width  = Math.round(img.width  * scale);
       canvas.height = Math.round(img.height * scale);
