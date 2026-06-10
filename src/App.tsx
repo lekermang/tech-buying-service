@@ -99,8 +99,9 @@ const SkupkaSamsungKaluga = safeLazy(() => import("./pages/seo/SkupkaSamsungKalu
 const SkupkaXiaomiKaluga = safeLazy(() => import("./pages/seo/SkupkaXiaomiKaluga"));
 const RemontIphoneKalugaSeo = safeLazy(() => import("./pages/seo/RemontIphoneKalugaSeo"));
 const RemontSamsungKalugaSeo = safeLazy(() => import("./pages/seo/RemontSamsungKaluga"));
-const ApplePrice = safeLazy(() => import("./pages/ApplePrice"));
-const PromoPage  = safeLazy(() => import("./pages/PromoPage"));
+const ApplePrice    = safeLazy(() => import("./pages/ApplePrice"));
+const PromoPage     = safeLazy(() => import("./pages/PromoPage"));
+const PriceRequest  = safeLazy(() => import("./pages/PriceRequest"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -234,6 +235,7 @@ const App = () => {
             <Route path="/remont-iphone-kaluga"    element={<RemontIphoneKalugaSeo />} />
             <Route path="/remont-samsung-kaluga"   element={<RemontSamsungKalugaSeo />} />
             <Route path="/Apple" element={<ApplePrice />} />
+            <Route path="/prajs" element={<PriceRequest />} />
             <Route path="/promo/:slug" element={<PromoPage />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
