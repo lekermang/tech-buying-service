@@ -479,74 +479,32 @@ def handler(event: dict, context) -> dict:
     # Если есть lead_id — добавляем кнопку "Беру в работу" + WhatsApp/Telegram
     photos_b64 = body.get('photos') or ([photo_b64] if photo_b64 else [])
 
-    # Загружаем фото в S3 и получаем CDN-URL для MAX
-    cdn_photo_urls = []
-    if lead_id and photos_b64:
-        try:
-            saved = upload_lead_photos_to_s3(lead_id, photos_b64)
-            cdn_photo_urls = [p['cdn_url'] for p in saved if p.get('cdn_url')]
-        except Exception as up_err:
-            print(f'[send-lead][S3] {up_err}')
-
-    recipients = get_all_recipients(main_chat_id)
     if lead_id:
         kb = build_take_keyboard(lead_id, phone, name, category or desc)
-        # Префикс с номером заявки в caption
         caption = f"📦 *Новая заявка #{lead_id} — Скупка24*\n\n" + caption.split('\n\n', 1)[1] if '\n\n' in caption else caption
     else:
         kb = build_contact_keyboard(phone, name, category or desc)
 
-    msg_ids = {}
-    if photos_b64:
-        send_tg_photos(token, main_chat_id, caption, photos_b64, kb)
-        for cid in recipients[1:]:
-            mid = send_tg_text(token, cid, caption, kb)
-            if mid: msg_ids[str(cid)] = mid
-    else:
-        for cid in recipients:
-            mid = send_tg_text(token, cid, caption, kb)
-            if mid: msg_ids[str(cid)] = mid
+    recipients = get_all_recipients(main_chat_id)
 
-    # Сохраняем message_ids чтобы потом можно было отредактировать сообщения
-    if lead_id and msg_ids:
-        try:
-            conn0 = psycopg2.connect(os.environ['DATABASE_URL'])
-            cur0 = conn0.cursor()
-            cur0.execute(
-                f"UPDATE {SCHEMA}.leads_tracking SET tg_message_ids='{json.dumps(msg_ids).replace(chr(39), chr(39)+chr(39))}'::jsonb, updated_at=NOW() WHERE id={lead_id}"
-            )
-            conn0.commit(); cur0.close(); conn0.close()
-        except Exception:
-            pass
-
-    # SMS клиенту с подтверждением
-    if lead_id:
-        try:
-            send_sms_confirmation(phone, lead_id, name)
-        except Exception:
-            pass
-
-    # 📧 Email-дубль на lekermanya@yandex.ru
-    try:
-        import threading
-        lead_num = f'#{lead_id}' if lead_id else ''
-        email_subject = f'Новая заявка {lead_num} — Скупка24'
-        rows_html = ''.join(
-            f'<tr><td style="padding:6px 12px;color:#888;white-space:nowrap">{k}</td>'
-            f'<td style="padding:6px 12px;font-weight:500">{v}</td></tr>'
-            for k, v in [
-                ('Имя',         name or '—'),
-                ('Телефон',     phone or '—'),
-                ('Категория',   category or '—'),
-                ('Устройство',  device or '—'),
-                ('Описание',    desc or '—'),
-                ('Цена клиента', (f'{client_price} ₽' if client_price else '—')),
-                ('Доставка',    delivery_info or '—'),
-                ('Связь',       channels_str or '—'),
-                ('Тип клиента', client_type or '—'),
-            ] if v and v != '—'
-        )
-        email_html = f'''<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f5f5f5;padding:20px">
+    # Email HTML — строим заранее до потока
+    lead_num = f'#{lead_id}' if lead_id else ''
+    rows_html = ''.join(
+        f'<tr><td style="padding:6px 12px;color:#888;white-space:nowrap">{k}</td>'
+        f'<td style="padding:6px 12px;font-weight:500">{v}</td></tr>'
+        for k, v in [
+            ('Имя',          name or '—'),
+            ('Телефон',      phone or '—'),
+            ('Категория',    category or '—'),
+            ('Устройство',   device or '—'),
+            ('Описание',     desc or '—'),
+            ('Цена клиента', (f'{client_price} ₽' if client_price else '—')),
+            ('Доставка',     delivery_info or '—'),
+            ('Связь',        channels_str or '—'),
+            ('Тип клиента',  client_type or '—'),
+        ] if v and v != '—'
+    )
+    email_html = f'''<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f5f5f5;padding:20px">
 <div style="max-width:560px;margin:auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)">
   <div style="background:#1a1a1a;padding:20px 24px">
     <span style="color:#FFD700;font-size:20px;font-weight:bold">📦 Новая заявка {lead_num}</span>
@@ -557,56 +515,104 @@ def handler(event: dict, context) -> dict:
     Скупка24 · skypka24.com · +7 (800) 600-68-33
   </div>
 </div></body></html>'''
-        threading.Thread(
-            target=_send_lead_email,
-            args=(email_subject, email_html),
-            daemon=True,
-        ).start()
-    except Exception:
-        pass
 
-    # 💬 MAX-бот: уведомить клиента о принятии заявки (если он писал нашему MAX-боту)
-    if lead_id:
-        try:
-            max_text = (
-                f"✅ *Заявка #{lead_id} принята!*\n"
-                + (f"📋 {category}\n" if category else "")
-                + (f"📝 {(desc or '')[:200]}\n" if desc else "")
-                + (f"💰 Ваша оценка: {client_price} ₽\n" if client_price else "")
-                + "\n📞 Менеджер позвонит в течение 15 минут.\n"
-                + "Срочные вопросы — пишите прямо сюда, в MAX."
-            )
-            requests.post(
-                'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c?action=send',
-                json={'phone': phone, 'text': max_text},
-                timeout=6,
-            )
-        except Exception as max_err:
-            print(f'[MAX LEAD] error: {max_err}')
+    # ── Все уведомления в одном фоновом потоке — не блокируем ответ клиенту ──
+    def _send_all_notifications():
+        # 1. Фото в S3
+        cdn_photo_urls = []
+        if lead_id and photos_b64:
+            try:
+                saved = upload_lead_photos_to_s3(lead_id, photos_b64)
+                cdn_photo_urls = [p['cdn_url'] for p in saved if p.get('cdn_url')]
+            except Exception as up_err:
+                print(f'[send-lead][S3] {up_err}')
 
-        # 💬 MAX-канал сотрудников: дублируем уведомление о новой заявке с фото
+        # 2. Telegram
+        msg_ids = {}
         try:
-            staff_text = (
-                f"🔔 *Новая заявка #{lead_id}*\n\n"
-                f"👤 {name or '—'}\n"
-                f"📞 {phone or '—'}\n"
-                + (f"📋 {category}\n" if category else "")
-                + (f"📱 Устройство: {device}\n" if device else "")
-                + (f"📝 {(desc or '')[:300]}\n" if desc else "")
-                + (f"💰 Цена клиента: {client_price} ₽\n" if client_price else "")
-                + (f"📡 Связь: {channels_str}\n" if channels_str else "")
-                + f"\n_Источник: сайт_"
-            )
-            staff_payload = {'text': staff_text}
-            if cdn_photo_urls:
-                staff_payload['photo_urls'] = cdn_photo_urls[:3]
-            requests.post(
-                'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c?action=staff_send',
-                json=staff_payload,
-                timeout=10,
-            )
-        except Exception as max_err:
-            print(f'[MAX STAFF LEAD] error: {max_err}')
+            if photos_b64:
+                send_tg_photos(token, main_chat_id, caption, photos_b64, kb)
+                for cid in recipients[1:]:
+                    mid = send_tg_text(token, cid, caption, kb)
+                    if mid: msg_ids[str(cid)] = mid
+            else:
+                for cid in recipients:
+                    mid = send_tg_text(token, cid, caption, kb)
+                    if mid: msg_ids[str(cid)] = mid
+        except Exception as tg_err:
+            print(f'[send-lead][TG] {tg_err}')
+
+        # 3. Сохраняем message_ids
+        if lead_id and msg_ids:
+            try:
+                conn0 = psycopg2.connect(os.environ['DATABASE_URL'])
+                cur0 = conn0.cursor()
+                cur0.execute(
+                    f"UPDATE {SCHEMA}.leads_tracking SET tg_message_ids='{json.dumps(msg_ids).replace(chr(39), chr(39)+chr(39))}'::jsonb, updated_at=NOW() WHERE id={lead_id}"
+                )
+                conn0.commit(); cur0.close(); conn0.close()
+            except Exception:
+                pass
+
+        # 4. SMS клиенту
+        if lead_id:
+            try:
+                send_sms_confirmation(phone, lead_id, name)
+            except Exception:
+                pass
+
+        # 5. Email-дубль
+        try:
+            _send_lead_email(f'Новая заявка {lead_num} — Скупка24', email_html)
+        except Exception as e:
+            print(f'[send-lead][email] {e}')
+
+        # 6. MAX — клиенту (подтверждение)
+        if lead_id:
+            try:
+                max_text = (
+                    f"✅ *Заявка #{lead_id} принята!*\n"
+                    + (f"📋 {category}\n" if category else "")
+                    + (f"📝 {(desc or '')[:200]}\n" if desc else "")
+                    + (f"💰 Ваша оценка: {client_price} ₽\n" if client_price else "")
+                    + "\n📞 Менеджер позвонит в течение 15 минут.\n"
+                    + "Срочные вопросы — пишите прямо сюда, в MAX."
+                )
+                requests.post(
+                    'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c?action=send',
+                    json={'phone': phone, 'text': max_text},
+                    timeout=8,
+                )
+            except Exception as max_err:
+                print(f'[MAX LEAD] error: {max_err}')
+
+            # 7. MAX — сотрудникам (самое важное!)
+            try:
+                staff_text = (
+                    f"🔔 *Новая заявка #{lead_id}*\n\n"
+                    f"👤 {name or '—'}\n"
+                    f"📞 {phone or '—'}\n"
+                    + (f"📋 {category}\n" if category else "")
+                    + (f"📱 {device}\n" if device else "")
+                    + (f"📝 {(desc or '')[:300]}\n" if desc else "")
+                    + (f"💰 Цена клиента: {client_price} ₽\n" if client_price else "")
+                    + (f"📡 Связь: {channels_str}\n" if channels_str else "")
+                    + f"\n_Источник: сайт_"
+                )
+                staff_payload = {'text': staff_text}
+                if cdn_photo_urls:
+                    staff_payload['photo_urls'] = cdn_photo_urls[:3]
+                r_max = requests.post(
+                    'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c?action=staff_send',
+                    json=staff_payload,
+                    timeout=12,
+                )
+                print(f'[MAX STAFF LEAD] status={r_max.status_code} body={r_max.text[:200]}')
+            except Exception as max_err:
+                print(f'[MAX STAFF LEAD] error: {max_err}')
+
+    import threading
+    threading.Thread(target=_send_all_notifications, daemon=True).start()
 
     # Если заявка на золото — сохраняем в gold_orders
     if category == 'Золото':
