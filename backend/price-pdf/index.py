@@ -257,243 +257,225 @@ def group_products(products: list, markup: int, cdn_photos: dict) -> dict:
     return ordered
 
 
+def _sim_order(sim: str) -> int:
+    if sim == "nano-SIM + eSIM": return 0
+    if sim == "eSIM only":       return 1
+    if sim == "Dual SIM (nano)": return 2
+    return 3
+
 # ── PDF ───────────────────────────────────────────────────────────────────────
 def build_pdf(groups: dict, total: int, generated_at: str, print_mode: bool = False) -> bytes:
+    from reportlab.lib.pagesizes import landscape
+    from reportlab.platypus import MultiCol
     FONT_REG, FONT_BOLD = setup_fonts()
 
     buf = io.BytesIO()
+    # Альбомный A4
+    PAGE = landscape(A4)
     doc = SimpleDocTemplate(
-        buf, pagesize=A4,
-        leftMargin=10*mm, rightMargin=10*mm,
-        topMargin=10*mm, bottomMargin=12*mm,
+        buf, pagesize=PAGE,
+        leftMargin=8*mm, rightMargin=8*mm,
+        topMargin=8*mm, bottomMargin=8*mm,
         title="Прайс Скупка24",
         author="Скупка24",
     )
 
-    # ── Цвета ──────────────────────────────────────────────────────────────────
-    WHITE     = colors.white
-    LGRAY     = colors.HexColor("#eeeeee")
+    WHITE = colors.white
+    GOLD  = colors.HexColor("#B8860B") if print_mode else colors.HexColor("#FFD700")
+    DARK_BG   = colors.HexColor("#1a1a1a")
+    GRAY      = colors.HexColor("#555555") if print_mode else colors.HexColor("#888888")
+    LGRAY     = colors.HexColor("#dddddd")
+    PRICE_CLR = colors.HexColor("#b91c1c") if print_mode else colors.HexColor("#7c2d12")
+    SIM_CLR   = colors.HexColor("#1d4ed8")
+    ESIM_CLR  = colors.HexColor("#c2410c")
+    DUAL_CLR  = colors.HexColor("#7e22ce")
+    NAME_CLR  = colors.HexColor("#111111")
+    ROW_ODD   = colors.HexColor("#f7f8fa")
+    ROW_EVEN  = WHITE
+    SIM_HDR_COLORS = {
+        "nano-SIM + eSIM": (colors.HexColor("#1d4ed8"), colors.HexColor("#eff6ff")),
+        "eSIM only":       (colors.HexColor("#c2410c"), colors.HexColor("#fff7ed")),
+        "Dual SIM (nano)": (colors.HexColor("#7e22ce"), colors.HexColor("#faf5ff")),
+    }
 
-    if print_mode:
-        # Версия для цветного принтера: белый фон, чёрный текст
-        GOLD      = colors.HexColor("#B8860B")   # тёмное золото — видно на белом
-        DARK_BG   = colors.HexColor("#1a1a1a")   # только шапка и CTA — тёмные
-        DARK2     = colors.HexColor("#f5f5f5")   # строка под шапкой — светло-серая
-        GRAY      = colors.HexColor("#555555")
-        PRICE_CLR = colors.HexColor("#b91c1c")   # красный — яркий на белом
-        SIM_CLR   = colors.HexColor("#1d4ed8")
-        ESIM_CLR  = colors.HexColor("#15803d")
-        DUAL_CLR  = colors.HexColor("#7e22ce")
-        ROW_ODD   = colors.HexColor("#f9f9f9")
-        ROW_EVEN  = WHITE
-        NAME_CLR  = colors.HexColor("#111111")
-        NUM_CLR   = colors.HexColor("#888888")
-        SUB_TEXT  = colors.HexColor("#444444")
-    else:
-        GOLD      = colors.HexColor("#FFD700")
-        DARK_BG   = colors.HexColor("#111111")
-        DARK2     = colors.HexColor("#222222")
-        GRAY      = colors.HexColor("#777777")
-        PRICE_CLR = colors.HexColor("#7c2d12")
-        SIM_CLR   = colors.HexColor("#1e40af")
-        ESIM_CLR  = colors.HexColor("#065f46")
-        DUAL_CLR  = colors.HexColor("#6b21a8")
-        ROW_ODD   = colors.HexColor("#f7f7f7")
-        ROW_EVEN  = WHITE
-        NAME_CLR  = colors.HexColor("#111111")
-        NUM_CLR   = colors.HexColor("#777777")
-        SUB_TEXT  = GRAY
-
-    def P(text: str, fn=None, fs=9, clr=None, align=None, leading=None) -> Paragraph:
-        """Быстрый конструктор параграфа."""
-        kw: dict = dict(
-            fontName=fn or FONT_REG,
-            fontSize=fs,
-            textColor=clr or colors.black,
-            leading=leading or (fs * 1.25),
-        )
-        if align == "R":
-            kw["alignment"] = TA_RIGHT
-        if align == "C":
-            kw["alignment"] = TA_CENTER
-        style = ParagraphStyle(f"s_{hash(text)}", **kw)
-        return Paragraph(text, style)
+    def P(text, fn=None, fs=7, clr=None, align=None):
+        kw = dict(fontName=fn or FONT_REG, fontSize=fs,
+                  textColor=clr or colors.black, leading=fs*1.3)
+        if align == "R": kw["alignment"] = TA_RIGHT
+        if align == "C": kw["alignment"] = TA_CENTER
+        return Paragraph(text, ParagraphStyle(f"p{hash(text[:30])}", **kw))
 
     story = []
-    W = doc.width
+    W = doc.width   # ~260mm для landscape A4
 
     # ── ШАПКА ──────────────────────────────────────────────────────────────────
-    hdr = Table(
-        [[
-            P("СКУПКА24 — ПРАЙС-ЛИСТ", FONT_BOLD, 20, WHITE),
-            Table([
-                [P("skypka24.com",                  FONT_BOLD, 10, GOLD,  "R")],
-                [P("г. Калуга, Кирова 7/47 и 11",   FONT_REG,   8, GRAY,  "R")],
-                [P("+7 (992) 990-33-33",             FONT_BOLD, 12, GOLD,  "R")],
-            ], colWidths=[68*mm], style=TableStyle([
-                ("TOPPADDING",    (0,0),(-1,-1), 1),
-                ("BOTTOMPADDING", (0,0),(-1,-1), 1),
-                ("BACKGROUND",    (0,0),(-1,-1), DARK_BG),
-            ])),
-        ]],
-        colWidths=[W - 72*mm, 72*mm],
-    )
+    hdr = Table([[
+        P("СКУПКА24 — ПРАЙС-ЛИСТ", FONT_BOLD, 18, WHITE),
+        P("skypka24.com  ·  г. Калуга, Кирова 7/47 и 11", FONT_REG, 8, GRAY, "C"),
+        P("+7 (992) 990-33-33", FONT_BOLD, 13, GOLD, "R"),
+    ]], colWidths=[W*0.38, W*0.38, W*0.24])
     hdr.setStyle(TableStyle([
         ("BACKGROUND",    (0,0),(-1,-1), DARK_BG),
-        ("TOPPADDING",    (0,0),(-1,-1), 10),
-        ("BOTTOMPADDING", (0,0),(-1,-1), 10),
-        ("LEFTPADDING",   (0,0),(-1,-1), 12),
-        ("RIGHTPADDING",  (0,0),(-1,-1), 12),
-        ("LINEBELOW",     (0,0),(-1,-1), 2.5, GOLD),
+        ("TOPPADDING",    (0,0),(-1,-1), 8),
+        ("BOTTOMPADDING", (0,0),(-1,-1), 8),
+        ("LEFTPADDING",   (0,0),(-1,-1), 10),
+        ("RIGHTPADDING",  (0,0),(-1,-1), 10),
+        ("LINEBELOW",     (0,0),(-1,0),  2, GOLD),
         ("VALIGN",        (0,0),(-1,-1), "MIDDLE"),
     ]))
-
     sub = Table([[
-        P(f"{total} позиций в наличии", FONT_REG, 8, SUB_TEXT),
-        P(f"Обновлено: {generated_at}", FONT_REG, 8, SUB_TEXT, "R"),
-    ]], colWidths=[W/2, W/2])
+        P(f"Всего позиций: {total}", FONT_REG, 7, GRAY),
+        P(f"Обновлено: {generated_at}  ·  nano+eSIM = Европа/ОАЭ  ·  eSIM only = США  ·  Dual = Китай",
+          FONT_REG, 7, GRAY, "C"),
+        P(f"skypka24.com", FONT_BOLD, 7, GOLD, "R"),
+    ]], colWidths=[W*0.2, W*0.6, W*0.2])
     sub.setStyle(TableStyle([
-        ("BACKGROUND",    (0,0),(-1,-1), DARK2),
-        ("TOPPADDING",    (0,0),(-1,-1), 4),
-        ("BOTTOMPADDING", (0,0),(-1,-1), 4),
-        ("LEFTPADDING",   (0,0),(-1,-1), 12),
-        ("RIGHTPADDING",  (0,0),(-1,-1), 12),
+        ("BACKGROUND",    (0,0),(-1,-1), colors.HexColor("#f0f0f0") if print_mode else colors.HexColor("#1e1e1e")),
+        ("TOPPADDING",    (0,0),(-1,-1), 3),
+        ("BOTTOMPADDING", (0,0),(-1,-1), 3),
+        ("LEFTPADDING",   (0,0),(-1,-1), 10),
+        ("RIGHTPADDING",  (0,0),(-1,-1), 10),
     ]))
+    story += [hdr, sub, Spacer(1, 4*mm)]
 
-    story += [hdr, sub, Spacer(1, 5*mm)]
+    # ── 3 КОЛОНКИ ──────────────────────────────────────────────────────────────
+    GAP   = 4*mm
+    NCOLS = 3
+    CW    = (W - GAP * (NCOLS - 1)) / NCOLS   # ширина одной колонки
 
-    # ── Колонки ────────────────────────────────────────────────────────────────
-    # №  Название  SIM  Регион  Цена
-    COL_NUM    = 8*mm
-    COL_PRICE  = 26*mm
-    COL_REGION = 13*mm
-    COL_SIM    = 30*mm
-    COL_NAME   = W - COL_NUM - COL_PRICE - COL_REGION - COL_SIM
+    # Размеры столбцов внутри одной колонки: Название | SIM | Цена
+    cNAME  = CW * 0.50
+    cSIM   = CW * 0.28
+    cPRICE = CW * 0.22
 
-    # ── Категории ──────────────────────────────────────────────────────────────
-    for cat, items in groups.items():
+    def make_item_row(item: dict, idx: int):
+        sim = item["sim"]
+        if sim == "eSIM only":       s_clr, s_lbl = ESIM_CLR, "eSIM only"
+        elif "Dual" in sim:          s_clr, s_lbl = DUAL_CLR, "Dual SIM"
+        elif sim == "nano-SIM + eSIM": s_clr, s_lbl = SIM_CLR, "nano+eSIM"
+        else:                        s_clr, s_lbl = GRAY, sim
+
+        reg = item["region"] or ""
+        if reg == "EU":   r_sfx = " 🇪🇺"
+        elif reg == "CN": r_sfx = " 🇨🇳"
+        elif reg == "US": r_sfx = " 🇺🇸"
+        else:             r_sfx = ""
+
+        name_txt = item["name"] + r_sfx
+        price_p  = P(item["price"], FONT_BOLD, 7, PRICE_CLR, "R") if item["has_price"] else P("под заказ", FONT_REG, 6, GRAY, "R")
+
+        bg = ROW_ODD if idx % 2 == 0 else ROW_EVEN
+        return [
+            P(name_txt, FONT_BOLD, 7, NAME_CLR),
+            P(s_lbl, FONT_REG, 6, s_clr, "C"),
+            price_p,
+        ], bg
+
+    def build_cat_block(cat: str, items: list) -> list:
+        """Строит flowable-блок одной категории."""
         cat_rgb   = CAT_RGB.get(cat, (0.4, 0.4, 0.4))
         cat_color = colors.Color(*cat_rgb)
-        label     = CAT_LABEL.get(cat, cat).upper()
-        dark_bg   = colors.Color(
-            max(0, cat_rgb[0]*0.18),
-            max(0, cat_rgb[1]*0.18),
-            max(0, cat_rgb[2]*0.18),
-        )
+        dark_cat  = colors.Color(max(0, cat_rgb[0]*0.15), max(0, cat_rgb[1]*0.15), max(0, cat_rgb[2]*0.15))
 
+        # Сортируем по SIM
+        sorted_items = sorted(items, key=lambda x: _sim_order(x["sim"]))
+
+        # Группируем по SIM
+        by_sim: dict = {}
+        for it in sorted_items:
+            k = it["sim"] or "Другое"
+            by_sim.setdefault(k, []).append(it)
+
+        blocks = []
         # Заголовок категории
         cat_hdr = Table(
-            [[P(f"  {label}  ({len(items)} шт.)", FONT_BOLD, 10, cat_color), "", "", "", ""]],
-            colWidths=[COL_NUM + COL_NAME, COL_SIM, COL_REGION, COL_PRICE, 0],
+            [[P(f"{CAT_LABEL.get(cat, cat).upper()}  ({len(items)})", FONT_BOLD, 8, cat_color)]],
+            colWidths=[CW]
         )
         cat_hdr.setStyle(TableStyle([
-            ("SPAN",         (0,0),(4,0)),
-            ("BACKGROUND",   (0,0),(-1,-1), dark_bg),
-            ("TOPPADDING",   (0,0),(-1,-1), 6),
-            ("BOTTOMPADDING",(0,0),(-1,-1), 6),
-            ("LEFTPADDING",  (0,0),(-1,-1), 4),
-            ("LINEABOVE",    (0,0),(-1,0),  2, cat_color),
-            ("LINEBELOW",    (0,0),(-1,0),  0.5, cat_color),
-        ]))
-
-        # Строки товаров
-        rows = []
-        for i, item in enumerate(items):
-            bg = ROW_ODD if i % 2 == 0 else ROW_EVEN
-
-            # Регион
-            if item["region"] == "EU":
-                r_clr, r_bg = colors.HexColor("#166534"), colors.HexColor("#dcfce7")
-            elif item["region"] == "US":
-                r_clr, r_bg = colors.HexColor("#1e40af"), colors.HexColor("#dbeafe")
-            elif item["region"] == "CN":
-                r_clr, r_bg = colors.HexColor("#854d0e"), colors.HexColor("#fef9c3")
-            else:
-                r_clr, r_bg = GRAY, bg
-            region_p = P(item["region"] or "", FONT_BOLD, 7, r_clr, "C") if item["region"] else P("", FONT_REG, 7, GRAY, "C")
-
-            # SIM
-            sim = item["sim"]
-            is_esim_only = sim == "eSIM only"
-            if is_esim_only:
-                s_clr = colors.HexColor("#c2410c")
-                sim_label = "eSIM only ⚠"
-            elif "Dual" in sim:
-                s_clr = DUAL_CLR
-                sim_label = sim
-            else:
-                s_clr = SIM_CLR
-                sim_label = sim
-            sim_p = P(sim_label, FONT_BOLD if is_esim_only else FONT_REG, 7, s_clr, "C") if sim else P("", FONT_REG, 7, GRAY, "C")
-
-            # Цена
-            if item["has_price"]:
-                price_p = P(item["price"], FONT_BOLD, 9.5, PRICE_CLR, "R")
-            else:
-                price_p = P("нет цены", FONT_REG, 8, LGRAY, "R")
-
-            rows.append([
-                P(str(i+1), FONT_REG, 7, NUM_CLR, "C"),
-                P(item["name"], FONT_BOLD, 9, NAME_CLR),
-                sim_p,
-                region_p,
-                price_p,
-            ])
-
-        rows_tbl = Table(rows, colWidths=[COL_NUM, COL_NAME, COL_SIM, COL_REGION, COL_PRICE])
-        ts = [
+            ("BACKGROUND",    (0,0),(-1,-1), dark_cat),
             ("TOPPADDING",    (0,0),(-1,-1), 4),
             ("BOTTOMPADDING", (0,0),(-1,-1), 4),
-            ("LEFTPADDING",   (0,0),(-1,-1), 3),
-            ("RIGHTPADDING",  (0,0),(-1,-1), 3),
-            ("VALIGN",        (0,0),(-1,-1), "MIDDLE"),
-            ("LINEBELOW",     (0,0),(-1,-1), 0.25, colors.HexColor("#e5e7eb")),
-            ("ALIGN",         (0,0),(0,-1),  "CENTER"),
-            ("ALIGN",         (3,0),(3,-1),  "CENTER"),
-        ]
-        for i in range(len(rows)):
-            bg = ROW_ODD if i % 2 == 0 else ROW_EVEN
-            ts.append(("BACKGROUND", (0,i), (-1,i), bg))
-            # Цветной фон для региона
-            item = items[i]
-            if item["region"] == "EU":
-                ts.append(("BACKGROUND", (3,i), (3,i), colors.HexColor("#f0fdf4")))
-            elif item["region"] == "US":
-                ts.append(("BACKGROUND", (3,i), (3,i), colors.HexColor("#eff6ff")))
-            elif item["region"] == "CN":
-                ts.append(("BACKGROUND", (3,i), (3,i), colors.HexColor("#fefce8")))
+            ("LEFTPADDING",   (0,0),(-1,-1), 5),
+            ("LINEABOVE",     (0,0),(-1,0),  1.5, cat_color),
+        ]))
+        blocks.append(cat_hdr)
 
-        rows_tbl.setStyle(TableStyle(ts))
+        for sim_key, sim_items in by_sim.items():
+            # SIM-подзаголовок если групп больше одной
+            if len(by_sim) > 1:
+                s_clr, s_bg = SIM_HDR_COLORS.get(sim_key, (GRAY, colors.HexColor("#f5f5f5")))
+                sim_hdr = Table(
+                    [[P(sim_key, FONT_REG, 6, s_clr)]],
+                    colWidths=[CW]
+                )
+                sim_hdr.setStyle(TableStyle([
+                    ("BACKGROUND",    (0,0),(-1,-1), s_bg),
+                    ("TOPPADDING",    (0,0),(-1,-1), 2),
+                    ("BOTTOMPADDING", (0,0),(-1,-1), 2),
+                    ("LEFTPADDING",   (0,0),(-1,-1), 6),
+                    ("LINEBELOW",     (0,0),(-1,0),  0.3, s_clr),
+                ]))
+                blocks.append(sim_hdr)
 
-        story.append(KeepTogether([cat_hdr, rows_tbl, Spacer(1, 3*mm)]))
+            # Строки товаров
+            rows_data, row_bgs = [], []
+            for i, it in enumerate(sim_items):
+                r, bg = make_item_row(it, i)
+                rows_data.append(r)
+                row_bgs.append(bg)
 
-    # ── CTA ────────────────────────────────────────────────────────────────────
-    story.append(Spacer(1, 3*mm))
-    cta = Table([
-        [P("НЕ НАШЛИ НУЖНУЮ МОДЕЛЬ?",    FONT_BOLD, 13, WHITE,  "C")],
-        [P("Позвоните — найдём под заказ за 1–3 дня. Покупаем и продаём 24/7.", FONT_REG, 9, GRAY, "C")],
-        [P("+7 (992) 990-33-33",          FONT_BOLD, 16, GOLD,   "C")],
-    ], colWidths=[W])
-    cta.setStyle(TableStyle([
-        ("BACKGROUND",    (0,0),(-1,-1), DARK_BG),
-        ("TOPPADDING",    (0,0),(0,0),   10),
-        ("TOPPADDING",    (0,1),(0,1),   3),
-        ("TOPPADDING",    (0,2),(0,2),   4),
-        ("BOTTOMPADDING", (0,2),(0,2),   12),
-        ("LEFTPADDING",   (0,0),(-1,-1), 8),
-        ("RIGHTPADDING",  (0,0),(-1,-1), 8),
-        ("LINEABOVE",     (0,0),(-1,0),  2.5, GOLD),
-    ]))
-    story.append(cta)
+            tbl = Table(rows_data, colWidths=[cNAME, cSIM, cPRICE])
+            ts = [
+                ("TOPPADDING",    (0,0),(-1,-1), 2),
+                ("BOTTOMPADDING", (0,0),(-1,-1), 2),
+                ("LEFTPADDING",   (0,0),(-1,-1), 5),
+                ("RIGHTPADDING",  (0,0),(-1,-1), 3),
+                ("VALIGN",        (0,0),(-1,-1), "MIDDLE"),
+                ("LINEBELOW",     (0,0),(-1,-1), 0.2, LGRAY),
+                ("ALIGN",         (1,0),(1,-1),  "CENTER"),
+            ]
+            for i, bg in enumerate(row_bgs):
+                ts.append(("BACKGROUND", (0,i), (-1,i), bg))
+            tbl.setStyle(TableStyle(ts))
+            blocks.append(tbl)
+
+        blocks.append(Spacer(1, 2*mm))
+        return blocks
+
+    # Распределяем категории по 3 колонкам равномерно
+    cat_list    = list(groups.items())
+    total_items = sum(len(v) for _, v in cat_list)
+    target      = total_items / NCOLS
+
+    cols_flows: list = [[], [], []]
+    col_counts       = [0, 0, 0]
+    col_idx = 0
+    for cat, items in cat_list:
+        if col_idx < NCOLS - 1 and col_counts[col_idx] >= target:
+            col_idx += 1
+        cols_flows[col_idx].extend(build_cat_block(cat, items))
+        col_counts[col_idx] += len(items)
+
+    # MultiCol принимает список списков + список ширин
+    story.append(MultiCol(cols_flows, [CW, CW, CW]))
 
     # ── Подвал ─────────────────────────────────────────────────────────────────
     story.append(Spacer(1, 3*mm))
     story.append(HRFlowable(width="100%", thickness=0.5, color=LGRAY))
-    story.append(Spacer(1, 1.5*mm))
-    story.append(P(
-        f"skypka24.com  |  г. Калуга, ул. Кирова 7/47 и ул. Кирова 11  |  +7 (992) 990-33-33  |  (c) {datetime.now().year} Скупка24",
-        FONT_REG, 7, GRAY, "C"
-    ))
+    story.append(Spacer(1, 1*mm))
+    footer = Table([[
+        P(f"+7 (992) 990-33-33", FONT_BOLD, 8, GOLD),
+        P("г. Калуга, ул. Кирова 7/47 и ул. Кирова 11  ·  skypka24.com", FONT_REG, 7, GRAY, "C"),
+        P(f"© {datetime.now().year} Скупка24. Цены актуальны на дату печати.", FONT_REG, 6, GRAY, "R"),
+    ]], colWidths=[W*0.25, W*0.5, W*0.25])
+    footer.setStyle(TableStyle([
+        ("LEFTPADDING",  (0,0),(-1,-1), 0),
+        ("RIGHTPADDING", (0,0),(-1,-1), 0),
+        ("TOPPADDING",   (0,0),(-1,-1), 0),
+        ("BOTTOMPADDING",(0,0),(-1,-1), 0),
+    ]))
+    story.append(footer)
 
     doc.build(story)
     return buf.getvalue()

@@ -1476,67 +1476,69 @@ export default function ApplePrice() {
                 );
               }
 
-              // Рендер строки товара
-              const renderItem = (item: PriceItem, i: number, accentColor: string, cat: string) => {
+              // Приоритет SIM для сортировки: nano+eSIM → eSIM only → Dual → остальные
+              const simOrder = (sim: string) => {
+                if (sim === "nano-SIM + eSIM") return 0;
+                if (sim === "eSIM only")        return 1;
+                if (sim === "Dual SIM (nano)")  return 2;
+                return 3;
+              };
+
+              // Карточка товара
+              const renderCard = (item: PriceItem, i: number, accentColor: string, cat: string) => {
                 const sim = item.sim ?? detectSim(item.name, item.region);
                 const inStock = !!item.price_num;
                 return (
-                  <div key={i} className="price-row flex items-center gap-0 group"
+                  <div key={i} className="price-row flex items-center gap-2 rounded-xl px-3 py-2.5 group"
                     style={{
-                      background: i % 2 === 0 ? "rgba(255,255,255,0.015)" : "transparent",
-                      borderBottom: "1px solid rgba(255,255,255,0.04)",
+                      background: "rgba(255,255,255,0.03)",
+                      border: "1px solid rgba(255,255,255,0.07)",
                       opacity: inStock ? 1 : 0.55,
+                      minWidth: 0,
                     }}>
-                    <div style={{ width: 52, padding: "3px 6px", flexShrink: 0 }}>
+                    {/* Фото / иконка */}
+                    <div style={{ flexShrink: 0 }}>
                       {item.photo ? (
-                        <img src={item.photo} alt={item.name} width={40} height={40}
-                          style={{ borderRadius: 6, objectFit: "cover", display: "block" }} />
+                        <img src={item.photo} alt={item.name} width={36} height={36}
+                          style={{ borderRadius: 8, objectFit: "cover", display: "block" }} />
                       ) : (
                         <div style={{
-                          width: 40, height: 40, borderRadius: 6,
-                          background: inStock ? `${accentColor}10` : "rgba(255,255,255,0.04)",
-                          display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18,
+                          width: 36, height: 36, borderRadius: 8, fontSize: 18,
+                          background: inStock ? `${accentColor}15` : "rgba(255,255,255,0.04)",
+                          display: "flex", alignItems: "center", justifyContent: "center",
                         }}>{CAT_EMOJI[cat] || "📦"}</div>
                       )}
                     </div>
-                    <div style={{ flex: 1, padding: "8px 6px", minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 0 }}>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: inStock ? "#e5e7eb" : "#9ca3af", lineHeight: 1.3 }}>
-                          {item.name}
-                        </span>
+                    {/* Инфо */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: inStock ? "#e5e7eb" : "#9ca3af", lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {item.name}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2, flexWrap: "wrap" }}>
+                        {sim && <SimBadge sim={sim} />}
                         {item.region && (
                           <span style={{
-                            fontSize: 8, marginLeft: 5, padding: "1px 5px", borderRadius: 4,
-                            verticalAlign: "middle", fontWeight: 700, flexShrink: 0,
-                            background: item.region === "EU" ? "rgba(74,222,128,0.15)"
-                              : item.region === "US" ? "rgba(96,165,250,0.15)" : "rgba(251,191,36,0.15)",
-                            color: item.region === "EU" ? "#4ade80"
-                              : item.region === "US" ? "#60a5fa" : "#fbbf24",
-                            border: `1px solid ${item.region === "EU" ? "#4ade8033"
-                              : item.region === "US" ? "#60a5fa33" : "#fbbf2433"}`,
+                            fontSize: 8, padding: "1px 4px", borderRadius: 3, fontWeight: 700,
+                            background: item.region === "EU" ? "rgba(74,222,128,0.15)" : item.region === "CN" ? "rgba(251,191,36,0.15)" : "rgba(96,165,250,0.15)",
+                            color: item.region === "EU" ? "#4ade80" : item.region === "CN" ? "#fbbf24" : "#60a5fa",
+                            border: `1px solid ${item.region === "EU" ? "#4ade8033" : item.region === "CN" ? "#fbbf2433" : "#60a5fa33"}`,
                           }}>{item.region}</span>
                         )}
                       </div>
-                      {sim && <div style={{ marginTop: 2 }}><SimBadge sim={sim} /></div>}
                     </div>
-                    <div style={{ padding: "8px 4px", textAlign: "right", whiteSpace: "nowrap", flexShrink: 0 }}>
+                    {/* Цена + кнопка */}
+                    <div style={{ flexShrink: 0, textAlign: "right" }}>
                       {inStock ? (
-                        <span style={{ fontSize: 14, fontWeight: 800, color: "#FFD700" }}>{item.price}</span>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: "#FFD700", whiteSpace: "nowrap" }}>{item.price}</div>
                       ) : (
-                        <span style={{
-                          fontSize: 9, fontWeight: 600, color: "#fb923c",
-                          background: "rgba(251,146,60,0.1)", border: "1px solid rgba(251,146,60,0.25)",
-                          borderRadius: 5, padding: "2px 6px",
-                        }}>🚗 заказ</span>
+                        <div style={{ fontSize: 9, color: "#fb923c", fontWeight: 600, whiteSpace: "nowrap" }}>🚗 заказ</div>
                       )}
-                    </div>
-                    <div style={{ padding: "4px 8px 4px 2px", flexShrink: 0 }}>
-                      <button className="order-btn" onClick={() => setOrderItem(item)} style={{
-                        padding: "5px 10px", borderRadius: 8, fontSize: 11, fontWeight: 700,
-                        cursor: "pointer", border: "none", whiteSpace: "nowrap",
+                      <button className="order-btn mt-1" onClick={() => setOrderItem(item)} style={{
+                        padding: "3px 8px", borderRadius: 6, fontSize: 10, fontWeight: 700,
+                        cursor: "pointer", border: "none", whiteSpace: "nowrap", display: "block",
                         ...(inStock
-                          ? { color: "#000", background: "linear-gradient(135deg,#FFD700,#f59e0b)", boxShadow: "0 2px 8px rgba(255,215,0,0.3)" }
-                          : { color: "#fb923c", background: "rgba(251,146,60,0.1)", border: "1px solid rgba(251,146,60,0.3)" }
+                          ? { color: "#000", background: "linear-gradient(135deg,#FFD700,#f59e0b)" }
+                          : { color: "#fb923c", background: "rgba(251,146,60,0.12)", border: "1px solid rgba(251,146,60,0.3)" }
                         ),
                       }}>Заказать</button>
                     </div>
@@ -1544,61 +1546,70 @@ export default function ApplePrice() {
                 );
               };
 
+              // SIM-группа: заголовок + сетка карточек
+              const renderSimGroup = (label: string, labelColor: string, labelBg: string, items: PriceItem[], accentColor: string, cat: string) => (
+                <div key={label} className="mb-4">
+                  <div className="flex items-center gap-2 px-2 py-1 mb-2 rounded-lg" style={{ background: labelBg }}>
+                    <span style={{ fontSize: 10, fontWeight: 800, color: labelColor, textTransform: "uppercase", letterSpacing: 1 }}>{label}</span>
+                    <span style={{ fontSize: 10, color: "rgba(255,255,255,0.2)" }}>({items.length})</span>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 6 }}>
+                    {items.map((item, i) => renderCard(item, i, accentColor, cat))}
+                  </div>
+                </div>
+              );
+
               return (
-                <div className="space-y-5">
+                <div className="space-y-6">
                   {filteredGroups.map(([cat, items]) => {
                     const accentColor = CAT_COLORS[cat] || "#FFD700";
-                    const isWatch = cat === "Apple Watch";
 
-                    // Apple Watch — группируем по диаметру (42mm / 46mm / прочее)
-                    if (isWatch && !q) {
-                      const bySize: Record<string, PriceItem[]> = {};
-                      items.forEach(item => {
-                        const m = item.name.match(/(\d{2}mm)/i);
-                        const key = m ? m[1] : "Другие";
-                        if (!bySize[key]) bySize[key] = [];
-                        bySize[key].push(item);
-                      });
-                      const sizeOrder = Object.keys(bySize).sort((a, b) => {
-                        const na = parseInt(a) || 999;
-                        const nb = parseInt(b) || 999;
-                        return na - nb;
-                      });
-                      return (
-                        <div key={cat}>
-                          <div className="flex items-center gap-2 px-3 py-2.5 mb-1 rounded-xl"
-                            style={{ background: `${accentColor}10`, borderLeft: `3px solid ${accentColor}` }}>
-                            <span className="text-[16px]">⌚</span>
-                            <span className="font-oswald font-bold text-[15px] uppercase tracking-wide" style={{ color: accentColor }}>{cat}</span>
-                            <span className="text-[11px] text-white/25 ml-1">({items.length} шт.)</span>
-                          </div>
-                          {sizeOrder.map(size => (
-                            <div key={size} className="mb-3">
-                              <div className="flex items-center gap-2 px-3 py-1.5 mb-0.5"
-                                style={{ borderLeft: `2px solid ${accentColor}55` }}>
-                                <span className="font-oswald font-bold text-[12px] uppercase tracking-widest" style={{ color: `${accentColor}99` }}>
-                                  {size === "Другие" ? "Другие" : `⌚ ${size}`}
-                                </span>
-                                <span className="text-[10px] text-white/20">({bySize[size].length} шт.)</span>
-                              </div>
-                              <div>{bySize[size].map((item, i) => renderItem(item, i, accentColor, cat))}</div>
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    }
+                    // Сортируем товары по SIM-типу
+                    const sorted = [...items].sort((a, b) => {
+                      const sa = a.sim ?? detectSim(a.name, a.region);
+                      const sb = b.sim ?? detectSim(b.name, b.region);
+                      return simOrder(sa) - simOrder(sb);
+                    });
 
-                    // Обычная категория
+                    // Группируем по SIM
+                    const bySim: Record<string, PriceItem[]> = {};
+                    sorted.forEach(item => {
+                      const s = item.sim ?? detectSim(item.name, item.region);
+                      const key = s || "Другое";
+                      if (!bySim[key]) bySim[key] = [];
+                      bySim[key].push(item);
+                    });
+
+                    const simGroups = Object.keys(bySim).sort((a, b) => simOrder(a) - simOrder(b));
+                    const hasSplit = simGroups.length > 1;
+
+                    const SIM_META: Record<string, { label: string; color: string; bg: string }> = {
+                      "nano-SIM + eSIM": { label: "nano-SIM + eSIM", color: "#60a5fa", bg: "rgba(59,130,246,0.08)" },
+                      "eSIM only":       { label: "eSIM only (США)",  color: "#f97316", bg: "rgba(249,115,22,0.08)" },
+                      "Dual SIM (nano)": { label: "Dual SIM (Китай)", color: "#a78bfa", bg: "rgba(167,139,250,0.08)" },
+                      "Другое":          { label: "Другое",           color: "#9ca3af", bg: "rgba(156,163,175,0.06)" },
+                    };
+
                     return (
                       <div key={cat}>
-                        <div className="flex items-center gap-2 px-3 py-2.5 mb-0.5 rounded-xl"
-                          style={{ background: `${accentColor}10`, borderLeft: `3px solid ${accentColor}` }}>
-                          <span className="text-[16px]">{CAT_EMOJI[cat] || "📦"}</span>
-                          <span className="font-oswald font-bold text-[15px] uppercase tracking-wide"
-                            style={{ color: accentColor }}>{cat}</span>
-                          <span className="text-[11px] text-white/25 ml-1">({items.length} шт.)</span>
+                        {/* Заголовок категории */}
+                        <div className="flex items-center gap-2 px-3 py-2.5 mb-3 rounded-xl"
+                          style={{ background: `${accentColor}12`, borderLeft: `3px solid ${accentColor}` }}>
+                          <span className="text-[17px]">{CAT_EMOJI[cat] || "📦"}</span>
+                          <span className="font-oswald font-bold text-[16px] uppercase tracking-wide" style={{ color: accentColor }}>{cat}</span>
+                          <span className="text-[11px] text-white/25 ml-1">· {items.length} шт.</span>
                         </div>
-                        <div>{items.map((item, i) => renderItem(item, i, accentColor, cat))}</div>
+
+                        {hasSplit ? (
+                          simGroups.map(simKey => {
+                            const meta = SIM_META[simKey] || SIM_META["Другое"];
+                            return renderSimGroup(meta.label, meta.color, meta.bg, bySim[simKey], accentColor, cat);
+                          })
+                        ) : (
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 6 }}>
+                            {sorted.map((item, i) => renderCard(item, i, accentColor, cat))}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
