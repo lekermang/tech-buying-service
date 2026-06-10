@@ -3,6 +3,90 @@ import { useLocation } from "react-router-dom";
 import Icon from "@/components/ui/icon";
 import { ymGoal, Goals } from "@/lib/ym";
 
+const PUBLIC_CHAT_URL = "https://functions.poehali.dev/60644856-ff88-4875-b2a9-97c87d32a630";
+
+/** Кнопка Live-чата для мобильной шапки */
+function MobileLiveChatBtn() {
+  const [unread, setUnread] = useState(false);
+  const [hasChat, setHasChat] = useState(false);
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    const auth = localStorage.getItem("pchat_auth");
+    const room = localStorage.getItem("pchat_room");
+    if (auth && room) setHasChat(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hasChat) return;
+    const auth = localStorage.getItem("pchat_auth");
+    const room = localStorage.getItem("pchat_room");
+    if (!auth || !room) return;
+    let cancelled = false;
+    const check = async () => {
+      try {
+        const since = parseInt(localStorage.getItem("pchat_last_seen_id") || "0", 10) || 0;
+        const r = await fetch(`${PUBLIC_CHAT_URL}?action=poll&room_id=${room}&since=${since}`, {
+          headers: { "X-Auth-Token": auth },
+        });
+        if (!r.ok || cancelled) return;
+        const d = await r.json();
+        if (d?.messages?.some((m: { author_type?: string }) => m.author_type !== "client")) {
+          setUnread(true);
+        }
+      } catch { /* ignore */ }
+    };
+    check();
+    const id = setInterval(check, 60_000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [hasChat]);
+
+  if (pathname === "/chat") return null;
+
+  return (
+    <a
+      href="/chat"
+      aria-label="Написать в чат"
+      onClick={() => ymGoal(Goals.TELEGRAM_CLICK, { place: "header_mobile_chat" })}
+      className="md:hidden relative inline-flex items-center gap-1.5 h-9 px-2.5 rounded-full active:scale-90 transition-all duration-200"
+      style={{
+        background: hasChat && unread
+          ? "linear-gradient(135deg, rgba(74,222,128,0.18), rgba(34,197,94,0.08))"
+          : "linear-gradient(135deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03))",
+        border: hasChat && unread
+          ? "1px solid rgba(74,222,128,0.45)"
+          : "1px solid rgba(255,255,255,0.12)",
+        boxShadow: hasChat && unread
+          ? "0 0 14px rgba(74,222,128,0.25)"
+          : "none",
+      }}
+    >
+      {/* Иконка */}
+      <span className="relative flex items-center justify-center w-5 h-5">
+        <Icon
+          name="MessageCircle"
+          size={17}
+          className={hasChat && unread ? "text-green-400" : "text-white/70"}
+        />
+        {/* Живая точка */}
+        {hasChat && unread ? (
+          <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-red-500 border border-[#0D0D0D] animate-pulse" />
+        ) : (
+          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400"
+            style={{ boxShadow: "0 0 6px rgba(74,222,128,0.8)" }}>
+            <span className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-75" />
+          </span>
+        )}
+      </span>
+      {/* Текст */}
+      <span className="font-oswald font-bold text-[11px] uppercase tracking-wider"
+        style={{ color: hasChat && unread ? "#4ade80" : "rgba(255,255,255,0.75)" }}>
+        Live
+      </span>
+    </a>
+  );
+}
+
 export type NavLink = { label: string; href: string };
 
 interface MainNavProps {
@@ -377,6 +461,9 @@ const MainNav = ({ navLinks, menuOpen, onToggleMenu, onNav, compact = false, onP
           >
             <Icon name="Phone" size={14} />
           </a>
+
+          {/* Live чат — мобилка (<md) */}
+          <MobileLiveChatBtn />
 
           {/* Бургер — мобилка (<md) */}
           <button
