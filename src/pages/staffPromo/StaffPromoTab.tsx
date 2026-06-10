@@ -60,6 +60,7 @@ function PromoForm({
     max_participants: initial.max_participants ? String(initial.max_participants) : "",
     image_b64:        "",
   } : {}) });
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -70,40 +71,15 @@ function PromoForm({
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      const TARGET_W = 1600, TARGET_H = 2000;
-      const canvas = document.createElement("canvas");
-      canvas.width  = TARGET_W;
-      canvas.height = TARGET_H;
-      const ctx = canvas.getContext("2d")!;
-      // Заполняем чёрным фоном
-      ctx.fillStyle = "#000";
-      ctx.fillRect(0, 0, TARGET_W, TARGET_H);
-      // Cover: масштабируем с обрезкой по центру
-      const srcRatio = img.width / img.height;
-      const dstRatio = TARGET_W / TARGET_H;
-      let sx = 0, sy = 0, sw = img.width, sh = img.height;
-      if (srcRatio > dstRatio) {
-        sw = img.height * dstRatio;
-        sx = (img.width - sw) / 2;
-      } else {
-        sh = img.width / dstRatio;
-        sy = (img.height - sh) / 2;
-      }
-      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, TARGET_W, TARGET_H);
-      const b64 = canvas.toDataURL("image/jpeg", 0.92).split(",")[1] || "";
-      set("image_b64", b64);
-      URL.revokeObjectURL(url);
-    };
-    img.src = url;
+    setImageFile(file);
+    set("image_b64", "selected"); // маркер что файл выбран
   };
 
   const handleSave = async () => {
     if (!form.title.trim()) { setErr("Введите название акции"); return; }
     setSaving(true); setErr(null);
     try {
+      // 1. Сохраняем поля акции (без фото)
       const action = initial ? "admin_update" : "admin_create";
       const payload: Record<string, unknown> = {
         title:            form.title.trim(),
@@ -116,7 +92,6 @@ function PromoForm({
         max_participants: form.max_participants ? parseInt(form.max_participants) : null,
       };
       if (!initial) payload.slug = form.slug.trim() || undefined;
-      if (form.image_b64) payload.image_b64 = form.image_b64;
       if (initial) payload.id = initial.id;
 
       const r = await fetch(`${PROMO_API}?action=${action}`, {
@@ -125,8 +100,29 @@ function PromoForm({
         body: JSON.stringify(payload),
       });
       const d = await r.json();
-      if (d.ok) onSave();
-      else setErr(d.error || "Ошибка сохранения");
+      if (!d.ok) { setErr(d.error || "Ошибка сохранения"); setSaving(false); return; }
+
+      const promoId = initial ? initial.id : d.id;
+
+      // 2. Загружаем фото отдельным бинарным запросом — без потери качества
+      if (imageFile && promoId) {
+        const uploadR = await fetch(`${PROMO_API}?action=upload_photo&promo_id=${promoId}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": imageFile.type || "image/jpeg",
+            "X-Employee-Token": token,
+          },
+          body: imageFile,
+        });
+        const uploadD = await uploadR.json();
+        if (!uploadD.ok) {
+          setErr("Акция сохранена, но фото не загрузилось: " + (uploadD.error || ""));
+          setSaving(false);
+          return;
+        }
+      }
+
+      onSave();
     } catch {
       setErr("Ошибка сети");
     }
@@ -202,14 +198,19 @@ function PromoForm({
         </div>
 
         <div>
-          <label className={labelCls}>Фото акции (900×480)</label>
-          <div className="flex items-center gap-2">
+          <label className={labelCls}>Фото акции (оригинал, без сжатия)</label>
+          <div className="flex items-center gap-2 flex-wrap">
             <button onClick={() => fileRef.current?.click()}
               className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-bold transition-all active:scale-95"
-              style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "#fff" }}>
+              style={{ background: imageFile ? "rgba(34,197,94,0.12)" : "rgba(255,255,255,0.06)", border: `1px solid ${imageFile ? "rgba(34,197,94,0.35)" : "rgba(255,255,255,0.12)"}`, color: imageFile ? "#4ade80" : "#fff" }}>
               <Icon name="ImagePlus" size={14} />
-              {form.image_b64 ? "Фото выбрано ✓" : "Выбрать файл"}
+              {imageFile ? `✓ ${imageFile.name}` : "Выбрать файл"}
             </button>
+            {imageFile && (
+              <span className="text-[10px] text-white/30">
+                {(imageFile.size / 1024 / 1024).toFixed(1)} МБ
+              </span>
+            )}
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
           </div>
         </div>

@@ -194,6 +194,55 @@ def handler(event: dict, context) -> dict:
         _notify_tg(promo['title'], name, phone, lead_id)
         return resp(200, {'ok': True, 'lead_id': lead_id})
 
+    # POST /promo-api?action=upload_photo&promo_id=1 — загрузка фото без сжатия
+    # Тело запроса: бинарный файл (isBase64Encoded=true на платформе)
+    if method == 'POST' and action == 'upload_photo':
+        if not _auth_owner():
+            return resp(403, {'error': 'forbidden'})
+        try:
+            promo_id = int(qs.get('promo_id') or 0)
+        except ValueError:
+            promo_id = 0
+        if not promo_id:
+            return resp(400, {'error': 'promo_id required'})
+        # Получаем slug для пути в S3
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute(f"SELECT slug FROM {SCHEMA}.promos WHERE id=%s", (promo_id,))
+            row = cur.fetchone()
+        if not row:
+            return resp(404, {'error': 'promo not found'})
+        slug = row[0]
+        # Декодируем тело
+        raw_body_bytes = event.get('body') or ''
+        is_b64 = event.get('isBase64Encoded', False)
+        if is_b64:
+            img_data = base64.b64decode(raw_body_bytes)
+        else:
+            img_data = raw_body_bytes.encode('latin-1') if isinstance(raw_body_bytes, str) else raw_body_bytes
+        # Определяем тип по сигнатуре
+        ct = 'image/jpeg'
+        if img_data[:8] == b'\x89PNG\r\n\x1a\n':
+            ct = 'image/png'
+        elif img_data[:4] == b'RIFF' and img_data[8:12] == b'WEBP':
+            ct = 'image/webp'
+        ext = {'image/png': 'png', 'image/webp': 'webp'}.get(ct, 'jpg')
+        key = f'promos/{slug}/cover.{ext}'
+        try:
+            s3 = _s3_client()
+            s3.put_object(Bucket=S3_BUCKET, Key=key, Body=img_data, ContentType=ct)
+            image_url = _cdn_url(key)
+        except Exception as e:
+            print(f'[promo-api][upload_photo] s3 error: {e}')
+            return resp(500, {'error': 'Ошибка загрузки в S3'})
+        # Обновляем image_url в БД
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"UPDATE {SCHEMA}.promos SET image_url=%s, updated_at=NOW() WHERE id=%s",
+                (image_url, promo_id)
+            )
+            conn.commit()
+        return resp(200, {'ok': True, 'image_url': image_url})
+
     # ════════════════════════════════════════════════════════════════
     # ADMIN ЭНДПОИНТЫ (требуют owner/admin токен)
     # ════════════════════════════════════════════════════════════════
