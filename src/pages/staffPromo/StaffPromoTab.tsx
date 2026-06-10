@@ -78,34 +78,45 @@ function PromoForm({
     set("image_b64", "selected");
   };
 
-  // XHR с реальным прогресс-баром — не блокирует UI
-  const uploadPhoto = (promoId: number, file: File): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const b64 = (reader.result as string).split(",")[1];
-        const body = JSON.stringify({ image_b64: b64, mime: file.type || "image/jpeg" });
-        const xhr = new XMLHttpRequest();
-        xhr.open("POST", `${PROMO_API}?action=upload_photo&promo_id=${promoId}`);
-        xhr.setRequestHeader("Content-Type", "application/json");
-        xhr.setRequestHeader("X-Employee-Token", token);
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) setUploadProgress(Math.round(e.loaded / e.total * 100));
-        };
-        xhr.onload = () => {
-          try {
-            const d = JSON.parse(xhr.responseText);
-            if (d.ok) resolve();
-            else reject(new Error(d.error || "Ошибка S3"));
-          } catch { reject(new Error("Неверный ответ")); }
-        };
-        xhr.onerror = () => reject(new Error("Нет соединения"));
-        setUploadProgress(0);
-        xhr.send(body);
+  // Загрузка напрямую в S3 через presigned URL — без лимитов, с реальным прогрессом
+  const uploadPhoto = async (promoId: number, file: File): Promise<void> => {
+    const mime = file.type || "image/jpeg";
+
+    // 1. Получаем presigned PUT URL от бэкенда
+    const urlResp = await fetch(
+      `${PROMO_API}?action=get_upload_url&promo_id=${promoId}&mime=${encodeURIComponent(mime)}`,
+      { headers: { "X-Employee-Token": token } }
+    );
+    const urlData = await urlResp.json();
+    if (!urlData.ok) throw new Error(urlData.error || "Не удалось получить URL загрузки");
+
+    const { upload_url, cdn_url } = urlData;
+
+    // 2. PUT файл напрямую в S3 через XHR с прогрессом
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("PUT", upload_url);
+      xhr.setRequestHeader("Content-Type", mime);
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) setUploadProgress(Math.round(e.loaded / e.total * 100));
       };
-      reader.onerror = () => reject(new Error("Ошибка чтения файла"));
-      reader.readAsDataURL(file);
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) resolve();
+        else reject(new Error(`S3 error ${xhr.status}`));
+      };
+      xhr.onerror = () => reject(new Error("Нет соединения с S3"));
+      setUploadProgress(0);
+      xhr.send(file);
     });
+
+    // 3. Сохраняем CDN URL в БД
+    const confirmResp = await fetch(`${PROMO_API}?action=confirm_photo`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Employee-Token": token },
+      body: JSON.stringify({ promo_id: promoId, cdn_url }),
+    });
+    const confirmData = await confirmResp.json();
+    if (!confirmData.ok) throw new Error(confirmData.error || "Ошибка сохранения URL");
   };
 
   const handleSave = async () => {

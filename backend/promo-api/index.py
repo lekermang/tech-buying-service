@@ -194,9 +194,9 @@ def handler(event: dict, context) -> dict:
         _notify_tg(promo['title'], name, phone, lead_id)
         return resp(200, {'ok': True, 'lead_id': lead_id})
 
-    # POST /promo-api?action=upload_photo&promo_id=1
-    # Тело: JSON { image_b64: "...", mime: "image/jpeg" }
-    if method == 'POST' and action == 'upload_photo':
+    # GET /promo-api?action=get_upload_url&promo_id=1&mime=image/jpeg
+    # Возвращает presigned PUT URL для прямой загрузки в S3 с фронта
+    if method == 'GET' and action == 'get_upload_url':
         if not _auth_owner():
             return resp(403, {'error': 'forbidden'})
         try:
@@ -205,43 +205,51 @@ def handler(event: dict, context) -> dict:
             promo_id = 0
         if not promo_id:
             return resp(400, {'error': 'promo_id required'})
-        # Получаем slug для пути в S3
         with get_conn() as conn, conn.cursor() as cur:
             cur.execute(f"SELECT slug FROM {SCHEMA}.promos WHERE id=%s", (promo_id,))
             row = cur.fetchone()
         if not row:
             return resp(404, {'error': 'promo not found'})
         slug = row[0]
-        # Декодируем оригинальные байты из base64
-        img_b64 = body.get('image_b64', '')
-        if not img_b64:
-            return resp(400, {'error': 'image_b64 required'})
-        try:
-            img_data = base64.b64decode(img_b64)
-        except Exception:
-            return resp(400, {'error': 'Неверный base64'})
-        # Тип файла
-        ct = body.get('mime') or 'image/jpeg'
-        if ct not in ('image/jpeg', 'image/png', 'image/webp'):
-            ct = 'image/jpeg'
-        ext = {'image/png': 'png', 'image/webp': 'webp'}.get(ct, 'jpg')
+        mime = qs.get('mime') or 'image/jpeg'
+        if mime not in ('image/jpeg', 'image/png', 'image/webp'):
+            mime = 'image/jpeg'
+        ext = {'image/png': 'png', 'image/webp': 'webp'}.get(mime, 'jpg')
         key = f'promos/{slug}/cover.{ext}'
-        print(f'[upload_photo] promo_id={promo_id} slug={slug} size={len(img_data)} ct={ct}')
+        cdn_url = _cdn_url(key)
         try:
             s3 = _s3_client()
-            s3.put_object(Bucket=S3_BUCKET, Key=key, Body=img_data, ContentType=ct)
-            image_url = _cdn_url(key)
+            upload_url = s3.generate_presigned_url(
+                'put_object',
+                Params={'Bucket': S3_BUCKET, 'Key': key, 'ContentType': mime},
+                ExpiresIn=300,
+            )
+            print(f'[get_upload_url] promo_id={promo_id} key={key}')
         except Exception as e:
-            print(f'[promo-api][upload_photo] s3 error: {e}')
-            return resp(500, {'error': f'Ошибка загрузки в S3: {e}'})
-        # Обновляем image_url в БД
+            print(f'[get_upload_url] error: {e}')
+            return resp(500, {'error': str(e)})
+        return resp(200, {'ok': True, 'upload_url': upload_url, 'cdn_url': cdn_url, 'key': key})
+
+    # POST /promo-api?action=confirm_photo
+    # Тело: { promo_id, cdn_url } — сохраняем image_url в БД после успешной загрузки
+    if method == 'POST' and action == 'confirm_photo':
+        if not _auth_owner():
+            return resp(403, {'error': 'forbidden'})
+        try:
+            promo_id = int(body.get('promo_id') or 0)
+        except (ValueError, TypeError):
+            promo_id = 0
+        cdn_url = (body.get('cdn_url') or '').strip()
+        if not promo_id or not cdn_url:
+            return resp(400, {'error': 'promo_id и cdn_url обязательны'})
         with get_conn() as conn, conn.cursor() as cur:
             cur.execute(
                 f"UPDATE {SCHEMA}.promos SET image_url=%s, updated_at=NOW() WHERE id=%s",
-                (image_url, promo_id)
+                (cdn_url, promo_id)
             )
             conn.commit()
-        return resp(200, {'ok': True, 'image_url': image_url})
+        print(f'[confirm_photo] promo_id={promo_id} url={cdn_url}')
+        return resp(200, {'ok': True, 'image_url': cdn_url})
 
     # ════════════════════════════════════════════════════════════════
     # ADMIN ЭНДПОИНТЫ (требуют owner/admin токен)
