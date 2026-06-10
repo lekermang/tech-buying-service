@@ -1191,4 +1191,100 @@ def handler(event, context):
             conn.commit()
             return resp(200, {'ok': True})
 
+    # =====================================================
+    # ДОЛГИ: владелец назначает, сотрудник видит свои
+    # =====================================================
+
+    if action == 'my_debts':
+        # Сотрудник видит свои активные (непогашенные) долги
+        with get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                f"""
+                SELECT id, amount, reason, comment, is_repaid, created_at
+                FROM {SCHEMA}.employee_debts
+                WHERE employee_id = %s AND is_repaid = false
+                ORDER BY created_at ASC
+                """,
+                (user_id,),
+            )
+            debts = cur.fetchall()
+            total_debt = sum(int(d['amount']) for d in debts)
+            return resp(200, {'debts': debts, 'total_debt': total_debt})
+
+    if action == 'owner_list_debts':
+        # Владелец видит долги конкретного сотрудника
+        if role not in ('owner', 'admin'):
+            return resp(403, {'error': 'forbidden'})
+        try:
+            emp_id = int(params.get('employee_id') or 0)
+        except (TypeError, ValueError):
+            emp_id = 0
+        if not emp_id:
+            return resp(400, {'error': 'employee_id required'})
+        with get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                f"""
+                SELECT id, amount, reason, comment, is_repaid, repaid_at, created_at
+                FROM {SCHEMA}.employee_debts
+                WHERE employee_id = %s
+                ORDER BY created_at DESC
+                """,
+                (emp_id,),
+            )
+            debts = cur.fetchall()
+            total_active = sum(int(d['amount']) for d in debts if not d['is_repaid'])
+            return resp(200, {'debts': debts, 'total_active': total_active})
+
+    if action == 'owner_add_debt' and method == 'POST':
+        # Владелец назначает долг сотруднику
+        if role not in ('owner', 'admin'):
+            return resp(403, {'error': 'forbidden'})
+        body = json.loads(event.get('body') or '{}')
+        try:
+            emp_id = int(body.get('employee_id') or 0)
+            amount = int(body.get('amount') or 0)
+        except (TypeError, ValueError):
+            emp_id = 0
+            amount = 0
+        reason = (body.get('reason') or '').strip()
+        comment = (body.get('comment') or '').strip() or None
+        if not emp_id or amount <= 0 or not reason:
+            return resp(400, {'error': 'employee_id, amount и reason обязательны'})
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"""
+                INSERT INTO {SCHEMA}.employee_debts
+                  (employee_id, amount, reason, comment, created_by)
+                VALUES (%s, %s, %s, %s, %s)
+                RETURNING id
+                """,
+                (emp_id, amount, reason, comment, user_id),
+            )
+            debt_id = cur.fetchone()[0]
+            conn.commit()
+        return resp(200, {'ok': True, 'debt_id': debt_id})
+
+    if action == 'owner_repay_debt' and method == 'POST':
+        # Владелец помечает долг как погашенный
+        if role not in ('owner', 'admin'):
+            return resp(403, {'error': 'forbidden'})
+        body = json.loads(event.get('body') or '{}')
+        try:
+            debt_id = int(body.get('debt_id') or 0)
+        except (TypeError, ValueError):
+            debt_id = 0
+        if not debt_id:
+            return resp(400, {'error': 'debt_id required'})
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute(
+                f"""
+                UPDATE {SCHEMA}.employee_debts
+                SET is_repaid = true, repaid_at = NOW(), updated_at = NOW()
+                WHERE id = %s
+                """,
+                (debt_id,),
+            )
+            conn.commit()
+        return resp(200, {'ok': True})
+
     return resp(404, {'error': 'unknown_action', 'action': action})

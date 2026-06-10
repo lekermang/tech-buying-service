@@ -33,6 +33,7 @@ import StaffBottomNav from "./StaffBottomNav";
 import StaffPasswordModal from "./StaffPasswordModal";
 import DigitalParticles from "@/components/fx/DigitalParticles";
 import PriceFloatingButton from "./PriceFloatingButton";
+import DebtBouncer from "../staffSalary/DebtBouncer";
 
 type Tab = StaffTab;
 
@@ -234,6 +235,8 @@ export function StaffMainLayout({
       <HolidayBanner className="z-20" />
       <HolidayCornerDecor />
       <ThemeBanner onOpen={() => setThemeOpen(true)} />
+      {/* Баннер долга — только для рядовых сотрудников */}
+      {empRole === "staff" && <DebtBouncer token={token} />}
 
       {/* Шапка */}
       <StaffHeader

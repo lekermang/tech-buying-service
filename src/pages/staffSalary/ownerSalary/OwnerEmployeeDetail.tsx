@@ -6,6 +6,7 @@ import {
   type CalendarDay, type DetailState, type LogRow,
 } from "./ownerSalaryTypes";
 import OwnerSavingsPanel from "./OwnerSavingsPanel";
+import OwnerDebtsPanel from "./OwnerDebtsPanel";
 
 type MonthCell = { date: string | null; status: CalendarDay["status"] | null; total: number; payout: number; bonus: number };
 
@@ -59,7 +60,7 @@ export default function OwnerEmployeeDetail({
   onResync: () => void;
   token: string;
 }) {
-  const [activeTab, setActiveTab] = useState<"salary" | "savings">("salary");
+  const [activeTab, setActiveTab] = useState<"salary" | "savings" | "debts">("salary");
 
   return (
     <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-5">
@@ -118,7 +119,7 @@ export default function OwnerEmployeeDetail({
         )}
       </div>
 
-      {/* Переключатель Зарплата / Копилка */}
+      {/* Переключатель Зарплата / Долги / Копилка */}
       <div className="flex gap-1 p-1 rounded-xl border border-white/8" style={{ background: "rgba(255,255,255,0.04)" }}>
         <button onClick={() => setActiveTab("salary")}
           className="flex-1 py-2 rounded-lg font-roboto text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
@@ -128,6 +129,15 @@ export default function OwnerEmployeeDetail({
             border: activeTab === "salary" ? "1px solid rgba(255,215,0,0.3)" : "1px solid transparent",
           }}>
           <Icon name="Wallet" size={13} /> Зарплата
+        </button>
+        <button onClick={() => setActiveTab("debts")}
+          className="flex-1 py-2 rounded-lg font-roboto text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
+          style={{
+            background: activeTab === "debts" ? "rgba(220,38,38,0.15)" : "transparent",
+            color: activeTab === "debts" ? "#fca5a5" : "rgba(255,255,255,0.4)",
+            border: activeTab === "debts" ? "1px solid rgba(220,38,38,0.3)" : "1px solid transparent",
+          }}>
+          <Icon name="AlertTriangle" size={13} /> Долги
         </button>
         <button onClick={() => setActiveTab("savings")}
           className="flex-1 py-2 rounded-lg font-roboto text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
@@ -139,6 +149,15 @@ export default function OwnerEmployeeDetail({
           <Icon name="PiggyBank" size={13} /> Копилка
         </button>
       </div>
+
+      {/* ── ДОЛГИ ── */}
+      {activeTab === "debts" && (
+        <OwnerDebtsPanel
+          employeeId={selected.id}
+          employeeName={selected.full_name}
+          token={token}
+        />
+      )}
 
       {/* ── КОПИЛКА ── */}
       {activeTab === "savings" && (
