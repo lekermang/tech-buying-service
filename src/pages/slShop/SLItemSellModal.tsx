@@ -1,6 +1,6 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
-import { slApi, type SLItem, PAYMENT_METHODS } from "./types";
+import { slApi, type SLItem, PAYMENT_METHODS, type SLDocTemplate, type SLDocContext } from "./types";
 import { triggerReaction } from "@/components/FunReaction";
 import { Inp2 } from "./SLItemsCommon";
 import { SLModal, SLField, SLInput, SLButton } from "./slUI";
@@ -51,6 +51,12 @@ export default function SLItemSellModal({ token, item, onClose, onDone }: { toke
   const [emailSending, setEmailSending] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const sellQtyNum = Math.max(1, Math.min(stockQty, parseInt(sellQty, 10) || 1));
+
+  // Экран выбора документов после продажи
+  const [docsScreen, setDocsScreen] = useState(false);
+  const [docTpls, setDocTpls] = useState<SLDocTemplate[]>([]);
+  const [docCtx, setDocCtx] = useState<SLDocContext | null>(null);
+  const [docsLoading, setDocsLoading] = useState(false);
   const submit = async () => {
     if (!amount || Number(amount) <= 0) { setErr("Укажите сумму"); return; }
     if (sellQtyNum > stockQty) {
@@ -65,22 +71,8 @@ export default function SLItemSellModal({ token, item, onClose, onDone }: { toke
     }});
     setSaving(false);
     if (r.ok) {
-      // Автопечать товарного чека сразу после продажи
-      if (autoPrint) {
-        try {
-          const ctxRes = await slApi(token, "doc_context", { params: { item_id: item.id } });
-          const tplRes = await slApi<{ id: number; code: string; name: string }[]>(
-            token, "doc_templates", { params: { only_active: "1", op_type: "sell" } }
-          );
-          if (ctxRes.ok && tplRes.ok && tplRes.data && tplRes.data.length > 0) {
-            const { printDoc } = await import("./docPrinter");
-            const tpl = tplRes.data.find(t => t.code === "sales_receipt") || tplRes.data[0];
-            printDoc(tpl as never, ctxRes.data as never);
-          }
-        } catch (e) {
-          console.error("auto-print sale", e);
-        }
-      }
+      triggerReaction("item_sold", Number(amount) || undefined);
+
       // Отправляем чек на email если указан
       if (emailInput.trim()) {
         const checkHtml = buildSaleCheckHtml(item, Number(amount), payment, Date.now());
@@ -93,10 +85,107 @@ export default function SLItemSellModal({ token, item, onClose, onDone }: { toke
           if (d.sent) setEmailSent(true);
         }).catch(() => {}).finally(() => setEmailSending(false));
       }
-      triggerReaction("item_sold", Number(amount) || undefined);
-      onDone();
+
+      // Загружаем документы и показываем экран выбора
+      setDocsLoading(true);
+      setDocsScreen(true);
+      try {
+        const [ctxRes, tplRes] = await Promise.all([
+          slApi<SLDocContext>(token, "doc_context", { params: { item_id: item.id } }),
+          slApi<SLDocTemplate[]>(token, "doc_templates", { params: { only_active: "1", op_type: "sell" } }),
+        ]);
+        if (ctxRes.ok && ctxRes.data) setDocCtx(ctxRes.data);
+        if (tplRes.ok && tplRes.data) setDocTpls(tplRes.data);
+
+        // Автопечать товарного чека если включено
+        if (autoPrint && ctxRes.ok && tplRes.ok && tplRes.data && tplRes.data.length > 0) {
+          const { printDoc } = await import("./docPrinter");
+          const tpl = tplRes.data.find(t => t.code === "sales_receipt") || tplRes.data[0];
+          printDoc(tpl as never, ctxRes.data as never);
+        }
+      } catch (e) {
+        console.error("docs-load sale", e);
+      } finally {
+        setDocsLoading(false);
+      }
     } else setErr(r.error || "Ошибка");
   };
+  // ── Экран выбора документов после успешной продажи ─────────────
+  if (docsScreen) {
+    return (
+      <SLModal
+        open
+        onClose={onDone}
+        title="Продано — выберите документы"
+        icon="CheckCircle2"
+        footer={
+          <SLButton variant="ghost" size="lg" icon="X" onClick={onDone} className="w-full">
+            Закрыть
+          </SLButton>
+        }
+      >
+        <div className="space-y-3">
+          {/* Итог продажи */}
+          <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 p-3 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+              <Icon name="CheckCircle2" size={18} className="text-emerald-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-bold text-emerald-300 truncate">{item.title}</div>
+              <div className="text-[11px] text-white/50">
+                {Number(amount).toLocaleString("ru-RU")} ₽ ·{" "}
+                {payment === "cash" ? "Наличные" : payment === "card" ? "Карта" : "Перевод"}
+              </div>
+            </div>
+          </div>
+
+          {/* Список документов */}
+          {docsLoading && (
+            <div className="flex items-center justify-center py-8 gap-2 text-white/40">
+              <Icon name="Loader2" size={16} className="animate-spin text-[#FFD700]" />
+              <span className="text-sm">Загружаю документы…</span>
+            </div>
+          )}
+
+          {!docsLoading && docTpls.length === 0 && (
+            <div className="text-center text-white/30 text-sm py-6">
+              Нет активных шаблонов.<br />
+              <span className="text-[11px]">Включите шаблоны в разделе «Документы».</span>
+            </div>
+          )}
+
+          {!docsLoading && docTpls.length > 0 && (
+            <div className="space-y-1.5">
+              <div className="text-[11px] text-white/40 uppercase tracking-wider font-bold px-0.5">Печать документов</div>
+              {docTpls.map(t => (
+                <button
+                  key={t.id}
+                  onClick={async () => {
+                    if (!docCtx) return;
+                    const { printDoc } = await import("./docPrinter");
+                    printDoc(t as never, docCtx as never);
+                  }}
+                  className="w-full text-left bg-[#0F0F0F] border border-[#1F1F1F] hover:border-[#FFD700]/50 hover:bg-[#FFD700]/5 rounded-xl p-3 transition-all active:scale-[0.98]"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-[#FFD700]/10 border border-[#FFD700]/20 flex items-center justify-center flex-shrink-0">
+                      <Icon name="FileText" size={15} className="text-[#FFD700]" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-bold text-white">{t.name}</div>
+                      {t.description && <div className="text-[10px] text-white/40 truncate">{t.description}</div>}
+                    </div>
+                    <Icon name="Printer" size={14} className="text-white/30 flex-shrink-0" />
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </SLModal>
+    );
+  }
+
   return (
     <SLModal
       open
