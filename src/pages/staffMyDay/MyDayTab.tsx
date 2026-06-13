@@ -4,6 +4,7 @@ import Checklist from "./Checklist";
 import RepairSignalsCard from "./RepairSignalsCard";
 import SalesSignalsCard from "./SalesSignalsCard";
 import OwnerSummaryCard from "./OwnerSummaryCard";
+import SalesPlanCard from "./SalesPlanCard";
 import AppDownloadCard from "@/components/AppDownloadCard";
 import { STAFF_DAILY_URL, type MyDayResponse, type DailyRole, type RepairSignals, type SalesSignals } from "./types";
 
@@ -129,6 +130,9 @@ export default function MyDayTab({ token }: { token: string }) {
           <span className="font-roboto text-sm">Готовлю твой день…</span>
         </div>
       )}
+
+      {/* План продаж — виден всем ролям */}
+      <SalesPlanCard token={token} />
 
       {data && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
