@@ -10,6 +10,8 @@ import AnalyticsRepairAndStaff from "./staffAnalytics/AnalyticsRepairAndStaff";
 import PeriodPicker from "./staffAnalytics/PeriodPicker";
 import { SLSHOP_URL } from "./staff.types";
 import FinanceTab from "./staffAnalytics/finance/FinanceTab";
+import SalesPlanCard, { type PlanData } from "./staffMyDay/SalesPlanCard";
+import PlanOwnerStats from "./staffMyDay/PlanOwnerStats";
 
 type RepairAnalytics = {
   total: number; done: number; revenue: number; costs: number;
@@ -32,11 +34,12 @@ type RepairAnalytics = {
 };
 
 export function AnalyticsTab({ token }: { token: string }) {
-  const [view, setView] = useState<"overview" | "finance">(() => {
-    try { return (localStorage.getItem("staff_analytics_view") as "overview" | "finance") || "overview"; }
+  const [view, setView] = useState<"overview" | "finance" | "plan">(() => {
+    try { return (localStorage.getItem("staff_analytics_view") as "overview" | "finance" | "plan") || "overview"; }
     catch { return "overview"; }
   });
   useEffect(() => { try { localStorage.setItem("staff_analytics_view", view); } catch {/* */} }, [view]);
+  const [planData, setPlanData] = useState<PlanData | null>(null);
 
   const [period, setPeriod] = useState("week");
   const [customRange, setCustomRange] = useState<{ from: string; to: string } | null>(null);
@@ -208,31 +211,32 @@ export function AnalyticsTab({ token }: { token: string }) {
     <div className="p-3">
       {/* Переключатель Обзор / Финансы */}
       <div className="inline-flex mb-3 p-1 rounded-full bg-gradient-to-br from-[#0E0E0E] to-[#080808] border border-[#1F1F1F]">
-        <button
-          onClick={() => setView("overview")}
-          className={`px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition inline-flex items-center gap-1.5 ${
-            view === "overview"
-              ? "bg-gradient-to-b from-[#FFE34D] to-[#d4a017] text-black shadow-[0_3px_10px_rgba(255,215,0,0.4)]"
-              : "text-white/55 hover:text-[#FFD700]"
-          }`}
-        >
-          <Icon name="LayoutDashboard" size={12} />
-          Обзор
-        </button>
-        <button
-          onClick={() => setView("finance")}
-          className={`px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition inline-flex items-center gap-1.5 ${
-            view === "finance"
-              ? "bg-gradient-to-b from-[#FFE34D] to-[#d4a017] text-black shadow-[0_3px_10px_rgba(255,215,0,0.4)]"
-              : "text-white/55 hover:text-[#FFD700]"
-          }`}
-        >
-          <Icon name="LineChart" size={12} />
-          Финансы
-        </button>
+        {(["overview", "plan", "finance"] as const).map((v) => {
+          const labels = { overview: "Обзор", plan: "План", finance: "Финансы" };
+          const icons  = { overview: "LayoutDashboard", plan: "Target", finance: "LineChart" };
+          return (
+            <button key={v} onClick={() => setView(v)}
+              className={`px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition inline-flex items-center gap-1.5 ${
+                view === v
+                  ? "bg-gradient-to-b from-[#FFE34D] to-[#d4a017] text-black shadow-[0_3px_10px_rgba(255,215,0,0.4)]"
+                  : "text-white/55 hover:text-[#FFD700]"
+              }`}
+            >
+              <Icon name={icons[v]} size={12} />
+              {labels[v]}
+            </button>
+          );
+        })}
       </div>
 
       {view === "finance" && <FinanceTab token={token} />}
+
+      {view === "plan" && (
+        <div className="space-y-0">
+          <SalesPlanCard token={token} onData={setPlanData} />
+          {planData && <PlanOwnerStats data={planData} />}
+        </div>
+      )}
 
       {view === "overview" && (
       <>

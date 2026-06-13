@@ -4,8 +4,7 @@ import Checklist from "./Checklist";
 import RepairSignalsCard from "./RepairSignalsCard";
 import SalesSignalsCard from "./SalesSignalsCard";
 import OwnerSummaryCard from "./OwnerSummaryCard";
-import SalesPlanCard, { type PlanData } from "./SalesPlanCard";
-import PlanOwnerStats from "./PlanOwnerStats";
+import SalesPlanCard from "./SalesPlanCard";
 import AppDownloadCard from "@/components/AppDownloadCard";
 import { STAFF_DAILY_URL, type MyDayResponse, type DailyRole, type RepairSignals, type SalesSignals } from "./types";
 
@@ -23,7 +22,6 @@ const ROLE_ICON: Record<DailyRole, string> = {
 
 export default function MyDayTab({ token }: { token: string }) {
   const [data, setData] = useState<MyDayResponse | null>(null);
-  const [planData, setPlanData] = useState<PlanData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<DailyRole | null>(null);
@@ -133,8 +131,8 @@ export default function MyDayTab({ token }: { token: string }) {
         </div>
       )}
 
-      {/* План продаж — виден всем ролям */}
-      <SalesPlanCard token={token} onData={setPlanData} />
+      {/* Баннеры горячих точек — видны всем ролям */}
+      <SalesPlanCard token={token} />
 
       {data && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
@@ -158,14 +156,11 @@ export default function MyDayTab({ token }: { token: string }) {
               <SalesSignalsCard signals={data.signals as SalesSignals} />
             )}
             {data.role === "owner" && (
-              <>
-                <OwnerSummaryCard
-                  repair={(data.signals as { repair: RepairSignals; sales: SalesSignals }).repair}
-                  sales={(data.signals as { repair: RepairSignals; sales: SalesSignals }).sales}
-                  team={data.team}
-                />
-                {planData && <PlanOwnerStats data={planData} />}
-              </>
+              <OwnerSummaryCard
+                repair={(data.signals as { repair: RepairSignals; sales: SalesSignals }).repair}
+                sales={(data.signals as { repair: RepairSignals; sales: SalesSignals }).sales}
+                team={data.team}
+              />
             )}
           </div>
         </div>
