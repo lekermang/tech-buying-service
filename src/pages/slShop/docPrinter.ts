@@ -470,188 +470,247 @@ function tplSalesReceiptA4(ctx: SLDocContext): string {
   const buyerPhone  = cl.phone ? escape(String(cl.phone)) : "";
   const employeeName = escape(String(op.employee_name || "—"));
 
-  return `${toolbarHtml(`Товарный чек А4 №${docNum}`)}
+  // Общий HTML товарного блока — используется на обеих сторонах
+  const itemBlock = `
+    <table class="goods-table">
+      <tr><td class="lc">Наименование / Name</td><td><b>${itemTitle}</b></td></tr>
+      ${itemSpecs ? `<tr><td class="lc">Характеристики / Specs</td><td>${itemSpecs}</td></tr>` : ""}
+      ${itemIMEI  ? `<tr><td class="lc">IMEI</td><td class="mono">${itemIMEI}</td></tr>` : ""}
+      ${itemSN    ? `<tr><td class="lc">Серийный № / S/N</td><td class="mono">${itemSN}</td></tr>` : ""}
+      <tr><td class="lc">Артикул / SKU</td><td>${itemSKU}</td></tr>
+      <tr><td class="lc">Состояние / Condition</td><td>${itemCond}</td></tr>
+      <tr><td class="lc">Кол-во / Qty</td><td>1 шт. (pcs.)</td></tr>
+      <tr class="price-row"><td class="lc">Цена / Price</td><td>${fmtPrice(amount)} ₽ <span class="grey">(${priceWords(amount)})</span></td></tr>
+    </table>`;
+
+  return `${toolbarHtml(`Товарный чек А4 №${docNum} — двусторонняя печать`)}
 <style>
-@page { size: A4; margin: 15mm 15mm 20mm; }
-body { font-family: 'Times New Roman', serif; color: #000; font-size: 11pt; line-height: 1.45; }
+/* ── Общие ── */
+* { box-sizing: border-box; }
+body { font-family: 'Times New Roman', serif; color: #000; font-size: 10.5pt; line-height: 1.4; margin: 0; padding: 0; }
 @media print { .toolbar { display: none !important } }
-@media screen { body { background: #e8e8e8; } .page { box-shadow: 0 2px 16px rgba(0,0,0,0.18); margin: 24px auto; } }
-.page { max-width: 180mm; background: #fff; padding: 0; }
+@media screen { body { background: #ccc; } .sheet { box-shadow: 0 2px 20px rgba(0,0,0,0.25); margin: 20px auto; } }
 
-/* Шапка */
-.header { border-bottom: 3px solid #000; padding-bottom: 5mm; margin-bottom: 5mm; }
-.header-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8mm; }
-.logo-block .logo-name { font-size: 22pt; font-weight: 900; letter-spacing: 1px; line-height: 1; text-transform: uppercase; }
-.logo-block .logo-sub  { font-size: 9pt; color: #444; letter-spacing: 0.5px; margin-top: 1mm; }
-.req-block { text-align: right; font-size: 8.5pt; color: #333; line-height: 1.6; }
-.req-block b { font-size: 9pt; }
+/* ── Листы — каждый = 1 страница А4 ── */
+@page { size: A4; margin: 0; }
+.sheet { width: 210mm; min-height: 297mm; background: #fff; padding: 14mm 16mm 14mm; display: flex; flex-direction: column; page-break-after: always; }
+.sheet:last-child { page-break-after: auto; }
 
-/* Заголовок документа */
-.doc-title { text-align: center; font-size: 16pt; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; margin: 5mm 0 2mm; border: 2px solid #000; padding: 3mm 0; }
-.doc-meta { display: flex; justify-content: space-between; font-size: 9.5pt; border: 1px solid #ccc; padding: 2mm 3mm; background: #f9f9f9; margin-bottom: 4mm; }
+/* ── Линия разреза (только на экране) ── */
+@media screen { .cut-hint { border-top: 1px dashed #aaa; margin: 0 0 6mm; padding-top: 2mm; font-size: 7.5pt; color: #aaa; text-align: center; display:flex; align-items:center; gap:3mm; }
+.cut-hint::before,.cut-hint::after { content:''; flex:1; border-top:1px dashed #ccc; } }
+@media print { .cut-hint { display: none; } }
 
-/* Товар */
-.goods-table { width: 100%; border-collapse: collapse; margin: 3mm 0; }
-.goods-table th { background: #000; color: #fff; padding: 2mm 3mm; font-size: 9.5pt; font-weight: bold; text-align: left; }
-.goods-table td { border: 1px solid #000; padding: 2.5mm 3mm; font-size: 10.5pt; vertical-align: top; }
-.goods-table .label-col { width: 38%; background: #f5f5f5; font-weight: bold; font-size: 9.5pt; }
-.price-row td { font-size: 13pt; font-weight: 900; }
+/* ── Шапка ── */
+.header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2.5px solid #000; padding-bottom: 4mm; margin-bottom: 4mm; gap: 6mm; }
+.logo-name { font-size: 20pt; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; line-height: 1; }
+.logo-sub  { font-size: 8.5pt; color: #555; margin-top: 1mm; }
+.req       { text-align: right; font-size: 8pt; color: #333; line-height: 1.55; }
+.req b     { font-size: 8.5pt; }
 
-/* Итог */
-.total-block { border: 2.5px solid #000; padding: 3mm 5mm; margin: 4mm 0; display: flex; justify-content: space-between; align-items: center; }
-.total-block .total-label { font-size: 11pt; font-weight: bold; text-transform: uppercase; }
-.total-block .total-sum   { font-size: 20pt; font-weight: 900; }
+/* ── Заголовок документа ── */
+.doc-title { text-align: center; font-size: 14pt; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; border: 2px solid #000; padding: 2.5mm 0; margin: 0 0 2.5mm; }
+.doc-meta  { display: flex; justify-content: space-between; border: 1px solid #bbb; background: #f8f8f8; padding: 1.5mm 3mm; font-size: 9pt; margin-bottom: 3.5mm; }
 
-/* Секции */
-.section-title { font-size: 8pt; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; color: #555; border-bottom: 1px solid #ccc; margin: 4mm 0 2mm; padding-bottom: 1mm; }
-.info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 6mm; }
-.info-row  { display: flex; gap: 2mm; font-size: 9.5pt; padding: 1.2mm 0; border-bottom: 1px dotted #ddd; }
-.info-row .lbl { min-width: 32mm; color: #555; font-size: 9pt; }
-.info-row .val { font-weight: bold; }
+/* ── Таблица товара ── */
+.goods-table { width: 100%; border-collapse: collapse; margin: 2.5mm 0; font-size: 10pt; }
+.goods-table td { border: 1px solid #000; padding: 2mm 2.5mm; vertical-align: top; }
+.goods-table .lc { width: 36%; background: #f3f3f3; font-weight: bold; font-size: 9pt; }
+.goods-table .mono { font-family: 'Courier New', monospace; letter-spacing: 0.5px; }
+.goods-table .price-row td { font-size: 12pt; font-weight: 900; }
+.grey { font-size: 9pt; font-weight: normal; color: #555; }
 
-/* Таможня */
-.customs-box { border: 1.5px solid #000; padding: 3mm 4mm; margin: 4mm 0; background: #fafafa; }
-.customs-box .customs-title { font-size: 10pt; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2mm; }
-.customs-box p { font-size: 9.5pt; margin: 1.5mm 0; }
-.customs-box .ru { color: #000; }
-.customs-box .en { color: #333; font-style: italic; font-size: 9pt; }
+/* ── Итог с печатью ── */
+.total-row { display: flex; justify-content: space-between; align-items: center; border: 2.5px solid #000; padding: 2.5mm 4mm; margin: 3mm 0; gap: 5mm; }
+.total-label { font-size: 10.5pt; font-weight: bold; text-transform: uppercase; }
+.total-pay   { font-size: 8.5pt; color: #555; }
+.total-sum   { font-size: 19pt; font-weight: 900; flex: 1; text-align: center; }
+.stamp-circle { width: 28mm; height: 28mm; border: 1px dashed #999; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 7.5pt; color: #aaa; text-align: center; flex-shrink: 0; }
 
-/* Гарантия */
-.warranty-box { border: 1px solid #aaa; padding: 2.5mm 4mm; margin: 3mm 0; font-size: 9.5pt; background: #f9f9f9; }
+/* ── Таможня ── */
+.customs { border: 1.5px solid #000; padding: 2.5mm 3.5mm; margin: 3mm 0; background: #fafafa; font-size: 9pt; }
+.customs .ct { font-weight: 900; text-transform: uppercase; font-size: 9.5pt; letter-spacing: 0.5px; margin-bottom: 1.5mm; }
+.customs .ru { color: #000; margin: 1mm 0; }
+.customs .en { color: #444; font-style: italic; margin: 1mm 0; font-size: 8.5pt; }
 
-/* Подписи */
-.signs { display: flex; justify-content: space-between; margin-top: 10mm; gap: 10mm; }
+/* ── Гарантия ── */
+.warranty { border: 1px solid #999; padding: 2mm 3mm; margin: 2.5mm 0; font-size: 9pt; background: #f9f9f9; }
+
+/* ── Подписи ── */
+.signs { display: flex; gap: 10mm; margin-top: 7mm; }
 .signs > div { flex: 1; }
-.signline { border-bottom: 1px solid #000; height: 12mm; margin-bottom: 1.5mm; }
-.signs .slabel { font-size: 9pt; color: #555; }
+.signline { border-bottom: 1px solid #000; height: 10mm; margin-bottom: 1.5mm; }
+.slabel { font-size: 8pt; color: #555; }
 
-/* Печать */
-.stamp-area { width: 30mm; height: 30mm; border: 1px dashed #aaa; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #bbb; font-size: 8pt; text-align: center; flex-shrink: 0; }
+/* ── Инфо-строки ── */
+.irow { display: flex; gap: 2mm; font-size: 9pt; padding: 1mm 0; border-bottom: 1px dotted #ddd; }
+.irow .il { min-width: 35mm; color: #666; font-size: 8.5pt; }
+.irow .iv { font-weight: bold; }
+.igrid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 5mm; margin-bottom: 2mm; }
 
-/* Низ */
-.footer-strip { border-top: 2px solid #000; margin-top: 6mm; padding-top: 3mm; font-size: 8pt; color: #444; display: flex; justify-content: space-between; }
-.barcode-area { text-align: center; font-family: 'Courier New', monospace; font-size: 8pt; letter-spacing: 3px; }
+/* ── Копия магазина — доп. стиль ── */
+.copy-badge { display: inline-block; font-size: 7.5pt; font-weight: bold; border: 1px solid #000; padding: 0.5mm 2mm; margin-left: 3mm; text-transform: uppercase; letter-spacing: 1px; vertical-align: middle; }
+.section-lbl { font-size: 7.5pt; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; color: #666; border-bottom: 1px solid #ccc; margin: 3mm 0 1.5mm; padding-bottom: 0.5mm; }
+.footer-line { border-top: 1.5px solid #000; margin-top: auto; padding-top: 2.5mm; font-size: 7.5pt; color: #555; display: flex; justify-content: space-between; }
 </style>
 
-<div class="page">
-  <!-- ШАПКА -->
+<!-- ══════════════════════════════════════════════════ -->
+<!-- СТОРОНА 1 — ЭКЗЕМПЛЯР ПОКУПАТЕЛЯ                  -->
+<!-- ══════════════════════════════════════════════════ -->
+<div class="sheet">
   <div class="header">
-    <div class="header-top">
-      <div class="logo-block">
-        <div class="logo-name">${shopShort}</div>
-        <div class="logo-sub">Комиссионный магазин / Second-hand electronics store</div>
-        ${branchName ? `<div style="font-size:8.5pt;color:#555;margin-top:0.5mm">${branchName}</div>` : ""}
-      </div>
-      <div class="req-block">
-        <b>${shopName}</b><br>
-        ИНН: ${shopINN} · ОГРН: ${shopOGRN}<br>
-        ${shopAddr}<br>
-        Тел: ${shopPhone}<br>
-        ${shopSite}
-      </div>
+    <div>
+      <div class="logo-name">${shopShort}</div>
+      <div class="logo-sub">Комиссионный магазин / Second-hand electronics store</div>
+      ${branchName ? `<div style="font-size:8pt;color:#666;margin-top:0.5mm">${branchName}</div>` : ""}
+    </div>
+    <div class="req">
+      <b>${shopName}</b><br>
+      ИНН: ${shopINN} &nbsp;·&nbsp; ОГРН: ${shopOGRN}<br>
+      ${shopAddr}<br>
+      Тел: ${shopPhone} &nbsp;·&nbsp; ${shopSite}
     </div>
   </div>
 
-  <!-- ЗАГОЛОВОК -->
-  <div class="doc-title">Товарный чек / Sales Receipt</div>
+  <div class="doc-title">Товарный чек / Sales Receipt <span style="font-size:9pt;font-weight:400">(экз. покупателя)</span></div>
   <div class="doc-meta">
-    <span>№ ${escape(String(docNum))}</span>
-    <span>Дата / Date: <b>${dateStr}</b></span>
-    <span>Время / Time: <b>${timeStr}</b></span>
+    <span>№&nbsp;<b>${escape(String(docNum))}</b></span>
+    <span>Дата / Date:&nbsp;<b>${dateStr}</b></span>
+    <span>Время / Time:&nbsp;<b>${timeStr}</b></span>
   </div>
 
-  <!-- ТОВАР -->
-  <div class="section-title">Сведения о товаре / Item description</div>
-  <table class="goods-table">
-    <tr>
-      <th style="width:38%">Поле / Field</th>
-      <th>Значение / Value</th>
-    </tr>
-    <tr><td class="label-col">Наименование / Name</td><td><b>${itemTitle}</b></td></tr>
-    ${itemSpecs ? `<tr><td class="label-col">Характеристики / Specs</td><td>${itemSpecs}</td></tr>` : ""}
-    ${itemIMEI  ? `<tr><td class="label-col">IMEI</td><td style="font-family:'Courier New',monospace;letter-spacing:1px">${itemIMEI}</td></tr>` : ""}
-    ${itemSN    ? `<tr><td class="label-col">Серийный номер / S/N</td><td style="font-family:'Courier New',monospace">${itemSN}</td></tr>` : ""}
-    <tr><td class="label-col">Артикул / SKU</td><td>${itemSKU}</td></tr>
-    <tr><td class="label-col">Состояние / Condition</td><td>${itemCond}</td></tr>
-    <tr><td class="label-col">Количество / Qty</td><td>1 шт. (pcs.)</td></tr>
-    <tr class="price-row">
-      <td class="label-col">Цена / Price</td>
-      <td>${fmtPrice(amount)} ₽&nbsp;&nbsp;<span style="font-size:10pt;font-weight:normal;color:#555">(${priceWords(amount)})</span></td>
-    </tr>
-  </table>
+  ${itemBlock}
 
-  <!-- ИТОГ -->
-  <div class="total-block">
+  <div class="total-row">
     <div>
       <div class="total-label">Итого / Total</div>
-      <div style="font-size:9pt;color:#555">${payLabel}</div>
+      <div class="total-pay">${payLabel}</div>
     </div>
-    <div class="total-sum">${fmtPrice(amount)} ₽</div>
-    <div class="stamp-area">М.П.<br>Stamp</div>
+    <div class="total-sum">${fmtPrice(amount)}&nbsp;₽</div>
+    <div class="stamp-circle">М.П.<br>Stamp</div>
   </div>
 
-  <!-- ИНФО О СДЕЛКЕ И ПОКУПАТЕЛЕ -->
-  <div class="section-title">Участники сделки / Transaction parties</div>
-  <div class="info-grid">
+  <div class="igrid">
     <div>
-      ${buyerName  ? `<div class="info-row"><span class="lbl">Покупатель / Buyer:</span><span class="val">${buyerName}</span></div>` : ""}
-      ${buyerPhone ? `<div class="info-row"><span class="lbl">Телефон / Phone:</span><span class="val">${buyerPhone}</span></div>` : ""}
-      <div class="info-row"><span class="lbl">Продавец / Seller:</span><span class="val">${employeeName}</span></div>
+      ${buyerName  ? `<div class="irow"><span class="il">Покупатель / Buyer:</span><span class="iv">${buyerName}</span></div>` : ""}
+      ${buyerPhone ? `<div class="irow"><span class="il">Телефон / Phone:</span><span class="iv">${buyerPhone}</span></div>` : ""}
+      <div class="irow"><span class="il">Продавец / Seller:</span><span class="iv">${employeeName}</span></div>
     </div>
     <div>
-      <div class="info-row"><span class="lbl">Дата продажи / Sale date:</span><span class="val">${dateStr}</span></div>
-      <div class="info-row"><span class="lbl">Время / Time:</span><span class="val">${timeStr}</span></div>
-      <div class="info-row"><span class="lbl">Магазин / Store:</span><span class="val">${shopShort}</span></div>
+      <div class="irow"><span class="il">Дата продажи:</span><span class="iv">${dateStr}</span></div>
+      <div class="irow"><span class="il">Время / Time:</span><span class="iv">${timeStr}</span></div>
+      <div class="irow"><span class="il">Магазин / Store:</span><span class="iv">${shopShort}</span></div>
     </div>
   </div>
 
-  <!-- ТАМОЖНЯ -->
-  <div class="customs-box">
-    <div class="customs-title">🛃 Для таможенного контроля / For customs clearance</div>
+  <div class="customs">
+    <div class="ct">🛃 Для таможенного контроля / For customs clearance</div>
     <p class="ru">Настоящий документ подтверждает законное приобретение товара физическим лицом на территории Российской Федерации в розничной торговой точке.</p>
     <p class="en">This document certifies that the goods were legally purchased by an individual in the Russian Federation at a retail store.</p>
     <p class="ru">Товар является личным имуществом покупателя и вывозится для личного пользования, не в коммерческих целях.</p>
     <p class="en">The goods are the personal property of the buyer and are exported for personal use, not for commercial purposes.</p>
-    <p style="margin-top:2mm;font-size:9pt;color:#555">
-      Продавец / Seller: ${shopName} · ИНН / TIN: ${shopINN} · ОГРН / OGRN: ${shopOGRN}<br>
-      Адрес / Address: ${shopAddr} · Тел. / Tel: ${shopPhone}
-    </p>
+    <p style="margin-top:1.5mm;font-size:8pt;color:#666">${shopName} · ИНН/TIN: ${shopINN} · ОГРН/OGRN: ${shopOGRN} · ${shopAddr}</p>
   </div>
 
-  <!-- ГАРАНТИЯ -->
-  <div class="warranty-box">
-    <b>Гарантийные обязательства / Warranty:</b>
+  <div class="warranty">
+    <b>Гарантия / Warranty:</b>
     ${warranty >= 365 ? `${Math.round(warranty / 365)} год (year)` : `${warranty} дней (days)`} с даты продажи / from sale date.
-    Гарантия действует до / Valid until: <b>${warrantyEnd}</b>.<br>
-    <span style="font-size:8.5pt;color:#555">Гарантия не распространяется на механические повреждения, попадание жидкости и нарушение правил эксплуатации. /
-    Warranty does not cover physical damage, liquid damage, or misuse.</span>
+    Действует до / Valid until: <b>${warrantyEnd}</b>.&nbsp;
+    <span class="grey">Не распространяется на мех. повреждения и попадание жидкости / Does not cover physical damage or liquid damage.</span>
   </div>
 
-  <!-- ПОДПИСИ -->
   <div class="signs">
     <div>
-      <div style="font-size:9.5pt;font-weight:bold;margin-bottom:2mm">Продавец / Seller</div>
-      <div style="font-size:8.5pt;color:#555;margin-bottom:1mm">${shopName}</div>
+      <div style="font-size:9pt;font-weight:bold;margin-bottom:1.5mm">Продавец / Seller</div>
+      <div style="font-size:8pt;color:#666;margin-bottom:1mm">${shopName}</div>
       <div class="signline"></div>
       <div class="slabel">подпись / signature &nbsp;&nbsp; М.П. / Stamp</div>
     </div>
     <div>
-      <div style="font-size:9.5pt;font-weight:bold;margin-bottom:2mm">Покупатель / Buyer</div>
-      <div style="font-size:8.5pt;color:#555;margin-bottom:1mm">${buyerName || "_________________________________"}</div>
+      <div style="font-size:9pt;font-weight:bold;margin-bottom:1.5mm">Покупатель / Buyer</div>
+      <div style="font-size:8pt;color:#666;margin-bottom:1mm">${buyerName || "_______________________________"}</div>
       <div class="signline"></div>
       <div class="slabel">подпись / signature</div>
     </div>
   </div>
 
-  <div class="footer-strip">
+  <div class="footer-line">
+    <span>Документ действителен без печати при наличии подписи продавца. / Valid without stamp if signed.</span>
+    <span style="font-family:'Courier New',monospace;letter-spacing:2px">${escape(String(docNum)).padStart(8,"0")}</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- СТОРОНА 2 — ЭКЗЕМПЛЯР МАГАЗИНА (обратная сторона) -->
+<!-- ══════════════════════════════════════════════════ -->
+<div class="sheet">
+  <div class="header">
     <div>
-      Документ действителен без печати при наличии подписи продавца.<br>
-      Document is valid without stamp if signed by seller.
+      <div class="logo-name">${shopShort} <span class="copy-badge">копия / магазин</span></div>
+      <div class="logo-sub">Комиссионный магазин · экземпляр продавца</div>
     </div>
-    <div class="barcode-area">
-      ${escape(String(docNum)).padStart(8, "0")}<br>
-      <span style="font-size:24pt;letter-spacing:-2px">|||||||||||||||</span>
+    <div class="req">
+      <b>${shopName}</b><br>
+      ИНН: ${shopINN} &nbsp;·&nbsp; ОГРН: ${shopOGRN}<br>
+      ${shopAddr}<br>
+      Тел: ${shopPhone}
     </div>
+  </div>
+
+  <div class="doc-title">Товарный чек №&nbsp;${escape(String(docNum))} <span style="font-size:9pt;font-weight:400">(экз. магазина)</span></div>
+  <div class="doc-meta">
+    <span>Дата: <b>${dateStr}</b></span>
+    <span>Время: <b>${timeStr}</b></span>
+    <span>Продавец: <b>${employeeName}</b></span>
+  </div>
+
+  ${itemBlock}
+
+  <div class="total-row">
+    <div>
+      <div class="total-label">Итого</div>
+      <div class="total-pay">${payLabel}</div>
+    </div>
+    <div class="total-sum">${fmtPrice(amount)}&nbsp;₽</div>
+    <div class="stamp-circle">М.П.</div>
+  </div>
+
+  <div class="section-lbl">Данные покупателя</div>
+  <div class="igrid">
+    <div>
+      ${buyerName  ? `<div class="irow"><span class="il">Покупатель:</span><span class="iv">${buyerName}</span></div>` : `<div class="irow"><span class="il">Покупатель:</span><span class="iv">________________________</span></div>`}
+      ${buyerPhone ? `<div class="irow"><span class="il">Телефон:</span><span class="iv">${buyerPhone}</span></div>` : `<div class="irow"><span class="il">Телефон:</span><span class="iv">________________________</span></div>`}
+    </div>
+    <div>
+      <div class="irow"><span class="il">Паспорт / Doc:</span><span class="iv">________________________</span></div>
+      <div class="irow"><span class="il">Гражданство:</span><span class="iv">________________________</span></div>
+    </div>
+  </div>
+
+  <div class="warranty">
+    <b>Гарантийные обязательства:</b> ${warranty >= 365 ? `${Math.round(warranty / 365)} год` : `${warranty} дней`} с даты продажи.
+    Действует до: <b>${warrantyEnd}</b>.
+    Гарантия не распространяется на механические повреждения, попадание жидкости и нарушение правил эксплуатации.
+  </div>
+
+  <div class="signs">
+    <div>
+      <div style="font-size:9pt;font-weight:bold;margin-bottom:1.5mm">Продавец</div>
+      <div style="font-size:8pt;color:#666;margin-bottom:1mm">${shopName}</div>
+      <div class="signline"></div>
+      <div class="slabel">подпись / М.П.</div>
+    </div>
+    <div>
+      <div style="font-size:9pt;font-weight:bold;margin-bottom:1.5mm">Покупатель (подтверждаю получение)</div>
+      <div style="font-size:8pt;color:#666;margin-bottom:1mm">${buyerName || "_______________________________"}</div>
+      <div class="signline"></div>
+      <div class="slabel">подпись</div>
+    </div>
+  </div>
+
+  <div class="footer-line">
+    <span>Товар получен. Претензий к качеству и комплектации не имею.</span>
+    <span style="font-family:'Courier New',monospace;letter-spacing:2px">${escape(String(docNum)).padStart(8,"0")}</span>
   </div>
 </div>
 <script>setTimeout(()=>window.print(),400);</` + `script>`;

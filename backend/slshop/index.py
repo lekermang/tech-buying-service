@@ -2035,8 +2035,13 @@ def update_item(body, employee=None):
         cur.close(); conn.close(); return _err(404, 'Товар не найден')
     cur_status = row[0]
     is_owner = employee and employee.get('role') == 'owner'
+    # Проданный товар: разрешаем редактировать IMEI/серийник/описание/фото всем,
+    # цену продажи — только владельцу, остальные поля — только владельцу
+    ALLOWED_SOLD_FIELDS = {'imei', 'serial_number', 'description', 'specs_short', 'specs', 'condition'}
     if cur_status == 'sold' and not is_owner:
-        return _err(403, 'Редактировать проданный товар может только владелец')
+        blocked = [k for k in data if k not in ALLOWED_SOLD_FIELDS]
+        if blocked:
+            return _err(403, f'Редактировать проданный товар может только владелец (поля: {", ".join(blocked)})')
     if cur_status == 'sold' and 'sell_price' in data and not is_owner:
         return _err(403, 'Менять цену продажи может только владелец')
     # Валидация FK
