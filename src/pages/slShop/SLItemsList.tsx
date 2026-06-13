@@ -8,6 +8,7 @@ import SLItemSellModal from "./SLItemSellModal";
 import SLItemsTable from "./SLItemsTable";
 import SLInvoiceModal from "./SLInvoiceModal";
 import { printLabelQuick } from "./labelPrinter";
+import PrintDocsButton from "./PrintDocsButton";
 
 const PHONE_SPECS_AI_URL = "https://functions.poehali.dev/983744a8-1cfc-42d8-a566-bf31dfa328b2";
 
@@ -323,6 +324,7 @@ export default function SLItemsList({ token, empName: _empName, isOwner = false 
 
       {viewMode === "table" ? (
         <SLItemsTable
+          token={token}
           items={items}
           selected={selected}
           toggleSelect={toggleSelect}
@@ -383,6 +385,14 @@ export default function SLItemsList({ token, empName: _empName, isOwner = false 
                         className="text-white/40 hover:text-[#FFD700] p-1 rounded hover:bg-[#FFD700]/10">
                         <Icon name="Printer" size={11} />
                       </button>
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <PrintDocsButton
+                          token={token}
+                          itemId={it.id}
+                          opType={it.status === "sold" ? "sell" : (it.source === "consignment" ? "consignment_in" : "buyout_individual")}
+                          variant="small"
+                        />
+                      </div>
                       {it.status !== "sold" && it.status !== "returned" && (
                         <button onClick={(e) => { e.stopPropagation(); setSellOpen(it); }}
                           className="text-[10px] bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded">

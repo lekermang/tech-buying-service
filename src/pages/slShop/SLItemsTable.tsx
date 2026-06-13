@@ -2,8 +2,10 @@ import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import { fmt, type SLItem, STATUS_LABEL } from "./types";
 import { printLabelQuick } from "./labelPrinter";
+import PrintDocsButton from "./PrintDocsButton";
 
 interface Props {
+  token: string;
   items: SLItem[];
   selected: Set<number>;
   toggleSelect: (id: number) => void;
@@ -31,7 +33,7 @@ const titleWithRam = (it: SLItem): string => {
   return it.title;
 };
 
-export default function SLItemsTable({ items, selected, toggleSelect, onOpen, onSell }: Props) {
+export default function SLItemsTable({ token, items, selected, toggleSelect, onOpen, onSell }: Props) {
   const [sortBy, setSortBy] = useState<SortField>("created_at");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
@@ -155,6 +157,14 @@ export default function SLItemsTable({ items, selected, toggleSelect, onOpen, on
                       className="text-white/50 hover:text-[#FFD700] p-1 rounded hover:bg-[#FFD700]/10">
                       <Icon name="Printer" size={13} />
                     </button>
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <PrintDocsButton
+                        token={token}
+                        itemId={it.id}
+                        opType={it.status === "sold" ? "sell" : (it.source === "consignment" ? "consignment_in" : "buyout_individual")}
+                        variant="small"
+                      />
+                    </div>
                     {it.status !== "sold" && it.status !== "returned" && (
                       <button
                         onClick={(e) => { e.stopPropagation(); onSell(it); }}
