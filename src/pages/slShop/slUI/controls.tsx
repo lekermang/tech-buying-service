@@ -132,7 +132,7 @@ export function SLModal({
   const bottomReserve = 'max(env(safe-area-inset-bottom, 0px), 12px)';
   return (
     <div
-      className="fixed inset-0 z-[80] bg-black/75 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-3 animate-[fadeIn_0.15s_ease]"
+      className="fixed inset-0 z-[130] bg-black/75 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-3 animate-[fadeIn_0.15s_ease]"
       onClick={onClose}
     >
       <div

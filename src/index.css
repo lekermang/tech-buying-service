@@ -52,7 +52,8 @@
     -webkit-tap-highlight-color: transparent;
     -webkit-text-size-adjust: 100%;
     text-rendering: optimizeSpeed;
-    overflow-x: hidden;
+    /* overflow-x НЕ ставим на body — это создаёт новый stacking context
+       и ломает position:fixed у модальных окон */
   }
 
   html {
@@ -60,11 +61,12 @@
     overflow-x: hidden;
   }
 
-  /* iPhone 15 Pro Max и др. — учёт Dynamic Island и Home Indicator */
+  /* iPhone 15 Pro Max и др. — учёт Dynamic Island.
+     ВАЖНО: padding-bottom на body ломает fixed-модалки (создаёт dead-zone).
+     Safe-area снизу обрабатывается в самих компонентах через env(). */
   @supports (padding: env(safe-area-inset-top)) {
     body {
       padding-top: env(safe-area-inset-top);
-      padding-bottom: env(safe-area-inset-bottom);
     }
   }
 
