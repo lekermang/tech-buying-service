@@ -72,7 +72,7 @@ const YooKassaModal = ({ open, onClose }: YooKassaModalProps) => {
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
-        className="relative w-full sm:max-w-md overflow-hidden max-h-[95dvh] sm:max-h-[88vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl"
+        className="relative w-full sm:max-w-md overflow-hidden max-h-[95dvh] sm:max-h-[88dvh] overflow-y-auto rounded-t-2xl sm:rounded-2xl"
         style={{
           background: "linear-gradient(170deg, rgba(20,16,8,0.99) 0%, rgba(10,8,4,1) 100%)",
           border: "1px solid rgba(255,215,0,0.18)",

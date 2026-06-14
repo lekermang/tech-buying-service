@@ -98,7 +98,8 @@ export default function ClientEditorModal({ token, client, onClose, onSaved }: P
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
-      <div className="w-full max-w-2xl max-h-[92vh] overflow-y-auto bg-gradient-to-br from-[#0F0F0F] to-[#080808] border border-[#FFD700]/30 rounded-2xl">
+      <div className="w-full max-w-2xl overflow-y-auto bg-gradient-to-br from-[#0F0F0F] to-[#080808] border border-[#FFD700]/30 rounded-2xl"
+        style={{ maxHeight: "calc(92dvh - env(safe-area-inset-bottom, 0px))" }}>
         <div className="sticky top-0 bg-[#0A0A0A]/95 backdrop-blur border-b border-[#1F1F1F] px-4 py-3 flex items-center gap-3 z-10">
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FFD700]/30 to-[#FFD700]/5 border border-[#FFD700]/20 flex items-center justify-center overflow-hidden">
             {client.avatar_url ? (

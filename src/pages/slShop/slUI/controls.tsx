@@ -126,10 +126,6 @@ export function SLModal({
   footer?: ReactNode;
 }) {
   if (!open) return null;
-  // iPhone Safari + наш staff-tabbar (Ремонт/Чат/.../Команда) внизу занимают ~80px.
-  // Резервируем достаточно места, чтобы кнопка "Подтвердить" не уезжала под бар.
-  // 110px = высота нашего таб-бара + Safari-бара + запас.
-  const bottomReserve = 'max(env(safe-area-inset-bottom, 0px), 12px)';
   return (
     <div
       className="fixed inset-0 z-[130] bg-black/75 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-3 animate-[fadeIn_0.15s_ease]"
@@ -142,8 +138,8 @@ export function SLModal({
           border: "1px solid rgba(255,215,0,0.2)",
           borderRadius: "20px 20px 0 0",
           boxShadow: "0 -8px 48px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,215,0,0.06), 0 -2px 0 rgba(255,215,0,0.15) inset",
-          paddingBottom: bottomReserve,
-          maxHeight: "92dvh",
+          // dvh учитывает браузерную панель. safe-area — вырез/хоум-бар устройства
+          maxHeight: "calc(92dvh - env(safe-area-inset-bottom, 0px))",
           display: "flex",
           flexDirection: "column",
         }}
@@ -180,8 +176,9 @@ export function SLModal({
           </button>
         </div>
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        {/* Body — paddingBottom = safe-area чтобы контент не уходил под хоум-бар */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3"
+          style={{ paddingBottom: "max(16px, env(safe-area-inset-bottom, 0px))" }}>
           {children}
         </div>
 
@@ -190,6 +187,7 @@ export function SLModal({
           <div className="px-4 py-3 shrink-0" style={{
             borderTop: "1px solid rgba(255,215,0,0.1)",
             background: "rgba(8,6,3,0.95)",
+            paddingBottom: "max(12px, env(safe-area-inset-bottom, 0px))",
           }}>
             {footer}
           </div>

@@ -27,7 +27,8 @@ const MobileMenu = ({ open, navLinks, onNav, onPayClick }: MobileMenuProps) => {
   if (!open) return null;
 
   return (
-    <div className="md:hidden fixed inset-x-0 top-0 bottom-0 z-[60] flex flex-col overflow-y-auto pt-[88px]" style={{ background: "linear-gradient(180deg, #07050A 0%, #080608 60%, #07050A 100%)" }}>
+    <div className="md:hidden fixed inset-x-0 top-0 z-[60] flex flex-col overflow-y-auto pt-[88px]"
+      style={{ background: "linear-gradient(180deg, #07050A 0%, #080608 60%, #07050A 100%)", bottom: 0, paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
       <div className="px-4 py-2 flex-1">
         {navLinks.map(l => (
           <button key={l.href} onClick={() => onNav(l.href)}

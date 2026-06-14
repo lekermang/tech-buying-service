@@ -122,7 +122,7 @@ export default function EvaluateModal({ onClose }: { onClose: () => void }) {
         }} />
 
         {/* Модал */}
-        <div className="relative w-full sm:max-w-md max-h-[95dvh] sm:max-h-[88vh] overflow-y-auto overflow-x-hidden"
+        <div className="relative w-full sm:max-w-md max-h-[95dvh] sm:max-h-[88dvh] overflow-y-auto overflow-x-hidden"
           style={{
             background: "linear-gradient(170deg, rgba(20,16,8,0.99) 0%, rgba(10,8,4,1) 100%)",
             border: "1px solid rgba(255,215,0,0.18)",

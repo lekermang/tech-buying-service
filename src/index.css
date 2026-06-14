@@ -61,13 +61,23 @@
     overflow-x: hidden;
   }
 
-  /* iPhone 15 Pro Max и др. — учёт Dynamic Island.
-     ВАЖНО: padding-bottom на body ломает fixed-модалки (создаёт dead-zone).
-     Safe-area снизу обрабатывается в самих компонентах через env(). */
+  /* ── Safe-area: только top (bottom ломает fixed-модалки) ── */
   @supports (padding: env(safe-area-inset-top)) {
     body {
       padding-top: env(safe-area-inset-top);
     }
+  }
+
+  /* ── Глобальные утилиты для мобильного браузера ──
+     dvh учитывает браузерную панель снизу (Chrome/Safari mobile).
+     Используй var(--modal-max-h) в модалках вместо 90vh/95vh.      */
+  :root {
+    --sab: env(safe-area-inset-bottom, 0px);
+    --sat: env(safe-area-inset-top, 0px);
+    /* Максимальная высота для bottom-sheet модалок */
+    --modal-max-h: calc(92dvh - env(safe-area-inset-bottom, 0px));
+    /* Паддинг снизу в скроллируемых контейнерах */
+    --scroll-pb: max(16px, env(safe-area-inset-bottom, 0px));
   }
 
   /* Минимальный тач-таргет 44px (Apple HIG) */

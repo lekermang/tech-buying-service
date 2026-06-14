@@ -99,7 +99,8 @@ export default function AvitoProductModal({ item, photoIdx, setPhotoIdx, onClose
       onClick={onClose}
     >
       <div
-        className="relative w-full sm:max-w-lg max-h-[95vh] bg-gradient-to-br from-[#1a1a1a] to-[#0D0D0D] border-2 border-[#FFD700]/40 rounded-t-2xl sm:rounded-xl overflow-hidden flex flex-col shadow-[0_0_60px_rgba(255,215,0,0.3)] animate-in slide-in-from-bottom-8 sm:slide-in-from-bottom-4 duration-300"
+        className="relative w-full sm:max-w-lg bg-gradient-to-br from-[#1a1a1a] to-[#0D0D0D] border-2 border-[#FFD700]/40 rounded-t-2xl sm:rounded-xl overflow-hidden flex flex-col shadow-[0_0_60px_rgba(255,215,0,0.3)] animate-in slide-in-from-bottom-8 sm:slide-in-from-bottom-4 duration-300"
+        style={{ maxHeight: "calc(95dvh - env(safe-area-inset-bottom, 0px))" }}
         onClick={e => e.stopPropagation()}
       >
         <span aria-hidden className="absolute top-0 left-0 right-0 h-px" style={{ background: "linear-gradient(90deg, transparent, rgba(255,215,0,0.9), transparent)" }} />

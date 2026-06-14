@@ -78,7 +78,7 @@ export default function FinanceParamsModal({ token, open, onClose, onSaved }: Pr
         {loading ? (
           <div className="p-10 text-center text-white/40 text-sm">Загрузка…</div>
         ) : (
-          <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
+          <div className="p-4 space-y-4 overflow-y-auto" style={{ maxHeight: "calc(70dvh - env(safe-area-inset-bottom, 0px))" }}>
             {error && (
               <div className="px-3 py-2 rounded border border-red-500/30 bg-red-500/10 text-red-300 text-xs">{error}</div>
             )}

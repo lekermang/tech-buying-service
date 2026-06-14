@@ -70,7 +70,9 @@ function Modal({ loading, tpls, ctx, onClose, onPick }: {
 }) {
   return (
     <div className="fixed inset-0 z-[140] bg-black/80 flex items-end sm:items-center justify-center p-2" onClick={onClose}>
-      <div className="bg-[#0A0A0A] border border-[#1F1F1F] rounded-2xl w-full max-w-md max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+      <div className="bg-[#0A0A0A] border border-[#1F1F1F] rounded-2xl w-full max-w-md overflow-y-auto"
+        style={{ maxHeight: "calc(90dvh - env(safe-area-inset-bottom, 0px))", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+        onClick={e => e.stopPropagation()}>
         <div className="sticky top-0 bg-[#0A0A0A] border-b border-[#1F1F1F] p-3 flex items-center justify-between z-10">
           <div className="font-bold">Печать документов</div>
           <button onClick={onClose}><Icon name="X" size={16} /></button>

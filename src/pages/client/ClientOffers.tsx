@@ -272,7 +272,8 @@ function NewOfferModal({
       onClick={onClose}
     >
       <div
-        className="bg-[#0E0E0E] border border-[#FFD700]/30 rounded-t-2xl sm:rounded-2xl p-5 w-full max-w-md max-h-[95vh] overflow-y-auto"
+        className="bg-[#0E0E0E] border border-[#FFD700]/30 rounded-t-2xl sm:rounded-2xl p-5 w-full max-w-md overflow-y-auto"
+        style={{ maxHeight: "calc(95dvh - env(safe-area-inset-bottom, 0px))", paddingBottom: "max(20px, env(safe-area-inset-bottom, 0px))" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 mb-4">

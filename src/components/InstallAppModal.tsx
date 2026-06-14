@@ -89,8 +89,8 @@ export default function InstallAppModal({ open, onClose, appName = "Скупка
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full sm:max-w-md bg-gradient-to-br from-[#141414] to-[#0A0A0A] border border-[#FFD700]/30 rounded-t-2xl sm:rounded-2xl shadow-2xl shadow-black/70 p-5 max-h-[92vh] overflow-y-auto"
-        style={{ paddingBottom: "calc(20px + env(safe-area-inset-bottom, 0px))" }}
+        className="w-full sm:max-w-md bg-gradient-to-br from-[#141414] to-[#0A0A0A] border border-[#FFD700]/30 rounded-t-2xl sm:rounded-2xl shadow-2xl shadow-black/70 p-5 overflow-y-auto"
+        style={{ maxHeight: "calc(92dvh - env(safe-area-inset-bottom, 0px))", paddingBottom: "calc(20px + env(safe-area-inset-bottom, 0px))" }}
       >
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2.5 min-w-0">
