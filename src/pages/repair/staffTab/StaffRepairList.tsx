@@ -3,7 +3,7 @@ import { STATUSES, Order, EMPTY_FORM } from "../types";
 import { EditForm } from "./staffTabTypes";
 import {
   SortMode, GroupMode, TimeGroup,
-  ageHours, urgencyLevel, getTimeGroup, TIME_GROUP_META,
+  ageHours, urgencyLevel, getTimeGroup, getUrgentTimeGroup, TIME_GROUP_META,
 } from "./repairListUtils";
 import RepairStatusFilter from "./RepairStatusFilter";
 import RepairNewOrderForm from "./RepairNewOrderForm";
@@ -51,7 +51,7 @@ export default function StaffRepairList({
   cardsView = "list",
   initialUrgentFilter,
 }: Props) {
-  const [sortMode, setSortMode] = useState<SortMode>("urgency");
+  const [sortMode, setSortMode] = useState<SortMode>("date_desc");
   const [groupMode, setGroupMode] = useState<GroupMode>("time");
 
   // urgentFilter — показывать только критичные (≥ 6ч без движения)
@@ -130,9 +130,17 @@ export default function StaffRepairList({
       return [{ key: "", label: "", color: "", icon: "", desc: "", orders: sortedOrders }];
     }
     if (groupMode === "time") {
-      const ORDER: TimeGroup[] = ["critical", "today", "yesterday", "week", "older"];
+      // В urgentFilter — показываем критичные группой «🚨 Срочные», остальные по дате
+      // В обычном режиме — только по дате: сегодня / вчера / позавчера / неделя / старше
+      const groupFn = urgentFilter ? getUrgentTimeGroup : getTimeGroup;
+      const ORDER: TimeGroup[] = urgentFilter
+        ? ["critical", "today", "yesterday", "day2ago", "week", "older"]
+        : ["today", "yesterday", "day2ago", "week", "older"];
       const map = new Map<TimeGroup, Order[]>(ORDER.map(k => [k, []]));
-      for (const o of sortedOrders) map.get(getTimeGroup(o))!.push(o);
+      for (const o of sortedOrders) {
+        const grp = groupFn(o);
+        if (map.has(grp)) map.get(grp)!.push(o);
+      }
       return ORDER
         .filter(k => map.get(k)!.length > 0)
         .map(k => {
