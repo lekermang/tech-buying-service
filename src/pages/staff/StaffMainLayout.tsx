@@ -34,6 +34,7 @@ import StaffPasswordModal from "./StaffPasswordModal";
 import DigitalParticles from "@/components/fx/DigitalParticles";
 import PriceFloatingButton from "./PriceFloatingButton";
 import DebtBouncer from "../staffSalary/DebtBouncer";
+import UrgentRepairBanner from "../repair/staffTab/UrgentRepairBanner";
 
 type Tab = StaffTab;
 
@@ -76,6 +77,8 @@ export function StaffMainLayout({
   const [siteChatUnread, setSiteChatUnread] = React.useState(0);
   const [leadsStats, setLeadsStats] = React.useState<{ new_count: number; overdue_count: number } | null>(null);
   const [leadsPanelOpen, setLeadsPanelOpen] = React.useState(false);
+  const [urgentRepairCount, setUrgentRepairCount] = React.useState(0);
+  const [urgentRepairTrigger, setUrgentRepairTrigger] = React.useState(0);
 
   React.useEffect(() => {
     const CHAT_URL = "https://functions.poehali.dev/60644856-ff88-4875-b2a9-97c87d32a630";
@@ -271,7 +274,7 @@ export function StaffMainLayout({
             {tab === "sitechat"     && <SiteChatTab token={token} />}
             {tab === "wanttobuy"    && <WantToBuyTab token={token} />}
             {tab === "chat"         && <VipChatTab token={token} />}
-            {tab === "repair"       && <StaffRepairTab token={token} isOwner={empRole === "owner"} />}
+            {tab === "repair"       && <StaffRepairTab token={token} isOwner={empRole === "owner"} onUrgentCount={setUrgentRepairCount} initialUrgentFilter={urgentRepairTrigger > 0} />}
             {tab === "goods"        && <GoodsTab token={token} />}
             {tab === "sales"        && <SalesTab token={token} />}
             {tab === "clients"      && <ClientsTab token={token} />}
@@ -310,6 +313,15 @@ export function StaffMainLayout({
 
       {/* Плавающая кнопка «Отправить прайс» — для всех сотрудников */}
       <PriceFloatingButton token={token} />
+
+      {/* Кнопка СРОЧНО — срочные ремонты (видна на всех вкладках) */}
+      <UrgentRepairBanner
+        count={urgentRepairCount}
+        onClick={() => {
+          setUrgentRepairTrigger(v => v + 1);
+          requestTab("repair");
+        }}
+      />
 
       {/* Нижняя навигация */}
       <StaffBottomNav

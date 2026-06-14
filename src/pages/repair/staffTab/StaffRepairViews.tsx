@@ -16,11 +16,13 @@ export default function StaffRepairViews({
   isOwner,
   st,
   actions,
+  initialUrgentFilter,
 }: {
   token: string;
   isOwner: boolean;
   st: StaffRepairState;
   actions: StaffRepairActions;
+  initialUrgentFilter?: boolean;
 }) {
   // ─── Счётчики статусов ───────────────────────────────────────────────────────
   const statusCounts: Record<string, number> = {};
@@ -103,6 +105,7 @@ export default function StaffRepairViews({
           callRobotReady={actions.callRobotReady}
           inviteToMax={actions.inviteToMax}
           cardsView={st.cardsView}
+          initialUrgentFilter={initialUrgentFilter}
         />
       )}
 

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { STATUSES, Order, EMPTY_FORM } from "../types";
 import { EditForm } from "./staffTabTypes";
 import {
@@ -8,6 +8,7 @@ import {
 import RepairStatusFilter from "./RepairStatusFilter";
 import RepairNewOrderForm from "./RepairNewOrderForm";
 import RepairSortGroupBar from "./RepairSortGroupBar";
+import Icon from "@/components/ui/icon";
 
 type Props = {
   orders: Order[];
@@ -38,6 +39,7 @@ type Props = {
   callRobotReady?: (id: number) => Promise<boolean>;
   inviteToMax?: (id: number) => Promise<boolean>;
   cardsView?: "grid" | "list";
+  initialUrgentFilter?: boolean;
 };
 
 export default function StaffRepairList({
@@ -47,14 +49,41 @@ export default function StaffRepairList({
   saving, saveError, setSaveError, isOwner, token,
   changeStatus, openReadyModal, issueOrder, saveCard, deleteOrder, callRobotReady, inviteToMax,
   cardsView = "list",
+  initialUrgentFilter,
 }: Props) {
   const [sortMode, setSortMode] = useState<SortMode>("urgency");
   const [groupMode, setGroupMode] = useState<GroupMode>("time");
 
+  // urgentFilter — показывать только критичные (≥ 6ч без движения)
+  // если пришли через кнопку СРОЧНО — включаем сразу
+  const [urgentFilter, setUrgentFilter] = useState(!!initialUrgentFilter);
+
+  // Если initialUrgentFilter изменится (повторное нажатие баннера) — реагируем
+  useEffect(() => {
+    if (initialUrgentFilter) setUrgentFilter(true);
+  }, [initialUrgentFilter]);
+
+  // Применяем urgentFilter поверх обычных orders
+  const filteredOrders = useMemo(() => {
+    if (!urgentFilter) return orders;
+    return orders.filter(o => urgencyLevel(o) >= 2);
+  }, [orders, urgentFilter]);
+
+  const urgentCount = useMemo(
+    () => orders.filter(o => urgencyLevel(o) >= 2).length,
+    [orders],
+  );
+
   const sortedOrders = useMemo(() => {
-    return orders
+    return filteredOrders
       .map((o, i) => ({ o, i }))
       .sort((a, b) => {
+        // В режиме urgentFilter — сортируем по дате создания (свежие первые)
+        if (urgentFilter) {
+          const ta = a.o.created_at ? new Date(a.o.created_at).getTime() : 0;
+          const tb = b.o.created_at ? new Date(b.o.created_at).getTime() : 0;
+          return tb - ta;
+        }
         if (sortMode === "urgency") {
           const la = urgencyLevel(a.o);
           const lb = urgencyLevel(b.o);
@@ -94,7 +123,7 @@ export default function StaffRepairList({
         return a.i - b.i;
       })
       .map(x => x.o);
-  }, [orders, sortMode]);
+  }, [filteredOrders, sortMode, urgentFilter]);
 
   const groupedOrders = useMemo(() => {
     if (groupMode === "none") {
@@ -135,6 +164,31 @@ export default function StaffRepairList({
 
   return (
     <>
+      {/* ── Баннер срочного фильтра ── */}
+      {urgentFilter && (
+        <div className="mx-3 mt-2 mb-1 flex items-center gap-2 rounded-xl px-3 py-2.5"
+          style={{
+            background: "linear-gradient(135deg, rgba(220,38,38,0.18), rgba(239,68,68,0.08))",
+            border: "1px solid rgba(239,68,68,0.35)",
+          }}>
+          <Icon name="AlertTriangle" size={14} style={{ color: "#ef4444", flexShrink: 0 }} />
+          <span className="font-oswald font-bold uppercase tracking-wide text-[13px]" style={{ color: "#f87171" }}>
+            Срочные ремонты — {urgentCount} шт.
+          </span>
+          <span className="font-roboto text-[11px] ml-1" style={{ color: "rgba(255,255,255,0.35)" }}>
+            · 6+ часов без движения
+          </span>
+          <button
+            onClick={() => setUrgentFilter(false)}
+            className="ml-auto flex items-center gap-1 font-roboto text-[11px] rounded-lg px-2 py-1 transition-colors"
+            style={{ color: "rgba(255,255,255,0.4)", background: "rgba(255,255,255,0.06)" }}
+          >
+            <Icon name="X" size={11} />
+            Все
+          </button>
+        </div>
+      )}
+
       <RepairStatusFilter
         orders={orders}
         filterStatus={filterStatus}
