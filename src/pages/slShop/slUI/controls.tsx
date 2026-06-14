@@ -132,16 +132,12 @@ export function SLModal({
       onClick={onClose}
     >
       <div
-        className={`w-full ${maxWidth} overflow-hidden relative`}
+        className={`w-full ${maxWidth} overflow-hidden relative rounded-t-[20px] sm:rounded-[20px] flex flex-col`}
         style={{
           background: "linear-gradient(180deg, rgba(16,12,6,0.99) 0%, rgba(10,8,4,1) 100%)",
           border: "1px solid rgba(255,215,0,0.2)",
-          borderRadius: "20px 20px 0 0",
           boxShadow: "0 -8px 48px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,215,0,0.06), 0 -2px 0 rgba(255,215,0,0.15) inset",
-          // dvh учитывает браузерную панель. safe-area — вырез/хоум-бар устройства
           maxHeight: "calc(92dvh - env(safe-area-inset-bottom, 0px))",
-          display: "flex",
-          flexDirection: "column",
         }}
         onClick={e => e.stopPropagation()}
       >
