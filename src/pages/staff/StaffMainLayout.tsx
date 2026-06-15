@@ -93,7 +93,7 @@ export function StaffMainLayout({
       } catch { /* ignore */ }
     };
     check();
-    const id = setInterval(check, 20000);
+    const id = setInterval(check, 60000);
     return () => clearInterval(id);
   }, [token]);
 

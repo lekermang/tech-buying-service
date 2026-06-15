@@ -255,7 +255,7 @@ export default function PublicChat() {
       } catch {
         /* ignore */
       }
-    }, 4000);
+    }, 15000);
     return () => clearInterval(id);
   }, [authToken, roomId, scrollToBottom]);
 

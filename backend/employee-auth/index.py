@@ -2,6 +2,7 @@ import json
 import os
 import secrets
 import hashlib
+import time
 from datetime import datetime, timedelta
 
 import psycopg2
@@ -14,6 +15,11 @@ HEADERS = {
 }
 SCHEMA = 't_p31606708_tech_buying_service'
 
+# Кэш токенов в памяти — экономит ~80% вызовов к БД при частых проверках
+# { token -> (employee_dict, expires_at_monotonic) }
+_TOKEN_CACHE: dict = {}
+_TOKEN_CACHE_TTL = 60  # секунд
+
 
 def get_conn():
     return psycopg2.connect(os.environ['DATABASE_URL'])
@@ -24,7 +30,6 @@ def hash_pw(pw: str) -> str:
 
 
 def hash_pin(pin: str) -> str:
-    # отдельная соль, чтобы PIN-хеш не совпадал с password_hash
     return hashlib.sha256(('pin:' + pin).encode()).hexdigest()
 
 
@@ -34,11 +39,18 @@ OWNER_REQUIRED_PIN = '231189'
 def get_employee_by_token(token: str):
     if not token:
         return None
+    now = time.monotonic()
+    cached = _TOKEN_CACHE.get(token)
+    if cached and cached[1] > now:
+        return cached[0]
     conn = get_conn(); cur = conn.cursor()
     cur.execute(f"SELECT id, full_name, login, role, avatar_url, email, phone FROM {SCHEMA}.employees WHERE auth_token=%s AND token_expires_at>NOW() AND is_active=true", (token,))
     row = cur.fetchone(); cur.close(); conn.close()
-    return {'id': row[0], 'full_name': row[1], 'login': row[2], 'role': row[3],
-            'avatar_url': row[4], 'email': row[5], 'phone': row[6]} if row else None
+    emp = {'id': row[0], 'full_name': row[1], 'login': row[2], 'role': row[3],
+           'avatar_url': row[4], 'email': row[5], 'phone': row[6]} if row else None
+    if emp:
+        _TOKEN_CACHE[token] = (emp, now + _TOKEN_CACHE_TTL)
+    return emp
 
 
 def handler(event: dict, context) -> dict:

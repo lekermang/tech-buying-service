@@ -33,6 +33,16 @@ HEADERS = {
     'Content-Type': 'application/json',
 }
 
+# ── In-memory кэши — снижают кол-во запросов к БД ──────────────────────────
+# Токены сотрудников: { token -> (emp_dict, expires_monotonic) }
+_EMP_CACHE: dict = {}
+_EMP_CACHE_TTL = 60  # сек
+
+# stats_today и recent_events: { key -> (response_dict, expires_monotonic) }
+_STATS_CACHE: dict = {}
+_STATS_TODAY_TTL = 60   # сек — обновляем раз в минуту
+_RECENT_TTL = 10        # сек — тосты чуть свежее
+
 
 def _ok(data, status=200):
     return {'statusCode': status, 'headers': HEADERS, 'body': json.dumps(data, ensure_ascii=False, default=_jd), 'isBase64Encoded': False}
@@ -57,6 +67,10 @@ def _get_conn():
 def _get_employee(token: str):
     if not token:
         return None
+    now = time.monotonic()
+    cached = _EMP_CACHE.get(token)
+    if cached and cached[1] > now:
+        return cached[0]
     conn = _get_conn(); cur = conn.cursor()
     try:
         cur.execute(
@@ -67,7 +81,9 @@ def _get_employee(token: str):
         row = cur.fetchone()
         if not row:
             return None
-        return {'id': row[0], 'full_name': row[1], 'login': row[2], 'role': row[3]}
+        emp = {'id': row[0], 'full_name': row[1], 'login': row[2], 'role': row[3]}
+        _EMP_CACHE[token] = (emp, now + _EMP_CACHE_TTL)
+        return emp
     finally:
         cur.close(); conn.close()
 
@@ -516,7 +532,11 @@ def action_online():
 
 
 def action_stats_today():
-    """KPI за сегодня."""
+    """KPI за сегодня. Кэш 60 сек."""
+    now = time.monotonic()
+    cached = _STATS_CACHE.get('stats_today')
+    if cached and cached[1] > now:
+        return cached[0]
     conn = _get_conn(); cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cur.execute(
         f"SELECT "
@@ -531,8 +551,6 @@ def action_stats_today():
     conv = int(row.get('conv_today') or 0)
     row['conversion_rate'] = round((conv / uniq * 100), 2) if uniq else 0.0
     row['conv_amount_today'] = float(row.get('conv_amount_today') or 0)
-
-    # Топ источников за сегодня
     cur.execute(
         f"SELECT source, COUNT(*) AS sessions, COUNT(DISTINCT visitor_id) AS visitors "
         f"FROM {SCHEMA}.an_sessions WHERE started_at::date = CURRENT_DATE "
@@ -540,7 +558,9 @@ def action_stats_today():
     )
     row['top_sources'] = [dict(r) for r in cur.fetchall()]
     cur.close(); conn.close()
-    return _ok(row)
+    result = _ok(row)
+    _STATS_CACHE['stats_today'] = (result, now + _STATS_TODAY_TTL)
+    return result
 
 
 def action_conversions(qs):
@@ -561,8 +581,13 @@ def action_conversions(qs):
 
 
 def action_recent_events(qs):
-    """Новые события за последние N секунд (для тостов)."""
+    """Новые события за последние N секунд (для тостов). Кэш 10 сек."""
     seconds = min(int(qs.get('seconds') or 15), 120)
+    cache_key = f'recent_{seconds}'
+    now = time.monotonic()
+    cached = _STATS_CACHE.get(cache_key)
+    if cached and cached[1] > now:
+        return cached[0]
     conn = _get_conn(); cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cur.execute(
         f"SELECT e.id, e.session_id, e.visitor_id, e.event_type, e.event_data, e.page_url, e.timestamp, "
@@ -576,7 +601,9 @@ def action_recent_events(qs):
     )
     items = [dict(r) for r in cur.fetchall()]
     cur.close(); conn.close()
-    return _ok({'items': items})
+    result = _ok({'items': items})
+    _STATS_CACHE[cache_key] = (result, now + _RECENT_TTL)
+    return result
 
 
 def action_visitor(qs):

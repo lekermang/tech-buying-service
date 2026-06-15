@@ -172,7 +172,7 @@ export default function SiteChatTab({ token }: { token: string }) {
   };
 
   useEffect(() => { loadRooms(); }, [loadRooms]);
-  useEffect(() => { const id = setInterval(loadRooms, 20000); return () => clearInterval(id); }, [loadRooms]);
+  useEffect(() => { const id = setInterval(loadRooms, 60000); return () => clearInterval(id); }, [loadRooms]);
   useEffect(() => {
     if (!activeRoom) return;
     lastIdRef.current = 0;

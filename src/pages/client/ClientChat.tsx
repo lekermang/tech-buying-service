@@ -144,7 +144,7 @@ export default function ClientChat({ token }: { token: string }) {
       } catch {
         /* ignore network errors */
       }
-    }, 8000);
+    }, 15000);
     return () => { active = false; clearInterval(id); };
   }, [authToken, roomId]);
 
