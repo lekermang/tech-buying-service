@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Icon from "@/components/ui/icon";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -10,6 +10,29 @@ const PRESETS = [
   { v: "week", l: "7 дней" },
   { v: "month", l: "30 дней" },
 ];
+
+const DAY_NAMES = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
+
+function build14Days(): { iso: string; label: string; dayName: string; dayNum: number; isToday: boolean; isWeekend: boolean }[] {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const days = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const isoStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const wd = d.getDay();
+    days.push({
+      iso: isoStr,
+      label: DAY_NAMES[wd],
+      dayNum: d.getDate(),
+      isToday: i === 0,
+      isWeekend: wd === 0 || wd === 6,
+    });
+  }
+  return days;
+}
 
 const fmt = (d: Date) => {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -41,6 +64,7 @@ export default function PeriodPicker({ period, setPeriod, customRange, setCustom
       ? { from: new Date(customRange.from), to: new Date(customRange.to) }
       : undefined,
   );
+  const days14 = useRef(build14Days()).current;
 
   const isCustom = period === "custom";
 
@@ -181,6 +205,47 @@ export default function PeriodPicker({ period, setPeriod, customRange, setCustom
           className={`${loading ? "animate-spin text-[#FFD700]" : "group-hover:rotate-180 transition-transform duration-500"}`}
         />
       </button>
+
+      {/* ── 14 дней: 2 недели кнопками ────────────────────────────────── */}
+      <div className="w-full flex gap-px overflow-x-auto scrollbar-none pb-0.5 mt-1">
+        {days14.map((d, idx) => {
+          const isActive = period === "custom" && customRange?.from === d.iso && customRange?.to === d.iso;
+          // Разделитель между неделями
+          const showDivider = idx === 6;
+          return (
+            <div key={d.iso} className="flex items-stretch gap-px shrink-0">
+              {showDivider && (
+                <div className="w-px self-stretch bg-[#2a2a2a] mx-0.5" />
+              )}
+              <button
+                onClick={() => {
+                  setCustomRange({ from: d.iso, to: d.iso });
+                  setPeriod("custom");
+                }}
+                title={d.iso}
+                className={`
+                  flex flex-col items-center justify-center px-2.5 py-1.5 rounded-lg transition-all active:scale-95 min-w-[36px]
+                  ${isActive
+                    ? "bg-gradient-to-b from-[#FFE34D] via-[#FFD700] to-[#d4a017] text-black shadow-[0_2px_10px_rgba(255,215,0,0.4)]"
+                    : d.isToday
+                      ? "bg-[#1a1a0a] border border-[#FFD700]/30 text-[#FFD700]/80 hover:border-[#FFD700]/60 hover:text-[#FFD700]"
+                      : d.isWeekend
+                        ? "bg-[#0E0E0E] border border-[#1a1a1a] text-white/35 hover:text-white/70 hover:border-white/20"
+                        : "bg-[#0E0E0E] border border-[#1a1a1a] text-white/50 hover:text-white/80 hover:border-white/20"
+                  }
+                `}
+              >
+                <span className={`font-roboto leading-none mb-0.5 ${isActive ? "font-bold text-[9px]" : "text-[9px]"}`}>
+                  {d.label}
+                </span>
+                <span className={`font-oswald leading-none ${isActive ? "font-black text-[13px]" : "font-bold text-[12px]"}`}>
+                  {d.dayNum}
+                </span>
+              </button>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
