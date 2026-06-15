@@ -95,6 +95,7 @@ const SkupkaIphoneKaluga = safeLazy(() => import("./pages/seo/SkupkaIphoneKaluga
 const SkupkaMacbookKaluga = safeLazy(() => import("./pages/seo/SkupkaMacbookKaluga"));
 const SkupkaNoutbukovKaluga = safeLazy(() => import("./pages/seo/SkupkaNoutbukovKaluga"));
 const SkupkaZolotaKaluga = safeLazy(() => import("./pages/seo/SkupkaZolotaKaluga"));
+const CenaZolotaKaluga   = safeLazy(() => import("./pages/seo/CenaZolotaKaluga"));
 const SkupkaSamsungKaluga = safeLazy(() => import("./pages/seo/SkupkaSamsungKaluga"));
 const SkupkaXiaomiKaluga = safeLazy(() => import("./pages/seo/SkupkaXiaomiKaluga"));
 const RemontIphoneKalugaSeo = safeLazy(() => import("./pages/seo/RemontIphoneKalugaSeo"));
@@ -230,6 +231,7 @@ const App = () => {
             <Route path="/skupka-macbook-kaluga"   element={<SkupkaMacbookKaluga />} />
             <Route path="/skupka-noutbukov-kaluga" element={<SkupkaNoutbukovKaluga />} />
             <Route path="/skupka-zolota-kaluga"    element={<SkupkaZolotaKaluga />} />
+            <Route path="/cena-zolota-kaluga"      element={<CenaZolotaKaluga />} />
             <Route path="/skupka-samsung-kaluga"   element={<SkupkaSamsungKaluga />} />
             <Route path="/skupka-xiaomi-kaluga"    element={<SkupkaXiaomiKaluga />} />
             <Route path="/remont-iphone-kaluga"    element={<RemontIphoneKalugaSeo />} />

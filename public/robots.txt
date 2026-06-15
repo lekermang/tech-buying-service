@@ -46,6 +46,8 @@ Allow: /blacklist
 Allow: /checklist
 Allow: /chat
 Allow: /repair-status
+Allow: /cena-zolota-kaluga
+Allow: /prajs
 Allow: /tools
 Disallow: /admin
 Disallow: /cabinet
@@ -97,6 +99,9 @@ Allow: /soviet-antiques
 Allow: /TopGold
 Allow: /requisites
 Allow: /safe-deals
+Allow: /cena-zolota-kaluga
+Allow: /repair-status
+Allow: /prajs
 Allow: /tools
 Disallow: /admin
 Disallow: /cabinet
@@ -166,6 +171,9 @@ Allow: /soviet-antiques
 Allow: /TopGold
 Allow: /requisites
 Allow: /safe-deals
+Allow: /cena-zolota-kaluga
+Allow: /repair-status
+Allow: /prajs
 Allow: /tools
 Disallow: /admin
 Disallow: /cabinet
