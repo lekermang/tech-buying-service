@@ -54,11 +54,10 @@ export default function SLItemsList({ token, empName: _empName, isOwner = false 
   const load = useCallback(async () => {
     setLoading(true);
     const r = await slApi<SLItem[]>(token, "items", {
-      params: { status: filter, q, category_id: catFilter || undefined },
+      params: { status: filter, q, category_id: catFilter || undefined, branch_id: branchFilter || undefined },
     });
     if (r.ok && r.data) {
       let result = r.data;
-      if (branchFilter) result = result.filter(i => i.branch_id === branchFilter);
       setAllItems(result);
       // фильтры на клиенте
       const min = priceMin ? Number(priceMin) : null;

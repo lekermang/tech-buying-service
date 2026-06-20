@@ -1881,13 +1881,16 @@ def _gen_sku():
 def list_items(params):
     status = (params.get('status') or '').strip()
     category_id = params.get('category_id')
+    branch_id = params.get('branch_id')
     q = (params.get('q') or '').strip()
-    limit = int(params.get('limit') or 200)
+    limit = int(params.get('limit') or 2000)
     where = []
     if status:
         where.append(f"i.status={_esc(status)}")
     if category_id:
         where.append(f"i.category_id={int(category_id)}")
+    if branch_id:
+        where.append(f"i.branch_id={int(branch_id)}")
     if q:
         like = f"%{q}%"
         where.append(f"(i.title ILIKE {_esc(like)} OR i.imei ILIKE {_esc(like)} OR i.sku ILIKE {_esc(like)})")

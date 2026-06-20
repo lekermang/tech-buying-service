@@ -1,4 +1,5 @@
 {
+  "public-chat": "https://functions.poehali.dev/06e0e177-7525-48f9-bce8-617ba9e87cde",
   "sales-plan": "https://functions.poehali.dev/2503599d-a182-40db-ab15-788c4c653872",
   "promo-api": "https://functions.poehali.dev/d0b139ce-b968-40cb-be48-3bdb67713efb",
   "price-pdf": "https://functions.poehali.dev/eff3d143-8966-4a6d-bbea-ddc77a6e5373",
@@ -28,7 +29,6 @@
   "notify-push": "https://functions.poehali.dev/0a041e7f-92ab-4dbf-86f0-cd09e3eabfbd",
   "staff-daily": "https://functions.poehali.dev/be89689d-a156-4e0e-bf96-11e5e715f3c1",
   "finance-analytics": "https://functions.poehali.dev/41aae5ce-14d4-4c12-8522-59fcf9ae1b6a",
-  "public-chat": "https://functions.poehali.dev/60644856-ff88-4875-b2a9-97c87d32a630",
   "vip-chat": "https://functions.poehali.dev/9bdac7bc-3f02-4dea-896e-1d5800741003",
   "salary-api": "https://functions.poehali.dev/0945fb27-103d-4e8f-9e4d-9d22d377e9a8",
   "icon-builder": "https://functions.poehali.dev/743789e1-14f8-4e97-b3cf-3d3d38173268",
