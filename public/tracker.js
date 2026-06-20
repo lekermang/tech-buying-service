@@ -10,7 +10,7 @@
   window.__skypkaAn = true;
 
   var API = 'https://functions.poehali.dev/4a685ed3-dad8-47ee-be16-48c6db749fd2';
-  var HEARTBEAT_MS = 15000;
+  var HEARTBEAT_MS = 60000;
   var SCROLL_MARKS = [25, 50, 75, 100];
   var SENT_SCROLL = {};
   var SENT_FORM_START = {};
