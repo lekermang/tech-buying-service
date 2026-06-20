@@ -675,6 +675,43 @@
 
 <body style="background:#0D0D0D;color:#fff;margin:0">
 <div id="root" style="background:#0D0D0D"></div>
+
+<!-- Глобальный перехватчик устаревших чанков после деплоя.
+     Срабатывает когда браузер не может загрузить JS/CSS файл (старый хеш).
+     Один раз сбрасывает SW + кэш и перезагружает страницу. -->
+<script>
+(function(){
+  var KEY = '__chunk_reload__';
+  var reload = function() {
+    if (sessionStorage.getItem(KEY)) return;
+    sessionStorage.setItem(KEY, '1');
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations()
+        .then(function(rs){ rs.forEach(function(r){ r.unregister(); }); })
+        .catch(function(){});
+    }
+    if ('caches' in window) {
+      caches.keys().then(function(keys){
+        keys.forEach(function(k){ caches.delete(k); });
+      }).catch(function(){});
+    }
+    setTimeout(function(){ window.location.reload(); }, 80);
+  };
+  window.addEventListener('error', function(e) {
+    var src = (e.filename || '') + (e.message || '');
+    if (/Importing a module script failed|Failed to fetch dynamically imported|Loading chunk|ChunkLoadError/i.test(src)) {
+      reload();
+    }
+  }, true);
+  window.addEventListener('unhandledrejection', function(e) {
+    var msg = String(e.reason && e.reason.message || e.reason || '');
+    if (/Importing a module script failed|Failed to fetch dynamically imported|Loading chunk|ChunkLoadError/i.test(msg)) {
+      reload();
+    }
+  });
+})();
+</script>
+
 <script type="module" src="/src/main.tsx"></script>
 <noscript><div><img src="https://mc.yandex.ru/watch/108421419" style="position:absolute;left:-9999px;width:1px;height:1px" alt=""/></div></noscript>
 </body>
