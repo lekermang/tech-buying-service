@@ -143,8 +143,8 @@ export default function SLItemDetail({ token, item: itemProp, isOwner, onClose, 
       <div className="bg-[#0A0A0A] border border-[#1F1F1F] rounded-2xl w-full max-w-md overflow-y-auto"
         style={{ maxHeight: "calc(92dvh - env(safe-area-inset-bottom, 0px))", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
         onClick={e => e.stopPropagation()}>
-        <div className="sticky top-0 bg-[#0A0A0A] border-b border-[#1F1F1F] p-3 flex items-center justify-between z-10">
-          <div className="font-bold text-sm truncate">
+        <div className="sticky top-0 bg-[#0A0A0A] border-b border-[#1F1F1F] p-3 flex items-center justify-between z-10 gap-2">
+          <div className="font-bold text-sm truncate min-w-0 flex-1">
             {item.title}
             {(item.ram_gb || item.storage_gb) && (
               <span className="ml-1.5 text-[#FFD700]">
@@ -152,7 +152,16 @@ export default function SLItemDetail({ token, item: itemProp, isOwner, onClose, 
               </span>
             )}
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 shrink-0">
+            {!editing && item.status !== "sold" && item.status !== "returned" && (
+              <button
+                onClick={onSell}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-black font-bold text-[12px] transition-all shadow-lg shadow-emerald-500/30"
+              >
+                <Icon name="ShoppingCart" size={13} />
+                Продать
+              </button>
+            )}
             <button
               onClick={shareItem}
               title="Отправить карточку в чат сотрудников"
@@ -396,15 +405,7 @@ export default function SLItemDetail({ token, item: itemProp, isOwner, onClose, 
               </div>
             </>
           )}
-          {!editing && item.status !== "sold" && item.status !== "returned" && (
-            <div className="sticky bottom-0 bg-[#0A0A0A] border-t border-[#1F1F1F] -mx-3 px-3 py-3 mt-3">
-              <button onClick={onSell}
-                className="w-full bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-black font-bold py-3 rounded-xl text-base transition-all">
-                <Icon name="ShoppingCart" size={16} className="inline mr-2" />
-                Продать
-              </button>
-            </div>
-          )}
+
         </div>
       </div>
       {shareToast && (
