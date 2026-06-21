@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import { slClasses } from "./primitives";
 
@@ -125,6 +125,12 @@ export function SLModal({
   maxWidth?: string;
   footer?: ReactNode;
 }) {
+  useEffect(() => {
+    if (!open) return;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, [open]);
+
   if (!open) return null;
   return (
     <div

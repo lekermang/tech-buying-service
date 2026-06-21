@@ -138,6 +138,11 @@ export default function SLItemDetail({ token, item: itemProp, isOwner, onClose, 
     setTimeout(() => setShareToast(null), 2000);
   };
 
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, []);
+
   return (
     <div className="fixed inset-0 z-[120] bg-black/80 flex items-end sm:items-center justify-center p-2" onClick={onClose}>
       <div className="bg-[#0A0A0A] border border-[#1F1F1F] rounded-2xl w-full max-w-md overflow-y-auto"

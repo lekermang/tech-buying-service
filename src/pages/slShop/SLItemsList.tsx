@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import Icon from "@/components/ui/icon";
 import { slApi, fmt, type SLItem, type SLCategory, STATUS_LABEL } from "./types";
 import SLItemsFilters from "./SLItemsFilters";
@@ -407,8 +408,14 @@ export default function SLItemsList({ token, empName: _empName, isOwner = false 
         </div>
       )}
 
-      {open && <SLItemDetail token={token} item={open} isOwner={isOwner} onClose={() => setOpen(null)} onUpdated={() => { setOpen(null); load(); }} onSell={() => { setSellOpen(open); setOpen(null); }} />}
-      {sellOpen && <SLItemSellModal token={token} item={sellOpen} onClose={() => setSellOpen(null)} onDone={() => { setSellOpen(null); load(); }} />}
+      {open && createPortal(
+        <SLItemDetail token={token} item={open} isOwner={isOwner} onClose={() => setOpen(null)} onUpdated={() => { setOpen(null); load(); }} onSell={() => { setSellOpen(open); setOpen(null); }} />,
+        document.body
+      )}
+      {sellOpen && createPortal(
+        <SLItemSellModal token={token} item={sellOpen} onClose={() => setSellOpen(null)} onDone={() => { setSellOpen(null); load(); }} />,
+        document.body
+      )}
       {invoiceOpen && (
         <SLInvoiceModal
           token={token}
