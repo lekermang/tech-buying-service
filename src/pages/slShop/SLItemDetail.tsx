@@ -200,9 +200,6 @@ export default function SLItemDetail({ token, item: itemProp, isOwner, onClose, 
               </div>
               <div className="flex gap-2 mt-3">
                 <button onClick={() => setEditing(true)} className="flex-1 bg-[#141414] border border-[#1F1F1F] py-2 rounded-lg text-sm">Редактировать</button>
-                {item.status !== "sold" && item.status !== "returned" && (
-                  <button onClick={onSell} className="flex-1 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 py-2 rounded-lg text-sm font-bold">Продать</button>
-                )}
               </div>
               {isPhone && (
                 <button onClick={generateSpecs} disabled={aiBusy}
@@ -398,6 +395,15 @@ export default function SLItemDetail({ token, item: itemProp, isOwner, onClose, 
                 </button>
               </div>
             </>
+          )}
+          {!editing && item.status !== "sold" && item.status !== "returned" && (
+            <div className="sticky bottom-0 bg-[#0A0A0A] border-t border-[#1F1F1F] -mx-3 px-3 py-3 mt-3">
+              <button onClick={onSell}
+                className="w-full bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-black font-bold py-3 rounded-xl text-base transition-all">
+                <Icon name="ShoppingCart" size={16} className="inline mr-2" />
+                Продать
+              </button>
+            </div>
           )}
         </div>
       </div>
