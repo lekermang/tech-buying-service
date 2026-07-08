@@ -50,9 +50,9 @@ export default function EvaluateInline({ source = "ocenka_page" }: { source?: st
 
     setSubmitted(true);
 
-    const sendBg = (body: Record<string, unknown>) => {
+    const sendBg = (body: Record<string, unknown>, timeoutMs = 12000) => {
       const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 12000);
+      const t = setTimeout(() => ctrl.abort(), timeoutMs);
       fetch(SEND_LEAD_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -67,9 +67,10 @@ export default function EvaluateInline({ source = "ocenka_page" }: { source?: st
       : formData.desc;
 
     sendBg({ ...formData, desc: descFull, photos: [], source });
+    // Таймаут увеличен: на мобильном интернете загрузка нескольких фото может не уложиться в 12 сек
     const readyPhotos = photos.map(p => p.base64).filter(Boolean);
     if (readyPhotos.length > 0) {
-      sendBg({ ...formData, desc: `[фото] ${descFull}`, photos: readyPhotos, source });
+      sendBg({ ...formData, desc: `[фото] ${descFull}`, photos: readyPhotos, source }, 60000);
     }
   };
 

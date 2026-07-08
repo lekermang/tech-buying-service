@@ -56,9 +56,9 @@ export default function EvaluateModal({ onClose }: { onClose: () => void }) {
       });
     } catch { /* noop */ }
 
-    const sendBg = (body: Record<string, unknown>) => {
+    const sendBg = (body: Record<string, unknown>, timeoutMs = 12000) => {
       const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 12000);
+      const t = setTimeout(() => ctrl.abort(), timeoutMs);
       fetch(SEND_LEAD_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -77,10 +77,12 @@ export default function EvaluateModal({ onClose }: { onClose: () => void }) {
     // Основная заявка (быстрая, без фото)
     sendBg({ ...formData, photos: [], contact_channels: [], contact_time: "" });
 
-    // Фото — отдельным фоновым запросом
+    // Фото — отдельным фоновым запросом. Таймаут увеличен: на мобильном интернете
+    // загрузка нескольких фото (до 2 МБ в base64) может не уложиться в 12 сек —
+    // пользователь уже видит «Спасибо», поэтому спокойно ждём дольше.
     const readyPhotos = photos.map(p => p.base64).filter(Boolean);
     if (readyPhotos.length > 0) {
-      sendBg({ ...formData, desc: `[фото] ${formData.desc}`, photos: readyPhotos });
+      sendBg({ ...formData, desc: `[фото] ${formData.desc}`, photos: readyPhotos }, 60000);
     }
   };
 
