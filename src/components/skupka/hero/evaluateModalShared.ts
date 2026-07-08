@@ -39,3 +39,40 @@ export const compressImage = (file: File, maxW = 1200, quality = 0.75): Promise<
     img.onerror = () => { URL.revokeObjectURL(url); fallback(); };
     img.src = url;
   });
+
+/**
+ * Загружает ОДНО фото в S3 сразу (не дожидаясь отправки формы), с реальным
+ * прогрессом (0-100) через XMLHttpRequest (fetch не даёт progress на upload).
+ * Возвращает photo_id — используется потом чтобы привязать фото к заявке.
+ * Так каждое фото видно "загружено ✓" ещё до нажатия "Отправить заявку",
+ * и большие фото не режутся лимитом keepalive-запроса (~64KB).
+ */
+export const uploadPhotoWithProgress = (
+  base64: string,
+  onProgress: (pct: number) => void
+): Promise<{ photo_id: number; cdn_url: string }> =>
+  new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${SEND_LEAD_URL}?action=upload_photo_temp`);
+    xhr.setRequestHeader("Content-Type", "application/json");
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          if (data?.ok && data?.photo_id) {
+            onProgress(100);
+            resolve({ photo_id: data.photo_id, cdn_url: data.cdn_url });
+            return;
+          }
+        } catch { /* noop */ }
+      }
+      reject(new Error("upload failed"));
+    };
+    xhr.onerror = () => reject(new Error("network error"));
+    xhr.timeout = 30000;
+    xhr.ontimeout = () => reject(new Error("timeout"));
+    xhr.send(JSON.stringify({ photo: base64 }));
+  });

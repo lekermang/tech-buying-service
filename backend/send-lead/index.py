@@ -340,6 +340,38 @@ def handler(event: dict, context) -> dict:
     raw_body = event.get('body') or '{}'
     body = json.loads(raw_body) if isinstance(raw_body, str) else (raw_body or {})
 
+    # ── Загрузка ОДНОГО фото сразу при выборе (реальный прогресс на клиенте) ──
+    # Фото грузится в S3 сразу, ещё без lead_id — привязка к заявке произойдёт
+    # позже через action=attach_photos. Так браузер не режет keepalive-запрос
+    # (лимит ~64KB) и пользователь видит настоящий progress загрузки каждого фото.
+    qs0 = event.get('queryStringParameters') or {}
+    if qs0.get('action') == 'upload_photo_temp' or body.get('action') == 'upload_photo_temp':
+        photo_b64_temp = body.get('photo') or ''
+        if not photo_b64_temp:
+            return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'photo required'})}
+        try:
+            s3 = _s3_client()
+            if s3 is None:
+                return {'statusCode': 500, 'headers': HEADERS, 'body': json.dumps({'error': 'S3 недоступен'})}
+            import uuid as _uuid
+            token_id = _uuid.uuid4().hex[:16]
+            data = base64.b64decode(photo_b64_temp)
+            key = f'leads-photos/tmp/{token_id}.jpg'
+            s3.put_object(Bucket=S3_BUCKET, Key=key, Body=data, ContentType='image/jpeg')
+            cdn_url = _cdn_url(key)
+            conn_t = psycopg2.connect(os.environ['DATABASE_URL'])
+            cur_t = conn_t.cursor()
+            cur_t.execute(
+                f"INSERT INTO {SCHEMA}.lead_photos (lead_id, s3_key, cdn_url) VALUES (NULL, %s, %s) RETURNING id",
+                (key, cdn_url)
+            )
+            photo_id = cur_t.fetchone()[0]
+            conn_t.commit(); cur_t.close(); conn_t.close()
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'photo_id': photo_id, 'cdn_url': cdn_url})}
+        except Exception as e:
+            print(f'[send-lead][upload_photo_temp] error: {e}')
+            return {'statusCode': 500, 'headers': HEADERS, 'body': json.dumps({'error': 'Не удалось загрузить фото'})}
+
     # ── Оценка сайта от клиента (после заявки) ───────────────────────────────
     qs = event.get('queryStringParameters') or {}
     if qs.get('action') == 'rate' or body.get('action') == 'rate':
@@ -477,6 +509,7 @@ def handler(event: dict, context) -> dict:
         lead_id = None
 
     photos_b64 = body.get('photos') or ([photo_b64] if photo_b64 else [])
+    photo_ids = body.get('photo_ids') or []  # уже загруженные фото (action=upload_photo_temp)
     lead_num = f'#{lead_id}' if lead_id else ''
 
     if lead_id:
@@ -487,13 +520,31 @@ def handler(event: dict, context) -> dict:
 
     recipients = get_all_recipients(main_chat_id)
 
-    # ── 1. Фото в S3 (быстро, нужны CDN-ссылки для Telegram и MAX) ──
+    # ── 1. Фото в S3 ──
     cdn_photo_urls = []
+    # 1a. Уже загруженные фото (новый способ — грузятся сразу при выборе в форме) — просто привязываем к lead_id
+    if lead_id and photo_ids:
+        try:
+            conn_p = psycopg2.connect(os.environ['DATABASE_URL'])
+            cur_p = conn_p.cursor()
+            ids_int = [int(x) for x in photo_ids if str(x).isdigit()]
+            if ids_int:
+                cur_p.execute(
+                    f"UPDATE {SCHEMA}.lead_photos SET lead_id=%s, expires_at=NOW() + INTERVAL '24 hours' "
+                    f"WHERE id = ANY(%s) AND lead_id IS NULL RETURNING cdn_url",
+                    (int(lead_id), ids_int)
+                )
+                cdn_photo_urls.extend([r[0] for r in cur_p.fetchall() if r[0]])
+            conn_p.commit(); cur_p.close(); conn_p.close()
+            print(f'[S3] attached {len(cdn_photo_urls)} pre-uploaded photos')
+        except Exception as up_err:
+            print(f'[S3][attach] error: {up_err}')
+    # 1b. Старый способ — base64 в теле запроса (fallback, режется keepalive на больших фото)
     if lead_id and photos_b64:
         try:
             saved = upload_lead_photos_to_s3(lead_id, photos_b64)
-            cdn_photo_urls = [p['cdn_url'] for p in saved if p.get('cdn_url')]
-            print(f'[S3] uploaded {len(cdn_photo_urls)} photos')
+            cdn_photo_urls.extend([p['cdn_url'] for p in saved if p.get('cdn_url')])
+            print(f'[S3] uploaded {len(saved)} photos (base64)')
         except Exception as up_err:
             print(f'[S3] error: {up_err}')
 

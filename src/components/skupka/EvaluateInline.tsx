@@ -6,7 +6,7 @@ import { useState, useRef } from "react";
 import Icon from "@/components/ui/icon";
 import { ymGoal, Goals } from "@/lib/ym";
 import { formatPhone, isPhoneValid } from "@/lib/phoneFormat";
-import { SEND_LEAD_URL, INP_CLS, LBL_CLS, compressImage } from "./hero/evaluateModalShared";
+import { SEND_LEAD_URL, INP_CLS, LBL_CLS, compressImage, uploadPhotoWithProgress } from "./hero/evaluateModalShared";
 
 const DEVICE_CATEGORIES = [
   { icon: "Smartphone", label: "Смартфон / iPhone" },
@@ -17,30 +17,49 @@ const DEVICE_CATEGORIES = [
   { icon: "Cpu", label: "Другое" },
 ];
 
+type PhotoItem = {
+  preview: string;
+  progress: number; // 0-100, 100 = загружено
+  photo_id: number | null;
+  failed: boolean;
+};
+
 export default function EvaluateInline({ source = "ocenka_page" }: { source?: string }) {
   const [step, setStep] = useState<1 | 2>(1);
   const [formData, setFormData] = useState({ name: "", phone: "", desc: "", client_price: "", category: "" });
-  const [photos, setPhotos] = useState<{ preview: string; base64: string }[]>([]);
+  const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  // Синхронная копия photos — нужна т.к. state обновляется асинхронно,
-  // а на момент клика "Отправить" сжатие фото может ещё не завершиться.
-  const photosRef = useRef<{ preview: string; base64: string }[]>([]);
-  const pendingCompressions = useRef<Promise<void>[]>([]);
+  // Промисы активных загрузок — ждём их все перед отправкой заявки.
+  const pendingUploads = useRef<Promise<void>[]>([]);
 
   const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     e.target.value = "";
     files.slice(0, 5 - photos.length).forEach(file => {
       const preview = URL.createObjectURL(file);
-      const p = compressImage(file).then(base64 => {
-        if (photosRef.current.length >= 5) return;
-        const entry = { preview, base64 };
-        photosRef.current = [...photosRef.current, entry];
-        setPhotos(prev => prev.length < 5 ? [...prev, entry] : prev);
-      });
-      pendingCompressions.current.push(p);
+      setPhotos(prev => prev.length < 5 ? [...prev, { preview, progress: 0, photo_id: null, failed: false }] : prev);
+      const setProgressFor = (updater: (p: PhotoItem) => PhotoItem) => {
+        setPhotos(prev => {
+          const i = prev.findIndex(p => p.preview === preview);
+          if (i === -1) return prev;
+          const next = [...prev];
+          next[i] = updater(next[i]);
+          return next;
+        });
+      };
+      const p = compressImage(file)
+        .then(base64 => uploadPhotoWithProgress(base64, (pct) => {
+          setProgressFor(p => ({ ...p, progress: pct }));
+        }))
+        .then(({ photo_id }) => {
+          setProgressFor(p => ({ ...p, progress: 100, photo_id }));
+        })
+        .catch(() => {
+          setProgressFor(p => ({ ...p, failed: true }));
+        });
+      pendingUploads.current.push(p);
     });
   };
 
@@ -55,38 +74,35 @@ export default function EvaluateInline({ source = "ocenka_page" }: { source?: st
     setError(null);
     ymGoal(Goals.FORM_SUBMIT, { source });
 
-    // Ждём завершения сжатия всех выбранных фото — иначе при быстром клике
-    // "Отправить" сразу после выбора файла фото терялось (state ещё не успевал обновиться).
-    if (pendingCompressions.current.length > 0) {
-      try { await Promise.all(pendingCompressions.current); } catch { /* noop */ }
+    // Фото грузятся сразу при выборе — к моменту отправки обычно уже готовы.
+    // Если фото ещё грузится — подождём его завершения.
+    if (pendingUploads.current.length > 0) {
+      try { await Promise.all(pendingUploads.current); } catch { /* noop */ }
     }
 
     ymGoal(Goals.FORM_SUCCESS, { source });
     setSubmitted(true);
 
-    const sendBg = (body: Record<string, unknown>, timeoutMs = 12000) => {
-      const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), timeoutMs);
-      fetch(SEND_LEAD_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-        keepalive: true,
-        signal: ctrl.signal,
-      }).catch(() => {}).finally(() => clearTimeout(t));
-    };
-
     const descFull = formData.category
       ? `[${formData.category}] ${formData.desc}`
       : formData.desc;
+    const readyPhotoIds = photos.filter(p => p.photo_id !== null).map(p => p.photo_id);
+    const hasPhotos = readyPhotoIds.length > 0;
 
-    sendBg({ ...formData, desc: descFull, photos: [], source });
-    // Таймаут увеличен: на мобильном интернете загрузка нескольких фото может не уложиться в 12 сек.
-    // Берём из photosRef (синхронный) — на момент отправки все сжатия уже гарантированно завершены.
-    const readyPhotos = photosRef.current.map(p => p.base64).filter(Boolean);
-    if (readyPhotos.length > 0) {
-      sendBg({ ...formData, desc: `[фото] ${descFull}`, photos: readyPhotos, source }, 60000);
-    }
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 12000);
+    fetch(SEND_LEAD_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...formData,
+        desc: hasPhotos ? `[фото] ${descFull}` : descFull,
+        photo_ids: readyPhotoIds,
+        source,
+      }),
+      keepalive: true,
+      signal: ctrl.signal,
+    }).catch(() => {}).finally(() => clearTimeout(t));
   };
 
   // ── Экран «Спасибо» ──────────────────────────────────────────────────────
@@ -235,8 +251,21 @@ export default function EvaluateInline({ source = "ocenka_page" }: { source?: st
               {photos.map((ph, i) => (
                 <div key={i} className="relative w-16 h-16 rounded-xl overflow-hidden border border-white/10">
                   <img src={ph.preview} alt="" className="w-full h-full object-cover" />
+                  {ph.failed ? (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/65">
+                      <Icon name="AlertTriangle" size={16} className="text-red-400" />
+                    </div>
+                  ) : ph.progress < 100 ? (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/55">
+                      <Icon name="Loader2" size={14} className="animate-spin text-white/90" />
+                      <span className="text-[9px] font-roboto font-bold text-white/90">{ph.progress}%</span>
+                    </div>
+                  ) : (
+                    <div className="absolute bottom-0.5 left-0.5 w-4 h-4 rounded-full flex items-center justify-center bg-emerald-500">
+                      <Icon name="Check" size={9} className="text-white" />
+                    </div>
+                  )}
                   <button onClick={() => {
-                    photosRef.current = photosRef.current.filter((_, j) => j !== i);
                     setPhotos(prev => prev.filter((_, j) => j !== i));
                   }}
                     className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/70 flex items-center justify-center text-white/70 hover:text-white">
@@ -263,14 +292,18 @@ export default function EvaluateInline({ source = "ocenka_page" }: { source?: st
         )}
 
         <button onClick={handleSubmit}
-          className="group relative overflow-hidden mt-6 w-full py-4 rounded-xl font-oswald font-bold uppercase tracking-wide text-black text-base active:scale-95 transition-all flex items-center justify-center gap-2
+          disabled={photos.some(p => p.progress < 100 && !p.failed)}
+          className="group relative overflow-hidden mt-6 w-full py-4 rounded-xl font-oswald font-bold uppercase tracking-wide text-black text-base active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed
                      bg-[linear-gradient(180deg,#fff3a0_0%,#ffd700_45%,#d4a017_100%)]
                      shadow-[0_0_0_1px_rgba(255,215,0,0.6),0_10px_30px_rgba(255,215,0,0.35),inset_0_1px_0_rgba(255,255,255,0.5)]
                      hover:shadow-[0_0_0_1px_rgba(255,215,0,0.9),0_14px_40px_rgba(255,215,0,0.55),inset_0_1px_0_rgba(255,255,255,0.6)]">
           <span className="absolute inset-0 bg-[linear-gradient(115deg,transparent_35%,rgba(255,255,255,0.7)_50%,transparent_65%)] bg-[length:200%_100%] -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
           <span className="relative flex items-center gap-2">
-            <Icon name="Send" size={18} />
-            Отправить — получить оценку
+            {photos.some(p => p.progress < 100 && !p.failed) ? (
+              <><Icon name="Loader2" size={18} className="animate-spin" /> Загружаю фото…</>
+            ) : (
+              <><Icon name="Send" size={18} /> Отправить — получить оценку</>
+            )}
           </span>
         </button>
 

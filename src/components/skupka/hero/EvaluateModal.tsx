@@ -2,22 +2,26 @@ import { useState, useRef, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import { ymGoal, Goals } from "@/lib/ym";
 import { formatPhone, isPhoneValid } from "@/lib/phoneFormat";
-import { SEND_LEAD_URL, INP_CLS, LBL_CLS, compressImage } from "./evaluateModalShared";
+import { SEND_LEAD_URL, INP_CLS, LBL_CLS, compressImage, uploadPhotoWithProgress } from "./evaluateModalShared";
 import SiteRatingThankYou from "@/components/skupka/SiteRatingThankYou";
+
+type PhotoItem = {
+  preview: string;
+  progress: number; // 0-100, 100 = загружено
+  photo_id: number | null;
+  failed: boolean;
+};
 
 export default function EvaluateModal({ onClose }: { onClose: () => void }) {
   const [step, setStep] = useState<1 | 2>(1);
   const [formData, setFormData] = useState({ name: "", phone: "", desc: "", client_price: "" });
-  const [photos, setPhotos] = useState<{ preview: string; base64: string }[]>([]);
+  const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [submitted, setSubmitted] = useState(false);
   const [leadId, setLeadId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  // Синхронная копия photos — нужна т.к. state обновляется асинхронно,
-  // а на момент клика "Отправить" сжатие фото может ещё не завершиться.
-  const photosRef = useRef<{ preview: string; base64: string }[]>([]);
-  // Промисы незавершённых сжатий — ждём их все перед отправкой, чтобы не терять фото.
-  const pendingCompressions = useRef<Promise<void>[]>([]);
+  // Промисы активных загрузок — ждём их все перед отправкой заявки.
+  const pendingUploads = useRef<Promise<void>[]>([]);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -29,13 +33,29 @@ export default function EvaluateModal({ onClose }: { onClose: () => void }) {
     e.target.value = "";
     files.slice(0, 5 - photos.length).forEach(file => {
       const preview = URL.createObjectURL(file);
-      const p = compressImage(file).then(base64 => {
-        if (photosRef.current.length >= 5) return;
-        const entry = { preview, base64 };
-        photosRef.current = [...photosRef.current, entry];
-        setPhotos(prev => prev.length < 5 ? [...prev, entry] : prev);
-      });
-      pendingCompressions.current.push(p);
+      const idx = photos.length + pendingUploads.current.length; // приблизительный индекс для обновления
+      setPhotos(prev => prev.length < 5 ? [...prev, { preview, progress: 0, photo_id: null, failed: false }] : prev);
+      const setProgressFor = (updater: (p: PhotoItem) => PhotoItem) => {
+        setPhotos(prev => {
+          const i = prev.findIndex(p => p.preview === preview);
+          if (i === -1) return prev;
+          const next = [...prev];
+          next[i] = updater(next[i]);
+          return next;
+        });
+      };
+      const p = compressImage(file)
+        .then(base64 => uploadPhotoWithProgress(base64, (pct) => {
+          setProgressFor(p => ({ ...p, progress: pct }));
+        }))
+        .then(({ photo_id }) => {
+          setProgressFor(p => ({ ...p, progress: 100, photo_id }));
+        })
+        .catch(() => {
+          setProgressFor(p => ({ ...p, failed: true }));
+        });
+      pendingUploads.current.push(p);
+      void idx;
     });
   };
 
@@ -51,14 +71,13 @@ export default function EvaluateModal({ onClose }: { onClose: () => void }) {
     setError(null);
     ymGoal(Goals.FORM_SUBMIT, {});
 
-    // Ждём завершения сжатия всех выбранных фото — иначе при быстром клике
-    // "Отправить" сразу после выбора файла фото терялось (state ещё не успевал обновиться).
-    if (pendingCompressions.current.length > 0) {
-      try { await Promise.all(pendingCompressions.current); } catch { /* noop */ }
+    // Ждём завершения загрузки всех выбранных фото — они грузятся сразу при выборе,
+    // так что к моменту отправки обычно уже готовы. Если фото ещё грузится — подождём.
+    if (pendingUploads.current.length > 0) {
+      try { await Promise.all(pendingUploads.current); } catch { /* noop */ }
     }
 
     // Мгновенно показываем «Спасибо» — не ждём сервер.
-    // Заявка уходит в фоне с таймаутом, фото — отдельным запросом.
     setSubmitted(true);
     ymGoal(Goals.FORM_SUCCESS, {});
     try {
@@ -71,35 +90,30 @@ export default function EvaluateModal({ onClose }: { onClose: () => void }) {
       });
     } catch { /* noop */ }
 
-    const sendBg = (body: Record<string, unknown>, timeoutMs = 12000) => {
-      const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), timeoutMs);
-      fetch(SEND_LEAD_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-        keepalive: true,
-        signal: ctrl.signal,
+    const readyPhotoIds = photos.filter(p => p.photo_id !== null).map(p => p.photo_id);
+    const hasPhotos = readyPhotoIds.length > 0;
+
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 12000);
+    fetch(SEND_LEAD_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...formData,
+        desc: hasPhotos ? `[фото] ${formData.desc}` : formData.desc,
+        photo_ids: readyPhotoIds,
+        contact_channels: [],
+        contact_time: "",
+      }),
+      keepalive: true,
+      signal: ctrl.signal,
+    })
+      .then(async (res) => {
+        if (!res.ok) return;
+        try { const data = await res.json(); if (data?.lead_id) setLeadId(data.lead_id); } catch { /* noop */ }
       })
-        .then(async (res) => {
-          if (!res.ok) return;
-          try { const data = await res.json(); if (data?.lead_id) setLeadId(data.lead_id); } catch { /* noop */ }
-        })
-        .catch(() => { /* отправка в фоне — ошибки не блокируют пользователя */ })
-        .finally(() => clearTimeout(t));
-    };
-
-    // Основная заявка (быстрая, без фото)
-    sendBg({ ...formData, photos: [], contact_channels: [], contact_time: "" });
-
-    // Фото — отдельным фоновым запросом. Таймаут увеличен: на мобильном интернете
-    // загрузка нескольких фото (до 2 МБ в base64) может не уложиться в 12 сек —
-    // пользователь уже видит «Спасибо», поэтому спокойно ждём дольше.
-    // Берём из photosRef (синхронный) — на момент отправки все сжатия уже гарантированно завершены.
-    const readyPhotos = photosRef.current.map(p => p.base64).filter(Boolean);
-    if (readyPhotos.length > 0) {
-      sendBg({ ...formData, desc: `[фото] ${formData.desc}`, photos: readyPhotos }, 60000);
-    }
+      .catch(() => { /* отправка в фоне — ошибки не блокируют пользователя */ })
+      .finally(() => clearTimeout(t));
   };
 
   // После успешной отправки — экран благодарности с оценкой сайта и каналом MAX
@@ -399,8 +413,22 @@ export default function EvaluateModal({ onClose }: { onClose: () => void }) {
                         <div className="absolute inset-0 pointer-events-none" style={{
                           background: "linear-gradient(145deg, rgba(255,255,255,0.05), transparent)",
                         }} />
+                        {/* Прогресс загрузки / статус */}
+                        {p.failed ? (
+                          <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.65)" }}>
+                            <Icon name="AlertTriangle" size={18} className="text-red-400" />
+                          </div>
+                        ) : p.progress < 100 ? (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1" style={{ background: "rgba(0,0,0,0.55)" }}>
+                            <Icon name="Loader2" size={16} className="animate-spin text-white/90" />
+                            <span className="text-[9px] font-roboto font-bold text-white/90">{p.progress}%</span>
+                          </div>
+                        ) : (
+                          <div className="absolute bottom-1 left-1 w-4 h-4 rounded-full flex items-center justify-center" style={{ background: "#22c55e" }}>
+                            <Icon name="Check" size={10} className="text-white" />
+                          </div>
+                        )}
                         <button type="button" onClick={() => {
-                          photosRef.current = photosRef.current.filter((_, i) => i !== idx);
                           setPhotos(prev => prev.filter((_, i) => i !== idx));
                         }}
                           className="absolute top-1 right-1 w-5 h-5 flex items-center justify-center rounded-full"
@@ -444,8 +472,14 @@ export default function EvaluateModal({ onClose }: { onClose: () => void }) {
                   </div>
                 )}
 
-                <button onClick={handleSubmit} className="btn-gold-premium btn-xl w-full">
-                  <Icon name="Check" size={18} /> Отправить заявку
+                <button
+                  onClick={handleSubmit}
+                  disabled={photos.some(p => p.progress < 100 && !p.failed)}
+                  className="btn-gold-premium btn-xl w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {photos.some(p => p.progress < 100 && !p.failed)
+                    ? <><Icon name="Loader2" size={18} className="animate-spin" /> Загружаю фото…</>
+                    : <><Icon name="Check" size={18} /> Отправить заявку</>}
                 </button>
 
                 <p className="font-roboto text-xs text-center" style={{ color: "rgba(255,255,255,0.2)" }}>
