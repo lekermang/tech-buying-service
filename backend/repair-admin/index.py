@@ -44,7 +44,7 @@ def send_tg_all(token: str, main_chat_id: str, conn, message: str):
             requests.post(
                 f'{tg_url}/sendMessage',
                 json={'chat_id': cid, 'text': message, 'parse_mode': 'Markdown'},
-                timeout=10
+                timeout=4
             )
         except Exception:
             pass
@@ -355,7 +355,7 @@ def send_tg_document(token: str, chat_id, doc_bytes: bytes, filename: str, capti
             f'https://api.telegram.org/bot{token}/sendDocument',
             data={'chat_id': chat_id, 'caption': caption},
             files={'document': (filename, doc_bytes, mime)},
-            timeout=30,
+            timeout=8,
         )
     except Exception:
         pass
@@ -1492,19 +1492,18 @@ def handler(event: dict, context) -> dict:
             repair_type = (body.get('repair_type') or '').strip()
             price = body.get('price')
             comment = (body.get('comment') or '').strip()
-            price_val = int(price) if price else 'NULL'
-            model_val = f"'{model}'" if model else 'NULL'
-            repair_type_val = f"'{repair_type}'" if repair_type else 'NULL'
-            comment_val = f"'{comment}'" if comment else 'NULL'
+            price_val = int(price) if price else None
             price_str = f"{int(price):,} ₽".replace(',', ' ') if price else 'не определена'
             suffix = ''.join(c for c in phone if c.isdigit())[-10:]
-            cur.execute(f"SELECT chat_id FROM {SCHEMA}.tg_phone_map WHERE RIGHT(REGEXP_REPLACE(phone, '[^0-9]', '', 'g'), 10) = '{suffix}' LIMIT 1")
+            cur.execute(
+                f"SELECT chat_id FROM {SCHEMA}.tg_phone_map WHERE RIGHT(REGEXP_REPLACE(phone, '[^0-9]', '', 'g'), 10) = %s LIMIT 1",
+                (suffix,)
+            )
             prow = cur.fetchone()
             client_chat_id = prow[0] if prow else None
 
             # Приёмщик (кто оформил заявку) и его бонус
             actor_login, _actor_role, _actor_name = current_employee(event)
-            created_by_val = f"'{actor_login}'" if actor_login else 'NULL'
             # Бонус приёмщика начисляем только Богдану и только из допустимых сумм
             acceptor_bonus = 0
             try:
@@ -1516,7 +1515,9 @@ def handler(event: dict, context) -> dict:
 
             cur.execute(
                 f"INSERT INTO {SCHEMA}.repair_orders (name, phone, model, repair_type, price, comment, client_tg_chat_id, created_by, acceptor_bonus) "
-                f"VALUES ('{name}', '{phone}', {model_val}, {repair_type_val}, {price_val}, {comment_val}, {'NULL' if not client_chat_id else client_chat_id}, {created_by_val}, {acceptor_bonus}) RETURNING id"
+                f"VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+                (name, phone, model or None, repair_type or None, price_val, comment or None,
+                 client_chat_id, actor_login or None, acceptor_bonus)
             )
             new_id = cur.fetchone()[0]
             conn.commit()
@@ -1537,29 +1538,18 @@ def handler(event: dict, context) -> dict:
             )
             if tg_token and main_chat:
                 send_tg_all(tg_token, main_chat, conn, tg_msg)
-                html_bytes = build_act_html(new_id, name, phone, model, repair_type, price_str, comment)
-                filename = f'Акт_приёмки_{new_id}_{name.replace(" ", "_")}.html'
-                recipients = [main_chat]
                 try:
-                    cur3 = conn.cursor()
-                    cur3.execute(f"SELECT telegram_chat_id FROM {SCHEMA}.notification_recipients WHERE is_active=true AND notify_repair=true")
-                    for row in cur3.fetchall():
-                        if row[0] and row[0] not in recipients:
-                            recipients.append(row[0])
-                    cur3.close()
+                    html_bytes = build_act_html(new_id, name, phone, model, repair_type, price_str, comment)
+                    filename = f'Акт_приёмки_{new_id}_{name.replace(" ", "_")}.html'
+                    send_tg_document(tg_token, main_chat, html_bytes, filename, caption=f'📋 Акт приёмки №{new_id} — открыть и распечатать')
                 except Exception:
                     pass
-                pluxan = os.environ.get('PLUXAN4IK_CHAT_ID', '')
-                if pluxan and pluxan not in recipients:
-                    recipients.append(pluxan)
-                for cid in recipients:
-                    send_tg_document(tg_token, cid, html_bytes, filename, caption=f'📋 Акт приёмки №{new_id} — открыть и распечатать')
             # MAX staff_send
             try:
                 requests.post(
                     'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c?action=staff_send',
                     json={'text': f'🔧 *Новый ремонт #{new_id} (с панели)*\n👤 {name}\n📞 {phone}\n📱 {model or "—"}\n🛠 {repair_type or "—"}\n💰 {price_str}'},
-                    timeout=6,
+                    timeout=4,
                 )
             except Exception:
                 pass
@@ -1580,23 +1570,10 @@ def handler(event: dict, context) -> dict:
             filename = f'Акт_приёмки_{order_id}_{(name or "клиент").replace(" ", "_")}.html'
             tg_token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
             main_chat = os.environ.get('TELEGRAM_CHAT_ID', '')
-            recipients = [main_chat] if main_chat else []
-            try:
-                cur2 = conn.cursor()
-                cur2.execute(f"SELECT telegram_chat_id FROM {SCHEMA}.notification_recipients WHERE is_active=true AND notify_repair=true")
-                for r2 in cur2.fetchall():
-                    if r2[0] and r2[0] not in recipients:
-                        recipients.append(r2[0])
-                cur2.close()
-            except Exception:
-                pass
-            pluxan = os.environ.get('PLUXAN4IK_CHAT_ID', '')
-            if pluxan and pluxan not in recipients:
-                recipients.append(pluxan)
             sent = 0
-            for cid in recipients:
-                send_tg_document(tg_token, cid, html_bytes, filename, caption=f'📋 Акт приёмки №{order_id} — {name} — открыть и распечатать')
-                sent += 1
+            if tg_token and main_chat:
+                send_tg_document(tg_token, main_chat, html_bytes, filename, caption=f'📋 Акт приёмки №{order_id} — {name} — открыть и распечатать')
+                sent = 1
             cur.close(); conn.close()
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'sent_to': sent}, ensure_ascii=False)}
 
