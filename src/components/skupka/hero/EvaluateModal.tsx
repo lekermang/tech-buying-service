@@ -13,6 +13,11 @@ export default function EvaluateModal({ onClose }: { onClose: () => void }) {
   const [leadId, setLeadId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Синхронная копия photos — нужна т.к. state обновляется асинхронно,
+  // а на момент клика "Отправить" сжатие фото может ещё не завершиться.
+  const photosRef = useRef<{ preview: string; base64: string }[]>([]);
+  // Промисы незавершённых сжатий — ждём их все перед отправкой, чтобы не терять фото.
+  const pendingCompressions = useRef<Promise<void>[]>([]);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -24,9 +29,13 @@ export default function EvaluateModal({ onClose }: { onClose: () => void }) {
     e.target.value = "";
     files.slice(0, 5 - photos.length).forEach(file => {
       const preview = URL.createObjectURL(file);
-      compressImage(file).then(base64 => {
-        setPhotos(prev => prev.length < 5 ? [...prev, { preview, base64 }] : prev);
+      const p = compressImage(file).then(base64 => {
+        if (photosRef.current.length >= 5) return;
+        const entry = { preview, base64 };
+        photosRef.current = [...photosRef.current, entry];
+        setPhotos(prev => prev.length < 5 ? [...prev, entry] : prev);
       });
+      pendingCompressions.current.push(p);
     });
   };
 
@@ -37,10 +46,16 @@ export default function EvaluateModal({ onClose }: { onClose: () => void }) {
     setStep(2);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (submitted) return;
     setError(null);
     ymGoal(Goals.FORM_SUBMIT, {});
+
+    // Ждём завершения сжатия всех выбранных фото — иначе при быстром клике
+    // "Отправить" сразу после выбора файла фото терялось (state ещё не успевал обновиться).
+    if (pendingCompressions.current.length > 0) {
+      try { await Promise.all(pendingCompressions.current); } catch { /* noop */ }
+    }
 
     // Мгновенно показываем «Спасибо» — не ждём сервер.
     // Заявка уходит в фоне с таймаутом, фото — отдельным запросом.
@@ -80,7 +95,8 @@ export default function EvaluateModal({ onClose }: { onClose: () => void }) {
     // Фото — отдельным фоновым запросом. Таймаут увеличен: на мобильном интернете
     // загрузка нескольких фото (до 2 МБ в base64) может не уложиться в 12 сек —
     // пользователь уже видит «Спасибо», поэтому спокойно ждём дольше.
-    const readyPhotos = photos.map(p => p.base64).filter(Boolean);
+    // Берём из photosRef (синхронный) — на момент отправки все сжатия уже гарантированно завершены.
+    const readyPhotos = photosRef.current.map(p => p.base64).filter(Boolean);
     if (readyPhotos.length > 0) {
       sendBg({ ...formData, desc: `[фото] ${formData.desc}`, photos: readyPhotos }, 60000);
     }
@@ -383,7 +399,10 @@ export default function EvaluateModal({ onClose }: { onClose: () => void }) {
                         <div className="absolute inset-0 pointer-events-none" style={{
                           background: "linear-gradient(145deg, rgba(255,255,255,0.05), transparent)",
                         }} />
-                        <button type="button" onClick={() => setPhotos(prev => prev.filter((_, i) => i !== idx))}
+                        <button type="button" onClick={() => {
+                          photosRef.current = photosRef.current.filter((_, i) => i !== idx);
+                          setPhotos(prev => prev.filter((_, i) => i !== idx));
+                        }}
                           className="absolute top-1 right-1 w-5 h-5 flex items-center justify-center rounded-full"
                           style={{ background: "rgba(0,0,0,0.85)", color: "white", border: "1px solid rgba(255,255,255,0.15)" }}>
                           <Icon name="X" size={9} />

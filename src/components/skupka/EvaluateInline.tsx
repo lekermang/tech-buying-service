@@ -24,15 +24,23 @@ export default function EvaluateInline({ source = "ocenka_page" }: { source?: st
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Синхронная копия photos — нужна т.к. state обновляется асинхронно,
+  // а на момент клика "Отправить" сжатие фото может ещё не завершиться.
+  const photosRef = useRef<{ preview: string; base64: string }[]>([]);
+  const pendingCompressions = useRef<Promise<void>[]>([]);
 
   const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     e.target.value = "";
     files.slice(0, 5 - photos.length).forEach(file => {
       const preview = URL.createObjectURL(file);
-      compressImage(file).then(base64 => {
-        setPhotos(prev => prev.length < 5 ? [...prev, { preview, base64 }] : prev);
+      const p = compressImage(file).then(base64 => {
+        if (photosRef.current.length >= 5) return;
+        const entry = { preview, base64 };
+        photosRef.current = [...photosRef.current, entry];
+        setPhotos(prev => prev.length < 5 ? [...prev, entry] : prev);
       });
+      pendingCompressions.current.push(p);
     });
   };
 
@@ -43,11 +51,17 @@ export default function EvaluateInline({ source = "ocenka_page" }: { source?: st
     setStep(2);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setError(null);
     ymGoal(Goals.FORM_SUBMIT, { source });
-    ymGoal(Goals.FORM_SUCCESS, { source });
 
+    // Ждём завершения сжатия всех выбранных фото — иначе при быстром клике
+    // "Отправить" сразу после выбора файла фото терялось (state ещё не успевал обновиться).
+    if (pendingCompressions.current.length > 0) {
+      try { await Promise.all(pendingCompressions.current); } catch { /* noop */ }
+    }
+
+    ymGoal(Goals.FORM_SUCCESS, { source });
     setSubmitted(true);
 
     const sendBg = (body: Record<string, unknown>, timeoutMs = 12000) => {
@@ -67,8 +81,9 @@ export default function EvaluateInline({ source = "ocenka_page" }: { source?: st
       : formData.desc;
 
     sendBg({ ...formData, desc: descFull, photos: [], source });
-    // Таймаут увеличен: на мобильном интернете загрузка нескольких фото может не уложиться в 12 сек
-    const readyPhotos = photos.map(p => p.base64).filter(Boolean);
+    // Таймаут увеличен: на мобильном интернете загрузка нескольких фото может не уложиться в 12 сек.
+    // Берём из photosRef (синхронный) — на момент отправки все сжатия уже гарантированно завершены.
+    const readyPhotos = photosRef.current.map(p => p.base64).filter(Boolean);
     if (readyPhotos.length > 0) {
       sendBg({ ...formData, desc: `[фото] ${descFull}`, photos: readyPhotos, source }, 60000);
     }
@@ -220,7 +235,10 @@ export default function EvaluateInline({ source = "ocenka_page" }: { source?: st
               {photos.map((ph, i) => (
                 <div key={i} className="relative w-16 h-16 rounded-xl overflow-hidden border border-white/10">
                   <img src={ph.preview} alt="" className="w-full h-full object-cover" />
-                  <button onClick={() => setPhotos(prev => prev.filter((_, j) => j !== i))}
+                  <button onClick={() => {
+                    photosRef.current = photosRef.current.filter((_, j) => j !== i);
+                    setPhotos(prev => prev.filter((_, j) => j !== i));
+                  }}
                     className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/70 flex items-center justify-center text-white/70 hover:text-white">
                     <Icon name="X" size={10} />
                   </button>
