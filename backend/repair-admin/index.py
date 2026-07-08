@@ -1180,9 +1180,9 @@ def handler(event: dict, context) -> dict:
                 pt = str(item.get('part_type', '')).strip()
                 price_val = int(item.get('price', 0))
                 if pt:
-                    cur.execute(f"UPDATE {SCHEMA}.repair_labor_prices SET price={price_val}, updated_at=NOW() WHERE part_type='{pt}'")
+                    cur.execute(f"UPDATE {SCHEMA}.repair_labor_prices SET price=%s, updated_at=NOW() WHERE part_type=%s", (price_val, pt))
                     # Мгновенно обновляем labor_cost во всех запчастях этого типа
-                    cur.execute(f"UPDATE {SCHEMA}.repair_parts SET labor_cost={price_val} WHERE part_type='{pt}'")
+                    cur.execute(f"UPDATE {SCHEMA}.repair_parts SET labor_cost=%s WHERE part_type=%s", (price_val, pt))
             if 'parts_markup' in body:
                 markup_val = int(body.get('parts_markup', 0))
                 cur.execute(f"""
@@ -1454,7 +1454,8 @@ def handler(event: dict, context) -> dict:
                 cur.close(); conn.close()
                 return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'Укажите имя и chat_id'}, ensure_ascii=False)}
             cur.execute(
-                f"INSERT INTO {SCHEMA}.notification_recipients (name, telegram_chat_id) VALUES ('{name}', '{chat_id_val}') RETURNING id"
+                f"INSERT INTO {SCHEMA}.notification_recipients (name, telegram_chat_id) VALUES (%s, %s) RETURNING id",
+                (name, chat_id_val)
             )
             new_id = cur.fetchone()[0]
             conn.commit(); cur.close(); conn.close()

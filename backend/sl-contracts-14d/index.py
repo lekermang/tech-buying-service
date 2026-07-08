@@ -1438,8 +1438,60 @@ def action_to_warehouse(body, actor):
         cur.close(); conn.close()
 
 
+def action_check_expired(params=None):
+    """Находит активные договоры 14 дней с истёкшим сроком (end_date < сегодня) и шлёт
+    напоминание в MAX сотрудникам/владельцу — пора выложить товар на Авито.
+    Уведомляет каждый договор только один раз (флаг expired_notified_at).
+    Вызывается по cron (например раз в час) без авторизации сотрудника."""
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute(
+        f"""SELECT c.id, c.contract_number, c.end_date, c.remaining_debt, c.amount,
+                   cl.full_name AS client_name, cl.phone AS client_phone,
+                   i.brand AS item_brand, i.model AS item_model, i.item_type
+            FROM {SCHEMA}.contracts_14d c
+            LEFT JOIN {SCHEMA}.contracts_14d_clients cl ON cl.id = c.client_id
+            LEFT JOIN {SCHEMA}.contracts_14d_items i ON i.id = c.item_id
+            WHERE c.status = 'active'
+              AND c.end_date < CURRENT_DATE
+              AND c.expired_notified_at IS NULL
+            ORDER BY c.end_date"""
+    )
+    rows = [dict(r) for r in cur.fetchall()]
+    notified = []
+    for r in rows:
+        item_name = ' '.join(filter(None, [r.get('item_brand'), r.get('item_model')])) or (r.get('item_type') or 'товар')
+        days_overdue = (date.today() - r['end_date']).days
+        text = (
+            f"⏰ *Залог вышел из срока — пора выкладывать на Авито*\n\n"
+            f"📋 {r['contract_number']}\n"
+            f"👤 {r.get('client_name') or '—'}\n"
+            f"📱 {item_name}\n"
+            f"💰 Остаток долга: {int(r['remaining_debt'] or 0):,} ₽\n".replace(',', '\u00a0') +
+            f"📅 Просрочен на {days_overdue} дн. (срок истёк {r['end_date'].strftime('%d.%m.%Y')})\n\n"
+            f"Переведите товар на склад и выставьте на Авито."
+        )
+        try:
+            requests.post(f'{MAX_BOT_URL}?action=staff_send', json={'text': text}, timeout=5)
+        except Exception as e:
+            print(f'[sl-contracts][check_expired] notify error contract={r["id"]}: {e}')
+        try:
+            cur.execute(
+                f"UPDATE {SCHEMA}.contracts_14d SET expired_notified_at = NOW() WHERE id=%s",
+                (r['id'],)
+            )
+            conn.commit()
+            notified.append(r['id'])
+        except Exception as e:
+            conn.rollback()
+            print(f'[sl-contracts][check_expired] db error contract={r["id"]}: {e}')
+    cur.close()
+    conn.close()
+    return _ok({'ok': True, 'found': len(rows), 'notified': notified})
+
+
 def handler(event: dict, context) -> dict:
-    """Договоры продажи на 14 дней (СмартЛомбард). Действия: list, get, create, calculate, payment, terminate, close, stats, upload_photo, public_view, extend, to_warehouse."""
+    """Договоры продажи на 14 дней (СмартЛомбард). Действия: list, get, create, calculate, payment, terminate, close, stats, upload_photo, public_view, extend, to_warehouse, check_expired."""
     method = event.get('httpMethod', 'GET')
     if method == 'OPTIONS':
         return {'statusCode': 200, 'headers': HEADERS, 'body': ''}
@@ -1450,6 +1502,10 @@ def handler(event: dict, context) -> dict:
     # Публичный action — без авторизации
     if method == 'GET' and action == 'public_view':
         return action_public_view(qs)
+
+    # Публичный action для cron — проверка просроченных залогов (без авторизации сотрудника)
+    if action == 'check_expired':
+        return action_check_expired(qs)
 
     headers = event.get('headers') or {}
     token = headers.get('X-Employee-Token') or headers.get('x-employee-token') or ''
