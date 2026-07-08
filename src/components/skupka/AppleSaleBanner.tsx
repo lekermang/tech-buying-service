@@ -1,52 +1,14 @@
 /**
- * Баннер акции: Техника Apple по оптовым ценам
- * 6–13 июня 2026 — скупка iPhone, MacBook, iPad по спец. ценам
+ * Баннер: скупка техники Apple по оптовым ценам (постоянный, без таймера акции)
  */
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import ApplePriceEmailModal from "./ApplePriceEmailModal";
 
-const SALE_END = new Date("2026-06-13T23:59:59");
 const CATALOG_URL = "https://preview--tech-buying-service.poehali.dev/catalog";
 
-function useCountdown() {
-  const calc = () => {
-    const diff = SALE_END.getTime() - Date.now();
-    if (diff <= 0) return null;
-    const d = Math.floor(diff / 86400000);
-    const h = Math.floor((diff % 86400000) / 3600000);
-    const m = Math.floor((diff % 3600000) / 60000);
-    const s = Math.floor((diff % 60000) / 1000);
-    return { d, h, m, s };
-  };
-  const [time, setTime] = useState(calc);
-  useEffect(() => {
-    const id = setInterval(() => setTime(calc()), 1000);
-    return () => clearInterval(id);
-  }, []);
-  return time;
-}
-
-function Digit({ v, label }: { v: number; label: string }) {
-  return (
-    <div className="flex flex-col items-center">
-      <div className="font-oswald font-bold text-2xl sm:text-3xl leading-none text-black tabular-nums min-w-[2.2ch] text-center"
-        style={{ textShadow: "0 1px 0 rgba(255,255,255,0.35)" }}>
-        {String(v).padStart(2, "0")}
-      </div>
-      <div className="text-[9px] uppercase tracking-widest text-black/60 font-roboto mt-0.5">{label}</div>
-    </div>
-  );
-}
-
-function Sep() {
-  return <span className="font-oswald font-bold text-2xl sm:text-3xl text-black/50 leading-none mb-3.5">:</span>;
-}
-
 export default function AppleSaleBanner() {
-  const time = useCountdown();
   const [priceOpen, setPriceOpen] = useState(false);
-  if (!time) return null; // акция завершена — баннер скрывается автоматически
 
   return (
     <>
@@ -91,7 +53,7 @@ export default function AppleSaleBanner() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-black opacity-40" />
                   <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-black" />
                 </span>
-                Акция · 6–13 июня 2026
+                Скупаем каждый день
               </div>
 
               {/* Заголовок */}
@@ -102,7 +64,7 @@ export default function AppleSaleBanner() {
                 <span className="text-black/70">по оптовым ценам</span>
               </h2>
               <p className="font-roboto text-black/65 text-sm leading-snug max-w-xs">
-                iPhone, MacBook, iPad — скупаем по специальным ценам в&nbsp;течение&nbsp;недели
+                iPhone, MacBook, iPad — скупаем по специальным ценам
               </p>
             </div>
 
@@ -122,22 +84,8 @@ export default function AppleSaleBanner() {
               ))}
             </div>
 
-            {/* Правая часть — таймер + кнопка */}
+            {/* Правая часть — кнопка */}
             <div className="flex flex-col items-start sm:items-end gap-4 shrink-0">
-              {/* Таймер */}
-              <div className="flex flex-col items-start sm:items-end gap-1">
-                <div className="text-[10px] font-roboto uppercase tracking-[0.2em] text-black/50">До конца акции</div>
-                <div className="flex items-end gap-1.5">
-                  <Digit v={time.d} label="дн" />
-                  <Sep />
-                  <Digit v={time.h} label="час" />
-                  <Sep />
-                  <Digit v={time.m} label="мин" />
-                  <Sep />
-                  <Digit v={time.s} label="сек" />
-                </div>
-              </div>
-
               {/* Кнопки */}
               <div className="flex flex-col gap-2 w-full sm:w-auto">
                 <button
