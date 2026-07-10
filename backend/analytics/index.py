@@ -804,7 +804,7 @@ def action_graph_hours(qs):
 
     if period == 'today':
         cur.execute(
-            f"SELECT EXTRACT(HOUR FROM started_at AT TIME ZONE 'Europe/Moscow')::int AS hour, "
+            f"SELECT EXTRACT(HOUR FROM (started_at + interval '3 hours'))::int AS hour, "
             f"COUNT(*) AS sessions, COUNT(DISTINCT visitor_id) AS visitors "
             f"FROM {SCHEMA}.an_sessions "
             f"WHERE started_at::date = CURRENT_DATE "
@@ -819,7 +819,7 @@ def action_graph_hours(qs):
 
         # CTA-клики по часам
         cur.execute(
-            f"SELECT EXTRACT(HOUR FROM timestamp AT TIME ZONE 'Europe/Moscow')::int AS hour, COUNT(*) AS cta "
+            f"SELECT EXTRACT(HOUR FROM (timestamp + interval '3 hours'))::int AS hour, COUNT(*) AS cta "
             f"FROM {SCHEMA}.an_events "
             f"WHERE timestamp::date = CURRENT_DATE AND event_type = 'cta_click' "
             f"GROUP BY hour ORDER BY hour",
@@ -831,7 +831,7 @@ def action_graph_hours(qs):
     else:
         days = 7 if period == '7d' else 30
         cur.execute(
-            f"SELECT (started_at AT TIME ZONE 'Europe/Moscow')::date AS day, "
+            f"SELECT ((started_at + interval '3 hours'))::date AS day, "
             f"COUNT(*) AS sessions, COUNT(DISTINCT visitor_id) AS visitors "
             f"FROM {SCHEMA}.an_sessions "
             f"WHERE started_at >= NOW() - INTERVAL '{days} days' "
@@ -841,7 +841,7 @@ def action_graph_hours(qs):
         day_map = {str(r['day']): r for r in rows}
 
         cur.execute(
-            f"SELECT (timestamp AT TIME ZONE 'Europe/Moscow')::date AS day, COUNT(*) AS cta "
+            f"SELECT ((timestamp + interval '3 hours'))::date AS day, COUNT(*) AS cta "
             f"FROM {SCHEMA}.an_events "
             f"WHERE timestamp >= NOW() - INTERVAL '{days} days' AND event_type = 'cta_click' "
             f"GROUP BY day ORDER BY day",
@@ -1070,7 +1070,7 @@ def action_anomalies(qs):
 
     # Сравниваем часовой трафик сегодня vs 7 дней
     cur.execute(
-        f"SELECT EXTRACT(HOUR FROM started_at AT TIME ZONE 'Europe/Moscow')::int AS hour, "
+        f"SELECT EXTRACT(HOUR FROM (started_at + interval '3 hours'))::int AS hour, "
         f"COUNT(*) AS sessions "
         f"FROM {SCHEMA}.an_sessions "
         f"WHERE started_at >= NOW() - INTERVAL '7 days' "
@@ -1084,7 +1084,7 @@ def action_anomalies(qs):
         week_avg[h] = round(week_avg[h] / 7, 1)
 
     cur.execute(
-        f"SELECT EXTRACT(HOUR FROM started_at AT TIME ZONE 'Europe/Moscow')::int AS hour, "
+        f"SELECT EXTRACT(HOUR FROM (started_at + interval '3 hours'))::int AS hour, "
         f"COUNT(*) AS sessions "
         f"FROM {SCHEMA}.an_sessions "
         f"WHERE started_at::date = CURRENT_DATE "
@@ -1143,7 +1143,7 @@ def action_cohort(qs):
     # Когорты за последние 8 недель
     cur.execute(
         f"SELECT "
-        f"  DATE_TRUNC('week', v.first_seen AT TIME ZONE 'Europe/Moscow')::date AS cohort_week, "
+        f"  DATE_TRUNC('week', (v.first_seen + interval '3 hours'))::date AS cohort_week, "
         f"  COUNT(DISTINCT v.visitor_id) AS cohort_size, "
         f"  SUM(CASE WHEN v.visit_count >= 2 THEN 1 ELSE 0 END) AS returned_w1, "
         f"  SUM(CASE WHEN v.visit_count >= 3 THEN 1 ELSE 0 END) AS returned_w2 "

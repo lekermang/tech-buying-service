@@ -68,8 +68,8 @@ def handler(event: dict, context) -> dict:
     # ── Ремонт сегодня и за месяц ───────────────────────────────
     cur.execute(f"""
         SELECT
-          COALESCE(SUM(CASE WHEN DATE(picked_up_at AT TIME ZONE 'Europe/Moscow') = %s THEN repair_amount ELSE 0 END), 0),
-          COALESCE(SUM(CASE WHEN DATE(picked_up_at AT TIME ZONE 'Europe/Moscow') >= %s THEN repair_amount ELSE 0 END), 0)
+          COALESCE(SUM(CASE WHEN DATE((picked_up_at + interval '3 hours')) = %s THEN repair_amount ELSE 0 END), 0),
+          COALESCE(SUM(CASE WHEN DATE((picked_up_at + interval '3 hours')) >= %s THEN repair_amount ELSE 0 END), 0)
         FROM {SCHEMA}.repair_orders
         WHERE status='выдан' AND repair_amount IS NOT NULL
     """, (today, month_from))
@@ -79,8 +79,8 @@ def handler(event: dict, context) -> dict:
     # ── Продажи б/у сегодня и за месяц ──────────────────────────
     cur.execute(f"""
         SELECT
-          COALESCE(SUM(CASE WHEN DATE(created_at AT TIME ZONE 'Europe/Moscow') = %s THEN amount ELSE 0 END), 0),
-          COALESCE(SUM(CASE WHEN DATE(created_at AT TIME ZONE 'Europe/Moscow') >= %s THEN amount ELSE 0 END), 0)
+          COALESCE(SUM(CASE WHEN DATE((created_at + interval '3 hours')) = %s THEN amount ELSE 0 END), 0),
+          COALESCE(SUM(CASE WHEN DATE((created_at + interval '3 hours')) >= %s THEN amount ELSE 0 END), 0)
         FROM {SCHEMA}.slshop_cash_movements
         WHERE category='Продажа товара' AND direction='in'
     """, (today, month_from))
@@ -90,8 +90,8 @@ def handler(event: dict, context) -> dict:
     # ── Закупки б/у сегодня и за месяц ──────────────────────────
     cur.execute(f"""
         SELECT
-          COALESCE(SUM(CASE WHEN DATE(created_at AT TIME ZONE 'Europe/Moscow') = %s THEN amount ELSE 0 END), 0),
-          COALESCE(SUM(CASE WHEN DATE(created_at AT TIME ZONE 'Europe/Moscow') >= %s THEN amount ELSE 0 END), 0)
+          COALESCE(SUM(CASE WHEN DATE((created_at + interval '3 hours')) = %s THEN amount ELSE 0 END), 0),
+          COALESCE(SUM(CASE WHEN DATE((created_at + interval '3 hours')) >= %s THEN amount ELSE 0 END), 0)
         FROM {SCHEMA}.slshop_cash_movements
         WHERE category='Скупка товара' AND direction='out'
     """, (today, month_from))
@@ -101,8 +101,8 @@ def handler(event: dict, context) -> dict:
     # ── Золото сегодня и за месяц ────────────────────────────────
     cur.execute(f"""
         SELECT
-          COALESCE(SUM(CASE WHEN DATE(completed_at AT TIME ZONE 'Europe/Moscow') = %s THEN sell_price ELSE 0 END), 0),
-          COALESCE(SUM(CASE WHEN DATE(completed_at AT TIME ZONE 'Europe/Moscow') >= %s THEN sell_price ELSE 0 END), 0)
+          COALESCE(SUM(CASE WHEN DATE((completed_at + interval '3 hours')) = %s THEN sell_price ELSE 0 END), 0),
+          COALESCE(SUM(CASE WHEN DATE((completed_at + interval '3 hours')) >= %s THEN sell_price ELSE 0 END), 0)
         FROM {SCHEMA}.gold_orders
         WHERE status='done' AND sell_price IS NOT NULL
     """, (today, month_from))
@@ -113,31 +113,31 @@ def handler(event: dict, context) -> dict:
     daily_chart = []
     if is_owner:
         cur.execute(f"""
-            SELECT DATE(picked_up_at AT TIME ZONE 'Europe/Moscow') as d,
+            SELECT DATE((picked_up_at + interval '3 hours')) as d,
                    COALESCE(SUM(repair_amount), 0)
             FROM {SCHEMA}.repair_orders
             WHERE status='выдан' AND repair_amount IS NOT NULL
-              AND DATE(picked_up_at AT TIME ZONE 'Europe/Moscow') >= %s
+              AND DATE((picked_up_at + interval '3 hours')) >= %s
             GROUP BY d
         """, (month_from,))
         repair_by_day = {str(row[0]): int(row[1]) for row in cur.fetchall()}
 
         cur.execute(f"""
-            SELECT DATE(created_at AT TIME ZONE 'Europe/Moscow') as d,
+            SELECT DATE((created_at + interval '3 hours')) as d,
                    COALESCE(SUM(amount), 0)
             FROM {SCHEMA}.slshop_cash_movements
             WHERE category='Продажа товара' AND direction='in'
-              AND DATE(created_at AT TIME ZONE 'Europe/Moscow') >= %s
+              AND DATE((created_at + interval '3 hours')) >= %s
             GROUP BY d
         """, (month_from,))
         sales_by_day = {str(row[0]): int(row[1]) for row in cur.fetchall()}
 
         cur.execute(f"""
-            SELECT DATE(completed_at AT TIME ZONE 'Europe/Moscow') as d,
+            SELECT DATE((completed_at + interval '3 hours')) as d,
                    COALESCE(SUM(sell_price), 0)
             FROM {SCHEMA}.gold_orders
             WHERE status='done' AND sell_price IS NOT NULL
-              AND DATE(completed_at AT TIME ZONE 'Europe/Moscow') >= %s
+              AND DATE((completed_at + interval '3 hours')) >= %s
             GROUP BY d
         """, (month_from,))
         gold_by_day = {str(row[0]): int(row[1]) for row in cur.fetchall()}

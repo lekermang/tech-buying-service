@@ -672,7 +672,7 @@ def yandex_alert_already_sent_today() -> bool:
         cur.execute(f"""
             SELECT 1 FROM {SCHEMA}.settings
             WHERE key = 'yandex_token_alert_date'
-            AND value = (NOW() AT TIME ZONE 'Europe/Moscow')::date::text
+            AND value = (NOW() + interval '3 hours')::date::text
         """)
         row = cur.fetchone()
         cur.close(); conn.close()
@@ -687,8 +687,8 @@ def mark_yandex_alert_sent():
         cur = conn.cursor()
         cur.execute(f"""
             INSERT INTO {SCHEMA}.settings (key, value, description)
-            VALUES ('yandex_token_alert_date', (NOW() AT TIME ZONE 'Europe/Moscow')::date::text, 'Дата последнего алерта о протухшем YANDEX_WEBMASTER_TOKEN')
-            ON CONFLICT (key) DO UPDATE SET value = (NOW() AT TIME ZONE 'Europe/Moscow')::date::text, updated_at = NOW()
+            VALUES ('yandex_token_alert_date', (NOW() + interval '3 hours')::date::text, 'Дата последнего алерта о протухшем YANDEX_WEBMASTER_TOKEN')
+            ON CONFLICT (key) DO UPDATE SET value = (NOW() + interval '3 hours')::date::text, updated_at = NOW()
         """)
         conn.commit()
         cur.close(); conn.close()
@@ -1089,7 +1089,7 @@ def get_repair_today_stats():
             COALESCE(SUM(master_income) FILTER (WHERE status = 'done'), 0) as master_income_sum,
             COUNT(*) as total
         FROM {SCHEMA}.repair_orders
-        WHERE DATE(created_at AT TIME ZONE 'Europe/Moscow') = (NOW() AT TIME ZONE 'Europe/Moscow')::date
+        WHERE DATE((created_at + interval '3 hours')) = (NOW() + interval '3 hours')::date
     """)
     row = cur.fetchone()
     cur.close(); conn.close()
@@ -1112,7 +1112,7 @@ def master_report_already_sent():
     cur = conn.cursor()
     cur.execute(f"""
         SELECT 1 FROM {SCHEMA}.repair_daily_master_income
-        WHERE report_date = (NOW() AT TIME ZONE 'Europe/Moscow')::date LIMIT 1
+        WHERE report_date = (NOW() + interval '3 hours')::date LIMIT 1
     """)
     row = cur.fetchone()
     cur.close(); conn.close()
@@ -1126,7 +1126,7 @@ def mark_master_report_sent(stats: dict):
         INSERT INTO {SCHEMA}.repair_daily_master_income
             (report_date, total_revenue, total_costs, profit, master_income, orders_done)
         VALUES (
-            (NOW() AT TIME ZONE 'Europe/Moscow')::date,
+            (NOW() + interval '3 hours')::date,
             {stats['revenue']}, {stats['costs']}, {stats['profit']},
             {stats['master_income']}, {stats['done']}
         )
@@ -1235,7 +1235,7 @@ def morning_reminder_already_sent():
     cur.execute(f"""
         SELECT 1 FROM {SCHEMA}.settings
         WHERE key = 'morning_reminder_date'
-        AND value = (NOW() AT TIME ZONE 'Europe/Moscow')::date::text
+        AND value = (NOW() + interval '3 hours')::date::text
     """)
     row = cur.fetchone()
     cur.close(); conn.close()
@@ -1247,8 +1247,8 @@ def mark_morning_reminder_sent():
     cur = conn.cursor()
     cur.execute(f"""
         INSERT INTO {SCHEMA}.settings (key, value, description)
-        VALUES ('morning_reminder_date', (NOW() AT TIME ZONE 'Europe/Moscow')::date::text, 'Дата последнего утреннего напоминания')
-        ON CONFLICT (key) DO UPDATE SET value = (NOW() AT TIME ZONE 'Europe/Moscow')::date::text, updated_at = NOW()
+        VALUES ('morning_reminder_date', (NOW() + interval '3 hours')::date::text, 'Дата последнего утреннего напоминания')
+        ON CONFLICT (key) DO UPDATE SET value = (NOW() + interval '3 hours')::date::text, updated_at = NOW()
     """)
     conn.commit()
     cur.close(); conn.close()
