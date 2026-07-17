@@ -61,8 +61,100 @@ def handler(event: dict, context) -> dict:
         return upload_pdf(body)
     if action == "parse_pdf":
         return parse_pdf(body)
+    if action in ("cash_current", "cash_history", "cash_add"):
+        return handle_cash_balance(action, body, token)
 
     return {"statusCode": 400, "headers": CORS, "body": json.dumps({"error": "unknown action"})}
+
+
+# ── Касса по фактическому остатку (наличные ₽ + золото 585 г) ──────────────────
+# Сотрудники дважды в день (10:00 / 19:00) вносят фактический остаток кассы.
+# Таблица: cash_balance_checks (id, checked_at, check_date, slot, cash_amount,
+# gold_585_grams, comment, employee_id, employee_name)
+
+def _cash_get_employee(cur, token: str):
+    cur.execute(
+        f"SELECT id, role, full_name FROM {SCHEMA}.employees "
+        "WHERE auth_token=%s AND token_expires_at>NOW() AND is_active=true",
+        (token,),
+    )
+    row = cur.fetchone()
+    return {"id": row[0], "role": row[1], "full_name": row[2]} if row else None
+
+
+def _cash_current_slot() -> str:
+    from datetime import timezone, timedelta
+    msk = timezone(timedelta(hours=3))
+    hour = datetime.now(msk).hour
+    return "morning" if 7 <= hour < 15 else "evening"
+
+
+def handle_cash_balance(action: str, body: dict, token: str) -> dict:
+    conn = psycopg2.connect(DB)
+    cur = conn.cursor()
+    try:
+        emp = _cash_get_employee(cur, token)
+        if not emp:
+            return {"statusCode": 401, "headers": CORS, "body": json.dumps({"error": "Не авторизован"})}
+
+        if action == "cash_current":
+            cur.execute(
+                f"SELECT id, checked_at, check_date, slot, cash_amount, gold_585_grams, comment, employee_name "
+                f"FROM {SCHEMA}.cash_balance_checks ORDER BY checked_at DESC LIMIT 1"
+            )
+            row = cur.fetchone()
+            if not row:
+                return {"statusCode": 200, "headers": CORS, "body": json.dumps({"current": None})}
+            return {"statusCode": 200, "headers": CORS, "body": json.dumps({"current": {
+                "id": row[0], "checked_at": row[1].isoformat(), "check_date": str(row[2]),
+                "slot": row[3], "cash_amount": float(row[4]), "gold_585_grams": float(row[5]),
+                "comment": row[6], "employee_name": row[7],
+            }}, ensure_ascii=False)}
+
+        if action == "cash_history":
+            limit = min(int(body.get("limit") or 30), 200)
+            cur.execute(
+                f"SELECT id, checked_at, check_date, slot, cash_amount, gold_585_grams, comment, employee_name "
+                f"FROM {SCHEMA}.cash_balance_checks ORDER BY checked_at DESC LIMIT %s",
+                (limit,)
+            )
+            items = [{
+                "id": r[0], "checked_at": r[1].isoformat(), "check_date": str(r[2]),
+                "slot": r[3], "cash_amount": float(r[4]), "gold_585_grams": float(r[5]),
+                "comment": r[6], "employee_name": r[7],
+            } for r in cur.fetchall()]
+            return {"statusCode": 200, "headers": CORS, "body": json.dumps({"items": items}, ensure_ascii=False)}
+
+        if action == "cash_add":
+            cash_amount = body.get("cash_amount")
+            gold_grams = body.get("gold_585_grams")
+            if cash_amount is None or gold_grams is None:
+                return {"statusCode": 400, "headers": CORS, "body": json.dumps({"error": "cash_amount и gold_585_grams обязательны"}, ensure_ascii=False)}
+            try:
+                cash_amount = float(cash_amount)
+                gold_grams = float(gold_grams)
+            except (TypeError, ValueError):
+                return {"statusCode": 400, "headers": CORS, "body": json.dumps({"error": "cash_amount и gold_585_grams должны быть числами"}, ensure_ascii=False)}
+            if cash_amount < 0 or gold_grams < 0:
+                return {"statusCode": 400, "headers": CORS, "body": json.dumps({"error": "Остаток не может быть отрицательным"}, ensure_ascii=False)}
+            slot = body.get("slot") or _cash_current_slot()
+            if slot not in ("morning", "evening", "manual"):
+                slot = "manual"
+            comment = (body.get("comment") or "").strip()[:500] or None
+            cur.execute(
+                f"INSERT INTO {SCHEMA}.cash_balance_checks "
+                f"(slot, cash_amount, gold_585_grams, comment, employee_id, employee_name) "
+                f"VALUES (%s, %s, %s, %s, %s, %s) RETURNING id, checked_at",
+                (slot, cash_amount, gold_grams, comment, emp["id"], emp["full_name"])
+            )
+            new_id, checked_at = cur.fetchone()
+            conn.commit()
+            return {"statusCode": 200, "headers": CORS, "body": json.dumps({"ok": True, "id": new_id, "checked_at": checked_at.isoformat()}, ensure_ascii=False)}
+
+        return {"statusCode": 400, "headers": CORS, "body": json.dumps({"error": "unknown cash action"})}
+    finally:
+        cur.close()
+        conn.close()
 
 
 # ── S3 клиент ─────────────────────────────────────────────────────────────────

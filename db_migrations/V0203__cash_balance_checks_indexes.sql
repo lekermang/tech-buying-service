@@ -1,0 +1,2 @@
+CREATE INDEX IF NOT EXISTS idx_cash_balance_checks_date ON t_p31606708_tech_buying_service.cash_balance_checks(check_date DESC);
+CREATE INDEX IF NOT EXISTS idx_cash_balance_checks_checked_at ON t_p31606708_tech_buying_service.cash_balance_checks(checked_at DESC);
