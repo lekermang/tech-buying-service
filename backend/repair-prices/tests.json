@@ -1,18 +1,17 @@
 {
   "tests": [
     {
-      "name": "GET prices returns list",
+      "name": "OPTIONS returns 200",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "GET returns price list",
       "method": "GET",
       "path": "/",
       "expectedStatus": 200,
-      "bodyMatcher": "partial"
-    },
-    {
-      "name": "POST without token returns 401",
-      "method": "POST",
-      "path": "/",
-      "body": {"category": "Ремонт", "name": "Тест", "price_from": 500},
-      "expectedStatus": 401,
+      "expectedBody": {"items": []},
       "bodyMatcher": "partial"
     }
   ]

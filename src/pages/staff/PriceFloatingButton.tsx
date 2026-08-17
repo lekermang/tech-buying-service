@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 
 const PRICE_EMAIL_URL = "https://functions.poehali.dev/9e9486d9-57f0-454c-bc19-b46e3d4bc682";
-const PUBLIC_PRICE_URL = "https://functions.poehali.dev/b39f271a-3a63-4998-b83b-3c64eeace265";
+const PUBLIC_PRICE_URL = "https://functions.poehali.dev/eff3d143-8966-4a6d-bbea-ddc77a6e5373";
 
 const MARKUP_PRESETS = [
   { label: "Без наценки", value: "0" },
@@ -82,7 +82,7 @@ export default function PriceFloatingButton({ token: _token }: Props) {
     setPrinting(true); setResult(null); setError(null);
     try {
       const m = parseInt(markup) || 0;
-      const res = await fetch(`${PUBLIC_PRICE_URL}?markup=${m}`);
+      const res = await fetch(`${PUBLIC_PRICE_URL}?format=json&markup=${m}`);
       const d = await res.json();
       if (!d.ok || !d.groups) throw new Error("Не удалось загрузить прайс");
 

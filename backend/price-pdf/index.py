@@ -494,6 +494,27 @@ def handler(event: dict, context) -> dict:
     except Exception:
         pass
 
+    # Публичный JSON-прайс для страницы /Apple (объединено из отдельной функции public-price)
+    if qs.get("format") == "json":
+        try:
+            json_markup = max(0, int(qs.get("markup", DEFAULT_MARKUP)))
+        except Exception:
+            json_markup = DEFAULT_MARKUP
+        json_products   = fetch_products()
+        json_cdn_photos = load_cdn_photos()
+        json_groups     = group_products(json_products, json_markup, json_cdn_photos)
+        json_total      = sum(len(v) for v in json_groups.values())
+        json_msk_now    = datetime.now(timezone(timedelta(hours=3)))
+        json_gen_at     = json_msk_now.strftime("%d.%m.%Y %H:%M МСК")
+        return {
+            "statusCode": 200,
+            "headers": {**HEADERS_CORS, "Cache-Control": "public, max-age=10800"},
+            "body": json.dumps({
+                "ok": True, "total": json_total, "markup": json_markup,
+                "generated_at": json_gen_at, "groups": json_groups,
+            }, ensure_ascii=False),
+        }
+
     admin_token = ((event.get("headers") or {}).get("x-admin-token", "")
                    or body.get("admin_token", ""))
     is_admin    = admin_token == ADMIN_TOKEN
