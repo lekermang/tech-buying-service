@@ -178,6 +178,9 @@ export default function RepairTab({ token }: { token: string }) {
         admin_note: null, created_at: new Date().toISOString(),
         purchase_amount: null, repair_amount: null,
         completed_at: null, master_income: null, parts_name: null, picked_up_at: null,
+        advance: null, is_paid: null, payment_method: null,
+        part_id: null, part_name: null, part_quality: null, part_source: null,
+        part_supplier: null, part_code: null, part_category: null, part_supplier_price: null,
       };
       printAct(newOrder);
     }

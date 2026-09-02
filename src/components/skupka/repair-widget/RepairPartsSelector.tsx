@@ -112,7 +112,7 @@ function WarrantyBadge({ quality }: { quality: string }) {
  */
 export default function RepairPartsSelector({
   form, partsLoading, parts, showPartsList,
-  selectedPart, extraWorks, extraWorksList, extraTotal, grandTotal,
+  selectedPart, extraWorks, extraWorksList, grandTotal,
   clientInfo, onSelectPart, onToggleExtra, onChangeSelection,
 }: Props) {
   const [source, setSource] = useState<Source>("stock");

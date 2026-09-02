@@ -246,7 +246,7 @@ export default function ClientAuthScreen({ onAuth }: Props) {
                   {error}
                 </div>
               )}
-              {success && mode !== "verified" && (
+              {success && (
                 <div className="px-3 py-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-xs flex items-center gap-2">
                   <Icon name="CheckCircle" size={14} />
                   {success}

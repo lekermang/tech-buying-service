@@ -47,6 +47,8 @@ export type Part = {
   part_type: string; labor_cost: number; total: number;
   is_latest_batch?: boolean;
   supplier_price?: number | null;
+  /** Есть на складе (stock > 0) — вычисляется на фронте при загрузке */
+  in_stock: boolean;
 };
 
 export type OrderStatus = {

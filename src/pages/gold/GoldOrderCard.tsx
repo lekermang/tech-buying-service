@@ -7,7 +7,7 @@ type Props = {
   expanded: boolean;
   onToggle: () => void;
   onStatusChange: (id: number, status: string, extra?: Partial<EditForm>) => void;
-  onSave: (order: GoldOrder, form: EditForm) => void;
+  onSave: (order: GoldOrder, form: EditForm) => void | Promise<void>;
   onDelete: (id: number) => void;
   saving: boolean;
   saveError: string | null;

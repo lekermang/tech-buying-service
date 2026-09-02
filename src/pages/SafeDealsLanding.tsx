@@ -48,11 +48,15 @@ const SLUGS = {
   },
 } as const;
 
-type SlugKey = keyof typeof SLUGS;
+type SlugConfig = {
+  title: string; description: string; keywords: string; h1: string; h2: string;
+  intent: "buyer" | "seller"; filter: (i: ShopItem) => boolean;
+  ctaTitle: string; ctaText: string;
+};
 
 export default function SafeDealsLanding() {
   const { slug = "" } = useParams<{ slug: string }>();
-  const cfg = (SLUGS as Record<string, typeof SLUGS["kupit-iphone-kaluga"]>)[slug as SlugKey];
+  const cfg = (SLUGS as Record<string, SlugConfig>)[slug];
   const [items, setItems] = useState<ShopItem[]>([]);
   const [loading, setLoading] = useState(true);
 

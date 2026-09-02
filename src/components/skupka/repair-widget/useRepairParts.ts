@@ -29,7 +29,7 @@ export function useRepairParts(params: { model: string; phone: string }) {
       try {
         const res = await fetch(`${REPAIR_PARTS_URL}?model=${encodeURIComponent(m)}&phone=${encodeURIComponent(phone)}`);
         const data = await res.json();
-        const fetched = data.parts || [];
+        const fetched: Part[] = (data.parts || []).map((p: Part) => ({ ...p, in_stock: (p.stock || 0) > 0 }));
         setParts(fetched);
         if (fetched.length > 0) setShowPartsList(true);
         setExtraWorksList(data.extra_works || []);

@@ -111,7 +111,7 @@ export default function BronzeSculptures() {
           address: { "@type": "PostalAddress", streetAddress: "ул. Кирова, 7", addressLocality: "Калуга", addressCountry: "RU" },
         }}
       />
-      <Header />
+      <Header scrollTo={() => {}} />
 
       {/* ══ HERO ══ */}
       <section className="relative min-h-[60vh] flex items-end overflow-hidden">
@@ -390,7 +390,7 @@ export default function BronzeSculptures() {
         </div>
       )}
 
-      <ContactsFooter />
+      <ContactsFooter scrollTo={() => {}} />
       <style>{`
         @keyframes purpleShimmer {
           0% { background-position: 200% center; }

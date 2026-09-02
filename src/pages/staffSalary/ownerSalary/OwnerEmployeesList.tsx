@@ -6,7 +6,7 @@ import { statusDot } from "./ownerSalaryTypes";
 const SAVINGS_URL = "https://functions.poehali.dev/4b6d2cd3-a8ca-4aac-aec2-ba9664b21b07";
 const fmt = (n: number) => Math.round(n).toLocaleString("ru-RU");
 
-type MyStats = {
+export type MyStats = {
   profit_today: number;
   revenue_today: number;
   sales_today: number;

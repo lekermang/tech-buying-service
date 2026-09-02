@@ -7,6 +7,7 @@ import csv
 import io
 import json
 import os
+import base64
 import urllib.request
 import psycopg2
 import psycopg2.extras
@@ -89,6 +90,92 @@ def handler(event: dict, context) -> dict:
 
     params = event.get("queryStringParameters") or {}
     action = params.get("action", "status")
+
+    # Статистика + превью для ручной загрузки CSV (вкладка "Наименования товаров")
+    if action == "import_status":
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute(f"SELECT COUNT(*) FROM {SCHEMA}.tools_products")
+        count = cur.fetchone()[0]
+        cur.execute(
+            f"""SELECT article, name, brand, category FROM {SCHEMA}.tools_products
+                ORDER BY updated_at DESC LIMIT 10"""
+        )
+        preview = [
+            {"article": r[0], "name": r[1], "brand": r[2] or "", "category": r[3] or ""}
+            for r in cur.fetchall()
+        ]
+        cur.close()
+        conn.close()
+        return {
+            "statusCode": 200,
+            "headers": {**CORS_HEADERS, "Content-Type": "application/json"},
+            "body": json.dumps({
+                "count": count,
+                "preview": preview,
+                "has_credentials": True,
+                "sync_status": {"running": False},
+            }, ensure_ascii=False),
+        }
+
+    # Ручная загрузка CSV-файла (base64) с колонками article,name,brand,category
+    if action == "import_csv" and event.get("httpMethod") == "POST":
+        try:
+            body = json.loads(event.get("body") or "{}")
+        except Exception:
+            body = {}
+        file_b64 = body.get("file", "")
+        delimiter = body.get("delimiter", ",")
+        if not file_b64:
+            return {
+                "statusCode": 400,
+                "headers": {**CORS_HEADERS, "Content-Type": "application/json"},
+                "body": json.dumps({"ok": False, "error": "file required"}),
+            }
+        try:
+            raw = base64.b64decode(file_b64)
+            try:
+                text = raw.decode("utf-8-sig")
+            except UnicodeDecodeError:
+                text = raw.decode("cp1251", errors="replace")
+            reader = csv.DictReader(io.StringIO(text), delimiter=delimiter)
+            batch = []
+            for row in reader:
+                article = (row.get("article") or "").strip()
+                name = (row.get("name") or "").strip()
+                if not article or not name:
+                    continue
+                brand = (row.get("brand") or "").strip()
+                category = (row.get("category") or "").strip()
+                batch.append((article, name, brand, category, "", 0.0, 0.0, ""))
+            conn = get_conn()
+            cur = conn.cursor()
+            if batch:
+                psycopg2.extras.execute_values(
+                    cur,
+                    f"""INSERT INTO {SCHEMA}.tools_products
+                        (article, name, brand, category, image_url, base_price, my_price, amount, updated_at)
+                        VALUES %s
+                        ON CONFLICT (article) DO UPDATE SET
+                            name=EXCLUDED.name, brand=EXCLUDED.brand, category=EXCLUDED.category,
+                            updated_at=NOW()""",
+                    batch,
+                    template="(%s,%s,%s,%s,%s,%s,%s,%s,NOW())",
+                )
+            conn.commit()
+            cur.close()
+            conn.close()
+            return {
+                "statusCode": 200,
+                "headers": {**CORS_HEADERS, "Content-Type": "application/json"},
+                "body": json.dumps({"ok": True, "imported": len(batch)}),
+            }
+        except Exception as e:
+            return {
+                "statusCode": 400,
+                "headers": {**CORS_HEADERS, "Content-Type": "application/json"},
+                "body": json.dumps({"ok": False, "error": str(e)}),
+            }
 
     # Один чанк: скачиваем CSV, пропускаем offset строк, берём CHUNK_SIZE
     if action == "sync_chunk":

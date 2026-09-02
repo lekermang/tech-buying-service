@@ -5,6 +5,7 @@ import GoldOrderCard from "./GoldOrderCard";
 type EditForm = {
   name: string; phone: string; item_name: string; weight: string;
   purity: string; buy_price: string; sell_price: string;
+  sell_price_per_gram: string;
   comment: string; admin_note: string; payment_method: string;
 };
 
@@ -14,7 +15,7 @@ type Props = {
   expandedId: number | null;
   onToggle: (id: number) => void;
   onStatusChange: (id: number, status: string) => void;
-  onSave: (order: GoldOrder, ef: EditForm) => void;
+  onSave: (order: GoldOrder, ef: EditForm) => void | Promise<void>;
   onDelete: (id: number) => void;
   saving: boolean;
   saveError: string | null;

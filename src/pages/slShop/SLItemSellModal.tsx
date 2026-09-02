@@ -119,7 +119,7 @@ export default function SLItemSellModal({ token, item, onClose, onDone }: { toke
         title="Продано — выберите документы"
         icon="CheckCircle2"
         footer={
-          <SLButton variant="ghost" size="lg" icon="X" onClick={onDone} className="w-full">
+          <SLButton variant="dark" size="lg" icon="X" onClick={onDone} className="w-full">
             Закрыть
           </SLButton>
         }

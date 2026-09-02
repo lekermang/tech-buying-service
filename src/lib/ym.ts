@@ -58,4 +58,5 @@ export const Goals = {
   HERO_CTA:          "hero_cta",          // главная кнопка в герое
   CATEGORY_CLICK:    "category_click",    // клик на категорию техники
   MAP_CLICK:         "map_click",         // клик по карте/адресу филиала
+  NAV_CLICK:         "nav_click",         // клик по нижней мобильной навигации
 } as const;

@@ -8,7 +8,8 @@ import { useEffect, useState } from "react";
 import Icon from "@/components/ui/icon";
 import AnalyticsDashboard from "./staffAnalytics/AnalyticsDashboard";
 
-export default function StaffAnalytics({ embedded, tokenProp }: { embedded?: boolean; tokenProp?: string } = {}) {
+export default function StaffAnalytics(props: { embedded?: boolean; tokenProp?: string }) {
+  const { embedded, tokenProp } = props || {};
   const [token, setToken] = useState(tokenProp || "");
   const [authReady, setAuthReady] = useState(!!tokenProp);
 

@@ -1,5 +1,5 @@
 export const LEADS_URL = "https://functions.poehali.dev/cccc3788-d793-49a5-9254-f194e6d94e18";
-export const PUBLIC_CHAT_URL = "https://functions.poehali.dev/81f2b98f-4c02-4f5a-afce-adf94d25dcac";
+export const PUBLIC_CHAT_URL = "https://functions.poehali.dev/06e0e177-7525-48f9-bce8-617ba9e87cde";
 export const MAX_BOT_URL = "https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c";
 
 export type LeadPhoto = {

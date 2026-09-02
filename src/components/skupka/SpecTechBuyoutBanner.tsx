@@ -65,7 +65,6 @@ export default function SpecTechBuyoutBanner() {
     <section className="px-4 sm:px-6 py-2">
       <div className="max-w-4xl mx-auto rounded-2xl overflow-hidden relative"
         style={{
-          background: "linear-gradient(135deg,#12090000 0%,#1a0d00 30%,#111500 100%)",
           background: "linear-gradient(135deg,#1a0d00 0%,#0f1100 60%,#0d0d0d 100%)",
           border: `1px solid ${A}25`,
           boxShadow: `0 0 40px ${A}07`,

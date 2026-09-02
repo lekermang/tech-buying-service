@@ -73,7 +73,7 @@ export default function EnableNotificationsBanner({ token }: { token: string }) 
       // 4) Подписка
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8(public_key),
+        applicationServerKey: urlBase64ToUint8(public_key) as BufferSource,
       });
 
       // 5) Отправка на backend

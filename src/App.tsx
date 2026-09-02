@@ -15,7 +15,7 @@ import FunReaction from "@/components/FunReaction";
  * мы один раз сбрасываем кэш Service Worker и перезагружаем страницу.
  */
 const RELOAD_KEY = "__chunk_reload__";
-const safeLazy = <T extends ComponentType<unknown>>(factory: () => Promise<{ default: T }>) =>
+const safeLazy = <P extends object>(factory: () => Promise<{ default: ComponentType<P> }>) =>
   lazy(() =>
     factory().catch((err: unknown) => {
       const msg = String((err as Error)?.message || err);

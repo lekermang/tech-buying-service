@@ -116,7 +116,7 @@ export function useStaffRepairActions(token: string, st: StaffRepairState) {
         };
         setShowForm(false);
         setForm(EMPTY_FORM);
-        triggerReaction("🎉");
+        triggerReaction("repair_accepted");
         printAct(newOrder).catch(() => {});
         if (email) {
           sendIntakeEmailBundle(newOrder, email, token)

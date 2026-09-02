@@ -17,7 +17,6 @@ import PremiumServicesGrid from "@/components/skupka/PremiumServicesGrid";
 import SafeDealsBanner from "@/components/skupka/SafeDealsBanner";
 import MaxChannelBanner from "@/components/skupka/MaxChannelBanner";
 import PublicChatFab from "@/components/skupka/PublicChatFab";
-import AppDownloadCard from "@/components/AppDownloadCard";
 import EasierWithUsBlock from "@/components/EasierWithUsBlock";
 import QuickContactSection from "@/components/QuickContactSection";
 import WholesaleBanner from "@/components/skupka/WholesaleBanner";
@@ -344,7 +343,7 @@ const SplashScreen = ({ onDone }: { onDone: () => void }) => {
   );
 };
 
-export default function Index() {
+export default function Index({ goldOpen = false }: { goldOpen?: boolean }) {
   const [splashDone, setSplashDone] = useState(false);
   useScrollReveal();
 
@@ -366,8 +365,8 @@ export default function Index() {
         </div>
 
         <div className="relative z-10">
-          <Header />
-          <HeroSection />
+          <Header goldOpen={goldOpen} scrollTo={scrollTo} />
+          <HeroSection scrollTo={scrollTo} />
 
           <PromoBanner />
           <AppleSaleBanner />
@@ -393,7 +392,7 @@ export default function Index() {
 
           <MaxChannelBanner />
 
-          <ContactsFooter />
+          <ContactsFooter scrollTo={scrollTo} />
         </div>
 
         {/* Мобильная нижняя навигация — premium frosted glass */}
@@ -419,7 +418,7 @@ export default function Index() {
           </div>
         </div>
 
-        <ExitPopup />
+        <ExitPopup onOpenEval={() => window.scrollTo({ top: 0, behavior: "smooth" })} />
         <CookieBanner />
         <PublicChatFab />
         <DesktopStickyBar />

@@ -26,6 +26,7 @@ function build14Days(): { iso: string; label: string; dayName: string; dayNum: n
     days.push({
       iso: isoStr,
       label: DAY_NAMES[wd],
+      dayName: DAY_NAMES[wd],
       dayNum: d.getDate(),
       isToday: i === 0,
       isWeekend: wd === 0 || wd === 6,

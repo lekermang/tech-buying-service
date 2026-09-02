@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import Icon from "@/components/ui/icon";
-import { slApi, fmt, type SLItem, type SLCategory, STATUS_LABEL } from "./types";
+import { slApi, fmt, type SLItem, type SLCategory, type SLBranch, STATUS_LABEL } from "./types";
 import SLItemsFilters from "./SLItemsFilters";
 import SLItemsMovePanel from "./SLItemsMovePanel";
 import SLItemDetail from "./SLItemDetail";
@@ -16,7 +16,7 @@ const PHONE_SPECS_AI_URL = "https://functions.poehali.dev/983744a8-1cfc-42d8-a56
 export default function SLItemsList({ token, empName: _empName, isOwner = false }: { token: string; empName?: string; isOwner?: boolean }) {
   const [items, setItems] = useState<SLItem[]>([]);
   const [cats, setCats] = useState<SLCategory[]>([]);
-  const [branches, setBranches] = useState<{ id: number; name: string }[]>([]);
+  const [branches, setBranches] = useState<SLBranch[]>([]);
   const [filter, setFilter] = useState("");
   const [q, setQ] = useState("");
   const [catFilter, setCatFilter] = useState<number | "">("");
@@ -81,7 +81,7 @@ export default function SLItemsList({ token, empName: _empName, isOwner = false 
 
   useEffect(() => {
     slApi<SLCategory[]>(token, "categories").then(r => { if (r.ok && r.data) setCats(r.data); });
-    slApi<{ id: number; name: string }[]>(token, "branches").then(r => { if (r.ok && r.data) setBranches(r.data); });
+    slApi<SLBranch[]>(token, "branches").then(r => { if (r.ok && r.data) setBranches(r.data); });
   }, [token]);
   useEffect(() => { load(); }, [load]);
 

@@ -73,8 +73,6 @@ export const MODEL_PHOTOS: Record<string, string> = {
   "iPad Air 13 M4 128GB Blue Wi-Fi":  C + "1ddc3cb3-d49b-48ca-ac3b-df683877061a.jpg",
   "AirPods Pro 3":        C + "cb1c4848-ecaf-40b4-8b32-4318293b68d6.jpg",
   "AirPods Pro 2 Type-C": C + "cb1c4848-ecaf-40b4-8b32-4318293b68d6.jpg",
-  "AirPods 4":            C + "b928293b-5974-444f-bfe1-6ac746dd4f17.jpg",
-  "AirPods 4 ANC":        C + "b928293b-5974-444f-bfe1-6ac746dd4f17.jpg",
   "AirPods Max 2":        C + "21671892-7620-474e-ba8a-afa23f8fad98.jpg",
   // ── Apple Watch ──
   "Watch Ultra 3 49mm": C + "de10719f-6169-49a9-91e7-507b8ad80f34.jpg",

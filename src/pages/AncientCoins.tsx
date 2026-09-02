@@ -37,7 +37,7 @@ export default function AncientCoins() {
           address: { "@type": "PostalAddress", streetAddress: "ул. Кирова, 7", addressLocality: "Калуга", addressCountry: "RU" },
         }}
       />
-      <Header />
+      <Header scrollTo={() => {}} />
 
       <AncientCoinsHero onOpenForm={() => setFormOpen(true)} />
 
@@ -58,7 +58,7 @@ export default function AncientCoins() {
         setFormOpen={setFormOpen}
       />
 
-      <ContactsFooter />
+      <ContactsFooter scrollTo={() => {}} />
 
       <style>{`
         @keyframes goldShimmer {

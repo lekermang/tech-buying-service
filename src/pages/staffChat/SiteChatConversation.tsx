@@ -24,7 +24,6 @@ type Props = {
   endRef: React.RefObject<HTMLDivElement>;
   onBack: () => void;
   onSetLightbox: (url: string) => void;
-  onSetDraft: (v: string) => void;
   onDraftChange: (v: string) => void;
   onSend: (text?: string) => void;
   onFileClick: () => void;

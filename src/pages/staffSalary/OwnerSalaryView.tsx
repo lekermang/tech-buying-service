@@ -5,7 +5,7 @@ import {
   type CalendarDay, type DetailState, type LogRow,
 } from "./ownerSalary/ownerSalaryTypes";
 import { DayEditModal, PayoutModal, BulkFillModal } from "./ownerSalary/OwnerSalaryModals";
-import OwnerEmployeesList from "./ownerSalary/OwnerEmployeesList";
+import OwnerEmployeesList, { type MyStats } from "./ownerSalary/OwnerEmployeesList";
 import OwnerEmployeeDetail from "./ownerSalary/OwnerEmployeeDetail";
 import SavingsView from "./SavingsView";
 import EmployeeSalaryView from "./EmployeeSalaryView";
@@ -18,7 +18,7 @@ interface Props {
 export default function OwnerSalaryView({ token, employeeName = "Владелец" }: Props) {
   const [mainTab, setMainTab] = useState<"employees" | "salary" | "savings">("employees");
   const [employees, setEmployees] = useState<EmployeeOverview[]>([]);
-  const [myStats, setMyStats] = useState<Record<string, number> | null>(null);
+  const [myStats, setMyStats] = useState<MyStats>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [detail, setDetail] = useState<DetailState | null>(null);
   const [editing, setEditing] = useState<{ daily_rate: string; bonus_percent: string } | null>(null);

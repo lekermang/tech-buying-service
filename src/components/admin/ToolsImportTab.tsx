@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import Icon from "@/components/ui/icon";
 
-const IMPORT_URL = "https://functions.poehali.dev/465711ab-0bef-49fe-b8c4-18c7f3064970";
 const SYNC_URL = "https://functions.poehali.dev/8e9219e9-9dcf-4726-a272-69c6ce976b80";
 
 interface Preview {
@@ -26,7 +25,7 @@ const ToolsImportTab = ({ token }: ToolsImportTabProps) => {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const loadStats = async () => {
-    const res = await fetch(`${IMPORT_URL}?token=${token}`);
+    const res = await fetch(`${SYNC_URL}?action=import_status`);
     const data = await res.json();
     setCount(data.count ?? 0);
     setPreview(data.preview ?? []);
@@ -34,21 +33,6 @@ const ToolsImportTab = ({ token }: ToolsImportTabProps) => {
   };
 
   useEffect(() => { loadStats(); }, []);
-
-  const pollStatus = async () => {
-    const res = await fetch(`${IMPORT_URL}?token=${token}`);
-    const data = await res.json();
-    setCount(data.count ?? 0);
-    setPreview(data.preview ?? []);
-    const s = data.sync_status || {};
-    if (s.running) {
-      setTimeout(pollStatus, 3000);
-    } else {
-      setSyncing(false);
-      if (s.error) setResult({ ok: false, error: s.error });
-      else if (s.last != null) setResult({ ok: true, imported: s.last });
-    }
-  };
 
   const runChunks = async () => {
     let offset = 0;
@@ -92,7 +76,7 @@ const ToolsImportTab = ({ token }: ToolsImportTabProps) => {
     reader.onload = async (ev) => {
       const base64 = (ev.target?.result as string).split(",")[1];
       try {
-        const res = await fetch(`${IMPORT_URL}?token=${token}`, {
+        const res = await fetch(`${SYNC_URL}?action=import_csv`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ file: base64, delimiter }),

@@ -81,7 +81,7 @@ export function StaffMainLayout({
   const [urgentRepairTrigger, setUrgentRepairTrigger] = React.useState(0);
 
   React.useEffect(() => {
-    const CHAT_URL = "https://functions.poehali.dev/60644856-ff88-4875-b2a9-97c87d32a630";
+    const CHAT_URL = "https://functions.poehali.dev/06e0e177-7525-48f9-bce8-617ba9e87cde";
     const check = async () => {
       try {
         const r = await fetch(`${CHAT_URL}?action=staff_rooms`, { headers: { "X-Employee-Token": token } });

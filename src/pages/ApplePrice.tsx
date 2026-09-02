@@ -1203,8 +1203,9 @@ export default function ApplePrice() {
       const raw = localStorage.getItem(CACHE_KEY);
       if (raw) {
         const { d, ts } = JSON.parse(raw);
-        const firstItem = Object.values(d?.groups || {})?.[0]?.[0];
-        const hasSimField = firstItem && "sim" in firstItem;
+        const groupsArr = Object.values(d?.groups || {}) as unknown[][];
+        const firstItem = groupsArr?.[0]?.[0];
+        const hasSimField = firstItem && typeof firstItem === "object" && "sim" in firstItem;
         if (d?.ok && hasSimField && Date.now() - ts < REFRESH_MS) {
           setData(d);
           setNextRefresh(ts + REFRESH_MS);

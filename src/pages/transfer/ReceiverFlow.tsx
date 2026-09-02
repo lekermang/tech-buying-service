@@ -100,7 +100,7 @@ export default function ReceiverFlow({ prefillCode, onCancel }: { prefillCode: s
           }
         }
       }
-      const blob = new Blob(chunks, { type: "application/zip" });
+      const blob = new Blob(chunks as BlobPart[], { type: "application/zip" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = `transfer_${new Date().toISOString().slice(0, 10)}.zip`;

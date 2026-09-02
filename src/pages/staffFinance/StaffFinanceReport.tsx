@@ -122,9 +122,9 @@ export default function StaffFinanceReport({ token }: { token: string }) {
       {/* Табы */}
       <div className="flex gap-1 p-1 rounded-xl" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}>
         {([
-          { k: "input",   l: "📂 Файлы" },
+          { k: "input",   l: "📂 Файлы", disabled: false },
           { k: "report",  l: "📊 Отчёт",  disabled: !result },
-          { k: "history", l: `🕐 История${history.length > 0 ? ` (${history.length})` : ""}` },
+          { k: "history", l: `🕐 История${history.length > 0 ? ` (${history.length})` : ""}`, disabled: false },
         ] as const).map(({ k, l, disabled }) => (
           <button key={k} onClick={() => !disabled && setView(k)}
             className="flex-1 py-1.5 rounded-lg font-roboto text-xs font-semibold transition-all"

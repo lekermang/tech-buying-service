@@ -9,7 +9,7 @@ interface Props {
   children: ReactNode;
   className?: string;
   strength?: number;
-  onClick?: () => void;
+  onClick?: (e: React.MouseEvent<HTMLElement>) => void;
   as?: "button" | "a";
   href?: string;
 }

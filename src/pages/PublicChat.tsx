@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import Icon from "@/components/ui/icon";
 
-const PUBLIC_CHAT_URL = "https://functions.poehali.dev/60644856-ff88-4875-b2a9-97c87d32a630";
+const PUBLIC_CHAT_URL = "https://functions.poehali.dev/06e0e177-7525-48f9-bce8-617ba9e87cde";
 
 const LS_AUTH = "pchat_auth";
 const LS_ROOM = "pchat_room";

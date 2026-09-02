@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 
-const INSTRUMENT_API_URL = "https://functions.poehali.dev/894b4895-a528-4a4d-8bef-423c19423565";
+const INSTRUMENT_API_URL = "https://functions.poehali.dev/434ea4ea-de14-4074-a738-e5db6e4f9697";
 const PAGE_SIZE = 100;
 
 interface Product {
@@ -107,15 +107,21 @@ const useProducts = (token: string, offset: number) => {
     setError(null);
     try {
       const res = await fetch(
-        `${INSTRUMENT_API_URL}?method=get.products.list&limit=${PAGE_SIZE}&offset=${offset}`,
+        `${INSTRUMENT_API_URL}?action=products&limit=${PAGE_SIZE}&offset=${offset}`,
         { headers: { "X-Admin-Token": token } }
       );
-      const raw = await res.json();
-      const data = typeof raw === "string" ? JSON.parse(raw) : raw;
+      const data = await res.json();
       if (data.error) { setError(data.error); return; }
-      const list: Product[] = Object.entries(data).map(([id, v]) => ({ id, ...(v as Omit<Product, "id">) }));
+      const list: Product[] = (data.items || []).map((v: { article: string; base_price: number; discount_price: number; amount: string }) => ({
+        id: v.article,
+        ARTICLE: v.article,
+        BASE_PRICE: String(v.base_price),
+        DISCOUNT_PRICE: v.discount_price,
+        RETAIL_PRICE: String(v.base_price),
+        AMOUNT: v.amount,
+      }));
       setProducts(list);
-      if (total === null) setTotal(list.length === PAGE_SIZE ? PAGE_SIZE * 10 : list.length);
+      setTotal(data.total ?? list.length);
     } catch (e) {
       setError(String(e));
     } finally {

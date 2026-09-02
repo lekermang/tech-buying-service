@@ -1,4 +1,4 @@
-export const CHAT_URL = "https://functions.poehali.dev/60644856-ff88-4875-b2a9-97c87d32a630";
+export const CHAT_URL = "https://functions.poehali.dev/06e0e177-7525-48f9-bce8-617ba9e87cde";
 export const POLL_INTERVAL = 30000;
 
 export const QUICK_REPLIES = [
