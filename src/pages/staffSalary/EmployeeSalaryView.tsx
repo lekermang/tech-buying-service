@@ -270,14 +270,18 @@ export default function EmployeeSalaryView({ token, employeeName }: Props) {
 
       {/* Ставка / бонус — только для обычных сотрудников */}
       {!isRepairMaster && (
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <div className="rounded-xl p-3 text-center" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
             <div className="font-roboto text-[10px] uppercase tracking-widest mb-1" style={{ color: "rgba(255,255,255,0.35)" }}>Ставка / день</div>
             <div className="font-oswald font-bold text-xl text-white">{fmt(state.config.daily_rate)} ₽</div>
           </div>
           <div className="rounded-xl p-3 text-center" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-            <div className="font-roboto text-[10px] uppercase tracking-widest mb-1" style={{ color: "rgba(255,255,255,0.35)" }}>Бонус с продаж</div>
+            <div className="font-roboto text-[10px] uppercase tracking-widest mb-1" style={{ color: "rgba(255,255,255,0.35)" }}>Бонус с продажи</div>
             <div className="font-oswald font-bold text-xl" style={{ color: "#a78bfa" }}>{state.config.bonus_percent}%</div>
+          </div>
+          <div className="rounded-xl p-3 text-center" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+            <div className="font-roboto text-[10px] uppercase tracking-widest mb-1" style={{ color: "rgba(255,255,255,0.35)" }}>Бонус с закупки</div>
+            <div className="font-oswald font-bold text-xl" style={{ color: "#f0b429" }}>{state.config.bonus_percent_purchase}%</div>
           </div>
         </div>
       )}

@@ -10,6 +10,7 @@ export const SALARY_URL = "https://functions.poehali.dev/0945fb27-103d-4e8f-9e4d
 export type SalaryConfig = {
   daily_rate: number;
   bonus_percent: number;
+  bonus_percent_purchase: number;
   min_hours_for_rate?: number;
 };
 
@@ -28,6 +29,9 @@ export type SalaryLogEntry = {
   personal_profit?: number;
   bonus_percent_at_time?: number;
   bonus_amount?: number;
+  personal_purchase_profit?: number;
+  bonus_percent_purchase_at_time?: number;
+  bonus_purchase_amount?: number;
   total: number;
   is_paid: boolean;
   paid_at: string | null;
@@ -41,6 +45,7 @@ export type EmployeeOverview = {
   role: string;
   daily_rate: number;
   bonus_percent: number;
+  bonus_percent_purchase: number;
   min_hours_for_rate: number;
   shift_id: number | null;
   shift_status: 'open' | 'closed' | 'dayoff' | null;

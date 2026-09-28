@@ -245,7 +245,7 @@ export default function OwnerEmployeesList({
                         </span>
                       </div>
                       <div className="text-white/35 text-xs font-roboto mt-0.5">
-                        {e.position || e.role} · {e.daily_rate.toLocaleString("ru-RU")} ₽/смена · {e.bonus_percent}%
+                        {e.position || e.role} · {e.daily_rate.toLocaleString("ru-RU")} ₽/смена · {e.bonus_percent}% продажа / {e.bonus_percent_purchase}% закупка
                       </div>
                     </div>
                     {(e.unpaid_total ?? 0) > 0 && (

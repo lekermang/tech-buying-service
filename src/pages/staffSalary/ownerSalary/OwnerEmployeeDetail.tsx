@@ -38,7 +38,7 @@ export default function OwnerEmployeeDetail({
 }: {
   selected: EmployeeOverview;
   detail: DetailState | null;
-  editing: { daily_rate: string; bonus_percent: string } | null;
+  editing: { daily_rate: string; bonus_percent: string; bonus_percent_purchase: string } | null;
   busy: boolean;
   viewMonth: Date;
   isCurrentMonth: boolean;
@@ -49,7 +49,7 @@ export default function OwnerEmployeeDetail({
   onBack: () => void;
   onBeginEdit: () => void;
   onCancelEdit: () => void;
-  onChangeEditing: (next: { daily_rate: string; bonus_percent: string }) => void;
+  onChangeEditing: (next: { daily_rate: string; bonus_percent: string; bonus_percent_purchase: string }) => void;
   onSaveConfig: () => void;
   onPrevMonth: () => void;
   onNextMonth: () => void;
@@ -98,9 +98,15 @@ export default function OwnerEmployeeDetail({
                 className="w-full mt-1 px-3 py-2 rounded-lg bg-black/40 border border-white/15 text-white font-roboto" />
             </label>
             <label>
-              <span className="text-white/50 text-xs uppercase font-oswald">% с продаж</span>
+              <span className="text-white/50 text-xs uppercase font-oswald">% с продажи</span>
               <input type="number" step="0.1" value={editing.bonus_percent}
                 onChange={e => onChangeEditing({ ...editing, bonus_percent: e.target.value })}
+                className="w-full mt-1 px-3 py-2 rounded-lg bg-black/40 border border-white/15 text-white font-roboto" />
+            </label>
+            <label>
+              <span className="text-white/50 text-xs uppercase font-oswald">% с закупки</span>
+              <input type="number" step="0.1" value={editing.bonus_percent_purchase}
+                onChange={e => onChangeEditing({ ...editing, bonus_percent_purchase: e.target.value })}
                 className="w-full mt-1 px-3 py-2 rounded-lg bg-black/40 border border-white/15 text-white font-roboto" />
             </label>
             <div className="sm:col-span-2 flex gap-2">
@@ -111,11 +117,13 @@ export default function OwnerEmployeeDetail({
             </div>
           </div>
         ) : (
-          <div className="mt-3 flex gap-6 text-sm font-roboto">
+          <div className="mt-3 flex gap-6 text-sm font-roboto flex-wrap">
             <div><div className="text-white/40 text-[10px] uppercase font-oswald">Ставка</div>
               <div className="text-white font-bold tabular-nums">{selected.daily_rate.toLocaleString("ru-RU")} ₽</div></div>
-            <div><div className="text-white/40 text-[10px] uppercase font-oswald">% с продаж</div>
+            <div><div className="text-white/40 text-[10px] uppercase font-oswald">% с продажи</div>
               <div className="text-white font-bold">{selected.bonus_percent}%</div></div>
+            <div><div className="text-white/40 text-[10px] uppercase font-oswald">% с закупки</div>
+              <div className="text-white font-bold">{selected.bonus_percent_purchase}%</div></div>
           </div>
         )}
       </div>
@@ -279,7 +287,7 @@ export default function OwnerEmployeeDetail({
           <div className="flex gap-6 text-sm font-roboto flex-wrap">
             <div><div className="text-white/40 text-[10px] uppercase font-oswald">Начислено в {MONTHS[viewMonth.getMonth()].toLowerCase()}</div>
               <div className="text-white font-bold tabular-nums font-oswald text-lg">{monthSummary.earned.toLocaleString("ru-RU")} ₽</div></div>
-            <div><div className="text-purple-300/70 text-[10px] uppercase font-oswald">Премия {selected.bonus_percent}%</div>
+            <div><div className="text-purple-300/70 text-[10px] uppercase font-oswald">Премия ({selected.bonus_percent}% продажа + {selected.bonus_percent_purchase}% закупка)</div>
               <div className="text-purple-300 font-bold tabular-nums font-oswald text-lg">{monthSummary.bonus.toLocaleString("ru-RU")} ₽</div></div>
             <div><div className="text-green-300/60 text-[10px] uppercase font-oswald">Выплачено</div>
               <div className="text-green-300 font-bold tabular-nums font-oswald text-lg">{monthSummary.paid.toLocaleString("ru-RU")} ₽</div></div>

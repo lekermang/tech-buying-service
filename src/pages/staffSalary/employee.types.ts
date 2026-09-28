@@ -10,7 +10,7 @@ export function currentMonthRange() {
 }
 
 export type TodayState = {
-  config: { daily_rate: number; bonus_percent: number };
+  config: { daily_rate: number; bonus_percent: number; bonus_percent_purchase: number };
   today_total: number | null;
   total_earned: number;
   total_paid: number;
@@ -24,18 +24,26 @@ export type TodayState = {
   acceptor_orders_count?: number;
 };
 
-export type DayRow = { shift_date: string; hours_worked: number; base_rate?: number; bonus_amount?: number; total: number };
+export type DayRow = {
+  shift_date: string; hours_worked: number; base_rate?: number;
+  bonus_amount?: number; bonus_purchase_amount?: number; total: number;
+};
 export type PayoutRow = { id: number; payout_date: string; amount: number; note: string | null };
 
 export type SaleRow = {
   id: number; time: string; item_title: string; item_category: string | null;
   sell_price: number; buy_price: number; profit: number; bonus_from_sale: number;
 };
+export type PurchaseRow = {
+  id: number; time: string; item_title: string; item_category: string | null;
+  sell_price: number; buy_price: number; profit: number; bonus_from_purchase: number;
+};
 export type GoldRow = { id: number; time: string; description: string; total_price: number };
 export type RepairShopRow = { id: number; time: string; device: string; repair_type: string; amount: number; parts_cost: number; profit: number };
 export type ContractRow = { id: number; time: string; item_name: string; loan_amount: number; profit: number };
 export type Breakdown = {
   goods: { count: number; revenue: number; profit: number };
+  purchases?: { count: number; revenue: number; profit: number; bonus: number };
   gold: { count: number; revenue: number };
   repairs: { count: number; revenue: number; profit: number };
   contracts: { count: number; revenue: number; profit: number };
@@ -43,8 +51,9 @@ export type Breakdown = {
 
 export type DayDetail = {
   date: string; day_log: DayRow | null;
-  config: { daily_rate: number; bonus_percent: number };
+  config: { daily_rate: number; bonus_percent: number; bonus_percent_purchase: number };
   sales: SaleRow[];
+  purchases?: PurchaseRow[];
   gold?: GoldRow[];
   repairs?: RepairShopRow[];
   contracts?: ContractRow[];

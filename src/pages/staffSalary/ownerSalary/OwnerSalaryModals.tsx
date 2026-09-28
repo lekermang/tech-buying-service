@@ -5,7 +5,7 @@ import { isoLocal, type LogRow } from "./ownerSalaryTypes";
 
 // === Модалка редактирования дня ===
 export function DayEditModal({
-  open, day, employeeId, defaultRate, defaultPercent, currentLog, token,
+  open, day, employeeId, defaultRate, defaultPercent, defaultPercentPurchase, currentLog, token,
   onClose, onSaved,
 }: {
   open: boolean;
@@ -13,6 +13,7 @@ export function DayEditModal({
   employeeId: number;
   defaultRate: number;
   defaultPercent: number;
+  defaultPercentPurchase: number;
   currentLog: LogRow | null;
   token: string;
   onClose: () => void;
@@ -22,6 +23,8 @@ export function DayEditModal({
   const [rate, setRate] = useState(String(defaultRate));
   const [bonus, setBonus] = useState("0");
   const [profit, setProfit] = useState("0");
+  const [bonusPurchase, setBonusPurchase] = useState("0");
+  const [purchaseProfit, setPurchaseProfit] = useState("0");
   const [auto, setAuto] = useState(true);
   const [busy, setBusy] = useState(false);
 
@@ -32,12 +35,16 @@ export function DayEditModal({
         setRate(String(currentLog.base_rate || 0));
         setBonus(String(currentLog.bonus_amount || 0));
         setProfit(String(currentLog.personal_profit || 0));
+        setBonusPurchase(String(currentLog.bonus_purchase_amount || 0));
+        setPurchaseProfit(String(currentLog.personal_purchase_profit || 0));
         setAuto(false);
       } else {
         setHours("8");
         setRate(String(defaultRate));
         setBonus("0");
         setProfit("0");
+        setBonusPurchase("0");
+        setPurchaseProfit("0");
         setAuto(true);
       }
     }
@@ -45,7 +52,7 @@ export function DayEditModal({
 
   if (!open) return null;
 
-  const total = (Number(rate) || 0) + (auto ? 0 : (Number(bonus) || 0));
+  const total = (Number(rate) || 0) + (auto ? 0 : (Number(bonus) || 0) + (Number(bonusPurchase) || 0));
 
   const save = async () => {
     setBusy(true);
@@ -61,6 +68,8 @@ export function DayEditModal({
           auto_bonus: auto,
           bonus_amount: auto ? 0 : (Number(bonus) || 0),
           personal_profit: auto ? 0 : (Number(profit) || 0),
+          bonus_purchase_amount: auto ? 0 : (Number(bonusPurchase) || 0),
+          personal_purchase_profit: auto ? 0 : (Number(purchaseProfit) || 0),
         }),
       });
       onSaved();
@@ -127,20 +136,30 @@ export function DayEditModal({
         <label className="flex items-center gap-2 cursor-pointer">
           <input type="checkbox" checked={auto} onChange={e => setAuto(e.target.checked)} className="w-4 h-4 accent-[#FFD700]" />
           <span className="text-white/80 text-sm font-roboto">
-            Бонус автоматом: {defaultPercent}% от продаж в Смарт-Ломбарде за этот день
+            Бонус автоматом: {defaultPercent}% с продажи + {defaultPercentPurchase}% с закупки за этот день
           </span>
         </label>
 
         {!auto && (
           <div className="grid grid-cols-2 gap-3">
             <label>
-              <span className="text-white/50 text-[10px] uppercase font-oswald">Прибыль за день, ₽</span>
+              <span className="text-white/50 text-[10px] uppercase font-oswald">Прибыль с продажи, ₽</span>
               <input type="number" value={profit} onChange={e => setProfit(e.target.value)}
                 className="w-full mt-1 px-3 py-2 rounded-lg bg-black/40 border border-white/15 text-white font-roboto" />
             </label>
             <label>
-              <span className="text-white/50 text-[10px] uppercase font-oswald">Бонус, ₽</span>
+              <span className="text-white/50 text-[10px] uppercase font-oswald">Бонус с продажи, ₽</span>
               <input type="number" value={bonus} onChange={e => setBonus(e.target.value)}
+                className="w-full mt-1 px-3 py-2 rounded-lg bg-black/40 border border-white/15 text-white font-roboto" />
+            </label>
+            <label>
+              <span className="text-white/50 text-[10px] uppercase font-oswald">Прибыль с закупки, ₽</span>
+              <input type="number" value={purchaseProfit} onChange={e => setPurchaseProfit(e.target.value)}
+                className="w-full mt-1 px-3 py-2 rounded-lg bg-black/40 border border-white/15 text-white font-roboto" />
+            </label>
+            <label>
+              <span className="text-white/50 text-[10px] uppercase font-oswald">Бонус с закупки, ₽</span>
+              <input type="number" value={bonusPurchase} onChange={e => setBonusPurchase(e.target.value)}
                 className="w-full mt-1 px-3 py-2 rounded-lg bg-black/40 border border-white/15 text-white font-roboto" />
             </label>
           </div>
@@ -153,7 +172,7 @@ export function DayEditModal({
         )}
         {auto && (
           <div className="text-white/50 text-xs font-roboto">
-            Итог посчитается при сохранении: ставка + {defaultPercent}% от прибыли Смарт-Ломбарда.
+            Итог посчитается при сохранении: ставка + {defaultPercent}% от прибыли продаж + {defaultPercentPurchase}% от прибыли закупок Смарт-Ломбарда.
           </div>
         )}
 
@@ -255,12 +274,13 @@ export function PayoutModal({
 
 // === Модалка массового заполнения дней по шаблону ===
 export function BulkFillModal({
-  open, employeeId, defaultRate, defaultPercent, token, onClose, onSaved,
+  open, employeeId, defaultRate, defaultPercent, defaultPercentPurchase, token, onClose, onSaved,
 }: {
   open: boolean;
   employeeId: number;
   defaultRate: number;
   defaultPercent: number;
+  defaultPercentPurchase: number;
   token: string;
   onClose: () => void;
   onSaved: () => void;
@@ -351,7 +371,7 @@ export function BulkFillModal({
         </div>
         <label className="flex items-center gap-2 cursor-pointer">
           <input type="checkbox" checked={autoBonus} onChange={e => setAutoBonus(e.target.checked)} className="w-4 h-4 accent-[#FFD700]" />
-          <span className="text-white/80 text-sm font-roboto">Авто-бонус {defaultPercent}% от продаж Смарт-Ломбарда</span>
+          <span className="text-white/80 text-sm font-roboto">Авто-бонус {defaultPercent}% с продажи + {defaultPercentPurchase}% с закупки (Смарт-Ломбард)</span>
         </label>
         <label className="flex items-center gap-2 cursor-pointer">
           <input type="checkbox" checked={weekdaysOnly} onChange={e => setWeekdaysOnly(e.target.checked)} className="w-4 h-4 accent-[#FFD700]" />

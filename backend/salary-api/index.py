@@ -83,7 +83,8 @@ def calc_slshop_profit_for_day(cur, employee_token, employee_name, day):
     """Прибыль за день из Смарт-Ломбарда: SUM(op.amount - item.buy_price)
     для op_type='sell' (Смарт-Ломбард использует именно 'sell').
     Матчим в первую очередь по employee_name (большинство операций без токена),
-    с fallback на employee_token."""
+    с fallback на employee_token.
+    Это база для бонуса «% с продажи» — начисляется тому, кто ПРОДАЛ товар."""
     cur.execute(
         f"""
         SELECT COALESCE(SUM(op.amount - COALESCE(i.buy_price, 0)), 0) AS profit
@@ -97,6 +98,27 @@ def calc_slshop_profit_for_day(cur, employee_token, employee_name, day):
           )
         """,
         (day, employee_name, employee_token),
+    )
+    v = _row_value(cur.fetchone(), 'profit', 0)
+    return int(v or 0)
+
+
+def calc_slshop_purchase_profit_for_day(cur, employee_name, day):
+    """Прибыль за день от товаров, которые этот сотрудник ЗАКУПИЛ (slshop_items.created_by),
+    а товар был ПРОДАН в этот день (sell_at::date = day). Это база для бонуса «% с закупки» —
+    начисляется тому, кто принял товар у клиента, даже если продал его кто-то другой.
+    База прибыли та же: sell_price - buy_price (как и для бонуса с продажи)."""
+    if not employee_name:
+        return 0
+    cur.execute(
+        f"""
+        SELECT COALESCE(SUM(i.sell_price - COALESCE(i.buy_price, 0)), 0) AS profit
+        FROM {SCHEMA}.slshop_items i
+        WHERE i.status = 'sold'
+          AND i.sell_at::date = %s
+          AND i.created_by = %s
+        """,
+        (day, employee_name),
     )
     v = _row_value(cur.fetchone(), 'profit', 0)
     return int(v or 0)
@@ -140,11 +162,11 @@ def handler(event, context):
         with get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             today = date.today()
             cur.execute(
-                f"SELECT daily_rate, bonus_percent FROM {SCHEMA}.employee_salary_config "
+                f"SELECT daily_rate, bonus_percent, bonus_percent_purchase FROM {SCHEMA}.employee_salary_config "
                 f"WHERE employee_id = %s",
                 (user_id,),
             )
-            cfg = cur.fetchone() or {'daily_rate': 2000, 'bonus_percent': 3.0}
+            cfg = cur.fetchone() or {'daily_rate': 2000, 'bonus_percent': 3.0, 'bonus_percent_purchase': 7.0}
 
             # Запись на сегодня (если владелец уже её проставил)
             cur.execute(
@@ -211,6 +233,7 @@ def handler(event, context):
                 'config': {
                     'daily_rate': cfg['daily_rate'],
                     'bonus_percent': float(cfg['bonus_percent']),
+                    'bonus_percent_purchase': float(cfg.get('bonus_percent_purchase', 7.0) or 7.0),
                 },
                 'today_total': today_total,
                 'total_earned': total_earned,
@@ -232,7 +255,8 @@ def handler(event, context):
             if date_from and date_to:
                 cur.execute(
                     f"""
-                    SELECT shift_date, hours_worked, base_rate, bonus_amount, total
+                    SELECT shift_date, hours_worked, base_rate, bonus_amount,
+                           bonus_purchase_amount, total
                     FROM {SCHEMA}.employee_salary_log
                     WHERE employee_id = %s AND shift_date >= %s AND shift_date <= %s
                     ORDER BY shift_date DESC
@@ -242,7 +266,8 @@ def handler(event, context):
             else:
                 cur.execute(
                     f"""
-                    SELECT shift_date, hours_worked, base_rate, bonus_amount, total
+                    SELECT shift_date, hours_worked, base_rate, bonus_amount,
+                           bonus_purchase_amount, total
                     FROM {SCHEMA}.employee_salary_log
                     WHERE employee_id = %s
                     ORDER BY shift_date DESC LIMIT 90
@@ -293,10 +318,10 @@ def handler(event, context):
 
             # Конфиг сотрудника (% бонуса)
             cur.execute(
-                f"SELECT daily_rate, bonus_percent FROM {SCHEMA}.employee_salary_config WHERE employee_id = %s",
+                f"SELECT daily_rate, bonus_percent, bonus_percent_purchase FROM {SCHEMA}.employee_salary_config WHERE employee_id = %s",
                 (user_id,),
             )
-            cfg = cur.fetchone() or {'daily_rate': 2000, 'bonus_percent': 3.0}
+            cfg = cur.fetchone() or {'daily_rate': 2000, 'bonus_percent': 3.0, 'bonus_percent_purchase': 7.0}
 
             # Список конкретных продаж за этот день (Б/у техника)
             cur.execute(
@@ -362,7 +387,30 @@ def handler(event, context):
             )
             contracts = cur.fetchall()
 
+            # Товары, которые этот сотрудник ЗАКУПИЛ (created_by) и которые были ПРОДАНЫ в этот день
+            cur.execute(
+                f"""
+                SELECT
+                    i.id,
+                    i.sell_at AS created_at,
+                    i.title AS item_title,
+                    c.name AS item_category,
+                    i.sell_price,
+                    COALESCE(i.buy_price, 0) AS buy_price,
+                    (i.sell_price - COALESCE(i.buy_price, 0)) AS profit
+                FROM {SCHEMA}.slshop_items i
+                LEFT JOIN {SCHEMA}.slshop_categories c ON c.id = i.category_id
+                WHERE i.status = 'sold'
+                  AND i.sell_at::date = %s
+                  AND i.created_by = %s
+                ORDER BY i.sell_at ASC
+                """,
+                (day_str, full_name),
+            )
+            purchases = cur.fetchall()
+
             bonus_pct = float(cfg['bonus_percent']) if cfg else 3.0
+            bonus_pct_purchase = float(cfg.get('bonus_percent_purchase', 7.0) or 7.0) if cfg else 7.0
             sales_list = []
             for s in sales:
                 profit = int(s['profit'] or 0)
@@ -409,12 +457,33 @@ def handler(event, context):
                     'profit': int(c.get('profit') or 0),
                 })
 
+            purchase_list = []
+            for p in purchases:
+                profit = int(p['profit'] or 0)
+                bonus_from_purchase = round(profit * bonus_pct_purchase / 100)
+                purchase_list.append({
+                    'id': p['id'],
+                    'time': p['created_at'].strftime('%H:%M') if p['created_at'] else '',
+                    'item_title': p['item_title'],
+                    'item_category': p['item_category'],
+                    'sell_price': int(p['sell_price'] or 0),
+                    'buy_price': int(p['buy_price'] or 0),
+                    'profit': profit,
+                    'bonus_from_purchase': bonus_from_purchase,
+                })
+
             # Сводка по категориям
             breakdown = {
                 'goods': {
                     'count': len(sales_list),
                     'revenue': sum(s['sell_price'] for s in sales_list),
                     'profit': sum(s['profit'] for s in sales_list),
+                },
+                'purchases': {
+                    'count': len(purchase_list),
+                    'revenue': sum(p['sell_price'] for p in purchase_list),
+                    'profit': sum(p['profit'] for p in purchase_list),
+                    'bonus': sum(p['bonus_from_purchase'] for p in purchase_list),
                 },
                 'gold': {
                     'count': len(gold_list),
@@ -435,8 +504,13 @@ def handler(event, context):
             return resp(200, {
                 'date': day_str,
                 'day_log': day_log,
-                'config': {'daily_rate': cfg['daily_rate'], 'bonus_percent': bonus_pct},
+                'config': {
+                    'daily_rate': cfg['daily_rate'],
+                    'bonus_percent': bonus_pct,
+                    'bonus_percent_purchase': bonus_pct_purchase,
+                },
                 'sales': sales_list,
+                'purchases': purchase_list,
                 'gold': gold_list,
                 'repairs': repair_list,
                 'contracts': contract_list,
@@ -604,6 +678,7 @@ def handler(event, context):
                   e.id, e.full_name, e.login, e.position, e.role,
                   COALESCE(cfg.daily_rate, 2000) AS daily_rate,
                   COALESCE(cfg.bonus_percent, 3.0) AS bonus_percent,
+                  COALESCE(cfg.bonus_percent_purchase, 7.0) AS bonus_percent_purchase,
                   COALESCE(cfg.min_hours_for_rate, 10.0) AS min_hours_for_rate,
                   sh.id AS shift_id, sh.status AS shift_status,
                   sh.started_at, sh.ended_at,
@@ -724,7 +799,9 @@ def handler(event, context):
                 cur.execute(
                     f"""
                     SELECT id, shift_date, hours_worked, base_rate, personal_profit,
-                           bonus_percent_at_time, bonus_amount, total, owner_set, created_at
+                           bonus_percent_at_time, bonus_amount,
+                           personal_purchase_profit, bonus_percent_purchase_at_time, bonus_purchase_amount,
+                           total, owner_set, created_at
                     FROM {SCHEMA}.employee_salary_log
                     WHERE employee_id = %s AND shift_date >= %s AND shift_date <= %s
                     ORDER BY shift_date DESC
@@ -735,7 +812,9 @@ def handler(event, context):
                 cur.execute(
                     f"""
                     SELECT id, shift_date, hours_worked, base_rate, personal_profit,
-                           bonus_percent_at_time, bonus_amount, total, owner_set, created_at
+                           bonus_percent_at_time, bonus_amount,
+                           personal_purchase_profit, bonus_percent_purchase_at_time, bonus_purchase_amount,
+                           total, owner_set, created_at
                     FROM {SCHEMA}.employee_salary_log
                     WHERE employee_id = %s
                     ORDER BY shift_date DESC LIMIT 365
@@ -835,16 +914,19 @@ def handler(event, context):
         auto_bonus = bool(body.get('auto_bonus', False))
         bonus_amount = int(body.get('bonus_amount', 0) or 0)
         personal_profit = int(body.get('personal_profit', 0) or 0)
+        bonus_purchase_amount = int(body.get('bonus_purchase_amount', 0) or 0)
+        personal_purchase_profit = int(body.get('personal_purchase_profit', 0) or 0)
 
         with get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             # Конфиг для % по умолчанию
             cur.execute(
-                f"SELECT daily_rate, bonus_percent FROM {SCHEMA}.employee_salary_config "
+                f"SELECT daily_rate, bonus_percent, bonus_percent_purchase FROM {SCHEMA}.employee_salary_config "
                 f"WHERE employee_id = %s",
                 (emp_id,),
             )
-            cfg = cur.fetchone() or {'daily_rate': 2000, 'bonus_percent': Decimal('3.0')}
+            cfg = cur.fetchone() or {'daily_rate': 2000, 'bonus_percent': Decimal('3.0'), 'bonus_percent_purchase': Decimal('7.0')}
             percent = Decimal(str(cfg['bonus_percent']))
+            percent_purchase = Decimal(str(cfg.get('bonus_percent_purchase', Decimal('7.0')) or Decimal('7.0')))
 
             # Токен и имя сотрудника для расчёта slshop-прибыли
             cur.execute(f"SELECT auth_token, full_name FROM {SCHEMA}.employees WHERE id = %s", (emp_id,))
@@ -855,8 +937,10 @@ def handler(event, context):
             if auto_bonus:
                 personal_profit = calc_slshop_profit_for_day(cur, emp_token, emp_name, day)
                 bonus_amount = int(Decimal(personal_profit) * percent / Decimal(100))
+                personal_purchase_profit = calc_slshop_purchase_profit_for_day(cur, emp_name, day)
+                bonus_purchase_amount = int(Decimal(personal_purchase_profit) * percent_purchase / Decimal(100))
 
-            total = base_rate + bonus_amount
+            total = base_rate + bonus_amount + bonus_purchase_amount
 
             # Создаём смену (status=closed для рабочего дня)
             shift_id = ensure_shift(cur, emp_id, day, status='closed')
@@ -866,21 +950,25 @@ def handler(event, context):
                 f"""
                 INSERT INTO {SCHEMA}.employee_salary_log
                   (shift_id, employee_id, shift_date, hours_worked, base_rate,
-                   personal_profit, bonus_percent_at_time, bonus_amount, total,
-                   is_paid, owner_set)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, false, true)
+                   personal_profit, bonus_percent_at_time, bonus_amount,
+                   personal_purchase_profit, bonus_percent_purchase_at_time, bonus_purchase_amount,
+                   total, is_paid, owner_set)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, false, true)
                 ON CONFLICT (employee_id, shift_date) DO UPDATE
                 SET hours_worked = EXCLUDED.hours_worked,
                     base_rate = EXCLUDED.base_rate,
                     personal_profit = EXCLUDED.personal_profit,
                     bonus_percent_at_time = EXCLUDED.bonus_percent_at_time,
                     bonus_amount = EXCLUDED.bonus_amount,
+                    personal_purchase_profit = EXCLUDED.personal_purchase_profit,
+                    bonus_percent_purchase_at_time = EXCLUDED.bonus_percent_purchase_at_time,
+                    bonus_purchase_amount = EXCLUDED.bonus_purchase_amount,
                     total = EXCLUDED.total,
                     owner_set = true,
                     shift_id = EXCLUDED.shift_id
                 """,
-                (shift_id, emp_id, day, hours, base_rate, personal_profit, percent,
-                 bonus_amount, total),
+                (shift_id, emp_id, day, hours, base_rate, personal_profit, percent, bonus_amount,
+                 personal_purchase_profit, percent_purchase, bonus_purchase_amount, total),
             )
             conn.commit()
             return resp(200, {
@@ -888,6 +976,8 @@ def handler(event, context):
                 'total': total,
                 'bonus_amount': bonus_amount,
                 'personal_profit': personal_profit,
+                'bonus_purchase_amount': bonus_purchase_amount,
+                'personal_purchase_profit': personal_purchase_profit,
             })
 
     if action == 'owner_bulk_fill' and method == 'POST':
@@ -919,11 +1009,12 @@ def handler(event, context):
 
         with get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
-                f"SELECT daily_rate, bonus_percent FROM {SCHEMA}.employee_salary_config WHERE employee_id = %s",
+                f"SELECT daily_rate, bonus_percent, bonus_percent_purchase FROM {SCHEMA}.employee_salary_config WHERE employee_id = %s",
                 (emp_id,),
             )
-            cfg = cur.fetchone() or {'daily_rate': 2000, 'bonus_percent': Decimal('3.0')}
+            cfg = cur.fetchone() or {'daily_rate': 2000, 'bonus_percent': Decimal('3.0'), 'bonus_percent_purchase': Decimal('7.0')}
             percent = Decimal(str(cfg['bonus_percent']))
+            percent_purchase = Decimal(str(cfg.get('bonus_percent_purchase', Decimal('7.0')) or Decimal('7.0')))
 
             cur.execute(f"SELECT auth_token, full_name FROM {SCHEMA}.employees WHERE id = %s", (emp_id,))
             emp_row = cur.fetchone()
@@ -965,31 +1056,39 @@ def handler(event, context):
                 # Считаем
                 personal_profit = 0
                 bonus = 0
+                personal_purchase_profit = 0
+                bonus_purchase = 0
                 if auto_bonus:
                     personal_profit = calc_slshop_profit_for_day(cur, emp_token, emp_name, day_str)
                     bonus = int(Decimal(personal_profit) * percent / Decimal(100))
-                total = base_rate + bonus
+                    personal_purchase_profit = calc_slshop_purchase_profit_for_day(cur, emp_name, day_str)
+                    bonus_purchase = int(Decimal(personal_purchase_profit) * percent_purchase / Decimal(100))
+                total = base_rate + bonus + bonus_purchase
 
                 shift_id = ensure_shift(cur, emp_id, day_str, status='closed')
                 cur.execute(
                     f"""
                     INSERT INTO {SCHEMA}.employee_salary_log
                       (shift_id, employee_id, shift_date, hours_worked, base_rate,
-                       personal_profit, bonus_percent_at_time, bonus_amount, total,
-                       is_paid, owner_set)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, false, true)
+                       personal_profit, bonus_percent_at_time, bonus_amount,
+                       personal_purchase_profit, bonus_percent_purchase_at_time, bonus_purchase_amount,
+                       total, is_paid, owner_set)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, false, true)
                     ON CONFLICT (employee_id, shift_date) DO UPDATE
                     SET hours_worked = EXCLUDED.hours_worked,
                         base_rate = EXCLUDED.base_rate,
                         personal_profit = EXCLUDED.personal_profit,
                         bonus_percent_at_time = EXCLUDED.bonus_percent_at_time,
                         bonus_amount = EXCLUDED.bonus_amount,
+                        personal_purchase_profit = EXCLUDED.personal_purchase_profit,
+                        bonus_percent_purchase_at_time = EXCLUDED.bonus_percent_purchase_at_time,
+                        bonus_purchase_amount = EXCLUDED.bonus_purchase_amount,
                         total = EXCLUDED.total,
                         owner_set = true,
                         shift_id = EXCLUDED.shift_id
                     """,
-                    (shift_id, emp_id, day_str, hours, base_rate, personal_profit, percent,
-                     bonus, total),
+                    (shift_id, emp_id, day_str, hours, base_rate, personal_profit, percent, bonus,
+                     personal_purchase_profit, percent_purchase, bonus_purchase, total),
                 )
                 filled += 1
                 cur_day += _td(days=1)
@@ -1011,11 +1110,12 @@ def handler(event, context):
 
         with get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
-                f"SELECT bonus_percent FROM {SCHEMA}.employee_salary_config WHERE employee_id = %s",
+                f"SELECT bonus_percent, bonus_percent_purchase FROM {SCHEMA}.employee_salary_config WHERE employee_id = %s",
                 (emp_id,),
             )
-            cfg = cur.fetchone() or {'bonus_percent': Decimal('3.0')}
+            cfg = cur.fetchone() or {'bonus_percent': Decimal('3.0'), 'bonus_percent_purchase': Decimal('7.0')}
             percent = Decimal(str(cfg['bonus_percent']))
+            percent_purchase = Decimal(str(cfg.get('bonus_percent_purchase', Decimal('7.0')) or Decimal('7.0')))
 
             cur.execute(f"SELECT auth_token, full_name FROM {SCHEMA}.employees WHERE id = %s", (emp_id,))
             emp_row = cur.fetchone()
@@ -1035,17 +1135,22 @@ def handler(event, context):
                 day_str = row['shift_date'].isoformat() if hasattr(row['shift_date'], 'isoformat') else str(row['shift_date'])
                 profit = calc_slshop_profit_for_day(cur, emp_token, emp_name, day_str)
                 bonus = int(Decimal(profit) * percent / Decimal(100))
-                total = int(row['base_rate'] or 0) + bonus
+                purchase_profit = calc_slshop_purchase_profit_for_day(cur, emp_name, day_str)
+                bonus_purchase = int(Decimal(purchase_profit) * percent_purchase / Decimal(100))
+                total = int(row['base_rate'] or 0) + bonus + bonus_purchase
                 cur.execute(
                     f"""
                     UPDATE {SCHEMA}.employee_salary_log
                     SET personal_profit = %s,
                         bonus_percent_at_time = %s,
                         bonus_amount = %s,
+                        personal_purchase_profit = %s,
+                        bonus_percent_purchase_at_time = %s,
+                        bonus_purchase_amount = %s,
                         total = %s
                     WHERE id = %s
                     """,
-                    (profit, percent, bonus, total, row['id']),
+                    (profit, percent, bonus, purchase_profit, percent_purchase, bonus_purchase, total, row['id']),
                 )
                 updated += 1
             conn.commit()
@@ -1066,7 +1171,8 @@ def handler(event, context):
                 f"""
                 UPDATE {SCHEMA}.employee_salary_log
                 SET hours_worked = 0, base_rate = 0, personal_profit = 0,
-                    bonus_amount = 0, total = 0, owner_set = true
+                    bonus_amount = 0, personal_purchase_profit = 0, bonus_purchase_amount = 0,
+                    total = 0, owner_set = true
                 WHERE employee_id = %s AND shift_date = %s
                 """,
                 (emp_id, day),
@@ -1092,7 +1198,8 @@ def handler(event, context):
                     f"""
                     UPDATE {SCHEMA}.employee_salary_log
                     SET hours_worked = 0, base_rate = 0, personal_profit = 0,
-                        bonus_amount = 0, total = 0
+                        bonus_amount = 0, personal_purchase_profit = 0, bonus_purchase_amount = 0,
+                        total = 0
                     WHERE employee_id = %s AND shift_date = %s
                     """,
                     (emp_id, day),
@@ -1171,22 +1278,24 @@ def handler(event, context):
             return resp(400, {'error': 'employee_id required'})
         daily_rate = int(body.get('daily_rate', 2000))
         bonus_percent = float(body.get('bonus_percent', 3.0))
+        bonus_percent_purchase = float(body.get('bonus_percent_purchase', 7.0))
         min_hours = float(body.get('min_hours_for_rate', 10.0))
 
         with get_conn() as conn, conn.cursor() as cur:
             cur.execute(
                 f"""
                 INSERT INTO {SCHEMA}.employee_salary_config
-                  (employee_id, daily_rate, bonus_percent, min_hours_for_rate, updated_by)
-                VALUES (%s, %s, %s, %s, %s)
+                  (employee_id, daily_rate, bonus_percent, bonus_percent_purchase, min_hours_for_rate, updated_by)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 ON CONFLICT (employee_id) DO UPDATE
                 SET daily_rate = EXCLUDED.daily_rate,
                     bonus_percent = EXCLUDED.bonus_percent,
+                    bonus_percent_purchase = EXCLUDED.bonus_percent_purchase,
                     min_hours_for_rate = EXCLUDED.min_hours_for_rate,
                     updated_at = NOW(),
                     updated_by = EXCLUDED.updated_by
                 """,
-                (emp_id, daily_rate, bonus_percent, min_hours, user_id),
+                (emp_id, daily_rate, bonus_percent, bonus_percent_purchase, min_hours, user_id),
             )
             conn.commit()
             return resp(200, {'ok': True})

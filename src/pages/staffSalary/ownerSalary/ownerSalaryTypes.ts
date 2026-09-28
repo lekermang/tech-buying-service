@@ -10,6 +10,9 @@ export type LogRow = {
   personal_profit: number;
   bonus_percent_at_time: number;
   bonus_amount: number;
+  personal_purchase_profit?: number;
+  bonus_percent_purchase_at_time?: number;
+  bonus_purchase_amount?: number;
   total: number;
   owner_set: boolean;
 };

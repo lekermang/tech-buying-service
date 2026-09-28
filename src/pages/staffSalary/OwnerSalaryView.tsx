@@ -21,7 +21,7 @@ export default function OwnerSalaryView({ token, employeeName = "Владеле�
   const [myStats, setMyStats] = useState<MyStats>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [detail, setDetail] = useState<DetailState | null>(null);
-  const [editing, setEditing] = useState<{ daily_rate: string; bonus_percent: string } | null>(null);
+  const [editing, setEditing] = useState<{ daily_rate: string; bonus_percent: string; bonus_percent_purchase: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
@@ -72,6 +72,7 @@ export default function OwnerSalaryView({ token, employeeName = "Владеле�
     setEditing({
       daily_rate: String(selected.daily_rate),
       bonus_percent: String(selected.bonus_percent),
+      bonus_percent_purchase: String(selected.bonus_percent_purchase ?? 7),
     });
   };
 
@@ -86,6 +87,7 @@ export default function OwnerSalaryView({ token, employeeName = "Владеле�
           employee_id: selected.id,
           daily_rate: Number(editing.daily_rate) || 0,
           bonus_percent: Number(editing.bonus_percent) || 0,
+          bonus_percent_purchase: Number(editing.bonus_percent_purchase) || 0,
         }),
       });
       setEditing(null);
@@ -154,7 +156,7 @@ export default function OwnerSalaryView({ token, employeeName = "Владеле�
     const cells: Cell[] = [];
     const calMap = new Map((detail?.calendar || []).map(d => [d.shift_date.slice(0, 10), d.status]));
     const logMap = new Map((detail?.history || []).map(l => [l.shift_date.slice(0, 10), l.total || 0]));
-    const bonusMap = new Map((detail?.history || []).map(l => [l.shift_date.slice(0, 10), l.bonus_amount || 0]));
+    const bonusMap = new Map((detail?.history || []).map(l => [l.shift_date.slice(0, 10), (l.bonus_amount || 0) + (l.bonus_purchase_amount || 0)]));
     const payMap = new Map<string, number>();
     for (const p of detail?.payouts || []) {
       const k = p.payout_date.slice(0, 10);
@@ -186,7 +188,7 @@ export default function OwnerSalaryView({ token, employeeName = "Владеле�
       const d = h.shift_date.slice(0, 10);
       if (d >= from && d <= to) {
         earned += Number(h.total) || 0;
-        bonus += Number(h.bonus_amount) || 0;
+        bonus += (Number(h.bonus_amount) || 0) + (Number(h.bonus_purchase_amount) || 0);
       }
     }
     let paid = 0;
@@ -308,6 +310,7 @@ export default function OwnerSalaryView({ token, employeeName = "Владеле�
           employeeId={selected.id}
           defaultRate={selected.daily_rate}
           defaultPercent={selected.bonus_percent}
+          defaultPercentPurchase={selected.bonus_percent_purchase}
           currentLog={dayEdit.log}
           token={token}
           onClose={() => setDayEdit(null)}
@@ -329,6 +332,7 @@ export default function OwnerSalaryView({ token, employeeName = "Владеле�
           employeeId={selected.id}
           defaultRate={selected.daily_rate}
           defaultPercent={selected.bonus_percent}
+          defaultPercentPurchase={selected.bonus_percent_purchase}
           token={token}
           onClose={() => setBulkOpen(false)}
           onSaved={reloadAfterChange}

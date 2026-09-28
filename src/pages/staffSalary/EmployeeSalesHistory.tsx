@@ -34,6 +34,7 @@ export default function EmployeeSalesHistory({
         <div className="space-y-1.5">
           {days.map((h) => {
             const bonus = Number(h.bonus_amount) || 0;
+            const bonusPurchase = Number(h.bonus_purchase_amount) || 0;
             const rate = Number(h.base_rate) || 0;
             const isExp = expandedDate === h.shift_date;
             const isLoadingThis = detailLoading === h.shift_date;
@@ -54,7 +55,8 @@ export default function EmployeeSalesHistory({
                         <span className="font-roboto text-xs" style={{ color: "rgba(255,255,255,0.35)" }}>{Number(h.hours_worked).toFixed(1)} ч</span>
                       )}
                       {rate > 0 && <span className="font-roboto text-xs" style={{ color: "rgba(255,255,255,0.45)" }}>· оклад {fmt(rate)} ₽</span>}
-                      {bonus > 0 && <span className="font-roboto text-xs font-semibold" style={{ color: "#a78bfa" }}>· бонус +{fmt(bonus)} ₽</span>}
+                      {bonus > 0 && <span className="font-roboto text-xs font-semibold" style={{ color: "#a78bfa" }}>· бонус продажа +{fmt(bonus)} ₽</span>}
+                      {bonusPurchase > 0 && <span className="font-roboto text-xs font-semibold" style={{ color: "#f0b429" }}>· бонус закупка +{fmt(bonusPurchase)} ₽</span>}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0 ml-3">
@@ -129,6 +131,44 @@ export default function EmployeeSalesHistory({
 
                       {detail.sales.length === 0 && bonus === 0 && (
                         <div className="px-3 py-2 font-roboto text-xs" style={{ color: "rgba(255,255,255,0.25)" }}>Продаж за этот день не найдено</div>
+                      )}
+
+                      {(detail.purchases?.length ?? 0) > 0 && (
+                        <div className="space-y-1.5 mt-1">
+                          <div className="font-roboto text-[10px] uppercase tracking-widest px-1" style={{ color: "rgba(240,180,41,0.7)" }}>
+                            Закупки, проданные сегодня · бонус {detail.config.bonus_percent_purchase}% с прибыли
+                          </div>
+                          {detail.purchases!.map((p) => (
+                            <div key={p.id} className="px-3 py-2 rounded-lg" style={{ background: "rgba(240,180,41,0.06)", border: "1px solid rgba(240,180,41,0.15)" }}>
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-roboto text-[10px]" style={{ color: "rgba(255,255,255,0.3)" }}>{p.time}</span>
+                                    <span className="font-roboto text-sm text-white/90 truncate">{p.item_title}</span>
+                                  </div>
+                                  {p.item_category && (
+                                    <div className="font-roboto text-[10px] mt-0.5" style={{ color: "rgba(255,255,255,0.3)" }}>{p.item_category}</div>
+                                  )}
+                                  <div className="flex flex-wrap items-center gap-x-2 mt-1">
+                                    <span className="font-roboto text-[11px]" style={{ color: "rgba(255,255,255,0.35)" }}>Продано: {fmt(p.sell_price)} ₽</span>
+                                    <span className="font-roboto text-[11px]" style={{ color: "rgba(255,255,255,0.25)" }}>Закупка: {fmt(p.buy_price)} ₽</span>
+                                    <span className="font-roboto text-[11px] font-semibold" style={{ color: "#34d399" }}>Прибыль: {fmt(p.profit)} ₽</span>
+                                  </div>
+                                </div>
+                                <div className="shrink-0 text-right">
+                                  <div className="font-oswald font-bold text-sm" style={{ color: "#f0b429" }}>+{fmt(p.bonus_from_purchase)} ₽</div>
+                                  <div className="font-roboto text-[10px]" style={{ color: "rgba(240,180,41,0.5)" }}>бонус</div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          {bonusPurchase > 0 && (
+                            <div className="flex items-center justify-between px-3 py-2 rounded-lg" style={{ background: "rgba(240,180,41,0.1)", border: "1px solid rgba(240,180,41,0.25)" }}>
+                              <span className="font-roboto text-xs font-semibold" style={{ color: "#f0b429" }}>Итого бонус с {detail.purchases!.length} закупок</span>
+                              <span className="font-oswald font-bold text-sm" style={{ color: "#f0b429" }}>+{fmt(bonusPurchase)} ₽</span>
+                            </div>
+                          )}
+                        </div>
                       )}
 
                       {/* Золото */}
