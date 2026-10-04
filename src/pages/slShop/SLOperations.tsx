@@ -2,7 +2,6 @@ import { useEffect, useState, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 import { slApi, fmt, type SLOperation } from "./types";
 import PrintDocsButton from "./PrintDocsButton";
-import { printDayAct, localDateKey, type ActKind } from "./actPrinter";
 
 const OP_TO_DOC_TYPE: Record<string, string> = {
   buy: "buyout_individual",
@@ -35,37 +34,16 @@ export default function SLOperations({ token, myRole }: { token: string; myRole?
   const [deleting, setDeleting] = useState<number | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
-  const [day, setDay] = useState("");
-
   const isOwner = myRole === "owner";
 
   const load = useCallback(async () => {
     setLoading(true);
-    const params: Record<string, string> = { op_type: type };
-    if (day) {
-      const prev = new Date(day + "T12:00:00");
-      prev.setDate(prev.getDate() - 1);
-      params.date_from = localDateKey(prev.toISOString());
-      params.date_to = day;
-    }
-    const r = await slApi<SLOperation[]>(token, "operations", { params });
-    if (r.ok && r.data) setOps(day ? r.data.filter(o => localDateKey(o.created_at) === day) : r.data);
+    const r = await slApi<SLOperation[]>(token, "operations", { params: { op_type: type } });
+    if (r.ok && r.data) setOps(r.data);
     setLoading(false);
-  }, [token, type, day]);
+  }, [token, type]);
 
   useEffect(() => { load(); }, [load]);
-
-  const printAct = async (kind: ActKind) => {
-    if (!day) { setMsg("Выберите дату для акта"); return; }
-    setMsg(null);
-    const prev = new Date(day + "T12:00:00");
-    prev.setDate(prev.getDate() - 1);
-    const r = await slApi<SLOperation[]>(token, "operations", {
-      params: { op_type: kind, date_from: localDateKey(prev.toISOString()), date_to: day },
-    });
-    if (!r.ok || !r.data) { setMsg(r.error || "Не удалось загрузить операции"); return; }
-    if (!printDayAct(kind, day, r.data)) setMsg("Разрешите всплывающие окна для печати");
-  };
 
   const remove = async (id: number) => {
     if (!confirm("Удалить операцию? Изменения товара будут отменены (товар вернётся в прежний статус).")) return;
@@ -88,25 +66,6 @@ export default function SLOperations({ token, myRole }: { token: string; myRole?
         <button onClick={load} className="ml-auto text-white/40 hover:text-[#FFD700] p-1.5">
           <Icon name={loading ? "Loader" : "RefreshCw"} size={13} className={loading ? "animate-spin" : ""} />
         </button>
-      </div>
-
-      <div className="bg-[#0F0F0F] border border-[#1F1F1F] rounded-lg p-2.5 mb-3 flex flex-wrap items-center gap-2">
-        <span className="text-[11px] text-white/50">Дата:</span>
-        <input type="date" value={day} onChange={e => setDay(e.target.value)}
-          className="px-2 py-1 rounded bg-black/40 border border-white/15 text-white text-sm" />
-        {day && (
-          <button onClick={() => setDay("")} className="text-[11px] text-white/40 hover:text-white underline">сбросить</button>
-        )}
-        <div className="flex gap-1.5 ml-auto">
-          <button onClick={() => printAct("buy")}
-            className="flex items-center gap-1 text-[11px] px-3 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-200 font-semibold">
-            <Icon name="Printer" size={12} /> Акт закупки
-          </button>
-          <button onClick={() => printAct("sell")}
-            className="flex items-center gap-1 text-[11px] px-3 py-1.5 rounded-full bg-blue-500/15 border border-blue-400/30 text-blue-200 font-semibold">
-            <Icon name="Printer" size={12} /> Акт продажи
-          </button>
-        </div>
       </div>
 
       {msg && <div className="bg-[#141414] border border-[#1F1F1F] text-white/70 text-sm p-2.5 rounded-lg mb-2">{msg}</div>}

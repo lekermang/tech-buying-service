@@ -580,7 +580,8 @@ def handler(event: dict, context) -> dict:
     if lead_id:
         try:
             staff_text = (
-                f"🔔 Новая заявка {lead_num}\n\n"
+                f"🚨🚨🚨 СРОЧНО СВЯЗАТЬСЯ! 🚨🚨🚨\n"
+                f"С тем, кто хочет что-то предложить через заявку сайта (заявка {lead_num})\n\n"
                 f"👤 {name or '—'}\n"
                 f"📞 {phone or '—'}\n"
                 + (f"📋 {category}\n" if category else "")
@@ -588,7 +589,7 @@ def handler(event: dict, context) -> dict:
                 + (f"📝 {(desc or '')[:300]}\n" if desc else "")
                 + (f"💰 Цена клиента: {client_price} ₽\n" if client_price else "")
                 + (f"📡 Связь: {channels_str}\n" if channels_str else "")
-                + "\nИсточник: сайт"
+                + "\n⚠️ Позвонить клиенту сразу, не откладывая!\nИсточник: сайт"
             )
             staff_payload: dict = {'text': staff_text}
             if cdn_photo_urls:

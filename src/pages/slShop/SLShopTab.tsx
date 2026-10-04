@@ -20,6 +20,7 @@ import SLBookkeeping from "./SLBookkeeping";
 import C14dTab from "./c14d/C14dTab";
 import SafeDealsTab from "./safeDeals/SafeDealsTab";
 import SLAvitoShowcase from "./SLAvitoShowcase";
+import SLPolice from "./SLPolice";
 import { slApi, can, type SLMyPermissions } from "./types";
 import { SLTabsGrid } from "./slUI";
 import { useNavigate } from "react-router-dom";
@@ -43,6 +44,7 @@ type SubTab =
   | "contracts14d"
   | "safedeals"
   | "avito"
+  | "police"
   | "roles";
 
 type TabDef = { k: SubTab; l: string; icon: string; perm?: string; ownerOnly?: boolean; featured?: boolean; tip?: string };
@@ -65,6 +67,7 @@ const ALL_TABS: TabDef[] = [
   { k: "bookkeeping",   l: "Бухгалтерия",    icon: "Calculator", perm: "cashflow_view", tip: "Денежная сводка: выручка, себестоимость, ОПЭКС, прибыль, экспорт CSV." },
   { k: "import",        l: "Импорт",         icon: "ArrowUpDown", perm: "excel_export", tip: "Импорт/экспорт товаров и операций (Excel, CSV)." },
   { k: "documents",     l: "Документы",      icon: "FileText", tip: "Шаблоны печатных документов и реквизиты ИП/филиалов." },
+  { k: "police",        l: "Полиция",        icon: "ShieldCheck", perm: "shop_view", tip: "Печать актов закупки, актов продажи и чеков за выбранное число (и время) для полиции." },
   { k: "categories",    l: "Категории",      icon: "Grid3x3", tip: "Иерархия категорий товаров (телефоны, ноутбуки, ювелирка и т.д.)." },
   { k: "roles",         l: "Роли",           icon: "ShieldCheck", ownerOnly: true, tip: "Управление ролями и правами доступа сотрудников." },
 ];
@@ -223,6 +226,7 @@ export default function SLShopTab({ token, myRole }: { token: string; myRole?: s
       {tab === "contracts14d" && <C14dTab token={token} />}
       {tab === "safedeals"  && <SafeDealsTab token={token} />}
       {tab === "avito"      && <SLAvitoShowcase token={token} />}
+      {tab === "police"     && <SLPolice token={token} />}
       {tab === "categories" && <SLCategories token={token} />}
       {tab === "roles"      && <SLRoles token={token} isOwner={isOwner} />}
     </div>
