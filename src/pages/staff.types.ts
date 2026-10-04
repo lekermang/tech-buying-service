@@ -1,6 +1,6 @@
 export const EMPLOYEE_AUTH_URL = "https://functions.poehali.dev/29210248-0b73-4c54-9b9f-acd13668dfea";
 export const GOODS_URL = "https://functions.poehali.dev/de4c1e8e-0c7b-4f25-a3fd-155c46fa3399";
-export const SALES_URL = "https://functions.poehali.dev/1610b50a-9d00-450f-a2ca-6311f04eafe7";
+export const SALES_URL = "https://functions.poehali.dev/4c2ae5a5-14d7-4708-9633-263cdc1bea40";
 export const AUTH_CLIENT_URL = "https://functions.poehali.dev/58edd0bc-cce3-4ece-acca-a003e2260758";
 export const SLSHOP_URL = "https://functions.poehali.dev/538a5bbf-3062-45fa-a438-c5ecdb11965e";
 export const SL_C14D_URL = "https://functions.poehali.dev/03ebbc37-291d-4868-9d2a-d24a261399ae";

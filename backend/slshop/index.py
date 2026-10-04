@@ -112,6 +112,90 @@ def get_employee_by_token(token: str):
     return {'id': row[0], 'full_name': row[1], 'login': row[2], 'role': row[3]} if row else None
 
 
+def auto_timesheet(employee):
+    """Автотабель: если сотрудник со ставкой совершил скупку/продажу под своей учётной записью,
+    на сегодня ставится рабочий день (ставка + бонусы 3% с продажи и 7% с закупки).
+    Выходные и дни, заполненные владельцем вручную, не трогаем."""
+    try:
+        if not employee or employee.get('role') == 'owner':
+            return
+        emp_id = int(employee['id'])
+        emp_name = employee.get('full_name')
+        conn = get_conn(); cur = conn.cursor()
+        cur.execute(
+            f"SELECT daily_rate, bonus_percent, bonus_percent_purchase FROM {SCHEMA}.employee_salary_config WHERE employee_id=%s",
+            (emp_id,),
+        )
+        cfg = cur.fetchone()
+        if not cfg or not cfg[0] or int(cfg[0]) <= 0:
+            cur.close(); conn.close(); return
+        rate, pct_sell, pct_buy = int(cfg[0]), float(cfg[1] or 0), float(cfg[2] or 0)
+
+        cur.execute("SELECT CURRENT_DATE")
+        day = cur.fetchone()[0]
+
+        cur.execute(f"SELECT status FROM {SCHEMA}.employee_shifts WHERE employee_id=%s AND shift_date=%s", (emp_id, day))
+        sh = cur.fetchone()
+        if sh and sh[0] == 'dayoff':
+            cur.close(); conn.close(); return
+
+        cur.execute(f"SELECT owner_set FROM {SCHEMA}.employee_salary_log WHERE employee_id=%s AND shift_date=%s", (emp_id, day))
+        lg = cur.fetchone()
+        if lg and lg[0]:
+            cur.close(); conn.close(); return
+
+        cur.execute(
+            f"""SELECT COALESCE(SUM(op.amount - COALESCE(i.buy_price, 0)), 0)
+                FROM {SCHEMA}.slshop_operations op
+                LEFT JOIN {SCHEMA}.slshop_items i ON i.id = op.item_id
+                WHERE op.op_type='sell' AND op.created_at::date=%s AND op.employee_name=%s""",
+            (day, emp_name),
+        )
+        sell_profit = int(cur.fetchone()[0] or 0)
+        cur.execute(
+            f"""SELECT COALESCE(SUM(sell_price - COALESCE(buy_price, 0)), 0)
+                FROM {SCHEMA}.slshop_items
+                WHERE status='sold' AND sell_at::date=%s AND created_by=%s""",
+            (day, emp_name),
+        )
+        buy_profit = int(cur.fetchone()[0] or 0)
+        bonus_sell = int(sell_profit * pct_sell / 100)
+        bonus_buy = int(buy_profit * pct_buy / 100)
+        total = rate + bonus_sell + bonus_buy
+
+        cur.execute(
+            f"""INSERT INTO {SCHEMA}.employee_shifts (employee_id, shift_date, status, started_at)
+                VALUES (%s, %s, 'closed', NOW())
+                ON CONFLICT (employee_id, shift_date) DO UPDATE SET status='closed'
+                RETURNING id""",
+            (emp_id, day),
+        )
+        shift_id = cur.fetchone()[0]
+        cur.execute(
+            f"""INSERT INTO {SCHEMA}.employee_salary_log
+                  (shift_id, employee_id, shift_date, hours_worked, base_rate,
+                   personal_profit, bonus_percent_at_time, bonus_amount,
+                   personal_purchase_profit, bonus_percent_purchase_at_time, bonus_purchase_amount,
+                   total, is_paid, owner_set)
+                VALUES (%s,%s,%s,8,%s,%s,%s,%s,%s,%s,%s,%s,false,false)
+                ON CONFLICT (employee_id, shift_date) DO UPDATE
+                SET personal_profit=EXCLUDED.personal_profit,
+                    bonus_percent_at_time=EXCLUDED.bonus_percent_at_time,
+                    bonus_amount=EXCLUDED.bonus_amount,
+                    personal_purchase_profit=EXCLUDED.personal_purchase_profit,
+                    bonus_percent_purchase_at_time=EXCLUDED.bonus_percent_purchase_at_time,
+                    bonus_purchase_amount=EXCLUDED.bonus_purchase_amount,
+                    base_rate=EXCLUDED.base_rate,
+                    total=EXCLUDED.total
+                WHERE {SCHEMA}.employee_salary_log.owner_set = false""",
+            (shift_id, emp_id, day, rate, sell_profit, pct_sell, bonus_sell,
+             buy_profit, pct_buy, bonus_buy, total),
+        )
+        conn.commit(); cur.close(); conn.close()
+    except Exception as e:
+        print(f'[slshop][auto_timesheet] error: {e}')
+
+
 def _esc(v):
     if v is None:
         return 'NULL'
@@ -2021,6 +2105,7 @@ def create_item(body, employee):
             )
     except Exception:
         pass
+    auto_timesheet(employee)
     return _ok({'id': item_id, 'sku': sku})
 
 
@@ -2568,6 +2653,7 @@ def sell_item(body, employee):
     except Exception as ne:
         print(f'[slshop][sell_item] notify error: {ne}')
 
+    auto_timesheet(employee)
     return _ok({'op_id': op_id})
 
 
@@ -3167,4 +3253,3 @@ def handler(event: dict, context) -> dict:
     except Exception as e:
         import traceback
         tb = traceback.format_exc().splitlines()[-1] if traceback else ''
-        return _err(500, f'Ошибка ({action}): {type(e).__name__}: {e} | {tb}')

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 
-const API_URL = "https://functions.poehali.dev/03c0735b-fa5a-4052-b02e-8c836039ff02";
+const API_URL = "https://functions.poehali.dev/c5c0f95d-3352-4ac6-8111-a0903f6e2eca";
 const ADMIN_TOKEN = "Mark2015N";
 
 const WATERMARK_PREVIEW = "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/bucket/e8e1312b-1620-4239-b89f-9b88afd67d1a.jpeg";

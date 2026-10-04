@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 import { adminHeaders } from "@/lib/adminFetch";
 
-const PRICES_URL = "https://functions.poehali.dev/cf08a66e-0b80-4105-826b-361e9be7f0f3";
+const PRICES_URL = "https://functions.poehali.dev/18c8827a-f4f8-46e2-af92-349ee069e542";
 
 const CATEGORIES = ["Ремонт", "Закупка"];
 

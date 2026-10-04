@@ -1,5 +1,5 @@
 export const REPAIR_ORDER_URL = "https://functions.poehali.dev/8d0ee3bd-41eb-44fe-9d30-aab6ddc2042d";
-export const REPAIR_STATUS_URL = "https://functions.poehali.dev/1fb5db63-4cb6-41be-af0f-80d6f9ce8fdf";
+export const REPAIR_STATUS_URL = "https://functions.poehali.dev/88440126-a32f-49ab-9640-6147dad6a18b";
 export const REPAIR_PARTS_URL = "https://functions.poehali.dev/68da5b17-ae5f-4568-8e27-0d945b995d82";
 
 export const STATUS_COLOR: Record<string, string> = {

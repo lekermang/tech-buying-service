@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 
-const REPAIR_STATUS_URL = "https://functions.poehali.dev/1fb5db63-4cb6-41be-af0f-80d6f9ce8fdf";
+const REPAIR_STATUS_URL = "https://functions.poehali.dev/88440126-a32f-49ab-9640-6147dad6a18b";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: string; step: number }> = {
   new:            { label: "Принято",           color: "text-blue-300",   bg: "bg-blue-500/20 border-blue-500/40",   icon: "ClipboardCheck", step: 1 },

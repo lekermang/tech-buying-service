@@ -1,4 +1,4 @@
-export const AVITO_URL = "https://functions.poehali.dev/d46cee41-3a2e-4973-a236-29fa6b90b7ce";
+export const AVITO_URL = "https://functions.poehali.dev/0d7da4d8-0d09-4a1a-a8cd-a40e6681f0f4";
 export const SYNC_URL = "https://functions.poehali.dev/49e23745-1449-4e4c-80c2-e7967f3c5584";
 export const LEAD_URL = "https://functions.poehali.dev/52666ff7-db52-4b6a-a90e-d60aeed699de";
 
