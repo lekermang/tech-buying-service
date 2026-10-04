@@ -80,12 +80,23 @@ export function AnalyticsTab({ token }: { token: string }) {
     setLoading(true);
     setError(null);
     try {
-      const [salesRes, repairRes, goldRes] = await Promise.all([
-        fetch(`${SALES_URL}?action=analytics&period=${period}${customQS}`, { headers: { "X-Employee-Token": token } }),
-        fetch(`${REPAIR_URL}?action=analytics&period=${repairPeriod}${customQS}`, { headers: { "X-Employee-Token": token } }),
-        fetch(`${GOLD_URL}?action=analytics&period=${repairPeriod}${customQS}`, { headers: { "X-Employee-Token": token } }),
+      const safeJson = async (url: string) => {
+        try {
+          const res = await fetch(url, { headers: { "X-Employee-Token": token } });
+          const text = await res.text();
+          return JSON.parse(text);
+        } catch {
+          return null;
+        }
+      };
+      const [salesD, repairD, goldD] = await Promise.all([
+        safeJson(`${SALES_URL}?action=analytics&period=${period}${customQS}`),
+        safeJson(`${REPAIR_URL}?action=analytics&period=${repairPeriod}${customQS}`),
+        safeJson(`${GOLD_URL}?action=analytics&period=${repairPeriod}${customQS}`),
       ]);
-      const [salesD, repairD, goldD] = await Promise.all([salesRes.json(), repairRes.json(), goldRes.json()]);
+      if (!salesD && !repairD && !goldD) {
+        setError("Ошибка загрузки данных. Попробуйте обновить.");
+      }
       if (salesD && typeof salesD === "object" && !salesD.error) setData(salesD);
       if (repairD && typeof repairD === "object" && !repairD.error) {
         setRepairData({ total: 0, done: 0, revenue: 0, costs: 0, profit: 0, master_total: 0, daily: [], ...repairD });
