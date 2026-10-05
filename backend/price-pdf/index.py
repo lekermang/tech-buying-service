@@ -584,7 +584,7 @@ def handler(event: dict, context) -> dict:
         json_gen_at     = json_msk_now.strftime("%d.%m.%Y %H:%M МСК")
         return {
             "statusCode": 200,
-            "headers": {**HEADERS_CORS, "Cache-Control": "public, max-age=10800"},
+            "headers": {**HEADERS_CORS, "Cache-Control": "public, max-age=300"},
             "body": json.dumps({
                 "ok": True, "total": json_total, "markup": json_markup,
                 "generated_at": json_gen_at, "groups": json_groups,
