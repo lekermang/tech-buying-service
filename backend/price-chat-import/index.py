@@ -85,7 +85,7 @@ def tg(method, payload):
     token = os.environ.get('SKYPKA_PRICE_BOT_TOKEN', '')
     req = urllib.request.Request(f'https://api.telegram.org/bot{token}/{method}',
                                  data=json.dumps(payload).encode(), headers={'Content-Type': 'application/json'})
-    with urllib.request.urlopen(req, timeout=10) as r:
+    with urllib.request.urlopen(req, timeout=3.5) as r:
         return json.loads(r.read())
 
 
@@ -102,6 +102,19 @@ def handler(event, context):
         body = {}
     hdrs = {k.lower(): v for k, v in (event.get('headers') or {}).items()}
     is_admin = hdrs.get('x-admin-token') == ADMIN or body.get('admin_token') == ADMIN
+
+    if action == 'info':
+        if not is_admin:
+            return resp(403, {'error': 'Forbidden'})
+        try:
+            me = tg('getMe', {})
+            wh = tg('getWebhookInfo', {})
+        except Exception as e:
+            return resp(200, {'ok': False, 'error': f'Telegram недоступен: {e}',
+                              'token_set': bool(os.environ.get('SKYPKA_PRICE_BOT_TOKEN'))})
+        return resp(200, {'bot': me.get('result', {}).get('username'), 'webhook_url': wh.get('result', {}).get('url'),
+                          'pending': wh.get('result', {}).get('pending_update_count'),
+                          'last_error': wh.get('result', {}).get('last_error_message')})
 
     if action == 'set_webhook':
         if not is_admin:
