@@ -1328,7 +1328,7 @@ export default function ApplePrice() {
         .price-row:hover { background: rgba(255,255,255,0.06) !important; border-color: rgba(255,215,0,0.25) !important; }
         .chips-scroll { scrollbar-width: none; -ms-overflow-style: none; }
         .chips-scroll::-webkit-scrollbar { display: none; }
-        .cat-section { scroll-margin-top: 120px; }
+        .cat-section { scroll-margin-top: 70px; }
       `}</style>
 
       {/* ── HEADER ── */}
@@ -1408,15 +1408,15 @@ export default function ApplePrice() {
       <div className="sticky top-0 z-10"
         style={{ background: "rgba(13,13,13,0.97)", backdropFilter: "blur(8px)", borderBottom: "2px solid #FFD700" }}>
         {/* Строка поиска */}
-        <div className="max-w-6xl mx-auto px-4 pt-2.5 pb-2">
-          <div className="relative">
+        <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center gap-2">
+          <div className="relative flex-1 min-w-0">
             <Icon name="Search" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
             <input
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Поиск по модели, памяти, цвету…"
-              className="w-full pl-8 pr-8 py-2 text-[13px] text-white outline-none rounded-lg transition-all"
+              className="w-full h-10 pl-8 pr-8 text-[14px] text-white outline-none rounded-lg transition-all"
               style={{
                 background: "rgba(255,255,255,0.06)",
                 border: search ? "1px solid rgba(255,215,0,0.4)" : "1px solid rgba(255,255,255,0.1)",
@@ -1429,37 +1429,15 @@ export default function ApplePrice() {
               </button>
             )}
           </div>
+          <button onClick={() => setOnlyStock(v => !v)}
+            className="shrink-0 flex items-center gap-1.5 px-3 h-10 rounded-lg text-[13px] font-bold transition-all active:scale-95"
+            style={onlyStock
+              ? { background: "rgba(74,222,128,0.18)", border: "1px solid rgba(74,222,128,0.6)", color: "#4ade80" }
+              : { background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.75)" }}>
+            <Icon name={onlyStock ? "CheckCircle2" : "Circle"} size={15} />
+            В наличии
+          </button>
         </div>
-
-        {data && (() => {
-          const stockOk = (it: PriceItem) => !!it.price_num && it.available !== false;
-          const cats = Object.entries(data.groups)
-            .map(([cat, items]) => [cat, onlyStock ? items.filter(stockOk).length : items.length] as [string, number])
-            .filter(([, n]) => n > 0);
-          return (
-            <div className="max-w-6xl mx-auto px-4 pb-2 flex items-center gap-2">
-              <button onClick={() => setOnlyStock(v => !v)}
-                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-bold transition-all active:scale-95"
-                style={onlyStock
-                  ? { background: "rgba(74,222,128,0.18)", border: "1px solid rgba(74,222,128,0.6)", color: "#4ade80" }
-                  : { background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.7)" }}>
-                <Icon name={onlyStock ? "CheckCircle2" : "Circle"} size={13} />
-                В наличии
-              </button>
-              <div className="chips-scroll flex items-center gap-1.5 overflow-x-auto flex-1">
-                {cats.map(([cat, n]) => (
-                  <button key={cat}
-                    onClick={() => document.getElementById(`cat-${cat}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                    className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full text-[12px] font-semibold whitespace-nowrap transition-all active:scale-95"
-                    style={{ background: `${CAT_COLORS[cat] || "#FFD700"}14`, border: `1px solid ${CAT_COLORS[cat] || "#FFD700"}40`, color: CAT_COLORS[cat] || "#FFD700" }}>
-                    <span>{CAT_EMOJI[cat] || "📦"}</span>{cat}
-                    <span style={{ opacity: 0.55, fontSize: 10 }}>{n}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          );
-        })()}
 
         {loading && (
           <div className="h-[3px] overflow-hidden" style={{ background: "rgba(255,215,0,0.1)" }}>
@@ -1491,6 +1469,32 @@ export default function ApplePrice() {
         {/* Данные */}
         {data && (
           <div className="max-w-6xl mx-auto px-3 py-4">
+            {(() => {
+              const stockOk = (it: PriceItem) => !!it.price_num && it.available !== false;
+              const cats = Object.entries(data.groups)
+                .map(([cat, items]) => [cat, onlyStock ? items.filter(stockOk).length : items.length] as [string, number])
+                .filter(([, n]) => n > 0);
+              return (
+                <div className="grid gap-2 mb-5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))" }}>
+                  {cats.map(([cat, n]) => {
+                    const c = CAT_COLORS[cat] || "#FFD700";
+                    return (
+                      <button key={cat}
+                        onClick={() => document.getElementById(`cat-${cat}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                        className="flex items-center gap-2 px-3 py-2 min-h-[52px] rounded-xl text-left transition-all active:scale-95"
+                        style={{ background: `${c}14`, border: `1px solid ${c}45` }}>
+                        <span className="text-[20px] shrink-0">{CAT_EMOJI[cat] || "📦"}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[13px] font-bold leading-tight break-words" style={{ color: c }}>{cat}</span>
+                          <span className="block text-[11px] text-white/40">{n} шт.</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
             {/* Заголовок даты */}
             <div className="flex items-center justify-between flex-wrap gap-2 px-1 mb-4">
               <div className="text-white/25 text-[12px]">{todayStr()}</div>
