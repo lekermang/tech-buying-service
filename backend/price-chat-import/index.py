@@ -64,6 +64,20 @@ def refine_category(name, cat):
     return cat
 
 
+def guess_category(name):
+    parts = name.split()
+    first = parts[0] if parts else ''
+    if re.fullmatch(r'\d{1,2}e?', first) or first in ('Air', 'SE2', 'SE3'):
+        return 'iPhone'
+    n = name.lower()
+    for key, cat in (('galaxy', 'Samsung'), ('redmi', 'Xiaomi'), ('poco', 'Xiaomi'), ('xiaomi', 'Xiaomi'),
+                     ('honor', 'Honor'), ('ipad', 'iPad'), ('airpods', 'AirPods'), ('macbook', 'MacBook'),
+                     ('ps5', 'Игровые консоли'), ('jbl', 'Колонки и аудио'), ('яндекс', 'Колонки и аудио')):
+        if n.startswith(key):
+            return cat
+    return None
+
+
 def parse_text(text):
     items, cat = [], None
     for raw in (text or '').splitlines():
@@ -87,7 +101,7 @@ def parse_text(text):
         items.append({
             'name': name, 'price': price, 'availability': avail,
             'region': FLAGS.get(m.group('flag') or '', None),
-            'category': refine_category(name, cat),
+            'category': refine_category(name, cat or guess_category(name)),
             'sku': 'smartbery_' + name.replace(' ', '_').lower(),
         })
     return items
@@ -268,6 +282,47 @@ def handler(event, context):
         body = {}
     hdrs = {k.lower(): v for k, v in (event.get('headers') or {}).items()}
     is_admin = hdrs.get('x-admin-token') == ADMIN or body.get('admin_token') == ADMIN
+
+    if action == 'status':
+        if not is_admin:
+            return resp(403, {'error': 'Forbidden'})
+        try:
+            seen = json.loads(get_setting('price_bot_seen_chats') or '{}')
+        except Exception:
+            seen = {}
+        allowed = os.environ.get('PRICE_SOURCE_CHAT_ID', '').strip()
+        extra = [c for c in (get_setting('price_bot_chats') or '').split(',') if c]
+        try:
+            cache = json.loads(get_setting('smartbery_products_cache') or '[]')
+        except Exception:
+            cache = []
+        conn = db(); cur = conn.cursor()
+        try:
+            cur.execute(f"SELECT updated_at FROM {SCHEMA}.settings WHERE key='smartbery_products_cache'")
+            r = cur.fetchone()
+        finally:
+            cur.close(); conn.close()
+        return resp(200, {
+            'last_update': get_setting('price_bot_last_update'),
+            'seen_chats': seen,
+            'allowed_chat_matches_seen': bool(allowed and allowed in seen),
+            'extra_allowed_chats': extra,
+            'private_users': len([u for u in (get_setting('price_bot_users') or '').split(',') if u]),
+            'price_items': len(cache),
+            'price_updated_at': str(r[0]) if r else None,
+        })
+
+    if action == 'allow_chat':
+        if not is_admin:
+            return resp(403, {'error': 'Forbidden'})
+        cid = str(body.get('chat_id', '')).strip()
+        if not re.fullmatch(r'-?\d{5,20}', cid):
+            return resp(400, {'error': 'chat_id required'})
+        extra = [c for c in (get_setting('price_bot_chats') or '').split(',') if c]
+        if cid not in extra:
+            extra.append(cid)
+            set_setting('price_bot_chats', ','.join(extra), 'Чаты, из которых бот принимает прайс')
+        return resp(200, {'ok': True, 'extra_allowed_chats': extra})
 
     if action == 'info':
         if not is_admin:
