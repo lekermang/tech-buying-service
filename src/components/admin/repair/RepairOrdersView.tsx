@@ -1,5 +1,5 @@
 import Icon from "@/components/ui/icon";
-import { STATUSES, Order, EditForm, EMPTY_FORM, EMPTY_READY } from "./repairTypes";
+import { STATUSES, Order, EditForm, EMPTY_FORM } from "./repairTypes";
 import RepairOrderCard from "./RepairOrderCard";
 
 type Props = {

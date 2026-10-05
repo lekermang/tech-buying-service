@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import Icon from "@/components/ui/icon";
-import { setToken, getToken, authCall, aiCall, INP } from "./unlockConstants";
+import { setToken, authCall, aiCall, INP } from "./unlockConstants";
 import { Panel } from "./UnlockShared";
 
 /* ══════════════════════════════════════════════════════════════════════════

@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import Icon from "@/components/ui/icon";
 import { c14dApi, fmt, fmtDate, type C14dIncomeReport } from "./types";
 import { SLSection, SLField, SLInput, SLSelect, SLButton, SLStat, SLGrid } from "../slUI";
 

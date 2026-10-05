@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Icon from "@/components/ui/icon";
-import { Product, CartItem, CatMeta, PriceRange, Meta } from "@/components/tools/types";
+import { Product, CartItem, Meta } from "@/components/tools/types";
 import ToolsProductCard from "@/components/tools/ToolsProductCard";
 import ToolsCartModal from "@/components/tools/ToolsCartModal";
 import ToolsSidebar from "@/components/tools/ToolsSidebar";

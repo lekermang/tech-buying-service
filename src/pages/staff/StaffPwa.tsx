@@ -1,5 +1,4 @@
 import { useState, useEffect, Component, type ReactNode } from "react";
-import Icon from "@/components/ui/icon";
 import { useStaffTheme } from "../staffTheme/StaffThemeContext";
 
 export class TabErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {

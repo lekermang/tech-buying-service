@@ -1,5 +1,5 @@
 import Icon from "@/components/ui/icon";
-import { ACCENT, SEND_LEAD_URL } from "./data";
+import { ACCENT } from "./data";
 
 interface PorcelainCtaProps {
   ctaPhone: string;

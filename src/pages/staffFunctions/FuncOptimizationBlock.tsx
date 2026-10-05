@@ -1,4 +1,4 @@
-import { type FuncStat, FUNC_STATS, OPTIMIZATION_STEPS, ACTIVE_PLAN } from "./functionsData";
+import { type FuncStat, OPTIMIZATION_STEPS, ACTIVE_PLAN } from "./functionsData";
 import Icon from "@/components/ui/icon";
 
 const STATUS_STYLE: Record<FuncStat["status"], { color: string; label: string; icon: string }> = {

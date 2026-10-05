@@ -62,44 +62,12 @@ const CATEGORIES = [
   "Наконечники токосъемные", "Подающие ролики", "Цангодержатели",
 ];
 
-const CATEGORY_NO_YML = new Set(["Машинки для укладки плитки", "Стартеры для бензопил"]);
-const CATEGORY_NO_CSV = new Set(["Стартеры для бензопил"]);
-
-const FormatBadge = ({ label, color }: { label: string; color: string }) => (
-  <a
-    href="#"
-    className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-roboto font-bold uppercase tracking-wide border transition-colors hover:opacity-80 ${color}`}
-  >
-    <Icon name="Download" size={11} />
-    {label}
-  </a>
-);
-
-interface RowProps {
-  name: string;
-  hasYml?: boolean;
-  hasCsv?: boolean;
-  hasExcel?: boolean;
-}
-
-const Row = ({ name, hasYml = true, hasCsv = true, hasExcel = true }: RowProps) => (
-  <tr className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-    <td className="py-3 px-4 font-roboto text-white/90 text-sm">{name}</td>
-    <td className="py-3 px-4">
-      <div className="flex flex-wrap gap-1.5">
-        {hasYml && <FormatBadge label="YML" color="border-[#FFD700]/40 text-[#FFD700] hover:border-[#FFD700]" />}
-        {hasCsv && <FormatBadge label="CSV" color="border-blue-400/40 text-blue-300 hover:border-blue-400" />}
-        {hasExcel && <FormatBadge label="Excel" color="border-green-400/40 text-green-300 hover:border-green-400" />}
-      </div>
-    </td>
-  </tr>
-);
 
 const useProducts = (token: string, offset: number) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [total, setTotal] = useState<number | null>(null);
+  const [, setTotal] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     if (!token) return;

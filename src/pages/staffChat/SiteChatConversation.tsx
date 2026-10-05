@@ -1,4 +1,3 @@
-import { useRef } from "react";
 import Icon from "@/components/ui/icon";
 import {
   Room, Message, ClientHistory, Tag, TAGS, TAG_COLORS,

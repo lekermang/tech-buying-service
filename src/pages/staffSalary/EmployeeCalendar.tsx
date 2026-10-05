@@ -1,6 +1,5 @@
 import { useMemo } from "react";
 import Icon from "@/components/ui/icon";
-import { fmt } from "./employee.types";
 import type { DayRow, PayoutRow, RepairDayRow } from "./employee.types";
 
 const MONTHS = [

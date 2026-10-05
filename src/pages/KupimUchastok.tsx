@@ -15,7 +15,6 @@ const PHONE_DISPLAY_SHORT = "+7 (992) 992-03-33";
 const PHONE_TEL = "tel:+79929990333";
 const A = "#4caf50";
 const A2 = "#2e7d32";
-const A_DARK = "#1b5e20";
 const OG_IMG = "https://cdn.poehali.dev/projects/aebcc4b4-364a-471f-b076-f05b82d2d364/files/ec924fcc-4a46-41dc-969f-6cabdce36eab.jpg";
 
 /* ── Фото галереи ── */

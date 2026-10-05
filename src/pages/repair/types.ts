@@ -277,7 +277,6 @@ export const printAct = async (o: Order) => {
 export const getActHtmlString = (o: Order): string => {
   const now = new Date(o.created_at);
   const dateStr = now.toLocaleDateString("ru-RU", { day: "2-digit", month: "long", year: "numeric" });
-  const timeStr = now.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
   const barNum = String(o.id).padStart(12, "0");
   const orderNum = String(o.id).padStart(6, "0");
 

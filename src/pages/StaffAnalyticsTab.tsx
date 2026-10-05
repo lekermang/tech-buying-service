@@ -211,7 +211,6 @@ export function AnalyticsTab({ token }: { token: string }) {
   const slRevenue = hasKom ? (slData?.kom_income || 0) : (slData?.income || 0);
   const slCosts = hasKom ? (slData?.kom_costs || 0) : (slData?.expense || 0);
   // Прибыль = выручка − себестоимость проданного (сумма profit по sold_items)
-  const slSalesRevenue = slData?.sales_total || slRevenue;
   const slProfitFromItems = (slData?.sold_items || []).reduce((s, it) => s + (it.profit || 0), 0);
   const slProfit = slProfitFromItems || (hasKom ? (slData?.kom_profit || 0) : (slData?.period_profit || 0));
 

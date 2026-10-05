@@ -1,5 +1,5 @@
 import Icon from "@/components/ui/icon";
-import { Room, Tag, TAG_COLORS, TAGS, fmtTime } from "./siteChatTypes";
+import { Room, Tag, TAG_COLORS, fmtTime } from "./siteChatTypes";
 
 type Props = {
   rooms: Room[];

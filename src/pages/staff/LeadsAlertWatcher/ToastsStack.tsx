@@ -1,4 +1,3 @@
-import React from "react";
 import Icon from "@/components/ui/icon";
 import { fmtPhone, sourceLabel, type Toast } from "./types";
 

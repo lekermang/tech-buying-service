@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import Icon from "@/components/ui/icon";
 import { ymGoal, Goals } from "@/lib/ym";
 import { formatPhone, isPhoneValid } from "@/lib/phoneFormat";
-import { SEND_LEAD_URL, INP_CLS, LBL_CLS } from "./hero/evaluateModalShared";
+import { SEND_LEAD_URL, LBL_CLS } from "./hero/evaluateModalShared";
 
 type Props = { onOpenModal?: () => void };
 

@@ -1,6 +1,6 @@
 import Icon from "@/components/ui/icon";
 import { CatalogItem } from "@/pages/catalog.types";
-import { CATEGORY_ICONS, BRAND_PRIORITY } from "@/components/catalog/catalog.utils";
+import { CATEGORY_ICONS } from "@/components/catalog/catalog.utils";
 
 interface CatalogSidebarProps {
   categories: string[];

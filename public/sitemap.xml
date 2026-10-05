@@ -19,66 +19,6 @@
     <changefreq>daily</changefreq>
     <priority>0.95</priority>
   </url>
-  <url>
-    <loc>https://skypka24.com/?section=catalog</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
-  </url>
-  <url>
-    <loc>https://skypka24.com/?section=tradein</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
-  </url>
-  <url>
-    <loc>https://skypka24.com/?section=how</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.75</priority>
-  </url>
-  <url>
-    <loc>https://skypka24.com/?section=guarantees</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.75</priority>
-  </url>
-  <url>
-    <loc>https://skypka24.com/?section=branches</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://skypka24.com/?section=about</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://skypka24.com/?section=reviews</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.75</priority>
-  </url>
-  <url>
-    <loc>https://skypka24.com/?section=avito</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://skypka24.com/?section=jobs</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://skypka24.com/?section=contacts</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
 
   <!-- ===== КАТАЛОГ ТЕХНИКИ (Б/У и Новая) ===== -->
   <url>
@@ -541,60 +481,12 @@
     <changefreq>weekly</changefreq>
     <priority>0.78</priority>
   </url>
-  <url>
-    <loc>https://skypka24.com/ancient-coins#ancient-rome</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.72</priority>
-  </url>
-  <url>
-    <loc>https://skypka24.com/ancient-coins#ancient-greece</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.72</priority>
-  </url>
-  <url>
-    <loc>https://skypka24.com/ancient-coins#parthia</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://skypka24.com/ancient-coins#ancient-rus</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
 
   <url>
     <loc>https://skypka24.com/russian-coins</loc>
     <lastmod>2026-06-04</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.78</priority>
-  </url>
-  <url>
-    <loc>https://skypka24.com/russian-coins#kievan-rus</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.72</priority>
-  </url>
-  <url>
-    <loc>https://skypka24.com/russian-coins#golden-horde</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.72</priority>
-  </url>
-  <url>
-    <loc>https://skypka24.com/russian-coins#moscow-state</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://skypka24.com/russian-coins#russian-empire</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
   </url>
 
   <!-- ===== АНТИКВАРИАТ — БРОНЗА ===== -->
@@ -604,36 +496,6 @@
     <changefreq>weekly</changefreq>
     <priority>0.75</priority>
   </url>
-  <url>
-    <loc>https://skypka24.com/bronze-sculptures#ancient-greece</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.68</priority>
-  </url>
-  <url>
-    <loc>https://skypka24.com/bronze-sculptures#ancient-rome</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.68</priority>
-  </url>
-  <url>
-    <loc>https://skypka24.com/bronze-sculptures#medieval</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.68</priority>
-  </url>
-  <url>
-    <loc>https://skypka24.com/bronze-sculptures#east</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.68</priority>
-  </url>
-  <url>
-    <loc>https://skypka24.com/bronze-sculptures#xix-xx</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.68</priority>
-  </url>
 
   <!-- ===== АНТИКВАРИАТ — ИКОНЫ ===== -->
   <url>
@@ -641,30 +503,6 @@
     <lastmod>2026-06-04</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.78</priority>
-  </url>
-  <url>
-    <loc>https://skypka24.com/icons#xvi-xvii</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://skypka24.com/icons#xviii-xix</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://skypka24.com/icons#oklady</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.68</priority>
-  </url>
-  <url>
-    <loc>https://skypka24.com/icons#metal</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.68</priority>
   </url>
 
   <!-- ===== АНТИКВАРИАТ — ФАРФОР ===== -->
@@ -674,30 +512,6 @@
     <changefreq>weekly</changefreq>
     <priority>0.75</priority>
   </url>
-  <url>
-    <loc>https://skypka24.com/porcelain#imperial</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.68</priority>
-  </url>
-  <url>
-    <loc>https://skypka24.com/porcelain#gardner</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.68</priority>
-  </url>
-  <url>
-    <loc>https://skypka24.com/porcelain#kuznetsov</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.68</priority>
-  </url>
-  <url>
-    <loc>https://skypka24.com/porcelain#crystal</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.65</priority>
-  </url>
 
   <!-- ===== АНТИКВАРИАТ — СОВЕТСКОЕ ===== -->
   <url>
@@ -705,30 +519,6 @@
     <lastmod>2026-06-04</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.75</priority>
-  </url>
-  <url>
-    <loc>https://skypka24.com/soviet-antiques#orders-medals</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.68</priority>
-  </url>
-  <url>
-    <loc>https://skypka24.com/soviet-antiques#avangard</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.68</priority>
-  </url>
-  <url>
-    <loc>https://skypka24.com/soviet-antiques#porcelain</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.65</priority>
-  </url>
-  <url>
-    <loc>https://skypka24.com/soviet-antiques#furniture</loc>
-    <lastmod>2026-06-04</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.65</priority>
   </url>
 
   <!-- ===== SEO ПОСАДОЧНЫЕ — СКУПКА ===== -->

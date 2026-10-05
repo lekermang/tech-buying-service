@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import Icon from "@/components/ui/icon";
 import { getActiveHoliday } from "./holidays";
 
 /** Маленькая кнопка-эмоджи в углу шапки.

@@ -6,7 +6,7 @@ import EmployeeRepairHistory from "./EmployeeRepairHistory";
 import EmployeeSalesHistory from "./EmployeeSalesHistory";
 import EmployeeCalendar from "./EmployeeCalendar";
 import {
-  fmt, currentMonthRange,
+  fmt,
   type TodayState, type DayRow, type PayoutRow,
   type DayDetail, type RepairHistory, type RepairDayDetail,
 } from "./employee.types";

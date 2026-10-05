@@ -1,4 +1,4 @@
-export const PHOTOS_URL = "https://functions.poehali.dev/4e286b87-fc23-49ef-9b77-22611bb6e1f9";
+export const PHOTOS_URL = "https://functions.poehali.dev/9ce35006-6f85-4285-b99c-2cafd29c71ed";
 export const SYNC_URL = "https://functions.poehali.dev/49e23745-1449-4e4c-80c2-e7967f3c5584";
 
 export type AvitoProduct = {

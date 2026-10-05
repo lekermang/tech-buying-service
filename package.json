@@ -12,7 +12,6 @@
   },
   "dependencies": {
     "-": "^0.0.1",
-    "@hookform/resolvers": "^3.9.0",
     "@radix-ui/react-accordion": "^1.2.0",
     "@radix-ui/react-alert-dialog": "^1.1.1",
     "@radix-ui/react-aspect-ratio": "^1.1.0",
@@ -48,9 +47,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.0.0",
     "d": "^1.0.2",
-    "date-fns": "^3.6.0",
     "dexie": "^4.4.2",
-    "dexie-react-hooks": "^4.4.0",
     "docx": "^9.6.1",
     "embla-carousel-react": "^8.3.0",
     "emoji-picker-react": "^4.19.1",
@@ -76,8 +73,7 @@
     "tailwind-merge": "^2.5.2",
     "tailwindcss-animate": "^1.0.7",
     "three": "^0.183.2",
-    "vaul": "^0.9.3",
-    "zod": "^3.23.8"
+    "vaul": "^0.9.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.0",

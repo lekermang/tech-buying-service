@@ -61,18 +61,6 @@ function toolbarHtml(label: string): string {
   </div>`;
 }
 
-function reqLine(ctx: SLDocContext): string {
-  const r = (ctx.requisites || {}) as Record<string, unknown>;
-  const parts = [
-    r.legal_name ? escape(r.legal_name) : "",
-    r.inn ? `ИНН ${escape(r.inn)}` : "",
-    r.ogrn ? `ОГРН ${escape(r.ogrn)}` : "",
-    r.legal_address ? escape(r.legal_address) : "",
-    r.phone ? `тел. ${escape(r.phone)}` : "",
-  ].filter(Boolean);
-  return parts.join(", ");
-}
-
 // ==================== Шаблоны ====================
 function tplContractPurchase(ctx: SLDocContext, copyOf?: number): string {
   const it = (ctx.item || {}) as Record<string, unknown>;
