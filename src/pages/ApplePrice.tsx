@@ -6,14 +6,15 @@ const PUBLIC_PRICE_URL = "https://functions.poehali.dev/eff3d143-8966-4a6d-bbea-
 const SEND_LEAD_URL    = "https://functions.poehali.dev/52666ff7-db52-4b6a-a90e-d60aeed699de";
 const PRICE_EMAIL_URL  = "https://functions.poehali.dev/9e9486d9-57f0-454c-bc19-b46e3d4bc682";
 const PRICE_PDF_URL    = "https://functions.poehali.dev/eff3d143-8966-4a6d-bbea-ddc77a6e5373";
-const DEFAULT_MARKUP   = 2000;
+const DEFAULT_MARKUP   = 3000;
 const REFRESH_MS       = 10 * 60 * 1000;
-const CACHE_KEY        = "apple_price_v4";
+const CACHE_KEY        = "apple_price_v5";
 
 interface PriceItem {
   name: string;
   price: string;
   price_num: number | null;
+  available?: boolean;
   region: string;
   sim?: string;
   photo: string | null;
@@ -129,7 +130,8 @@ function formatPhone(v: string): string {
 }
 
 // ── Модал заказа ───────────────────────────────────────────────────────────────
-function OrderModal({ item, onClose }: { item: PriceItem; onClose: () => void }) {
+function OrderModal({ item, onClose, mode = "order" }: { item: PriceItem; onClose: () => void; mode?: "order" | "discount" }) {
+  const isDiscount = mode === "discount";
   const [name, setName]       = useState("");
   const [phone, setPhone]     = useState("+7");
   const [sending, setSending] = useState(false);
@@ -158,8 +160,10 @@ function OrderModal({ item, onClose }: { item: PriceItem; onClose: () => void })
         body: JSON.stringify({
           name:     name.trim(),
           phone:    phoneDigits,
-          category: "Прайс Apple",
-          desc:     `Хочет купить: ${item.name}${item.price_num ? ` — ${item.price}` : " (под заказ)"}`,
+          category: isDiscount ? "Прайс Apple — просьба о скидке" : "Прайс Apple",
+          desc:     isDiscount
+            ? `ПРОСИТ СКИДКУ: ${item.name}${item.price_num ? ` — цена на сайте ${item.price}` : ""}${item.available === false ? " (под заказ)" : ""}`
+            : `Хочет купить: ${item.name}${item.price_num ? ` — ${item.price}` : ""}${item.available === false ? " (под заказ)" : ""}`,
         }),
       });
       setDone(true);
@@ -187,7 +191,7 @@ function OrderModal({ item, onClose }: { item: PriceItem; onClose: () => void })
             <div className="text-center py-4">
               <div className="text-5xl mb-4">✅</div>
               <div className="font-oswald font-bold text-[20px] text-white uppercase mb-2">Заявка принята!</div>
-              <div className="text-white/50 text-[13px] mb-1">Перезвоним в течение 15 минут</div>
+              <div className="text-white/50 text-[13px] mb-1">{isDiscount ? "Менеджер свяжется и назовёт лучшую цену" : "Перезвоним в течение 15 минут"}</div>
               <div className="text-white/30 text-[11px] mb-6">на номер {phone}</div>
               <button onClick={onClose}
                 className="w-full py-3 rounded-2xl font-oswald font-bold text-[14px] uppercase tracking-wide text-black"
@@ -211,14 +215,15 @@ function OrderModal({ item, onClose }: { item: PriceItem; onClose: () => void })
                   <div className="font-bold text-white text-[14px] leading-tight">{item.name}</div>
                   {item.price_num ? (
                     <div className="font-oswald font-black text-[18px] mt-0.5" style={{ color: "#FFD700" }}>{item.price}</div>
-                  ) : (
+                  ) : null}
+                  {item.available === false || !item.price_num ? (
                     <div className="text-[11px] mt-0.5" style={{ color: "#fb923c" }}>🚗 Под заказ · привезём за 1–2 дня</div>
-                  )}
+                  ) : null}
                 </div>
               </div>
 
               <div className="font-oswald font-bold text-[16px] text-white uppercase tracking-wide mb-1">
-                Заказать / уточнить
+                {isDiscount ? "Просьба сделать скидку" : "Заказать / уточнить"}
               </div>
               <div className="text-[11px] text-white/30 mb-4">Перезвоним в течение 15 минут</div>
 
@@ -276,7 +281,7 @@ function OrderModal({ item, onClose }: { item: PriceItem; onClose: () => void })
                   className="flex-[2] flex items-center justify-center gap-2 py-3 rounded-2xl font-oswald font-bold text-[14px] uppercase tracking-wide text-black disabled:opacity-60"
                   style={{ background: "linear-gradient(135deg,#FFD700,#d97706)", boxShadow: "0 4px 20px rgba(255,215,0,0.35)" }}>
                   <Icon name={sending ? "Loader2" : "Phone"} size={16} className={sending ? "animate-spin" : ""} />
-                  {sending ? "Отправка…" : "Перезвоните мне"}
+                  {sending ? "Отправка…" : isDiscount ? "Прошу скидку" : "Перезвоните мне"}
                 </button>
               </div>
             </>
@@ -553,7 +558,7 @@ function TomorrowPanel({
   // Собираем все позиции БЕЗ цены в основном прайсе — это «под заказ»
   const items = Object.entries(groups).flatMap(([cat, list]) =>
     list
-      .filter(it => !it.price_num)
+      .filter(it => !it.price_num || it.available === false)
       .map(it => ({ ...it, cat }))
   );
 
@@ -1154,6 +1159,7 @@ export default function ApplePrice() {
   const [nextRefresh, setNextRefresh] = useState(Date.now() + REFRESH_MS);
   const [timer, setTimer]             = useState("");
   const [orderItem, setOrderItem]     = useState<PriceItem | null>(null);
+  const [orderMode, setOrderMode]     = useState<"order" | "discount">("order");
   const [emailModal, setEmailModal]   = useState(() => qs.get("modal") === "price");
   const [pdfLoading, setPdfLoading]     = useState(false);
   const [printPdfLoading, setPrintPdfLoading] = useState(false);
@@ -1504,7 +1510,8 @@ export default function ApplePrice() {
               // Карточка товара
               const renderCard = (item: PriceItem, i: number, accentColor: string, cat: string) => {
                 const sim = item.sim ?? detectSim(item.name, item.region);
-                const inStock = !!item.price_num;
+                const inStock = !!item.price_num && item.available !== false;
+                const hasPrice = !!item.price_num;
                 return (
                   <div key={i} className="price-row flex items-center gap-2 rounded-xl px-3 py-2.5 group"
                     style={{
@@ -1543,21 +1550,35 @@ export default function ApplePrice() {
                         )}
                       </div>
                     </div>
-                    {/* Цена + кнопка */}
+                    {/* Цена + кнопки */}
                     <div style={{ flexShrink: 0, textAlign: "right" }}>
-                      {inStock ? (
-                        <div style={{ fontSize: 13, fontWeight: 800, color: "#FFD700", whiteSpace: "nowrap" }}>{item.price}</div>
+                      {hasPrice ? (
+                        <div style={{ fontSize: 13, fontWeight: 800, color: inStock ? "#FFD700" : "#d4a017", whiteSpace: "nowrap" }}>{item.price}</div>
                       ) : (
-                        <div style={{ fontSize: 9, color: "#fb923c", fontWeight: 600, whiteSpace: "nowrap" }}>🚗 заказ</div>
+                        <div style={{ fontSize: 9, color: "#fb923c", fontWeight: 600, whiteSpace: "nowrap" }}>цену уточняем</div>
                       )}
-                      <button className="order-btn mt-1" onClick={() => setOrderItem(item)} style={{
-                        padding: "3px 8px", borderRadius: 6, fontSize: 10, fontWeight: 700,
-                        cursor: "pointer", border: "none", whiteSpace: "nowrap", display: "block",
-                        ...(inStock
-                          ? { color: "#000", background: "linear-gradient(135deg,#FFD700,#f59e0b)" }
-                          : { color: "#fb923c", background: "rgba(251,146,60,0.12)", border: "1px solid rgba(251,146,60,0.3)" }
-                        ),
-                      }}>Заказать</button>
+                      {!inStock && (
+                        <div style={{ fontSize: 9, color: "#fb923c", fontWeight: 600, whiteSpace: "nowrap" }}>🚗 под заказ</div>
+                      )}
+                      <div style={{ display: "flex", gap: 4, justifyContent: "flex-end", marginTop: 4 }}>
+                        {hasPrice && (
+                          <button title="Просьба сделать скидку"
+                            onClick={() => { setOrderMode("discount"); setOrderItem(item); }}
+                            style={{
+                              padding: "3px 6px", borderRadius: 6, fontSize: 10, fontWeight: 700,
+                              cursor: "pointer", whiteSpace: "nowrap",
+                              color: "#4ade80", background: "rgba(74,222,128,0.1)", border: "1px solid rgba(74,222,128,0.3)",
+                            }}>% Скидка</button>
+                        )}
+                        <button className="order-btn" onClick={() => { setOrderMode("order"); setOrderItem(item); }} style={{
+                          padding: "3px 8px", borderRadius: 6, fontSize: 10, fontWeight: 700,
+                          cursor: "pointer", border: "none", whiteSpace: "nowrap",
+                          ...(inStock
+                            ? { color: "#000", background: "linear-gradient(135deg,#FFD700,#f59e0b)" }
+                            : { color: "#fb923c", background: "rgba(251,146,60,0.12)", border: "1px solid rgba(251,146,60,0.3)" }
+                          ),
+                        }}>Заказать</button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -1696,7 +1717,7 @@ export default function ApplePrice() {
       </div>
 
       {/* Модал заказа */}
-      {orderItem && <OrderModal item={orderItem} onClose={() => setOrderItem(null)} />}
+      {orderItem && <OrderModal item={orderItem} mode={orderMode} onClose={() => setOrderItem(null)} />}
 
       {/* Модал отправки прайса на email */}
       {emailModal && <EmailPriceModal onClose={() => setEmailModal(false)} />}

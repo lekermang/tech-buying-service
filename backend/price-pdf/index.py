@@ -23,7 +23,7 @@ from reportlab.lib.enums import TA_RIGHT, TA_CENTER
 # ── Настройки ──────────────────────────────────────────────────────────────────
 SCHEMA         = "t_p31606708_tech_buying_service"
 SMARTBERY_URL  = "https://smartbery-qrcode.ru/api/v1/products/"
-DEFAULT_MARKUP = 2000
+DEFAULT_MARKUP = 3000
 ADMIN_TOKEN    = "Mark2015N"
 
 # DejaVu Sans — открытый шрифт с полной кириллицей, ~750 КБ
@@ -458,7 +458,10 @@ def build_pdf(groups: dict, total: int, generated_at: str, print_mode: bool = Fa
         else:             r_sfx = ""
 
         name_txt = item["name"] + r_sfx
-        price_p  = P(item["price"], FONT_BOLD, 7, PRICE_CLR, "R") if item["has_price"] else P("под заказ", FONT_REG, 6, GRAY, "R")
+        if item["has_price"]:
+            price_p = P(item["price"] + ("" if item.get("available", True) else " ·з"), FONT_BOLD, 7, PRICE_CLR, "R")
+        else:
+            price_p = P("под заказ", FONT_REG, 6, GRAY, "R")
 
         bg = ROW_ODD if idx % 2 == 0 else ROW_EVEN
         return [
@@ -593,9 +596,14 @@ def handler(event: dict, context) -> dict:
     # Публичный JSON-прайс для страницы /Apple (объединено из отдельной функции public-price)
     if qs.get("format") == "json":
         try:
-            json_markup = max(0, int(qs.get("markup", DEFAULT_MARKUP)))
+            json_markup = int(qs.get("markup", DEFAULT_MARKUP))
         except Exception:
             json_markup = DEFAULT_MARKUP
+        json_admin = ((event.get("headers") or {}).get("x-admin-token", "")
+                      or body.get("admin_token", "") or qs.get("admin_token", "")) == ADMIN_TOKEN
+        if not json_admin:
+            json_markup = max(json_markup, DEFAULT_MARKUP)
+        json_markup = max(0, json_markup)
         json_products   = fetch_products()
         json_cdn_photos = load_cdn_photos()
         json_groups     = group_products(json_products, json_markup, json_cdn_photos)
