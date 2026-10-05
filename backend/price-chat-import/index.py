@@ -1,7 +1,8 @@
 """
 Импорт прайса из закрытого Telegram-чата (DanEL bot) через бота @Skypkaklgbot. v1
 Webhook:  POST /  (Update от Telegram)
-?action=set_webhook  POST {admin_token}   — привязать бота к этой функции
+Привязка (делается с телефона/компьютера, т.к. сервер не видит api.telegram.org): открыть в браузере
+  https://api.telegram.org/bot<ТОКЕН>/setWebhook?url=<адрес функции>?key=<WEBHOOK_KEY>
 ?action=parse        POST {admin_token, text, apply?}  — проверить разбор текста (apply=true — записать в каталог)
 Формат строки: "🇪🇺 17 Pro 512 Blue - 121900 ✅📸"  (✅ в наличии, 🚗 под заказ)
 Секреты: SKYPKA_PRICE_BOT_TOKEN (токен @Skypkaklgbot), PRICE_SOURCE_CHAT_ID (разрешённый чат)
@@ -12,6 +13,7 @@ import psycopg2
 SCHEMA = 't_p31606708_tech_buying_service'
 ADMIN = 'Mark2015N'
 MARKUP = 3000
+WEBHOOK_KEY = 'wym5IyJBNPx1OWlEVLTTUuSGvjto8JoA'
 CORS = {'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Token'}
 
 FLAGS = {'🇪🇺': 'EU', '🇺🇸': 'US', '🇷🇺': 'RU', '🇨🇳': 'CN', '🇦🇪': 'AE', '🇭🇰': 'HK', '🇯🇵': 'JP'}
@@ -133,7 +135,9 @@ def handler(event, context):
             result.update(apply_items(items))
         return resp(200, result)
 
-    # Webhook от Telegram
+    # Webhook от Telegram (только с верным ключом в адресе)
+    if qs.get('key') != WEBHOOK_KEY:
+        return resp(403, {'error': 'Forbidden'})
     msg = body.get('message') or body.get('edited_message') or body.get('channel_post') or body.get('edited_channel_post')
     if not msg:
         return resp(200, {'ok': True})
@@ -141,6 +145,16 @@ def handler(event, context):
     chat_id = str(msg.get('chat', {}).get('id', ''))
     if not allowed or chat_id != allowed:
         print(f'ignored chat {chat_id}')
+        try:
+            title = (msg.get('chat', {}).get('title') or msg.get('chat', {}).get('username') or '').replace("'", "''")
+            conn = db(); cur = conn.cursor()
+            cur.execute(
+                f"INSERT INTO {SCHEMA}.settings (key, value, description, updated_at) VALUES "
+                f"('price_bot_last_chat', '{chat_id} | {title}', 'Последний чат, из которого писал бот прайса', NOW()) "
+                f"ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()")
+            conn.commit(); cur.close(); conn.close()
+        except Exception as e:
+            print(f'last_chat save error {e}')
         return resp(200, {'ok': True, 'ignored': True})
     text = msg.get('text') or msg.get('caption') or ''
     items = parse_text(text)
