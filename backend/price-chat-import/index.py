@@ -1,5 +1,5 @@
 """
-Импорт прайса из закрытого Telegram-чата (DanEL bot) через бота @Skypkaklgbot. v1
+Импорт прайса из Telegram через бота @Skypkaklgbot. v2 — группа + пересылка в личку, ответы через webhook
 Webhook:  POST /  (Update от Telegram)
 Привязка (делается с телефона/компьютера, т.к. сервер не видит api.telegram.org): открыть в браузере
   https://api.telegram.org/bot<ТОКЕН>/setWebhook?url=<адрес функции>?key=<WEBHOOK_KEY>
@@ -15,6 +15,7 @@ ADMIN = 'Mark2015N'
 MARKUP = 3000
 CACHE_KEY = 'smartbery_products_cache'
 WEBHOOK_KEY = 'wym5IyJBNPx1OWlEVLTTUuSGvjto8JoA'
+BOT_PASS = '838B355C'
 CORS = {'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Token'}
 
 FLAGS = {'🇪🇺': 'EU', '🇺🇸': 'US', '🇷🇺': 'RU', '🇨🇳': 'CN', '🇦🇪': 'AE', '🇭🇰': 'HK', '🇯🇵': 'JP'}
@@ -61,6 +62,14 @@ def save_to_cache(items):
             cache = json.loads(row[0]) if row and row[0] else []
         except Exception:
             cache = []
+        if not cache:
+            cur.execute(
+                f"SELECT model, storage, color, region, availability, price, photo_url "
+                f"FROM {SCHEMA}.catalog WHERE sku LIKE 'smartbery_%%' AND is_active = true AND price IS NOT NULL")
+            for model, storage, color, region, avail, price, photo in cur.fetchall():
+                nm = " ".join(x for x in [(model or '').replace('iPhone ', '', 1), (storage or '').replace('GB', ''), color or ''] if x).strip()
+                cache.append({'availability': avail == 'in_stock', 'country': region, 'name': nm,
+                              'photo_tg': photo if photo and 't.me' in photo else None, 'price': price})
         by_name = {c.get('name'): c for c in cache if isinstance(c, dict)}
         for it in items:
             old = by_name.get(it['name'], {})
@@ -114,6 +123,56 @@ def apply_items(items):
         cur.close(); conn.close()
     cached = save_to_cache(items)
     return {'updated': updated, 'inserted': inserted, 'unknown': unknown, 'price_list_size': cached}
+
+
+def get_setting(key):
+    conn = db(); cur = conn.cursor()
+    try:
+        cur.execute(f"SELECT value FROM {SCHEMA}.settings WHERE key=%s", (key,))
+        r = cur.fetchone()
+        return r[0] if r else ''
+    finally:
+        cur.close(); conn.close()
+
+
+def set_setting(key, value, desc=''):
+    conn = db(); cur = conn.cursor()
+    try:
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.settings (key, value, description, updated_at) VALUES (%s, %s, %s, NOW()) "
+            f"ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()",
+            (key, value, desc))
+        conn.commit()
+    finally:
+        cur.close(); conn.close()
+
+
+def note_update(chat_id, ctype, title, uid, username, text):
+    """Запоминаем последнее, что увидел бот, чтобы можно было проверить, доходят ли сообщения."""
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone(timedelta(hours=3))).strftime('%d.%m %H:%M МСК')
+    sample = (text or '').replace('\n', ' ')[:80]
+    set_setting('price_bot_last_update',
+                f"{now} | чат {chat_id} ({ctype}) {title} | от {uid} @{username} | {sample}",
+                'Последнее сообщение, которое получил бот прайса')
+    try:
+        seen = json.loads(get_setting('price_bot_seen_chats') or '{}')
+    except Exception:
+        seen = {}
+    if chat_id not in seen:
+        seen[chat_id] = title or ctype
+        if len(seen) > 12:
+            seen.pop(next(iter(seen)))
+        set_setting('price_bot_seen_chats', json.dumps(seen, ensure_ascii=False), 'Чаты, откуда писал бот прайса')
+
+
+def reply(chat_id, text, reply_to=None):
+    """Ответ прямо в ответе на webhook — исходящая связь с Telegram не нужна."""
+    body = {'method': 'sendMessage', 'chat_id': chat_id, 'text': text}
+    if reply_to:
+        body['reply_to_message_id'] = reply_to
+    return {'statusCode': 200, 'headers': {**CORS, 'Content-Type': 'application/json'},
+            'body': json.dumps(body, ensure_ascii=False)}
 
 
 def tg(method, payload):
@@ -174,32 +233,53 @@ def handler(event, context):
     msg = body.get('message') or body.get('edited_message') or body.get('channel_post') or body.get('edited_channel_post')
     if not msg:
         return resp(200, {'ok': True})
-    allowed = os.environ.get('PRICE_SOURCE_CHAT_ID', '').strip()
-    chat_id = str(msg.get('chat', {}).get('id', ''))
-    if not allowed or chat_id != allowed:
-        print(f'ignored chat {chat_id}')
-        try:
-            title = (msg.get('chat', {}).get('title') or msg.get('chat', {}).get('username') or '').replace("'", "''")
-            conn = db(); cur = conn.cursor()
-            cur.execute(
-                f"INSERT INTO {SCHEMA}.settings (key, value, description, updated_at) VALUES "
-                f"('price_bot_last_chat', '{chat_id} | {title}', 'Последний чат, из которого писал бот прайса', NOW()) "
-                f"ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()")
-            conn.commit(); cur.close(); conn.close()
-        except Exception as e:
-            print(f'last_chat save error {e}')
-        return resp(200, {'ok': True, 'ignored': True})
+    chat = msg.get('chat') or {}
+    chat_id = str(chat.get('id', ''))
+    ctype = chat.get('type', '')
+    frm = msg.get('from') or {}
+    uid = str(frm.get('id', ''))
     text = msg.get('text') or msg.get('caption') or ''
+    mid = msg.get('message_id')
+    is_private = ctype == 'private'
+    try:
+        note_update(chat_id, ctype, chat.get('title') or chat.get('username') or '', uid, frm.get('username') or '', text)
+    except Exception as e:
+        print(f'note_update error {e}')
+
+    users = [u for u in (get_setting('price_bot_users') or '').split(',') if u]
+
+    if is_private and text.startswith('/auth'):
+        parts = text.split(None, 1)
+        if len(parts) > 1 and parts[1].strip() == BOT_PASS:
+            if uid not in users:
+                users.append(uid)
+                set_setting('price_bot_users', ','.join(users), 'Кому разрешено присылать прайс боту в личку')
+            return reply(chat_id, '✅ Готово. Теперь пересылайте мне сообщения с прайсом — я обновлю цены на сайте.')
+        return reply(chat_id, '❌ Неверный код.')
+
+    if is_private and text.startswith('/start'):
+        return reply(chat_id, 'Бот прайса Скупка24. Чтобы пересылать мне прайс, отправьте: /auth КОД\nВаш ID: ' + uid)
+
+    extra_chats = [c for c in (get_setting('price_bot_chats') or '').split(',') if c]
+    allowed = os.environ.get('PRICE_SOURCE_CHAT_ID', '').strip()
+    chat_ok = chat_id == allowed or chat_id in extra_chats
+    user_ok = is_private and uid in users
+    if not (chat_ok or user_ok):
+        print(f'ignored chat {chat_id} type {ctype} user {uid}')
+        if is_private:
+            return reply(chat_id, 'Доступ не открыт. Отправьте: /auth КОД')
+        return resp(200, {'ok': True, 'ignored': True})
+
     items = parse_text(text)
     if not items:
+        if is_private:
+            return reply(chat_id, 'Не нашёл строк прайса. Формат: 🇪🇺 17 Pro 512 Blue - 121900 ✅')
         return resp(200, {'ok': True, 'items': 0})
     res = apply_items(items)
     print(f'price import: {res}')
-    try:
-        note = f"✅ Прайс обновлён: {res['updated']} обновлено, {res['inserted']} добавлено"
+    if is_private:
+        note = f"✅ Прайс обновлён: {len(items)} позиций (в каталоге обновлено {res['updated']}, добавлено {res['inserted']}). Сайт /apple показывает новые цены."
         if res['unknown']:
-            note += '\n⚠️ Не найдены: ' + ', '.join(res['unknown'][:10])
-        tg('sendMessage', {'chat_id': chat_id, 'text': note, 'reply_to_message_id': msg.get('message_id')})
-    except Exception as e:
-        print(f'notify error {e}')
+            note += '\nТолько в прайс /apple (без каталога): ' + ', '.join(res['unknown'][:8])
+        return reply(chat_id, note, mid)
     return resp(200, {'ok': True, **res})
