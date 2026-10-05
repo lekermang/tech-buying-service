@@ -13,6 +13,7 @@ import psycopg2
 SCHEMA = 't_p31606708_tech_buying_service'
 ADMIN = 'Mark2015N'
 MARKUP = 3000
+CACHE_KEY = 'smartbery_products_cache'
 WEBHOOK_KEY = 'wym5IyJBNPx1OWlEVLTTUuSGvjto8JoA'
 CORS = {'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Token'}
 
@@ -50,6 +51,37 @@ def parse_text(text):
     return items
 
 
+def save_to_cache(items):
+    """Кладёт позиции в запасной прайс, из которого /apple берёт данные, когда поставщик недоступен."""
+    conn = db(); cur = conn.cursor()
+    try:
+        cur.execute(f"SELECT value FROM {SCHEMA}.settings WHERE key=%s", (CACHE_KEY,))
+        row = cur.fetchone()
+        try:
+            cache = json.loads(row[0]) if row and row[0] else []
+        except Exception:
+            cache = []
+        by_name = {c.get('name'): c for c in cache if isinstance(c, dict)}
+        for it in items:
+            old = by_name.get(it['name'], {})
+            by_name[it['name']] = {
+                'availability': it['availability'] == 'in_stock',
+                'country': it['region'],
+                'name': it['name'],
+                'photo_tg': old.get('photo_tg'),
+                'price': it['price'],
+            }
+        payload = json.dumps(list(by_name.values()), ensure_ascii=False).replace("'", "''")
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.settings (key, value, description, updated_at) VALUES "
+            f"('{CACHE_KEY}', '{payload}', 'Запасной прайс для /apple', NOW()) "
+            f"ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()")
+        conn.commit()
+        return len(by_name)
+    finally:
+        cur.close(); conn.close()
+
+
 def apply_items(items):
     conn = db(); cur = conn.cursor()
     updated, inserted, unknown = 0, 0, []
@@ -80,7 +112,8 @@ def apply_items(items):
         conn.commit()
     finally:
         cur.close(); conn.close()
-    return {'updated': updated, 'inserted': inserted, 'unknown': unknown}
+    cached = save_to_cache(items)
+    return {'updated': updated, 'inserted': inserted, 'unknown': unknown, 'price_list_size': cached}
 
 
 def tg(method, payload):

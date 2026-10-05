@@ -219,8 +219,28 @@ def _cache_load() -> list:
         cur = conn.cursor()
         cur.execute(f"SELECT value FROM {SCHEMA}.settings WHERE key = '{CACHE_KEY}'")
         row = cur.fetchone()
+        if row and row[0]:
+            cur.close(); conn.close()
+            return json.loads(row[0])
+        cur.execute(
+            f"SELECT model, storage, color, region, availability, price, photo_url "
+            f"FROM {SCHEMA}.catalog WHERE sku LIKE 'smartbery_%' AND is_active = true AND price IS NOT NULL"
+        )
+        rows = cur.fetchall()
         cur.close(); conn.close()
-        return json.loads(row[0]) if row and row[0] else []
+        out = []
+        for model, storage, color, region, avail, price, photo in rows:
+            m = (model or "").replace("iPhone ", "", 1)
+            st = (storage or "").replace("GB", "")
+            name = " ".join(x for x in [m, st, color or ""] if x).strip()
+            out.append({
+                "availability": avail == "in_stock",
+                "country": region,
+                "name": name,
+                "photo_tg": photo if photo and "t.me" in photo else None,
+                "price": price,
+            })
+        return out
     except Exception as e:
         print(f"[price-pdf][cache_load] {e}")
         return []
@@ -233,7 +253,7 @@ def fetch_products() -> list:
         headers={"Authorization": f"Bearer {token}"}
     )
     try:
-        with urllib.request.urlopen(req, timeout=12) as r:
+        with urllib.request.urlopen(req, timeout=6) as r:
             data = json.loads(r.read())
         if isinstance(data, list) and data:
             _cache_save(data)
