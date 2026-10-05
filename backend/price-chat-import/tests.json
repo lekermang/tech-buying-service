@@ -1,0 +1,6 @@
+{
+  "tests": [
+    {"name": "OPTIONS", "method": "OPTIONS", "path": "/", "expectedStatus": 200},
+    {"name": "Parse preview", "method": "POST", "path": "/?action=parse", "body": {"admin_token": "Mark2015N", "text": "🇪🇺 17 Pro 512 Blue - 121900 ✅📸"}, "expectedStatus": 200, "bodyMatcher": "partial"}
+  ]
+}
