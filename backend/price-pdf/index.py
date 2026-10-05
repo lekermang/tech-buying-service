@@ -44,7 +44,8 @@ CATEGORY_ORDER = [
     "iPhone", "MacBook", "iPad", "Apple Watch", "AirPods",
     "Samsung", "Xiaomi", "Honor",
     "Наушники", "Планшеты", "Умные часы", "Игровые консоли",
-    "Аксессуары Apple", "Аксессуары", "Прочее",
+    "Аксессуары Apple", "Аксессуары", "Realme / OnePlus / Nothing", "Vivo / Tecno / Infinix",
+    "Dyson", "Garmin", "Камеры и экшн-камеры", "Колонки и аудио", "Гаджеты", "Прочее",
 ]
 
 CAT_LABEL = {
@@ -263,7 +264,7 @@ def fetch_products() -> list:
         cached = _cache_load()
         if not cached:
             raise
-        return [p for p in cached if p.get("availability")]
+        return cached
 
 
 def load_cdn_photos() -> dict:
@@ -284,27 +285,42 @@ def load_cdn_photos() -> dict:
 
 def group_products(products: list, markup: int, cdn_photos: dict) -> dict:
     groups: dict = {}
+    name_regions: dict = {}
+    for p in products:
+        nm = (p.get("name") or "").strip()
+        name_regions.setdefault(nm, set()).add(p.get("country") or "")
     for p in products:
         raw_name  = (p.get("name") or "").strip()
         raw_price = p.get("price")
         region    = p.get("country") or ""
-        category  = detect_category(raw_name)
+        category  = p.get("category") or detect_category(raw_name)
 
         price_str = ""
+        price_num = None
         has_price = raw_price is not None
         if has_price:
-            final = int(raw_price) + markup
-            # Форматируем: пробел как разделитель тысяч
-            price_str = f"{final:,}".replace(",", " ") + " руб."
+            price_num = int(raw_price) + markup
+            price_str = f"{price_num:,}".replace(",", " ") + " руб."
 
         sim_type = detect_sim(raw_name, region)
+        photo = cdn_photos.get(_sku_key(raw_name)) or None
+        if not photo:
+            tg = p.get("photo_tg")
+            photo = tg if tg and "cdn.poehali.dev" in tg else None
+
+        display = raw_name
+        if len(name_regions.get(raw_name, ())) > 1 and region:
+            display = f"{raw_name} ({region})"
 
         groups.setdefault(category, []).append({
-            "name":      raw_name,
+            "name":      display,
             "price":     price_str,
+            "price_num": price_num,
             "has_price": has_price,
+            "available": bool(p.get("availability", True)),
             "region":    region,
             "sim":       sim_type,
+            "photo":     photo,
         })
 
     ordered = {}

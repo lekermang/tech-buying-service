@@ -19,7 +19,20 @@ BOT_PASS = '838B355C'
 CORS = {'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Token'}
 
 FLAGS = {'🇪🇺': 'EU', '🇺🇸': 'US', '🇷🇺': 'RU', '🇨🇳': 'CN', '🇦🇪': 'AE', '🇭🇰': 'HK', '🇯🇵': 'JP'}
-LINE_RE = re.compile(r'^\s*(?P<flag>[\U0001F1E6-\U0001F1FF]{2})?\s*(?P<name>.+?)\s+[-–—:]\s*(?P<price>\d[\d\s.]{2,9})\b(?P<tail>.*)$')
+LINE_RE = re.compile(
+    r'^\s*(?P<flag>[\U0001F1E6-\U0001F1FF]{2})?\s*(?P<name>.+?)\s+[-–—]\s*'
+    r'(?:(?P<price>\d[\d\s.]{2,9})\b|(?P<ask>Цену\s+уточняйте))(?P<tail>.*)$')
+
+HEADER_CATS = [
+    ('iphone', 'iPhone'), ('xiaomi', 'Xiaomi'), ('poco', 'Xiaomi'),
+    ('realme', 'Realme / OnePlus / Nothing'), ('vivo', 'Vivo / Tecno / Infinix'),
+    ('honor', 'Honor'), ('samsung', 'Samsung'), ('dyson', 'Dyson'), ('garmin', 'Garmin'),
+    ('sony', 'Игровые консоли'), ('gopro', 'Камеры и экшн-камеры'), ('ray-ban', 'Гаджеты'),
+    ('яндекс', 'Колонки и аудио'), ('airpods', 'AirPods'), ('ipad', 'iPad'),
+    ('macbook', 'MacBook'), ('watch', 'Apple Watch'),
+]
+APPLE_ACC = ('airtag', 'magsafe', 'power adapter', 'кабель', 'стекло', 'чехол', 'pencil',
+             'magic keyboard', 'magic mouse', 'macbook air m', 'iphone')
 
 
 def resp(code, data):
@@ -30,99 +43,166 @@ def db():
     return psycopg2.connect(os.environ['DATABASE_URL'])
 
 
+def header_category(line):
+    low = line.lower()
+    if not low.strip().startswith('категория'):
+        return None
+    for key, cat in HEADER_CATS:
+        if key in low:
+            return cat
+    return None
+
+
+def refine_category(name, cat):
+    n = name.lower()
+    if n.startswith('earpods'):
+        return 'Наушники'
+    if n.startswith('airpods'):
+        return 'AirPods'
+    if cat in ('AirPods', 'iPad', 'MacBook') and any(k in n for k in APPLE_ACC) and not n.startswith('ipad'):
+        return 'Аксессуары Apple'
+    return cat
+
+
 def parse_text(text):
-    items = []
+    items, cat = [], None
     for raw in (text or '').splitlines():
+        hc = header_category(raw)
+        if hc:
+            cat = hc
+            continue
         m = LINE_RE.match(raw)
         if not m:
             continue
         name = re.sub(r'\s+', ' ', m.group('name')).strip()
-        name = re.sub(r'(?i)\b(\d+)\s?tb\b', lambda x: str(int(x.group(1)) * 1024), name)
-        name = re.sub(r'(?i)\b(\d+)\s?gb\b', r'\1', name)
-        price = int(re.sub(r'\D', '', m.group('price')))
-        if price < 500:
+        if len(name) < 2 or name.lower() in ('4 pack',):
             continue
-        tail = m.group('tail')
+        price = None
+        if m.group('price'):
+            price = int(re.sub(r'\D', '', m.group('price')))
+            if price < 500:
+                continue
+        tail = m.group('tail') or ''
         avail = 'on_order' if '🚗' in tail else 'in_stock'
         items.append({
             'name': name, 'price': price, 'availability': avail,
             'region': FLAGS.get(m.group('flag') or '', None),
+            'category': refine_category(name, cat),
             'sku': 'smartbery_' + name.replace(' ', '_').lower(),
         })
     return items
 
 
-def save_to_cache(items):
-    """Кладёт позиции в запасной прайс, из которого /apple берёт данные, когда поставщик недоступен."""
+def _key(name, region):
+    return f'{name}|{region or ""}'
+
+
+def set_setting_raw(key, value, desc=''):
     conn = db(); cur = conn.cursor()
     try:
-        cur.execute(f"SELECT value FROM {SCHEMA}.settings WHERE key=%s", (CACHE_KEY,))
-        row = cur.fetchone()
-        try:
-            cache = json.loads(row[0]) if row and row[0] else []
-        except Exception:
-            cache = []
-        if not cache:
-            cur.execute(
-                f"SELECT model, storage, color, region, availability, price, photo_url "
-                f"FROM {SCHEMA}.catalog WHERE sku LIKE 'smartbery_%%' AND is_active = true AND price IS NOT NULL")
-            for model, storage, color, region, avail, price, photo in cur.fetchall():
-                nm = " ".join(x for x in [(model or '').replace('iPhone ', '', 1), (storage or '').replace('GB', ''), color or ''] if x).strip()
-                cache.append({'availability': avail == 'in_stock', 'country': region, 'name': nm,
-                              'photo_tg': photo if photo and 't.me' in photo else None, 'price': price})
-        by_name = {c.get('name'): c for c in cache if isinstance(c, dict)}
-        for it in items:
-            old = by_name.get(it['name'], {})
-            by_name[it['name']] = {
-                'availability': it['availability'] == 'in_stock',
-                'country': it['region'],
-                'name': it['name'],
-                'photo_tg': old.get('photo_tg'),
-                'price': it['price'],
-            }
-        payload = json.dumps(list(by_name.values()), ensure_ascii=False).replace("'", "''")
         cur.execute(
-            f"INSERT INTO {SCHEMA}.settings (key, value, description, updated_at) VALUES "
-            f"('{CACHE_KEY}', '{payload}', 'Запасной прайс для /apple', NOW()) "
-            f"ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()")
+            f"INSERT INTO {SCHEMA}.settings (key, value, description, updated_at) VALUES (%s, %s, %s, NOW()) "
+            f"ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()", (key, value, desc))
         conn.commit()
-        return len(by_name)
     finally:
         cur.close(); conn.close()
 
 
-def apply_items(items):
+def save_to_cache(items, replace=False):
+    """Запасной прайс для /apple. replace=True — полностью заменить (свежий полный прайс), иначе слияние."""
+    cache = []
+    if not replace:
+        conn = db(); cur = conn.cursor()
+        try:
+            cur.execute(f"SELECT value FROM {SCHEMA}.settings WHERE key=%s", (CACHE_KEY,))
+            row = cur.fetchone()
+            try:
+                cache = json.loads(row[0]) if row and row[0] else []
+            except Exception:
+                cache = []
+            if not cache:
+                cur.execute(
+                    f"SELECT model, storage, color, region, availability, price, photo_url "
+                    f"FROM {SCHEMA}.catalog WHERE sku LIKE 'smartbery_%%' AND is_active = true AND price IS NOT NULL")
+                for model, storage, color, region, avail, price, photo in cur.fetchall():
+                    nm = " ".join(x for x in [(model or '').replace('iPhone ', '', 1), (storage or '').replace('GB', ''), color or ''] if x).strip()
+                    cache.append({'availability': avail == 'in_stock', 'country': region, 'name': nm,
+                                  'photo_tg': None, 'price': price})
+        finally:
+            cur.close(); conn.close()
+    by_key = {_key(c.get('name'), c.get('country')): c for c in cache if isinstance(c, dict)}
+    for it in items:
+        k = _key(it['name'], it['region'])
+        old = by_key.get(k, {})
+        by_key[k] = {
+            'availability': it['availability'] == 'in_stock',
+            'country': it['region'],
+            'name': it['name'],
+            'photo_tg': old.get('photo_tg'),
+            'price': it['price'],
+            'category': it.get('category') or old.get('category'),
+        }
+    set_setting_raw(CACHE_KEY, json.dumps(list(by_key.values()), ensure_ascii=False), 'Запасной прайс для /apple')
+    return len(by_key)
+
+
+def _storage(parts):
+    for i, p in enumerate(parts):
+        if p.isdigit() and int(p) in (64, 128, 256, 512, 1024, 2048):
+            return i, f'{p}GB'
+        if re.fullmatch(r'(?i)\d+tb', p):
+            return i, p.upper()
+    return None, None
+
+
+def apply_items(items, replace=False):
+    """Пакетное обновление каталога (один запрос на всё), затем запасной прайс для /apple."""
+    from psycopg2.extras import execute_values
+    priced = [i for i in items if i['price'] is not None]
+    priced.sort(key=lambda i: i['region'] == 'EU')
+    by_sku = {}
+    for it in priced:
+        by_sku[it['sku']] = it
+    rows = [(it['sku'], it['price'], it['price'] + MARKUP, it['availability'], it['region'])
+            for it in by_sku.values()]
+    updated_skus = set()
+    inserted, unknown = 0, []
     conn = db(); cur = conn.cursor()
-    updated, inserted, unknown = 0, 0, []
     try:
-        for it in items:
-            retail = it['price'] + MARKUP
-            cur.execute(
-                f"UPDATE {SCHEMA}.catalog SET price=%s, retail_price=%s, availability=%s, "
-                f"region=COALESCE(%s, region), is_active=true, updated_at=NOW() WHERE sku=%s",
-                (it['price'], retail, it['availability'], it['region'], it['sku']))
-            if cur.rowcount:
-                updated += 1
+        if rows:
+            res = execute_values(
+                cur,
+                f"UPDATE {SCHEMA}.catalog c SET price=v.price, retail_price=v.retail, availability=v.avail, "
+                f"region=COALESCE(v.region, c.region), is_active=true, updated_at=NOW() "
+                f"FROM (VALUES %s) AS v(sku, price, retail, avail, region) WHERE c.sku=v.sku RETURNING c.sku",
+                rows, template="(%s, %s::int, %s::int, %s, %s)", fetch=True)
+            updated_skus = {r[0] for r in res}
+        new_rows = []
+        for it in by_sku.values():
+            if it['sku'] in updated_skus:
                 continue
             parts = it['name'].split()
-            if parts and (re.fullmatch(r'\d+e?', parts[0]) or parts[0] in ('Air', 'SE2', 'SE3')):
-                st = next((p for p in parts if p.isdigit() and int(p) in (64, 128, 256, 512, 1024, 2048)), None)
-                idx = parts.index(st) if st else len(parts) - 1
-                model = 'iPhone ' + ' '.join(parts[:idx] if st else parts[:-1])
-                color = ' '.join(parts[idx + 1:]) if st else parts[-1]
-                cur.execute(
-                    f"INSERT INTO {SCHEMA}.catalog (category, brand, model, color, storage, region, availability, "
-                    f"price, retail_price, sku, is_active) VALUES ('iPhone','Apple',%s,%s,%s,%s,%s,%s,%s,%s,true)",
-                    (model, color or None, f'{st}GB' if st else None, it['region'], it['availability'],
-                     it['price'], retail, it['sku']))
-                inserted += 1
+            if it.get('category') == 'iPhone' and parts:
+                idx, st = _storage(parts)
+                if idx is None:
+                    unknown.append(it['name']); continue
+                new_rows.append(('iPhone', 'Apple', 'iPhone ' + ' '.join(parts[:idx]), ' '.join(parts[idx + 1:]) or None,
+                                 st, it['region'], it['availability'], it['price'], it['price'] + MARKUP, it['sku']))
             else:
                 unknown.append(it['name'])
+        if new_rows:
+            execute_values(
+                cur,
+                f"INSERT INTO {SCHEMA}.catalog (category, brand, model, color, storage, region, availability, "
+                f"price, retail_price, sku, is_active) VALUES %s",
+                new_rows, template="(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,true)")
+            inserted = len(new_rows)
         conn.commit()
     finally:
         cur.close(); conn.close()
-    cached = save_to_cache(items)
-    return {'updated': updated, 'inserted': inserted, 'unknown': unknown, 'price_list_size': cached}
+    cached = save_to_cache(items, replace=replace)
+    return {'updated': len(updated_skus), 'inserted': inserted, 'unknown_count': len(unknown),
+            'unknown': unknown[:15], 'price_list_size': cached}
 
 
 def get_setting(key):
@@ -136,15 +216,7 @@ def get_setting(key):
 
 
 def set_setting(key, value, desc=''):
-    conn = db(); cur = conn.cursor()
-    try:
-        cur.execute(
-            f"INSERT INTO {SCHEMA}.settings (key, value, description, updated_at) VALUES (%s, %s, %s, NOW()) "
-            f"ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()",
-            (key, value, desc))
-        conn.commit()
-    finally:
-        cur.close(); conn.close()
+    set_setting_raw(key, value, desc)
 
 
 def note_update(chat_id, ctype, title, uid, username, text):
@@ -222,9 +294,11 @@ def handler(event, context):
         if not is_admin:
             return resp(403, {'error': 'Forbidden'})
         items = parse_text(body.get('text', ''))
-        result = {'items': items}
-        if body.get('apply'):
-            result.update(apply_items(items))
+        result = {'count': len(items), 'with_price': sum(1 for i in items if i['price'] is not None)}
+        if not body.get('apply'):
+            result['items'] = items[:40]
+        else:
+            result.update(apply_items(items, replace=bool(body.get('replace'))))
         return resp(200, result)
 
     # Webhook от Telegram (только с верным ключом в адресе)
