@@ -195,15 +195,55 @@ def setup_fonts():
 
 
 # ── Данные ────────────────────────────────────────────────────────────────────
+CACHE_KEY = "smartbery_products_cache"
+
+
+def _cache_save(data: list) -> None:
+    try:
+        conn = psycopg2.connect(os.environ["DATABASE_URL"])
+        cur = conn.cursor()
+        payload = json.dumps(data, ensure_ascii=False).replace("'", "''")
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.settings (key, value, description, updated_at) "
+            f"VALUES ('{CACHE_KEY}', '{payload}', 'Последний удачный прайс поставщика', NOW()) "
+            f"ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()"
+        )
+        conn.commit(); cur.close(); conn.close()
+    except Exception as e:
+        print(f"[price-pdf][cache_save] {e}")
+
+
+def _cache_load() -> list:
+    try:
+        conn = psycopg2.connect(os.environ["DATABASE_URL"])
+        cur = conn.cursor()
+        cur.execute(f"SELECT value FROM {SCHEMA}.settings WHERE key = '{CACHE_KEY}'")
+        row = cur.fetchone()
+        cur.close(); conn.close()
+        return json.loads(row[0]) if row and row[0] else []
+    except Exception as e:
+        print(f"[price-pdf][cache_load] {e}")
+        return []
+
+
 def fetch_products() -> list:
     token = os.environ.get("SMARTBERY_TOKEN", "")
     req = urllib.request.Request(
         SMARTBERY_URL,
         headers={"Authorization": f"Bearer {token}"}
     )
-    with urllib.request.urlopen(req, timeout=25) as r:
-        data = json.loads(r.read())
-    return [p for p in data if p.get("availability")]
+    try:
+        with urllib.request.urlopen(req, timeout=12) as r:
+            data = json.loads(r.read())
+        if isinstance(data, list) and data:
+            _cache_save(data)
+        return [p for p in data if p.get("availability")]
+    except Exception as e:
+        print(f"[price-pdf][fetch] поставщик недоступен: {e}; беру сохранённый прайс")
+        cached = _cache_load()
+        if not cached:
+            raise
+        return [p for p in cached if p.get("availability")]
 
 
 def load_cdn_photos() -> dict:

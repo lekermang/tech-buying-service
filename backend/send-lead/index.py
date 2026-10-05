@@ -241,21 +241,21 @@ def send_tg_text(token: str, chat_id: str, text: str, reply_markup: dict = None)
         payload = {'chat_id': chat_id, 'text': text, 'parse_mode': 'Markdown'}
         if reply_markup:
             payload['reply_markup'] = json.dumps(reply_markup)
-        r = requests.post(url, json=payload, timeout=10)
+        r = requests.post(url, json=payload, timeout=5)
         if r.status_code == 200:
             try: return r.json().get('result', {}).get('message_id')
             except Exception: return None
-        r2 = requests.post(url, json={'chat_id': chat_id, 'text': text, 'parse_mode': 'Markdown'}, timeout=10)
+        r2 = requests.post(url, json={'chat_id': chat_id, 'text': text, 'parse_mode': 'Markdown'}, timeout=5)
         if r2.status_code == 200:
             try: return r2.json().get('result', {}).get('message_id')
             except Exception: return None
-        r3 = requests.post(url, json={'chat_id': chat_id, 'text': text}, timeout=10)
+        r3 = requests.post(url, json={'chat_id': chat_id, 'text': text}, timeout=5)
         if r3.status_code == 200:
             try: return r3.json().get('result', {}).get('message_id')
             except Exception: return None
     except Exception:
         try:
-            requests.post(url, json={'chat_id': chat_id, 'text': text}, timeout=10)
+            requests.post(url, json={'chat_id': chat_id, 'text': text}, timeout=5)
         except Exception:
             pass
     return None
@@ -548,35 +548,7 @@ def handler(event: dict, context) -> dict:
         except Exception as up_err:
             print(f'[S3] error: {up_err}')
 
-    # ── 2. Telegram — текст + фото через CDN (не base64, быстро!) ──
-    msg_ids = {}
-    try:
-        # Добавляем CDN-ссылки на фото прямо в текст сообщения
-        tg_caption = caption
-        if cdn_photo_urls:
-            tg_caption += '\n\n📸 ' + ' | '.join(f'[фото {i+1}]({u})' for i, u in enumerate(cdn_photo_urls[:5]))
-
-        for cid in recipients:
-            mid = send_tg_text(token, cid, tg_caption, kb)
-            if mid:
-                msg_ids[str(cid)] = mid
-        print(f'[TG] sent to {len(msg_ids)} chats')
-    except Exception as tg_err:
-        print(f'[TG] error: {tg_err}')
-
-    # ── 3. Сохраняем message_ids ──
-    if lead_id and msg_ids:
-        try:
-            conn0 = psycopg2.connect(os.environ['DATABASE_URL'])
-            cur0 = conn0.cursor()
-            cur0.execute(
-                f"UPDATE {SCHEMA}.leads_tracking SET tg_message_ids='{json.dumps(msg_ids).replace(chr(39), chr(39)+chr(39))}'::jsonb, updated_at=NOW() WHERE id={lead_id}"
-            )
-            conn0.commit(); cur0.close(); conn0.close()
-        except Exception:
-            pass
-
-    # ── 4. MAX сотрудникам (самое важное!) ──
+    # ── 1.5. MAX сотрудникам — ПЕРВЫМ, до Telegram (самое важное!) ──
     if lead_id:
         try:
             staff_text = (
@@ -597,11 +569,42 @@ def handler(event: dict, context) -> dict:
             r_max = requests.post(
                 'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c?action=staff_send',
                 json=staff_payload,
-                timeout=12,
+                timeout=8,
             )
             print(f'[MAX-STAFF] status={r_max.status_code} body={r_max.text[:300]}')
         except Exception as e:
             print(f'[MAX-STAFF] error: {e}')
+
+    # ── 2. Telegram — текст + фото через CDN (не base64, быстро!) ──
+    msg_ids = {}
+    try:
+        # Добавляем CDN-ссылки на фото прямо в текст сообщения
+        tg_caption = caption
+        if cdn_photo_urls:
+            tg_caption += '\n\n📸 ' + ' | '.join(f'[фото {i+1}]({u})' for i, u in enumerate(cdn_photo_urls[:5]))
+
+        from concurrent.futures import ThreadPoolExecutor
+        def _one(cid):
+            return cid, send_tg_text(token, cid, tg_caption, kb)
+        with ThreadPoolExecutor(max_workers=max(1, min(8, len(recipients)))) as ex:
+            for cid, mid in ex.map(_one, recipients):
+                if mid:
+                    msg_ids[str(cid)] = mid
+        print(f'[TG] sent to {len(msg_ids)} chats')
+    except Exception as tg_err:
+        print(f'[TG] error: {tg_err}')
+
+    # ── 3. Сохраняем message_ids ──
+    if lead_id and msg_ids:
+        try:
+            conn0 = psycopg2.connect(os.environ['DATABASE_URL'])
+            cur0 = conn0.cursor()
+            cur0.execute(
+                f"UPDATE {SCHEMA}.leads_tracking SET tg_message_ids='{json.dumps(msg_ids).replace(chr(39), chr(39)+chr(39))}'::jsonb, updated_at=NOW() WHERE id={lead_id}"
+            )
+            conn0.commit(); cur0.close(); conn0.close()
+        except Exception:
+            pass
 
     # ── 5. SMS клиенту ──
     if lead_id:
