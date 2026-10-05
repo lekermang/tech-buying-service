@@ -265,23 +265,48 @@ def _fill_missing_prices(data: list) -> list:
     return out
 
 
+def _cache_age() -> float:
+    """Сколько секунд назад обновлялся сохранённый прайс (бот или поставщик)."""
+    try:
+        conn = psycopg2.connect(os.environ["DATABASE_URL"])
+        cur = conn.cursor()
+        cur.execute(f"SELECT EXTRACT(EPOCH FROM (NOW() - updated_at)) FROM {SCHEMA}.settings WHERE key = '{CACHE_KEY}'")
+        row = cur.fetchone()
+        cur.close(); conn.close()
+        return float(row[0]) if row and row[0] is not None else 1e12
+    except Exception as e:
+        print(f"[price-pdf][cache_age] {e}")
+        return 1e12
+
+
+def _merge(cached: list, fresh: list) -> list:
+    by_key = {((p.get("name") or "").strip(), p.get("country") or ""): p for p in cached}
+    for p in fresh:
+        by_key[((p.get("name") or "").strip(), p.get("country") or "")] = p
+    return list(by_key.values())
+
+
 def fetch_products() -> list:
+    """Свежий сохранённый прайс (бот/поставщик, до 15 мин) отдаём сразу; иначе пробуем поставщика 3 сек."""
+    cached = _cache_load()
+    if cached and _cache_age() < 900:
+        return cached
     token = os.environ.get("SMARTBERY_TOKEN", "")
     req = urllib.request.Request(
         SMARTBERY_URL,
         headers={"Authorization": f"Bearer {token}"}
     )
     try:
-        with urllib.request.urlopen(req, timeout=6) as r:
+        with urllib.request.urlopen(req, timeout=3) as r:
             data = json.loads(r.read())
         if not isinstance(data, list) or not data:
             raise ValueError("пустой ответ поставщика")
         data = _fill_missing_prices(data)
-        _cache_save(data)
-        return data
+        merged = _merge(cached, data) if cached else data
+        _cache_save(merged)
+        return merged
     except Exception as e:
         print(f"[price-pdf][fetch] поставщик недоступен: {e}; беру сохранённый прайс")
-        cached = _cache_load()
         if not cached:
             raise
         return cached

@@ -900,7 +900,7 @@ function ClarifyModal({ item, onClose }: { item: PriceItem & { cat?: string }; o
 function SkeletonLoader() {
   const rows = [8, 12, 7, 10, 6, 9, 5];
   return (
-    <div className="max-w-5xl mx-auto px-3 py-4 space-y-6">
+    <div className="max-w-6xl mx-auto px-3 py-4 space-y-6">
       {/* Прогресс-полоска */}
       <div className="h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,215,0,0.1)" }}>
         <div className="h-full rounded-full animate-progress-bar"
@@ -1165,6 +1165,7 @@ export default function ApplePrice() {
   const [printPdfLoading, setPrintPdfLoading] = useState(false);
   const [tomorrowOpen, setTomorrowOpen] = useState(false);
   const [search, setSearch]             = useState("");
+  const [onlyStock, setOnlyStock]     = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const downloadPdf = useCallback(async (printMode: boolean) => {
@@ -1323,24 +1324,16 @@ export default function ApplePrice() {
         .animate-progress-bar {
           animation: progressBar 1.6s ease-in-out infinite;
         }
-        .order-btn {
-          opacity: 0;
-          transform: translateX(6px);
-          transition: opacity 0.18s, transform 0.18s;
-        }
-        .price-row:hover .order-btn {
-          opacity: 1;
-          transform: translateX(0);
-        }
-        @media (max-width: 640px) {
-          .order-btn { opacity: 1; transform: none; }
-        }
+        .price-row { transition: background 0.15s, border-color 0.15s; }
+        .price-row:hover { background: rgba(255,255,255,0.06) !important; border-color: rgba(255,215,0,0.25) !important; }
+        .chips-scroll { scrollbar-width: none; -ms-overflow-style: none; }
+        .chips-scroll::-webkit-scrollbar { display: none; }
+        .cat-section { scroll-margin-top: 120px; }
       `}</style>
 
       {/* ── HEADER ── */}
-      <div className="sticky top-0 z-10"
-        style={{ background: "linear-gradient(135deg,#111,#0d0d0d)", borderBottom: "2px solid #FFD700" }}>
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+      <div style={{ background: "linear-gradient(135deg,#111,#0d0d0d)" }}>
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
               style={{ background: "linear-gradient(135deg,#FFD700,#d97706)" }}>
@@ -1411,9 +1404,11 @@ export default function ApplePrice() {
             </button>
           </div>
         </div>
-        {/* Прогресс-полоска под шапкой при обновлении */}
+      </div>
+      <div className="sticky top-0 z-10"
+        style={{ background: "rgba(13,13,13,0.97)", backdropFilter: "blur(8px)", borderBottom: "2px solid #FFD700" }}>
         {/* Строка поиска */}
-        <div className="max-w-5xl mx-auto px-4 pb-2.5">
+        <div className="max-w-6xl mx-auto px-4 pt-2.5 pb-2">
           <div className="relative">
             <Icon name="Search" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
             <input
@@ -1436,6 +1431,36 @@ export default function ApplePrice() {
           </div>
         </div>
 
+        {data && (() => {
+          const stockOk = (it: PriceItem) => !!it.price_num && it.available !== false;
+          const cats = Object.entries(data.groups)
+            .map(([cat, items]) => [cat, onlyStock ? items.filter(stockOk).length : items.length] as [string, number])
+            .filter(([, n]) => n > 0);
+          return (
+            <div className="max-w-6xl mx-auto px-4 pb-2 flex items-center gap-2">
+              <button onClick={() => setOnlyStock(v => !v)}
+                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-bold transition-all active:scale-95"
+                style={onlyStock
+                  ? { background: "rgba(74,222,128,0.18)", border: "1px solid rgba(74,222,128,0.6)", color: "#4ade80" }
+                  : { background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.7)" }}>
+                <Icon name={onlyStock ? "CheckCircle2" : "Circle"} size={13} />
+                В наличии
+              </button>
+              <div className="chips-scroll flex items-center gap-1.5 overflow-x-auto flex-1">
+                {cats.map(([cat, n]) => (
+                  <button key={cat}
+                    onClick={() => document.getElementById(`cat-${cat}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                    className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full text-[12px] font-semibold whitespace-nowrap transition-all active:scale-95"
+                    style={{ background: `${CAT_COLORS[cat] || "#FFD700"}14`, border: `1px solid ${CAT_COLORS[cat] || "#FFD700"}40`, color: CAT_COLORS[cat] || "#FFD700" }}>
+                    <span>{CAT_EMOJI[cat] || "📦"}</span>{cat}
+                    <span style={{ opacity: 0.55, fontSize: 10 }}>{n}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         {loading && (
           <div className="h-[3px] overflow-hidden" style={{ background: "rgba(255,215,0,0.1)" }}>
             <div className="h-full animate-progress-bar"
@@ -1451,7 +1476,7 @@ export default function ApplePrice() {
 
         {/* Ошибка */}
         {error && (
-          <div className="max-w-5xl mx-auto px-4 pt-12">
+          <div className="max-w-6xl mx-auto px-4 pt-12">
             <div className="flex items-center gap-3 p-4 rounded-2xl"
               style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}>
               <Icon name="AlertCircle" size={18} className="text-red-400 shrink-0" />
@@ -1465,7 +1490,7 @@ export default function ApplePrice() {
 
         {/* Данные */}
         {data && (
-          <div className="max-w-5xl mx-auto px-3 py-4">
+          <div className="max-w-6xl mx-auto px-3 py-4">
             {/* Заголовок даты */}
             <div className="flex items-center justify-between flex-wrap gap-2 px-1 mb-4">
               <div className="text-white/25 text-[12px]">{todayStr()}</div>
@@ -1479,22 +1504,23 @@ export default function ApplePrice() {
 
               // Фильтрация по поиску
               const filteredGroups = Object.entries(data.groups).reduce<[string, PriceItem[]][]>((acc, [cat, items]) => {
-                if (!q) { acc.push([cat, items]); return acc; }
                 const filtered = items.filter(it =>
-                  it.name.toLowerCase().includes(q) ||
-                  cat.toLowerCase().includes(q) ||
-                  (it.region || "").toLowerCase().includes(q)
+                  (!onlyStock || (!!it.price_num && it.available !== false)) &&
+                  (!q ||
+                    it.name.toLowerCase().includes(q) ||
+                    cat.toLowerCase().includes(q) ||
+                    (it.region || "").toLowerCase().includes(q))
                 );
                 if (filtered.length) acc.push([cat, filtered]);
                 return acc;
               }, []);
 
-              if (q && filteredGroups.length === 0) {
+              if ((q || onlyStock) && filteredGroups.length === 0) {
                 return (
                   <div className="text-center py-16 text-white/30">
                     <div className="text-4xl mb-3">🔍</div>
                     <div className="font-oswald text-[15px] uppercase tracking-wide">Ничего не найдено</div>
-                    <div className="text-[12px] mt-1">Попробуйте другой запрос</div>
+                    <div className="text-[12px] mt-1">Попробуйте другой запрос или уберите фильтр «В наличии»</div>
                   </div>
                 );
               }
@@ -1535,7 +1561,7 @@ export default function ApplePrice() {
                     </div>
                     {/* Инфо */}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: inStock ? "#e5e7eb" : "#9ca3af", lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: inStock ? "#e5e7eb" : "#9ca3af", lineHeight: 1.3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                         {item.name}
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2, flexWrap: "wrap" }}>
@@ -1591,7 +1617,7 @@ export default function ApplePrice() {
                     <span style={{ fontSize: 10, fontWeight: 800, color: labelColor, textTransform: "uppercase", letterSpacing: 1 }}>{label}</span>
                     <span style={{ fontSize: 10, color: "rgba(255,255,255,0.2)" }}>({items.length})</span>
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 6 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 8 }}>
                     {items.map((item, i) => renderCard(item, i, accentColor, cat))}
                   </div>
                 </div>
@@ -1606,7 +1632,10 @@ export default function ApplePrice() {
                     const sorted = [...items].sort((a, b) => {
                       const sa = a.sim ?? detectSim(a.name, a.region);
                       const sb = b.sim ?? detectSim(b.name, b.region);
-                      return simOrder(sa) - simOrder(sb);
+                      const d = simOrder(sa) - simOrder(sb);
+                      if (d !== 0) return d;
+                      const av = (it: PriceItem) => (it.price_num && it.available !== false ? 0 : 1);
+                      return av(a) - av(b);
                     });
 
                     // Группируем по SIM
@@ -1629,7 +1658,7 @@ export default function ApplePrice() {
                     };
 
                     return (
-                      <div key={cat}>
+                      <div key={cat} id={`cat-${cat}`} className="cat-section">
                         {/* Заголовок категории */}
                         <div className="flex items-center gap-2 px-3 py-2.5 mb-3 rounded-xl"
                           style={{ background: `${accentColor}12`, borderLeft: `3px solid ${accentColor}` }}>
@@ -1644,7 +1673,7 @@ export default function ApplePrice() {
                             return renderSimGroup(meta.label, meta.color, meta.bg, bySim[simKey], accentColor, cat);
                           })
                         ) : (
-                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 6 }}>
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 8 }}>
                             {sorted.map((item, i) => renderCard(item, i, accentColor, cat))}
                           </div>
                         )}
