@@ -247,6 +247,24 @@ def _cache_load() -> list:
         return []
 
 
+def _fill_missing_prices(data: list) -> list:
+    """Если у поставщика цена пустая — берём последнюю известную из сохранённого прайса."""
+    if all(p.get("price") is not None for p in data):
+        return data
+    old = {}
+    for p in _cache_load():
+        if p.get("price") is not None:
+            old[((p.get("name") or "").strip(), p.get("country") or "")] = p["price"]
+    out = []
+    for p in data:
+        if p.get("price") is None:
+            k = ((p.get("name") or "").strip(), p.get("country") or "")
+            if k in old:
+                p = {**p, "price": old[k]}
+        out.append(p)
+    return out
+
+
 def fetch_products() -> list:
     token = os.environ.get("SMARTBERY_TOKEN", "")
     req = urllib.request.Request(
@@ -256,9 +274,11 @@ def fetch_products() -> list:
     try:
         with urllib.request.urlopen(req, timeout=6) as r:
             data = json.loads(r.read())
-        if isinstance(data, list) and data:
-            _cache_save(data)
-        return [p for p in data if p.get("availability")]
+        if not isinstance(data, list) or not data:
+            raise ValueError("пустой ответ поставщика")
+        data = _fill_missing_prices(data)
+        _cache_save(data)
+        return data
     except Exception as e:
         print(f"[price-pdf][fetch] поставщик недоступен: {e}; беру сохранённый прайс")
         cached = _cache_load()
