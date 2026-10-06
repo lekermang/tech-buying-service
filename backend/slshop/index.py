@@ -2146,7 +2146,6 @@ def create_item(body, employee):
             _notify_buy(title, unit_buy_price, qty, (employee.get('full_name') if employee else None) or 'Сотрудник')
     except Exception as ne:
         print(f'[slshop][create_item] notify error: {ne}')
-    auto_timesheet(employee)
     return _ok({'id': item_id, 'sku': sku})
 
 
@@ -2694,7 +2693,6 @@ def sell_item(body, employee):
     except Exception as ne:
         print(f'[slshop][sell_item] notify error: {ne}')
 
-    auto_timesheet(employee)
     return _ok({'op_id': op_id})
 
 
@@ -3118,6 +3116,22 @@ def import_items(body, employee):
 
 # ============ Router ============
 def handler(event: dict, context) -> dict:
+    """Обёртка: любая успешная операция записи (POST) под учёткой сотрудника
+    автоматически проставляет ему смену на сегодня (auto_timesheet)."""
+    result = _handler(event, context)
+    try:
+        if event.get('httpMethod') == 'POST' and int(result.get('statusCode', 500)) < 400:
+            hdrs = {k.lower(): v for k, v in (event.get('headers') or {}).items()}
+            tok = (hdrs.get('x-employee-token') or '').strip()
+            emp = get_employee_by_token(tok) if tok else None
+            if emp:
+                auto_timesheet(emp)
+    except Exception as e:
+        print(f'[slshop][handler] auto_timesheet error: {e}')
+    return result
+
+
+def _handler(event: dict, context) -> dict:
     """Единая точка входа SmartLombard (комиссионка): товары, операции, клиенты, статистика, ценники, импорт/экспорт"""
     if event.get('httpMethod') == 'OPTIONS':
         return {'statusCode': 200, 'headers': HEADERS, 'body': ''}
