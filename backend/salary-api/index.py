@@ -11,7 +11,7 @@ Returns: HTTP-ответ с JSON
 import json
 import os
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 import psycopg2
 import psycopg2.extras
@@ -122,6 +122,12 @@ def calc_slshop_purchase_profit_for_day(cur, employee_name, day):
     )
     v = _row_value(cur.fetchone(), 'profit', 0)
     return int(v or 0)
+
+
+def pct_round(profit, percent):
+    """Процент от прибыли с математическим округлением (half up), в целых рублях."""
+    v = Decimal(str(profit or 0)) * Decimal(str(percent)) / Decimal(100)
+    return int(v.quantize(Decimal('1'), rounding=ROUND_HALF_UP))
 
 
 def ensure_shift(cur, employee_id, day, status='closed'):
@@ -414,7 +420,7 @@ def handler(event, context):
             sales_list = []
             for s in sales:
                 profit = int(s['profit'] or 0)
-                bonus_from_sale = round(profit * bonus_pct / 100)
+                bonus_from_sale = pct_round(profit, bonus_pct)
                 sales_list.append({
                     'id': s['id'],
                     'time': s['created_at'].strftime('%H:%M') if s['created_at'] else '',
@@ -460,7 +466,7 @@ def handler(event, context):
             purchase_list = []
             for p in purchases:
                 profit = int(p['profit'] or 0)
-                bonus_from_purchase = round(profit * bonus_pct_purchase / 100)
+                bonus_from_purchase = pct_round(profit, bonus_pct_purchase)
                 purchase_list.append({
                     'id': p['id'],
                     'time': p['created_at'].strftime('%H:%M') if p['created_at'] else '',
@@ -936,9 +942,9 @@ def handler(event, context):
 
             if auto_bonus:
                 personal_profit = calc_slshop_profit_for_day(cur, emp_token, emp_name, day)
-                bonus_amount = int(Decimal(personal_profit) * percent / Decimal(100))
+                bonus_amount = pct_round(personal_profit, percent)
                 personal_purchase_profit = calc_slshop_purchase_profit_for_day(cur, emp_name, day)
-                bonus_purchase_amount = int(Decimal(personal_purchase_profit) * percent_purchase / Decimal(100))
+                bonus_purchase_amount = pct_round(personal_purchase_profit, percent_purchase)
 
             total = base_rate + bonus_amount + bonus_purchase_amount
 
@@ -1060,9 +1066,9 @@ def handler(event, context):
                 bonus_purchase = 0
                 if auto_bonus:
                     personal_profit = calc_slshop_profit_for_day(cur, emp_token, emp_name, day_str)
-                    bonus = int(Decimal(personal_profit) * percent / Decimal(100))
+                    bonus = pct_round(personal_profit, percent)
                     personal_purchase_profit = calc_slshop_purchase_profit_for_day(cur, emp_name, day_str)
-                    bonus_purchase = int(Decimal(personal_purchase_profit) * percent_purchase / Decimal(100))
+                    bonus_purchase = pct_round(personal_purchase_profit, percent_purchase)
                 total = base_rate + bonus + bonus_purchase
 
                 shift_id = ensure_shift(cur, emp_id, day_str, status='closed')
@@ -1134,9 +1140,9 @@ def handler(event, context):
             for row in rows:
                 day_str = row['shift_date'].isoformat() if hasattr(row['shift_date'], 'isoformat') else str(row['shift_date'])
                 profit = calc_slshop_profit_for_day(cur, emp_token, emp_name, day_str)
-                bonus = int(Decimal(profit) * percent / Decimal(100))
+                bonus = pct_round(profit, percent)
                 purchase_profit = calc_slshop_purchase_profit_for_day(cur, emp_name, day_str)
-                bonus_purchase = int(Decimal(purchase_profit) * percent_purchase / Decimal(100))
+                bonus_purchase = pct_round(purchase_profit, percent_purchase)
                 total = int(row['base_rate'] or 0) + bonus + bonus_purchase
                 cur.execute(
                     f"""
