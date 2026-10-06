@@ -2746,9 +2746,9 @@ def list_operations(params):
     if op_type:
         where.append(f"o.op_type={_esc(op_type)}")
     if date_from:
-        where.append(f"o.created_at>={_esc(date_from)}")
+        where.append(f"o.created_at>={_esc(date_from)}::date")
     if date_to:
-        where.append(f"o.created_at<={_esc(date_to)} + INTERVAL '1 day'")
+        where.append(f"o.created_at<{_esc(date_to)}::date + INTERVAL '1 day'")
     wsql = (' WHERE ' + ' AND '.join(where)) if where else ''
     conn = get_conn()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
@@ -2757,7 +2757,7 @@ def list_operations(params):
         f"FROM {SCHEMA}.slshop_operations o "
         f"LEFT JOIN {SCHEMA}.slshop_items i ON i.id=o.item_id "
         f"LEFT JOIN {SCHEMA}.slshop_clients c ON c.id=o.client_id "
-        f"{wsql} ORDER BY o.created_at DESC LIMIT 300"
+        f"{wsql} ORDER BY o.created_at DESC LIMIT 1000"
     )
     rows = cur.fetchall()
     cur.close(); conn.close()

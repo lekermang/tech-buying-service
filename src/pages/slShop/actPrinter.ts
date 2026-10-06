@@ -30,7 +30,13 @@ export type PrintOpts = {
   timeFrom: string;
   timeTo: string;
   showTime: boolean;
+  rowTime?: boolean;
+  customTime?: string;
 };
+
+function rowTimeOf(o: SLOperation, opts: { customTime?: string }): string {
+  return opts.customTime || localTimeKey(o.created_at);
+}
 
 export function filterByDayAndTime(ops: SLOperation[], opType: "buy" | "sell", date: string, timeFrom: string, timeTo: string): SLOperation[] {
   return ops
@@ -83,8 +89,9 @@ function openWindow(title: string, body: string): boolean {
   return true;
 }
 
-function periodLabel(date: string, timeFrom: string, timeTo: string, showTime: boolean): string {
+function periodLabel(date: string, timeFrom: string, timeTo: string, showTime: boolean, customTime?: string): string {
   const dateRu = new Date(date + "T12:00:00").toLocaleDateString("ru-RU", { day: "2-digit", month: "long", year: "numeric" });
+  if (customTime) return `${dateRu}, ${customTime}`;
   if (!showTime) return dateRu;
   return `${dateRu}, с ${timeFrom || "00:00"} до ${timeTo || "23:59"}`;
 }
@@ -93,15 +100,16 @@ function buildActs(list: SLOperation[], opts: PrintOpts): { title: string; perio
   const isBuy = opts.kind === "act_buy";
   const title = isBuy ? "АКТ ЗАКУПКИ" : "АКТ ПРОДАЖИ";
   const partyLabel = isBuy ? "ФИО продавца (клиента)" : "ФИО покупателя";
-  const period = periodLabel(opts.date, opts.timeFrom, opts.timeTo, opts.showTime);
+  const period = periodLabel(opts.date, opts.timeFrom, opts.timeTo, opts.showTime, opts.customTime);
   const total = list.reduce((s, o) => s + (Number(o.amount) || 0), 0);
-  const timeHead = opts.showTime ? `<th style="width:16mm">Время</th>` : "";
-  const cols = opts.showTime ? 6 : 5;
+  const showCol = !!(opts.showTime || opts.rowTime);
+  const timeHead = showCol ? `<th style="width:16mm">Время</th>` : "";
+  const cols = showCol ? 6 : 5;
 
   const rows = list.map((o, i) => `
     <tr>
       <td class="c">${i + 1}</td>
-      ${opts.showTime ? `<td class="c">${esc(localTimeKey(o.created_at))}</td>` : ""}
+      ${showCol ? `<td class="c">${esc(rowTimeOf(o, opts))}</td>` : ""}
       <td>${esc(o.client_name || "—")}</td>
       <td>${esc(o.item_title || "—")}</td>
       <td>${esc(o.item_imei || "—")}</td>
@@ -133,16 +141,16 @@ export function printPoliceActs(list: SLOperation[], opts: PrintOpts): boolean {
 }
 
 function buildChecks(list: SLOperation[], opts: PrintOpts): { period: string; body: string } {
-  const period = periodLabel(opts.date, opts.timeFrom, opts.timeTo, opts.showTime);
+  const period = periodLabel(opts.date, opts.timeFrom, opts.timeTo, opts.showTime, opts.customTime);
   const total = list.reduce((s, o) => s + (Number(o.amount) || 0), 0);
 
   const checks = list.map(o => {
-    const dt = new Date(o.created_at);
-    const dateStr = dt.toLocaleDateString("ru-RU");
+    const dateStr = new Date(opts.date + "T12:00:00").toLocaleDateString("ru-RU");
+    const showT = !!(opts.showTime || opts.rowTime);
     const pay = ({ cash: "Наличные", card: "Карта", transfer: "Перевод" } as Record<string, string>)[String(o.payment_method || "cash")] || "—";
     return `
     <div class="check">
-      <div class="row"><b>ТОВАРНЫЙ ЧЕК № ${o.id}</b><span>${esc(dateStr)}${opts.showTime ? " " + esc(localTimeKey(o.created_at)) : ""}</span></div>
+      <div class="row"><b>ТОВАРНЫЙ ЧЕК № ${o.id}</b><span>${esc(dateStr)}${showT ? " " + esc(rowTimeOf(o, opts)) : ""}</span></div>
       <div class="row"><span>Товар</span><b>${esc(o.item_title || "—")}</b></div>
       <div class="row"><span>IMEI / серийный №</span><span>${esc(o.item_imei || "—")}</span></div>
       <div class="row"><span>Покупатель</span><span>${esc(o.client_name || "—")}</span></div>
