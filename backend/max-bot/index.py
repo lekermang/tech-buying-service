@@ -1350,11 +1350,23 @@ def action_staff_send(body: dict) -> dict:
                 photo_urls.append(url)
 
     targets: list[int] = []
-    cid = get_staff_channel_id()
+    leads_cid = None
+    if body.get('lead_id'):
+        try:
+            conn = _conn(); cur = conn.cursor()
+            cur.execute(f"SELECT value FROM {SCHEMA}.settings WHERE key='max_leads_chat_id' LIMIT 1")
+            r = cur.fetchone(); cur.close(); conn.close()
+            if r and r[0] and int(r[0]) != 0:
+                leads_cid = int(r[0])
+        except Exception:
+            leads_cid = None
+    if leads_cid:
+        targets.append(leads_cid)
+    cid = None if leads_cid else get_staff_channel_id()
     if cid:
         targets.append(int(cid))
     owners_raw = (os.environ.get('MAX_OWNER_USER_ID') or '').strip()
-    for piece in owners_raw.replace(' ', '').split(','):
+    for piece in ([] if leads_cid else owners_raw.replace(' ', '').split(',')):
         if piece.isdigit():
             uid = int(piece)
             if uid and uid not in targets:
@@ -1585,6 +1597,28 @@ def handler(event: dict, context) -> dict:
 
     if method == 'POST' and action == 'send':
         return action_send(body)
+
+    if action == 'list_chats':
+        if headers.get('x-admin-token') != os.environ.get('ADMIN_TOKEN', '') and (body.get('admin_token') or '') != os.environ.get('ADMIN_TOKEN', ''):
+            return _err(403, 'Forbidden')
+        ok, d = max_call('chats', params={'count': 100}, http_method='GET')
+        chats = [{'chat_id': c.get('chat_id'), 'title': c.get('title'), 'type': c.get('type'),
+                  'members': c.get('participants_count')} for c in (d.get('chats') or [])]
+        return _ok({'ok': ok, 'chats': chats, 'raw_error': None if ok else d})
+
+    if method == 'POST' and action == 'set_leads_chat':
+        if headers.get('x-admin-token') != os.environ.get('ADMIN_TOKEN', '') and (body.get('admin_token') or '') != os.environ.get('ADMIN_TOKEN', ''):
+            return _err(403, 'Forbidden')
+        cid = int(body.get('chat_id') or 0)
+        if not cid:
+            return _err(400, 'chat_id обязателен')
+        conn = _conn(); cur = conn.cursor()
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.settings (key, value) VALUES ('max_leads_chat_id', {_esc(str(cid))}) "
+            f"ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()"
+        )
+        conn.commit(); cur.close(); conn.close()
+        return _ok({'ok': True, 'leads_chat_id': cid})
 
     if method == 'POST' and action == 'staff_send':
         return action_staff_send(body)
