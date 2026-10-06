@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import Icon from "@/components/ui/icon";
+import { toast } from "sonner";
 import {
   c14dApi,
   type C14dDetail, type C14dCashAccount,
@@ -18,6 +19,7 @@ export default function C14dDetailView({ token, contractId, onBack }: Props) {
   const [c, setC] = useState<C14dDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [confirmErr, setConfirmErr] = useState<string | null>(null);
 
   // payment modal
   const [payOpen, setPayOpen] = useState(false);
@@ -136,8 +138,14 @@ export default function C14dDetailView({ token, contractId, onBack }: Props) {
     const action = confirm.kind === "terminate" ? "terminate" : "close";
     const r = await c14dApi(token, action, { method: "POST", body: { contract_id: c.id, reason: confirm.reason } });
     setConfirmSaving(false);
-    if (!r.ok) { setErr(r.error || "Ошибка"); return; }
-    setConfirm(null); reload();
+    if (!r.ok) {
+      const m = r.error || "Не удалось выполнить действие";
+      setErr(m); setConfirmErr(m); toast.error(m);
+      return;
+    }
+    setConfirmErr(null); setConfirm(null); setErr(null);
+    toast.success(action === "terminate" ? "Договор расторгнут" : "Договор закрыт");
+    reload();
   };
 
   const submitCancelPayment = async () => {
@@ -190,8 +198,8 @@ export default function C14dDetailView({ token, contractId, onBack }: Props) {
         c={c}
         onBack={onBack}
         onPay={() => setPayOpen(true)}
-        onClose={() => setConfirm({ kind: "close" })}
-        onTerminate={() => setConfirm({ kind: "terminate" })}
+        onClose={() => { setConfirmErr(null); setConfirm({ kind: "close" }); }}
+        onTerminate={() => { setConfirmErr(null); setConfirm({ kind: "terminate" }); }}
         onExtend={toggleExtend}
         onPhotoClick={setPhotoSrc}
       />
@@ -232,6 +240,7 @@ export default function C14dDetailView({ token, contractId, onBack }: Props) {
         confirm={confirm}
         setConfirm={setConfirm}
         confirmSaving={confirmSaving}
+        confirmErr={confirmErr}
         submitConfirm={submitConfirm}
         cancelPaymentId={cancelPaymentId}
         setCancelPaymentId={setCancelPaymentId}

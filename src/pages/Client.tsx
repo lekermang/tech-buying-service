@@ -5,7 +5,6 @@ import ClientAuthScreen from "./client/ClientAuthScreen";
 import ClientRepairs from "./client/ClientRepairs";
 import ClientContracts from "./client/ClientContracts";
 import ClientOffers from "./client/ClientOffers";
-import ClientChat from "./client/ClientChat";
 import ClientProfileTab from "./client/ClientProfile";
 import ClientSales from "./client/ClientSales";
 import ClientNotificationsBanner from "./client/ClientNotificationsBanner";
@@ -14,14 +13,13 @@ import { ClientProfile } from "./client/clientTypes";
 const AUTH_URL = (funcUrls as Record<string, string>)["client-auth"];
 const CAB_URL = (funcUrls as Record<string, string>)["client-cabinet"];
 
-type Tab = "repairs" | "contracts" | "sales" | "offers" | "chat" | "profile";
+type Tab = "repairs" | "contracts" | "sales" | "offers" | "profile";
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: "repairs", label: "Ремонты", icon: "Wrench" },
   { id: "contracts", label: "Договор", icon: "ScrollText" },
   { id: "sales", label: "Скупка", icon: "PackageCheck" },
   { id: "offers", label: "Заявки", icon: "Send" },
-  { id: "chat", label: "Чат", icon: "MessageCircle" },
   { id: "profile", label: "Профиль", icon: "UserCircle" },
 ];
 
@@ -31,7 +29,7 @@ export default function Client() {
   const [tab, setTab] = useState<Tab>(() => {
     const p = new URLSearchParams(window.location.search);
     const t = p.get("tab") as Tab | null;
-    return (t && ["repairs", "contracts", "sales", "offers", "chat", "profile"].includes(t)) ? t : "repairs";
+    return (t && ["repairs", "contracts", "sales", "offers", "profile"].includes(t)) ? t : "repairs";
   });
   const [loading, setLoading] = useState(false);
 
@@ -180,7 +178,6 @@ export default function Client() {
         {tab === "contracts" && <ClientContracts token={token} />}
         {tab === "sales" && <ClientSales token={token} />}
         {tab === "offers" && <ClientOffers token={token} />}
-        {tab === "chat" && <ClientChat token={token} />}
         {tab === "profile" && (
           <ClientProfileTab
             token={token}

@@ -17,7 +17,6 @@ type Props = {
   onInviteMax: (lead: Lead) => void;
   onRobocall: (lead: Lead) => void;
   onOpenHistory: (lead: Lead) => void;
-  onInviteToChat: (lead: Lead) => void;
 };
 
 export default function LeadsPanel({
@@ -33,7 +32,6 @@ export default function LeadsPanel({
   onInviteMax,
   onRobocall,
   onOpenHistory,
-  onInviteToChat,
 }: Props) {
   const overdue = stats?.overdue_count || 0;
   const newCount = stats?.new_count || 0;
@@ -207,13 +205,6 @@ export default function LeadsPanel({
                     title="Открыть CRM-карточку клиента: все его заявки, ремонты, золото"
                   >
                     <Icon name="History" size={12} /> 📇 История клиента
-                  </button>
-                  <button
-                    onClick={() => onInviteToChat(l)}
-                    className="text-[11px] bg-[#FFD700]/15 hover:bg-[#FFD700]/25 border border-[#FFD700]/40 text-[#FFD700] rounded py-1.5 font-roboto font-bold inline-flex items-center justify-center gap-1 active:scale-95 transition-all"
-                    title="Сгенерировать invite-ссылку и отправить клиенту"
-                  >
-                    <Icon name="MessageSquare" size={12} /> 💬 Пригласить в чат
                   </button>
                 </div>
                 <div className="mt-1 flex items-center justify-between gap-2 flex-wrap">

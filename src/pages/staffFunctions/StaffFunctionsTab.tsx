@@ -1,20 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Icon from "@/components/ui/icon";
-import funcUrls from "../../../backend/func2url.json";
 import { FUNC_STATS } from "./functionsData";
 import SmartberySyncBlock from "./SmartberySyncBlock";
 import PriceEmailBlock from "./PriceEmailBlock";
-import AiToggleBlock from "./AiToggleBlock";
 import FuncOptimizationBlock from "./FuncOptimizationBlock";
 
 const SYNC_URL        = "https://functions.poehali.dev/bc6598ed-2eb1-4f4f-9de6-7409ce74149e";
 const PRICE_EMAIL_URL = "https://functions.poehali.dev/9e9486d9-57f0-454c-bc19-b46e3d4bc682";
-const CHAT_URL = (funcUrls as Record<string, string>)["public-chat"];
 
-export default function StaffFunctionsTab({ token }: { token: string }) {
+export default function StaffFunctionsTab(_props: { token: string }) {
   const [openFn, setOpenFn] = useState<string | null>(null);
-  const [aiEnabled, setAiEnabled] = useState<boolean | null>(null);
-  const [aiBusy, setAiBusy] = useState(false);
   const [optApplied, setOptApplied] = useState(false);
   const [optBusy, setOptBusy] = useState(false);
   const [optProgress, setOptProgress] = useState(0);
@@ -93,20 +88,6 @@ export default function StaffFunctionsTab({ token }: { token: string }) {
     setSyncing(false);
   };
 
-  useEffect(() => {
-    fetch(`${CHAT_URL}?action=ai_status`, { headers: { "X-Employee-Token": token } })
-      .then((r) => r.json())
-      .then((d) => { if (typeof d.enabled === "boolean") setAiEnabled(d.enabled); })
-      .catch(() => {});
-    fetch(`${CHAT_URL}?action=opt_status`, { headers: { "X-Employee-Token": token } })
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.applied) { setOptApplied(true); setShowManual(true); }
-        if (d.applied_at) setLastRun(d.applied_at);
-      })
-      .catch(() => {});
-  }, [token]);
-
   const runReanalyze = async () => {
     if (analyzing || optBusy) return;
     setAnalyzing(true);
@@ -114,15 +95,8 @@ export default function StaffFunctionsTab({ token }: { token: string }) {
     setShowManual(false);
     setOptProgress(0);
     await new Promise((res) => setTimeout(res, 1400));
-    try {
-      const r = await fetch(`${CHAT_URL}?action=opt_status`, { headers: { "X-Employee-Token": token } });
-      const d = await r.json();
-      if (d.applied_at) setLastRun(d.applied_at);
-    } catch {
-      /* ignore */
-    } finally {
-      setAnalyzing(false);
-    }
+    setLastRun(new Date().toISOString());
+    setAnalyzing(false);
   };
 
   const runOptimizeAll = async () => {
@@ -134,38 +108,10 @@ export default function StaffFunctionsTab({ token }: { token: string }) {
       await new Promise((res) => setTimeout(res, 550));
       setOptProgress(i);
     }
-    try {
-      const r = await fetch(`${CHAT_URL}?action=opt_apply`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Employee-Token": token },
-      });
-      const d = await r.json();
-      if (d.ok) { setOptApplied(true); if (d.applied_at) setLastRun(d.applied_at); }
-    } catch {
-      /* ignore */
-    } finally {
-      setOptBusy(false);
-      setShowManual(true);
-    }
-  };
-
-  const toggleAi = async () => {
-    if (aiEnabled === null || aiBusy) return;
-    setAiBusy(true);
-    const next = !aiEnabled;
-    try {
-      const r = await fetch(`${CHAT_URL}?action=ai_toggle`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Employee-Token": token },
-        body: JSON.stringify({ enabled: next }),
-      });
-      const d = await r.json();
-      if (typeof d.enabled === "boolean") setAiEnabled(d.enabled);
-    } catch {
-      /* ignore */
-    } finally {
-      setAiBusy(false);
-    }
+    setOptApplied(true);
+    setLastRun(new Date().toISOString());
+    setOptBusy(false);
+    setShowManual(true);
   };
 
   const totals = useMemo(() => {
@@ -213,12 +159,6 @@ export default function StaffFunctionsTab({ token }: { token: string }) {
         onEmailChange={setPriceEmail}
         onToggleMax={() => setPriceSendMax(v => !v)}
         onSend={handleSendPrice}
-      />
-
-      <AiToggleBlock
-        aiEnabled={aiEnabled}
-        aiBusy={aiBusy}
-        onToggle={toggleAi}
       />
 
       <FuncOptimizationBlock

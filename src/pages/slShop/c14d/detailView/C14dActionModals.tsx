@@ -19,6 +19,7 @@ type Props = {
   confirm: null | { kind: "terminate" | "close"; reason?: string };
   setConfirm: (v: null | { kind: "terminate" | "close"; reason?: string }) => void;
   confirmSaving: boolean;
+  confirmErr?: string | null;
   submitConfirm: () => void;
   // Cancel payment
   cancelPaymentId: number | null;
@@ -33,7 +34,7 @@ type Props = {
 export default function C14dActionModals({
   c,
   avitoMatches, avitoModalOpen, avitoArchiving, setAvitoModalOpen, archiveAvitoItem,
-  confirm, setConfirm, confirmSaving, submitConfirm,
+  confirm, setConfirm, confirmSaving, confirmErr, submitConfirm,
   cancelPaymentId, setCancelPaymentId, cancelSaving, submitCancelPayment,
   photoSrc, setPhotoSrc,
 }: Props) {
@@ -132,6 +133,9 @@ export default function C14dActionModals({
             ? "Действие необратимо. Договор будет помечен как «расторгнут»."
             : "Договор будет переведён в архив со статусом «завершён»."}
         </div>
+        {confirmErr && (
+          <div className="rounded-md bg-red-500/10 border border-red-500/30 text-red-300 px-2.5 py-1.5 text-[12px] mb-2">{confirmErr}</div>
+        )}
         {confirm?.kind === "terminate" && (
           <SLField label="Причина (опционально)">
             <SLTextarea rows={2} value={confirm.reason || ""} onChange={e => setConfirm({ ...confirm, reason: e.target.value })} />

@@ -59,7 +59,6 @@ const BgaPajkaKaluga = safeLazy(() => import("./pages/repair/BgaPajkaKaluga"));
 const SnyatieFrpKaluga = safeLazy(() => import("./pages/repair/SnyatieFrpKaluga"));
 const Requisites = safeLazy(() => import("./pages/Requisites"));
 const Act = safeLazy(() => import("./pages/Act"));
-const PublicChat = safeLazy(() => import("./pages/PublicChat"));
 const PublicContract14d = safeLazy(() => import("./pages/PublicContract14d"));
 const PublicInvestor = safeLazy(() => import("./pages/PublicInvestor"));
 const Client = safeLazy(() => import("./pages/Client"));
@@ -194,7 +193,6 @@ const App = () => {
             <Route path="/repair-discount" element={<RepairDiscount />} />
             <Route path="/requisites" element={<Requisites />} />
             <Route path="/act" element={<Act />} />
-            <Route path="/chat" element={<PublicChat />} />
             <Route path="/p/c/:number" element={<PublicContract14d />} />
             <Route path="/investor/:token" element={<PublicInvestor />} />
             <Route path="/client" element={<Client />} />

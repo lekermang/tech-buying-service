@@ -89,7 +89,7 @@ function periodLabel(date: string, timeFrom: string, timeTo: string, showTime: b
   return `${dateRu}, с ${timeFrom || "00:00"} до ${timeTo || "23:59"}`;
 }
 
-export function printPoliceActs(list: SLOperation[], opts: PrintOpts): boolean {
+function buildActs(list: SLOperation[], opts: PrintOpts): { title: string; period: string; body: string } {
   const isBuy = opts.kind === "act_buy";
   const title = isBuy ? "АКТ ЗАКУПКИ" : "АКТ ПРОДАЖИ";
   const partyLabel = isBuy ? "ФИО продавца (клиента)" : "ФИО покупателя";
@@ -124,10 +124,15 @@ export function printPoliceActs(list: SLOperation[], opts: PrintOpts): boolean {
     <div><div class="line"></div><div class="small">Ответственное лицо Скупка24 / подпись, ФИО</div></div>
     <div><div class="line"></div><div class="small">Дата, М.П.</div></div>
   </div>`;
-  return openWindow(`${title} ${period}`, body);
+  return { title, period, body };
 }
 
-export function printPoliceChecks(list: SLOperation[], opts: PrintOpts): boolean {
+export function printPoliceActs(list: SLOperation[], opts: PrintOpts): boolean {
+  const r = buildActs(list, opts);
+  return openWindow(`${r.title} ${r.period}`, r.body);
+}
+
+function buildChecks(list: SLOperation[], opts: PrintOpts): { period: string; body: string } {
   const period = periodLabel(opts.date, opts.timeFrom, opts.timeTo, opts.showTime);
   const total = list.reduce((s, o) => s + (Number(o.amount) || 0), 0);
 
@@ -152,5 +157,19 @@ export function printPoliceChecks(list: SLOperation[], opts: PrintOpts): boolean
   <div class="sub">за ${esc(period)}, г. Калуга</div>
   ${checks || `<div class="c" style="padding:10mm">За выбранный период продаж нет</div>`}
   <div class="total">Всего: ${list.length} шт. на сумму ${fmtMoney(total)} ₽</div>`;
-  return openWindow(`Чеки продажи ${period}`, body);
+  return { period, body };
+}
+
+export function printPoliceChecks(list: SLOperation[], opts: PrintOpts): boolean {
+  const r = buildChecks(list, opts);
+  return openWindow(`Чеки продажи ${r.period}`, r.body);
+}
+
+/** Закупка + продажа + чеки за одно число — одним документом. */
+export function printPoliceAll(buy: SLOperation[], sell: SLOperation[], opts: Omit<PrintOpts, "kind">): boolean {
+  const a = buildActs(buy, { ...opts, kind: "act_buy" });
+  const b = buildActs(sell, { ...opts, kind: "act_sell" });
+  const c = buildChecks(sell, { ...opts, kind: "check_sell" });
+  const brk = `<div style="page-break-after:always"></div>`;
+  return openWindow(`Документы за ${a.period}`, a.body + brk + b.body + brk + c.body);
 }

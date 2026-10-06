@@ -32,13 +32,6 @@ const SECTION_META: Record<string, SectionMeta> = {
     color: "#fb923c",
     tag: "Сервис",
   },
-  sitechat: {
-    title: "Сайт-чат",
-    subtitle: "Чаты с посетителями сайта Скупка24 в реальном времени — отвечай быстро и конвертируй в сделки.",
-    icon: "MessageCircle",
-    color: "#4ade80",
-    tag: "Онлайн",
-  },
   salary: {
     title: "Зарплата",
     subtitle: "Моя текущая смена, начисленные бонусы, ставки и итоговый заработок за любой период.",

@@ -18,16 +18,6 @@ export type FuncStat = {
 
 export const FUNC_STATS: FuncStat[] = [
   {
-    name: "public-chat", label: "Чат с сайта",
-    calls: 7922, hours: 66, avgSec: 0.12, errorsPct: 16,
-    curTimeout: 30, recTimeout: 10, status: "done",
-    notes: [
-      "✓ Polling замедлён 4с → 8с (нагрузка снижена вдвое)",
-      "✓ При истёкшей сессии (401) опрос останавливается, токен сбрасывается",
-      "→ Выставить таймаут 10с вместо 30с",
-    ],
-  },
-  {
     name: "leads-monitor", label: "Монитор заявок",
     calls: 5778, hours: 48, avgSec: 0.1, errorsPct: 0,
     curTimeout: 30, recTimeout: 10, status: "warn",

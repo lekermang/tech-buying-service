@@ -3,7 +3,6 @@ import { shareToChat, formatLeadShare } from "@/lib/shareToChat";
 import ToastsStack from "./LeadsAlertWatcher/ToastsStack";
 import LeadsPanel from "./LeadsAlertWatcher/LeadsPanel";
 import ClientHistoryDrawer from "./LeadsAlertWatcher/ClientHistoryDrawer";
-import InviteToChatDialog from "./LeadsAlertWatcher/InviteToChatDialog";
 import {
   LEADS_URL,
   fmtPhone,
@@ -33,7 +32,6 @@ export default function LeadsAlertWatcher({
   const openPanel  = () => { if (onPanelOpen) onPanelOpen(); else setInternalPanelOpen(true); };
   const closePanel = () => { if (onPanelClose) onPanelClose(); else setInternalPanelOpen(false); };
   const [historyLead, setHistoryLead] = React.useState<Lead | null>(null);
-  const [inviteLeadState, setInviteLeadState] = React.useState<Lead | null>(null);
   const seenRef = React.useRef<Set<number>>(getSeenIds());
 
   const fetchHot = React.useCallback(async () => {
@@ -214,7 +212,6 @@ export default function LeadsAlertWatcher({
           onInviteMax={inviteMax}
           onRobocall={robocallLead}
           onOpenHistory={(l) => setHistoryLead(l)}
-          onInviteToChat={(l) => setInviteLeadState(l)}
         />
       )}
 
@@ -224,17 +221,6 @@ export default function LeadsAlertWatcher({
         onClose={() => setHistoryLead(null)}
         phone={historyLead?.client_phone || ""}
         name={historyLead?.client_name || ""}
-        token={token}
-      />
-
-      {/* Диалог приглашения в чат */}
-      <InviteToChatDialog
-        open={!!inviteLeadState}
-        onClose={() => setInviteLeadState(null)}
-        phone={inviteLeadState?.client_phone || ""}
-        name={inviteLeadState?.client_name || ""}
-        leadId={inviteLeadState?.id || null}
-        device={inviteLeadState?.device || null}
         token={token}
       />
 

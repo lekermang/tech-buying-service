@@ -19,7 +19,6 @@ import StaffSectionBanner from "./StaffSectionBanner";
 import LeadsAlertWatcher from "./LeadsAlertWatcher";
 import MyDayTab from "../staffMyDay/MyDayTab";
 import VipChatTab from "../staffChat/VipChatTab";
-import SiteChatTab from "../staffChat/SiteChatTab";
 import WantToBuyTab from "../staffWantToBuy/WantToBuyTab";
 import AppUpdateBanner from "@/components/AppUpdateBanner";
 import { getInitials } from "./staffConstants";
@@ -68,28 +67,10 @@ export function StaffMainLayout({
   const [profileOpen, setProfileOpen] = React.useState(false);
   const [myAvatar, setMyAvatar] = React.useState<string | null>(null);
   const [myName, setMyName] = React.useState<string | null>(null);
-  const [siteChatUnread, setSiteChatUnread] = React.useState(0);
   const [leadsStats, setLeadsStats] = React.useState<{ new_count: number; overdue_count: number } | null>(null);
   const [leadsPanelOpen, setLeadsPanelOpen] = React.useState(false);
   const [urgentRepairCount, setUrgentRepairCount] = React.useState(0);
   const [urgentRepairTrigger, setUrgentRepairTrigger] = React.useState(0);
-
-  React.useEffect(() => {
-    const CHAT_URL = "https://functions.poehali.dev/06e0e177-7525-48f9-bce8-617ba9e87cde";
-    const check = async () => {
-      try {
-        const r = await fetch(`${CHAT_URL}?action=staff_rooms`, { headers: { "X-Employee-Token": token } });
-        const d = await r.json();
-        if (d?.ok && Array.isArray(d.rooms)) {
-          const total = d.rooms.reduce((s: number, rm: { unread_count: number }) => s + (rm.unread_count || 0), 0);
-          setSiteChatUnread(total);
-        }
-      } catch { /* ignore */ }
-    };
-    check();
-    const id = setInterval(check, 60000);
-    return () => clearInterval(id);
-  }, [token]);
 
   // Мобила = узкий экран ИЛИ сенсорное устройство (надёжнее, чем только ширина).
   // На таких устройствах отключаем тяжёлые canvas/WebGL-эффекты, которые
@@ -135,7 +116,6 @@ export function StaffMainLayout({
   const analyticsAllowed = canSeeAnalytics(empRole, empName);
 
   const requestTab = (t: Tab) => {
-    if (t === "sitechat") setSiteChatUnread(0);
     // Заявки — открываем панель поверх текущей вкладки, не меняем таб
     if (t === "leads") { setLeadsPanelOpen(true); return; }
     if (isOwner || unlocked[t]) { setTab(t); return; }
@@ -164,7 +144,6 @@ export function StaffMainLayout({
       tip: "Входящие заявки от клиентов сайта — оценка, скупка, вопросы. Горящие — просроченные без ответа." },
     { k: "myday",        l: "Мой день",    icon: "CalendarCheck",   tip: "Персональный чек-лист смены: мёртвые деньги, Авито-индекс, узкие места и план дня." },
     { k: "repair",       l: "Ремонт",      icon: "Wrench",          tip: "Заявки на ремонт техники: статусы, сроки, история по устройствам." },
-    { k: "sitechat",     l: "Сайт-чат",    icon: "MessageCircle",   tip: "Чаты с клиентами, открытыми прямо на сайте Скупка24 — отвечай быстро.", badge: siteChatUnread || undefined },
     { k: "salary",       l: "Зарплата",    icon: "Wallet",          tip: "Моя текущая смена, начисления, ставки и итоговый заработок за период." },
     { k: "wanttobuy",    l: "Запросы",     icon: "ClipboardList",   tip: "Заявки клиентов на поиск конкретных моделей б/у и нового товара — можно предложить наличие." },
     { k: "clients",      l: "Клиенты",     icon: "Users",           tip: "База клиентов, история сделок, скидки, СМС и пуш-рассылки." },
@@ -255,7 +234,6 @@ export function StaffMainLayout({
             </div>
           }>
             {tab === "myday"        && <MyDayTab token={token} />}
-            {tab === "sitechat"     && <SiteChatTab token={token} />}
             {tab === "wanttobuy"    && <WantToBuyTab token={token} />}
             {tab === "chat"         && <VipChatTab token={token} />}
             {tab === "repair"       && <StaffRepairTab token={token} isOwner={empRole === "owner"} onUrgentCount={setUrgentRepairCount} initialUrgentFilter={urgentRepairTrigger > 0} />}

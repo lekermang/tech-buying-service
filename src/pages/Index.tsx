@@ -16,7 +16,6 @@ import PremiumServicesGrid from "@/components/skupka/PremiumServicesGrid";
 
 import SafeDealsBanner from "@/components/skupka/SafeDealsBanner";
 import MaxChannelBanner from "@/components/skupka/MaxChannelBanner";
-import PublicChatFab from "@/components/skupka/PublicChatFab";
 import EasierWithUsBlock from "@/components/EasierWithUsBlock";
 import QuickContactSection from "@/components/QuickContactSection";
 import WholesaleBanner from "@/components/skupka/WholesaleBanner";
@@ -420,7 +419,6 @@ export default function Index({ goldOpen = false }: { goldOpen?: boolean }) {
 
         <ExitPopup onOpenEval={() => window.scrollTo({ top: 0, behavior: "smooth" })} />
         <CookieBanner />
-        <PublicChatFab />
         <DesktopStickyBar />
       </div>
     </>

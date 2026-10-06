@@ -12,7 +12,6 @@ export type StaffTab =
   | "salary"
   | "myday"
   | "chat"
-  | "sitechat"
   | "wanttobuy"
   | "finance"
   | "functions"

@@ -67,7 +67,7 @@ const ALL_TABS: TabDef[] = [
   { k: "bookkeeping",   l: "Бухгалтерия",    icon: "Calculator", perm: "cashflow_view", tip: "Денежная сводка: выручка, себестоимость, ОПЭКС, прибыль, экспорт CSV." },
   { k: "import",        l: "Импорт",         icon: "ArrowUpDown", perm: "excel_export", tip: "Импорт/экспорт товаров и операций (Excel, CSV)." },
   { k: "documents",     l: "Документы",      icon: "FileText", tip: "Шаблоны печатных документов и реквизиты ИП/филиалов." },
-  { k: "police",        l: "Полиция",        icon: "ShieldCheck", perm: "shop_view", tip: "Печать актов закупки, актов продажи и чеков за выбранное число (и время) для полиции." },
+  { k: "police",        l: "Полиция",        icon: "ShieldCheck", featured: true, tip: "Печать актов закупки, актов продажи и чеков за выбранное число (и время) для полиции." },
   { k: "categories",    l: "Категории",      icon: "Grid3x3", tip: "Иерархия категорий товаров (телефоны, ноутбуки, ювелирка и т.д.)." },
   { k: "roles",         l: "Роли",           icon: "ShieldCheck", ownerOnly: true, tip: "Управление ролями и правами доступа сотрудников." },
 ];
