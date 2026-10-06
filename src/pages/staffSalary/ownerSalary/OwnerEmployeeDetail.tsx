@@ -301,14 +301,16 @@ export default function OwnerEmployeeDetail({
       <div className="rounded-xl border border-[#FFD700]/30 bg-gradient-to-br from-[#FFD700]/8 to-transparent p-4">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex gap-6 text-sm font-roboto flex-wrap">
-            <div><div className="text-white/40 text-[10px] uppercase font-oswald">Начислено в {MONTHS[viewMonth.getMonth()].toLowerCase()}</div>
-              <div className="text-white font-bold tabular-nums font-oswald text-lg">{monthSummary.earned.toLocaleString("ru-RU")} ₽</div></div>
-            <div><div className="text-purple-300/70 text-[10px] uppercase font-oswald">Премия ({selected.bonus_percent}% продажа + {selected.bonus_percent_purchase}% закупка)</div>
-              <div className="text-purple-300 font-bold tabular-nums font-oswald text-lg">{monthSummary.bonus.toLocaleString("ru-RU")} ₽</div></div>
-            <div><div className="text-green-300/60 text-[10px] uppercase font-oswald">Выплачено</div>
-              <div className="text-green-300 font-bold tabular-nums font-oswald text-lg">{monthSummary.paid.toLocaleString("ru-RU")} ₽</div></div>
-            <div><div className="text-[#FFD700]/70 text-[10px] uppercase font-oswald">Остаток</div>
-              <div className="text-[#FFD700] font-bold tabular-nums font-oswald text-lg">{monthSummary.remaining.toLocaleString("ru-RU")} ₽</div></div>
+            <div><div className="text-white/40 text-[10px] uppercase font-oswald">Начислено всего</div>
+              <div className="text-white font-bold tabular-nums font-oswald text-lg">{(detail?.summary.total_all ?? 0).toLocaleString("ru-RU")} ₽</div>
+              <div className="text-white/35 text-[10px]">за {MONTHS[viewMonth.getMonth()].toLowerCase()}: {monthSummary.earned.toLocaleString("ru-RU")} ₽</div></div>
+            <div><div className="text-purple-300/70 text-[10px] uppercase font-oswald">Проценты ({selected.bonus_percent}% с продаж)</div>
+              <div className="text-purple-300 font-bold tabular-nums font-oswald text-lg">{(detail?.summary.total_bonus ?? 0).toLocaleString("ru-RU")} ₽</div>
+              <div className="text-purple-300/40 text-[10px]">за {MONTHS[viewMonth.getMonth()].toLowerCase()}: {monthSummary.bonus.toLocaleString("ru-RU")} ₽</div></div>
+            <div><div className="text-green-300/60 text-[10px] uppercase font-oswald">Выплачено всего</div>
+              <div className="text-green-300 font-bold tabular-nums font-oswald text-lg">{(detail?.summary.total_paid ?? 0).toLocaleString("ru-RU")} ₽</div></div>
+            <div><div className="text-[#FFD700]/70 text-[10px] uppercase font-oswald">Остаток к выплате</div>
+              <div className="text-[#FFD700] font-bold tabular-nums font-oswald text-lg">{(detail?.summary.total_unpaid ?? 0).toLocaleString("ru-RU")} ₽</div></div>
           </div>
           <div className="flex gap-2 flex-wrap">
             <button onClick={onResync} disabled={busy}

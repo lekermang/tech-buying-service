@@ -900,8 +900,8 @@ def handler(event, context):
 
             # Сводка общая
             cur.execute(
-                f"SELECT COALESCE(SUM(total), 0) AS s, COALESCE(SUM(bonus_amount), 0) AS b, "
-                f"COALESCE(SUM(personal_profit), 0) AS p FROM {SCHEMA}.employee_salary_log WHERE employee_id = %s",
+                f"SELECT COALESCE(SUM(total), 0) AS s, COALESCE(SUM(bonus_amount + COALESCE(bonus_purchase_amount, 0)), 0) AS b, "
+                f"COALESCE(SUM(personal_profit + COALESCE(personal_purchase_profit, 0)), 0) AS p FROM {SCHEMA}.employee_salary_log WHERE employee_id = %s",
                 (emp_id,),
             )
             srow = cur.fetchone()
