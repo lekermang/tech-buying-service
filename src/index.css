@@ -1941,3 +1941,67 @@
     }
   }
 }
+
+/* ===== Staff: стиль Сбербанка ===== */
+.sber-theme {
+  --sber-bg: #121212;
+  --sber-card: #1f1f1f;
+  --sber-card-2: #2a2a2a;
+  --sber-green: #21a038;
+  --sber-green-2: #2fc24b;
+  --sber-lime: #7ed321;
+  --sber-text-2: rgba(255,255,255,0.55);
+  font-family: "Manrope", "Roboto", sans-serif;
+  background: var(--sber-bg) !important;
+  color: #fff;
+}
+.sber-theme .font-oswald,
+.sber-theme .font-roboto,
+.sber-theme .font-mono,
+.sber-theme h1, .sber-theme h2, .sber-theme h3, .sber-theme h4 {
+  font-family: "Manrope", "Roboto", sans-serif !important;
+  letter-spacing: normal !important;
+}
+.sber-theme .font-oswald { text-transform: none !important; font-weight: 700; }
+.sber-theme .uppercase { text-transform: none !important; }
+.sber-theme .tracking-widest, .sber-theme .tracking-wider, .sber-theme .tracking-wide { letter-spacing: normal !important; }
+
+.sber-theme [style*="box-shadow"] { box-shadow: none !important; }
+.sber-theme [style*="text-shadow"] { text-shadow: none !important; }
+.sber-theme [style*="drop-shadow"] { filter: none !important; }
+.sber-theme .noir-scanline::after { display: none; }
+
+.sber-theme .rounded-xl { border-radius: 20px; }
+.sber-theme .rounded-2xl { border-radius: 24px; }
+.sber-theme .rounded-lg { border-radius: 16px; }
+
+.sber-theme .bg-white\/5,
+.sber-theme .bg-white\/\[0\.03\],
+.sber-theme .bg-white\/\[0\.04\],
+.sber-theme .bg-white\/\[0\.02\] { background-color: var(--sber-card) !important; }
+.sber-theme .border-white\/10,
+.sber-theme .border-white\/5,
+.sber-theme .border-white\/\[0\.07\] { border-color: transparent !important; }
+
+.sber-theme [style*="border: 1px solid rgba(255, 255, 255"],
+.sber-theme [style*="border: 1.5px solid rgba(255, 215, 0"],
+.sber-theme [style*="border: 1px solid rgba(255, 215, 0"],
+.sber-theme [style*="border: 1.5px solid rgba(52, 211, 153"],
+.sber-theme [style*="border: 1px solid rgba(167, 139, 250"] { border-color: transparent !important; }
+
+.sber-theme [style*="background: linear-gradient(145deg, rgba(255, 215, 0"],
+.sber-theme [style*="background: linear-gradient(145deg, rgba(52, 211, 153"] { background: var(--sber-card) !important; }
+
+.sber-theme .text-\[\#FFD700\] { color: var(--sber-green-2) !important; }
+.sber-theme [style*="color: rgb(255, 215, 0)"] { color: var(--sber-green-2) !important; }
+.sber-theme .bg-\[\#FFD700\] { background-color: var(--sber-green) !important; color: #fff !important; }
+.sber-theme .bg-\[\#FFD700\]\/15,
+.sber-theme .bg-\[\#FFD700\]\/10 { background-color: rgba(33,160,56,0.18) !important; }
+.sber-theme .border-\[\#FFD700\]\/30,
+.sber-theme .border-\[\#FFD700\]\/20 { border-color: transparent !important; }
+
+.sber-theme input, .sber-theme select, .sber-theme textarea { border-radius: 14px; }
+
+.sber-card { background: var(--sber-card); border-radius: 24px; }
+.sber-chip { background: var(--sber-card-2); border-radius: 14px; }
+.sber-no-scrollbar::-webkit-scrollbar { display: none; }

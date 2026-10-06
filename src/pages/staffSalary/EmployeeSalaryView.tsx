@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import Icon from "@/components/ui/icon";
+import SberBarChart from "@/components/sber/SberBarChart";
 import { SALARY_URL } from "@/pages/staff.types";
 import SavingsView from "@/pages/staffSalary/SavingsView";
 import EmployeeRepairHistory from "./EmployeeRepairHistory";
@@ -215,6 +216,19 @@ export default function EmployeeSalaryView({ token, employeeName }: Props) {
           <div className="font-roboto text-xs mt-2" style={{ color: "rgba(255,255,255,0.35)" }}>
             Заработано {fmt(state.total_earned)} ₽ · Выплачено {fmt(state.total_paid)} ₽
           </div>
+        </div>
+      )}
+
+      {days.length > 0 && (
+        <div className="sber-card p-4">
+          <div className="text-[13px]" style={{ color: "var(--sber-text-2)" }}>Доход по дням</div>
+          <div className="text-[26px] font-extrabold mb-1">{fmt(totalEarned)} ₽</div>
+          <SberBarChart
+            data={[...days].reverse().map(d => ({
+              label: new Date(d.shift_date + "T12:00:00").toLocaleDateString("ru-RU", { day: "numeric" }),
+              value: Number(d.total) || 0,
+            }))}
+          />
         </div>
       )}
 

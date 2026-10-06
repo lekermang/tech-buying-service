@@ -2,28 +2,6 @@ import { useState, useRef, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import { PROTECTED_TABS, type StaffTab } from "./staffConstants";
 import { prefetchTab } from "./StaffLazy";
-import { SLTooltip } from "../slShop/slUI";
-
-// ── Индивидуальный цвет акцента для каждой вкладки ──────────────────────────
-const TAB_COLOR: Partial<Record<StaffTab, string>> = {
-  leads:        "#ef4444",
-  myday:        "#fb923c",
-  repair:       "#fb923c",
-  sitechat:     "#4ade80",
-  salary:       "#34d399",
-  wanttobuy:    "#38bdf8",
-  clients:      "#60a5fa",
-  smartlombard: "#FFD700",
-  chat:         "#818cf8",
-  avitopro:     "#34d399",
-  analytics:    "#a78bfa",
-  finance:      "#f472b6",
-  visitors:     "#c084fc",
-  gold:         "#fbbf24",
-  employees:    "#60a5fa",
-  functions:    "#94a3b8",
-  unlock:       "#fbbf24",
-};
 
 type TabDef = {
   k: StaffTab;
@@ -45,198 +23,54 @@ type Props = {
   onRequestTab: (t: StaffTab) => void;
 };
 
-// ── Кнопка таба — Dark Cinema стиль ──────────────────────────────────────
+// ── Кнопка таба — стиль Сбербанка ──────────────────────────────────────
 function NavTab({
-  t, active, locked, isHot, roleColor, onPress, prefetch,
+  t, active, locked, isHot, onPress, prefetch,
 }: {
   t: TabDef; active: boolean; locked: boolean; isHot: boolean;
-  roleColor: string; onPress: (k: StaffTab) => void; prefetch: (k: string) => void;
+  roleColor?: string; onPress: (k: StaffTab) => void; prefetch: (k: string) => void;
 }) {
-  const accentColor = TAB_COLOR[t.k] || roleColor;
-  const [pressed, setPressed] = useState(false);
-  const [ripple, setRipple] = useState(false);
-
-  const handleClick = () => {
-    setRipple(true);
-    setTimeout(() => setRipple(false), 500);
-    onPress(t.k);
-  };
-
   return (
-    <SLTooltip
-      placement="top"
-      delay={600}
-      as="flex"
-      content={
-        <>
-          <b style={{ color: accentColor }}>{t.l}</b>
-          {t.tip && <><br /><span style={{ color: "rgba(255,255,255,0.5)", fontSize: "11px" }}>{t.tip}</span></>}
-          {locked && <><br /><span className="text-red-300">🔒 Только для владельца</span></>}
-        </>
-      }
+    <button
+      onClick={() => onPress(t.k)}
+      onMouseEnter={() => prefetch(t.k)}
+      onTouchStart={() => prefetch(t.k)}
+      aria-label={t.l}
+      aria-current={active ? "page" : undefined}
+      className="relative flex flex-col items-center justify-center active:scale-90 transition-transform"
+      style={{ flex: "1 0 60px", minWidth: "56px", minHeight: "62px", gap: "4px", paddingTop: 8, paddingBottom: 6 }}
     >
-      <button
-        onClick={handleClick}
-        onMouseEnter={() => prefetch(t.k)}
-        onTouchStart={() => prefetch(t.k)}
-        onPointerDown={() => setPressed(true)}
-        onPointerUp={() => setPressed(false)}
-        onPointerLeave={() => setPressed(false)}
-        aria-label={t.l}
-        aria-current={active ? "page" : undefined}
-        className="relative flex flex-col items-center justify-center overflow-hidden"
-        style={{
-          flex: "1 0 52px",
-          minWidth: "48px",
-          minHeight: "62px",
-          paddingTop: "10px",
-          paddingBottom: "8px",
-          gap: "5px",
-          transform: pressed ? "scale(0.84) translateY(1px)" : "scale(1) translateY(0)",
-          transition: "transform 0.12s cubic-bezier(0.23, 1, 0.32, 1)",
-        }}
-      >
-        {/* ── Ripple ── */}
-        {ripple && (
-          <span className="absolute inset-0 pointer-events-none" style={{
-            background: `radial-gradient(circle at 50% 60%, ${accentColor}30 0%, transparent 65%)`,
-            animation: "noirRipple 0.5s ease-out forwards",
-            borderRadius: "inherit",
-          }} />
+      <div className="relative flex items-center justify-center" style={{ width: 28, height: 28 }}>
+        <Icon
+          name={t.icon}
+          size={24}
+          style={{ color: active ? "var(--sber-green-2)" : t.hot ? "#ef4444" : "rgba(255,255,255,0.4)" }}
+        />
+        {isHot && (
+          <span className="absolute flex items-center justify-center font-bold text-white" style={{
+            top: "-6px", right: "-8px", minWidth: 17, height: 17, padding: "0 4px",
+            fontSize: 10, borderRadius: 9, background: "#f97316", lineHeight: 1,
+          }}>
+            {(t.badge as number) > 99 ? "99+" : t.badge}
+          </span>
         )}
-
-        {/* ── Активный фон ── */}
-        {active && (
-          <>
-            <span className="absolute pointer-events-none" style={{
-              inset: "3px 2px 0px 2px",
-              background: `radial-gradient(ellipse at 50% 100%, ${accentColor}22 0%, transparent 70%)`,
-              borderRadius: "10px",
-            }} />
-            <span className="absolute pointer-events-none" style={{
-              inset: "3px 2px 0px 2px",
-              border: `1px solid ${accentColor}18`,
-              borderRadius: "10px",
-              background: `linear-gradient(180deg, ${accentColor}08 0%, transparent 60%)`,
-            }} />
-          </>
-        )}
-
-        {/* ── Premium подложка ── */}
-        {t.premium && !active && (
-          <span className="absolute pointer-events-none" style={{
-            inset: "4px",
-            background: "linear-gradient(135deg, rgba(255,215,0,0.05), rgba(255,215,0,0.02))",
-            border: "1px solid rgba(255,215,0,0.08)",
-            borderRadius: "8px",
-          }} />
-        )}
-
-        {/* ── Верхний световой индикатор ── */}
-        {active && (
-          <span className="absolute top-0 left-1/2 -translate-x-1/2" style={{
-            width: "40px",
-            height: "3px",
-            borderRadius: "0 0 4px 4px",
-            background: `linear-gradient(90deg, transparent, ${accentColor}dd, #fff8e8, ${accentColor}dd, transparent)`,
-            boxShadow: `0 0 16px ${accentColor}, 0 0 32px ${accentColor}80, 0 0 64px ${accentColor}30`,
-          }} />
-        )}
-
-        {/* ── Горящий фон для «Заявок» — пульсирует красным ── */}
-        {t.hot && !active && (
-          <span className="absolute pointer-events-none" style={{
-            inset: "3px 2px 0px 2px",
-            background: "radial-gradient(ellipse at 50% 100%, rgba(239,68,68,0.22) 0%, transparent 70%)",
-            borderRadius: "10px",
-            animation: "hotGlow 1.4s ease-in-out infinite alternate",
-          }} />
-        )}
-
-        {/* ── Иконка ── */}
-        <div className="relative flex items-center justify-center" style={{ width: 24, height: 24 }}>
-          <Icon
-            name={t.icon}
-            size={active ? 22 : 19}
-            style={{
-              color: active
-                ? accentColor
-                : t.hot
-                  ? "#ef4444"
-                  : t.premium
-                    ? "rgba(255,215,0,0.6)"
-                    : "rgba(255,255,255,0.32)",
-              filter: active
-                ? `drop-shadow(0 0 6px ${accentColor}) drop-shadow(0 0 18px ${accentColor}70)`
-                : t.hot
-                  ? "drop-shadow(0 0 6px rgba(239,68,68,0.8)) drop-shadow(0 0 14px rgba(239,68,68,0.4))"
-                  : t.premium
-                    ? "drop-shadow(0 0 4px rgba(255,215,0,0.4))"
-                    : "none",
-              transition: "all 0.2s cubic-bezier(0.23, 1, 0.32, 1)",
-              animation: t.hot && !active ? "hotIconPulse 1.4s ease-in-out infinite alternate" : "none",
-            }}
-          />
-
-          {/* Бейдж */}
-          {isHot && (
-            <span className="absolute flex items-center justify-center font-bold text-white" style={{
-              top: "-8px", right: "-9px",
-              minWidth: "17px", height: "17px",
-              padding: "0 3px", fontSize: "8px", borderRadius: "9px",
-              background: "linear-gradient(135deg, #ff5555, #ef4444)",
-              boxShadow: "0 0 10px rgba(239,68,68,0.9), 0 0 20px rgba(239,68,68,0.4)",
-              animation: "pulse 1.5s infinite",
-              lineHeight: 1,
-            }}>
-              {(t.badge as number) > 99 ? "99+" : t.badge}
-            </span>
-          )}
-
-          {/* Замок */}
-          {locked && (
-            <span className="absolute" style={{ top: "-7px", right: "-7px", fontSize: "10px" }}>🔒</span>
-          )}
-
-          {/* Premium точка */}
-          {t.premium && !active && (
-            <span className="absolute rounded-full" style={{
-              top: "-2px", right: "-3px",
-              width: "7px", height: "7px",
-              background: "linear-gradient(135deg, #FFE34D, #FFD700)",
-              boxShadow: "0 0 8px rgba(255,215,0,1), 0 0 16px rgba(255,215,0,0.6)",
-            }} />
-          )}
-        </div>
-
-        {/* ── Лейбл ── */}
-        <span
-          className="font-roboto leading-none select-none"
-          style={{
-            fontSize: active ? "10px" : "9px",
-            fontWeight: (active || t.hot) ? 700 : 400,
-            letterSpacing: active ? "0.04em" : "0.01em",
-            color: active ? accentColor : t.hot ? "#f87171" : "rgba(255,255,255,0.3)",
-            textShadow: active
-              ? `0 0 10px ${accentColor}90, 0 0 20px ${accentColor}40`
-              : t.hot
-                ? "0 0 8px rgba(239,68,68,0.6)"
-                : "none",
-            transition: "all 0.2s cubic-bezier(0.23, 1, 0.32, 1)",
-          }}
-        >
-          {t.l}
-        </span>
-      </button>
-    </SLTooltip>
+        {locked && <span className="absolute" style={{ top: "-6px", right: "-6px", fontSize: 10 }}>🔒</span>}
+      </div>
+      <span className="leading-none select-none" style={{
+        fontSize: 11, fontWeight: active ? 700 : 500,
+        color: active ? "var(--sber-green-2)" : "rgba(255,255,255,0.45)",
+      }}>
+        {t.l}
+      </span>
+    </button>
   );
 }
 
 // ── Drawer — всплывающий список вкладок для owner ─────────────────────────
 function DrawerMenu({
-  tabs, tab, roleColor, isOwner, unlocked, onSelect, onClose,
+  tabs, tab, isOwner, unlocked, onSelect, onClose,
 }: {
-  tabs: TabDef[]; tab: StaffTab; roleColor: string;
+  tabs: TabDef[]; tab: StaffTab;
   isOwner: boolean; unlocked: Record<string, boolean>;
   onSelect: (k: StaffTab) => void; onClose: () => void;
 }) {
@@ -245,83 +79,47 @@ function DrawerMenu({
       {/* Backdrop */}
       <div
         className="fixed inset-0 z-[60]"
-        style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(3px)" }}
+        style={{ background: "rgba(0,0,0,0.6)" }}
         onClick={onClose}
       />
-      {/* Panel */}
       <div
         className="fixed left-0 right-0 z-[61]"
         style={{
           bottom: "calc(72px + env(safe-area-inset-bottom, 0px))",
-          background: "linear-gradient(180deg, rgba(14,10,6,0.98), rgba(8,6,3,0.99))",
-          borderTop: `1px solid ${roleColor}30`,
-          borderRadius: "20px 20px 0 0",
-          boxShadow: `0 -8px 40px rgba(0,0,0,0.8), 0 -2px 0 ${roleColor}20 inset`,
-          padding: "16px 8px 8px",
+          background: "var(--sber-card)",
+          borderRadius: "28px 28px 0 0",
+          padding: "14px 12px 12px",
           animation: "drawerUp 0.22s cubic-bezier(0.22,1,0.36,1) forwards",
         }}
       >
-        {/* Ручка */}
         <div className="flex justify-center mb-3">
-          <div className="w-10 h-1 rounded-full" style={{ background: `${roleColor}40` }} />
+          <div className="w-10 h-1 rounded-full" style={{ background: "rgba(255,255,255,0.2)" }} />
         </div>
-
-        <div className="font-roboto text-[10px] uppercase tracking-widest mb-3 px-3" style={{ color: `${roleColor}60` }}>
-          Ещё разделы
-        </div>
-
-        {/* Сетка вкладок */}
-        <div className="grid grid-cols-4 gap-1 px-2">
+        <div className="text-[18px] font-extrabold mb-3 px-2 text-white">Ещё разделы</div>
+        <div className="grid grid-cols-4 gap-2">
           {tabs.map(t => {
             const locked = PROTECTED_TABS.includes(t.k) && !isOwner && !unlocked[t.k];
             const active = tab === t.k;
-            const tabAccent = TAB_COLOR[t.k] || roleColor;
             return (
               <button
                 key={t.k}
                 onClick={() => { onSelect(t.k); onClose(); }}
                 onMouseEnter={() => prefetchTab(t.k)}
-                className="relative flex flex-col items-center justify-center gap-1.5 py-3 px-1 rounded-xl transition-all active:scale-90"
-                style={{
-                  background: active
-                    ? `linear-gradient(145deg, ${tabAccent}18, ${tabAccent}08)`
-                    : "rgba(255,255,255,0.03)",
-                  border: active
-                    ? `1px solid ${tabAccent}30`
-                    : "1px solid rgba(255,255,255,0.07)",
-                }}
+                className="relative flex flex-col items-center justify-center gap-1.5 py-3 px-1 active:scale-90 transition-transform"
+                style={{ background: "var(--sber-card-2)", borderRadius: 20, outline: active ? "2px solid var(--sber-green-2)" : "none" }}
               >
-                {active && (
-                  <span className="absolute top-0 left-1/2 -translate-x-1/2" style={{
-                    width: "32px", height: "2px", borderRadius: "0 0 4px 4px",
-                    background: `linear-gradient(90deg, transparent, ${tabAccent}cc, transparent)`,
-                  }} />
-                )}
                 <div className="relative">
-                  <Icon
-                    name={t.icon}
-                    size={20}
-                    style={{
-                      color: active ? tabAccent : t.premium ? "rgba(255,215,0,0.55)" : "rgba(255,255,255,0.45)",
-                      filter: active ? `drop-shadow(0 0 6px ${tabAccent}80)` : "none",
-                    }}
-                  />
+                  <Icon name={t.icon} size={22} style={{ color: active ? "var(--sber-green-2)" : "#fff" }} />
                   {locked && <span className="absolute -top-1.5 -right-1.5 text-[9px]">🔒</span>}
-                  {t.premium && !active && (
-                    <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full"
-                      style={{ background: "#FFD700", boxShadow: "0 0 6px rgba(255,215,0,0.8)" }} />
-                  )}
                   {t.badge && t.badge > 0 ? (
-                    <span className="absolute -top-2 -right-2 flex items-center justify-center text-white"
-                      style={{ minWidth: 16, height: 16, fontSize: 8, borderRadius: 9, padding: "0 3px",
-                        background: "linear-gradient(135deg,#ff5555,#ef4444)",
-                        boxShadow: "0 0 8px rgba(239,68,68,0.8)" }}>
+                    <span className="absolute -top-2 -right-3 flex items-center justify-center text-white"
+                      style={{ minWidth: 16, height: 16, fontSize: 9, borderRadius: 9, padding: "0 3px", background: "#f97316" }}>
                       {t.badge > 99 ? "99+" : t.badge}
                     </span>
                   ) : null}
                 </div>
-                <span className="font-roboto text-[10px] leading-tight text-center select-none"
-                  style={{ color: active ? tabAccent : "rgba(255,255,255,0.45)", fontWeight: active ? 700 : 400 }}>
+                <span className="text-[11px] leading-tight text-center select-none"
+                  style={{ color: active ? "var(--sber-green-2)" : "rgba(255,255,255,0.8)", fontWeight: active ? 700 : 500 }}>
                   {t.l}
                 </span>
               </button>
@@ -333,7 +131,7 @@ function DrawerMenu({
   );
 }
 
-export default function StaffBottomNav({ tabs, drawerTabs = [], tab, roleColor, isOwner, unlocked, onRequestTab }: Props) {
+export default function StaffBottomNav({ tabs, drawerTabs = [], tab, isOwner, unlocked, onRequestTab }: Props) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -374,7 +172,6 @@ export default function StaffBottomNav({ tabs, drawerTabs = [], tab, roleColor, 
         <DrawerMenu
           tabs={drawerTabs}
           tab={tab}
-          roleColor={roleColor}
           isOwner={isOwner}
           unlocked={unlocked}
           onSelect={onRequestTab}
@@ -386,35 +183,13 @@ export default function StaffBottomNav({ tabs, drawerTabs = [], tab, roleColor, 
         className="fixed bottom-0 left-0 right-0 z-50"
         style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
       >
-        {/* Fade сверху */}
-        <div className="absolute left-0 right-0 pointer-events-none" style={{
-          top: "-50px", height: "50px",
-          background: "linear-gradient(to top, rgba(5,4,3,0.98), rgba(5,4,3,0.7), transparent)",
-        }} />
-
-        {/* 3D пластина */}
         <div className="relative" style={{
-          background: "linear-gradient(180deg, rgba(18,14,8,0.97) 0%, rgba(10,8,5,0.99) 100%)",
-          backdropFilter: "blur(40px)",
-          WebkitBackdropFilter: "blur(40px)",
-          borderTop: `1px solid ${roleColor}20`,
-          boxShadow: `0 -1px 0 rgba(255,255,255,0.04) inset, 0 -20px 60px rgba(0,0,0,0.8), 0 -4px 20px rgba(0,0,0,0.6)`,
+          background: "#1a1a1a",
+          borderTop: "1px solid rgba(255,255,255,0.06)",
         }}>
-
-          {/* Верхняя световая линия */}
-          <div className="absolute top-0 left-0 right-0 pointer-events-none" style={{
-            height: "2px",
-            background: `linear-gradient(90deg, transparent 0%, ${roleColor}25 10%, ${roleColor}80 35%, #fff8e8cc 50%, ${roleColor}80 65%, ${roleColor}25 90%, transparent 100%)`,
-            boxShadow: `0 0 20px ${roleColor}50, 0 0 40px ${roleColor}20`,
-          }} />
-
-          <div className="absolute top-0 left-0 right-0 h-12 pointer-events-none" style={{
-            background: `radial-gradient(ellipse at 50% 0%, ${roleColor}08 0%, transparent 70%)`,
-          }} />
-
           <div
             ref={scrollRef}
-            className="flex"
+            className="flex overflow-x-auto sber-no-scrollbar"
             style={{ WebkitOverflowScrolling: "touch" }}
           >
             {/* Основные табы */}
@@ -423,68 +198,31 @@ export default function StaffBottomNav({ tabs, drawerTabs = [], tab, roleColor, 
               const isHot = Boolean(t.badge && t.badge > 0);
               return (
                 <NavTab key={t.k} t={t} active={tab === t.k} locked={locked}
-                  isHot={isHot} roleColor={roleColor} onPress={onRequestTab} prefetch={prefetchTab} />
+                  isHot={isHot} onPress={onRequestTab} prefetch={prefetchTab} />
               );
             })}
 
-            {/* Кнопка «···» для owner — открывает drawer */}
             {drawerTabs.length > 0 && (
               <button
                 onClick={() => setDrawerOpen(v => !v)}
-                className="relative flex flex-col items-center justify-center overflow-hidden"
-                style={{
-                  flex: "1 0 52px",
-                  minWidth: "48px",
-                  minHeight: "62px",
-                  paddingTop: "10px",
-                  paddingBottom: "8px",
-                  gap: "5px",
-                }}
+                className="relative flex flex-col items-center justify-center active:scale-90 transition-transform"
+                style={{ flex: "1 0 60px", minWidth: "56px", minHeight: "62px", gap: 4, paddingTop: 8, paddingBottom: 6 }}
                 aria-label="Ещё разделы"
               >
-                {/* Активный фон если в drawer выбрана вкладка */}
-                {(drawerHasActive || drawerOpen) && (
-                  <>
-                    <span className="absolute pointer-events-none" style={{
-                      inset: "3px 2px 0px 2px",
-                      background: `radial-gradient(ellipse at 50% 100%, ${roleColor}22 0%, transparent 70%)`,
-                      borderRadius: "10px",
-                    }} />
-                    <span className="absolute top-0 left-1/2 -translate-x-1/2" style={{
-                      width: "40px", height: "3px", borderRadius: "0 0 4px 4px",
-                      background: `linear-gradient(90deg, transparent, ${roleColor}dd, #fff8e8, ${roleColor}dd, transparent)`,
-                      boxShadow: `0 0 16px ${roleColor}, 0 0 32px ${roleColor}80`,
-                    }} />
-                  </>
-                )}
-
-                {/* Иконка «···» или «✕» */}
-                <div className="relative flex items-center justify-center" style={{ width: 24, height: 24 }}>
+                <div className="relative flex items-center justify-center" style={{ width: 28, height: 28 }}>
                   <Icon
                     name={drawerOpen ? "X" : "MoreHorizontal"}
-                    size={drawerOpen ? 20 : 19}
-                    style={{
-                      color: (drawerHasActive || drawerOpen) ? roleColor : "rgba(255,255,255,0.32)",
-                      filter: (drawerHasActive || drawerOpen) ? `drop-shadow(0 0 6px ${roleColor})` : "none",
-                      transition: "all 0.2s ease",
-                    }}
+                    size={24}
+                    style={{ color: (drawerHasActive || drawerOpen) ? "var(--sber-green-2)" : "rgba(255,255,255,0.4)" }}
                   />
-                  {/* Бейдж если в drawer есть уведомления */}
                   {drawerHasBadge && !drawerOpen && (
-                    <span className="absolute -top-1.5 -right-1.5 w-2 h-2 rounded-full"
-                      style={{ background: "#ef4444", boxShadow: "0 0 6px rgba(239,68,68,0.8)" }} />
+                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full" style={{ background: "#f97316" }} />
                   )}
                 </div>
-
-                <span
-                  className="font-roboto leading-none select-none"
-                  style={{
-                    fontSize: (drawerHasActive || drawerOpen) ? "10px" : "9px",
-                    fontWeight: (drawerHasActive || drawerOpen) ? 700 : 400,
-                    color: (drawerHasActive || drawerOpen) ? roleColor : "rgba(255,255,255,0.3)",
-                    transition: "all 0.2s ease",
-                  }}
-                >
+                <span className="leading-none select-none" style={{
+                  fontSize: 11, fontWeight: (drawerHasActive || drawerOpen) ? 700 : 500,
+                  color: (drawerHasActive || drawerOpen) ? "var(--sber-green-2)" : "rgba(255,255,255,0.45)",
+                }}>
                   {drawerOpen ? "Закрыть" : "Ещё"}
                 </span>
               </button>

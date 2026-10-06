@@ -1,5 +1,6 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
+import SberBarChart from "@/components/sber/SberBarChart";
 import type { EmployeeOverview } from "@/pages/staff.types";
 import {
   MONTHS, WEEKDAYS,
@@ -207,6 +208,21 @@ export default function OwnerEmployeeDetail({
               {Number(detail.summary.total_unpaid).toLocaleString("ru-RU")} ₽
             </div>
           </div>
+        </div>
+      )}
+
+      {detail && detail.history.length > 0 && (
+        <div className="sber-card p-4">
+          <div className="text-[13px]" style={{ color: "var(--sber-text-2)" }}>Начислено по дням</div>
+          <div className="text-[26px] font-extrabold mb-1">
+            {Math.round(detail.history.reduce((a, r) => a + Number(r.total || 0), 0)).toLocaleString("ru-RU")} ₽
+          </div>
+          <SberBarChart
+            data={[...detail.history].sort((a, b) => a.shift_date.localeCompare(b.shift_date)).map(r => ({
+              label: String(Number(r.shift_date.slice(8, 10))),
+              value: Number(r.total) || 0,
+            }))}
+          />
         </div>
       )}
 
