@@ -9,11 +9,110 @@ HEADERS = {
 }
 
 
+import re
+import html as _html
+
+COMP_TTL_MIN = 30
+VALID_PURITIES = (375, 500, 585, 750, 850, 875, 900, 916, 958, 999)
+
+
+def _http_text(url: str, timeout: int = 12) -> str:
+    req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return r.read().decode('utf-8', errors='ignore')
+
+
+def _num(v: str) -> int:
+    return int(re.sub(r'\D', '', v or '') or 0)
+
+
+def _parse_sunlight(page: str) -> dict:
+    out: dict = {}
+    for probe, price in re.findall(
+        r'price-fineness-skupka-item__probe">(\d{3})\s*[^<]*</span><span class="price-fineness-skupka-item__price">([\d\s\u00a0]+)\s*₽', page
+    ):
+        pr, val = int(probe), _num(price)
+        if pr == 583:
+            pr = 585
+        if pr in VALID_PURITIES and val > 1000 and pr not in out:
+            out[pr] = val
+    return out
+
+
+def _parse_region(page: str) -> dict:
+    t = re.sub(r'<script.*?</script>|<style.*?</style>', '', page, flags=re.S)
+    t = _html.unescape(re.sub(r'<[^>]+>', ' ', t))
+    t = re.sub(r'\s+', ' ', t)
+    a = t.find('Лом золота в пробах')
+    if a < 0:
+        return {}
+    seg = t[a:a + 900]
+    out: dict = {}
+    for probe, price in re.findall(r'\b(375|500|585|750|850|900|916|958|999)\b[^₽]{0,32}?(?<!\d)(\d{1,2} ?\d{3})\s*₽\s*\d{1,2} ?\d{3}\s*₽', seg):
+        pr, val = int(probe), _num(price)
+        if val > 1000 and pr not in out:
+            out[pr] = val
+    return out
+
+
+SOURCES = [
+    ('SUNLIGHT', 'https://sunlight.net/skupka/', _parse_sunlight, 'Москва, макс. цена за грамм'),
+    ('Регион Золото', 'https://www.region-zoloto.ru/dinamika-zolota', _parse_region, 'Физлица, наличные/карта'),
+]
+
+
+def competitors_response() -> dict:
+    import psycopg2
+    conn = psycopg2.connect(os.environ['DATABASE_URL'])
+    cur = conn.cursor()
+    result = []
+    for name, url, parser, note in SOURCES:
+        cur.execute(
+            f"SELECT MAX(recorded_at) FROM {SCHEMA}.gold_competitor_prices WHERE source = %s", (name,)
+        )
+        last = cur.fetchone()[0]
+        fresh = False
+        if last is not None:
+            cur.execute("SELECT NOW() - %s < INTERVAL '%s minutes'", (last, COMP_TTL_MIN))
+            fresh = bool(cur.fetchone()[0])
+        if not fresh:
+            try:
+                prices = parser(_http_text(url))
+                if len(prices) >= 3:
+                    for pr, val in prices.items():
+                        cur.execute(
+                            f"INSERT INTO {SCHEMA}.gold_competitor_prices (source, purity, price) VALUES (%s, %s, %s)",
+                            (name, pr, val)
+                        )
+                    conn.commit()
+            except Exception as e:
+                conn.rollback()
+                print(f'[gold-price][competitors] {name}: {e}')
+        cur.execute(
+            f"SELECT DISTINCT ON (purity) purity, price, recorded_at FROM {SCHEMA}.gold_competitor_prices "
+            f"WHERE source = %s AND recorded_at > NOW() - INTERVAL '2 days' ORDER BY purity, recorded_at DESC",
+            (name,)
+        )
+        rows = cur.fetchall()
+        if rows:
+            result.append({
+                'source': name, 'url': url, 'note': note,
+                'prices': {str(r[0]): int(r[1]) for r in rows},
+                'updated_at': str(max(r[2] for r in rows)),
+            })
+    cur.close(); conn.close()
+    return {'statusCode': 200, 'headers': {**HEADERS, 'Cache-Control': 'public, max-age=300'},
+            'body': json.dumps({'ok': True, 'competitors': result}, ensure_ascii=False)}
+
+
 def handler(event: dict, context) -> dict:
     """Биржевой курс золота 999 пробы + история за 7 дней"""
 
     if event.get('httpMethod') == 'OPTIONS':
         return {'statusCode': 200, 'headers': {**HEADERS, 'Access-Control-Allow-Methods': 'GET, OPTIONS'}, 'body': ''}
+
+    if (event.get('queryStringParameters') or {}).get('action') == 'competitors':
+        return competitors_response()
 
     # 0. Кеш — если есть свежая запись до 10 минут, возвращаем её без внешних API
     import psycopg2

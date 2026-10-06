@@ -1,3 +1,4 @@
+import GoldRatesBar from "./goldBuy/GoldRatesBar";
 import React from "react";
 import Icon from "@/components/ui/icon";
 import BackgroundFx from "../staffTheme/BackgroundFx";
@@ -263,6 +264,7 @@ export function StaffMainLayout({
       {/* Контент */}
       <div className="flex-1 overflow-y-auto relative z-10"
         style={{ paddingBottom: "calc(72px + env(safe-area-inset-bottom, 0px) + 24px)" }}>
+        <GoldRatesBar token={token} />
         <StaffSectionBanner tab={tab} />
         <TabErrorBoundary key={tab}>
           <React.Suspense fallback={

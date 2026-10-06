@@ -38,6 +38,23 @@ def get_conn():
     return psycopg2.connect(os.environ['DATABASE_URL'])
 
 
+def employee_role(event: dict):
+    headers = {k.lower(): v for k, v in (event.get('headers') or {}).items()}
+    token = headers.get('x-employee-token', '')
+    if not token:
+        return None
+    token_safe = token.replace("'", "''")
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        f"SELECT role FROM {SCHEMA}.employees WHERE auth_token='{token_safe}' AND token_expires_at>NOW() AND is_active=true"
+    )
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    return row[0] if row else None
+
+
 def check_token(event: dict) -> bool:
     headers = {k.lower(): v for k, v in (event.get('headers') or {}).items()}
     token = headers.get('x-employee-token', '')
@@ -216,7 +233,8 @@ def handler(event: dict, context) -> dict:
         finally:
             cur.close(); conn.close()
 
-    if not check_token(event):
+    _role = employee_role(event)
+    if not _role:
         return {'statusCode': 401, 'headers': HEADERS, 'body': json.dumps({'error': 'Unauthorized'}, ensure_ascii=False)}
 
     method = event.get('httpMethod', 'GET')
@@ -227,6 +245,23 @@ def handler(event: dict, context) -> dict:
             body = json.loads(event['body'])
         except Exception:
             pass
+
+    if _role not in ('owner', 'admin'):
+        _allowed = (method == 'POST' and body.get('action') == 'create') or \
+                   (method == 'GET' and params.get('action') == 'today_summary')
+        if not _allowed:
+            return {'statusCode': 403, 'headers': HEADERS, 'body': json.dumps({'error': 'Нет доступа'}, ensure_ascii=False)}
+
+    if method == 'GET' and params.get('action') == 'today_summary':
+        _c = get_conn(); _cu = _c.cursor()
+        _cu.execute(
+            f"SELECT COUNT(*), COALESCE(SUM(weight),0), COALESCE(SUM(buy_price),0) FROM {SCHEMA}.gold_orders "
+            f"WHERE (created_at AT TIME ZONE 'Europe/Moscow')::date = (NOW() AT TIME ZONE 'Europe/Moscow')::date"
+        )
+        _r = _cu.fetchone()
+        _cu.close(); _c.close()
+        return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps(
+            {'ok': True, 'count': int(_r[0]), 'grams': float(_r[1]), 'sum': int(_r[2])}, ensure_ascii=False)}
 
     conn = get_conn()
     cur = conn.cursor()
@@ -719,6 +754,29 @@ def handler(event: dict, context) -> dict:
         if action == 'create':
             name = str(body.get('name', '')).strip()
             phone = str(body.get('phone', '')).strip()
+            if body.get('strict') or _role not in ('owner', 'admin'):
+                _digits = ''.join(ch for ch in phone if ch.isdigit())
+                try:
+                    _w = float(body.get('weight') or 0)
+                except Exception:
+                    _w = 0
+                try:
+                    _b = float(body.get('buy_price') or 0)
+                except Exception:
+                    _b = 0
+                _errs = []
+                if len(_digits) != 11:
+                    _errs.append('номер телефона')
+                if _w <= 0:
+                    _errs.append('вес')
+                if _b <= 0:
+                    _errs.append('общая выданная сумма')
+                if _errs:
+                    cur.close(); conn.close()
+                    return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps(
+                        {'error': 'Заполните: ' + ', '.join(_errs)}, ensure_ascii=False)}
+                if not name:
+                    name = 'Клиент'
             if not name or not phone:
                 cur.close(); conn.close()
                 return {'statusCode': 400, 'headers': HEADERS, 'body': json.dumps({'error': 'Имя и телефон обязательны'}, ensure_ascii=False)}
