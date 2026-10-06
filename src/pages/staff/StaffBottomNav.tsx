@@ -40,7 +40,7 @@ function NavTab({
       className="relative flex flex-col items-center justify-center active:scale-90 transition-transform"
       style={{ flex: "1 0 60px", minWidth: "56px", minHeight: "62px", gap: "4px", paddingTop: 8, paddingBottom: 6 }}
     >
-      <div className="relative flex items-center justify-center" style={{ width: 28, height: 28 }}>
+      <div className={`relative sber-nav-pill${active ? " active" : ""}`}>
         <Icon
           name={t.icon}
           size={24}
@@ -106,7 +106,7 @@ function DrawerMenu({
                 onClick={() => { onSelect(t.k); onClose(); }}
                 onMouseEnter={() => prefetchTab(t.k)}
                 className="relative flex flex-col items-center justify-center gap-1.5 py-3 px-1 active:scale-90 transition-transform"
-                style={{ background: "var(--sber-card-2)", borderRadius: 20, outline: active ? "2px solid var(--sber-green-2)" : "none" }}
+                style={{ background: active ? "rgba(47,194,75,0.16)" : "linear-gradient(180deg,#2c2c2c,#222)", borderRadius: 20, boxShadow: active ? "inset 0 0 0 1.5px var(--sber-green-2)" : "inset 0 1px 0 rgba(255,255,255,0.07)" }}
               >
                 <div className="relative">
                   <Icon name={t.icon} size={22} style={{ color: active ? "var(--sber-green-2)" : "#fff" }} />

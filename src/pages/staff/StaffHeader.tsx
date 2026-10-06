@@ -31,8 +31,7 @@ function HeaderBtn({
   return (
     <SLTooltip content={tooltip} placement="bottom">
       <button onClick={onClick}
-        className="flex items-center justify-center active:scale-90 transition-transform rounded-2xl"
-        style={{ width: 44, height: 44, background: "var(--sber-card)", color: "#fff" }}>
+        className="sber-icon-btn">
         <Icon name={icon} size={size} />
       </button>
     </SLTooltip>

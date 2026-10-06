@@ -2005,3 +2005,42 @@
 .sber-card { background: var(--sber-card); border-radius: 24px; }
 .sber-chip { background: var(--sber-card-2); border-radius: 14px; }
 .sber-no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* ── Sber dark buttons ─────────────────────────────────────────────── */
+.sber-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 48px; padding: 0 22px; border-radius: 16px;
+  font-weight: 700; font-size: 15px; color: #fff; border: 0; cursor: pointer;
+  background: linear-gradient(180deg, #2fc24b 0%, #21a038 100%);
+  box-shadow: 0 6px 18px rgba(33,160,56,0.35), inset 0 1px 0 rgba(255,255,255,0.22) !important;
+  transition: transform .15s ease, filter .15s ease, box-shadow .15s ease;
+}
+.sber-btn:hover { filter: brightness(1.08); }
+.sber-btn:active { transform: scale(0.96); filter: brightness(0.95); }
+.sber-btn:disabled { opacity: .45; pointer-events: none; }
+.sber-btn-dark {
+  background: linear-gradient(180deg, #2a2a2a 0%, #1f1f1f 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.07), inset 0 0 0 1px rgba(255,255,255,0.05) !important;
+}
+.sber-btn-dark:hover { background: linear-gradient(180deg, #333 0%, #262626 100%); }
+.sber-btn-ghost {
+  background: rgba(47,194,75,0.14); color: #2fc24b; box-shadow: none !important;
+}
+.sber-btn-danger {
+  background: linear-gradient(180deg, #ef4444 0%, #c92f2f 100%);
+  box-shadow: 0 6px 18px rgba(239,68,68,0.3), inset 0 1px 0 rgba(255,255,255,0.2) !important;
+}
+.sber-icon-btn {
+  width: 44px; height: 44px; border-radius: 16px; color: #fff; border: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(180deg, #2c2c2c 0%, #1f1f1f 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), inset 0 0 0 1px rgba(255,255,255,0.05) !important;
+  transition: transform .15s ease, background .15s ease, color .15s ease;
+}
+.sber-icon-btn:hover { background: linear-gradient(180deg, #363636 0%, #262626 100%); color: #2fc24b; }
+.sber-icon-btn:active { transform: scale(0.9); }
+.sber-nav-pill {
+  display: flex; align-items: center; justify-content: center;
+  width: 52px; height: 30px; border-radius: 15px; transition: background .2s ease;
+}
+.sber-nav-pill.active { background: rgba(47,194,75,0.18); }
