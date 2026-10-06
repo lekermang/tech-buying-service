@@ -155,6 +155,52 @@ def _investor_public(conn, cur, share_token: str) -> dict:
     }
 
 
+MAX_BOT_URL = 'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c'
+
+
+def _rub(v) -> str:
+    return f"{int(round(float(v or 0))):,}".replace(',', '\u00a0') + ' ₽'
+
+
+def _g(v) -> str:
+    return f"{float(v or 0):.2f}".rstrip('0').rstrip('.').replace('.', ',') + ' г'
+
+
+def _employee_name(event: dict) -> str:
+    headers = {k.lower(): v for k, v in (event.get('headers') or {}).items()}
+    token = (headers.get('x-employee-token', '') or '').replace("'", "''")
+    if not token:
+        return ''
+    try:
+        conn = get_conn(); cur = conn.cursor()
+        cur.execute(f"SELECT full_name FROM {SCHEMA}.employees WHERE auth_token='{token}' AND is_active=true")
+        row = cur.fetchone(); cur.close(); conn.close()
+        return (row[0] if row and row[0] else '') or ''
+    except Exception:
+        return ''
+
+
+def _stock_line(cur) -> str:
+    """Остаток золота на складе (учёт веса): всё, что куплено и ещё не продано."""
+    cur.execute(
+        f"SELECT COALESCE(SUM(weight),0), COALESCE(SUM(buy_price),0), COUNT(*), "
+        f"COALESCE(SUM(weight * (CAST(NULLIF(purity,'') AS NUMERIC) / 585.0)),0) "
+        f"FROM {SCHEMA}.gold_orders WHERE status = 'new' AND weight > 0"
+    )
+    w, buy, cnt, w585 = cur.fetchone()
+    return (
+        f"📦 *Остаток на складе:* {_g(w)} ({int(cnt)} поз.), в 585 пробе {_g(w585)}\n"
+        f"💵 Вложено в остаток: {_rub(buy)}"
+    )
+
+
+def _notify_max(text: str) -> None:
+    try:
+        requests.post(f'{MAX_BOT_URL}?action=staff_send', json={'text': text}, timeout=6)
+    except Exception as e:
+        print(f'[gold-admin][MAX] {e}')
+
+
 def handler(event: dict, context) -> dict:
     """Управление заявками на скупку золота — CRUD + аналитика. Только для owner/admin."""
 
@@ -641,9 +687,20 @@ def handler(event: dict, context) -> dict:
                     WHERE id = {int(oid)}
                 """)
             conn.commit()
-            cur.close(); conn.close()
-
             total_profit = int(total_revenue - total_buy)
+            try:
+                _notify_max(
+                    f"💰 *Продано золото* ({len(updates)} поз.)\n\n"
+                    f"⚖️ *Вес: {_g(total_weight_raw)}*, в 585 пробе {_g(total_weight_585)}\n"
+                    f"💵 *Выручка: {_rub(total_revenue)}* ({_rub(price_per_gram_585)}/г в 585)\n"
+                    f"🛒 Куплено на: {_rub(total_buy)}\n"
+                    f"📈 Прибыль: {_rub(total_profit)}"
+                    + (f"\n👨‍💼 {_employee_name(event)}" if _employee_name(event) else "")
+                    + "\n\n" + _stock_line(cur)
+                )
+            except Exception as ne:
+                print(f'[gold-admin][sell_all notify] {ne}')
+            cur.close(); conn.close()
             return {
                 'statusCode': 200, 'headers': HEADERS,
                 'body': json.dumps({
@@ -711,6 +768,23 @@ def handler(event: dict, context) -> dict:
             """)
             order_id = cur.fetchone()[0]
             conn.commit()
+            try:
+                _w = float(weight) if weight else 0
+                _bp = int(buy_price) if buy_price is not None else 0
+                _text = (
+                    f"🥇 *Куплено золото* #{order_id}\n\n"
+                    f"📿 {str(body.get('item_name', '') or 'Золото')}"
+                    + (f", проба {PURITY_LABELS.get(str(body.get('purity') or ''), body.get('purity'))}" if body.get('purity') else "")
+                    + f"\n⚖️ *Вес: {_g(_w)}*\n"
+                    + f"💵 *Сумма: {_rub(_bp)}*"
+                    + (f" ({_rub(_bp / _w)}/г)" if _w > 0 and _bp > 0 else "")
+                    + (f"\n👤 {name}" if name else "")
+                    + (f"\n👨‍💼 {_employee_name(event)}" if _employee_name(event) else "")
+                    + "\n\n" + _stock_line(cur)
+                )
+                _notify_max(_text)
+            except Exception as ne:
+                print(f'[gold-admin][create notify] {ne}')
             cur.close(); conn.close()
             return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'order_id': order_id}, ensure_ascii=False)}
 
@@ -848,6 +922,23 @@ def handler(event: dict, context) -> dict:
             except Exception:
                 pass
 
+        if new_status in ('done', 'cancelled'):
+            try:
+                cur.execute(f"SELECT item_name, weight, purity, buy_price, sell_price FROM {SCHEMA}.gold_orders WHERE id = {order_id}")
+                _it = cur.fetchone()
+                if _it:
+                    _head = '💰 *Продано золото*' if new_status == 'done' else '❌ *Золото — отмена*'
+                    _notify_max(
+                        f"{_head} #{order_id}\n\n"
+                        f"📿 {_it[0] or 'Золото'}" + (f", проба {_it[2]}" if _it[2] else "") + "\n"
+                        f"⚖️ *Вес: {_g(_it[1])}*\n"
+                        + (f"💵 *Продано за: {_rub(_it[4])}*\n" if new_status == 'done' and _it[4] else "")
+                        + (f"🛒 Куплено за: {_rub(_it[3])}\n" if _it[3] else "")
+                        + (f"👨‍💼 {_employee_name(event)}\n" if _employee_name(event) else "")
+                        + "\n" + _stock_line(cur)
+                    )
+            except Exception as ne:
+                print(f'[gold-admin][status notify] {ne}')
         cur.close(); conn.close()
         return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True}, ensure_ascii=False)}
 

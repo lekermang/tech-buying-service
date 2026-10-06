@@ -1841,15 +1841,31 @@ def handler(event: dict, context) -> dict:
             main_chat_id = os.environ['TELEGRAM_CHAT_ID']
             send_tg_all(token, main_chat_id, conn, tg_msg)
 
-            # 💬 MAX-канал сотрудников: дубликат уведомления о смене статуса
+            # 💬 MAX-канал сотрудников: ремонт принят / готов / выдан
             try:
-                staff_max_text = (
-                    f"🔔 *Ремонт #{order_id} — {status_label}*\n\n"
-                    f"📱 {device_model or '—'}\n"
-                    f"👤 {client_name or '—'}\n"
-                    f"📞 {client_phone or '—'}"
-                    + (f"\n💰 {r_amount} ₽" if r_amount else "")
+                _emp_name = (current_employee(event)[2] or '').strip()
+                cur.execute(
+                    f"SELECT payment_method, purchase_amount, repair_amount, is_paid "
+                    f"FROM {SCHEMA}.repair_orders WHERE id = {order_id}"
                 )
+                _pr = cur.fetchone() or (None, None, None, None)
+                _pay = {'cash': 'наличные', 'card': 'карта', 'transfer': 'перевод'}.get(_pr[0] or '', _pr[0] or '')
+                _head = {
+                    'new': '📥 Ремонт принят',
+                    'accepted': '📥 Ремонт принят мастером',
+                    'ready': '✅ Ремонт готов',
+                    'done': '📤 Ремонт выдан клиенту',
+                }.get(new_status, f"🔔 Ремонт — {status_label}")
+                _sum = _pr[2] if new_status == 'done' and _pr[2] else r_amount
+                staff_max_text = (
+                    f"{_head} #{order_id}\n\n"
+                    f"📱 {device_model or '—'}\n"
+                    + (f"🔧 {repair_t}\n" if repair_t else "")
+                    + f"👤 {client_name or '—'}\n"
+                    + f"📞 {client_phone or '—'}\n"
+                    + (f"💰 {int(_sum):,} ₽".replace(',', '\u00a0') + (f" · {_pay}" if new_status == 'done' and _pay else "") + "\n" if _sum else "")
+                    + (f"👨‍💼 {_emp_name}" if _emp_name else "")
+                ).rstrip()
                 requests.post(
                     'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c?action=staff_send',
                     json={'text': staff_max_text},
