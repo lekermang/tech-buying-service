@@ -314,7 +314,9 @@ def handler(event, context):
             # Итог дня из лога
             cur.execute(
                 f"""
-                SELECT shift_date, hours_worked, base_rate, bonus_amount, total
+                SELECT shift_date, hours_worked, base_rate, bonus_amount, total,
+                       personal_profit, bonus_percent_at_time,
+                       personal_purchase_profit, bonus_percent_purchase_at_time, bonus_purchase_amount
                 FROM {SCHEMA}.employee_salary_log
                 WHERE employee_id = %s AND shift_date = %s
                 """,
@@ -335,7 +337,7 @@ def handler(event, context):
                 SELECT
                     op.id,
                     op.created_at,
-                    COALESCE(i.title, op.item_name, 'Товар') AS item_title,
+                    COALESCE(i.title, 'Товар') AS item_title,
                     c.name AS item_category,
                     op.amount AS sell_price,
                     COALESCE(i.buy_price, 0) AS buy_price,
@@ -355,41 +357,43 @@ def handler(event, context):
             )
             sales = cur.fetchall()
 
-            # Золото за день
+            # Другие операции магазина за день (справочно, в бонус не входят)
             cur.execute(
                 f"""
-                SELECT id, created_at, weight_g, price_per_g, total_price, item_description
+                SELECT id, created_at, item_name, weight, purity, buy_price
                 FROM {SCHEMA}.gold_orders
-                WHERE date(created_at) = %s AND status = 'completed'
+                WHERE (created_at AT TIME ZONE 'Europe/Moscow')::date = %s AND status <> 'cancelled'
                 ORDER BY created_at ASC
                 """,
                 (day_str,),
             )
             gold_orders = cur.fetchall()
 
-            # Ремонты за день (прибыль магазина)
             cur.execute(
                 f"""
-                SELECT id, created_at, device_model, repair_type, repair_amount,
-                       parts_cost, COALESCE(repair_amount - parts_cost, repair_amount) AS profit
+                SELECT id, created_at, model, repair_type, repair_amount,
+                       purchase_amount,
+                       (COALESCE(repair_amount, 0) - COALESCE(purchase_amount, 0)) AS profit
                 FROM {SCHEMA}.repair_orders
-                WHERE date(created_at) = %s AND status != 'cancelled'
+                WHERE (created_at AT TIME ZONE 'Europe/Moscow')::date = %s AND status <> 'cancelled'
                 ORDER BY created_at ASC
                 """,
                 (day_str,),
             )
             repair_orders = cur.fetchall()
 
-            # Договора 14 дней за день (выкупы)
             cur.execute(
                 f"""
-                SELECT id, created_at, item_name, loan_amount, interest_amount,
-                       COALESCE(interest_amount, 0) AS profit
-                FROM {SCHEMA}.contracts_14d
-                WHERE date(created_at) = %s AND status != 'cancelled'
-                ORDER BY created_at ASC
+                SELECT c.id, c.created_at, c.contract_number,
+                       TRIM(COALESCE(it.brand, '') || ' ' || COALESCE(it.model, '')) AS item_name,
+                       c.amount AS loan_amount,
+                       (c.total_due - c.amount) AS profit
+                FROM {SCHEMA}.contracts_14d c
+                LEFT JOIN {SCHEMA}.contracts_14d_items it ON it.id = c.item_id
+                WHERE c.start_date = %s AND c.status <> 'draft' AND c.created_by = %s
+                ORDER BY c.created_at ASC
                 """,
-                (day_str,),
+                (day_str, full_name),
             )
             contracts = cur.fetchall()
 
@@ -434,11 +438,12 @@ def handler(event, context):
 
             gold_list = []
             for g in gold_orders:
+                w = float(g.get('weight') or 0)
                 gold_list.append({
                     'id': g['id'],
                     'time': g['created_at'].strftime('%H:%M') if g['created_at'] else '',
-                    'description': g.get('item_description') or f"{g.get('weight_g', '?')} г",
-                    'total_price': int(g.get('total_price') or 0),
+                    'description': f"{g.get('item_name') or 'Золото'}, {w:g} г" + (f", проба {g['purity']}" if g.get('purity') else ''),
+                    'total_price': int(g.get('buy_price') or 0),
                 })
 
             repair_list = []
@@ -446,10 +451,10 @@ def handler(event, context):
                 repair_list.append({
                     'id': r['id'],
                     'time': r['created_at'].strftime('%H:%M') if r['created_at'] else '',
-                    'device': r.get('device_model') or '—',
+                    'device': r.get('model') or '—',
                     'repair_type': r.get('repair_type') or '—',
                     'amount': int(r.get('repair_amount') or 0),
-                    'parts_cost': int(r.get('parts_cost') or 0),
+                    'parts_cost': int(r.get('purchase_amount') or 0),
                     'profit': int(r.get('profit') or 0),
                 })
 
@@ -458,7 +463,7 @@ def handler(event, context):
                 contract_list.append({
                     'id': c['id'],
                     'time': c['created_at'].strftime('%H:%M') if c['created_at'] else '',
-                    'item_name': c.get('item_name') or '—',
+                    'item_name': f"{c.get('contract_number') or ''} {c.get('item_name') or ''}".strip() or '—',
                     'loan_amount': int(c.get('loan_amount') or 0),
                     'profit': int(c.get('profit') or 0),
                 })
@@ -507,8 +512,28 @@ def handler(event, context):
                 },
             }
 
+            rate_day = int((day_log or {}).get('base_rate') or 0)
+            sales_profit = sum(x['profit'] for x in sales_list)
+            sales_bonus = sum(x['bonus_from_sale'] for x in sales_list)
+            purch_profit = sum(x['profit'] for x in purchase_list)
+            purch_bonus = sum(x['bonus_from_purchase'] for x in purchase_list)
+            calc = {
+                'rate': rate_day,
+                'sales_profit': sales_profit,
+                'sales_percent': bonus_pct,
+                'sales_bonus': pct_round(sales_profit, bonus_pct),
+                'purchase_profit': purch_profit,
+                'purchase_percent': bonus_pct_purchase,
+                'purchase_bonus': pct_round(purch_profit, bonus_pct_purchase),
+            }
+            calc['computed_total'] = calc['rate'] + calc['sales_bonus'] + calc['purchase_bonus']
+            calc['saved_total'] = int((day_log or {}).get('total') or 0)
+            calc['saved_bonus_sales'] = int((day_log or {}).get('bonus_amount') or 0)
+            calc['saved_bonus_purchase'] = int((day_log or {}).get('bonus_purchase_amount') or 0)
+
             return resp(200, {
                 'date': day_str,
+                'calc': calc,
                 'day_log': day_log,
                 'config': {
                     'daily_rate': cfg['daily_rate'],

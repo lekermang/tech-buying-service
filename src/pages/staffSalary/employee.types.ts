@@ -49,8 +49,15 @@ export type Breakdown = {
   contracts: { count: number; revenue: number; profit: number };
 };
 
+export type DayCalc = {
+  rate: number;
+  sales_profit: number; sales_percent: number; sales_bonus: number;
+  purchase_profit: number; purchase_percent: number; purchase_bonus: number;
+  computed_total: number; saved_total: number; saved_bonus_sales: number; saved_bonus_purchase: number;
+};
+
 export type DayDetail = {
-  date: string; day_log: DayRow | null;
+  date: string; day_log: DayRow | null; calc?: DayCalc;
   config: { daily_rate: number; bonus_percent: number; bonus_percent_purchase: number };
   sales: SaleRow[];
   purchases?: PurchaseRow[];

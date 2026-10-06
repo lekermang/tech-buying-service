@@ -76,6 +76,51 @@ export default function EmployeeSalesHistory({
                       <div className="font-roboto text-[10px] uppercase tracking-widest mb-2" style={{ color: "rgba(255,255,255,0.3)" }}>
                         Расшифровка начислений
                       </div>
+                      {detail.calc && (
+                        <div className="rounded-xl p-3 mb-2" style={{ background: "rgba(255,215,0,0.06)", border: "1px solid rgba(255,215,0,0.25)" }}>
+                          <div className="font-oswald font-bold text-sm uppercase tracking-wide text-[#FFD700] mb-2">Как посчитано</div>
+                          <div className="space-y-1.5 font-roboto text-[13px]">
+                            <div className="flex justify-between gap-3">
+                              <span className="text-white/70">Оклад за смену</span>
+                              <b className="text-white tabular-nums">{fmt(detail.calc.rate)} ₽</b>
+                            </div>
+                            <div>
+                              <div className="flex justify-between gap-3">
+                                <span className="text-white/70">Бонус с продаж: {detail.calc.sales_percent}% от прибыли</span>
+                                <b className="tabular-nums" style={{ color: "#a78bfa" }}>+{fmt(detail.calc.sales_bonus)} ₽</b>
+                              </div>
+                              <div className="text-[11px] text-white/40">
+                                Прибыль {fmt(detail.calc.sales_profit)} ₽ × {detail.calc.sales_percent}% = {fmt(detail.calc.sales_bonus)} ₽
+                                {detail.sales.length > 0 && ` · продаж: ${detail.sales.length}`}
+                              </div>
+                            </div>
+                            {(detail.calc.purchase_percent > 0 || detail.calc.purchase_profit > 0) && (
+                              <div>
+                                <div className="flex justify-between gap-3">
+                                  <span className="text-white/70">Бонус с закупок: {detail.calc.purchase_percent}% от прибыли</span>
+                                  <b className="tabular-nums" style={{ color: "#f0b429" }}>+{fmt(detail.calc.purchase_bonus)} ₽</b>
+                                </div>
+                                <div className="text-[11px] text-white/40">
+                                  Прибыль {fmt(detail.calc.purchase_profit)} ₽ × {detail.calc.purchase_percent}% = {fmt(detail.calc.purchase_bonus)} ₽
+                                  {(detail.purchases?.length ?? 0) > 0 && ` · закупок: ${detail.purchases!.length}`}
+                                </div>
+                              </div>
+                            )}
+                            <div className="flex justify-between gap-3 pt-1.5 border-t border-white/10">
+                              <span className="font-bold text-white">Итого за день</span>
+                              <b className="font-oswald text-base tabular-nums text-[#FFD700]">{fmt(detail.calc.saved_total || detail.calc.computed_total)} ₽</b>
+                            </div>
+                            {detail.calc.saved_total !== detail.calc.computed_total && detail.calc.saved_total > 0 && (
+                              <div className="text-[11px] text-orange-300">
+                                По продажам выходит {fmt(detail.calc.computed_total)} ₽, но владелец записал {fmt(detail.calc.saved_total)} ₽.
+                              </div>
+                            )}
+                          </div>
+                          <div className="mt-2 text-[11px] text-white/35">
+                            Прибыль = цена продажи минус закупочная цена товара. Бонус с продаж получает тот, кто продал, бонус с закупок — тот, кто принял товар у клиента.
+                          </div>
+                        </div>
+                      )}
                       {rate > 0 && (
                         <div className="flex items-center justify-between px-3 py-2 rounded-lg" style={{ background: "rgba(255,255,255,0.04)" }}>
                           <div className="flex items-center gap-2">
