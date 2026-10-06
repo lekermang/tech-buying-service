@@ -21,7 +21,6 @@ function isoLocal(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 }
 function startOfMonth(d: Date) { return new Date(d.getFullYear(), d.getMonth(), 1); }
-function endOfMonth(d: Date)   { return new Date(d.getFullYear(), d.getMonth() + 1, 0); }
 
 export default function EmployeeSalaryView({ token, employeeName }: Props) {
   const todayIso = isoLocal(new Date());
@@ -38,8 +37,8 @@ export default function EmployeeSalaryView({ token, employeeName }: Props) {
     return viewMonth.getFullYear() === now.getFullYear() && viewMonth.getMonth() === now.getMonth();
   }, [viewMonth]);
 
-  const dateFrom = isoLocal(startOfMonth(viewMonth));
-  const dateTo   = isoLocal(endOfMonth(viewMonth));
+  const dateFrom = "2000-01-01";
+  const dateTo   = "2100-12-31";
 
   // Детализация обычных продаж
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
@@ -124,6 +123,9 @@ export default function EmployeeSalaryView({ token, employeeName }: Props) {
   };
 
   const totalEarned = days.reduce((s, d) => s + Number(d.total), 0);
+  const workedDays = days.filter(d => Number(d.total) > 0).length;
+  const baseSum = days.reduce((s, d) => s + (Number(d.base_rate) || 0), 0);
+  const bonusSum = days.reduce((s, d) => s + (Number(d.bonus_amount) || 0) + (Number(d.bonus_purchase_amount) || 0), 0);
   const totalPaid = payouts.filter(p => p.amount > 0).reduce((s, p) => s + Number(p.amount), 0);
 
   if (loading || !state) {
@@ -192,7 +194,7 @@ export default function EmployeeSalaryView({ token, employeeName }: Props) {
           border: "1.5px solid rgba(52,211,153,0.3)",
           boxShadow: "0 0 32px rgba(52,211,153,0.08)",
         }}>
-          <div className="font-roboto text-[10px] uppercase tracking-widest mb-1" style={{ color: "rgba(52,211,153,0.6)" }}>Заработано за месяц</div>
+          <div className="font-roboto text-[10px] uppercase tracking-widest mb-1" style={{ color: "rgba(52,211,153,0.6)" }}>Заработано всего</div>
           <div className="font-oswald font-black text-5xl tabular-nums" style={{ color: "#34d399" }}>
             {fmt(repairHistory?.total_earned ?? 0)} ₽
           </div>
@@ -219,12 +221,29 @@ export default function EmployeeSalaryView({ token, employeeName }: Props) {
         </div>
       )}
 
+      {!isRepairMaster && (
+        <div className="grid grid-cols-3 gap-2">
+          <div className="sber-card p-3">
+            <div className="text-[11px]" style={{ color: "var(--sber-text-2)" }}>Отработано дней</div>
+            <div className="text-[22px] font-extrabold">{workedDays}</div>
+          </div>
+          <div className="sber-card p-3">
+            <div className="text-[11px]" style={{ color: "var(--sber-text-2)" }}>За выходы</div>
+            <div className="text-[22px] font-extrabold">{fmt(baseSum)} ₽</div>
+          </div>
+          <div className="sber-card p-3">
+            <div className="text-[11px]" style={{ color: "var(--sber-text-2)" }}>Проценты</div>
+            <div className="text-[22px] font-extrabold" style={{ color: "var(--sber-green-2)" }}>{fmt(bonusSum)} ₽</div>
+          </div>
+        </div>
+      )}
+
       {days.length > 0 && (
         <div className="sber-card p-4">
-          <div className="text-[13px]" style={{ color: "var(--sber-text-2)" }}>Доход по дням</div>
+          <div className="text-[13px]" style={{ color: "var(--sber-text-2)" }}>Всего начислено · последние 30 дней на графике</div>
           <div className="text-[26px] font-extrabold mb-1">{fmt(totalEarned)} ₽</div>
           <SberBarChart
-            data={[...days].reverse().map(d => ({
+            data={[...days].slice(0, 30).reverse().map(d => ({
               label: new Date(d.shift_date + "T12:00:00").toLocaleDateString("ru-RU", { day: "numeric" }),
               value: Number(d.total) || 0,
             }))}

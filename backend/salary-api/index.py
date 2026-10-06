@@ -172,7 +172,7 @@ def handler(event, context):
                 f"WHERE employee_id = %s",
                 (user_id,),
             )
-            cfg = cur.fetchone() or {'daily_rate': 2000, 'bonus_percent': 3.0, 'bonus_percent_purchase': 7.0}
+            cfg = cur.fetchone() or {'daily_rate': 2000, 'bonus_percent': 10.0, 'bonus_percent_purchase': 0.0}
 
             # Запись на сегодня (если владелец уже её проставил)
             cur.execute(
@@ -239,7 +239,7 @@ def handler(event, context):
                 'config': {
                     'daily_rate': cfg['daily_rate'],
                     'bonus_percent': float(cfg['bonus_percent']),
-                    'bonus_percent_purchase': float(cfg.get('bonus_percent_purchase', 7.0) or 7.0),
+                    'bonus_percent_purchase': float(cfg.get('bonus_percent_purchase') or 0),
                 },
                 'today_total': today_total,
                 'total_earned': total_earned,
@@ -329,7 +329,7 @@ def handler(event, context):
                 f"SELECT daily_rate, bonus_percent, bonus_percent_purchase FROM {SCHEMA}.employee_salary_config WHERE employee_id = %s",
                 (user_id,),
             )
-            cfg = cur.fetchone() or {'daily_rate': 2000, 'bonus_percent': 3.0, 'bonus_percent_purchase': 7.0}
+            cfg = cur.fetchone() or {'daily_rate': 2000, 'bonus_percent': 10.0, 'bonus_percent_purchase': 0.0}
 
             # Список конкретных продаж за этот день (Б/у техника)
             cur.execute(
@@ -419,8 +419,8 @@ def handler(event, context):
             )
             purchases = cur.fetchall()
 
-            bonus_pct = float(cfg['bonus_percent']) if cfg else 3.0
-            bonus_pct_purchase = float(cfg.get('bonus_percent_purchase', 7.0) or 7.0) if cfg else 7.0
+            bonus_pct = float(cfg['bonus_percent']) if cfg else 10.0
+            bonus_pct_purchase = float(cfg.get('bonus_percent_purchase') or 0) if cfg else 0.0
             sales_list = []
             for s in sales:
                 profit = int(s['profit'] or 0)
@@ -708,8 +708,8 @@ def handler(event, context):
                 SELECT
                   e.id, e.full_name, e.login, e.position, e.role,
                   COALESCE(cfg.daily_rate, 2000) AS daily_rate,
-                  COALESCE(cfg.bonus_percent, 3.0) AS bonus_percent,
-                  COALESCE(cfg.bonus_percent_purchase, 7.0) AS bonus_percent_purchase,
+                  COALESCE(cfg.bonus_percent, 10.0) AS bonus_percent,
+                  COALESCE(cfg.bonus_percent_purchase, 0.0) AS bonus_percent_purchase,
                   COALESCE(cfg.min_hours_for_rate, 10.0) AS min_hours_for_rate,
                   sh.id AS shift_id, sh.status AS shift_status,
                   sh.started_at, sh.ended_at,
@@ -955,9 +955,9 @@ def handler(event, context):
                 f"WHERE employee_id = %s",
                 (emp_id,),
             )
-            cfg = cur.fetchone() or {'daily_rate': 2000, 'bonus_percent': Decimal('3.0'), 'bonus_percent_purchase': Decimal('7.0')}
+            cfg = cur.fetchone() or {'daily_rate': 2000, 'bonus_percent': Decimal('10.0'), 'bonus_percent_purchase': Decimal('0')}
             percent = Decimal(str(cfg['bonus_percent']))
-            percent_purchase = Decimal(str(cfg.get('bonus_percent_purchase', Decimal('7.0')) or Decimal('7.0')))
+            percent_purchase = Decimal(str(cfg.get('bonus_percent_purchase') or 0))
 
             # Токен и имя сотрудника для расчёта slshop-прибыли
             cur.execute(f"SELECT auth_token, full_name FROM {SCHEMA}.employees WHERE id = %s", (emp_id,))
@@ -1043,9 +1043,9 @@ def handler(event, context):
                 f"SELECT daily_rate, bonus_percent, bonus_percent_purchase FROM {SCHEMA}.employee_salary_config WHERE employee_id = %s",
                 (emp_id,),
             )
-            cfg = cur.fetchone() or {'daily_rate': 2000, 'bonus_percent': Decimal('3.0'), 'bonus_percent_purchase': Decimal('7.0')}
+            cfg = cur.fetchone() or {'daily_rate': 2000, 'bonus_percent': Decimal('10.0'), 'bonus_percent_purchase': Decimal('0')}
             percent = Decimal(str(cfg['bonus_percent']))
-            percent_purchase = Decimal(str(cfg.get('bonus_percent_purchase', Decimal('7.0')) or Decimal('7.0')))
+            percent_purchase = Decimal(str(cfg.get('bonus_percent_purchase') or 0))
 
             cur.execute(f"SELECT auth_token, full_name FROM {SCHEMA}.employees WHERE id = %s", (emp_id,))
             emp_row = cur.fetchone()
@@ -1144,9 +1144,9 @@ def handler(event, context):
                 f"SELECT bonus_percent, bonus_percent_purchase FROM {SCHEMA}.employee_salary_config WHERE employee_id = %s",
                 (emp_id,),
             )
-            cfg = cur.fetchone() or {'bonus_percent': Decimal('3.0'), 'bonus_percent_purchase': Decimal('7.0')}
+            cfg = cur.fetchone() or {'bonus_percent': Decimal('10.0'), 'bonus_percent_purchase': Decimal('0')}
             percent = Decimal(str(cfg['bonus_percent']))
-            percent_purchase = Decimal(str(cfg.get('bonus_percent_purchase', Decimal('7.0')) or Decimal('7.0')))
+            percent_purchase = Decimal(str(cfg.get('bonus_percent_purchase') or 0))
 
             cur.execute(f"SELECT auth_token, full_name FROM {SCHEMA}.employees WHERE id = %s", (emp_id,))
             emp_row = cur.fetchone()
@@ -1308,8 +1308,8 @@ def handler(event, context):
         if not emp_id:
             return resp(400, {'error': 'employee_id required'})
         daily_rate = int(body.get('daily_rate', 2000))
-        bonus_percent = float(body.get('bonus_percent', 3.0))
-        bonus_percent_purchase = float(body.get('bonus_percent_purchase', 7.0))
+        bonus_percent = float(body.get('bonus_percent', 10.0))
+        bonus_percent_purchase = float(body.get('bonus_percent_purchase', 0.0))
         min_hours = float(body.get('min_hours_for_rate', 10.0))
 
         with get_conn() as conn, conn.cursor() as cur:
