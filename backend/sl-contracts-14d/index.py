@@ -13,6 +13,37 @@ import boto3
 MAX_BOT_URL = 'https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c'
 
 
+def _notify_contract_created(contract_number: str, client_name: str, item_name: str,
+                              amount: float, total_due: float, term_days: int,
+                              end_date, actor_name: str, is_late: bool = False) -> None:
+    """Уведомляет сотрудников в MAX и Telegram о том, что взято в залог (договор 14 дней)."""
+    text = (
+        f"🔐 *Взято в залог*\n\n"
+        f"📋 {contract_number}\n"
+        f"👤 {client_name}\n"
+        f"📱 {item_name}\n"
+        f"💵 Выдано: *{int(amount):,} ₽*\n".replace(',', '\u00a0') +
+        f"↩️ К возврату: {int(total_due):,} ₽\n".replace(',', '\u00a0') +
+        f"🕐 Срок: {term_days} дн. (до {end_date.strftime('%d.%m.%Y')})\n"
+        + ("⚠️ Внесён задним числом\n" if is_late else "")
+        + f"👨‍💼 Принял: {actor_name}"
+    )
+    try:
+        requests.post(f'{MAX_BOT_URL}?action=staff_send', json={'text': text}, timeout=6)
+    except Exception as e:
+        print(f'[sl-contracts][notify_created MAX] error: {e}')
+    try:
+        tg_token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+        tg_chat = os.environ.get('TELEGRAM_CHAT_ID', '')
+        if tg_token and tg_chat:
+            requests.post(
+                f'https://api.telegram.org/bot{tg_token}/sendMessage',
+                json={'chat_id': tg_chat, 'text': text, 'parse_mode': 'Markdown'}, timeout=6,
+            )
+    except Exception as e:
+        print(f'[sl-contracts][notify_created TG] error: {e}')
+
+
 def _notify_contract_closed(contract_number: str, client_name: str, item_name: str,
                              amount: float, profit: float, actor_name: str) -> None:
     """Уведомляет сотрудников в MAX о том, что клиент вышел с договора."""
@@ -453,7 +484,30 @@ def action_create(body, actor):
             'cash_account_id': resolved_cash_id,
             'payout_movement_id': payout_movement_id,
         }, actor)
+        if status == 'active':
+            try:
+                cur.execute(
+                    f"INSERT INTO {SCHEMA}.slshop_events (event_type, entity_type, entity_id, title, description, amount, employee_name) "
+                    f"VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                    ('pledge', 'contract', contract_id,
+                     f"Взято в залог: {' '.join(filter(None, [item.get('brand'), item.get('model')])) or item.get('item_type') or 'Устройство'}",
+                     f"Договор {contract_number}, {(client.get('full_name') or '').strip()}, {term_days} дн.",
+                     float(amount), (actor or {}).get('full_name'))
+                )
+            except Exception as ee:
+                print(f'[sl-contracts][create] journal error: {ee}')
         conn.commit()
+        if status == 'active':
+            try:
+                _notify_contract_created(
+                    contract_number,
+                    (client.get('full_name') or '').strip(),
+                    ' '.join(filter(None, [item.get('brand'), item.get('model')])) or item.get('item_type') or 'Устройство',
+                    float(amount), float(total_due), term_days, end_date,
+                    (actor or {}).get('full_name') or 'Сотрудник', is_late,
+                )
+            except Exception as ne:
+                print(f'[sl-contracts][create] notify error: {ne}')
         return _ok({
             'id': contract_id,
             'contract_number': contract_number,

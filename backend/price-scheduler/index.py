@@ -1713,6 +1713,84 @@ def do_send_price_to_max() -> dict:
         return {'ok': False, 'error': str(e)}
 
 
+ACQUIRING_HOUR = 20
+ACQUIRING_MINUTE = 30
+
+
+def acquiring_already_sent_today() -> bool:
+    key = 'acquiring_reminder_date'
+    today = datetime.now(MSK).strftime('%Y-%m-%d')
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT value FROM " + SCHEMA + ".settings WHERE key = %s", (key,))
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    return bool(row and row[0] == today)
+
+
+def mark_acquiring_sent() -> None:
+    today = datetime.now(MSK).strftime('%Y-%m-%d')
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO " + SCHEMA + ".settings (key, value, description, updated_at) "
+        "VALUES ('acquiring_reminder_date', %s, 'Дата последнего напоминания о сверке эквайринга', NOW()) "
+        "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()",
+        (today,)
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+def _rub(v) -> str:
+    return f"{int(round(float(v or 0))):,}".replace(',', '\u00a0') + ' ₽'
+
+
+def do_send_acquiring_reminder() -> dict:
+    """Напоминание в MAX: сверить итоги дня на эквайринге (терминале) с картовыми продажами."""
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT COUNT(*), COALESCE(SUM(amount), 0) FROM " + SCHEMA + ".slshop_operations "
+        "WHERE op_type = 'sell' AND payment_method = 'card' "
+        "AND (created_at AT TIME ZONE 'Europe/Moscow')::date = (NOW() AT TIME ZONE 'Europe/Moscow')::date"
+    )
+    sales_cnt, sales_sum = cur.fetchone()
+    cur.execute(
+        "SELECT COUNT(*), COALESCE(SUM(COALESCE(repair_amount, price, 0)), 0) FROM " + SCHEMA + ".repair_orders "
+        "WHERE is_paid = true AND payment_method = 'card' "
+        "AND (status_updated_at AT TIME ZONE 'Europe/Moscow')::date = (NOW() AT TIME ZONE 'Europe/Moscow')::date"
+    )
+    rep_cnt, rep_sum = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    total = float(sales_sum or 0) + float(rep_sum or 0)
+    date_str = datetime.now(MSK).strftime('%d.%m.%Y')
+    text = (
+        f"💳 *Сверка итогов на эквайринге* — {date_str}\n\n"
+        f"Закройте смену на терминале и сверьте итог с системой:\n\n"
+        f"🛒 Продажи по карте: {int(sales_cnt)} шт — {_rub(sales_sum)}\n"
+        f"🔧 Ремонты по карте: {int(rep_cnt)} шт — {_rub(rep_sum)}\n"
+        f"━━━━━━━━━━\n"
+        f"💵 *Ожидаемый итог по карте: {_rub(total)}*\n\n"
+        f"Если сумма на терминале отличается — сообщите владельцу."
+    )
+    try:
+        req = urllib.request.Request(
+            f'{MAX_BOT_URL}?action=staff_send',
+            data=json.dumps({'text': text}).encode('utf-8'),
+            headers={'Content-Type': 'application/json'},
+        )
+        with urllib.request.urlopen(req, timeout=12) as resp:
+            d = json.loads(resp.read())
+        return {'ok': True, 'sales': float(sales_sum or 0), 'repairs': float(rep_sum or 0), 'response': d}
+    except Exception as e:
+        return {'ok': False, 'error': str(e)}
+
+
 def handler(event: dict, context) -> dict:
     """Отправка прайса в Telegram + ping sitemap в Яндекс.Вебмастер (10:00 МСК) + автопостинг новостей каждый час"""
     if event.get('httpMethod') == 'OPTIONS':
@@ -1786,6 +1864,9 @@ def handler(event: dict, context) -> dict:
         result = do_send_master_report(force=True)
         return ok(result)
 
+    if action == 'send_acquiring_reminder':
+        return ok(do_send_acquiring_reminder())
+
     if action == 'send_morning_reminder':
         result = do_send_morning_reminder()
         return ok(result)
@@ -1827,6 +1908,13 @@ def handler(event: dict, context) -> dict:
         # 99% тиков schedule_check теперь возвращают skipped за <50мс.
         # Реальная работа делается только в action == 'send_now' / 'sync_tools_now' / 'post_news_now' / ...
         is_top_of_hour = now_msk.minute < 5
+
+        # 20:30 МСК — напоминание о сверке эквайринга (с запасом до конца дня, если тик пропущен)
+        if (now_msk.hour, now_msk.minute) >= (ACQUIRING_HOUR, ACQUIRING_MINUTE) and not acquiring_already_sent_today():
+            acq = do_send_acquiring_reminder()
+            if acq.get('ok'):
+                mark_acquiring_sent()
+            return ok({'acquiring_reminder': acq})
 
         # Прайс отправляется только раз в день, в SEND_HOUR (10:00). Всё остальное — skipped.
         if not is_top_of_hour or now_msk.hour != SEND_HOUR:

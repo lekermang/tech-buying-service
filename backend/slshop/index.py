@@ -26,16 +26,16 @@ PUSH_URL = "https://functions.poehali.dev/0a041e7f-92ab-4dbf-86f0-cd09e3eabfbd"
 MAX_BOT_URL = "https://functions.poehali.dev/4618b13e-cd61-4167-b943-0f3d439d0c8c"
 
 
-def _notify_sale(title: str, item_name: str, amount: float, employee_name: str, qty: int = 1) -> None:
-    """Уведомляет сотрудников в MAX и Telegram о продаже со смартломбарда."""
+PAY_LABELS = {'cash': 'наличные', 'card': 'карта', 'transfer': 'перевод'}
+
+
+def _fmt_rub(v) -> str:
+    return f"{int(round(float(v or 0))):,}".replace(',', '\u00a0') + ' ₽'
+
+
+def _send_staff(text: str) -> None:
+    """Дублирует операцию в MAX (все staff-каналы) и в Telegram."""
     try:
-        qty_text = f' ({qty} шт)' if qty > 1 else ''
-        text = (
-            f"💰 *Продажа со склада*\n\n"
-            f"📱 {item_name}{qty_text}\n"
-            f"💵 *{int(amount):,} ₽*\n".replace(',', '\u00a0') +
-            f"👨‍💼 {employee_name}"
-        )
         data = json.dumps({'text': text}).encode('utf-8')
         req = urllib.request.Request(
             f'{MAX_BOT_URL}?action=staff_send', data=data, method='POST',
@@ -43,18 +43,11 @@ def _notify_sale(title: str, item_name: str, amount: float, employee_name: str, 
         )
         urllib.request.urlopen(req, timeout=5).read()
     except Exception as e:
-        print(f'[slshop][notify_sale MAX] {e}')
+        print(f'[slshop][notify MAX] {e}')
     try:
         tg_token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
         tg_chat = os.environ.get('TELEGRAM_CHAT_ID', '')
         if tg_token and tg_chat:
-            qty_text = f' ({qty} шт)' if qty > 1 else ''
-            text = (
-                f"💰 *Продажа со склада*\n\n"
-                f"📱 {item_name}{qty_text}\n"
-                f"💵 *{int(amount):,} ₽*\n".replace(',', '\u00a0') +
-                f"👨‍💼 {employee_name}"
-            )
             data = json.dumps({'chat_id': tg_chat, 'text': text, 'parse_mode': 'Markdown'}).encode('utf-8')
             req = urllib.request.Request(
                 f'https://api.telegram.org/bot{tg_token}/sendMessage', data=data, method='POST',
@@ -62,7 +55,33 @@ def _notify_sale(title: str, item_name: str, amount: float, employee_name: str, 
             )
             urllib.request.urlopen(req, timeout=5).read()
     except Exception as e:
-        print(f'[slshop][notify_sale TG] {e}')
+        print(f'[slshop][notify TG] {e}')
+
+
+def _notify_sale(title: str, item_name: str, amount: float, employee_name: str, qty: int = 1,
+                 payment: str = '', contract: str = '') -> None:
+    qty_text = f' ({qty} шт)' if qty > 1 else ''
+    pay = PAY_LABELS.get(payment or '', payment or '')
+    text = (
+        f"💰 *Продано*\n\n"
+        f"📱 {item_name}{qty_text}\n"
+        f"💵 *{_fmt_rub(amount)}*" + (f" · {pay}" if pay else '') + "\n"
+        + (f"📋 Договор: {contract}\n" if contract else '')
+        + f"👨‍💼 {employee_name}"
+    )
+    _send_staff(text)
+
+
+def _notify_buy(title: str, buy_price: float, qty: int, employee_name: str, bulk: bool = False) -> None:
+    qty_text = f' × {qty} шт' if qty > 1 else ''
+    head = '📦 *Закуплено*' if bulk else '🛒 *Куплено*'
+    text = (
+        f"{head}\n\n"
+        f"📱 {title}{qty_text}\n"
+        f"💵 *{_fmt_rub(buy_price * qty)}*" + (f" ({_fmt_rub(buy_price)} за шт)" if qty > 1 else '') + "\n"
+        f"👨‍💼 {employee_name}"
+    )
+    _send_staff(text)
 
 
 def _send_push_event(title: str, body: str, url: str = "/staff", tag: str = "slshop") -> None:
@@ -1697,6 +1716,7 @@ def items_bulk_create(body, employee):
             'status': status,
             'source': source,
             'branch_id': branch_id,
+            '_bulk': True,
         }
         res = create_item(sub_body, employee)
         try:
@@ -1717,6 +1737,21 @@ def items_bulk_create(body, employee):
             total_buy += buy * qty
         else:
             errors.append({'index': idx, 'title': title, 'error': data.get('error') or 'Не удалось создать'})
+
+    try:
+        if created and total_buy > 0:
+            _lines = '\n'.join(
+                f"• {c['title']}" + (f" × {c['quantity']}" if c['quantity'] > 1 else '') + f" — {_fmt_rub(c['buy_price'] * c['quantity'])}"
+                for c in created[:15]
+            )
+            _more = f"\n…и ещё {len(created) - 15}" if len(created) > 15 else ''
+            _emp = (employee.get('full_name') if employee else None) or 'Сотрудник'
+            _send_staff(
+                f"📦 *Закуплено* ({len(created)} поз., {total_qty} шт)\n\n{_lines}{_more}\n\n"
+                f"💵 *Итого: {_fmt_rub(total_buy)}*\n👨‍💼 {_emp}"
+            )
+    except Exception as ne:
+        print(f'[slshop][bulk_create] notify error: {ne}')
 
     return _ok({
         'created': created,
@@ -2052,7 +2087,8 @@ def create_item(body, employee):
     unit_buy_price = float(data.get('buy_price') or 0)
     total_buy = unit_buy_price * qty
     log_note = f'Цена {unit_buy_price:g} ₽' + (f' × {qty} шт = {total_buy:g} ₽' if qty > 1 else '')
-    _log_event(cur, 'buy', 'item', item_id, f'Скупка: {title}' + (f' ({qty} шт)' if qty > 1 else ''),
+    _is_bulk = bool(body.get('_bulk'))
+    _log_event(cur, 'buy', 'item', item_id, f"{'Закуплено' if _is_bulk else 'Куплено'}: {title}" + (f' ({qty} шт)' if qty > 1 else ''),
                log_note, total_buy, data.get('branch_id'), employee)
     # Если это скупка с ценой > 0 — создадим операцию buy
     if data.get('source', 'buyout') == 'buyout' and unit_buy_price > 0:
@@ -2105,6 +2141,11 @@ def create_item(body, employee):
             )
     except Exception:
         pass
+    try:
+        if unit_buy_price > 0 and not body.get('_bulk') and data.get('source', 'buyout') == 'buyout':
+            _notify_buy(title, unit_buy_price, qty, (employee.get('full_name') if employee else None) or 'Сотрудник')
+    except Exception as ne:
+        print(f'[slshop][create_item] notify error: {ne}')
     auto_timesheet(employee)
     return _ok({'id': item_id, 'sku': sku})
 
@@ -2649,7 +2690,7 @@ def sell_item(body, employee):
     # Уведомляем сотрудников о продаже в MAX и Telegram
     try:
         emp_name = (employee.get('full_name') if employee else None) or 'Сотрудник'
-        _notify_sale(sold_title or 'Товар', sold_title or 'Товар', float(amount), emp_name, sell_qty)
+        _notify_sale(sold_title or 'Товар', sold_title or 'Товар', float(amount), emp_name, sell_qty, payment, contract or '')
     except Exception as ne:
         print(f'[slshop][sell_item] notify error: {ne}')
 

@@ -3,8 +3,9 @@ import Icon from "@/components/ui/icon";
 import { slApi, fmt, type SLEvent } from "./types";
 
 const ACTION_LABELS: Record<string, { l: string; icon: string; color: string }> = {
-  buy: { l: "Скупка", icon: "ShoppingCart", color: "text-emerald-300" },
-  sale: { l: "Продажа", icon: "HandCoins", color: "text-blue-300" },
+  buy: { l: "Куплено / закуплено", icon: "ShoppingCart", color: "text-emerald-300" },
+  sale: { l: "Продано", icon: "HandCoins", color: "text-blue-300" },
+  pledge: { l: "Взято в залог", icon: "Lock", color: "text-amber-300" },
   return: { l: "Возврат", icon: "Undo2", color: "text-orange-300" },
   cash_in: { l: "Касса: приход", icon: "ArrowDownToLine", color: "text-emerald-300" },
   cash_out: { l: "Касса: расход", icon: "ArrowUpFromLine", color: "text-red-300" },
