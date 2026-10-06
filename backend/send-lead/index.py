@@ -563,7 +563,7 @@ def handler(event: dict, context) -> dict:
                 + (f"📡 Связь: {channels_str}\n" if channels_str else "")
                 + "\n⚠️ Позвонить клиенту сразу, не откладывая!\nИсточник: сайт"
             )
-            staff_payload: dict = {'text': staff_text}
+            staff_payload: dict = {'text': staff_text, 'lead_id': lead_id}
             if cdn_photo_urls:
                 staff_payload['photo_urls'] = cdn_photo_urls[:3]
             r_max = requests.post(

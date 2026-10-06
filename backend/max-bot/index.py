@@ -979,6 +979,81 @@ def answer_callback(callback_id: str, text: str | None = None, notification: str
     return max_call('answers', params={'callback_id': callback_id}, payload=payload or {'notification': '✓'})
 
 
+LEAD_STATUS_MARK = '\n\n━━━━━━━━━━\n'
+
+
+def lead_keyboard(lead_id: int) -> dict:
+    return {'buttons': [
+        [{'type': 'callback', 'text': '🎯 Беру в работу', 'payload': f'lead:take:{lead_id}'}],
+        [{'type': 'callback', 'text': '✅ Обработана', 'payload': f'lead:done:{lead_id}'},
+         {'type': 'callback', 'text': '❌ Не обработана', 'payload': f'lead:undone:{lead_id}'}],
+    ]}
+
+
+def handle_lead_callback(cb: dict, payload: str) -> dict:
+    """Кнопки под заявкой: lead:take|done|undone:<id>. Обновляет БД и само сообщение (кто и что нажал)."""
+    callback_id = cb.get('callback_id') or ''
+    sender = cb.get('user') or cb.get('sender') or {}
+    uname = (sender.get('name') or ' '.join(x for x in [sender.get('first_name'), sender.get('last_name')] if x)
+             or sender.get('username') or f"id{sender.get('user_id', '')}").strip()
+    uid = str(sender.get('user_id') or sender.get('id') or '')
+    try:
+        _, action, lid_s = payload.split(':', 2)
+        lid = int(lid_s)
+    except Exception:
+        return {'ok': False}
+
+    status, label = {
+        'take': ('taken', '🟡 В работе'),
+        'done': ('answered', '✅ Обработана'),
+        'undone': ('new', '❌ Не обработана'),
+    }.get(action, (None, None))
+    if not status:
+        return {'ok': False}
+
+    try:
+        conn = _conn(); cur = conn.cursor()
+        if status == 'taken':
+            sets = f"status='taken', owner_name={_esc(uname)}, owner_chat_id={_esc(uid)}, taken_at=COALESCE(taken_at, NOW())"
+        elif status == 'answered':
+            sets = f"status='answered', owner_name={_esc(uname)}, owner_chat_id={_esc(uid)}, answered_at=NOW(), taken_at=COALESCE(taken_at, NOW())"
+        else:
+            sets = "status='new', owner_name=NULL, owner_chat_id=NULL, taken_at=NULL, answered_at=NULL"
+        cur.execute(f"UPDATE {SCHEMA}.leads_tracking SET {sets}, updated_at=NOW() WHERE id={lid}")
+        try:
+            cur.execute(
+                f"INSERT INTO {SCHEMA}.leads_tracking_log (lead_id, action, note) "
+                f"VALUES ({lid}, {_esc('max_' + action)}, {_esc(uname)})"
+            )
+        except Exception:
+            conn.rollback()
+            cur.execute(f"UPDATE {SCHEMA}.leads_tracking SET {sets}, updated_at=NOW() WHERE id={lid}")
+        conn.commit(); cur.close(); conn.close()
+    except Exception as e:
+        print(f'[MAX] lead callback db error: {e}')
+
+    # Перерисовываем сообщение: исходный текст + строка статуса
+    msg = cb.get('message') or {}
+    mbody = msg.get('body') or {}
+    orig = (mbody.get('text') or msg.get('text') or '')
+    orig = orig.split(LEAD_STATUS_MARK)[0]
+    from datetime import datetime, timedelta
+    hhmm = (datetime.utcnow() + timedelta(hours=3)).strftime('%H:%M')
+    new_text = f"{orig}{LEAD_STATUS_MARK}{label}: {uname} ({hhmm})"
+    if callback_id:
+        ok, d = max_call('answers', params={'callback_id': callback_id}, payload={
+            'message': {
+                'text': new_text,
+                'attachments': [{'type': 'inline_keyboard', 'payload': lead_keyboard(lid)}],
+            },
+            'notification': label,
+        })
+        if not ok:
+            print(f'[MAX] lead answer failed: {d}')
+    _log('in', 'callback_lead', payload, payload=cb)
+    return {'ok': True}
+
+
 def handle_callback(cb: dict) -> dict:
     """Нажатие inline-кнопки (тип callback).
     В MAX callback приходит БЕЗ chat_id — только user_id и callback_id.
@@ -987,6 +1062,9 @@ def handle_callback(cb: dict) -> dict:
     max_user_id = int(sender.get('user_id') or sender.get('id') or 0)
     payload = cb.get('payload') or cb.get('data') or cb.get('callback_data') or ''
     callback_id = cb.get('callback_id') or ''
+
+    if payload.startswith('lead:'):
+        return handle_lead_callback(cb, payload)
 
     if not max_user_id:
         _log('in', 'callback_no_user', payload, payload=cb, error='no max_user_id')
@@ -1089,7 +1167,10 @@ def action_webhook(body: dict) -> dict:
         return _ok({'ok': True})
 
     if update_type in ('message_callback', 'callback'):
-        handle_callback(body.get('callback') or body)
+        cbo = body.get('callback') or body
+        if body.get('message') and not cbo.get('message'):
+            cbo = {**cbo, 'message': body.get('message')}
+        handle_callback(cbo)
         return _ok({'ok': True})
 
     # Бота добавили в канал/группу — сохраняем chat_id как staff-канал или news-канал
@@ -1284,10 +1365,11 @@ def action_staff_send(body: dict) -> dict:
 
     delivered = 0
     last_resp: dict = {}
+    lead_id = int(body.get('lead_id') or 0)
     for tid in targets:
         # Сначала текст
         if text:
-            ok, d = send_max_message(tid, text)
+            ok, d = send_max_message(tid, text, lead_keyboard(lead_id) if lead_id else None)
             last_resp = d
             _log('out', 'staff_send', text, max_chat_id=tid,
                  payload=d, error='' if ok else json.dumps(d, ensure_ascii=False)[:300])

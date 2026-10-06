@@ -1369,6 +1369,8 @@ def handler(event: dict, context) -> dict:
             except Exception as _s3err:
                 print(f'[repair-order][S3] {_s3err}')
         staff_payload = {'text': staff_repair}
+        if lead_id:
+            staff_payload['lead_id'] = lead_id
         if repair_cdn_urls:
             staff_payload['photo_urls'] = repair_cdn_urls
         requests.post(
