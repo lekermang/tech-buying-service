@@ -1,3 +1,4 @@
+import { reportError } from "@/lib/errorReporter";
 import { Component, type ReactNode } from "react";
 
 type Props = { children: ReactNode };
@@ -19,6 +20,7 @@ export default class StaffRootBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, info: { componentStack: string }) {
     // Попадёт в логи фронтенда — поможет точно увидеть причину
     console.error("[StaffRootBoundary]", error?.message, error?.stack, info?.componentStack);
+    reportError("react", error?.message || "Сбой приложения", `${error?.stack || ""}\n${info?.componentStack || ""}`);
   }
 
   handleReload = () => {

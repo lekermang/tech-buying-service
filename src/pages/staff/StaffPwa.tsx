@@ -1,3 +1,4 @@
+import { reportError } from "@/lib/errorReporter";
 import { useState, useEffect, Component, type ReactNode } from "react";
 import { useStaffTheme } from "../staffTheme/StaffThemeContext";
 
@@ -7,7 +8,7 @@ export class TabErrorBoundary extends Component<{ children: ReactNode }, { error
     this.state = { error: null };
   }
   static getDerivedStateFromError(e: Error) { return { error: e.message }; }
-  componentDidCatch(e: Error) { console.error("[TabError]", e); }
+  componentDidCatch(e: Error) { console.error("[TabError]", e); reportError("react", e?.message || "Сбой раздела", e?.stack); }
   render() {
     if (this.state.error) return (
       <div className="p-6 text-center">
