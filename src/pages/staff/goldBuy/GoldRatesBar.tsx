@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import Icon from "@/components/ui/icon";
 import GoldBuyModal from "./GoldBuyModal";
 import { PURITIES, coef, exchangePrice, ourPrice, rub, useGoldRates } from "./useGoldRates";
@@ -8,6 +9,15 @@ export default function GoldRatesBar({ token }: { token: string }) {
   const { exchange, competitors, loading, updatedAt, reload } = rates;
   const [open, setOpen] = useState(false);
   const [buyOpen, setBuyOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => { document.body.style.overflow = prev; window.removeEventListener("keydown", onKey); };
+  }, [open]);
 
   const sun = competitors.find(c => c.source === "SUNLIGHT");
   const sun585 = sun?.prices["585"];
@@ -34,8 +44,19 @@ export default function GoldRatesBar({ token }: { token: string }) {
         </button>
       </div>
 
-      {open && (
-        <div className="px-3 pb-3 max-h-[70vh] overflow-y-auto">
+      {open && createPortal(
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 p-3" onClick={() => setOpen(false)}>
+          <div className="w-full max-w-3xl rounded-3xl bg-[#121212] border border-[#FFD700]/30 shadow-2xl shadow-black"
+            onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 pt-3">
+              <div className="font-oswald font-bold text-[#FFD700] uppercase tracking-wide flex items-center gap-2">
+                <Icon name="Gem" size={16} /> Цены на золото сегодня
+              </div>
+              <button onClick={() => setOpen(false)} className="w-9 h-9 flex items-center justify-center text-white/50">
+                <Icon name="X" size={18} />
+              </button>
+            </div>
+        <div className="p-4 max-h-[88vh] overflow-y-auto">
           <div className="grid grid-cols-3 gap-2 mb-2">
             <div className="rounded-lg bg-white/5 border border-white/10 px-2 py-1.5">
               <div className="text-[9px] uppercase text-white/40 font-roboto">Биржа, 999 ₽/г</div>
@@ -101,6 +122,9 @@ export default function GoldRatesBar({ token }: { token: string }) {
             </button>
           </div>
         </div>
+          </div>
+        </div>,
+        document.body,
       )}
 
       {buyOpen && <GoldBuyModal token={token} rates={rates} onClose={() => setBuyOpen(false)} />}

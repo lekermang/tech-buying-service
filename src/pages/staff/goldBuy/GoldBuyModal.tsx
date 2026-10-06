@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import Icon from "@/components/ui/icon";
 import { formatPhone } from "@/lib/phoneFormat";
 import funcUrls from "../../../../backend/func2url.json";
@@ -82,10 +83,17 @@ export default function GoldBuyModal({ token, rates, onClose }: Props) {
     setSaving(false);
   };
 
-  return (
-    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/80" onClick={onClose}>
-      <div className="w-full sm:max-w-md max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-[#121212] border border-[#FFD700]/30 p-4"
-        style={{ paddingBottom: "calc(16px + env(safe-area-inset-bottom, 0px))" }}
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => { document.body.style.overflow = prev; window.removeEventListener("keydown", onKey); };
+  }, [onClose]);
+
+  return createPortal(
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 p-3" onClick={onClose}>
+      <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-3xl bg-[#121212] border border-[#FFD700]/30 p-4 shadow-2xl shadow-black"
         onClick={e => e.stopPropagation()}>
         {done ? (
           <div className="text-center py-6">
@@ -185,6 +193,7 @@ export default function GoldBuyModal({ token, rates, onClose }: Props) {
           </>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
