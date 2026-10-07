@@ -158,9 +158,10 @@ def auto_timesheet(employee):
         if sh and sh[0] == 'dayoff':
             cur.close(); conn.close(); return
 
-        cur.execute(f"SELECT owner_set FROM {SCHEMA}.employee_salary_log WHERE employee_id=%s AND shift_date=%s", (emp_id, day))
+        cur.execute(f"SELECT owner_set, COALESCE(total,0), COALESCE(base_rate,0) FROM {SCHEMA}.employee_salary_log WHERE employee_id=%s AND shift_date=%s", (emp_id, day))
         lg = cur.fetchone()
-        if lg and lg[0]:
+        # Ручную запись владельца не трогаем, но пустую (нулевую) заготовку — перезаписываем
+        if lg and lg[0] and (int(lg[1]) > 0 or int(lg[2]) > 0):
             cur.close(); conn.close(); return
 
         cur.execute(
@@ -205,8 +206,12 @@ def auto_timesheet(employee):
                     bonus_percent_purchase_at_time=EXCLUDED.bonus_percent_purchase_at_time,
                     bonus_purchase_amount=EXCLUDED.bonus_purchase_amount,
                     base_rate=EXCLUDED.base_rate,
-                    total=EXCLUDED.total
-                WHERE {SCHEMA}.employee_salary_log.owner_set = false""",
+                    total=EXCLUDED.total,
+                    hours_worked=8,
+                    owner_set=false
+                WHERE {SCHEMA}.employee_salary_log.owner_set = false
+                   OR (COALESCE({SCHEMA}.employee_salary_log.total,0) = 0
+                       AND COALESCE({SCHEMA}.employee_salary_log.base_rate,0) = 0)""",
             (shift_id, emp_id, day, rate, sell_profit, pct_sell, bonus_sell,
              buy_profit, pct_buy, bonus_buy, total),
         )

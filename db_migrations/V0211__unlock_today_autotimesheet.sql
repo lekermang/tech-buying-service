@@ -1,0 +1,1 @@
+UPDATE employee_salary_log SET owner_set = false WHERE employee_id = 10 AND shift_date = '2026-10-07' AND total = 0 AND base_rate = 0;
