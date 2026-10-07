@@ -10,6 +10,10 @@ const IGNORE = [
   /Load failed/i,
   /Failed to fetch$/i,
   /NetworkError when attempting/i,
+  /^Ошибка$/,
+  /Failed to fetch dynamically imported module/i,
+  /error loading dynamically imported module/i,
+  /Importing a module script failed/i,
   /chrome-extension:|moz-extension:/i,
 ];
 
@@ -56,7 +60,6 @@ export function installErrorReporter() {
     const t = e.target as HTMLElement | null;
     if (t && t !== (window as unknown as HTMLElement) && (t as HTMLImageElement).src) {
       const src = (t as HTMLImageElement).src;
-      if (!src.startsWith(REPORT_URL)) reportError("resource", `Не загрузился файл: ${src}`);
       return;
     }
     reportError("js", e.message || "Ошибка", e.error?.stack, location.href);

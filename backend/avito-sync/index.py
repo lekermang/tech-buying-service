@@ -1459,7 +1459,8 @@ def handler(event: dict, context: Any) -> dict:
         try:
             return _resp(200, auto_sync_if_stale(mins))
         except Exception as e:
-            return _resp(500, {'ok': False, 'error': str(e)})
+            print(f'[avito-sync] auto failed: {e}')
+            return _resp(200, {'ok': False, 'error': str(e)})
 
     if action == 'dashboard':
         try:

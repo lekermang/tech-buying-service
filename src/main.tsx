@@ -5,6 +5,17 @@ import { installErrorReporter } from './lib/errorReporter'
 
 installErrorReporter();
 
+// После обновления сайта старые чанки пропадают — один раз перезагружаем страницу
+window.addEventListener('vite:preloadError', (e) => {
+  e.preventDefault();
+  try {
+    if (sessionStorage.getItem('chunk_reload') !== '1') {
+      sessionStorage.setItem('chunk_reload', '1');
+      window.location.reload();
+    }
+  } catch { /* ignore */ }
+});
+
 createRoot(document.getElementById("root")!).render(<App />);
 
 // Регистрация Service Worker — откладываем на idle,

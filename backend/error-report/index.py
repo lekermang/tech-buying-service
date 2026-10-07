@@ -41,7 +41,7 @@ def _fingerprint(kind, message, url):
 
 
 def handler(event: dict, context) -> dict:
-    """Принимает ошибки сайта и отправляет в MAX владельцам (повторы склеиваются, не чаще раза в 30 минут)."""
+    """Принимает ошибки сайта и сохраняет в БД (в MAX не отправляются)."""
     method = event.get('httpMethod', 'POST')
     if method == 'OPTIONS':
         return {'statusCode': 200, 'headers': HEADERS, 'body': ''}
@@ -77,27 +77,8 @@ def handler(event: dict, context) -> dict:
     rid, cnt, should_send = cur.fetchone()
     conn.commit()
 
+    # Уведомления в MAX отключены: ошибки только сохраняются в БД
     sent = False
-    if should_send:
-        title = KIND_ICON.get(kind, '🐞 Ошибка')
-        lines = [f'{title} на сайте', '', f'📝 {message}']
-        if url:
-            lines.append(f'🔗 {url}')
-        if employee:
-            lines.append(f'👤 {employee}')
-        if cnt > 1:
-            lines.append(f'🔁 Повторов: {cnt}')
-        if stack:
-            lines += ['', stack[:700]]
-        lines += ['', f'№ {rid}']
-        try:
-            r = requests.post(f'{MAX_BOT_URL}?action=staff_send', json={'text': '\n'.join(lines)}, timeout=6)
-            sent = r.ok
-        except Exception as e:
-            print(f'[error-report] max send failed: {e}')
-        if sent:
-            cur.execute(f"UPDATE {SCHEMA}.error_reports SET last_sent_at = NOW() WHERE id = %s", (rid,))
-            conn.commit()
     cur.close()
     conn.close()
     return _resp(200, {'ok': True, 'id': rid, 'sent': sent})
