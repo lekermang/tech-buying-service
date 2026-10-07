@@ -928,6 +928,329 @@ def handler(event, context):
                 'summary': summary,
             })
 
+    if action == 'owner_employee_report':
+        try:
+            emp_id = int(params.get('employee_id') or 0)
+        except (TypeError, ValueError):
+            emp_id = 0
+        d_from = params.get('from')
+        d_to = params.get('to')
+        if not emp_id or not d_from or not d_to:
+            return resp(400, {'error': 'employee_id, from, to required'})
+        with get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                f"SELECT id, full_name, login, position, role, auth_token FROM {SCHEMA}.employees WHERE id = %s",
+                (emp_id,),
+            )
+            emp = cur.fetchone()
+            if not emp:
+                return resp(404, {'error': 'employee not found'})
+            ename = emp['full_name']
+            etoken = emp['auth_token']
+
+            cur.execute(
+                f"SELECT daily_rate, bonus_percent, bonus_percent_purchase FROM {SCHEMA}.employee_salary_config WHERE employee_id = %s",
+                (emp_id,),
+            )
+            cfg = cur.fetchone() or {'daily_rate': 2000, 'bonus_percent': 10.0, 'bonus_percent_purchase': 0.0}
+            pct_sale = float(cfg['bonus_percent'] or 0)
+            pct_buy = float(cfg['bonus_percent_purchase'] or 0)
+
+            # ПРОДАЖИ сотрудника + чья закупка
+            cur.execute(
+                f"""
+                SELECT op.id AS op_id, op.created_at, op.amount AS sell_price, op.payment_method, op.note,
+                       i.id AS item_id, i.title, i.sku, i.imei, i.condition,
+                       c.name AS category,
+                       COALESCE(i.buy_price, 0) AS buy_price,
+                       i.created_by AS purchased_by, COALESCE(i.buy_at, i.created_at) AS bought_at,
+                       i.original_sell_price, i.discount_count
+                FROM {SCHEMA}.slshop_operations op
+                LEFT JOIN {SCHEMA}.slshop_items i ON i.id = op.item_id
+                LEFT JOIN {SCHEMA}.slshop_categories c ON c.id = i.category_id
+                WHERE op.op_type = 'sell'
+                  AND op.created_at::date >= %s AND op.created_at::date <= %s
+                  AND ((op.employee_name IS NOT NULL AND op.employee_name = %s)
+                       OR (op.employee_token IS NOT NULL AND op.employee_token = %s))
+                ORDER BY op.created_at ASC
+                """,
+                (d_from, d_to, ename, etoken),
+            )
+            sales_rows = cur.fetchall()
+
+            # ЗАКУПКИ сотрудника + кто и за сколько продал
+            cur.execute(
+                f"""
+                SELECT i.id AS item_id, i.title, i.sku, i.imei, i.condition, i.status,
+                       c.name AS category,
+                       COALESCE(i.buy_price, 0) AS buy_price, i.sell_price AS list_price,
+                       COALESCE(i.buy_at, i.created_at) AS bought_at,
+                       i.sell_at, so.amount AS sold_price, so.employee_name AS sold_by
+                FROM {SCHEMA}.slshop_items i
+                LEFT JOIN {SCHEMA}.slshop_categories c ON c.id = i.category_id
+                LEFT JOIN {SCHEMA}.slshop_operations so ON so.id = i.sell_operation_id
+                WHERE i.created_by = %s
+                  AND COALESCE(i.buy_at, i.created_at)::date >= %s
+                  AND COALESCE(i.buy_at, i.created_at)::date <= %s
+                ORDER BY COALESCE(i.buy_at, i.created_at) ASC
+                """,
+                (ename, d_from, d_to),
+            )
+            buy_rows = cur.fetchall()
+
+            # Проданное за период из ЕГО закупок (кем бы ни продано)
+            cur.execute(
+                f"""
+                SELECT i.id AS item_id, i.title, c.name AS category,
+                       COALESCE(i.buy_price, 0) AS buy_price,
+                       COALESCE(so.amount, i.sell_price) AS sold_price,
+                       i.sell_at, so.employee_name AS sold_by,
+                       COALESCE(i.buy_at, i.created_at) AS bought_at
+                FROM {SCHEMA}.slshop_items i
+                LEFT JOIN {SCHEMA}.slshop_categories c ON c.id = i.category_id
+                LEFT JOIN {SCHEMA}.slshop_operations so ON so.id = i.sell_operation_id
+                WHERE i.created_by = %s AND i.status = 'sold'
+                  AND i.sell_at::date >= %s AND i.sell_at::date <= %s
+                ORDER BY i.sell_at ASC
+                """,
+                (ename, d_from, d_to),
+            )
+            my_buys_sold_rows = cur.fetchall()
+
+            # Остатки непроданного от его закупок (всего)
+            cur.execute(
+                f"""
+                SELECT COUNT(*) AS cnt, COALESCE(SUM(buy_price), 0) AS cost
+                FROM {SCHEMA}.slshop_items
+                WHERE created_by = %s AND status NOT IN ('sold', 'archived', 'deleted')
+                """,
+                (ename,),
+            )
+            stock = cur.fetchone()
+
+            cur.execute(
+                f"""
+                SELECT shift_date, hours_worked, base_rate, personal_profit, bonus_percent_at_time, bonus_amount,
+                       personal_purchase_profit, bonus_percent_purchase_at_time, bonus_purchase_amount,
+                       total, owner_set
+                FROM {SCHEMA}.employee_salary_log
+                WHERE employee_id = %s AND shift_date >= %s AND shift_date <= %s
+                """,
+                (emp_id, d_from, d_to),
+            )
+            logs = {str(r['shift_date']): r for r in cur.fetchall()}
+            cur.execute(
+                f"SELECT shift_date, status, started_at, ended_at FROM {SCHEMA}.employee_shifts "
+                f"WHERE employee_id = %s AND shift_date >= %s AND shift_date <= %s",
+                (emp_id, d_from, d_to),
+            )
+            shifts = {str(r['shift_date']): r for r in cur.fetchall()}
+            cur.execute(
+                f"SELECT payout_date, amount, note FROM {SCHEMA}.employee_payouts "
+                f"WHERE employee_id = %s AND payout_date >= %s AND payout_date <= %s ORDER BY payout_date",
+                (emp_id, d_from, d_to),
+            )
+            payouts = cur.fetchall()
+
+        def hhmm(v):
+            return v.strftime('%H:%M') if v else ''
+
+        def dstr(v):
+            return v.strftime('%Y-%m-%d') if v else ''
+
+        sales = []
+        for r in sales_rows:
+            sp = int(r['sell_price'] or 0)
+            bp = int(r['buy_price'] or 0)
+            profit = sp - bp
+            pb = r['purchased_by']
+            own = bool(pb) and pb == ename
+            days = None
+            if r['bought_at'] and r['created_at']:
+                days = max((r['created_at'].date() - r['bought_at'].date()).days, 0)
+            sales.append({
+                'op_id': r['op_id'], 'date': dstr(r['created_at']), 'time': hhmm(r['created_at']),
+                'item_id': r['item_id'], 'title': r['title'] or 'Товар', 'sku': r['sku'],
+                'imei': r['imei'], 'category': r['category'] or 'Без категории',
+                'condition': r['condition'], 'payment': r['payment_method'],
+                'buy_price': bp, 'sell_price': sp, 'profit': profit,
+                'margin_pct': round(profit * 100 / bp, 1) if bp else None,
+                'purchased_by': pb or 'не указан', 'own_purchase': own,
+                'bought_date': dstr(r['bought_at']), 'days_in_stock': days,
+                'discount_count': r['discount_count'] or 0,
+                'original_price': int(r['original_sell_price'] or 0) or None,
+                'bonus': pct_round(profit, pct_sale),
+            })
+
+        buys = []
+        for r in buy_rows:
+            bp = int(r['buy_price'] or 0)
+            sold = r['status'] == 'sold'
+            sp = int(r['sold_price'] or r['list_price'] or 0) if sold else None
+            buys.append({
+                'item_id': r['item_id'], 'date': dstr(r['bought_at']), 'time': hhmm(r['bought_at']),
+                'title': r['title'] or 'Товар', 'sku': r['sku'], 'imei': r['imei'],
+                'category': r['category'] or 'Без категории', 'condition': r['condition'],
+                'buy_price': bp, 'list_price': int(r['list_price'] or 0), 'status': r['status'],
+                'sold': sold, 'sold_date': dstr(r['sell_at']) if sold else None,
+                'sold_price': sp, 'sold_by': r['sold_by'] if sold else None,
+                'profit': (sp - bp) if sold and sp is not None else None,
+                'bonus': pct_round((sp - bp), pct_buy) if sold and sp is not None else 0,
+            })
+
+        my_buys_sold = []
+        for r in my_buys_sold_rows:
+            bp = int(r['buy_price'] or 0)
+            sp = int(r['sold_price'] or 0)
+            my_buys_sold.append({
+                'item_id': r['item_id'], 'title': r['title'] or 'Товар',
+                'category': r['category'] or 'Без категории',
+                'buy_price': bp, 'sold_price': sp, 'profit': sp - bp,
+                'sold_date': dstr(r['sell_at']), 'sold_by': r['sold_by'] or 'не указан',
+                'bought_date': dstr(r['bought_at']), 'bonus': pct_round(sp - bp, pct_buy),
+            })
+
+        # По дням
+        days_map = {}
+
+        def day(d):
+            if d not in days_map:
+                days_map[d] = {'date': d, 'sales': [], 'purchases': [], 'purchases_sold_by_others': []}
+            return days_map[d]
+
+        for s in sales:
+            day(s['date'])['sales'].append(s)
+        for b in buys:
+            day(b['date'])['purchases'].append(b)
+        for m in my_buys_sold:
+            if m['sold_by'] != ename:
+                day(m['sold_date'])['purchases_sold_by_others'].append(m)
+        for d in list(logs.keys()) + list(shifts.keys()):
+            day(d)
+
+        days = []
+        for d in sorted(days_map.keys()):
+            x = days_map[d]
+            lg = logs.get(d)
+            sh = shifts.get(d)
+            x['shift_status'] = sh['status'] if sh else None
+            x['shift_started'] = hhmm(sh['started_at']) if sh and sh.get('started_at') else ''
+            x['shift_ended'] = hhmm(sh['ended_at']) if sh and sh.get('ended_at') else ''
+            x['salary'] = {
+                'entered': bool(lg),
+                'owner_set': bool(lg and lg['owner_set']),
+                'hours': float(lg['hours_worked'] or 0) if lg else 0,
+                'base': int(lg['base_rate'] or 0) if lg else 0,
+                'bonus_sale': int(lg['bonus_amount'] or 0) if lg else 0,
+                'bonus_purchase': int(lg['bonus_purchase_amount'] or 0) if lg else 0,
+                'total': int(lg['total'] or 0) if lg else 0,
+            }
+            x['sales_count'] = len(x['sales'])
+            x['sales_revenue'] = sum(s['sell_price'] for s in x['sales'])
+            x['sales_profit'] = sum(s['profit'] for s in x['sales'])
+            x['purchases_count'] = len(x['purchases'])
+            x['purchases_cost'] = sum(b['buy_price'] for b in x['purchases'])
+            x['has_activity'] = bool(x['sales'] or x['purchases'] or x['purchases_sold_by_others'])
+            days.append(x)
+
+        # Аналитика
+        revenue = sum(s['sell_price'] for s in sales)
+        cost = sum(s['buy_price'] for s in sales)
+        profit = revenue - cost
+        own_s = [s for s in sales if s['own_purchase']]
+        alien_s = [s for s in sales if not s['own_purchase']]
+
+        def agg(lst):
+            return {
+                'count': len(lst),
+                'revenue': sum(s['sell_price'] for s in lst),
+                'cost': sum(s['buy_price'] for s in lst),
+                'profit': sum(s['profit'] for s in lst),
+            }
+
+        by_src = {}
+        for s in alien_s:
+            k = s['purchased_by']
+            by_src.setdefault(k, []).append(s)
+        sources = sorted(
+            [dict(name=k, **agg(v)) for k, v in by_src.items()],
+            key=lambda z: -z['profit'],
+        )
+        by_cat = {}
+        for s in sales:
+            by_cat.setdefault(s['category'], []).append(s)
+        categories = sorted(
+            [dict(name=k, **agg(v)) for k, v in by_cat.items()],
+            key=lambda z: -z['revenue'],
+        )
+        by_buyer = {}
+        for m in my_buys_sold:
+            by_buyer.setdefault(m['sold_by'], []).append(m)
+        sold_by_whom = sorted(
+            [{'name': k, 'count': len(v), 'revenue': sum(i['sold_price'] for i in v),
+              'profit': sum(i['profit'] for i in v)} for k, v in by_buyer.items()],
+            key=lambda z: -z['profit'],
+        )
+        stock_days = [s['days_in_stock'] for s in sales if s['days_in_stock'] is not None]
+        loss = [s for s in sales if s['profit'] < 0]
+        work_days = sum(1 for d in days if d['shift_status'] in ('open', 'closed') or d['salary']['entered'])
+        no_entry_days = [d['date'] for d in days if d['has_activity'] and not d['salary']['entered']]
+        buys_total = sum(b['buy_price'] for b in buys)
+        buys_sold = [b for b in buys if b['sold']]
+
+        analytics = {
+            'sales': {**agg(sales), 'margin_pct': round(profit * 100 / cost, 1) if cost else None,
+                      'avg_check': int(revenue / len(sales)) if sales else 0,
+                      'avg_profit': int(profit / len(sales)) if sales else 0,
+                      'avg_days_in_stock': round(sum(stock_days) / len(stock_days), 1) if stock_days else None,
+                      'bonus': sum(s['bonus'] for s in sales)},
+            'own_purchase_sales': agg(own_s),
+            'alien_purchase_sales': agg(alien_s),
+            'alien_sources': sources,
+            'categories': categories,
+            'loss_sales': [{'date': s['date'], 'title': s['title'], 'profit': s['profit'],
+                            'purchased_by': s['purchased_by']} for s in loss],
+            'top_sales': sorted(
+                [{'date': s['date'], 'title': s['title'], 'profit': s['profit'], 'sell_price': s['sell_price'],
+                  'purchased_by': s['purchased_by']} for s in sales], key=lambda z: -z['profit'])[:5],
+            'purchases': {
+                'count': len(buys), 'cost': buys_total,
+                'sold_count': len(buys_sold),
+                'sold_pct': round(len(buys_sold) * 100 / len(buys), 1) if buys else None,
+                'unsold_count': len(buys) - len(buys_sold),
+                'unsold_cost': sum(b['buy_price'] for b in buys if not b['sold']),
+                'avg_buy': int(buys_total / len(buys)) if buys else 0,
+            },
+            'my_purchases_sold_in_period': {
+                'count': len(my_buys_sold),
+                'revenue': sum(m['sold_price'] for m in my_buys_sold),
+                'profit': sum(m['profit'] for m in my_buys_sold),
+                'bonus': sum(m['bonus'] for m in my_buys_sold),
+                'by_whom': sold_by_whom,
+                'sold_by_others_count': sum(1 for m in my_buys_sold if m['sold_by'] != ename),
+            },
+            'stock_now': {'count': int(stock['cnt'] or 0), 'cost': int(stock['cost'] or 0)},
+            'discipline': {
+                'work_days': work_days,
+                'days_with_activity': sum(1 for d in days if d['has_activity']),
+                'days_not_entered': no_entry_days,
+                'earned': sum(d['salary']['total'] for d in days),
+                'paid': sum(int(p['amount'] or 0) for p in payouts),
+            },
+        }
+        return resp(200, {
+            'employee': {'id': emp['id'], 'full_name': ename, 'login': emp['login'],
+                         'position': emp['position'] or emp['role']},
+            'config': {'daily_rate': int(cfg['daily_rate'] or 0), 'bonus_percent': pct_sale,
+                       'bonus_percent_purchase': pct_buy},
+            'period': {'from': d_from, 'to': d_to},
+            'analytics': analytics,
+            'days': days,
+            'sales': sales,
+            'purchases': buys,
+            'payouts': payouts,
+        })
+
     if action == 'owner_set_day' and method == 'POST':
         # Владелец вписывает начисление за конкретный день: часы + сумма (или авто-расчёт)
         body = json.loads(event.get('body') or '{}')

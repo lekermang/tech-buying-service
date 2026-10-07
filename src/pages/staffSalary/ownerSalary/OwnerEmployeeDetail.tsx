@@ -8,6 +8,7 @@ import {
 } from "./ownerSalaryTypes";
 import OwnerSavingsPanel from "./OwnerSavingsPanel";
 import OwnerDebtsPanel from "./OwnerDebtsPanel";
+import OwnerEmployeeReport from "./OwnerEmployeeReport";
 
 type MonthCell = { date: string | null; status: CalendarDay["status"] | null; total: number; payout: number; bonus: number };
 
@@ -62,7 +63,7 @@ export default function OwnerEmployeeDetail({
   onResync: () => void;
   token: string;
 }) {
-  const [activeTab, setActiveTab] = useState<"salary" | "savings" | "debts">("salary");
+  const [activeTab, setActiveTab] = useState<"salary" | "savings" | "debts" | "report">("salary");
 
   return (
     <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-5">
@@ -158,7 +159,20 @@ export default function OwnerEmployeeDetail({
           }}>
           <Icon name="PiggyBank" size={13} /> Копилка
         </button>
+        <button onClick={() => setActiveTab("report")}
+          className="flex-1 py-2 rounded-lg font-roboto text-xs font-semibold transition-all flex items-center justify-center gap-1.5"
+          style={{
+            background: activeTab === "report" ? "rgba(34,197,94,0.15)" : "transparent",
+            color: activeTab === "report" ? "#4ade80" : "rgba(255,255,255,0.4)",
+            border: activeTab === "report" ? "1px solid rgba(34,197,94,0.3)" : "1px solid transparent",
+          }}>
+          <Icon name="BarChart3" size={13} /> Отчёт
+        </button>
       </div>
+
+      {activeTab === "report" && (
+        <OwnerEmployeeReport employeeId={selected.id} token={token} initialMonth={viewMonth} />
+      )}
 
       {/* ── ДОЛГИ ── */}
       {activeTab === "debts" && (
