@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState } from "react";
 import Icon from "@/components/ui/icon";
 
 const PRICE_EMAIL_URL = "https://functions.poehali.dev/9e9486d9-57f0-454c-bc19-b46e3d4bc682";
@@ -24,27 +24,6 @@ export default function PriceFloatingButton({ token: _token }: Props) {
   const [printing, setPrinting] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  // Магнитный эффект
-  const btnRef = useRef<HTMLButtonElement>(null);
-  const [magOffset, setMagOffset] = useState({ x: 0, y: 0 });
-  const [isHovered, setIsHovered] = useState(false);
-
-  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
-    const btn = btnRef.current;
-    if (!btn) return;
-    const rect = btn.getBoundingClientRect();
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
-    const dx = e.clientX - cx;
-    const dy = e.clientY - cy;
-    setMagOffset({ x: dx * 0.35, y: dy * 0.35 });
-  }, []);
-
-  const handleMouseLeave = useCallback(() => {
-    setMagOffset({ x: 0, y: 0 });
-    setIsHovered(false);
-  }, []);
 
   const handleSend = async () => {
     if (!email.trim() && !sendMax) return;
@@ -169,34 +148,13 @@ export default function PriceFloatingButton({ token: _token }: Props) {
 
   return (
     <>
-      {/* FAB кнопка */}
       <button
-        ref={btnRef}
         onClick={() => { setOpen(true); setResult(null); setError(null); }}
-        onMouseMove={handleMouseMove}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={handleMouseLeave}
-        className="fixed z-[55] right-4 group"
-        style={{
-          bottom: "calc(72px + env(safe-area-inset-bottom, 0px) + 12px)",
-          transform: `translate(${magOffset.x}px, ${magOffset.y}px)`,
-          transition: isHovered ? "transform 0.15s ease-out" : "transform 0.4s cubic-bezier(0.34,1.56,0.64,1)",
-        }}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-oswald font-bold text-[11px] uppercase tracking-wider text-[#FFD700] active:scale-95 transition-all"
+        style={{ background: "rgba(255,215,0,0.1)", border: "1px solid rgba(255,215,0,0.35)" }}
       >
-        <span className="absolute inset-0 rounded-2xl bg-[#FFD700]/30 blur-xl scale-110 animate-pulse pointer-events-none" />
-        <span
-          className="relative flex items-center gap-2.5 px-4 py-3 rounded-2xl font-oswald font-bold text-[13px] uppercase tracking-widest text-black select-none overflow-hidden"
-          style={{
-            background: "linear-gradient(135deg, #FFD700 0%, #f59e0b 50%, #d97706 100%)",
-            boxShadow: isHovered
-              ? "0 8px 32px rgba(255,215,0,0.6), 0 2px 8px rgba(0,0,0,0.4)"
-              : "0 4px 20px rgba(255,215,0,0.35), 0 2px 6px rgba(0,0,0,0.3)",
-          }}
-        >
-          <span className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent pointer-events-none rounded-2xl" />
-          <Icon name="Send" size={15} className="text-black/80 relative z-10" />
-          <span className="relative z-10">Прайс</span>
-        </span>
+        <Icon name="Send" size={12} />
+        Прайс
       </button>
 
       {/* Модал */}

@@ -23,6 +23,7 @@ import SLAvitoShowcase from "./SLAvitoShowcase";
 import SLPolice from "./SLPolice";
 import { slApi, can, type SLMyPermissions } from "./types";
 import { SLTabsGrid } from "./slUI";
+import PriceFloatingButton from "../staff/PriceFloatingButton";
 import { useNavigate } from "react-router-dom";
 
 type SubTab =
@@ -180,6 +181,8 @@ export default function SLShopTab({ token, myRole }: { token: string; myRole?: s
                 <Icon name="Zap" size={12} className="relative" style={{ filter: "drop-shadow(0 0 4px rgba(0,0,0,0.4))" }} />
                 <span className="relative">Оценить</span>
               </button>
+
+              <PriceFloatingButton token={token} />
 
               {/* Live badge */}
               <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full" style={{

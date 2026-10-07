@@ -26,7 +26,6 @@ import { getInitials } from "./staffConstants";
 import StaffHeader from "./StaffHeader";
 import StaffBottomNav from "./StaffBottomNav";
 import StaffPasswordModal from "./StaffPasswordModal";
-import PriceFloatingButton from "./PriceFloatingButton";
 import DebtBouncer from "../staffSalary/DebtBouncer";
 import UrgentRepairBanner from "../repair/staffTab/UrgentRepairBanner";
 
@@ -272,9 +271,6 @@ export function StaffMainLayout({
           </React.Suspense>
         </TabErrorBoundary>
       </div>
-
-      {/* Плавающая кнопка «Отправить прайс» — для всех сотрудников */}
-      <PriceFloatingButton token={token} />
 
       {/* Кнопка СРОЧНО — срочные ремонты (видна на всех вкладках) */}
       <UrgentRepairBanner
