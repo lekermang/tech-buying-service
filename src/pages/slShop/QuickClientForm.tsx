@@ -18,6 +18,7 @@ type PassportData = {
   birth_date?: string | null;
   address?: string;
   _ocr_error?: string;
+  _warnings?: string[];
 };
 
 type ClientMatchStats = {
@@ -79,20 +80,23 @@ export default function QuickClientForm({ token, onCreated, onCancel }: Props) {
   // Записываем в state только пустые поля — не затираем то, что сотрудник уже исправил
   const applyPassportData = (pd: PassportData) => {
     const filled = new Set<string>(recognizedFields);
-    if (pd.full_name && !fullName.trim()) { setFullName(pd.full_name); filled.add("fullName"); }
-    if (pd.series && !series.trim()) { setSeries(pd.series); filled.add("series"); }
-    if (pd.number && !number.trim()) { setNumber(pd.number); filled.add("number"); }
-    if (pd.issued_by && !issuedBy.trim()) { setIssuedBy(pd.issued_by); filled.add("issuedBy"); }
-    if (pd.issued_date && !issuedDate) { setIssuedDate(pd.issued_date); filled.add("issuedDate"); }
-    if (pd.birth_date && !birthDate) { setBirthDate(pd.birth_date); filled.add("birthDate"); }
-    if (pd.address && !address.trim()) { setAddress(pd.address); filled.add("address"); }
+    const canSet = (key: string, cur: string) => !String(cur || "").trim() || recognizedFields.has(key);
+    let count = 0;
+    if (pd.full_name && canSet("fullName", fullName)) { setFullName(pd.full_name); filled.add("fullName"); count++; }
+    if (pd.series && canSet("series", series)) { setSeries(pd.series); filled.add("series"); count++; }
+    if (pd.number && canSet("number", number)) { setNumber(pd.number); filled.add("number"); count++; }
+    if (pd.issued_by && canSet("issuedBy", issuedBy)) { setIssuedBy(pd.issued_by); filled.add("issuedBy"); count++; }
+    if (pd.issued_date && canSet("issuedDate", issuedDate)) { setIssuedDate(pd.issued_date); filled.add("issuedDate"); count++; }
+    if (pd.birth_date && canSet("birthDate", birthDate)) { setBirthDate(pd.birth_date); filled.add("birthDate"); count++; }
+    if (pd.address && canSet("address", address)) { setAddress(pd.address); filled.add("address"); count++; }
     setRecognizedFields(filled);
-    if (filled.size > recognizedFields.size) {
-      setInfo(`ИИ распознал данные из паспорта: ${filled.size} полей. Проверь и поправь, если нужно.`);
-      setTimeout(() => setInfo(null), 5000);
-    } else if (pd._ocr_error) {
-      setInfo("Фото сохранено, но автоматически распознать данные не удалось. Заполни вручную.");
-      setTimeout(() => setInfo(null), 5000);
+    const warn = pd._warnings && pd._warnings.length ? ` Внимание: ${pd._warnings.join("; ")}.` : "";
+    if (count > 0) {
+      setInfo(`ИИ распознал ${count} полей. Проверь по фото и поправь, если нужно.${warn}`);
+      setTimeout(() => setInfo(null), 12000);
+    } else {
+      setInfo(`${pd._ocr_error ? pd._ocr_error + ". " : "Данные не распознаны. "}Фото сохранено. Переснимите ровнее при хорошем свете или заполните вручную.`);
+      setTimeout(() => setInfo(null), 12000);
     }
   };
 

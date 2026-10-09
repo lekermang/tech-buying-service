@@ -1310,18 +1310,25 @@ def upsert_client(body):
 
 # ============ Client passport photo upload + AI OCR ============
 PASSPORT_OCR_PROMPT = (
-    "Ты — помощник по распознаванию российского паспорта. На фото — страница с фотографией владельца "
-    "(2-3 разворот) или страница регистрации. Извлеки текстовые данные и верни СТРОГО JSON без комментариев.\n\n"
+    "Это рабочая задача оформления договора в ломбарде/скупке: сотрудник фотографирует паспорт клиента с его согласия, "
+    "а ты переносишь печатный текст с фото в поля формы. Это обычная оцифровка документа (OCR).\n"
+    "На фото российский паспорт гражданина РФ: страница с фотографией (разворот 2-3) или страница с пропиской. "
+    "Фото может быть под углом, с бликами или повёрнуто — прочитай всё, что возможно. "
+    "Верни СТРОГО один JSON-объект без пояснений и без markdown.\n\n"
     "Поля:\n"
-    "- full_name: ФИО полностью одной строкой в формате 'Фамилия Имя Отчество' (с заглавных букв)\n"
-    "- series: серия паспорта (4 цифры, можно с пробелом, например '12 34')\n"
-    "- number: номер паспорта (6 цифр)\n"
-    "- issued_by: кем выдан, как написано в паспорте, одной строкой\n"
-    "- issued_date: дата выдачи в формате YYYY-MM-DD (если видна)\n"
-    "- birth_date: дата рождения в формате YYYY-MM-DD (если видна)\n"
-    "- address: адрес регистрации одной строкой (если виден на странице с пропиской)\n\n"
-    "Если поле не видно на фото — верни пустую строку для строк или null для дат. "
-    "Не выдумывай данные, верни только то, что реально читается на фото."
+    "- full_name: ФИО одной строкой 'Фамилия Имя Отчество', каждое слово с заглавной буквы, остальные строчные\n"
+    "- series: серия, ровно 4 цифры, без пробелов\n"
+    "- number: номер, ровно 6 цифр\n"
+    "- issued_by: кем выдан, как в паспорте, одной строкой\n"
+    "- issued_date: дата выдачи, формат YYYY-MM-DD\n"
+    "- birth_date: дата рождения, формат YYYY-MM-DD\n"
+    "- gender: 'М' или 'Ж' если видно, иначе пустая строка\n"
+    "- birth_place: место рождения, если видно\n"
+    "- department_code: код подразделения вида 123-456, если виден\n"
+    "- address: адрес регистрации одной строкой (только если виден на странице с пропиской)\n\n"
+    "Подсказки: серия и номер часто напечатаны крупно и красным/серым по вертикали вдоль края разворота, "
+    "а также внизу страницы; на странице с фото серия записана как 'XX XX', номер как 'XXXXXX'. "
+    "Если поле не читается — верни пустую строку (для дат null). Не выдумывай и не угадывай цифры."
 )
 
 
@@ -1339,57 +1346,138 @@ def _cdn_url(key: str) -> str:
     return f"https://cdn.poehali.dev/projects/{os.environ['AWS_ACCESS_KEY_ID']}/bucket/{key}"
 
 
+def _norm_date(v):
+    """Приводит дату к YYYY-MM-DD из форматов ДД.ММ.ГГГГ, ДД/ММ/ГГГГ, YYYY-MM-DD. Иначе None."""
+    if not v:
+        return None
+    t = str(v).strip()
+    m = re.match(r'^(\d{4})-(\d{1,2})-(\d{1,2})', t)
+    if m:
+        y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    else:
+        m = re.match(r'^(\d{1,2})[.\-/ ](\d{1,2})[.\-/ ](\d{4})', t)
+        if not m:
+            return None
+        d, mo, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    if not (1900 <= y <= 2100 and 1 <= mo <= 12 and 1 <= d <= 31):
+        return None
+    return f'{y:04d}-{mo:02d}-{d:02d}'
+
+
+def _title_name(v):
+    parts = re.split(r'\s+', (v or '').strip())
+    out = []
+    for p in parts:
+        if not p:
+            continue
+        out.append('-'.join(x[:1].upper() + x[1:].lower() for x in p.split('-')))
+    return ' '.join(out)
+
+
+def _extract_json(raw: str) -> dict:
+    raw = (raw or '').strip()
+    if raw.startswith('```'):
+        raw = raw.strip('`')
+        if raw.lower().startswith('json'):
+            raw = raw[4:]
+        raw = raw.strip()
+    try:
+        return json.loads(raw)
+    except Exception:
+        m = re.search(r'\{.*\}', raw, re.S)
+        if m:
+            return json.loads(m.group(0))
+        raise ValueError('Модель не вернула данные паспорта: ' + raw[:80])
+
+
+def _normalize_passport(parsed: dict) -> dict:
+    series = re.sub(r'\D', '', str(parsed.get('series') or ''))
+    number = re.sub(r'\D', '', str(parsed.get('number') or ''))
+    # Иногда серия и номер приходят слитно в одном из полей (10 цифр)
+    if len(series) == 10 and not number:
+        series, number = series[:4], series[4:]
+    if len(number) == 10 and not series:
+        series, number = number[:4], number[4:]
+    result = {
+        'full_name': _title_name(parsed.get('full_name')),
+        'series': series if len(series) == 4 else '',
+        'number': number if len(number) == 6 else '',
+        'issued_by': re.sub(r'\s+', ' ', str(parsed.get('issued_by') or '')).strip(),
+        'issued_date': _norm_date(parsed.get('issued_date')),
+        'birth_date': _norm_date(parsed.get('birth_date')),
+        'address': re.sub(r'\s+', ' ', str(parsed.get('address') or '')).strip(),
+        'gender': str(parsed.get('gender') or '').strip()[:1].upper(),
+        'birth_place': re.sub(r'\s+', ' ', str(parsed.get('birth_place') or '')).strip(),
+        'department_code': str(parsed.get('department_code') or '').strip(),
+    }
+    warnings = []
+    if series and len(series) != 4:
+        warnings.append('серия прочитана не полностью')
+    if number and len(number) != 6:
+        warnings.append('номер прочитан не полностью')
+    if result['birth_date'] and result['issued_date'] and result['issued_date'] <= result['birth_date']:
+        warnings.append('дата выдачи раньше даты рождения, проверьте даты')
+        result['issued_date'] = None
+    if result['issued_date'] and result['issued_date'] > datetime.utcnow().strftime('%Y-%m-%d'):
+        warnings.append('дата выдачи в будущем')
+        result['issued_date'] = None
+    if warnings:
+        result['_warnings'] = warnings
+    return result
+
+
+def _call_ocr_model(api_key: str, model: str, data_url: str) -> dict:
+    payload = json.dumps({
+        "model": model,
+        "messages": [
+            {"role": "system", "content": "Ты точный OCR-движок для документов. Отвечаешь только JSON."},
+            {"role": "user", "content": [
+                {"type": "text", "text": PASSPORT_OCR_PROMPT},
+                {"type": "image_url", "image_url": {"url": data_url, "detail": "high"}},
+            ]},
+        ],
+        "max_tokens": 700,
+        "temperature": 0,
+        "response_format": {"type": "json_object"},
+    }).encode('utf-8')
+    req = urllib.request.Request(
+        'https://api.polza.ai/v1/chat/completions',
+        data=payload,
+        headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'},
+    )
+    with urllib.request.urlopen(req, timeout=22) as resp:
+        data = json.loads(resp.read())
+    raw = (data.get('choices') or [{}])[0].get('message', {}).get('content', '') or ''
+    return _extract_json(raw)
+
+
 def _ocr_passport_via_ai(data_url: str) -> dict:
-    """Распознаёт паспорт через GPT-4o (Polza.ai). Возвращает dict с полями (можно пустыми).
-    Если ключа нет или распознавание упало — возвращает пустой словарь, не падает."""
+    """Распознаёт паспорт РФ через GPT-4o (Polza.ai): основная модель, при сбое — запасная.
+    Возвращает нормализованный dict; при ошибке — {'_ocr_error': 'понятная причина'}."""
     api_key = os.environ.get('POLZA_AI_API_KEY', '')
     if not api_key:
-        return {}
-    try:
-        payload = json.dumps({
-            "model": "gpt-4o-mini",
-            "messages": [{
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": PASSPORT_OCR_PROMPT},
-                    {"type": "image_url", "image_url": {"url": data_url}},
-                ],
-            }],
-            "max_tokens": 600,
-            "temperature": 0.1,
-            "response_format": {"type": "json_object"},
-        }).encode('utf-8')
-        req = urllib.request.Request(
-            'https://api.polza.ai/v1/chat/completions',
-            data=payload,
-            headers={
-                'Content-Type': 'application/json',
-                'Authorization': f'Bearer {api_key}',
-            },
-        )
-        with urllib.request.urlopen(req, timeout=40) as resp:
-            data = json.loads(resp.read())
-        raw = (data.get('choices') or [{}])[0].get('message', {}).get('content', '').strip()
-        if raw.startswith('```'):
-            raw = raw.strip('`')
-            if raw.lower().startswith('json'):
-                raw = raw[4:]
-            raw = raw.strip()
-        parsed = json.loads(raw)
-        # Нормализуем ключи: серия без пробелов будет лучше для отображения, но оставим как есть
-        result = {
-            'full_name': (parsed.get('full_name') or '').strip(),
-            'series': (parsed.get('series') or '').strip().replace(' ', ''),
-            'number': (parsed.get('number') or '').strip().replace(' ', ''),
-            'issued_by': (parsed.get('issued_by') or '').strip(),
-            'issued_date': parsed.get('issued_date') or None,
-            'birth_date': parsed.get('birth_date') or None,
-            'address': (parsed.get('address') or '').strip(),
-        }
-        return result
-    except Exception as e:
-        # AI-сбой не должен ломать загрузку самого фото
-        return {'_ocr_error': str(e)[:200]}
+        return {'_ocr_error': 'Не подключён ключ ИИ-распознавания (POLZA_AI_API_KEY)'}
+    last_err = ''
+    for model in ('gpt-4o', 'gpt-4o-mini'):
+        try:
+            parsed = _call_ocr_model(api_key, model, data_url)
+            result = _normalize_passport(parsed)
+            useful = any(result.get(k) for k in ('full_name', 'series', 'number', 'issued_by', 'birth_date', 'issued_date', 'address'))
+            if useful:
+                return result
+            last_err = 'На фото не удалось прочитать данные паспорта'
+        except urllib.error.HTTPError as e:
+            code = e.code
+            if code in (401, 403):
+                last_err = 'Ключ ИИ-распознавания не принят'
+                break
+            if code == 402:
+                last_err = 'Закончились средства на балансе ИИ-сервиса'
+                break
+            last_err = f'ИИ-сервис вернул ошибку {code}'
+        except Exception as e:
+            last_err = str(e)[:160] or 'Сбой распознавания'
+    return {'_ocr_error': last_err or 'Не удалось распознать паспорт'}
 
 
 def client_passport_upload(body, employee):

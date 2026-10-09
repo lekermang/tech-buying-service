@@ -22,6 +22,7 @@ type PassportData = {
   birth_date?: string | null;
   address?: string;
   _ocr_error?: string;
+  _warnings?: string[];
 };
 
 type Props = {
@@ -75,19 +76,27 @@ export default function C14dCreateForm({ token, onCreated, onCancel, prefill }: 
 
   const applyPassportData = (pd: PassportData) => {
     const filled = new Set<string>(recognizedFields);
-    if (pd.full_name && !fullName.trim()) { setFullName(pd.full_name); filled.add("fullName"); }
-    if (pd.series && !passSeries.trim()) { setPassSeries(pd.series); filled.add("series"); }
-    if (pd.number && !passNumber.trim()) { setPassNumber(pd.number); filled.add("number"); }
-    if (pd.issued_by && !passIssuedBy.trim()) { setPassIssuedBy(pd.issued_by); filled.add("issuedBy"); }
-    if (pd.issued_date && !passIssueDate) { setPassIssueDate(pd.issued_date); filled.add("issuedDate"); }
-    if (pd.birth_date && !birthDate) { setBirthDate(pd.birth_date); filled.add("birthDate"); }
+    const canSet = (key: string, cur: string) => !String(cur || "").trim() || recognizedFields.has(key);
+    let count = 0;
+    if (pd.full_name && canSet("fullName", fullName)) { setFullName(pd.full_name); filled.add("fullName"); count++; }
+    if (pd.series && canSet("series", passSeries)) { setPassSeries(pd.series); filled.add("series"); count++; }
+    if (pd.number && canSet("number", passNumber)) { setPassNumber(pd.number); filled.add("number"); count++; }
+    if (pd.issued_by && canSet("issuedBy", passIssuedBy)) { setPassIssuedBy(pd.issued_by); filled.add("issuedBy"); count++; }
+    if (pd.issued_date && canSet("issuedDate", passIssueDate)) { setPassIssueDate(pd.issued_date); filled.add("issuedDate"); count++; }
+    if (pd.birth_date && canSet("birthDate", birthDate)) { setBirthDate(pd.birth_date); filled.add("birthDate"); count++; }
     setRecognizedFields(filled);
-    if (filled.size > recognizedFields.size) {
-      setScanInfo(`ИИ распознал данные паспорта: ${filled.size} полей. Проверь и поправь, если нужно.`);
-      setTimeout(() => setScanInfo(null), 6000);
-    } else if (pd._ocr_error) {
-      setScanInfo("Фото сохранено, но автоматически распознать данные не удалось. Заполни вручную.");
-      setTimeout(() => setScanInfo(null), 6000);
+    const warn = pd._warnings && pd._warnings.length ? ` Внимание: ${pd._warnings.join("; ")}.` : "";
+    if (count > 0) {
+      const missing: string[] = [];
+      if (!pd.series || !pd.number) missing.push("серия/номер");
+      if (!pd.issued_by) missing.push("кем выдан");
+      if (!pd.birth_date) missing.push("дата рождения");
+      const miss = missing.length ? ` Не прочитано: ${missing.join(", ")}.` : "";
+      setScanInfo(`ИИ распознал ${count} полей. Проверь по фото и поправь, если нужно.${miss}${warn}`);
+      setTimeout(() => setScanInfo(null), 12000);
+    } else {
+      setScanInfo(`${pd._ocr_error ? pd._ocr_error + ". " : "Данные не распознаны. "}Фото сохранено. Переснимите ровнее при хорошем свете (разворот с фото целиком) или заполните вручную.`);
+      setTimeout(() => setScanInfo(null), 12000);
     }
   };
 
