@@ -172,6 +172,22 @@ export function printLabelQuick(item: SLItem, opts: { empName?: string; size?: s
   printLabels([item], makeTmpl(sz.w, sz.h, sz.thermal), { empName: opts.empName, discount: opts.discount });
 }
 
+/** Массовая печать ценников одним заданием. copiesByQty — печатать по одному ценнику на каждую штуку (quantity). */
+export function printLabelsQuick(
+  items: SLItem[],
+  opts: { empName?: string; size?: string; copiesByQty?: boolean } = {},
+): void {
+  const code = opts.size || getLastLabelSize();
+  const sz = LABEL_SIZES.find(s => s.code === code) || LABEL_SIZES[0];
+  setLastLabelSize(sz.code);
+  const list: SLItem[] = [];
+  items.forEach(it => {
+    const n = opts.copiesByQty ? Math.max(1, Math.min(50, Number(it.quantity ?? 1) || 1)) : 1;
+    for (let i = 0; i < n; i++) list.push(it);
+  });
+  printLabels(list, makeTmpl(sz.w, sz.h, sz.thermal), { empName: opts.empName });
+}
+
 export function printLabels(items: SLItem[], tmpl: SLLabelTemplate, opts: { empName?: string; discount?: DiscountOpts } = {}): void {
   if (!items.length) return;
   const w = window.open("", "_blank", "width=600,height=800");

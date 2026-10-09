@@ -9,6 +9,7 @@ interface Props {
   items: SLItem[];
   selected: Set<number>;
   toggleSelect: (id: number) => void;
+  onToggleAll?: () => void;
   onOpen: (it: SLItem) => void;
   onSell: (it: SLItem) => void;
 }
@@ -33,7 +34,7 @@ const titleWithRam = (it: SLItem): string => {
   return it.title;
 };
 
-export default function SLItemsTable({ token, items, selected, toggleSelect, onOpen, onSell }: Props) {
+export default function SLItemsTable({ token, items, selected, toggleSelect, onToggleAll, onOpen, onSell }: Props) {
   const [sortBy, setSortBy] = useState<SortField>("created_at");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
@@ -85,7 +86,15 @@ export default function SLItemsTable({ token, items, selected, toggleSelect, onO
           borderBottom: "1px solid rgba(255,215,0,0.1)",
         }}>
           <tr>
-            <th className="px-2 py-1.5 w-8"></th>
+            <th className="px-2 py-1.5 w-8">
+              {onToggleAll && (
+                <button onClick={onToggleAll} title="Выбрать все / снять выбор"
+                  className={`w-4 h-4 rounded border-2 flex items-center justify-center ${items.length > 0 && selected.size === items.length ? "bg-[#FFD700] border-[#FFD700]" : "border-white/20"}`}>
+                  {items.length > 0 && selected.size === items.length && <Icon name="Check" size={9} className="text-black" />}
+                  {selected.size > 0 && selected.size < items.length && <span className="w-2 h-0.5 bg-[#FFD700]" />}
+                </button>
+              )}
+            </th>
             <Th f="title" l="Наименование" w="min-w-[180px]" />
             <Th f="sku" l="ID" w="w-[110px]" />
             <th className="text-left px-2 py-1.5 font-bold text-[10px] uppercase tracking-wide text-white/50 w-[120px]">S/N · IMEI</th>

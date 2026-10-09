@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import Icon from "@/components/ui/icon";
 import { slApi, fmt, type SLItem, type SLCategory, type SLBranch, STATUS_LABEL } from "./types";
 import SLItemsFilters from "./SLItemsFilters";
+import SLItemsBulkBar from "./SLItemsBulkBar";
 import SLItemsMovePanel from "./SLItemsMovePanel";
 import SLItemDetail from "./SLItemDetail";
 import SLItemSellModal from "./SLItemSellModal";
@@ -13,7 +14,7 @@ import PrintDocsButton from "./PrintDocsButton";
 
 const PHONE_SPECS_AI_URL = "https://functions.poehali.dev/983744a8-1cfc-42d8-a566-bf31dfa328b2";
 
-export default function SLItemsList({ token, empName: _empName, isOwner = false }: { token: string; empName?: string; isOwner?: boolean }) {
+export default function SLItemsList({ token, empName, isOwner = false }: { token: string; empName?: string; isOwner?: boolean }) {
   const [items, setItems] = useState<SLItem[]>([]);
   const [cats, setCats] = useState<SLCategory[]>([]);
   const [branches, setBranches] = useState<SLBranch[]>([]);
@@ -202,6 +203,14 @@ export default function SLItemsList({ token, empName: _empName, isOwner = false 
         allItems={allItems}
       />
 
+      <SLItemsBulkBar
+        items={items}
+        selectedItems={items.filter(i => selected.has(i.id))}
+        empName={empName}
+        onSelectAll={selectAll}
+        onClear={clearSelection}
+      />
+
       <SLItemsMovePanel
         branches={branches}
         movingTo={movingTo} setMovingTo={setMovingTo}
@@ -330,6 +339,7 @@ export default function SLItemsList({ token, empName: _empName, isOwner = false 
           toggleSelect={toggleSelect}
           onOpen={setOpen}
           onSell={setSellOpen}
+          onToggleAll={() => (selected.size === items.length ? clearSelection() : selectAll())}
         />
       ) : (
         <div className="space-y-1.5">
