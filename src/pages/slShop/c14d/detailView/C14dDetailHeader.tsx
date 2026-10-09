@@ -111,6 +111,27 @@ export default function C14dDetailHeader({ c, onBack, onPay, onClose, onTerminat
         </div>
       )}
 
+      {c.status === "active" && c.today_calc && Number(c.today_calc.today_remaining) > 0 && (
+        <div className="rounded-xl border-2 border-emerald-500/50 bg-gradient-to-br from-emerald-500/15 via-emerald-500/5 to-transparent p-3 shadow-[0_0_24px_rgba(16,185,129,0.12)]">
+          <div className="flex items-end justify-between gap-2">
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-emerald-300/80 font-bold">Оплатить сегодня</div>
+              <div className="font-oswald font-bold text-[30px] leading-none text-emerald-300">{fmt(c.today_calc.today_remaining)} ₽</div>
+              <div className="text-[10px] text-white/50 mt-1">
+                Выдано {fmt(c.amount)} ₽ + проценты {fmt(c.today_calc.interest_today)} ₽ за {Math.max(1, c.today_calc.days_passed)} дн.
+              </div>
+            </div>
+            <div className="text-right shrink-0">
+              <div className="text-[10px] uppercase tracking-wider text-[#FFD700]/80 font-bold">Прибыль</div>
+              <div className="font-oswald font-bold text-[22px] leading-none text-[#FFD700]">+{fmt(c.today_calc.interest_today)} ₽</div>
+            </div>
+          </div>
+          <SLButton variant="success" size="lg" icon="HandCoins" onClick={onPay} className="w-full mt-2.5">
+            Принять оплату {fmt(c.today_calc.today_remaining)} ₽
+          </SLButton>
+        </div>
+      )}
+
       {c.extended && c.extended_note && (
         <div className="rounded-md bg-orange-500/10 border border-orange-500/30 px-2.5 py-1 text-[11px] text-orange-200">
           <Icon name="MessageSquare" size={11} className="inline mr-1" />

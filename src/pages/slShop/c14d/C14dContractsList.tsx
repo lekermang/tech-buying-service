@@ -13,7 +13,7 @@ type Props = {
   items: C14dListItem[];
   loading: boolean;
   err: string | null;
-  onOpen: (id: number) => void;
+  onOpen: (id: number, pay?: boolean) => void;
   token: string;
   onRefresh: () => void;
   showFilters?: boolean;
@@ -235,10 +235,21 @@ export default function C14dContractsList({ items, loading, err, onOpen, token, 
 
                   {active && <C14dContactButtons phone={it.client_phone} message={msg} />}
 
+                  {active && Number(it.today_remaining || 0) > 0 && (
+                    <button onClick={() => onOpen(it.id, true)}
+                      className="w-full rounded-lg py-2.5 px-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white active:scale-[0.98] transition shadow-[0_2px_14px_rgba(16,185,129,0.3)]">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="flex items-center gap-1.5 font-bold uppercase tracking-wide text-[12px]"><Icon name="HandCoins" size={15} /> Принять оплату сегодня</span>
+                        <span className="font-oswald font-bold text-[17px]">{fmt(it.today_remaining)} ₽</span>
+                      </div>
+                      <div className="text-[10px] text-white/85 text-left mt-0.5">Прибыль: +{fmt(it.interest_today ?? 0)} ₽ (проценты за {it.days_passed ?? 0} дн.)</div>
+                    </button>
+                  )}
+
                   <div className="flex gap-1.5">
                     <button onClick={() => onOpen(it.id)}
                       className="flex-[1.4] flex items-center justify-center gap-1 rounded-md py-2 text-[11px] font-bold uppercase tracking-wide bg-gradient-to-r from-[#FFD700] to-[#b8860b] text-black active:scale-[0.97] transition">
-                      <Icon name="FileSearch" size={12} /> {active ? "Открыть / платёж" : "Открыть договор"}
+                      <Icon name="FileSearch" size={12} /> Открыть договор
                     </button>
                     {active && (
                       <>

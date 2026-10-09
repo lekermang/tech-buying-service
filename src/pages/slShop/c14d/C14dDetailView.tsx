@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Icon from "@/components/ui/icon";
 import { toast } from "sonner";
 import {
@@ -11,11 +11,11 @@ import C14dPaymentsTable from "./detailView/C14dPaymentsTable";
 import C14dPaymentModal from "./detailView/C14dPaymentModal";
 import C14dActionModals from "./detailView/C14dActionModals";
 
-type Props = { token: string; contractId: number; onBack: () => void };
+type Props = { token: string; contractId: number; onBack: () => void; autoPay?: boolean };
 
 type AvitoMatch = { id: number; title: string; price: number | null; url: string | null; main_photo: string | null };
 
-export default function C14dDetailView({ token, contractId, onBack }: Props) {
+export default function C14dDetailView({ token, contractId, onBack, autoPay }: Props) {
   const [c, setC] = useState<C14dDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -68,6 +68,20 @@ export default function C14dDetailView({ token, contractId, onBack }: Props) {
   };
 
   useEffect(() => { reload();   }, [contractId]);
+
+  const openPayToday = (data: C14dDetail | null = c) => {
+    const rest = data?.today_calc ? Number(data.today_calc.today_remaining) : 0;
+    if (rest > 0) { setPaySum(String(rest)); setPayType("full"); }
+    setPayOpen(true);
+  };
+
+  const autoPayDone = useRef(false);
+  useEffect(() => {
+    if (autoPay && c && c.status === "active" && !autoPayDone.current) {
+      autoPayDone.current = true;
+      openPayToday(c);
+    }
+  }, [c, autoPay]);
 
   const findAvitoListings = async () => {
     if (!c) return;
@@ -197,7 +211,7 @@ export default function C14dDetailView({ token, contractId, onBack }: Props) {
       <C14dDetailHeader
         c={c}
         onBack={onBack}
-        onPay={() => setPayOpen(true)}
+        onPay={() => openPayToday()}
         onClose={() => { setConfirmErr(null); setConfirm({ kind: "close" }); }}
         onTerminate={() => { setConfirmErr(null); setConfirm({ kind: "terminate" }); }}
         onExtend={toggleExtend}

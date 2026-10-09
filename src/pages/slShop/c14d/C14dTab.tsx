@@ -66,6 +66,7 @@ export default function C14dTab({ token }: Props) {
   const [dateTo, setDateTo] = useState("");
 
   const [openId, setOpenId] = useState<number | null>(null);
+  const [openPay, setOpenPay] = useState(false);
 
   const fetchStats = useCallback(async () => {
     const r = await c14dApi<C14dStats>(token, "stats");
@@ -103,7 +104,7 @@ export default function C14dTab({ token }: Props) {
   ];
 
   if (openId != null) {
-    return <C14dDetailView token={token} contractId={openId} onBack={() => { setOpenId(null); load(); fetchStats(); }} />;
+    return <C14dDetailView key={`${openId}-${openPay}`} token={token} contractId={openId} autoPay={openPay} onBack={() => { setOpenId(null); setOpenPay(false); load(); fetchStats(); }} />;
   }
 
   return (
@@ -214,7 +215,7 @@ export default function C14dTab({ token }: Props) {
           items={items}
           loading={loading}
           err={err}
-          onOpen={setOpenId}
+          onOpen={(id, pay) => { setOpenPay(!!pay); setOpenId(id); }}
           token={token}
           onRefresh={() => { load(); fetchStats(); }}
         />
