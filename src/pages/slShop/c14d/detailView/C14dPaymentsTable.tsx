@@ -1,6 +1,7 @@
 import Icon from "@/components/ui/icon";
 import { fmt, fmtDate, type C14dDetail } from "../types";
 import { SLSection } from "../../slUI";
+import { LOG_LABELS, logSummary, TONE_CLS } from "../helpers";
 
 type Props = {
   c: C14dDetail;
@@ -61,17 +62,32 @@ export default function C14dPaymentsTable({ c, onCancelPayment }: Props) {
         )}
       </SLSection>
 
-      {/* Журнал */}
+      {/* История */}
       {(c.log?.length || 0) > 0 && (
-        <SLSection icon="ClipboardList" title="Журнал">
-          <div className="space-y-0.5 max-h-40 overflow-y-auto scrollbar-premium pr-1">
-            {c.log.map(l => (
-              <div key={l.id} className="text-[11px] text-white/65 flex items-center gap-1.5 py-0.5">
-                <span className="text-white/35 shrink-0 w-16">{fmtDate(l.created_at)}</span>
-                <span className="text-[#FFD700] shrink-0 font-semibold uppercase tracking-wide text-[10px]">{l.action}</span>
-                <span className="text-white/40 truncate">{l.actor_name || "—"}</span>
-              </div>
-            ))}
+        <SLSection icon="ClipboardList" title={`История · ${c.log.length}`}>
+          <div className="space-y-1.5 max-h-72 overflow-y-auto scrollbar-premium pr-1">
+            {c.log.map(l => {
+              const meta = LOG_LABELS[l.action] || { l: l.action, icon: "Circle", tone: "gray" as const };
+              const sum = logSummary(l.action, (l.details || {}) as Record<string, unknown>, n => fmt(n));
+              const dt = new Date(l.created_at);
+              return (
+                <div key={l.id} className="flex gap-2 items-start">
+                  <div className={`w-6 h-6 rounded-full border flex items-center justify-center shrink-0 ${TONE_CLS[meta.tone]}`}>
+                    <Icon name={meta.icon} fallback="Circle" size={11} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[12px] text-white/90 font-semibold">{meta.l}</span>
+                      <span className="text-[10px] text-white/35 shrink-0">
+                        {fmtDate(l.created_at)} {dt.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                    {sum && <div className="text-[11px] text-white/60">{sum}</div>}
+                    <div className="text-[10px] text-white/35">{l.actor_name || "—"}</div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </SLSection>
       )}

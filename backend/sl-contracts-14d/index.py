@@ -560,9 +560,9 @@ def action_list(params):
     cur.execute(
         f"SELECT c.id, c.contract_number, c.amount, c.total_due, c.paid_total, c.remaining_debt, "
         f"c.start_date, c.end_date, c.status, c.created_at, c.created_by, "
-        f"c.extended, c.extended_at, c.extended_note, "
+        f"c.extended, c.extended_at, c.extended_note, c.interest_rate, c.term_days, c.closed_at, "
         f"cl.full_name AS client_name, cl.phone AS client_phone, "
-        f"i.brand AS item_brand, i.model AS item_model, i.item_type "
+        f"i.brand AS item_brand, i.model AS item_model, i.item_type, i.serial_number "
         f"FROM {SCHEMA}.contracts_14d c "
         f"JOIN {SCHEMA}.contracts_14d_clients cl ON cl.id=c.client_id "
         f"JOIN {SCHEMA}.contracts_14d_items i ON i.id=c.item_id "
@@ -579,6 +579,20 @@ def action_list(params):
         else:
             r['overdue'] = False
             r['overdue_days'] = 0
+        if r['status'] == 'active':
+            r['days_left'] = (ed - today).days if ed else None
+            tc = _calc_today(
+                r.get('amount'), r.get('interest_rate'), r.get('term_days') or 14,
+                r.get('start_date'), r.get('paid_total'), extended=bool(r.get('extended')),
+            )
+            r['today_due_full'] = tc['today_due_full']
+            r['today_remaining'] = tc['today_remaining']
+            r['days_passed'] = tc['days_passed_raw']
+            r['interest_today'] = tc['interest_today']
+        else:
+            r['days_left'] = None
+    if status_filter == 'active':
+        rows.sort(key=lambda x: (x.get('days_left') if x.get('days_left') is not None else 9999))
     return _ok({'items': rows, 'count': len(rows)})
 
 

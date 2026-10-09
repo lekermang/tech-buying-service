@@ -5,6 +5,8 @@ import {
   type C14dDetail,
 } from "../types";
 import { printContract14d } from "../printContract14d";
+import { dueState, TONE_CLS, clientMessage, fmtPhone } from "../helpers";
+import C14dContactButtons from "../C14dContactButtons";
 import {
   SLSection, SLButton, SLPill, SLStat, SLGrid,
 } from "../../slUI";
@@ -44,6 +46,15 @@ type Props = {
 export default function C14dDetailHeader({ c, onBack, onPay, onClose, onTerminate, onExtend, onPhotoClick }: Props) {
   const badge = STATUS_BADGE[c.status];
   const passport = c.passport_series ? `${c.passport_series} ${c.passport_number || ""}` : "";
+  const daysLeft = c.status === "active" && c.end_date
+    ? Math.round((new Date(c.end_date.slice(0, 10) + "T00:00:00").getTime() - new Date(new Date().toDateString()).getTime()) / 86400000)
+    : null;
+  const due = dueState({ status: c.status, extended: c.extended, days_left: daysLeft });
+  const msg = clientMessage({
+    contract_number: c.contract_number, client_name: c.client_name, end_date: c.end_date,
+    today_remaining: c.today_calc?.today_remaining ?? Number(c.remaining_debt),
+    days_left: daysLeft, item_brand: c.item_brand, item_model: c.item_model,
+  }, fmtDate);
   const passportFull = c.passport_issued_by ? `${passport}, ${c.passport_issued_by} ${fmtDate(c.passport_issue_date)}` : passport;
 
   return (
@@ -83,6 +94,22 @@ export default function C14dDetailHeader({ c, onBack, onPay, onClose, onTerminat
         {c.extended && <SLPill color="orange" icon="Timer">Продление активно</SLPill>}
         <div className="text-[10px] text-white/40 ml-auto">{fmtDate(c.created_at)} · {c.created_by || "—"}</div>
       </div>
+
+      {c.status === "active" && (
+        <div className={`rounded-xl border px-3 py-2 flex items-center gap-2 ${TONE_CLS[due.tone]}`}>
+          <Icon name={due.tone === "red" ? "AlertTriangle" : due.tone === "green" ? "CheckCircle2" : "Clock"} size={16} />
+          <div className="flex-1 min-w-0">
+            <div className="font-oswald font-bold text-[13px] uppercase tracking-wide">{due.label}</div>
+            <div className="text-[10px] opacity-75">Договор до {fmtDate(c.end_date)} · выдан {fmtDate(c.start_date)}</div>
+          </div>
+          {c.today_calc && (
+            <div className="text-right shrink-0">
+              <div className="text-[9px] uppercase opacity-70">Клиент вернёт</div>
+              <div className="font-oswald font-bold text-[16px]">{fmt(c.today_calc.today_remaining)} ₽</div>
+            </div>
+          )}
+        </div>
+      )}
 
       {c.extended && c.extended_note && (
         <div className="rounded-md bg-orange-500/10 border border-orange-500/30 px-2.5 py-1 text-[11px] text-orange-200">
@@ -145,9 +172,12 @@ export default function C14dDetailHeader({ c, onBack, onPay, onClose, onTerminat
           <Row l="ФИО" v={c.client_name} />
           <Row l="Дата рождения" v={fmtDate(c.client_birth_date)} />
           <Row l="Паспорт" v={passportFull} />
-          <Row l="Телефон" v={c.client_phone} />
+          <Row l="Телефон" v={fmtPhone(c.client_phone)} />
           {c.client_email && <Row l="E-mail" v={c.client_email} />}
         </SLGrid>
+        <div className="mt-2">
+          <C14dContactButtons phone={c.client_phone} message={msg} size="md" />
+        </div>
       </SLSection>
 
       {/* Имущество */}

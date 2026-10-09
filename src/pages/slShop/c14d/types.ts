@@ -95,6 +95,15 @@ export type C14dListItem = {
   extended?: boolean;
   extended_at?: string | null;
   extended_note?: string | null;
+  interest_rate?: number | string;
+  term_days?: number;
+  serial_number?: string | null;
+  closed_at?: string | null;
+  days_left?: number | null;
+  days_passed?: number;
+  today_due_full?: number;
+  today_remaining?: number;
+  interest_today?: number;
 };
 
 export type C14dTodayCalc = {
