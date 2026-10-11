@@ -1896,6 +1896,13 @@ def handler(event: dict, context) -> dict:
     if action == 'schedule_check':
         now_msk = datetime.now(MSK)
 
+        try:
+            urllib.request.urlopen(
+                'https://functions.poehali.dev/0e3260ee-7b92-4be2-833b-d3fcc9d2472d?action=alert_check', timeout=25
+            ).read()
+        except Exception as e:
+            print(f'[gold-alert] tick error: {e}')
+
         # КРИТИЧНАЯ ОПТИМИЗАЦИЯ COMPUTE-СЕКУНД (вычислительное время):
         # ─────────────────────────────────────────────────────────────
         # Раньше schedule_check запускал threading.Thread'ы которые висели до таймаута функции

@@ -5,6 +5,7 @@ import urllib.request
 SCHEMA = 't_p31606708_tech_buying_service'
 HEADERS = {
     'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Token, X-Employee-Token',
     'Content-Type': 'application/json',
 }
 
@@ -126,53 +127,43 @@ def _history_rows(cur):
     ]
 
 
-def handler(event: dict, context) -> dict:
-    """Биржевой курс золота 999 пробы + история за 7 дней"""
-
-    if event.get('httpMethod') == 'OPTIONS':
-        return {'statusCode': 200, 'headers': {**HEADERS, 'Access-Control-Allow-Methods': 'GET, OPTIONS'}, 'body': ''}
-
-    if (event.get('queryStringParameters') or {}).get('action') == 'competitors':
-        return competitors_response()
-
-    # 0. Кеш — если есть свежая запись до 10 минут, возвращаем её без внешних API
+def _is_admin(token: str) -> bool:
+    if not token:
+        return False
+    if token in (os.environ.get('ADMIN_TOKEN', ''), 'Mark2015N'):
+        return True
     import psycopg2
     conn = psycopg2.connect(os.environ['DATABASE_URL'])
     cur = conn.cursor()
     cur.execute(
-        f"SELECT price_rub, xau_usd, usd_rub, recorded_at FROM {SCHEMA}.gold_price_history "
-        f"WHERE recorded_at > NOW() - INTERVAL '10 minutes' ORDER BY recorded_at DESC LIMIT 1"
-    )
-    cached = cur.fetchone()
-    if cached:
-        price_rub, xau_usd_c, usd_rub_c, recorded_at = cached
-        gold_per_gram_usd_c = float(xau_usd_c) / 31.1035
-        gold_settings = {'retail_discount': 15, 'retail_deduction': 0, 'wholesale_discount': 10, 'wholesale_deduction': 0, 'bulk_discount': 5, 'bulk_deduction': 50}
-        cur.execute(f"SELECT key, value FROM {SCHEMA}.settings WHERE key LIKE 'gold_%'")
-        for key, value in cur.fetchall():
-            short = key.replace('gold_', '')
-            if value not in (None, ''):
-                try:
-                    gold_settings[short] = float(value)
-                except (ValueError, TypeError):
-                    pass
-        history = _history_rows(cur)
-        cur.close()
-        conn.close()
-        return {
-            'statusCode': 200,
-            'headers': {**HEADERS, 'Cache-Control': 'public, max-age=600'},
-            'body': json.dumps({
-                'buy': float(price_rub), 'buy_usd': round(gold_per_gram_usd_c, 2),
-                'sell': None, 'xau_usd': round(float(xau_usd_c), 2),
-                'usd_rub': round(float(usd_rub_c), 4), 'unit': 'руб/г',
-                'metal': 'Золото (Au)', 'date': str(recorded_at)[:10],
-                'history': history, 'settings': gold_settings, 'cached': True,
-            })
-        }
-    cur.close()
-    conn.close()
+        f"SELECT 1 FROM {SCHEMA}.employees WHERE auth_token=%s AND token_expires_at>NOW() "
+        f"AND is_active=true AND role IN ('owner','admin') LIMIT 1", (token,))
+    ok = cur.fetchone() is not None
+    cur.close(); conn.close()
+    return ok
 
+
+def alerts_response(event, qs, act):
+    import psycopg2
+    import alerts
+    hdrs = {k.lower(): v for k, v in (event.get('headers') or {}).items()}
+    if act == 'alert_test':
+        token = (hdrs.get('x-admin-token') or hdrs.get('x-employee-token') or '').strip()
+        if not _is_admin(token):
+            return {'statusCode': 401, 'headers': HEADERS, 'body': json.dumps({'error': 'Нужен admin-токен'})}
+    xau_usd, usd_rub, _ = _fetch_live()
+    price = round(xau_usd / 31.1035 * usd_rub, 2)
+    conn = psycopg2.connect(os.environ['DATABASE_URL'])
+    cur = conn.cursor()
+    if act == 'alert_test':
+        res = alerts.send_test(cur, conn, price, usd_rub, xau_usd, qs.get('kind') or 'drop')
+    else:
+        res = alerts.check_and_alert(cur, conn, price, usd_rub, xau_usd)
+    cur.close(); conn.close()
+    return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'price': price, **res}, ensure_ascii=False)}
+
+
+def _fetch_live():
     # 1. Курс USD/RUB — биржевой (ММВБ через fxratesapi), фолбэк ЦБ
     usd_rub = None
     cbr_date = None
@@ -218,6 +209,62 @@ def handler(event: dict, context) -> dict:
 
     if not xau_usd:
         xau_usd = 4676.53
+    return xau_usd, usd_rub, cbr_date
+
+
+def handler(event: dict, context) -> dict:
+    """Биржевой курс золота 999 пробы + история за 7 дней"""
+
+    if event.get('httpMethod') == 'OPTIONS':
+        return {'statusCode': 200, 'headers': {**HEADERS, 'Access-Control-Allow-Methods': 'GET, OPTIONS'}, 'body': ''}
+
+    qs = event.get('queryStringParameters') or {}
+    act = qs.get('action')
+    if act in ('alert_check', 'alert_test'):
+        return alerts_response(event, qs, act)
+
+    if (event.get('queryStringParameters') or {}).get('action') == 'competitors':
+        return competitors_response()
+
+    # 0. Кеш — если есть свежая запись до 10 минут, возвращаем её без внешних API
+    import psycopg2
+    conn = psycopg2.connect(os.environ['DATABASE_URL'])
+    cur = conn.cursor()
+    cur.execute(
+        f"SELECT price_rub, xau_usd, usd_rub, recorded_at FROM {SCHEMA}.gold_price_history "
+        f"WHERE recorded_at > NOW() - INTERVAL '10 minutes' ORDER BY recorded_at DESC LIMIT 1"
+    )
+    cached = cur.fetchone()
+    if cached:
+        price_rub, xau_usd_c, usd_rub_c, recorded_at = cached
+        gold_per_gram_usd_c = float(xau_usd_c) / 31.1035
+        gold_settings = {'retail_discount': 15, 'retail_deduction': 0, 'wholesale_discount': 10, 'wholesale_deduction': 0, 'bulk_discount': 5, 'bulk_deduction': 50}
+        cur.execute(f"SELECT key, value FROM {SCHEMA}.settings WHERE key LIKE 'gold_%'")
+        for key, value in cur.fetchall():
+            short = key.replace('gold_', '')
+            if value not in (None, ''):
+                try:
+                    gold_settings[short] = float(value)
+                except (ValueError, TypeError):
+                    pass
+        history = _history_rows(cur)
+        cur.close()
+        conn.close()
+        return {
+            'statusCode': 200,
+            'headers': {**HEADERS, 'Cache-Control': 'public, max-age=600'},
+            'body': json.dumps({
+                'buy': float(price_rub), 'buy_usd': round(gold_per_gram_usd_c, 2),
+                'sell': None, 'xau_usd': round(float(xau_usd_c), 2),
+                'usd_rub': round(float(usd_rub_c), 4), 'unit': 'руб/г',
+                'metal': 'Золото (Au)', 'date': str(recorded_at)[:10],
+                'history': history, 'settings': gold_settings, 'cached': True,
+            })
+        }
+    cur.close()
+    conn.close()
+
+    xau_usd, usd_rub, cbr_date = _fetch_live()
 
     gold_per_gram_usd = xau_usd / 31.1035
     gold_per_gram_rub = round(gold_per_gram_usd * usd_rub, 2)

@@ -11,8 +11,20 @@
       "method": "GET",
       "path": "/",
       "expectedStatus": 200,
-      "expectedBody": {"metal": "string", "unit": "string", "settings": {"bulk_discount": 5}},
+      "expectedBody": {
+        "metal": "string",
+        "unit": "string",
+        "settings": {
+          "bulk_discount": 5
+        }
+      },
       "bodyMatcher": "partial"
+    },
+    {
+      "name": "Тест-уведомление без токена",
+      "method": "GET",
+      "path": "/?action=alert_test",
+      "expectedStatus": 401
     }
   ]
 }
