@@ -120,6 +120,17 @@ export type SLAnalytics = {
   by_branch: { branch: string | null; sold_count: number; sold_sum: number; bought_sum: number }[];
   by_day: { d: string; sold_count: number; sold_sum: number; bought_sum: number }[];
   by_category: { category: string | null; sold_count: number; sold_sum: number }[];
+  contracts?: {
+    closed_count: number;
+    issued: number;
+    returned: number;
+    profit: number;
+    payments_received: number;
+    active_count: number;
+    active_issued: number;
+    overdue_count: number;
+    by_day: { d: string; count: number; profit: number }[];
+  };
 };
 
 export type SLAccounting = {

@@ -101,6 +101,35 @@ export default function SLAnalytics({ token }: { token: string }) {
                       <Card title="Период" value={data.period} sub={`с ${data.date_from}`} icon="Calendar" color="red" />
                     </div>
 
+                    {data.contracts && (() => {
+                      const c = data.contracts;
+                      const total = totalProfit + c.profit;
+                      return (
+                        <Section title="Договоры 14 дней (СмартЛомбард)" icon="FileSignature">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
+                            <Card title="Прибыль с договоров" value={`${c.profit > 0 ? "+" : ""}${fmt(c.profit)} ₽`} sub={`${c.closed_count} выкуплено`} icon="TrendingUp" color="emerald" />
+                            <Card title="Получено платежей" value={`${fmt(c.payments_received)} ₽`} sub="за период" icon="HandCoins" color="blue" />
+                            <Card title="Сейчас в залоге" value={`${fmt(c.active_issued)} ₽`} sub={`${c.active_count} дог.${c.overdue_count ? `, просрочено ${c.overdue_count}` : ""}`} icon="Lock" color="orange" />
+                            <Card title="Прибыль всего" value={`${fmt(total)} ₽`} sub="товары + договоры" icon="Coins" color="emerald" />
+                          </div>
+                          <div className="text-[10px] text-white/40 mb-2">
+                            Прибыль с договора = сколько вернул клиент минус сколько ему выдали. Считается в день закрытия договора. Выдано по закрытым: {fmt(c.issued)} ₽, возвращено: {fmt(c.returned)} ₽.
+                          </div>
+                          {c.by_day.length === 0 ? <Empty /> : (
+                            <div className="space-y-1">
+                              {c.by_day.slice(-15).map((d, i) => (
+                                <div key={i} className="flex items-center gap-2 text-[12px]">
+                                  <span className="w-20 text-white/50 shrink-0">{new Date(d.d).toLocaleDateString("ru-RU")}</span>
+                                  <span className="flex-1 text-white/40">{d.count} выкуплено</span>
+                                  <span className={`font-bold w-24 text-right ${d.profit >= 0 ? "text-emerald-300" : "text-red-300"}`}>{d.profit > 0 ? "+" : ""}{fmt(d.profit)}₽</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </Section>
+                      );
+                    })()}
+
                     {/* По филиалам */}
                     <Section title="По филиалам" icon="MapPin">
                       {data.by_branch.length === 0 ? <Empty /> : (

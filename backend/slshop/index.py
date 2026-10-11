@@ -910,6 +910,44 @@ def analytics_full(params):
         f"{cond_op} GROUP BY c.name ORDER BY sold_sum DESC LIMIT 20"
     )
     by_category = [dict(r) for r in cur.fetchall()]
+    contracts = {
+        'closed_count': 0, 'issued': 0.0, 'returned': 0.0, 'profit': 0.0,
+        'payments_received': 0.0, 'active_count': 0, 'active_issued': 0.0,
+        'overdue_count': 0, 'by_day': [],
+    }
+    try:
+        cur.execute(
+            f"SELECT COUNT(*) AS cnt, COALESCE(SUM(amount),0) AS issued, "
+            f"COALESCE(SUM(paid_total),0) AS returned, COALESCE(SUM(paid_total - amount),0) AS profit "
+            f"FROM {SCHEMA}.contracts_14d WHERE status='closed' AND closed_at >= {_esc(date_from)}"
+        )
+        r = cur.fetchone() or {}
+        contracts['closed_count'] = int(r.get('cnt') or 0)
+        contracts['issued'] = float(r.get('issued') or 0)
+        contracts['returned'] = float(r.get('returned') or 0)
+        contracts['profit'] = float(r.get('profit') or 0)
+        cur.execute(
+            f"SELECT COALESCE(SUM(amount),0) AS s FROM {SCHEMA}.contracts_14d_payments WHERE paid_at >= {_esc(date_from)}"
+        )
+        contracts['payments_received'] = float((cur.fetchone() or {}).get('s') or 0)
+        cur.execute(
+            f"SELECT COUNT(*) AS cnt, COALESCE(SUM(amount),0) AS issued, "
+            f"COUNT(*) FILTER (WHERE end_date < CURRENT_DATE) AS overdue "
+            f"FROM {SCHEMA}.contracts_14d WHERE status='active'"
+        )
+        r = cur.fetchone() or {}
+        contracts['active_count'] = int(r.get('cnt') or 0)
+        contracts['active_issued'] = float(r.get('issued') or 0)
+        contracts['overdue_count'] = int(r.get('overdue') or 0)
+        cur.execute(
+            f"SELECT (closed_at AT TIME ZONE 'Europe/Moscow')::date AS d, COUNT(*) AS cnt, "
+            f"COALESCE(SUM(paid_total - amount),0) AS profit "
+            f"FROM {SCHEMA}.contracts_14d WHERE status='closed' AND closed_at >= {_esc(date_from)} "
+            f"GROUP BY 1 ORDER BY 1"
+        )
+        contracts['by_day'] = [{'d': x['d'].isoformat(), 'count': int(x['cnt']), 'profit': float(x['profit'])} for x in cur.fetchall()]
+    except Exception as e:
+        print(f'[slshop][analytics] contracts error: {e}')
     cur.close(); conn.close()
     return _ok({
         'period': period, 'date_from': date_from,
@@ -917,6 +955,7 @@ def analytics_full(params):
         'by_branch': by_branch,
         'by_day': by_day,
         'by_category': by_category,
+        'contracts': contracts,
     })
 
 
