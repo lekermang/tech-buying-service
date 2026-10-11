@@ -19,13 +19,13 @@ export function useSLDashboardData(token: string, period: string): SLDashboardSt
 
   const load = useCallback(async () => {
     setLoading(true); setErr(null);
-    const [r1, r2, r3] = await Promise.all([
-      slApi<SLStats>(token, "stats", { params: { period } }),
+    const r1 = await slApi<SLStats>(token, "stats", { params: { period } });
+    if (r1.ok && r1.data) setData(r1.data);
+    else setErr(r1.error || "Ошибка");
+    const [r2, r3] = await Promise.all([
       slApi<SLSoldItem[]>(token, "sold", { params: { period } }),
       slApi<SLBoughtItem[]>(token, "bought", { params: { period } }),
     ]);
-    if (r1.ok && r1.data) setData(r1.data);
-    else setErr(r1.error || "Ошибка");
     if (r2.ok && r2.data) setSold(r2.data);
     if (r3.ok && r3.data) setBought(r3.data);
     setLoading(false);

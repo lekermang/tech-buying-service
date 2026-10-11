@@ -442,6 +442,26 @@ export const PAYMENT_METHODS = [
   { v: "transfer", l: "Перевод" },
 ];
 
+const SL_RATE_RE = /rate limit|QueryCanceled|too many/i;
+const SL_INFLIGHT = new Map<string, Promise<{ ok: boolean; data: unknown; raw?: string; error?: string }>>();
+const SL_CACHE = new Map<string, { t: number; v: { ok: boolean; data: unknown; raw?: string; error?: string } }>();
+const SL_CACHE_TTL = 4000;
+const SL_CACHEABLE = new Set(["stats", "sold", "bought", "cash_summary", "cash_accounts", "my_permissions", "branches", "categories"]);
+const slSleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+async function slFetchOnce(url: string, init: RequestInit, rawText?: boolean) {
+  const res = await fetch(url, init);
+  if (rawText) {
+    const text = await res.text();
+    return { ok: res.ok, data: null, raw: text } as { ok: boolean; data: unknown; raw?: string; error?: string };
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data?.error) {
+    return { ok: false, data: null, error: data?.error || `HTTP ${res.status}` } as { ok: boolean; data: unknown; raw?: string; error?: string };
+  }
+  return { ok: true, data } as { ok: boolean; data: unknown; raw?: string; error?: string };
+}
+
 export async function slApi<T = unknown>(
   token: string,
   action: string,
@@ -458,28 +478,49 @@ export async function slApi<T = unknown>(
   Object.entries(opts.params || {}).forEach(([k, v]) => {
     if (v !== undefined && v !== null && v !== "") url.searchParams.set(k, String(v));
   });
-  try {
-    const init: RequestInit = {
-      method,
-      headers: {
-        "X-Employee-Token": token,
-        ...(method === "POST" ? { "Content-Type": "application/json" } : {}),
-      },
-    };
-    if (method === "POST") init.body = JSON.stringify(opts.body || {});
-    const res = await fetch(url.toString(), init);
-    if (opts.rawText) {
-      const text = await res.text();
-      return { ok: res.ok, data: null, raw: text };
-    }
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || data?.error) {
-      return { ok: false, data: null, error: data?.error || `HTTP ${res.status}` };
-    }
-    return { ok: true, data: data as T };
-  } catch (e) {
-    return { ok: false, data: null, error: e instanceof Error ? e.message : String(e) };
+  const init: RequestInit = {
+    method,
+    headers: {
+      "X-Employee-Token": token,
+      ...(method === "POST" ? { "Content-Type": "application/json" } : {}),
+    },
+  };
+  if (method === "POST") init.body = JSON.stringify(opts.body || {});
+
+  const key = `${token}|${url.toString()}`;
+  const isGet = method === "GET" && !opts.rawText;
+
+  if (isGet && SL_CACHEABLE.has(action)) {
+    const hit = SL_CACHE.get(key);
+    if (hit && Date.now() - hit.t < SL_CACHE_TTL) return hit.v as { ok: boolean; data: T | null; raw?: string; error?: string };
   }
+  if (isGet && SL_INFLIGHT.has(key)) {
+    return (await SL_INFLIGHT.get(key)) as { ok: boolean; data: T | null; raw?: string; error?: string };
+  }
+
+  const run = async () => {
+    let last: { ok: boolean; data: unknown; raw?: string; error?: string } = { ok: false, data: null, error: "Ошибка" };
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        last = await slFetchOnce(url.toString(), init, opts.rawText);
+      } catch (e) {
+        return { ok: false, data: null, error: e instanceof Error ? e.message : String(e) };
+      }
+      const retriable = !last.ok && method === "GET" && SL_RATE_RE.test(last.error || "");
+      if (!retriable) break;
+      await slSleep(700 * (attempt + 1) + Math.random() * 400);
+    }
+    if (last.ok && isGet && SL_CACHEABLE.has(action)) SL_CACHE.set(key, { t: Date.now(), v: last });
+    if (method === "POST") SL_CACHE.clear();
+    return last;
+  };
+
+  const p = run();
+  if (isGet) {
+    SL_INFLIGHT.set(key, p);
+    p.finally(() => SL_INFLIGHT.delete(key));
+  }
+  return (await p) as { ok: boolean; data: T | null; raw?: string; error?: string };
 }
 
 export function fmt(n: number | string | undefined | null): string {
