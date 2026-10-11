@@ -2184,17 +2184,20 @@ def create_item(body, employee):
     _log_event(cur, 'buy', 'item', item_id, f"{'Закуплено' if _is_bulk else 'Куплено'}: {title}" + (f' ({qty} шт)' if qty > 1 else ''),
                log_note, total_buy, data.get('branch_id'), employee)
     # Если это скупка с ценой > 0 — создадим операцию buy
+    pay_method = (body.get('pay_method') or 'cash').strip()
+    if pay_method not in ('cash', 'card', 'transfer'):
+        pay_method = 'cash'
     if data.get('source', 'buyout') == 'buyout' and unit_buy_price > 0:
         cur.execute(
-            f"INSERT INTO {SCHEMA}.slshop_operations (op_type, item_id, client_id, amount, employee_name, status_to) "
-            f"VALUES ('buy', {item_id}, {_esc(data.get('buy_client_id'))}, {_esc(total_buy)}, "
+            f"INSERT INTO {SCHEMA}.slshop_operations (op_type, item_id, client_id, amount, payment_method, employee_name, status_to) "
+            f"VALUES ('buy', {item_id}, {_esc(data.get('buy_client_id'))}, {_esc(total_buy)}, {_esc(pay_method)}, "
             f"{_esc(employee.get('full_name') if employee else None)}, 'stock') RETURNING id"
         )
         op_id = cur.fetchone()[0]
         cur.execute(f"UPDATE {SCHEMA}.slshop_items SET buy_operation_id={op_id} WHERE id={item_id}")
         # Авто-расход по кассе при скупке (на полную сумму партии)
         branch_id = data.get('branch_id')
-        if branch_id:
+        if branch_id and pay_method == 'cash':
             cur.execute(
                 f"SELECT id, balance FROM {SCHEMA}.slshop_cash_accounts WHERE branch_id={int(branch_id)} AND is_active=true LIMIT 1"
             )
@@ -2532,6 +2535,254 @@ def cash_summary():
     rows = cur.fetchall()
     cur.close(); conn.close()
     return [dict(r) for r in rows]
+
+
+
+# ============ Кассовый день: сверка, безнал, заработок владельца ============
+CASH_NON_OPEX = ('Скупка товара', 'contracts_14d_payout', 'contracts_14d_payment_cancel',
+                 'Личный расход владельца', 'Корректировка по сверке')
+CASH_OWNER_TAKE = 'Личный расход владельца'
+CASH_FIX_CATEGORY = 'Корректировка по сверке'
+MSK_DATE = "AT TIME ZONE 'Europe/Moscow'"
+
+
+def _msk_today(cur):
+    cur.execute(f"SELECT (NOW() {MSK_DATE})::date AS d")
+    return cur.fetchone()['d']
+
+
+def _cashless_day(cur, ds):
+    """Безналичные операции за день: продажи, платежи по договорам (приход), выкупы и выдачи переводом (расход)."""
+    rows_in, rows_out = [], []
+    cur.execute(
+        f"SELECT o.payment_method AS method, COUNT(*) AS cnt, COALESCE(SUM(o.amount),0) AS sum "
+        f"FROM {SCHEMA}.slshop_operations o "
+        f"WHERE o.op_type='sell' AND COALESCE(o.payment_method,'cash') <> 'cash' "
+        f"AND (o.created_at {MSK_DATE})::date = {ds} GROUP BY 1"
+    )
+    for r in cur.fetchall():
+        rows_in.append({'kind': 'sale', 'label': 'Продажи товаров', 'method': r['method'], 'count': int(r['cnt']), 'sum': float(r['sum'])})
+    cur.execute(
+        f"SELECT p.pay_method AS method, COUNT(*) AS cnt, COALESCE(SUM(p.amount),0) AS sum "
+        f"FROM {SCHEMA}.contracts_14d_payments p "
+        f"WHERE COALESCE(p.pay_method,'cash') <> 'cash' AND (p.paid_at {MSK_DATE})::date = {ds} GROUP BY 1"
+    )
+    for r in cur.fetchall():
+        rows_in.append({'kind': 'contract_payment', 'label': 'Платежи по договорам', 'method': r['method'], 'count': int(r['cnt']), 'sum': float(r['sum'])})
+    cur.execute(
+        f"SELECT o.payment_method AS method, COUNT(*) AS cnt, COALESCE(SUM(o.amount),0) AS sum "
+        f"FROM {SCHEMA}.slshop_operations o "
+        f"WHERE o.op_type='buy' AND COALESCE(o.payment_method,'cash') <> 'cash' "
+        f"AND (o.created_at {MSK_DATE})::date = {ds} GROUP BY 1"
+    )
+    for r in cur.fetchall():
+        rows_out.append({'kind': 'buy', 'label': 'Скупка (выплата переводом)', 'method': r['method'], 'count': int(r['cnt']), 'sum': float(r['sum'])})
+    cur.execute(
+        f"SELECT c.payout_method AS method, COUNT(*) AS cnt, COALESCE(SUM(c.amount),0) AS sum "
+        f"FROM {SCHEMA}.contracts_14d c "
+        f"WHERE c.status <> 'draft' AND COALESCE(c.payout_method,'cash') <> 'cash' "
+        f"AND (c.created_at {MSK_DATE})::date = {ds} GROUP BY 1"
+    )
+    for r in cur.fetchall():
+        rows_out.append({'kind': 'contract_payout', 'label': 'Выдача по договорам переводом', 'method': r['method'], 'count': int(r['cnt']), 'sum': float(r['sum'])})
+    total_in = sum(x['sum'] for x in rows_in)
+    total_out = sum(x['sum'] for x in rows_out)
+    return {'in': rows_in, 'out': rows_out, 'total_in': total_in, 'total_out': total_out}
+
+
+def _period_profit(cur, d_from, d_to):
+    """Заработок за период [d_from; d_to] (SQL-выражения дат): прибыль с продаж + проценты по закрытым договорам - расходы."""
+    cur.execute(
+        f"SELECT COUNT(*) AS cnt, COALESCE(SUM(o.amount),0) AS rev, "
+        f"COALESCE(SUM(o.amount - COALESCE(i.buy_price,0)),0) AS prof "
+        f"FROM {SCHEMA}.slshop_operations o LEFT JOIN {SCHEMA}.slshop_items i ON i.id=o.item_id "
+        f"WHERE o.op_type='sell' AND (o.created_at {MSK_DATE})::date BETWEEN {d_from} AND {d_to}"
+    )
+    sr = cur.fetchone()
+    cur.execute(
+        f"SELECT COUNT(*) AS cnt, COALESCE(SUM(paid_total - amount),0) AS prof "
+        f"FROM {SCHEMA}.contracts_14d WHERE status='closed' "
+        f"AND (closed_at {MSK_DATE})::date BETWEEN {d_from} AND {d_to}"
+    )
+    cr = cur.fetchone()
+    nonopex = ', '.join(_esc(c) for c in CASH_NON_OPEX)
+    cur.execute(
+        f"SELECT COALESCE(SUM(amount),0) AS s FROM {SCHEMA}.slshop_cash_movements "
+        f"WHERE direction='out' AND COALESCE(category,'') NOT IN ({nonopex}) "
+        f"AND (created_at {MSK_DATE})::date BETWEEN {d_from} AND {d_to}"
+    )
+    expenses = float(cur.fetchone()['s'] or 0)
+    cur.execute(
+        f"SELECT COALESCE(SUM(amount),0) AS s FROM {SCHEMA}.slshop_cash_movements "
+        f"WHERE direction='out' AND category={_esc(CASH_OWNER_TAKE)} "
+        f"AND (created_at {MSK_DATE})::date BETWEEN {d_from} AND {d_to}"
+    )
+    taken = float(cur.fetchone()['s'] or 0)
+    sales_profit = float(sr['prof'] or 0)
+    contract_profit = float(cr['prof'] or 0)
+    net = sales_profit + contract_profit - expenses
+    return {
+        'sales_count': int(sr['cnt'] or 0), 'sales_revenue': float(sr['rev'] or 0),
+        'sales_profit': sales_profit,
+        'contracts_closed': int(cr['cnt'] or 0), 'contract_profit': contract_profit,
+        'expenses': expenses, 'net': net,
+        'taken': taken, 'available': max(0.0, net - taken),
+    }
+
+
+def cash_day(params, employee):
+    """Кассовый день: что должно быть в кассе, операции дня, безнал, сверки сотрудников, заработок владельца."""
+    raw_day = (params.get('date') or '').strip()
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    today = _msk_today(cur)
+    d = raw_day if re.match(r'^\d{4}-\d{2}-\d{2}$', raw_day) else today.isoformat()
+    ds = _esc(d) + '::date'
+    is_today = (d == today.isoformat())
+
+    cur.execute(
+        f"SELECT a.id, a.name, a.balance, a.branch_id, b.name AS branch_name "
+        f"FROM {SCHEMA}.slshop_cash_accounts a LEFT JOIN {SCHEMA}.slshop_branches b ON b.id=a.branch_id "
+        f"WHERE a.is_active=true ORDER BY a.is_default DESC, a.id"
+    )
+    accounts = [dict(r) for r in cur.fetchall()]
+
+    cur.execute(
+        f"SELECT account_id, category, direction, COUNT(*) AS cnt, COALESCE(SUM(amount),0) AS sum "
+        f"FROM {SCHEMA}.slshop_cash_movements WHERE (created_at {MSK_DATE})::date = {ds} "
+        f"GROUP BY 1,2,3 ORDER BY 5 DESC"
+    )
+    cat_rows = [dict(r) for r in cur.fetchall()]
+
+    cur.execute(
+        f"SELECT m.id, m.account_id, a.name AS account_name, m.direction, m.amount, m.balance_after, "
+        f"m.category, m.reason, m.taken_by, m.employee_name, m.is_auto, m.created_at "
+        f"FROM {SCHEMA}.slshop_cash_movements m LEFT JOIN {SCHEMA}.slshop_cash_accounts a ON a.id=m.account_id "
+        f"WHERE (m.created_at {MSK_DATE})::date = {ds} ORDER BY m.created_at DESC, m.id DESC LIMIT 300"
+    )
+    movements = [dict(r) for r in cur.fetchall()]
+
+    cur.execute(
+        f"SELECT * FROM {SCHEMA}.cash_day_counts WHERE count_date = {ds} ORDER BY id DESC"
+    )
+    counts_today = [dict(r) for r in cur.fetchall()]
+
+    for a in accounts:
+        rows = [r for r in cat_rows if r['account_id'] == a['id']]
+        a['day_in'] = sum(float(r['sum']) for r in rows if r['direction'] == 'in')
+        a['day_out'] = sum(float(r['sum']) for r in rows if r['direction'] == 'out')
+        a['categories'] = [
+            {'category': r['category'], 'direction': r['direction'], 'count': int(r['cnt']), 'sum': float(r['sum'])}
+            for r in rows
+        ]
+        if is_today:
+            expected = float(a['balance'] or 0)
+        else:
+            cur.execute(
+                f"SELECT balance_after FROM {SCHEMA}.slshop_cash_movements WHERE account_id={int(a['id'])} "
+                f"AND (created_at {MSK_DATE})::date <= {ds} ORDER BY created_at DESC, id DESC LIMIT 1"
+            )
+            br = cur.fetchone()
+            expected = float(br['balance_after'] or 0) if br else 0.0
+        a['expected_cash'] = expected
+        a['opening_cash'] = expected - a['day_in'] + a['day_out']
+        last = next((c for c in counts_today if c['account_id'] == a['id']), None)
+        a['last_count'] = last
+
+    cashless = _cashless_day(cur, ds)
+    last_cashless = next((c for c in counts_today if c['account_id'] is None), None)
+
+    cur.execute(
+        f"SELECT * FROM {SCHEMA}.cash_day_counts ORDER BY id DESC LIMIT 40"
+    )
+    history = [dict(r) for r in cur.fetchall()]
+    acc_names = {a['id']: a['name'] for a in accounts}
+    for h in history:
+        h['account_name'] = acc_names.get(h['account_id']) if h['account_id'] else 'Безнал'
+
+    owner = None
+    if employee and employee.get('role') == 'owner':
+        day_p = _period_profit(cur, ds, ds)
+        month_p = _period_profit(cur, f"date_trunc('month', {ds})::date", ds)
+        cash_total = sum(a['expected_cash'] for a in accounts)
+        day_p['can_take_now'] = max(0.0, min(day_p['available'], cash_total))
+        month_p['can_take_now'] = max(0.0, min(month_p['available'], cash_total))
+        owner = {'day': day_p, 'month': month_p, 'cash_total': cash_total}
+
+    cur.close(); conn.close()
+    return _ok({
+        'date': d, 'is_today': is_today,
+        'accounts': accounts, 'movements': movements,
+        'cashless': cashless, 'last_cashless_count': last_cashless,
+        'counts_history': history, 'owner': owner,
+        'can_correct': bool(employee and employee.get('role') in ('owner', 'admin', 'manager')),
+    })
+
+
+def cash_day_count_save(body, employee):
+    """Сотрудник вносит реальные цифры: деньги в кассе, в сейфе и безнал за день."""
+    if not employee:
+        return _err(401, 'Не авторизован')
+    account_id = body.get('account_id')
+    comment = (body.get('comment') or '').strip() or None
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    today = _msk_today(cur)
+    emp_id = employee.get('id')
+    emp_name = employee.get('full_name')
+
+    if account_id in (None, ''):
+        cl = body.get('cashless_counted')
+        if cl in (None, ''):
+            cur.close(); conn.close(); return _err(400, 'Введите сумму по безналу')
+        cl = float(cl)
+        expected = _cashless_day(cur, _esc(today.isoformat()) + '::date')['total_in']
+        diff = cl - expected
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.cash_day_counts (count_date, account_id, cash_counted, safe_amount, cashless_counted, "
+            f"expected_cash, expected_cashless, diff_cash, diff_cashless, comment, employee_id, employee_name) "
+            f"VALUES ({_esc(today.isoformat())}, NULL, 0, 0, {cl}, 0, {expected}, 0, {diff}, {_esc(comment)}, {_esc(emp_id)}, {_esc(emp_name)}) RETURNING id"
+        )
+        cid = cur.fetchone()['id']
+        conn.commit(); cur.close(); conn.close()
+        return _ok({'id': cid, 'expected': expected, 'diff': diff})
+
+    try:
+        acc_id = int(account_id)
+        counted = float(body.get('cash_counted'))
+        safe = float(body.get('safe_amount') or 0)
+    except (TypeError, ValueError):
+        cur.close(); conn.close(); return _err(400, 'Введите суммы числами')
+    if counted < 0 or safe < 0:
+        cur.close(); conn.close(); return _err(400, 'Сумма не может быть отрицательной')
+    cur.execute(f"SELECT balance, branch_id, name FROM {SCHEMA}.slshop_cash_accounts WHERE id={acc_id} FOR UPDATE")
+    acc = cur.fetchone()
+    if not acc:
+        cur.close(); conn.close(); return _err(404, 'Касса не найдена')
+    expected = float(acc['balance'] or 0)
+    diff = counted - expected
+    corrected = False
+    if body.get('apply_correction') and abs(diff) >= 0.01:
+        if employee.get('role') not in ('owner', 'admin', 'manager'):
+            cur.close(); conn.close()
+            return _err(403, 'Привести кассу в соответствие может только владелец или администратор')
+        direction = 'in' if diff > 0 else 'out'
+        cur.execute(
+            f"INSERT INTO {SCHEMA}.slshop_cash_movements (account_id, direction, amount, balance_after, category, reason, employee_name, is_auto, branch_id) "
+            f"VALUES ({acc_id}, {_esc(direction)}, {abs(diff)}, {counted}, {_esc(CASH_FIX_CATEGORY)}, "
+            f"{_esc(f'Сверка: по факту {counted:g} ₽, в системе было {expected:g} ₽')}, {_esc(emp_name)}, TRUE, {_esc(acc['branch_id'])})"
+        )
+        cur.execute(f"UPDATE {SCHEMA}.slshop_cash_accounts SET balance={counted} WHERE id={acc_id}")
+        corrected = True
+    cur.execute(
+        f"INSERT INTO {SCHEMA}.cash_day_counts (count_date, account_id, cash_counted, safe_amount, "
+        f"expected_cash, diff_cash, corrected, comment, employee_id, employee_name) "
+        f"VALUES ({_esc(today.isoformat())}, {acc_id}, {counted}, {safe}, {expected}, {diff}, {_esc(corrected)}, "
+        f"{_esc(comment)}, {_esc(emp_id)}, {_esc(emp_name)}) RETURNING id"
+    )
+    cid = cur.fetchone()['id']
+    conn.commit(); cur.close(); conn.close()
+    return _ok({'id': cid, 'expected': expected, 'diff': diff, 'corrected': corrected})
 
 
 # ============ Requisites ============
@@ -3341,6 +3592,10 @@ def _handler(event: dict, context) -> dict:
             return _ok(list_cash_accounts())
         if action == 'cash_summary':
             return _ok(cash_summary())
+        if action == 'cash_day':
+            return cash_day(params, employee)
+        if action == 'cash_day_count_save' and method == 'POST':
+            return cash_day_count_save(body, employee)
         if action == 'cash_movements':
             return _ok(cash_movements_list(params))
         if action == 'cash_movement_create' and method == 'POST':

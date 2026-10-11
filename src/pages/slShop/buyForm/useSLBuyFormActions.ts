@@ -31,7 +31,7 @@ export function useSLBuyFormActions(token: string, st: SLBuyFormState) {
     source, consignmentPercent, status,
     description,
     categoryId,
-    branchId,
+    branchId, payMethod,
     clientQuery,
     clientId,
     setClientResults,
@@ -223,6 +223,7 @@ export function useSLBuyFormActions(token: string, st: SLBuyFormState) {
       consignment_percent: source === "consignment" ? (Number(consignmentPercent) || 0) : null,
       consignment_owner_id: source === "consignment" ? buyClientId : null,
       branch_id: branchId || null,
+      pay_method: payMethod,
     };
     const r = await slApi<{ id: number; sku: string }>(token, "item_create", { method: "POST", body: payload });
     setSaving(false);

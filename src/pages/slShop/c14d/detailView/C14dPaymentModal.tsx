@@ -18,6 +18,8 @@ type Props = {
   setPayComment: (v: string) => void;
   payAccountId: string;
   setPayAccountId: (v: string) => void;
+  payMethod: "cash" | "card" | "transfer";
+  setPayMethod: (v: "cash" | "card" | "transfer") => void;
   paySkipCash: boolean;
   setPaySkipCash: (v: boolean) => void;
   payPaidAt: string;
@@ -29,7 +31,7 @@ type Props = {
 
 export default function C14dPaymentModal({
   c, open, saving, paySum, setPaySum, payType, setPayType, payComment, setPayComment,
-  payAccountId, setPayAccountId, paySkipCash, setPaySkipCash, payPaidAt, setPayPaidAt,
+  payAccountId, setPayAccountId, payMethod, setPayMethod, paySkipCash, setPaySkipCash, payPaidAt, setPayPaidAt,
   accounts, onClose, onSubmit,
 }: Props) {
   const [advanced, setAdvanced] = useState(false);
@@ -39,6 +41,20 @@ export default function C14dPaymentModal({
   const toPay = t ? Number(t.today_remaining) : 0;
   const simple = !advanced && !!t && toPay > 0;
   const profit = t ? Number(t.interest_today) : 0;
+
+  const methodPicker = (
+    <SLField label="Как клиент платит">
+      <div className="grid grid-cols-3 gap-1.5">
+        {([["cash", "Наличные", "Banknote"], ["card", "Карта", "CreditCard"], ["transfer", "Перевод", "Smartphone"]] as const).map(([v, l, i]) => (
+          <button key={v} type="button" onClick={() => setPayMethod(v)}
+            className={`px-1.5 py-1.5 rounded-md border text-[11px] font-bold flex items-center justify-center gap-1 ${payMethod === v ? "bg-[#FFD700]/12 border-[#FFD700] text-[#FFD700]" : "bg-[#0A0A0A] border-[#1A1A1A] text-white/55"}`}>
+            <Icon name={i} size={12} />{l}
+          </button>
+        ))}
+      </div>
+      {payMethod !== "cash" && <div className="text-[9px] text-white/45 mt-0.5">Деньги не попадут в кассу наличных, а учтутся в безнале за день.</div>}
+    </SLField>
+  );
 
   return (
     <SLModal
@@ -85,8 +101,10 @@ export default function C14dPaymentModal({
             <div className="text-[10px] text-emerald-300/80 text-center">Клиент выкупает досрочно и экономит {fmt(t.saving)} ₽ против полного срока</div>
           )}
 
+          {methodPicker}
+
           <SLField label="В какую кассу принять деньги">
-            <SLSelect value={payAccountId} onChange={e => setPayAccountId(e.target.value)} disabled={paySkipCash}>
+            <SLSelect value={payAccountId} onChange={e => setPayAccountId(e.target.value)} disabled={paySkipCash || payMethod !== "cash"}>
               {accounts.length === 0 && <option value="">Нет касс</option>}
               {accounts.map(a => <option key={a.id} value={a.id}>{a.name} · {fmt(a.balance)} ₽{a.is_default ? " ★" : ""}</option>)}
             </SLSelect>
@@ -145,8 +163,9 @@ export default function C14dPaymentModal({
             </div>
           )}
         </SLField>
+        {methodPicker}
         <SLField label="Касса прихода">
-          <SLSelect value={payAccountId} onChange={e => setPayAccountId(e.target.value)} disabled={paySkipCash}>
+          <SLSelect value={payAccountId} onChange={e => setPayAccountId(e.target.value)} disabled={paySkipCash || payMethod !== "cash"}>
             {accounts.length === 0 && <option value="">Нет касс</option>}
             {accounts.map(a => <option key={a.id} value={a.id}>{a.name} · {fmt(a.balance)} ₽{a.is_default ? " ★" : ""}</option>)}
           </SLSelect>

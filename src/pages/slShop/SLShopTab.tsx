@@ -13,6 +13,7 @@ import SLDiscount from "./SLDiscount";
 import SLRevision from "./SLRevision";
 import SLRoles from "./SLRoles";
 import SLCash from "./SLCash";
+import SLCashDay from "./SLCashDay";
 import SLDocuments from "./SLDocuments";
 import SLJournal from "./SLJournal";
 import SLAnalytics from "./SLAnalytics";
@@ -36,6 +37,7 @@ type SubTab =
   | "discount"
   | "revision"
   | "cash"
+  | "cashday"
   | "journal"
   | "analytics"
   | "bookkeeping"
@@ -57,6 +59,7 @@ const ALL_TABS: TabDef[] = [
   { k: "safedeals",     l: "Безоп. сделка", icon: "Shield", featured: true, tip: "Комиссионка с гарантом: продавец → офис → проверка → QR → покупатель. Комиссия 10%." },
   { k: "avito",         l: "Витрина Авито",  icon: "Sparkles", featured: true, tip: "Загружай фото с телефона к товарам с Авито — превращай объявления в премиум-карточки на сайте." },
   { k: "stock",         l: "Склад",          icon: "Package", perm: "shop_view", tip: "Товары на складе и витрине: фильтры, поиск, ценники, продажа." },
+  { k: "cashday",       l: "Сверка кассы",   icon: "ClipboardCheck", featured: true, tip: "Сколько денег должно быть в кассе, ввод реальных цифр (касса, сейф, безнал), заработок за день." },
   { k: "cash",          l: "Касса",          icon: "Wallet", perm: "cashflow_view", tip: "Кассы наличных по филиалам, приход/расход, история движений." },
   { k: "operations",    l: "Операции",       icon: "Activity", perm: "shop_view", tip: "Журнал всех операций: скупка, продажа, возврат, перемещение, списание." },
   { k: "clients",       l: "Клиенты",        icon: "Users", perm: "clients", tip: "База клиентов комиссионки — поиск, паспортные данные, история." },
@@ -215,6 +218,7 @@ export default function SLShopTab({ token, myRole }: { token: string; myRole?: s
       {tab === "dashboard"  && <SLDashboard token={token} empName={empName} onNav={(k) => setTab(k as SubTab)} />}
       {tab === "buy"        && <SLBuyForm token={token} onSaved={() => setTab("stock")} />}
       {tab === "stock"      && <SLItemsList token={token} empName={empName} isOwner={isOwner} />}
+      {tab === "cashday"    && <SLCashDay token={token} />}
       {tab === "cash"       && <SLCash token={token} isOwner={isOwner} />}
       {tab === "operations" && <SLOperations token={token} myRole={myRole} />}
       {tab === "clients"    && <SLClientsList token={token} />}

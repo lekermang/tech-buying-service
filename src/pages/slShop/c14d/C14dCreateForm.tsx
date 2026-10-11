@@ -131,6 +131,7 @@ export default function C14dCreateForm({ token, onCreated, onCancel, prefill }: 
   const [accounts, setAccounts] = useState<C14dCashAccount[]>([]);
   const [cashAccountId, setCashAccountId] = useState<string>("");
   const [skipCash, setSkipCash] = useState(false);
+  const [payoutMethod, setPayoutMethod] = useState<"cash" | "transfer">("cash");
 
   useEffect(() => {
     c14dApi<{ accounts: C14dCashAccount[] }>(token, "cash_accounts").then(r => {
@@ -219,6 +220,7 @@ export default function C14dCreateForm({ token, onCreated, onCancel, prefill }: 
         start_date: startDate || todayISO(),
         cash_account_id: cashAccountId ? Number(cashAccountId) : null,
         skip_cash: skipCash,
+        payout_method: payoutMethod,
       },
     });
     setSaving(false);
@@ -418,8 +420,16 @@ export default function C14dCreateForm({ token, onCreated, onCancel, prefill }: 
             <SLField label="Дата окончания">
               <div className="rounded-md bg-[#0A0A0A] border border-[#1A1A1A] px-2.5 py-1.5 text-[12px] text-[#FFD700] font-semibold">{endDateISO || "—"}</div>
             </SLField>
+            <SLField label="Чем выдаём деньги">
+              <div className="grid grid-cols-2 gap-1.5">
+                {([["cash", "Наличные из кассы"], ["transfer", "Переводом"]] as const).map(([v, l]) => (
+                  <button key={v} type="button" onClick={() => setPayoutMethod(v)}
+                    className={`px-2 py-1.5 rounded-md border text-[12px] font-bold ${payoutMethod === v ? "bg-[#FFD700]/12 border-[#FFD700] text-[#FFD700]" : "bg-[#0A0A0A] border-[#1A1A1A] text-white/55"}`}>{l}</button>
+                ))}
+              </div>
+            </SLField>
             <SLField label="Касса (выдача)">
-              <SLSelect value={cashAccountId} onChange={e => setCashAccountId(e.target.value)} disabled={skipCash}>
+              <SLSelect value={cashAccountId} onChange={e => setCashAccountId(e.target.value)} disabled={skipCash || payoutMethod === "transfer"}>
                 {accounts.length === 0 && <option value="">Нет касс</option>}
                 {accounts.map(a => <option key={a.id} value={a.id}>{a.name} · {fmt(a.balance)}{a.is_default ? " ★" : ""}</option>)}
               </SLSelect>

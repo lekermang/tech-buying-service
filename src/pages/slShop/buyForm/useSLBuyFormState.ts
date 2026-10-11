@@ -54,6 +54,7 @@ export function useSLBuyFormState() {
   const [source, setSource] = useState<"buyout" | "consignment">("buyout");
   const [consignmentPercent, setConsignmentPercent] = useState("");
   const [status, setStatus] = useState<"stock" | "showcase" | "consignment">("stock");
+  const [payMethod, setPayMethod] = useState<"cash" | "transfer">("cash");
   const [description, setDescription] = useState("");
   const [clientQuery, setClientQuery] = useState("");
   const [clientId, setClientId] = useState<number | "">("");
@@ -127,6 +128,7 @@ export function useSLBuyFormState() {
     source, setSource,
     consignmentPercent, setConsignmentPercent,
     status, setStatus,
+    payMethod, setPayMethod,
     description, setDescription,
     // Клиент
     clientQuery, setClientQuery,

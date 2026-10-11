@@ -366,6 +366,11 @@ def action_create(body, actor):
     status = (body.get('status') or 'active').strip()  # active | draft
     cash_account_id = body.get('cash_account_id')
     skip_cash = bool(body.get('skip_cash'))  # для late-договоров (внесены задним числом)
+    payout_method = (body.get('payout_method') or 'cash').strip()
+    if payout_method not in ('cash', 'transfer'):
+        payout_method = 'cash'
+    if payout_method != 'cash':
+        skip_cash = True
 
     # Дата заключения договора (можно указать прошлую, нельзя будущую)
     today = date.today()
@@ -435,13 +440,14 @@ def action_create(body, actor):
         cur.execute(
             f"INSERT INTO {SCHEMA}.contracts_14d "
             f"(contract_number, client_id, item_id, amount, interest_rate, term_days, total_due, "
-            f"remaining_debt, start_date, end_date, status, created_by, cash_account_id) "
-            f"VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+            f"remaining_debt, start_date, end_date, status, created_by, cash_account_id, payout_method) "
+            f"VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
             (
                 contract_number, client_id, item_id, amount, interest_rate, term_days,
                 total_due, total_due, start_date, end_date, status,
                 (actor or {}).get('full_name'),
                 resolved_cash_id,
+                payout_method,
             )
         )
         contract_id = cur.fetchone()[0]
@@ -686,6 +692,11 @@ def action_payment(body, actor):
     comment = body.get('comment') or None
     cash_account_id = body.get('cash_account_id')
     skip_cash = bool(body.get('skip_cash'))
+    pay_method = (body.get('pay_method') or 'cash').strip()
+    if pay_method not in ('cash', 'card', 'transfer'):
+        pay_method = 'cash'
+    if pay_method != 'cash':
+        skip_cash = True
     # Дата операции (datetime-local: '2026-05-09T14:30'). Если не передано — NOW()
     paid_at_raw = (body.get('paid_at') or '').strip()
     paid_at_value = None
@@ -778,19 +789,19 @@ def action_payment(body, actor):
             cur.execute(
                 f"INSERT INTO {SCHEMA}.contracts_14d_payments "
                 f"(contract_id, amount, payment_type, comment, recorded_by, "
-                f"cash_account_id, cash_movement_id, income_type, paid_at) "
-                f"VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+                f"cash_account_id, cash_movement_id, income_type, paid_at, pay_method) "
+                f"VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
                 (cid, amount, payment_type, comment, (actor or {}).get('full_name'),
-                 cash_id, movement_id, income_type, paid_at_value)
+                 cash_id, movement_id, income_type, paid_at_value, pay_method)
             )
         else:
             cur.execute(
                 f"INSERT INTO {SCHEMA}.contracts_14d_payments "
                 f"(contract_id, amount, payment_type, comment, recorded_by, "
-                f"cash_account_id, cash_movement_id, income_type) "
-                f"VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+                f"cash_account_id, cash_movement_id, income_type, pay_method) "
+                f"VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
                 (cid, amount, payment_type, comment, (actor or {}).get('full_name'),
-                 cash_id, movement_id, income_type)
+                 cash_id, movement_id, income_type, pay_method)
             )
         payment_id = cur.fetchone()[0]
 

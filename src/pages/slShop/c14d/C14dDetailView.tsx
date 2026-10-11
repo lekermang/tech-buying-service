@@ -30,6 +30,7 @@ export default function C14dDetailView({ token, contractId, onBack, autoPay }: P
   const [accounts, setAccounts] = useState<C14dCashAccount[]>([]);
   const [payAccountId, setPayAccountId] = useState<string>("");
   const [paySkipCash, setPaySkipCash] = useState(false);
+  const [payMethod, setPayMethod] = useState<"cash" | "card" | "transfer">("cash");
   // Дата операции (по умолчанию — сейчас, формат datetime-local)
   const nowLocal = () => {
     const d = new Date();
@@ -131,13 +132,14 @@ export default function C14dDetailView({ token, contractId, onBack, autoPay }: P
         comment: payComment || null,
         cash_account_id: payAccountId ? Number(payAccountId) : null,
         skip_cash: paySkipCash,
+        pay_method: payMethod,
         paid_at: payPaidAt || null,
       },
     });
     setPaySaving(false);
     if (!r.ok) { setErr(r.error || "Ошибка платежа"); return; }
     const wasFullPayment = payType === "full" || r.data?.status === "closed";
-    setPayOpen(false); setPaySum(""); setPayComment(""); setPayType("partial"); setPaySkipCash(false);
+    setPayOpen(false); setPaySum(""); setPayComment(""); setPayType("partial"); setPaySkipCash(false); setPayMethod("cash");
     setPayPaidAt(nowLocal());
     await reload();
     // После полного выкупа — ищем в Авито-каталоге, чтобы снять с продажи
@@ -236,6 +238,8 @@ export default function C14dDetailView({ token, contractId, onBack, autoPay }: P
         payAccountId={payAccountId}
         setPayAccountId={setPayAccountId}
         paySkipCash={paySkipCash}
+        payMethod={payMethod}
+        setPayMethod={setPayMethod}
         setPaySkipCash={setPaySkipCash}
         payPaidAt={payPaidAt}
         setPayPaidAt={setPayPaidAt}

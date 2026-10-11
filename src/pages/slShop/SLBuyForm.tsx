@@ -56,6 +56,7 @@ export default function SLBuyForm({ token, onSaved }: { token: string; onSaved: 
           minPrice={st.minPrice} setMinPrice={st.setMinPrice}
           consignmentPercent={st.consignmentPercent} setConsignmentPercent={st.setConsignmentPercent}
           status={st.status} setStatus={st.setStatus}
+          payMethod={st.payMethod} setPayMethod={st.setPayMethod}
         />
 
         <SLBuyFormFooter st={st} submit={submit} token={token} onSaved={onSaved} />
