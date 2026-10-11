@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import GoldTickerMobile from "./GoldTickerMobile";
 import GoldTickerDesktopCompact from "./GoldTickerDesktopCompact";
-import { getMarketStatus, timeAgo, type Period } from "./goldTickerUtils";
+import { getMarketStatus, timeAgo } from "./goldTickerUtils";
 
 interface GoldTickerProps {
   goldPrice: { buy: number; buy_usd?: number; xau_usd?: number; usd_rub?: number; date: string } | null;
@@ -30,8 +30,6 @@ const GoldTicker = ({
   onSellClick,
   compact = false,
 }: GoldTickerProps) => {
-  const [period, setPeriod] = useState<Period>(7);
-
   // Обновляем статус биржи и "обновлено N мин назад" каждые 5 секунд в реалтайме
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -59,11 +57,6 @@ const GoldTicker = ({
     if (prevBuy === null) setPrevBuy(goldPrice.buy);
   }, [goldPrice?.buy, prevBuy]);
 
-  const filteredHistory = useMemo(() => {
-    if (!goldHistory.length) return [];
-    return goldHistory.slice(-period);
-  }, [goldHistory, period]);
-
   return (
     <div className="relative">
       {/* Тонкий фоновый слой — без border, без starfield (они в Header) */}
@@ -82,6 +75,7 @@ const GoldTicker = ({
           market={market}
           updatedAgo={updatedAgo}
           flash={flash}
+          history={goldHistory}
           onSellClick={onSellClick}
         />
       </div>
@@ -91,9 +85,7 @@ const GoldTicker = ({
         goldPrice={goldPrice}
         priceRetail999={priceRetail999}
         priceWholesale999={priceWholesale999}
-        filteredHistory={filteredHistory}
-        period={period}
-        setPeriod={setPeriod}
+        history={goldHistory}
         market={market}
         updatedAgo={updatedAgo}
         flash={flash}

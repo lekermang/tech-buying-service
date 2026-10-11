@@ -105,6 +105,27 @@ def competitors_response() -> dict:
             'body': json.dumps({'ok': True, 'competitors': result}, ensure_ascii=False)}
 
 
+
+def _history_rows(cur):
+    cur.execute(
+        f"""
+        SELECT DATE(recorded_at + INTERVAL '3 hours') AS day,
+               AVG(price_rub)::NUMERIC(12,2) AS avg_price,
+               MIN(price_rub)::NUMERIC(12,2) AS min_price,
+               MAX(price_rub)::NUMERIC(12,2) AS max_price
+        FROM {SCHEMA}.gold_price_history
+        WHERE recorded_at > NOW() - INTERVAL '92 days' AND price_rub > 1000
+        GROUP BY day
+        ORDER BY day ASC
+        LIMIT 95
+        """
+    )
+    return [
+        {'date': str(r[0]), 'price': float(r[1]), 'min': float(r[2]), 'max': float(r[3])}
+        for r in cur.fetchall()
+    ]
+
+
 def handler(event: dict, context) -> dict:
     """Биржевой курс золота 999 пробы + история за 7 дней"""
 
@@ -135,12 +156,7 @@ def handler(event: dict, context) -> dict:
                     gold_settings[short] = float(value)
                 except (ValueError, TypeError):
                     pass
-        cur.execute(
-            f"""SELECT DATE(recorded_at + INTERVAL '3 hours') AS day, AVG(price_rub)::NUMERIC(12,2)
-                FROM {SCHEMA}.gold_price_history WHERE recorded_at > NOW() - INTERVAL '8 days'
-                GROUP BY day ORDER BY day ASC LIMIT 8"""
-        )
-        history = [{'date': str(r[0]), 'price': float(r[1])} for r in cur.fetchall()]
+        history = _history_rows(cur)
         cur.close()
         conn.close()
         return {
@@ -232,21 +248,8 @@ def handler(event: dict, context) -> dict:
         )
         conn.commit()
 
-    # История за 7 дней — одна точка в день
-    cur.execute(
-        f"""
-        SELECT
-            DATE(recorded_at + INTERVAL '3 hours') AS day,
-            AVG(price_rub)::NUMERIC(12,2) AS avg_price
-        FROM {SCHEMA}.gold_price_history
-        WHERE recorded_at > NOW() - INTERVAL '8 days'
-        GROUP BY day
-        ORDER BY day ASC
-        LIMIT 8
-        """
-    )
-    rows = cur.fetchall()
-    history = [{'date': str(r[0]), 'price': float(r[1])} for r in rows]
+    # История за 90 дней — одна точка в день (среднее, мин, макс)
+    history = _history_rows(cur)
 
     # Настройки скидок
     cur.execute(

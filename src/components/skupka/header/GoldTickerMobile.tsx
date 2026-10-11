@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import Icon from "@/components/ui/icon";
 import { ymGoal, Goals } from "@/lib/ym";
+import GoldChart, { type GoldPoint } from "./GoldChart";
 import { APK_URL, EXE_URL, PROBES_DISPLAY, type MarketStatus } from "./goldTickerUtils";
 
 /** S24Medallion — вращающееся золотое кольцо с "S24" внутри */
@@ -27,6 +28,7 @@ interface GoldTickerMobileProps {
   market: MarketStatus;
   updatedAgo: string;
   flash: "up" | "down" | null;
+  history: GoldPoint[];
   onSellClick: () => void;
 }
 
@@ -46,6 +48,7 @@ const GoldTickerMobile = ({
   market,
   updatedAgo,
   flash,
+  history,
   onSellClick,
 }: GoldTickerMobileProps) => {
   const [openDetails, setOpenDetails] = useState(false);
@@ -284,6 +287,15 @@ const GoldTickerMobile = ({
                   {updatedAgo}
                 </span>
               )}
+            </div>
+
+            {/* График динамики */}
+            <div className="rounded-lg bg-black/30 border border-[#FFD700]/15 p-2">
+              <div className="font-oswald font-bold text-[9px] uppercase tracking-[0.2em] text-[#FFD700]/70 mb-1.5 flex items-center gap-1.5">
+                <Icon name="LineChart" size={10} />
+                Динамика цены 999
+              </div>
+              <GoldChart history={history} current={goldPrice?.buy} height={130} defaultPeriod={30} />
             </div>
 
             {/* Раскладка по пробам */}

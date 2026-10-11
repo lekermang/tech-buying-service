@@ -8,16 +8,15 @@
 import { useState, useRef, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 import { ymGoal, Goals } from "@/lib/ym";
-import { APK_URL, EXE_URL, type MarketStatus, type Period, PROBES_DISPLAY } from "./goldTickerUtils";
+import { APK_URL, EXE_URL, type MarketStatus, PROBES_DISPLAY } from "./goldTickerUtils";
+import GoldChart, { type GoldPoint } from "./GoldChart";
 
 
 interface Props {
   goldPrice: { buy: number; buy_usd?: number; xau_usd?: number; usd_rub?: number; date: string } | null;
   priceRetail999: number | null;
   priceWholesale999: number | null;
-  filteredHistory: { date: string; price: number }[];
-  period: Period;
-  setPeriod: (p: Period) => void;
+  history: GoldPoint[];
   market: MarketStatus;
   updatedAgo: string;
   flash: "up" | "down" | null;
@@ -28,7 +27,7 @@ interface Props {
 
 const GoldTickerDesktopCompact = ({
   goldPrice, priceRetail999, priceWholesale999,
-  filteredHistory, period, setPeriod,
+  history,
   market, updatedAgo, flash, delta, onSellClick, compact,
 }: Props) => {
   const [open, setOpen] = useState(false);
@@ -49,23 +48,13 @@ const GoldTickerDesktopCompact = ({
     };
   }, [open]);
 
-  // График мини-полоской (SVG)
   const chart = (() => {
-    if (filteredHistory.length < 2) return null;
-    const W = 100, H = 24, pad = 2;
-    const prices = filteredHistory.map(h => h.price);
-    const min = Math.min(...prices); const max = Math.max(...prices); const range = max - min || 1;
-    const xy = prices.map((p, i) => ({
-      x: pad + (i / (prices.length - 1)) * (W - pad * 2),
-      y: H - pad - ((p - min) / range) * (H - pad * 2),
-    }));
-    const pts = xy.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-    const fill = `${xy[0].x},${H - pad} ${pts} ${xy[xy.length - 1].x},${H - pad}`;
-    const last = prices[prices.length - 1]; const first = prices[0]; const up = last >= first;
-    const color = up ? '#22c55e' : '#ef4444';
-    const fadeColor = up ? 'rgba(34,197,94,0.22)' : 'rgba(239,68,68,0.22)';
-    const deltaPct = Math.abs(((last - first) / first) * 100).toFixed(1);
-    return { W, H, pts, fill, color, fadeColor, up, deltaPct };
+    const pts = history.filter(h => h.price > 1000).slice(-7);
+    if (pts.length < 2) return null;
+    const first = pts[0].price;
+    const last = goldPrice?.buy || pts[pts.length - 1].price;
+    const up = last >= first;
+    return { up, color: up ? "#22c55e" : "#ef4444", deltaPct: Math.abs(((last - first) / first) * 100).toFixed(1) };
   })();
 
   return (
@@ -154,7 +143,7 @@ const GoldTickerDesktopCompact = ({
         <div className="absolute left-0 right-0 top-full z-50 ticker-panel-glass rounded-xl animate-in fade-in slide-in-from-top-1 duration-150">
           <div className="max-w-7xl mx-auto px-5 py-4 grid grid-cols-12 gap-4">
             {/* Колонка 1: Курсы биржи */}
-            <div className="col-span-3 space-y-2">
+            <div className="col-span-2 space-y-2">
               <div className="font-oswald font-bold text-[10px] uppercase tracking-wider text-[#FFD700]/70">Курсы биржи</div>
               {goldPrice?.xau_usd && (
                 <Row k="XAU / oz" v={`$${goldPrice.xau_usd.toLocaleString('en-US', { maximumFractionDigits: 0 })}`} />
@@ -194,50 +183,13 @@ const GoldTickerDesktopCompact = ({
             </div>
 
             {/* Колонка 3: График */}
-            {chart && (
-              <div className="col-span-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="font-oswald font-bold text-[10px] uppercase tracking-wider text-[#FFD700]/70">Динамика</div>
-                  <div className="flex items-center gap-0.5 bg-black/40 border border-white/10 rounded p-0.5">
-                    {([7, 30, 90] as Period[]).map(p => (
-                      <button key={p} onClick={() => setPeriod(p)}
-                        className={`px-1.5 py-0.5 rounded-sm text-[9px] font-oswald font-bold uppercase tracking-wide transition ${
-                          period === p ? "bg-[#FFD700]/20 text-[#FFD700]" : "text-white/45 hover:text-white"
-                        }`}
-                      >{p}д</button>
-                    ))}
-                  </div>
-                </div>
-                <div className="bg-black/40 border border-white/10 rounded-md p-2">
-                  <svg width="100%" height="50" viewBox={`0 0 ${chart.W} ${chart.H + 26}`} preserveAspectRatio="none">
-                    <defs>
-                      <linearGradient id="gchart-full" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={chart.fadeColor} />
-                        <stop offset="100%" stopColor="transparent" />
-                      </linearGradient>
-                      <filter id="neon-glow">
-                        <feGaussianBlur stdDeviation="2" result="blur" />
-                        <feMerge>
-                          <feMergeNode in="blur" />
-                          <feMergeNode in="SourceGraphic" />
-                        </feMerge>
-                      </filter>
-                    </defs>
-                    <polygon points={chart.fill} fill="url(#gchart-full)" />
-                    <polyline points={chart.pts} fill="none" stroke={chart.color} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" filter="url(#neon-glow)" />
-                  </svg>
-                  <div className="flex items-center justify-between mt-1 text-[10px]">
-                    <span className="text-white/40">за {period} дн.</span>
-                    <span className="font-oswald font-bold" style={{ color: chart.color }}>
-                      {chart.up ? '▲' : '▼'} {chart.deltaPct}%
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
+            <div className="col-span-5">
+              <div className="font-oswald font-bold text-[10px] uppercase tracking-wider text-[#FFD700]/70 mb-2">Динамика цены 999</div>
+              <GoldChart history={history} current={goldPrice?.buy} height={150} defaultPeriod={30} />
+            </div>
 
             {/* Колонка 4: Кабинеты + приложения */}
-            <div className="col-span-3 space-y-2">
+            <div className="col-span-2 space-y-2">
               <div className="font-oswald font-bold text-[10px] uppercase tracking-wider text-[#FFD700]/70">Быстрый доступ</div>
               <div className="grid grid-cols-2 gap-1.5">
                 <DetailBtn href="/cabinet" icon="User" label="Клиент" color="gold" />
