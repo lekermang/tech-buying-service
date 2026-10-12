@@ -58,6 +58,14 @@ export default function GoldTabHeader({
         )}
       </div>
 
+      {view === "list" && onOpenTag && (
+        <button onClick={onOpenTag}
+          className="w-full mb-2 flex items-center justify-center gap-2 py-3 rounded-md bg-[#FFD700]/10 border border-[#FFD700]/50 text-[#FFD700] active:scale-[0.98] transition font-oswald font-bold text-sm uppercase tracking-wide">
+          <Icon name="Printer" size={17} />
+          Печать ценника · перевод веса в 585
+        </button>
+      )}
+
       {view === "list" && (
         <div className="space-y-2">
           <div className="flex items-center gap-2">
@@ -76,13 +84,6 @@ export default function GoldTabHeader({
                 </button>
               )}
             </div>
-            {onOpenTag && (
-              <button onClick={onOpenTag} title="Ценник и калькулятор"
-                className="shrink-0 flex items-center gap-1.5 px-3 py-2.5 rounded-md bg-[#FFD700]/10 border border-[#FFD700]/40 text-[#FFD700] active:scale-95 transition font-oswald font-bold text-xs uppercase">
-                <Icon name="Calculator" size={15} />
-                <span className="hidden sm:inline">Ценник</span>
-              </button>
-            )}
             <button onClick={onRefresh} disabled={loading}
               className="text-white/40 hover:text-[#FFD700] active:scale-90 p-2.5 rounded-md transition-all shrink-0 hover:bg-white/5">
               <Icon name={loading ? "Loader" : "RefreshCw"} size={16} className={loading ? "animate-spin" : ""} />
