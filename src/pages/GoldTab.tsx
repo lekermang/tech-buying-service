@@ -9,6 +9,8 @@ import GoldTabStatusFilter from "./gold/GoldTabStatusFilter";
 import GoldTabCreateForm from "./gold/GoldTabCreateForm";
 import GoldTabList from "./gold/GoldTabList";
 import GoldInvestorTab from "./gold/GoldInvestorTab";
+import GoldPriceTagModal from "./gold/GoldPriceTagModal";
+import { to585 } from "./gold/goldCalc";
 
 type View = "list" | "analytics" | "investor";
 type Period = "day" | "yesterday" | "week" | "month" | "year" | "all" | "custom";
@@ -36,6 +38,8 @@ export default function GoldTab({ token }: { token: string }) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ...EMPTY_GOLD_FORM });
   const [creating, setCreating] = useState(false);
+  const [tagOpen, setTagOpen] = useState(false);
+  const [tagOrder, setTagOrder] = useState<GoldOrder | null>(null);
 
   const [analytics, setAnalytics] = useState<GoldAnalytics | null>(null);
   const [period, setPeriod] = useState<Period>("week");
@@ -149,6 +153,25 @@ export default function GoldTab({ token }: { token: string }) {
     }
   };
 
+  const onQuickSell = async (order: GoldOrder, price585: number) => {
+    const w = order.weight || 0;
+    if (!w || price585 <= 0) return;
+    const total = Math.round(to585(w, order.purity) * price585);
+    setSaving(true);
+    setSaveError(null);
+    const res = await fetch(GOLD_URL, {
+      method: "POST", headers,
+      body: JSON.stringify({
+        id: order.id, status: "done",
+        weight: w, sell_price: total, sell_price_per_gram: total / w,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setSaving(false);
+    if (!data.ok) setSaveError(data.error || "Не удалось сохранить продажу");
+    loadOrders();
+  };
+
   const onDelete = async (id: number) => {
     setSaving(true);
     await fetch(GOLD_URL, { method: "POST", headers, body: JSON.stringify({ action: "delete", id }) });
@@ -173,6 +196,7 @@ export default function GoldTab({ token }: { token: string }) {
         dateTo={dateTo}
         onDateFromChange={setDateFrom}
         onDateToChange={setDateTo}
+        onOpenTag={() => { setTagOrder(null); setTagOpen(true); }}
       />
 
       {/* Аналитика */}
@@ -232,10 +256,18 @@ export default function GoldTab({ token }: { token: string }) {
             onStatusChange={onStatusChange}
             onSave={onSave}
             onDelete={onDelete}
+            onQuickSell={onQuickSell}
+            onOpenTag={(o) => { setTagOrder(o); setTagOpen(true); }}
             saving={saving}
             saveError={saveError}
           />
         </>
+      )}
+      {tagOpen && (
+        <GoldPriceTagModal
+          onClose={() => setTagOpen(false)}
+          initial={tagOrder ? { weight: tagOrder.weight, purity: tagOrder.purity, price585: tagOrder.sell_price_per_gram && tagOrder.weight ? (tagOrder.sell_price_per_gram * tagOrder.weight) / to585(tagOrder.weight, tagOrder.purity) : null } : undefined}
+        />
       )}
     </div>
   );

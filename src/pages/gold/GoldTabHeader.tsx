@@ -15,11 +15,12 @@ type Props = {
   dateTo: string;
   onDateFromChange: (v: string) => void;
   onDateToChange: (v: string) => void;
+  onOpenTag?: () => void;
 };
 
 export default function GoldTabHeader({
   view, onViewChange, showForm, onToggleForm, search, onSearchChange,
-  loading, onRefresh, dateFrom, dateTo, onDateFromChange, onDateToChange,
+  loading, onRefresh, dateFrom, dateTo, onDateFromChange, onDateToChange, onOpenTag,
 }: Props) {
   return (
     <div className="px-3 pt-3 pb-2 border-b border-[#1A1A1A] bg-gradient-to-b from-[#0D0D0D] to-[#0A0A0A]">
@@ -75,6 +76,13 @@ export default function GoldTabHeader({
                 </button>
               )}
             </div>
+            {onOpenTag && (
+              <button onClick={onOpenTag} title="Ценник и калькулятор"
+                className="shrink-0 flex items-center gap-1.5 px-3 py-2.5 rounded-md bg-[#FFD700]/10 border border-[#FFD700]/40 text-[#FFD700] active:scale-95 transition font-oswald font-bold text-xs uppercase">
+                <Icon name="Calculator" size={15} />
+                <span className="hidden sm:inline">Ценник</span>
+              </button>
+            )}
             <button onClick={onRefresh} disabled={loading}
               className="text-white/40 hover:text-[#FFD700] active:scale-90 p-2.5 rounded-md transition-all shrink-0 hover:bg-white/5">
               <Icon name={loading ? "Loader" : "RefreshCw"} size={16} className={loading ? "animate-spin" : ""} />

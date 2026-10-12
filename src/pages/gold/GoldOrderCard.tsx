@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import { GoldOrder, GOLD_STATUSES, PURITY_OPTIONS, PAYMENT_OPTIONS, money } from "./types";
+import { toNum, to585, fmtG, fmtRub } from "./goldCalc";
 
 type Props = {
   order: GoldOrder;
@@ -9,6 +10,8 @@ type Props = {
   onStatusChange: (id: number, status: string, extra?: Partial<EditForm>) => void;
   onSave: (order: GoldOrder, form: EditForm) => void | Promise<void>;
   onDelete: (id: number) => void;
+  onQuickSell: (order: GoldOrder, price585: number) => void | Promise<void>;
+  onOpenTag: (order: GoldOrder) => void;
   saving: boolean;
   saveError: string | null;
 };
@@ -27,7 +30,8 @@ function fmt(iso: string) {
   return new Date(iso).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
-export default function GoldOrderCard({ order, expanded, onToggle, onStatusChange, onSave, onDelete, saving, saveError }: Props) {
+export default function GoldOrderCard({ order, expanded, onToggle, onStatusChange, onSave, onDelete, onQuickSell, onOpenTag, saving, saveError }: Props) {
+  const [quickSpg, setQuickSpg] = useState("");
   const [form, setForm] = useState<EditForm>({
     name: order.name, phone: order.phone,
     item_name: order.item_name || "", weight: order.weight ? String(order.weight) : "",
@@ -48,6 +52,13 @@ export default function GoldOrderCard({ order, expanded, onToggle, onStatusChang
     !isNaN(spgNum) && spgNum > 0 && !isNaN(wNum) && wNum > 0
       ? Math.round(spgNum * wNum)
       : (form.sell_price ? parseInt(form.sell_price) : null);
+
+  const qSpg = toNum(quickSpg);
+  const qW585 = to585(order.weight || 0, order.purity);
+  const qTotal = qSpg * qW585;
+  const qProfit = qTotal - (order.buy_price || 0);
+  const w585Card = order.weight ? to585(order.weight, order.purity) : 0;
+  const isConverted = !!order.purity && toNum(order.purity) !== 585;
 
   const buyNum = form.buy_price ? parseInt(form.buy_price) : (order.buy_price || 0);
   const profit = computedSell != null ? computedSell - buyNum : order.profit;
@@ -70,6 +81,9 @@ export default function GoldOrderCard({ order, expanded, onToggle, onStatusChang
           {order.purity && <span className="font-roboto text-white/30 text-xs">· {order.purity}</span>}
           {order.weight && <span className="font-roboto text-white/30 text-xs">· {order.weight}г</span>}
         </div>
+        {isConverted && w585Card > 0 && (
+          <div className="font-roboto text-[11px] text-[#FFD700]/70 mt-0.5">в пересчёте на 585: <b>{fmtG(w585Card)} г</b></div>
+        )}
         {(order.buy_price || order.sell_price || order.sell_price_per_gram) && (
           <div className="flex gap-3 mt-1 flex-wrap items-baseline">
             {order.buy_price != null && <span className="font-oswald font-bold text-[#FFD700] text-sm">{money(order.buy_price)}</span>}
@@ -92,6 +106,43 @@ export default function GoldOrderCard({ order, expanded, onToggle, onStatusChang
         )}
         <div className="font-roboto text-white/20 text-[10px] mt-0.5">{fmt(order.created_at)}</div>
       </div>
+
+      {order.status === "new" && order.weight ? (
+        <div className="px-4 pb-3 -mt-1" onClick={e => e.stopPropagation()}>
+          <div className="flex items-stretch gap-2">
+            <div className="relative flex-1">
+              <input type="number" inputMode="decimal" value={quickSpg} onChange={e => setQuickSpg(e.target.value)}
+                placeholder="Цена за 1 г (585)"
+                className="w-full h-11 bg-[#0D0D0D] border border-blue-500/40 text-blue-300 pl-3 pr-8 rounded-md font-oswald font-bold text-base focus:outline-none focus:border-blue-400" />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-300/50 text-sm">₽</span>
+            </div>
+            <button disabled={saving || qSpg <= 0}
+              onClick={() => onQuickSell(order, qSpg)}
+              className="h-11 px-4 rounded-md bg-gradient-to-b from-green-400 to-green-600 text-black font-oswald font-bold text-xs uppercase flex items-center gap-1.5 disabled:opacity-35 active:scale-95 transition shrink-0">
+              <Icon name="BadgeCheck" size={15} />Продано
+            </button>
+            <button onClick={() => onOpenTag(order)} title="Ценник"
+              className="h-11 w-11 rounded-md border border-[#FFD700]/40 text-[#FFD700] flex items-center justify-center active:scale-95 transition shrink-0">
+              <Icon name="Printer" size={16} />
+            </button>
+          </div>
+          {qSpg > 0 && (
+            <div className="mt-1.5 flex items-center justify-between font-roboto text-[11px]">
+              <span className="text-white/45">{fmtG(qW585)} г × {fmtRub(qSpg)} = <b className="text-blue-300">{fmtRub(qTotal)} ₽</b></span>
+              <span className={qProfit >= 0 ? "text-green-400" : "text-red-400"}>
+                прибыль: <b>{qProfit >= 0 ? "+" : "−"}{fmtRub(Math.abs(qProfit))} ₽</b>
+              </span>
+            </div>
+          )}
+        </div>
+      ) : order.status === "done" ? (
+        <div className="px-4 pb-3 -mt-1" onClick={e => e.stopPropagation()}>
+          <button onClick={() => onOpenTag(order)}
+            className="h-8 px-3 rounded-md border border-[#FFD700]/30 text-[#FFD700]/80 flex items-center gap-1.5 font-roboto text-[11px] active:scale-95 transition">
+            <Icon name="Printer" size={13} />Печать ценника
+          </button>
+        </div>
+      ) : null}
 
       {/* Развёрнутая форма */}
       {expanded && (

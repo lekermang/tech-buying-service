@@ -17,12 +17,14 @@ type Props = {
   onStatusChange: (id: number, status: string) => void;
   onSave: (order: GoldOrder, ef: EditForm) => void | Promise<void>;
   onDelete: (id: number) => void;
+  onQuickSell: (order: GoldOrder, price585: number) => void | Promise<void>;
+  onOpenTag: (order: GoldOrder) => void;
   saving: boolean;
   saveError: string | null;
 };
 
 export default function GoldTabList({
-  orders, loading, expandedId, onToggle, onStatusChange, onSave, onDelete, saving, saveError,
+  orders, loading, expandedId, onToggle, onStatusChange, onSave, onDelete, onQuickSell, onOpenTag, saving, saveError,
 }: Props) {
   return (
     <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
@@ -50,6 +52,8 @@ export default function GoldTabList({
           onStatusChange={onStatusChange}
           onSave={onSave}
           onDelete={onDelete}
+          onQuickSell={onQuickSell}
+          onOpenTag={onOpenTag}
           saving={saving}
           saveError={saveError}
         />
