@@ -218,6 +218,236 @@ def _notify_max(text: str) -> None:
         print(f'[gold-admin][MAX] {e}')
 
 
+def _safe_date(v: str) -> str:
+    return ''.join(ch for ch in (v or '') if ch.isdigit() or ch == '-')[:10]
+
+
+def _period_sql(period: str, date_from: str, date_to: str):
+    """Возвращает (условие по дате продажи, условие по дате закупки) в часовом поясе МСК."""
+    sold = "COALESCE(completed_at, status_updated_at, created_at)"
+    buy = "created_at"
+    day0 = "(DATE_TRUNC('day', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours')"
+    if period == 'custom' and (date_from or date_to):
+        df, dt = _safe_date(date_from), _safe_date(date_to)
+        a, b = [], []
+        if df:
+            a.append(f"{sold} >= ('{df}'::date - INTERVAL '3 hours')")
+            b.append(f"{buy} >= ('{df}'::date - INTERVAL '3 hours')")
+        if dt:
+            a.append(f"{sold} < (('{dt}'::date + INTERVAL '1 day') - INTERVAL '3 hours')")
+            b.append(f"{buy} < (('{dt}'::date + INTERVAL '1 day') - INTERVAL '3 hours')")
+        return (' AND '.join(a) or 'TRUE'), (' AND '.join(b) or 'TRUE')
+    if period == 'all':
+        return 'TRUE', 'TRUE'
+    if period == 'year':
+        y = "(DATE_TRUNC('year', NOW() + INTERVAL '3 hours') - INTERVAL '3 hours')"
+        return f"{sold} >= {y}", f"{buy} >= {y}"
+    if period == 'yesterday':
+        return (f"{sold} >= ({day0} - INTERVAL '1 day') AND {sold} < {day0}",
+                f"{buy} >= ({day0} - INTERVAL '1 day') AND {buy} < {day0}")
+    if period == 'day':
+        return f"{sold} >= {day0}", f"{buy} >= {day0}"
+    if period == 'week':
+        return f"{sold} >= ({day0} - INTERVAL '6 days')", f"{buy} >= ({day0} - INTERVAL '6 days')"
+    return f"{sold} >= ({day0} - INTERVAL '29 days')", f"{buy} >= ({day0} - INTERVAL '29 days')"
+
+
+W585 = "(weight * (CAST(NULLIF(purity, '') AS NUMERIC) / 585.0))"
+
+
+def _f(v) -> float:
+    return float(v) if v is not None else 0.0
+
+
+def _gold_report(cur, period: str, date_from: str, date_to: str) -> dict:
+    sold_w, buy_w = _period_sql(period, date_from, date_to)
+    T = f"{SCHEMA}.gold_orders"
+    SOLD_AT = "COALESCE(completed_at, status_updated_at, created_at)"
+
+    cur.execute(f"""
+        SELECT COALESCE(NULLIF(purity, ''), '—'),
+               COUNT(*), COALESCE(SUM(weight),0), COALESCE(SUM({W585}),0),
+               COALESCE(SUM(buy_price),0), COALESCE(SUM(sell_price),0), COALESCE(SUM(profit),0)
+        FROM {T} WHERE status = 'done' AND {sold_w}
+        GROUP BY 1 ORDER BY SUM(profit) DESC NULLS LAST
+    """)
+    sold_by_purity = []
+    for r in cur.fetchall():
+        w585 = _f(r[3]); buy = int(r[4]); sell = int(r[5]); prof = int(r[6])
+        sold_by_purity.append({
+            'purity': r[0], 'count': int(r[1]), 'weight': _f(r[2]), 'weight585': w585,
+            'buy': buy, 'sell': sell, 'profit': prof,
+            'margin_pct': round(prof / buy * 100, 1) if buy > 0 else 0,
+            'profit_per_g585': round(prof / w585, 1) if w585 > 0 else 0,
+        })
+
+    cur.execute(f"""
+        SELECT COALESCE(NULLIF(purity, ''), '—'),
+               COUNT(*), COALESCE(SUM(weight),0), COALESCE(SUM({W585}),0), COALESCE(SUM(buy_price),0)
+        FROM {T} WHERE status <> 'cancelled' AND {buy_w}
+        GROUP BY 1 ORDER BY SUM(buy_price) DESC NULLS LAST
+    """)
+    bought_by_purity = []
+    for r in cur.fetchall():
+        w585 = _f(r[3]); buy = int(r[4])
+        bought_by_purity.append({
+            'purity': r[0], 'count': int(r[1]), 'weight': _f(r[2]), 'weight585': w585,
+            'buy': buy, 'avg_price585': round(buy / w585, 1) if w585 > 0 else 0,
+        })
+
+    cur.execute(f"""
+        SELECT DATE(created_at + INTERVAL '3 hours'), COUNT(*), COALESCE(SUM(weight),0),
+               COALESCE(SUM({W585}),0), COALESCE(SUM(buy_price),0)
+        FROM {T} WHERE status <> 'cancelled' AND {buy_w}
+        GROUP BY 1 ORDER BY 1 DESC LIMIT 62
+    """)
+    bought_by_day = []
+    for r in cur.fetchall():
+        w585 = _f(r[3]); buy = int(r[4])
+        bought_by_day.append({
+            'day': str(r[0]), 'count': int(r[1]), 'weight': _f(r[2]), 'weight585': w585,
+            'buy': buy, 'avg_price585': round(buy / w585, 1) if w585 > 0 else 0,
+        })
+
+    cur.execute(f"""
+        SELECT COALESCE(NULLIF(payment_method, ''), '—'), COUNT(*), COALESCE(SUM(buy_price),0)
+        FROM {T} WHERE status <> 'cancelled' AND {buy_w}
+        GROUP BY 1 ORDER BY 3 DESC
+    """)
+    bought_by_payment = [{'method': r[0], 'count': int(r[1]), 'sum': int(r[2])} for r in cur.fetchall()]
+
+    cur.execute(f"""
+        SELECT COALESCE(SUM(buy_price),0), COALESCE(SUM(sell_price),0), COALESCE(SUM(profit),0),
+               COUNT(*), COALESCE(SUM({W585}),0), COALESCE(SUM(weight),0),
+               COALESCE(AVG(EXTRACT(EPOCH FROM ({SOLD_AT} - created_at))/86400.0),0),
+               COALESCE(MAX(profit),0), COALESCE(MIN(profit),0),
+               COUNT(*) FILTER (WHERE profit < 0)
+        FROM {T} WHERE status = 'done' AND {sold_w}
+    """)
+    k = cur.fetchone()
+    k_buy, k_sell, k_prof, k_cnt = int(k[0]), int(k[1]), int(k[2]), int(k[3])
+    k_w585 = _f(k[4])
+
+    cur.execute(f"""
+        SELECT COUNT(*), COALESCE(SUM(buy_price),0), COALESCE(SUM({W585}),0), COALESCE(SUM(weight),0)
+        FROM {T} WHERE status <> 'cancelled' AND {buy_w}
+    """)
+    b = cur.fetchone()
+    b_cnt, b_sum, b_w585, b_w = int(b[0]), int(b[1]), _f(b[2]), _f(b[3])
+
+    cur.execute(f"SELECT COUNT(*) FROM {T} WHERE status = 'cancelled' AND {buy_w}")
+    cancelled = int(cur.fetchone()[0])
+
+    kpi = {
+        'sold_count': k_cnt, 'sold_buy': k_buy, 'sold_sell': k_sell, 'profit': k_prof,
+        'sold_weight585': k_w585,
+        'margin_pct': round(k_prof / k_buy * 100, 1) if k_buy > 0 else 0,
+        'avg_profit_per_deal': round(k_prof / k_cnt) if k_cnt else 0,
+        'profit_per_g585': round(k_prof / k_w585, 1) if k_w585 > 0 else 0,
+        'avg_buy_price585_sold': round(k_buy / k_w585, 1) if k_w585 > 0 else 0,
+        'avg_sell_price585': round(k_sell / k_w585, 1) if k_w585 > 0 else 0,
+        'avg_days_to_sell': round(_f(k[6]), 1),
+        'best_deal': int(k[7]), 'worst_deal': int(k[8]), 'loss_deals': int(k[9]),
+        'bought_count': b_cnt, 'bought_sum': b_sum, 'bought_weight': b_w, 'bought_weight585': b_w585,
+        'avg_buy_price585': round(b_sum / b_w585, 1) if b_w585 > 0 else 0,
+        'cancelled': cancelled,
+    }
+
+    cur.execute(f"""
+        SELECT id, item_name, weight, purity, buy_price, sell_price, profit, {SOLD_AT}, name
+        FROM {T} WHERE status = 'done' AND {sold_w}
+        ORDER BY profit DESC NULLS LAST LIMIT 5
+    """)
+    def _deal(r):
+        return {'id': r[0], 'item_name': r[1] or '', 'weight': _f(r[2]), 'purity': r[3] or '',
+                'buy': int(r[4] or 0), 'sell': int(r[5] or 0), 'profit': int(r[6] or 0),
+                'at': r[7].isoformat() if r[7] else None, 'client': r[8] or ''}
+    top_deals = [_deal(r) for r in cur.fetchall()]
+    cur.execute(f"""
+        SELECT id, item_name, weight, purity, buy_price, sell_price, profit, {SOLD_AT}, name
+        FROM {T} WHERE status = 'done' AND {sold_w} AND profit < 0
+        ORDER BY profit ASC LIMIT 5
+    """)
+    worst_deals = [_deal(r) for r in cur.fetchall()]
+
+    cur.execute(f"""
+        WITH m AS (
+          SELECT TO_CHAR(DATE_TRUNC('month', created_at + INTERVAL '3 hours'), 'YYYY-MM') AS ym,
+                 COUNT(*) AS bc, COALESCE(SUM(buy_price),0) AS bsum, COALESCE(SUM({W585}),0) AS bw
+          FROM {T} WHERE status <> 'cancelled' GROUP BY 1
+        ), s AS (
+          SELECT TO_CHAR(DATE_TRUNC('month', {SOLD_AT} + INTERVAL '3 hours'), 'YYYY-MM') AS ym,
+                 COUNT(*) AS sc, COALESCE(SUM(sell_price),0) AS ssum, COALESCE(SUM(profit),0) AS prof
+          FROM {T} WHERE status = 'done' GROUP BY 1
+        )
+        SELECT COALESCE(m.ym, s.ym), COALESCE(bc,0), COALESCE(bsum,0), COALESCE(bw,0),
+               COALESCE(sc,0), COALESCE(ssum,0), COALESCE(prof,0)
+        FROM m FULL OUTER JOIN s ON m.ym = s.ym
+        ORDER BY 1 DESC LIMIT 12
+    """)
+    by_month = [{
+        'month': r[0], 'bought_count': int(r[1]), 'bought_sum': int(r[2]), 'bought_weight585': _f(r[3]),
+        'sold_count': int(r[4]), 'sold_sum': int(r[5]), 'profit': int(r[6]),
+    } for r in cur.fetchall()]
+
+    cur.execute(f"""
+        SELECT CASE
+                 WHEN NOW() - created_at < INTERVAL '3 days' THEN '0-2 дня'
+                 WHEN NOW() - created_at < INTERVAL '8 days' THEN '3-7 дней'
+                 WHEN NOW() - created_at < INTERVAL '15 days' THEN '8-14 дней'
+                 ELSE '15+ дней' END AS b,
+               COUNT(*), COALESCE(SUM(weight),0), COALESCE(SUM({W585}),0), COALESCE(SUM(buy_price),0)
+        FROM {T} WHERE status = 'new' GROUP BY 1
+    """)
+    order = {'0-2 дня': 0, '3-7 дней': 1, '8-14 дней': 2, '15+ дней': 3}
+    stock_age = sorted([{
+        'bucket': r[0], 'count': int(r[1]), 'weight': _f(r[2]), 'weight585': _f(r[3]), 'buy': int(r[4]),
+    } for r in cur.fetchall()], key=lambda x: order.get(x['bucket'], 9))
+
+    cur.execute(f"""
+        SELECT COUNT(*), COALESCE(SUM(weight),0), COALESCE(SUM({W585}),0), COALESCE(SUM(buy_price),0),
+               COALESCE(SUM(buy_price) FILTER (WHERE is_investor_money),0)
+        FROM {T} WHERE status = 'new'
+    """)
+    st = cur.fetchone()
+    stock = {
+        'count': int(st[0]), 'weight': _f(st[1]), 'weight585': _f(st[2]),
+        'buy_sum': int(st[3]), 'investor_buy_sum': int(st[4]),
+        'avg_price585': round(int(st[3]) / _f(st[2]), 1) if _f(st[2]) > 0 else 0,
+    }
+
+    cur.execute(f"""
+        SELECT COALESCE(SUM(profit) FILTER (WHERE status='done'),0),
+               COALESCE(SUM(buy_price) FILTER (WHERE status <> 'cancelled'),0),
+               COALESCE(SUM(sell_price) FILTER (WHERE status = 'done'),0)
+        FROM {T}
+    """)
+    al = cur.fetchone()
+    all_time = {'profit': int(al[0]), 'bought_sum': int(al[1]), 'sold_sum': int(al[2])}
+
+    return {
+        'period': period, 'kpi': kpi, 'sold_by_purity': sold_by_purity,
+        'bought_by_purity': bought_by_purity, 'bought_by_day': bought_by_day,
+        'bought_by_payment': bought_by_payment, 'top_deals': top_deals,
+        'worst_deals': worst_deals, 'by_month': by_month, 'stock_age': stock_age,
+        'stock': stock, 'all_time': all_time,
+    }
+
+
+def _money_row(r) -> dict:
+    return {
+        'id': r[0], 'created_at': r[1].isoformat() if r[1] else None,
+        'cash_register': _f(r[2]), 'safe_cash': _f(r[3]), 'bank_account': _f(r[4]),
+        'other_money': _f(r[5]), 'investor_money': _f(r[6]), 'debts_owed_to_me': _f(r[7]),
+        'start_capital': _f(r[8]), 'withdrawn': _f(r[9]), 'expenses': _f(r[10]),
+        'gold_market_price_585': _f(r[11]), 'note': r[12] or '', 'author': r[13] or '',
+    }
+
+
+MONEY_COLS = ("id, created_at, cash_register, safe_cash, bank_account, other_money, investor_money, "
+              "debts_owed_to_me, start_capital, withdrawn, expenses, gold_market_price_585, note, author")
+
+
 def handler(event: dict, context) -> dict:
     """Управление заявками на скупку золота — CRUD + аналитика. Только для owner/admin."""
 
@@ -290,6 +520,19 @@ def handler(event: dict, context) -> dict:
                     'default_profit_per_gram': float(r[4] or 0),
                 }
             }, ensure_ascii=False)}
+
+        if action == 'report':
+            rep = _gold_report(cur, params.get('period', 'month'),
+                               (params.get('date_from') or '').strip(), (params.get('date_to') or '').strip())
+            cur.close(); conn.close()
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps(rep, ensure_ascii=False)}
+
+        if action == 'money':
+            cur.execute(f"SELECT {MONEY_COLS} FROM {SCHEMA}.gold_money_snapshots ORDER BY created_at DESC LIMIT 30")
+            rows = [_money_row(r) for r in cur.fetchall()]
+            cur.close(); conn.close()
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps(
+                {'latest': rows[0] if rows else None, 'history': rows}, ensure_ascii=False)}
 
         # Аналитика за период
         if action == 'analytics':
@@ -632,6 +875,28 @@ def handler(event: dict, context) -> dict:
                     'default_profit_per_gram': float(r[3] or 0),
                 }
             }, ensure_ascii=False)}
+
+        if action == 'money_save':
+            def _n(key):
+                try:
+                    return float(str(body.get(key) or 0).replace(',', '.').replace(' ', ''))
+                except Exception:
+                    return 0.0
+            note = str(body.get('note') or '').replace("'", "''")[:500]
+            author = _employee_name(event).replace("'", "''")[:100]
+            cur.execute(f"""
+                INSERT INTO {SCHEMA}.gold_money_snapshots
+                  (cash_register, safe_cash, bank_account, other_money, investor_money, debts_owed_to_me,
+                   start_capital, withdrawn, expenses, gold_market_price_585, note, author)
+                VALUES ({_n('cash_register')}, {_n('safe_cash')}, {_n('bank_account')}, {_n('other_money')},
+                        {_n('investor_money')}, {_n('debts_owed_to_me')}, {_n('start_capital')}, {_n('withdrawn')},
+                        {_n('expenses')}, {_n('gold_market_price_585')}, '{note}', '{author}')
+                RETURNING {MONEY_COLS}
+            """)
+            saved = _money_row(cur.fetchone())
+            conn.commit()
+            cur.close(); conn.close()
+            return {'statusCode': 200, 'headers': HEADERS, 'body': json.dumps({'ok': True, 'saved': saved}, ensure_ascii=False)}
 
         # Удалить заявку
         if action == 'delete':

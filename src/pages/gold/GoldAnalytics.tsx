@@ -1,6 +1,8 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
-import { GoldAnalytics, GoldDayStat } from "./types";
+import { GoldAnalytics, GoldDayStat, GoldReport } from "./types";
+import GoldMoneyMap from "./GoldMoneyMap";
+import GoldReportView from "./GoldReportView";
 import GoldPeriodSelector, { GoldPeriod } from "./GoldPeriodSelector";
 import GoldProfitHeader from "./GoldProfitHeader";
 import GoldStockBlock from "./GoldStockBlock";
@@ -10,6 +12,7 @@ type Period = GoldPeriod;
 
 type Props = {
   analytics: GoldAnalytics | null;
+  report?: GoldReport | null;
   loading: boolean;
   period: Period;
   stats: GoldDayStat[];
@@ -24,7 +27,7 @@ type Props = {
 };
 
 export default function GoldAnalyticsView({
-  analytics, loading, period, stats, onPeriodChange,
+  analytics, report = null, loading, period, stats, onPeriodChange,
   periodFrom = "", periodTo = "",
   onPeriodFromChange, onPeriodToChange, onRefresh, token, onSold,
 }: Props) {
@@ -52,12 +55,16 @@ export default function GoldAnalyticsView({
 
       {analytics && !loading && (
         <>
+          {token && <GoldMoneyMap token={token} report={report} />}
+
           <GoldProfitHeader
             analytics={analytics}
             period={period}
             periodFrom={periodFrom}
             periodTo={periodTo}
           />
+
+          {report && <GoldReportView report={report} />}
 
           <GoldStockBlock
             analytics={analytics}

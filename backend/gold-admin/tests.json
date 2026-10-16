@@ -5,7 +5,9 @@
       "method": "GET",
       "path": "/",
       "expectedStatus": 401,
-      "expectedBody": {"error": "string"},
+      "expectedBody": {
+        "error": "string"
+      },
       "bodyMatcher": "partial"
     },
     {
@@ -19,7 +21,9 @@
       "method": "GET",
       "path": "/?action=investor_public",
       "expectedStatus": 400,
-      "expectedBody": {"error": "string"},
+      "expectedBody": {
+        "error": "string"
+      },
       "bodyMatcher": "partial"
     },
     {
@@ -27,7 +31,29 @@
       "method": "GET",
       "path": "/?action=investor_public&token=zzzz",
       "expectedStatus": 404,
-      "expectedBody": {"error": "string"},
+      "expectedBody": {
+        "error": "string"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Report without token 401",
+      "method": "GET",
+      "path": "/?action=report&period=month",
+      "expectedStatus": 401,
+      "expectedBody": {
+        "error": "string"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Money without token 401",
+      "method": "GET",
+      "path": "/?action=money",
+      "expectedStatus": 401,
+      "expectedBody": {
+        "error": "string"
+      },
       "bodyMatcher": "partial"
     }
   ]

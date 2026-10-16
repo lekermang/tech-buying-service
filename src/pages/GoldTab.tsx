@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import {
-  GOLD_URL, GoldOrder, GoldAnalytics, GoldDayStat,
+  GOLD_URL, GoldOrder, GoldAnalytics, GoldDayStat, GoldReport,
   EMPTY_GOLD_FORM,
 } from "./gold/types";
 import GoldAnalyticsView from "./gold/GoldAnalytics";
@@ -47,6 +47,7 @@ export default function GoldTab({ token }: { token: string }) {
   const [periodTo, setPeriodTo] = useState("");
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [stats, setStats] = useState<GoldDayStat[]>([]);
+  const [report, setReport] = useState<GoldReport | null>(null);
 
   const headers = { "Content-Type": "application/json", "X-Employee-Token": token };
 
@@ -71,13 +72,20 @@ export default function GoldTab({ token }: { token: string }) {
       if (from) url += `&date_from=${from}`;
       if (to) url += `&date_to=${to}`;
     }
-    const [aRes, sRes] = await Promise.all([
+    let rUrl = `${GOLD_URL}?action=report&period=${p}`;
+    if (p === "custom") {
+      if (from) rUrl += `&date_from=${from}`;
+      if (to) rUrl += `&date_to=${to}`;
+    }
+    const [aRes, sRes, rRes] = await Promise.all([
       fetch(url, { headers: { "X-Employee-Token": token } }),
       fetch(`${GOLD_URL}?action=daily_stats`, { headers: { "X-Employee-Token": token } }),
+      fetch(rUrl, { headers: { "X-Employee-Token": token } }),
     ]);
-    const [aData, sData] = await Promise.all([aRes.json(), sRes.json()]);
+    const [aData, sData, rData] = await Promise.all([aRes.json(), sRes.json(), rRes.json()]);
     setAnalytics(aData);
     setStats(sData.stats || []);
+    setReport(rData && rData.kpi ? rData : null);
     setAnalyticsLoading(false);
   }, [token]);
 
@@ -203,6 +211,7 @@ export default function GoldTab({ token }: { token: string }) {
       {view === "analytics" && (
         <GoldAnalyticsView
           analytics={analytics}
+          report={report}
           loading={analyticsLoading}
           period={period}
           stats={stats}

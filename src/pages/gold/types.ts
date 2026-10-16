@@ -140,3 +140,51 @@ export const fmtDay = (iso: string) => {
   const d = new Date(iso + "T12:00:00");
   return d.toLocaleDateString("ru-RU", { weekday: "short", day: "numeric", month: "short" });
 };
+
+export type GoldPurityRow = {
+  purity: string; count: number; weight: number; weight585: number;
+  buy: number; sell?: number; profit?: number; margin_pct?: number;
+  profit_per_g585?: number; avg_price585?: number;
+};
+
+export type GoldDeal = {
+  id: number; item_name: string; weight: number; purity: string;
+  buy: number; sell: number; profit: number; at: string | null; client: string;
+};
+
+export type GoldReport = {
+  period: string;
+  kpi: {
+    sold_count: number; sold_buy: number; sold_sell: number; profit: number; sold_weight585: number;
+    margin_pct: number; avg_profit_per_deal: number; profit_per_g585: number;
+    avg_buy_price585_sold: number; avg_sell_price585: number; avg_days_to_sell: number;
+    best_deal: number; worst_deal: number; loss_deals: number;
+    bought_count: number; bought_sum: number; bought_weight: number; bought_weight585: number;
+    avg_buy_price585: number; cancelled: number;
+  };
+  sold_by_purity: GoldPurityRow[];
+  bought_by_purity: GoldPurityRow[];
+  bought_by_day: { day: string; count: number; weight: number; weight585: number; buy: number; avg_price585: number }[];
+  bought_by_payment: { method: string; count: number; sum: number }[];
+  top_deals: GoldDeal[];
+  worst_deals: GoldDeal[];
+  by_month: { month: string; bought_count: number; bought_sum: number; bought_weight585: number; sold_count: number; sold_sum: number; profit: number }[];
+  stock_age: { bucket: string; count: number; weight: number; weight585: number; buy: number }[];
+  stock: { count: number; weight: number; weight585: number; buy_sum: number; investor_buy_sum: number; avg_price585: number };
+  all_time: { profit: number; bought_sum: number; sold_sum: number };
+};
+
+export type GoldMoneySnapshot = {
+  id: number; created_at: string | null;
+  cash_register: number; safe_cash: number; bank_account: number; other_money: number;
+  investor_money: number; debts_owed_to_me: number; start_capital: number; withdrawn: number;
+  expenses: number; gold_market_price_585: number; note: string; author: string;
+};
+
+export const PAYMENT_LABEL: Record<string, string> = { cash: "Наличные", card: "Карта", transfer: "Перевод", "—": "Не указано" };
+
+export const fmtMonth = (ym: string) => {
+  const [y, m] = ym.split("-");
+  const names = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
+  return `${names[parseInt(m, 10) - 1] || m} ${y}`;
+};
