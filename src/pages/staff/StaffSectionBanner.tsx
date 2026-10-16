@@ -130,6 +130,13 @@ const SECTION_META: Record<string, SectionMeta> = {
     color: "#f472b6",
     tag: "Маркетинг",
   },
+  growth: {
+    title: "Развитие",
+    subtitle: "План роста: этапы, задачи со статусами, KPI-цели и риски. Прогресс общий для всей команды.",
+    icon: "Rocket",
+    color: "#d946ef",
+    tag: "Стратегия",
+  },
 };
 
 export default function StaffSectionBanner({ tab }: { tab: StaffTab }) {

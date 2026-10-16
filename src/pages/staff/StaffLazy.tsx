@@ -10,6 +10,7 @@ export const loadAvitoPro      = () => import("../StaffAvitoProTab");
 export const loadSalary        = () => import("../staffSalary/StaffSalaryTab");
 export const loadFinance       = () => import("../staffFinance/StaffFinanceReport");
 export const loadPromo         = () => import("../staffPromo/StaffPromoTab");
+export const loadGrowth        = () => import("../staffGrowth/GrowthRoadmap");
 
 export const GoodsTab        = lazy(loadGoods);
 export const StaffRepairTab  = lazy(loadRepair);
@@ -23,6 +24,7 @@ export const AvitoProTab     = lazy(loadAvitoPro);
 export const SalaryTab       = lazy(loadSalary);
 export const FinanceTab      = lazy(loadFinance);
 export const PromoTab        = lazy(loadPromo);
+export const GrowthTab       = lazy(loadGrowth);
 
 export const TAB_PRELOADERS: Record<string, () => Promise<unknown>> = {
   goods: loadGoods,
@@ -37,6 +39,7 @@ export const TAB_PRELOADERS: Record<string, () => Promise<unknown>> = {
   salary: loadSalary,
   finance: loadFinance,
   promo: loadPromo,
+  growth: loadGrowth,
 };
 
 export function prefetchTab(t: string): void {

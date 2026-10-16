@@ -9,7 +9,7 @@ import { canSeeAnalytics, type StaffTab } from "./staffConstants";
 import { FontApplier, TabErrorBoundary } from "./StaffPwa";
 import {
   GoodsTab, StaffRepairTab, GoldTab, SalesTab, ClientsTab, AnalyticsTab,
-  EmployeesTab, SmartLombardTab, AvitoProTab, SalaryTab, FinanceTab, PromoTab,
+  EmployeesTab, SmartLombardTab, AvitoProTab, SalaryTab, FinanceTab, PromoTab, GrowthTab,
 } from "./StaffLazy";
 const VisitorsAnalyticsTab = React.lazy(() => import("../StaffAnalytics"));
 const StaffFunctionsTab = React.lazy(() => import("../staffFunctions/StaffFunctionsTab"));
@@ -157,6 +157,7 @@ export function StaffMainLayout({
     ...(isOwner ? [{ k: "functions" as Tab, l: "Функции",   icon: "Cpu",          tip: "Мониторинг и оптимизация потребления облачных функций — нагрузка и стоимость." }] : []),
     ...(isOwner ? [{ k: "unlock"    as Tab, l: "Unlock",    icon: "Unlock",       tip: "Управление кабинетом разблокировки: наценки, заказы, выплаты, финансы." }] : []),
     ...(isOwner ? [{ k: "promo"     as Tab, l: "Акции",     icon: "Megaphone",    tip: "Создание акций, страниц для клиентов и сбор заявок." }] : []),
+    ...(isOwnerOrAdmin ? [{ k: "growth" as Tab, l: "Развитие", icon: "Rocket",       tip: "План развития: этапы, задачи со статусами, KPI-цели и риски. Прогресс общий для команды." }] : []),
   ];
 
   // Вкладки в основной панели по роли
@@ -258,6 +259,7 @@ export function StaffMainLayout({
             {tab === "functions"    && isOwner && <StaffFunctionsTab token={token} />}
             {tab === "unlock"       && isOwner && <UnlockManagerTab token={token} />}
             {tab === "promo"        && isOwner && <PromoTab token={token} />}
+            {tab === "growth"       && isOwnerOrAdmin && <GrowthTab token={token} isOwner={isOwner} />}
             {tab === "finance"      && isOwner && <FinanceTab token={token} />}
             {tab === "finance"      && !isOwner && (
               <div className="flex flex-col items-center justify-center py-24 px-6 text-center gap-3">
