@@ -56,10 +56,29 @@ def handler(event: dict, context) -> dict:
             )
             log = [{'task_id': r[0], 'from': r[1], 'to': r[2], 'by': r[3] or '', 'at': r[4].isoformat()}
                    for r in cur.fetchall()]
-            return _resp(200, {'statuses': statuses, 'log': log})
+            cur.execute(
+                f"SELECT id, task_id, text, author, created_at FROM {SCHEMA}.growth_roadmap_notes "
+                f"ORDER BY created_at DESC LIMIT 500"
+            )
+            notes = [{'id': r[0], 'task_id': r[1], 'text': r[2], 'by': r[3] or '', 'at': r[4].isoformat()}
+                     for r in cur.fetchall()]
+            return _resp(200, {'statuses': statuses, 'log': log, 'notes': notes, 'me': who})
 
         body = json.loads(event.get('body') or '{}')
         action = body.get('action', 'set')
+
+        if action == 'note':
+            task_id = str(body.get('task_id') or '')
+            text = str(body.get('text') or '').strip()[:2000]
+            if not re.fullmatch(r'[a-z0-9_]{1,20}', task_id) or not text:
+                return _resp(400, {'error': 'Пустая заметка'})
+            cur.execute(
+                f"INSERT INTO {SCHEMA}.growth_roadmap_notes (task_id, text, author) "
+                f"VALUES ('{task_id}', '{_q(text)}', '{_q(who)}') RETURNING id, created_at"
+            )
+            r = cur.fetchone()
+            conn.commit()
+            return _resp(200, {'ok': True, 'note': {'id': r[0], 'task_id': task_id, 'text': text, 'by': who, 'at': r[1].isoformat()}})
 
         if action == 'reset':
             if me[0] != 'owner':
