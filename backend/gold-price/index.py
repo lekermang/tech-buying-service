@@ -212,6 +212,82 @@ def _fetch_live():
     return xau_usd, usd_rub, cbr_date
 
 
+import time
+from datetime import datetime, timezone, timedelta
+from email.utils import parsedate_to_datetime
+import xml.etree.ElementTree as ET
+
+MSK = timezone(timedelta(hours=3))
+NEWS_TTL_SEC = 600
+_news_cache: dict = {'ts': 0.0, 'items': []}
+
+NEWS_FEEDS = [
+    ('Investing', 'https://ru.investing.com/rss/news_11.rss'),
+    ('Финам', 'https://www.finam.ru/analysis/nslent/rsspoint/'),
+    ('Финам', 'https://www.finam.ru/analysis/conews/rsspoint/'),
+]
+GOLD_RE = re.compile(r'золот|драгмет|драгоцен|XAU|gold|слитк', re.I)
+MACRO_RE = re.compile(r'ключев|ставк[аиу] ЦБ|курс (доллар|рубл)|доллар|рубл[ья]|нефт|ФРС|инфляц|юан', re.I)
+SPORT_RE = re.compile(r'чемпионат|медал|олимпи|Кубок|Кубка|турнир|борц|спортсмен|золотое правило|золотой|золотую|золотые|золотая|черн\w+ золот', re.I)
+
+
+def _parse_dt(raw: str):
+    raw = (raw or '').strip()
+    if not raw:
+        return None
+    try:
+        return parsedate_to_datetime(raw).astimezone(MSK)
+    except Exception:
+        pass
+    try:
+        return datetime.strptime(raw, '%Y-%m-%d %H:%M:%S').replace(tzinfo=MSK)
+    except Exception:
+        return None
+
+
+def _load_news() -> list:
+    gold, macro, seen = [], [], set()
+    for src, url in NEWS_FEEDS:
+        try:
+            root = ET.fromstring(_http_text(url, 10).lstrip('\ufeff'))
+        except Exception:
+            continue
+        for it in root.findall('.//item')[:120]:
+            title = _html.unescape((it.findtext('title') or '')).strip()
+            link = (it.findtext('link') or '').strip()
+            dt = _parse_dt(it.findtext('pubDate'))
+            if not title or not dt or title in seen or SPORT_RE.search(title):
+                continue
+            row = {'title': title, 'url': link, 'source': src, 'ts': dt.isoformat(), '_k': dt.timestamp()}
+            if GOLD_RE.search(title):
+                gold.append(row); seen.add(title)
+            elif MACRO_RE.search(title):
+                macro.append(row); seen.add(title)
+    gold.sort(key=lambda x: -x['_k'])
+    macro.sort(key=lambda x: -x['_k'])
+    items = gold[:5]
+    if len(items) < 5:
+        items += macro[:5 - len(items)]
+    items.sort(key=lambda x: -x['_k'])
+    for i in items:
+        i.pop('_k', None)
+    return items
+
+
+def news_response() -> dict:
+    now = time.time()
+    if not _news_cache['items'] or now - _news_cache['ts'] > NEWS_TTL_SEC:
+        items = _load_news()
+        if items or not _news_cache['items']:
+            _news_cache['items'] = items
+            _news_cache['ts'] = now
+    return {
+        'statusCode': 200,
+        'headers': {**HEADERS, 'Cache-Control': 'public, max-age=300'},
+        'body': json.dumps({'news': _news_cache['items']}, ensure_ascii=False),
+    }
+
+
 def handler(event: dict, context) -> dict:
     """Биржевой курс золота 999 пробы + история за 7 дней"""
 
@@ -222,6 +298,9 @@ def handler(event: dict, context) -> dict:
     act = qs.get('action')
     if act in ('alert_check', 'alert_test'):
         return alerts_response(event, qs, act)
+
+    if act == 'news':
+        return news_response()
 
     if (event.get('queryStringParameters') or {}).get('action') == 'competitors':
         return competitors_response()

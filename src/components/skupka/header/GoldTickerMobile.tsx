@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import Icon from "@/components/ui/icon";
 import { ymGoal, Goals } from "@/lib/ym";
 import GoldChart, { type GoldPoint } from "./GoldChart";
+import GoldNewsList from "./GoldNewsList";
 import { APK_URL, EXE_URL, PROBES_DISPLAY, type MarketStatus } from "./goldTickerUtils";
 
 /** S24Medallion — вращающееся золотое кольцо с "S24" внутри */
@@ -287,6 +288,10 @@ const GoldTickerMobile = ({
                   {updatedAgo}
                 </span>
               )}
+            </div>
+
+            <div className="rounded-lg bg-black/30 border border-[#FFD700]/15 p-2">
+              <GoldNewsList enabled={openDetails} />
             </div>
 
             {/* График динамики */}

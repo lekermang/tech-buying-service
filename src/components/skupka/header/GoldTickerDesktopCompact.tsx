@@ -10,6 +10,7 @@ import Icon from "@/components/ui/icon";
 import { ymGoal, Goals } from "@/lib/ym";
 import { APK_URL, EXE_URL, type MarketStatus, PROBES_DISPLAY } from "./goldTickerUtils";
 import GoldChart, { type GoldPoint } from "./GoldChart";
+import GoldNewsList from "./GoldNewsList";
 
 
 interface Props {
@@ -197,6 +198,9 @@ const GoldTickerDesktopCompact = ({
                 <DetailBtn href={EXE_URL} icon="Monitor" label="Windows" color="gold" download="Skupka24-Setup.exe" />
                 <DetailBtn href={APK_URL} icon="Smartphone" label="Android" color="emerald" download="Skupka24.apk" />
               </div>
+            </div>
+            <div className="col-span-12 pt-3 border-t border-white/10">
+              <GoldNewsList enabled={open} />
             </div>
           </div>
         </div>

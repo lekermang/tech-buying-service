@@ -25,6 +25,12 @@
       "method": "GET",
       "path": "/?action=alert_test",
       "expectedStatus": 401
+    },
+    {
+      "name": "Новости по золоту",
+      "method": "GET",
+      "path": "/?action=news",
+      "expectedStatus": 200
     }
   ]
 }
